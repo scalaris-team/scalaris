@@ -79,15 +79,21 @@ start_link(DHTNodeGroup, Role) ->
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
--type rtms() :: [{?RT:key(), comm:mypid() | unknown,
-                  non_neg_integer(), comm:mypid()}].
+-type rtm() :: {?RT:key(),
+                comm:mypid() | unknown,
+                Role :: non_neg_integer(),
+                Acceptor :: comm:mypid() | unknown}.
+
+-type rtms() :: [rtm()].
 
 -type state() ::
     {RTMs           :: rtms(),
      TableName      :: pdb:tableid(),
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
-     GLocalLearner   :: comm:mypid()}.
+     GLocalLearner   :: comm:mypid(),
+     %% reference counting on subscriptions inside RTMs
+     Subs         :: [{comm:mypid(), non_neg_integer()}]}.
 
 -type state_uninit() ::
     {RTMs           :: rtms(),
@@ -95,6 +101,8 @@ start_link(DHTNodeGroup, Role) ->
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
      GLocalLearner  :: comm:mypid(),
+     %% reference counting on subscriptions inside RTMs
+     Subs         :: [{comm:mypid(), non_neg_integer()}],
      QueuedMessages :: msg_queue:msg_queue()}.
 
 %% initialize: return initial state.
@@ -117,13 +125,14 @@ init([]) ->
         tx_tm ->
             comm:send_local(pid_groups:get_my(dht_node),
                             {get_node_details, comm:this(), [node]}),
-            State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner, msg_queue:new()},
+            State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner,
+                     [], msg_queue:new()},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/2,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner}
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, []}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -137,8 +146,8 @@ on({learner_decide, ItemId, _PaxosID, Value} = Msg, State) ->
             %% created in init_RTM
             TmpItemState = tx_item_state:hold_back(Msg, ItemState),
             NewItemState = tx_item_state:set_status(TmpItemState, uninitialized),
-            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
-                                 {tx_tm_rtm_delete_itemid, ItemId}),
+%%            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
+ %%                                {tx_tm_rtm_delete_itemid, ItemId}),
             my_set_entry(NewItemState, State);
         false -> %% ok
             TxId = tx_item_state:get_txid(ItemState),
@@ -181,14 +190,16 @@ on({learner_decide, ItemId, _PaxosID, Value} = Msg, State) ->
     end,
     State;
 
-on({tx_tm_rtm_commit, Client, ClientsID, TransLog},
-   {RTMs, _TableName, _Role, _LAcceptor, GLLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p as ~p~n", [TransLog, _Role]),
+on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
+    ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p as ~p~n",
+           [TransLog, state_get_role(State)]),
     Maj = config:read(quorum_factor),
+    RTMs = state_get_RTMs(State),
+    GLLearner = state_get_gllearner(State),
     NewTid = {tx_id, util:get_global_uid()},
     NewTxItemIds = [ {tx_item_id, util:get_global_uid()} || _ <- TransLog ],
     TLogTxItemIds = lists:zip(TransLog, NewTxItemIds),
-    TmpTxState = tx_state:new(NewTid, Client, ClientsID, RTMs,
+    TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
                               TLogTxItemIds, [GLLearner]),
     TxState = tx_state:set_status(TmpTxState, ok),
     _ = my_set_entry(TxState, State),
@@ -205,23 +216,48 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog},
               ItemState
           end || {TLogEntry, ItemId} <- TLogTxItemIds ],
 
-    my_start_fds_for_tid(NewTid, TxState),
     my_init_RTMs(TxState, ItemStates),
     my_init_TPs(TxState, ItemStates),
+    %% send a weak timeout to ourselves to take further care
+    %% if the tx is slow (or a majority of tps failed)
+    msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, self(),
+                         {tx_tm_rtm_tid_isdone, NewTid}),
     State;
 
+on({tx_tm_rtm_tid_isdone, TxId}, State) ->
+    ?TRACE("tx_tm_rtm_tid_isdone ~p as ~p~n",
+           [TxId, state_get_role(State)]),
+    {ErrCode, TxState} = my_get_tx_entry(TxId, State),
+    case ErrCode of
+        new -> ok; %% already finished, nothing to be done
+        uninitialized ->
+            %% cannot happen, as isdone is triggered by initialize
+            log:log(warn, "isdone detected uninitialized!~n"),
+            ok; %% can that happen? Yes. We should delete it?!
+        ok ->
+            %% This tx is a bit slow. Start fds on the participants
+            %% and then take over on crash messages.  when not enough
+            %% tps have registered? propose yourself.
+
+            %% TODO: instead of direct takeover, fd:subscribe to the
+            %% participants. And then takeover when a crash is
+            %% actually reported.
+            send_to_rtms([hd(tx_state:get_rtms(TxState))], fun(_X) ->
+            {tx_tm_rtm_propose_yourself, TxId} end), ok end, State;
+
 %% this tx is finished and enough TPs were informed, delete the state
-on({tx_tm_rtm_delete, TxId, Decision} = Msg,
-   {_RTMs, TableName, Role, LAcceptor, GLLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on({delete, ~p, ~p}) in ~p ~n", [TxId, Decision, Role]),
+on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
+    ?TRACE("tx_tm_rtm:on({delete, ~p, ~p}) in ~p ~n",
+           [TxId, Decision, state_get_role(State)]),
     %% TODO: use ok as error code?!
     %% {ok, TxState} = my_get_tx_entry(TxId, State),
     {ErrCode, TxState} = my_get_tx_entry(TxId, State),
     %% inform RTMs on delete
+    Role = state_get_role(State),
     case {ErrCode, Role} of
         {ok, tx_tm} ->
             RTMs = tx_state:get_rtms(TxState),
-            _ = [ comm:send(get_rtmpid(RTM), Msg) || RTM <- RTMs ],
+            send_to_rtms(RTMs, fun(_X) -> Msg end),
             %% inform used learner to delete paxosids.
             AllPaxIds =
                 [ begin
@@ -235,6 +271,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
             %% separately, so we give the minority a second to arrive
             %% and then send the delete request.
             %% learner:stop_paxosids(GLLearner, lists:flatten(AllPaxIds)),
+            GLLearner = state_get_gllearner(State),
             msg_delay:send_local(1, comm:make_local(GLLearner),
                                  {learner_deleteids, lists:flatten(AllPaxIds)}),
             DeleteIt = true;
@@ -242,6 +279,11 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
             %% the test my_trigger_delete was passed, at least by the TM
             %% RTMs only wait for all tp register messages, to not miss them
             %% record, that every TP was informed and all paxids decided
+
+            %% TODO: instead subscribing directly do a reference
+            %% counting in the status field state_get_subs /
+            %% state_set_subs
+            fd:unsubscribe(tx_state:get_tm(TxState)),
             TmpTxState = tx_state:set_numinformed(
                            TxState, tx_state:get_numids(TxState) *
                                config:read(replication_factor)),
@@ -258,11 +300,12 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
                   [ PaxId || {PaxId, _RTlog, _TP}
                     <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
               end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
+            LAcceptor = state_get_lacceptor(State),
 %%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
 %%                                 {acceptor_deleteids, lists:flatten(AllPaxIds)});
             comm:send_local(LAcceptor,
                                {acceptor_deleteids, lists:flatten(AllPaxIds)});
-         {new, _} ->
+        {new, _} ->
             %% already deleted
             DeleteIt = false;
         {uninitialized, _} ->
@@ -275,11 +318,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
             %% request to delete from the tm
             ok;
         true ->
-            %% unsubscribe RTMs from FD
-            case Role of
-                tx_tm -> my_stop_fds_for_tid(TxId, TxState);
-                _ -> ok
-            end,
+            TableName = state_get_tablename(State),
             %% delete locally
             _ = [ pdb:delete(ItemId, TableName)
               || {_, ItemId} <- tx_state:get_tlog_txitemids(TxState)],
@@ -293,8 +332,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg,
 
 %% generated by on(register_TP) via msg_delay to not increase memory
 %% footprint
-on({tx_tm_rtm_delete_txid, TxId},
-   {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+on({tx_tm_rtm_delete_txid, TxId}, State) ->
     ?TRACE("tx_tm_rtm:on({delete_txid, ...}) ~n", []),
     %% Debug diagnostics and output:
     %%     {Status, Entry} = my_get_tx_entry(TxId, State),
@@ -308,13 +346,12 @@ on({tx_tm_rtm_delete_txid, TxId},
     %%         ok ->
     %%             io:format("Oops, this should have been cleaned normally.~n")
     %%     end,
-    pdb:delete(TxId, TableName),
+    pdb:delete(TxId, state_get_tablename(State)),
     State;
 
 %% generated by on(learner_decide) via msg_delay to not increase memory
 %% footprint
-on({tx_tm_rtm_delete_itemid, TxItemId},
-   {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+on({tx_tm_rtm_delete_itemid, TxItemId}, State) ->
     ?TRACE("tx_tm_rtm:on({delete_itemid, ...}) ~n", []),
     %% Debug diagnostics and output:
     %% {Status, Entry} = my_get_item_entry(TxItemId, State),
@@ -328,19 +365,23 @@ on({tx_tm_rtm_delete_itemid, TxItemId},
     %%     ok ->
     %%         io:format("Oops, this should have been cleaned normally.~n")
     %% end,
-    pdb:delete(TxItemId, TableName),
+    pdb:delete(TxItemId, state_get_tablename(State)),
     State;
 
 %% sent by my_init_RTMs
-on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
-   {_RTMs, _TableName, _Role, LAcceptor, _GLLearner} = State) ->
+on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
    ?TRACE("tx_tm_rtm:on({init_RTM, ...}) ~n", []),
 
     %% lookup transaction id locally and merge with given TxState
     Tid = tx_state:get_tid(TxState),
     {LocalTxStatus, LocalTxEntry} = my_get_tx_entry(Tid, State),
     TmpEntry = case LocalTxStatus of
-                   new -> TxState; %% nothing known locally
+                   new ->
+                       %% TODO: instead subscribing directly do a
+                       %% reference counting in the status field
+                       %% state_get_subs / state_set_subs
+                       fd:subscribe(tx_state:get_tm(TxState)),
+                       TxState; %% nothing known locally
                    uninitialized ->
                        %% take over hold back from existing entry
                        %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
@@ -372,10 +413,10 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
               _ = my_set_entry(NewItem, State),
               NewItem
           end || Entry <- ItemStates],
-%%    io:format("New Item States: ~p~n", [NewItemStates]),
 
     %% initiate local paxos acceptors (with received paxos_ids)
     Learners = tx_state:get_learners(TxState),
+    LAcceptor = state_get_lacceptor(State),
     _ = [ [ acceptor:start_paxosid_local(LAcceptor, PaxId, Learners)
         || {PaxId, _RTlog, _TP}
                <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
@@ -392,14 +433,14 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, InRole} = _Msg,
     %% io:format("Stopping hold back queue processing~n"),
 
     %% set timeout and remember timerid to cancel, if finished earlier?
-    msg_delay:send_local(1 + InRole, self(), {tx_tm_rtm_propose_yourself, Tid}),
+    %%msg_delay:send_local(1 + InRole, self(), {tx_tm_rtm_propose_yourself, Tid}),
     %% after timeout take over and initiate new paxos round as proposer
     %% done in on({tx_tm_rtm_propose_yourself...}) handler
     State;
 
 % received by RTMs
-on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
-   {_RTMs, _TableName, Role, _LAcceptor, _GLLearner} = State) ->
+on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
+    Role = state_get_role(State),
     %% TODO merge register_TP and accept messages to a single message
     ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [Msg, Role]),
     {ErrCodeTx, TmpTxState} = my_get_tx_entry(Tid, State),
@@ -410,8 +451,8 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
             %% io:format("Holding back a registerTP for id ~p in ~p~n", [Tid, Role]),
             T2TxState = tx_state:hold_back(Msg, TmpTxState),
             NewTxState = tx_state:set_status(T2TxState, uninitialized),
-            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
-                                 {tx_tm_rtm_delete_txid, Tid}),
+%%            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
+ %%                                {tx_tm_rtm_delete_txid, Tid}),
             my_set_entry(NewTxState, State);
         false -> %% ok
             TxState = tx_state:inc_numtpsregistered(TmpTxState),
@@ -445,18 +486,18 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg,
     State;
 
 % timeout on Tid maybe a proposer crashed? Force proposals with abort.
-on({tx_tm_rtm_propose_yourself, Tid},
-   {_RTMs, _TableName, Role, _LAcceptor, GLLearner} = State) ->
-    ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, _Role]),
+on({tx_tm_rtm_propose_yourself, Tid}, State) ->
+    ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, state_get_role(State)]),
     %% after timeout take over and initiate new paxos round as proposer
     {ErrCodeTx, TxState} = my_get_tx_entry(Tid, State),
     _ =
     case ErrCodeTx of
         new -> ok; %% takeover is not necessary. Was finished successfully.
         _Any ->
-            log:log(warn, "Takeover by RTM was necessary."),
+            log:log(info, "Takeover by RTM was necessary."),
             Maj = config:read(quorum_factor),
             RTMs = tx_state:get_rtms(TxState),
+            Role = state_get_role(State),
             Accs = rtms_get_accpids(RTMs),
             {_, _, ThisRTMsNumber, _} = lists:keyfind(comm:this(), 2, RTMs),
 
@@ -467,14 +508,17 @@ on({tx_tm_rtm_propose_yourself, Tid},
                   {_, ItemState} = my_get_item_entry(ItemId, State),
                   case tx_item_state:get_decided(ItemState) of
                       false ->
+                          GLLearner = state_get_gllearner(State),
                           [ begin
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
                                                       comm:this(), ItemId),
                                 %% add learner to running paxos acceptors
-                                _ = [ comm:send(Acc,
-                                                {acceptor_add_learner, PaxId, GLLearner})
-                                      || Acc <- Accs],
-
+                                _ = [ case unknown =/= X of
+                                          true -> comm:send(X,
+                                                            {acceptor_add_learner,
+                                                             PaxId, GLLearner});
+                                          false -> ok
+                                      end || X <- Accs],
                                 Proposer =
                                     comm:make_global(get_my(Role, proposer)),
                                 proposer:start_paxosid(
@@ -492,57 +536,76 @@ on({tx_tm_rtm_propose_yourself, Tid},
     State;
 
 %% failure detector events
-on({crash, Pid},
-   {RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     ct:pal("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    _ = [ begin
-              Name = get_nth_rtm_name(get_nth(RTM)),
-              Key = get_rtmkey(RTM),
-              api_dht_raw:unreliable_lookup(
-                Key, {get_rtm, comm:this(), Key, Name})
-          end
-      || RTM <- RTMs, get_rtmpid(RTM) =:= Pid ],
-    State;
+    RTMs = state_get_RTMs(State),
+    NewRTMs = [ case get_rtmpid(RTM) of
+                    Pid ->
+                        I = get_nth(RTM),
+                        Name = get_nth_rtm_name(I),
+                        Key = get_rtmkey(RTM),
+                        api_dht_raw:unreliable_lookup(
+                          Key, {get_rtm, comm:this(), Key, Name}),
+                        rtm_entry_new(Key, unknown, I, unknown);
+                    _ -> RTM
+                end
+                || RTM <- RTMs, get_rtmpid(RTM) =:= Pid ],
+    %% scan over all running transactions and delete this Pid
+    %% if necessary, takeover the tx and try deciding with abort
+    NewState = lists:foldl(
+                 fun(X,StateIter) ->
+                         case tx_state:is_tx_state(X) of
+                             true -> ct:pal("propose yourself for: ~p~n", [tx_state:get_tid(X)]),
+                                     on({tx_tm_rtm_propose_yourself, tx_state:get_tid(X)}, StateIter);
+                             false -> StateIter
+                         end
+                end, State, pdb:tab2list(state_get_tablename(State))),
 
-on({crash, _Pid, _Cookie},
-   {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
-    ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
-    %% @todo should we take over, if the TM failed?
-    %% Takeover done by timeout (propose yourself). Doing it here could
-    %% improve speed, but really necessary!?
-    %%
-    %% for all Tids make a fold with
-    %% NewState = lists:foldr(fun(X, XState) ->
-    %%   on({tx_tm_rtm_propose_yourself, Tid}, XState)
-    %%                        end, State, listwithalltids),
-    State;
+    %% no longer use this RTM
+    state_set_RTMs(NewState, NewRTMs);
 
-on({new_node_id, Id}, {RTMs, TableName, tx_tm, LAcceptor, GLLearner}) ->
+%% on({crash, _Pid, _Cookie},
+%%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
+%%     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
+%%     %% @todo should we take over, if the TM failed?
+%%     %% Takeover done by timeout (propose yourself). Doing it here could
+%%     %% improve speed, but really necessary!?
+%%     %%
+%%     %% for all Tids make a fold with
+%%     %% NewState = lists:foldr(fun(X, XState) ->
+%%     %%   on({tx_tm_rtm_propose_yourself, Tid}, XState)
+%%     %%                        end, State, listwithalltids),
+%%     State;
+
+on({new_node_id, Id}, State) ->
+    tx_tm = state_get_role(State),
+    RTMs = state_get_RTMs(State),
     IDs = ?RT:get_replica_keys(Id),
     NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
-    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner};
+    state_set_RTMs(State, NewRTMs);
 %% periodic RTM update
-on({update_RTMs},
-   {RTMs, _TableName, tx_tm, _LAcceptor, _GLLearner} = State) ->
+on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
+    tx_tm = state_get_role(State),
+    RTMs = state_get_RTMs(State),
     my_RTM_update(RTMs),
     State;
-
 %% accept RTM updates
-on({get_rtm_reply, InKey, InPid, InAcceptor},
-   {RTMs, TableName, tx_tm, LAcceptor, GLLearner} = _State) ->
+on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:get_rtm_reply in Pid ~p for Pid ~p and State ~p~n", [self(), InPid, _State]),
+    tx_tm = state_get_role(State),
+    RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     rtms_of_same_dht_node(NewRTMs),
-    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner}.
+    state_set_RTMs(State, NewRTMs).
+
 
 -spec on_init(comm:message(), state_uninit())
     -> state_uninit() |
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 %% While initializing
-on_init({get_node_details_response, NodeDetails},
-        {_RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+on_init({get_node_details_response, NodeDetails}, State) ->
     ?TRACE("tx_tm_rtm:on_init:get_node_details_response State; ~p~n", [_State]),
     IdSelf = node:id(node_details:get(NodeDetails, node)),
     %% provide ids for RTMs (sorted by increasing latency to them).
@@ -550,40 +613,44 @@ on_init({get_node_details_response, NodeDetails},
     RTM_ids = ?RT:get_replica_keys(IdSelf),
     {NewRTMs, _} = lists:foldr(
                 fun(X, {Acc, I}) ->
-                        {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
+                  {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
                 end,
                 {[], length(RTM_ids) - 1}, RTM_ids),
     my_RTM_update(NewRTMs),
-    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages};
+    state_set_RTMs(State, NewRTMs);
 
-on_init({update_RTMs},
-        {RTMs, _TableName, tx_tm, _LAcceptor, _GLLearner, _QueuedMessages} = State) ->
+on_init({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
-    my_RTM_update(RTMs),
+    my_RTM_update(state_get_RTMs(State)),
     State;
 
-on_init({get_rtm_reply, InKey, InPid, InAcceptor},
-        {RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:get_rtm_reply in Pid ~p for Pid ~p State ~p~n", [self(), InPid, _State]),
+    tx_tm = state_get_role(State),
+    RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
-    case lists:keyfind(unknown, 2, NewRTMs) of %% filled all entries?
+    case lists:keymember(unknown, 2, NewRTMs) of %% filled all entries?
         false ->
             rtms_of_same_dht_node(NewRTMs),
-            msg_queue:send(QueuedMessages),
+            msg_queue:send(state_get_qmsg(State)),
             gen_component:change_handler(
-              {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner}, on);
-        _ -> {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages}
+              state_to_on(state_set_RTMs(State, NewRTMs)), on);
+        _ -> state_set_RTMs(State, NewRTMs)
     end;
 
-on_init({new_node_id, Id}, {RTMs, TableName, tx_tm, LAcceptor, GLLearner, Queue}) ->
+on_init({new_node_id, Id}, State) ->
+    tx_tm = state_get_role(State),
+    RTMs = state_get_RTMs(State),
     IDs = ?RT:get_replica_keys(Id),
     NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
-    {NewRTMs, TableName, tx_tm, LAcceptor, GLLearner, Queue};
+    state_set_RTMs(State, NewRTMs);
 
-on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg,
-        {RTMs, TableName, tx_tm, LAcceptor, GLLearner, QueuedMessages} = _State) ->
+on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
+    %% only in tx_tm
+    tx_tm = state_get_role(State),
+    QueuedMessages = state_get_qmsg(State),
     NewQueuedMessages = msg_queue:add(QueuedMessages, Msg),
-    {RTMs, TableName, tx_tm, LAcceptor, GLLearner, NewQueuedMessages}.
+    state_set_qmsg(State, NewQueuedMessages).
 
 %% functions for periodic RTM updates
 -spec my_RTM_update(rtms()) -> ok.
@@ -599,28 +666,13 @@ my_RTM_update(RTMs) ->
     ok.
 
 %% functions for tx processing
--spec my_start_fds_for_tid(tx_state:tx_id(), tx_state:tx_state()) -> ok.
-my_start_fds_for_tid(Tid, TxEntry) ->
-    ?TRACE("tx_tm_rtm:my_start_fds_for_tid~n", []),
-    RTMs = tx_state:get_rtms(TxEntry),
-    RTMGPids = rtms_get_rtmpids(RTMs),
-    fd:subscribe(RTMGPids, Tid).
-
--spec my_stop_fds_for_tid(tx_state:tx_id(), tx_state:tx_state()) -> ok.
-my_stop_fds_for_tid(Tid, TxEntry) ->
-    ?TRACE("tx_tm_rtm:my_stop_fds_for_tid~n", []),
-    RTMs = tx_state:get_rtms(TxEntry),
-    RTMGPids = rtms_get_rtmpids(RTMs),
-    fd:unsubscribe(RTMGPids, Tid).
-
 -spec my_init_RTMs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
 my_init_RTMs(TxState, ItemStates) ->
     ?TRACE("tx_tm_rtm:my_init_RTMs~n", []),
     RTMs = tx_state:get_rtms(TxState),
-    _ = [ comm:send(get_rtmpid(RTM),
-                    {tx_tm_rtm_init_RTM, TxState, ItemStates, get_nth(RTM)})
-      || RTM <- RTMs ],
-    ok.
+    send_to_rtms(
+      RTMs, fun(X) -> {tx_tm_rtm_init_RTM, TxState, ItemStates, get_nth(X)}
+            end).
 
 -spec my_init_TPs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
 my_init_TPs(TxState, ItemStates) ->
@@ -649,9 +701,8 @@ my_init_TPs(TxState, ItemStates) ->
 
 -spec my_get_tx_entry(tx_state:tx_id(), state())
                      -> {new | ok | uninitialized, tx_state:tx_state()}.
-my_get_tx_entry(Id,
-                {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
-    case pdb:get(Id, TableName) of
+my_get_tx_entry(Id, State) ->
+    case pdb:get(Id, state_get_tablename(State)) of
         undefined -> {new, tx_state:new(Id)};
         Entry -> {tx_state:get_status(Entry), Entry}
     end.
@@ -659,16 +710,16 @@ my_get_tx_entry(Id,
 -spec my_get_item_entry(tx_item_state:tx_item_id(), state()) ->
                                {new | uninitialized | ok,
                                 tx_item_state:tx_item_state()}.
-my_get_item_entry(Id, {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = _State) ->
-    case pdb:get(Id, TableName) of
+my_get_item_entry(Id, State) ->
+    case pdb:get(Id, state_get_tablename(State)) of
         undefined -> {new, tx_item_state:new(Id)};
         Entry -> {tx_item_state:get_status(Entry), Entry}
     end.
 
 -spec my_set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
                    state()) -> state().
-my_set_entry(NewEntry, {_RTMs, TableName, _Role, _LAcceptor, _GLLearner} = State) ->
-    pdb:set(NewEntry, TableName),
+my_set_entry(NewEntry, State) ->
+    pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
 -spec my_inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
@@ -733,7 +784,7 @@ my_trigger_delete_if_done(TxState) ->
 rtms_of_same_dht_node(InRTMs) ->
     Groups = lists:usort([catch(pid_groups:group_of(
                                   comm:make_local(get_rtmpid(X))))
-                          || X <- InRTMs]),
+                          || X <- InRTMs, get_rtmpid(X) =/= unknown]),
     case length(Groups) of
         4 -> false;
         _ ->
@@ -741,14 +792,23 @@ rtms_of_same_dht_node(InRTMs) ->
             true
     end.
 
+-spec rtm_entry_new(?RT:key(), comm:mypid() | unknown,
+                    non_neg_integer(), comm:mypid() | unknown) -> rtm().
 rtm_entry_new(Key, RTMPid, Nth, AccPid) -> {Key, RTMPid, Nth, AccPid}.
+-spec get_rtmkey(rtm()) -> ?RT:key().
 get_rtmkey(RTMEntry) -> element(1, RTMEntry).
+-spec set_rtmkey(rtm(), ?RT:key()) -> rtm().
 set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
+-spec get_rtmpid(rtm()) -> comm:mypid() | unknown.
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
+-spec get_nth(rtm()) -> non_neg_integer().
 get_nth(RTMEntry)    -> element(3, RTMEntry).
+-spec get_accpid(rtm()) -> comm:mypid() | unknown.
 get_accpid(RTMEntry) -> element(4, RTMEntry).
 
+-spec rtms_get_rtmpids(rtms()) -> [ comm:mypid() | unknown ].
 rtms_get_rtmpids(RTMs) -> [ get_rtmpid(X) || X <- RTMs ].
+-spec rtms_get_accpids(rtms()) -> [ comm:mypid() | unknown ].
 rtms_get_accpids(RTMs) -> [ get_accpid(X) || X <- RTMs ].
 
 -spec rtms_upd_entry(rtms(), ?RT:key(), comm:mypid(), comm:mypid()) -> rtms().
@@ -768,6 +828,13 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
           false -> Entry
       end || Entry <- RTMs ].
 
+-spec send_to_rtms(rtms(), fun((rtm()) -> comm:message())) -> ok.
+send_to_rtms(RTMs, MsgGen) ->
+    _ = [ case get_rtmpid(RTM) of
+              unknown -> ok;
+              RTMPid  -> comm:send(RTMPid, MsgGen(RTM))
+          end || RTM <- RTMs ],
+    ok.
 
 -spec get_nth_rtm_name(pos_integer()) -> atom(). %% pid_groups:pidname().
 get_nth_rtm_name(Nth) ->
@@ -778,6 +845,32 @@ get_my(Role, PaxosRole) ->
     PidName = list_to_existing_atom(
                 atom_to_list(Role) ++ "_" ++ atom_to_list(PaxosRole)),
     pid_groups:get_my(PidName).
+
+-spec state_get_RTMs(state() | state_uninit())      -> rtms().
+state_get_RTMs(State)          -> element(1, State).
+-spec state_set_RTMs(state() | state_uninit(), rtms())
+                    -> state() | state_uninit().
+state_set_RTMs(State, Val)     -> setelement(1, State, Val).
+-spec state_get_tablename(state() | state_uninit()) -> pdb:tableid().
+state_get_tablename(State)     -> element(2, State).
+-spec state_get_role(state() | state_uninit())       -> pid_groups:pidname().
+state_get_role(State)          -> element(3, State).
+-spec state_get_lacceptor(state() | state_uninit())  -> pid().
+state_get_lacceptor(State)     -> element(4, State).
+-spec state_get_gllearner(state() | state_uninit()) -> comm:mypid().
+state_get_gllearner(State) -> element(5, State).
+% -spec state_get_subs(state() | state_uninit()) ->
+%                             [{comm:mypid(), non_neg_integer()}].
+% state_get_subs(State)          -> element(6, State).
+-spec state_get_qmsg(state_uninit()) -> msg_queue:msg_queue().
+state_get_qmsg(State)          -> element(7, State).
+-spec state_set_qmsg(state_uninit(), msg_queue:msg_queue()) -> state_uninit().
+state_set_qmsg(State, Val)     -> setelement(7, State, Val).
+
+-spec state_to_on(state_uninit()) -> state().
+state_to_on(State) ->
+    {A, B, C, D, E, F, _G} = State,
+    {A, B, C, D, E, F}.
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.
@@ -793,7 +886,7 @@ check_config() ->
     config:is_integer(tx_rtm_update_interval) and
     config:is_greater_than(tx_rtm_update_interval, 0) and
 
-    config:is_greater_than_equal(tx_timeout, 1000/3)
-%%     config:is_greater_than_equal(tx_timeout, 1000/2)
+    config:is_greater_than_equal(tx_timeout, 1000 div 3)
+%%     config:is_greater_than_equal(tx_timeout, 1000 div 2)
     .
 

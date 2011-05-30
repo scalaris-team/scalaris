@@ -30,7 +30,8 @@ all() ->
      abort_prepared_rc,
      abort_prepared_rmc,
      abort_prepared_wmc,%,
-     tm_crash, tp_crash
+     tm_crash, tp_crash,
+     all_tp_crash
     ].
 
 suite() -> [{timetrap, {seconds, 120}}].
@@ -277,10 +278,14 @@ tm_crash(_) ->
     _ = [ gen_component:bp_barrier(X) || X <- TMs ],
     %% ct:pal("Barriers set~n"),
 
-    %% TM only performs the tx_tm_rtm_commit that lead to the BP
+    %% TM only will perform the tx_tm_rtm_commit, that lead to the BP
     %% bp_step blocks. Do it asynchronously. (We don't know which TM
     %% got the request.
     Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- TMs ],
+
+    %% report all tx_tms as failed
+    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
+          || X <- TMs ],
 
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
@@ -299,16 +304,19 @@ tp_crash(_) ->
     api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     Proposers = pid_groups:find_all(paxos_proposer),
-    %% all TMs break at next commit request:
-    [ gen_component:bp_set(X, proposer_initialize, tp_crash) || X <- Proposers ],
+    Proposer = hd(Proposers),
+    %% break one TP (minority) after proposer initialize:
+    gen_component:bp_set(Proposer, proposer_initialize, tp_crash),
     %% ct:pal("Breakpoints set~n"),
-    [ gen_component:bp_barrier(X) || X <- Proposers ],
+    gen_component:bp_barrier(Proposer),
     %% ct:pal("Barriers set~n"),
 
     %% TM only performs the tx_tm_rtm_commit that lead to the BP
     %% bp_step blocks. Do it asynchronously. (We don't know which TM
     %% got the request.
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
+    %% report the one tp as failed
+    comm:send_local(fd, {unittest_report_down, comm:make_global(Proposer)}),
 
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
@@ -317,6 +325,36 @@ tp_crash(_) ->
 
     %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    [ gen_component:bp_del(X, tp_crash) || X <- Proposers ],
+    gen_component:bp_del(Proposer, tp_crash),
+    gen_component:bp_cont(Proposer).
 
-    [ gen_component:bp_cont(X) || X <- Proposers ].
+all_tp_crash(_) ->
+    ct:pal("Starting all_tp_crash, simulated by holding the dht_node_proposers~n"),
+    api_tx:write("a", "Hello world!"),
+    %% ct:pal("written initial value and setting breakpoints now~n"),
+    Proposers = pid_groups:find_all(paxos_proposer),
+
+    %% break oll TPs (majority) after proposer initialize:
+    [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
+      || Proposer <- Proposers],
+    %% ct:pal("Breakpoints set~n"),
+    [ gen_component:bp_barrier(Proposer) || Proposer <- Proposers ],
+    %% ct:pal("Barriers set~n"),
+
+    %% TM only performs the tx_tm_rtm_commit that lead to the BP
+    %% bp_step blocks. Do it asynchronously. (We don't know which TM
+    %% got the request.
+    %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
+    %% report the one tp as failed
+    [ comm:send_local(fd, {unittest_report_down, comm:make_global(Proposer)})
+      || Proposer <- Proposers],
+
+    %% ct:pal("Starting read commit~n"),
+    Res = api_tx:req_list([{read, "a"}, {commit}]),
+
+    ct:pal("Res: ~p~n", [Res]),
+
+    %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
+
+    [ gen_component:bp_del(Proposer, all_tp_crash) ||  Proposer <- Proposers],
+    [ gen_component:bp_cont(Proposer) || Proposer <- Proposers].

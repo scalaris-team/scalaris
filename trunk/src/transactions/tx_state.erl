@@ -28,10 +28,12 @@
 -define(TRACE(X,Y), ok).
 
 %% Operations on tx_state
--export([new/6, new/1]).
+-export([is_tx_state/1]).
+-export([new/7, new/1]).
 -export([get_tid/1, set_tid/2]).
 -export([get_client/1, set_client/2]).
 -export([get_clientsid/1, set_clientsid/2]).
+-export([get_tm/1, set_tm/2]).
 -export([get_rtms/1, set_rtms/2]).
 -export([get_tlog_txitemids/1, set_tlog_txitemids/2]).
 -export([get_learners/1]).
@@ -60,6 +62,7 @@
          tx_state,                 %% type-marker (unnecessary in principle)
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
+         comm:mypid() | unknown,   %% TM
          [tx_tm_rtm:rtms()], %% [{Key, RTM, Nth}]
          [{tx_tlog:tlog_entry(),
            tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
@@ -79,15 +82,25 @@
 %%               timeout before RTM takes over
 %%               }
 
--spec new(tx_id(), _, _, _, _, _) -> tx_state().
-new(Tid, Client, ClientsID, RTMs, TLogTxItemIds, Learners) ->
-    {Tid, tx_state, Client, ClientsID, RTMs, TLogTxItemIds, Learners,
+-spec is_tx_state(tx_state()) -> boolean().
+is_tx_state(TxState) ->
+    is_tuple(TxState)
+        andalso erlang:tuple_size(TxState) >= 2
+        andalso tx_state =:= element(2, TxState).
+
+-spec new(tx_id(), comm:mypid() | unknown,
+          comm:mypid() | unknown, comm:mypid() | unknown,
+          [comm:mypid()],
+          [{tx_tlog:tlog_entry(), tx_item_state:tx_item_id()}],
+          [comm:mypid()]) -> tx_state().
+new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->
+    {Tid, tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
      undecided, length(TLogTxItemIds),
      _Prepared = 0, _Aborts = 0, _Informed = 0, _PaxDecided = 0,
      _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
 -spec new(tx_id()) -> tx_state().
 new(Tid) ->
-    new(Tid, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
+    new(Tid, unknown, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
 
 -spec get_tid(tx_state()) -> tx_id().
 get_tid(State) ->                 element(1, State).
@@ -101,60 +114,66 @@ set_client(State, Val) ->         setelement(3, State, Val).
 get_clientsid(State) ->           element(4, State).
 -spec set_clientsid(tx_state(), any()) -> tx_state().
 set_clientsid(State, Val) ->      setelement(4, State, Val).
+
+-spec get_tm(tx_state()) -> comm:mypid() | unknown.
+get_tm(State) ->                  element(5, State).
+-spec set_tm(tx_state(), comm:mypid() | unknown) -> tx_state().
+set_tm(State, Val) ->             setelement(5, State, Val).
+
 -spec get_rtms(tx_state()) -> tx_tm_rtm:rtms().
-get_rtms(State) ->                element(5, State).
+get_rtms(State) ->                element(6, State).
 -spec set_rtms(tx_state(), tx_tm_rtm:rtms()) -> tx_state().
-set_rtms(State, Val) ->           setelement(5, State, Val).
+set_rtms(State, Val) ->           setelement(6, State, Val).
 -spec get_tlog_txitemids(tx_state()) -> [{tx_tlog:tlog_entry(),
                                           tx_item_state:tx_item_id()}].
-get_tlog_txitemids(State) ->      element(6, State).
+get_tlog_txitemids(State) ->      element(7, State).
 -spec set_tlog_txitemids(tx_state(),
                          [{tx_tlog:tlog_entry(),
                            tx_item_state:tx_item_id()}]) -> tx_state().
-set_tlog_txitemids(State, Val) -> setelement(6, State, Val).
+set_tlog_txitemids(State, Val) -> setelement(7, State, Val).
 -spec get_learners(tx_state()) -> [comm:mypid()].
-get_learners(State) ->            element(7, State).
+get_learners(State) ->            element(8, State).
 -spec is_decided(tx_state()) -> undecided | false | abort | commit.
-is_decided(State) ->              element(8, State).
+is_decided(State) ->              element(9, State).
 -spec set_decided(tx_state(), undecided | false | abort | commit) -> tx_state().
-set_decided(State, Val) ->        setelement(8, State, Val).
+set_decided(State, Val) ->        setelement(9, State, Val).
 -spec get_numids(tx_state()) -> non_neg_integer().
-get_numids(State) ->              element(9, State).
+get_numids(State) ->              element(10, State).
 -spec get_numprepared(tx_state()) -> non_neg_integer().
-get_numprepared(State) ->         element(10, State).
+get_numprepared(State) ->         element(11, State).
 -spec inc_numprepared(tx_state()) -> tx_state().
-inc_numprepared(State) ->         setelement(10, State, 1 + element(10, State)).
+inc_numprepared(State) ->         setelement(11, State, 1 + element(11, State)).
 -spec get_numabort(tx_state()) -> non_neg_integer().
-get_numabort(State) ->            element(11, State).
+get_numabort(State) ->            element(12, State).
 -spec inc_numabort(tx_state()) -> tx_state().
-inc_numabort(State) ->            setelement(11, State, 1 + element(11, State)).
+inc_numabort(State) ->            setelement(12, State, 1 + element(12, State)).
 -spec get_numinformed(tx_state()) -> non_neg_integer().
-get_numinformed(State) ->         element(12, State).
+get_numinformed(State) ->         element(13, State).
 -spec inc_numinformed(tx_state()) -> tx_state().
-inc_numinformed(State) ->         setelement(12, State, 1 + element(12, State)).
+inc_numinformed(State) ->         setelement(13, State, 1 + element(13, State)).
 -spec set_numinformed(tx_state(), non_neg_integer()) -> tx_state().
-set_numinformed(State, Val) ->    setelement(12, State, Val).
+set_numinformed(State, Val) ->    setelement(13, State, Val).
 -spec get_numpaxdecided(tx_state()) -> non_neg_integer().
-get_numpaxdecided(State) ->       element(13, State).
+get_numpaxdecided(State) ->       element(14, State).
 -spec inc_numpaxdecided(tx_state()) -> tx_state().
-inc_numpaxdecided(State) ->       setelement(13, State, 1 + element(13, State)).
+inc_numpaxdecided(State) ->       setelement(14, State, 1 + element(14, State)).
 -spec set_numpaxdecided(tx_state(), non_neg_integer()) -> tx_state().
-set_numpaxdecided(State, Val) ->  setelement(13, State, Val).
+set_numpaxdecided(State, Val) ->  setelement(14, State, Val).
 -spec get_numtpsregistered(tx_state()) -> non_neg_integer().
-get_numtpsregistered(State) ->    element(14, State).
+get_numtpsregistered(State) ->    element(15, State).
 -spec inc_numtpsregistered(tx_state()) -> tx_state().
-inc_numtpsregistered(State) ->    setelement(14, State, 1 + element(14, State)).
+inc_numtpsregistered(State) ->    setelement(15, State, 1 + element(15, State)).
 
 -spec get_status(tx_state()) -> new | uninitialized | ok.
-get_status(State) -> element(15, State).
+get_status(State) -> element(16, State).
 -spec set_status(tx_state(), new | uninitialized | ok) -> tx_state().
-set_status(State, Status) -> setelement(15, State, Status).
+set_status(State, Status) -> setelement(16, State, Status).
 -spec hold_back(comm:message(), tx_state()) -> tx_state().
-hold_back(Msg, State) -> setelement(16, State, [Msg | element(16, State)]).
+hold_back(Msg, State) -> setelement(17, State, [Msg | element(17, State)]).
 -spec get_hold_back(tx_state()) -> [comm:message()].
-get_hold_back(State) -> element(16, State).
+get_hold_back(State) -> element(17, State).
 -spec set_hold_back(tx_state(), [comm:message()]) -> tx_state().
-set_hold_back(State, Queue) -> setelement(16, State, Queue).
+set_hold_back(State, Queue) -> setelement(17, State, Queue).
 
 -spec newly_decided(tx_state()) -> undecided | false | abort | commit.
 newly_decided(State) ->
