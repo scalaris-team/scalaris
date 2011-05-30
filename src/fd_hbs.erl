@@ -158,6 +158,11 @@ on({crashed, WatchedPid}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
+    case Subscriptions of
+        [] -> log:log(warn, "No one to inform on crash of ~.0p~n",
+                      [WatchedPid]);
+        _ -> ok
+    end,
     _ = [ case Cookie of
               '$fd_nil' ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
