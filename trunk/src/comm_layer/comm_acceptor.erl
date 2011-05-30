@@ -61,8 +61,8 @@ server(LS) ->
             end,
             {ok, NewPid} = comm_conn_rcv:start_link(
                              pid_groups:my_groupname(), S),
-            gen_tcp:controlling_process(S, NewPid),
-            ok = inet:setopts(S, comm_server:tcp_options()),
+            _ = gen_tcp:controlling_process(S, NewPid),
+            _ = inet:setopts(S, comm_server:tcp_options()),
             server(LS);
         Other ->
             log:log(warn,"[ CC ] unknown message ~p", [Other]),
