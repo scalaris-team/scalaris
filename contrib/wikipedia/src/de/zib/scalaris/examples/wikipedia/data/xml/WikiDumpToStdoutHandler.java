@@ -94,6 +94,7 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
                 if (iterator.hasNext())
                     System.out.println(",");
             }
+            ++pageCount;
             System.err.println(" " + page_xml.getRevisions().size() + " " + title);
 
             System.out.println("], []}.");

@@ -64,6 +64,7 @@ public class Main {
 
             WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions);
             handler.setUp();
+            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
             myReader.setContentHandler(handler);
             myReader.parse(getFileReader(filename));
             handler.tearDown();

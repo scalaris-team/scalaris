@@ -44,6 +44,19 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     protected WikiModel wikiModel;
     
     private int maxRevisions = -1; // all revisions by default
+    
+    /**
+     * The time at the start of an import operation.
+     */
+    private long timeAtStart = 0;
+    /**
+     * The time at the end of an import operation.
+     */
+    private long timeAtEnd = 0;
+    /**
+     * The number of (successfully) processed pages.
+     */
+    protected int pageCount = 0;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -90,7 +103,9 @@ public abstract class WikiDumpHandler extends DefaultHandler {
          * <namespaces> <namespace key="-2">Media</namespace> ... </namespaces>
          * </siteinfo> <page></page> ...
          */
-        if (localName.equals("siteinfo")) {
+        if (localName.equals("mediawiki")) {
+            importStart();
+        } else if (localName.equals("siteinfo")) {
             inSiteInfo = true;
             currentSiteInfo = new XmlSiteInfo();
             currentSiteInfo.startSiteInfo(uri, localName, qName, attributes);
@@ -167,6 +182,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
             } else {
                 currentPage.endElement(uri, localName, qName);
             }
+        } else if (localName.equals("mediawiki")) {
+            importEnd();
         }
     }
     
@@ -201,5 +218,64 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      * Method to be called after using the handler (to clean up).
      */
     public void tearDown() {
+    }
+
+    /**
+     * Sets the time the import started.
+     */
+    final protected void importStart() {
+        timeAtStart = System.currentTimeMillis();
+    }
+
+    /**
+     * Sets the time the import finished.
+     */
+    final protected void importEnd() {
+        timeAtEnd = System.currentTimeMillis();
+    }
+
+    /**
+     * Gets the time the import started.
+     * 
+     * @return the time the import started (in milliseconds)
+     */
+    public long getTimeAtStart() {
+        return timeAtStart;
+    }
+
+    /**
+     * Gets the time the import finished.
+     * 
+     * @return the time the import finished (in milliseconds)
+     */
+    public long getTimeAtEnd() {
+        return timeAtEnd;
+    }
+
+    /**
+     * Gets the number of imported pages
+     * 
+     * @return the number of pages imported into Scalaris
+     */
+    public int getPageCount() {
+        return pageCount;
+    }
+
+    /**
+     * Reports the speed of the import (pages/s) and may be used as a shutdown
+     * handler.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public class ReportAtShutDown extends Thread {
+        public void run() {
+            // import may have been interrupted - get an end time in this case
+            if (timeAtEnd == 0) {
+                importEnd();
+            }
+            final long timeTaken = timeAtEnd - timeAtStart;
+            final long speed = (pageCount * 1000) / timeTaken;
+            System.out.println("Finished import (" + speed + " pages/s)");
+        }
     }
 }

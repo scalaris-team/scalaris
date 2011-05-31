@@ -50,7 +50,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     private TransactionSingleOp scalaris_single;
     private Transaction scalaris_tx;
     private List<String> newPages = new LinkedList<String>();
-    private int pageCount = 0;
     private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(100);
     private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(100);
 
