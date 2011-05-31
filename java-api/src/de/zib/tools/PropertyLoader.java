@@ -19,6 +19,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Properties;
 
 /**
@@ -46,6 +48,31 @@ public class PropertyLoader {
      * @return indicates whether the properties have been successfully loaded
      */
     public static boolean loadProperties(final Properties properties, final String filename) {
+        return loadProperties(properties, filename, false, false, new String[0]);
+    }
+
+    /**
+     * Tries to locate the file given by {@code filename} and loads it into the
+     * given properties parameter.
+     *
+     * @param properties
+     *            the {@link Properties} object to load the file into
+     * @param filename
+     *            the filename of the file containing the properties
+     * @param envNonemptyOverwrite
+     *            allows properties to be overwritten by non-empty system
+     *            properties
+     * @param envEmptyOverwrite
+     *            allows properties to be overwritten by empty system properties
+     * @param addPropNames
+     *            names of additional properties which can be fetched from
+     *            system properties
+     *
+     * @return indicates whether the properties have been successfully loaded
+     */
+    public static boolean loadProperties(final Properties properties,
+            final String filename, final boolean envNonemptyOverwrite,
+            final boolean envEmptyOverwrite, final String[] addPropNames) {
         FileInputStream fis = null;
         try {
             final ClassLoader classLoader = PropertyLoader.class.getClassLoader();
@@ -77,6 +104,22 @@ public class PropertyLoader {
                 try {
                     fis.close();
                 } catch (final IOException e) {
+                }
+            }
+            if (envEmptyOverwrite || envNonemptyOverwrite) {
+                final HashSet<Object> keys = new HashSet<Object>(properties.keySet());
+                keys.addAll(Arrays.asList(addPropNames));
+                for (final Object key: keys) {
+                    final String propName = (String) key;
+                    if (!propName.equals("PropertyLoader.loadedfile")) {
+                        final String prop = System.getProperty(propName);
+                        if ((prop != null)) {
+                            if ((envNonemptyOverwrite && !prop.isEmpty()) ||
+                                    (envEmptyOverwrite && prop.isEmpty())) {
+                                properties.setProperty(propName, prop);
+                            }
+                        }
+                    }
                 }
             }
         }
