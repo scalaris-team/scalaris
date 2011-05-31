@@ -165,15 +165,8 @@ public class ConnectionFactory {
             configFile = defaultConfigFile;
         }
 //        System.out.println("loading config file: " + configFile);
-        PropertyLoader.loadProperties(properties, configFile);
-
-        for (final String propName: new String[] {"scalaris.node", "scalaris.cookie", "scalaris.client.name", "scalaris.client.appendUUID"}) {
-            final String prop = System.getProperty(propName);
-            if ((prop != null) && !prop.isEmpty()) {
-                properties.setProperty(propName, prop);
-            }
-        }
-
+        PropertyLoader.loadProperties(properties, configFile, true, false,
+                new String[] {"scalaris.node", "scalaris.cookie", "scalaris.client.name", "scalaris.client.appendUUID"});
         setProperties(properties);
     }
 
