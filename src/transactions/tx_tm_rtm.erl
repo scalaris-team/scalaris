@@ -249,68 +249,67 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
 on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
     ?TRACE("tx_tm_rtm:on({delete, ~p, ~p}) in ~p ~n",
            [TxId, Decision, state_get_role(State)]),
-    %% TODO: use ok as error code?!
-    %% {ok, TxState} = my_get_tx_entry(TxId, State),
     {ErrCode, TxState} = my_get_tx_entry(TxId, State),
     %% inform RTMs on delete
     Role = state_get_role(State),
-    case {ErrCode, Role} of
-        {ok, tx_tm} ->
-            RTMs = tx_state:get_rtms(TxState),
-            send_to_rtms(RTMs, fun(_X) -> Msg end),
-            %% inform used learner to delete paxosids.
-            AllPaxIds =
-                [ begin
-                      {ok, ItemState} = my_get_item_entry(ItemId, State),
-                      [ PaxId || {PaxId, _RTLog, _TP}
-                        <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
-                  end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
-            %% We could delete immediately, but we still miss the
-            %% minority of learner_decides, which would re-create the
-            %% id in the learner, which then would have to be deleted
-            %% separately, so we give the minority a second to arrive
-            %% and then send the delete request.
-            %% learner:stop_paxosids(GLLearner, lists:flatten(AllPaxIds)),
-            GLLearner = state_get_gllearner(State),
-            msg_delay:send_local(1, comm:make_local(GLLearner),
-                                 {learner_deleteids, lists:flatten(AllPaxIds)}),
-            DeleteIt = true;
-        {ok, _} ->
-            %% the test my_trigger_delete was passed, at least by the TM
-            %% RTMs only wait for all tp register messages, to not miss them
-            %% record, that every TP was informed and all paxids decided
-
-            %% TODO: instead subscribing directly do a reference
-            %% counting in the status field state_get_subs /
-            %% state_set_subs
-            fd:unsubscribe(tx_state:get_tm(TxState)),
-            TmpTxState = tx_state:set_numinformed(
-                           TxState, tx_state:get_numids(TxState) *
-                               config:read(replication_factor)),
-            Tmp2TxState = tx_state:set_numpaxdecided(
-                           TmpTxState, tx_state:get_numids(TxState) *
-                                config:read(replication_factor)),
-            Tmp3TxState = tx_state:set_decided(Tmp2TxState, Decision),
-            _ = my_set_entry(Tmp3TxState, State),
-            DeleteIt = tx_state:all_tps_registered(TxState),
-            %% inform used acceptors to delete paxosids.
-            AllPaxIds =
-                [ begin
-                  {ok, ItemState} = my_get_item_entry(ItemId, State),
-                  [ PaxId || {PaxId, _RTlog, _TP}
-                    <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
-              end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
-            LAcceptor = state_get_lacceptor(State),
-%%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
-%%                                 {acceptor_deleteids, lists:flatten(AllPaxIds)});
-            comm:send_local(LAcceptor,
-                               {acceptor_deleteids, lists:flatten(AllPaxIds)});
-        {new, _} ->
-            %% already deleted
-            DeleteIt = false;
-        {uninitialized, _} ->
-            DeleteIt = false %% will be deleted when msg_delay triggers it
-    end,
+    {DeleteIt, NewState} =
+        case {ErrCode, Role} of
+            {ok, tx_tm} ->
+                RTMs = tx_state:get_rtms(TxState),
+                send_to_rtms(RTMs, fun(_X) -> Msg end),
+                %% inform used learner to delete paxosids.
+                AllPaxIds =
+                    [ begin
+                          {ok, ItemState} = my_get_item_entry(ItemId, State),
+                          [ PaxId || {PaxId, _RTLog, _TP}
+                                         <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
+                      end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
+                %% We could delete immediately, but we still miss the
+                %% minority of learner_decides, which would re-create the
+                %% id in the learner, which then would have to be deleted
+                %% separately, so we give the minority a second to arrive
+                %% and then send the delete request.
+                %% learner:stop_paxosids(GLLearner, lists:flatten(AllPaxIds)),
+                GLLearner = state_get_gllearner(State),
+                msg_delay:send_local(1, comm:make_local(GLLearner),
+                                     {learner_deleteids, lists:flatten(AllPaxIds)}),
+                {_DeleteIt = true, State};
+            {ok, _} ->
+                %% the test my_trigger_delete was passed, at least by the TM
+                %% RTMs only wait for all tp register messages, to not miss them
+                %% record, that every TP was informed and all paxids decided
+                TmpTxState = tx_state:set_numinformed(
+                               TxState, tx_state:get_numids(TxState) *
+                                   config:read(replication_factor)),
+                Tmp2TxState = tx_state:set_numpaxdecided(
+                                TmpTxState, tx_state:get_numids(TxState) *
+                                    config:read(replication_factor)),
+                Tmp3TxState = tx_state:set_decided(Tmp2TxState, Decision),
+                _ = my_set_entry(Tmp3TxState, State),
+                Delete = tx_state:all_tps_registered(TxState),
+                TmpState =
+                    case Delete of
+                        true ->
+                            state_unsubscribe(State, tx_state:get_tm(TxState));
+                        false -> State
+                    end,
+                %% inform used acceptors to delete paxosids.
+                AllPaxIds =
+                    [ begin
+                          {ok, ItemState} = my_get_item_entry(ItemId, State),
+                          [ PaxId || {PaxId, _RTlog, _TP}
+                                         <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
+                      end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
+                LAcceptor = state_get_lacceptor(State),
+                %%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
+                %%                                 {acceptor_deleteids, lists:flatten(AllPaxIds)});
+                comm:send_local(LAcceptor,
+                                {acceptor_deleteids, lists:flatten(AllPaxIds)}),
+                {Delete, TmpState};
+            {new, _} -> {false, State}; %% already deleted
+            {uninitialized, _} ->
+                {false, State} %% will be deleted when msg_delay triggers it
+        end,
     case DeleteIt of
         false ->
             %% @TODO if we are a rtm, we still wait for register TPs
@@ -328,7 +327,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
             %% In the future, we will handle this using msg_delay for
             %% outstanding txids to trigger a delete of the items.
     end,
-    State;
+    NewState;
 
 %% generated by on(register_TP) via msg_delay to not increase memory
 %% footprint
@@ -375,30 +374,28 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     %% lookup transaction id locally and merge with given TxState
     Tid = tx_state:get_tid(TxState),
     {LocalTxStatus, LocalTxEntry} = my_get_tx_entry(Tid, State),
-    TmpEntry = case LocalTxStatus of
-                   new ->
-                       %% TODO: instead subscribing directly do a
-                       %% reference counting in the status field
-                       %% state_get_subs / state_set_subs
-                       fd:subscribe(tx_state:get_tm(TxState)),
-                       TxState; %% nothing known locally
-                   uninitialized ->
-                       %% take over hold back from existing entry
-                       %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
-                       HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
-                       tx_state:set_hold_back(TxState, HoldBackQ);
-                   ok ->
-                       log:log(error, "Duplicate init_RTM", []),
-                       LocalTxEntry
-               end,
+    {TmpEntry, NewState} =
+        case LocalTxStatus of
+            new ->
+                TmpState = state_subscribe(State, tx_state:get_tm(TxState)),
+                {TxState, TmpState}; %% nothing known locally
+            uninitialized ->
+                %% take over hold back from existing entry
+                %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
+                HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
+                {tx_state:set_hold_back(TxState, HoldBackQ), State};
+            ok ->
+                log:log(error, "Duplicate init_RTM", []),
+                {LocalTxEntry, State}
+        end,
     NewEntry = tx_state:set_status(TmpEntry, ok),
-    _ = my_set_entry(NewEntry, State),
+    _ = my_set_entry(NewEntry, NewState),
 
     %% lookup items locally and merge with given ItemStates
     NewItemStates =
         [ begin
               EntryId = tx_item_state:get_itemid(Entry),
-              {LocalItemStatus, LocalItem} = my_get_item_entry(EntryId, State),
+              {LocalItemStatus, LocalItem} = my_get_item_entry(EntryId, NewState),
               TmpItem = case LocalItemStatus of
                             new -> Entry; %% nothing known locally
                             uninitialized ->
@@ -410,13 +407,13 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
                                 LocalItem
                         end,
               NewItem = tx_item_state:set_status(TmpItem, ok),
-              _ = my_set_entry(NewItem, State),
+              _ = my_set_entry(NewItem, NewState),
               NewItem
           end || Entry <- ItemStates],
 
     %% initiate local paxos acceptors (with received paxos_ids)
     Learners = tx_state:get_learners(TxState),
-    LAcceptor = state_get_lacceptor(State),
+    LAcceptor = state_get_lacceptor(NewState),
     _ = [ [ acceptor:start_paxosid_local(LAcceptor, PaxId, Learners)
         || {PaxId, _RTlog, _TP}
                <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
@@ -425,9 +422,9 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     %% process hold back messages for tx_state
     %% @TODO better use a foldr
     %% io:format("Starting hold back queue processing~n"),
-    _ = [ on(OldMsg, State) || OldMsg <- lists:reverse(tx_state:get_hold_back(NewEntry)) ],
+    _ = [ on(OldMsg, NewState) || OldMsg <- lists:reverse(tx_state:get_hold_back(NewEntry)) ],
     %% process hold back messages for tx_items
-    _ = [ [ on(OldMsg, State)
+    _ = [ [ on(OldMsg, NewState)
         || OldMsg <- lists:reverse(tx_item_state:get_hold_back(Item)) ]
       || Item <- NewItemStates],
     %% io:format("Stopping hold back queue processing~n"),
@@ -436,7 +433,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     %%msg_delay:send_local(1 + InRole, self(), {tx_tm_rtm_propose_yourself, Tid}),
     %% after timeout take over and initiate new paxos round as proposer
     %% done in on({tx_tm_rtm_propose_yourself...}) handler
-    State;
+    NewState;
 
 % received by RTMs
 on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
@@ -859,9 +856,10 @@ state_get_role(State)          -> element(3, State).
 state_get_lacceptor(State)     -> element(4, State).
 -spec state_get_gllearner(state() | state_uninit()) -> comm:mypid().
 state_get_gllearner(State) -> element(5, State).
-% -spec state_get_subs(state() | state_uninit()) ->
-%                             [{comm:mypid(), non_neg_integer()}].
-% state_get_subs(State)          -> element(6, State).
+-spec state_get_subs(state()) -> [{comm:mypid(), non_neg_integer()}].
+state_get_subs(State)          -> element(6, State).
+-spec state_set_subs(state(), [{comm:mypid(), non_neg_integer()}]) -> state().
+state_set_subs(State, Val)          -> setelement(6, State, Val).
 -spec state_get_qmsg(state_uninit()) -> msg_queue:msg_queue().
 state_get_qmsg(State)          -> element(7, State).
 -spec state_set_qmsg(state_uninit(), msg_queue:msg_queue()) -> state_uninit().
@@ -871,6 +869,36 @@ state_set_qmsg(State, Val)     -> setelement(7, State, Val).
 state_to_on(State) ->
     {A, B, C, D, E, F, _G} = State,
     {A, B, C, D, E, F}.
+
+-spec state_subscribe(state(), comm:mypid()) -> state().
+state_subscribe(State, Pid) ->
+    Subs = state_get_subs(State),
+    NewSubs = case lists:keyfind(Pid, 1, Subs) of
+                  false -> fd:subscribe(Pid),
+                           [{Pid, 1} | Subs];
+                  Tuple ->
+                      NewVal = setelement(2, Tuple, element(2, Tuple) + 1),
+                      lists:keyreplace(Pid, 1, Subs, NewVal)
+              end,
+    state_set_subs(State, NewSubs).
+
+-spec state_unsubscribe(state(), comm:mypid()) -> state().
+state_unsubscribe(State, Pid) ->
+    Subs = state_get_subs(State),
+    NewSubs = case lists:keyfind(Pid, 1, Subs) of
+                  false -> Subs;
+                  Tuple ->
+                      case element(2, Tuple) of
+                          1 ->
+                              %% delay the actual unsubscribe for better perf.?
+                              fd:unsubscribe(element(1, Tuple)),
+                              lists:keydelete(Pid, 1, Subs);
+                          Num ->
+                              NewVal = setelement(2, Tuple, Num - 1),
+                              lists:keyreplace(Pid, 1, Subs, NewVal)
+                      end
+              end,
+    state_set_subs(State, NewSubs).
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.
