@@ -358,10 +358,13 @@ public class WikiServlet extends HttpServlet implements Servlet {
                     addToParam_notice(request, "error getting category pages: " + catPagesResult.message);
                 }
             }
-            value.setPage(mainText);
             if (wikiModel.getRedirectLink() != null) {
-                value.setRedirectedTo(wikiModel.getRedirectLink());
+                String redirectedPageName = wikiModel.getRedirectLink();
+                value.setRedirectedTo(redirectedPageName);
+                // add the content from the page directed to:
+                mainText = wikiModel.render(wikiModel.getRedirectContent(redirectedPageName));
             }
+            value.setPage(mainText);
             value.setCategories(wikiModel.getCategories().keySet());
         } else if (renderer == 0) {
             value.setPage("<p>WikiText:<pre>"

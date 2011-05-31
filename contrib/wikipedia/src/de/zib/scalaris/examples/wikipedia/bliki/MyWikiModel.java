@@ -108,21 +108,33 @@ public class MyWikiModel extends WikiModel {
         
         if (getRedirectLink() != null) {
             // requesting a page from a redirect?
-            String pageName = getRedirectLink();
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
-            if (getRevResult.success) {
-                // make PAGENAME in the redirected content work as expected
-                setPageName(pageName);
-                return getRevResult.revision.getText();
-            } else {
-//                System.err.println(getRevResult.message);
-//                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
-                return "#redirect [[" + pageName + "]]";
-            }
+            return getRedirectContent(getRedirectLink());
         }
 //        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
 //            templateParameters + ")");
         return null;
+    }
+    
+    /**
+     * Gets the contents of the newest revision of the page redirected to.
+     * 
+     * @param pageName
+     *            the name of the page redirected to
+     * 
+     * @return the contents of the newest revision of that page or a placeholder
+     *         string
+     */
+    public String getRedirectContent(String pageName) {
+        RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
+        if (getRevResult.success) {
+            // make PAGENAME in the redirected content work as expected
+            setPageName(pageName);
+            return getRevResult.revision.getText();
+        } else {
+//            System.err.println(getRevResult.message);
+//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
+            return "&#35;redirect [[" + pageName + "]]";
+        }
     }
 
     /* (non-Javadoc)
