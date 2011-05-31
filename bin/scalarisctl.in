@@ -44,6 +44,7 @@ TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 NODE_NAME=node1
 daemonize=0
 first=0
+first_quorum=0
 port=""
 yaws_port=""
 join_at=""
