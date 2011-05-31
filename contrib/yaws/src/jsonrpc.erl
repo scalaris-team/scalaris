@@ -5,10 +5,10 @@
 %%
 %% Redistribution and use in source and binary forms, with or without
 %% modification, are permitted provided that the following conditions
-%% are met: 
+%% are met:
 %%
 %% 1. Redistributions of source code must retain the above copyright
-%%    notice, this list of conditions and the following disclaimer. 
+%%    notice, this list of conditions and the following disclaimer.
 %% 2. Redistributions in binary form must reproduce the above
 %%    copyright notice, this list of conditions and the following
 %%    disclaimer in the documentation and/or other materials provided
@@ -28,86 +28,27 @@
 
 -module(jsonrpc).
 -author("Gaspar Chilingarov <nm@web.am>, Gurgen Tumanyan <barbarian@armkb.com>").
--vsn("2").
--export([call/3]).
+-vsn("3").
 -export([s/2]).        % extract element from proplist
 
-%%%
-%%% call function calls json-rpc method on remote host 
-%%%
-%%% URL - remote server url (may use https)
-%%% Options - option list to be passed to http:request 
-%% (ssl options ot timeout, for example)
-%%% Payload -> {call, MethodName, Args} tuple
-%%% MethodName -> atom
-%%% Args -> list
-%%%
-call(URL, Options, Payload) -> 
-    try
-        {ok, CallPayloadDeep} = encode_call_payload(Payload),
-        CallPayload = lists:flatten(CallPayloadDeep),
-        {ok, Response} = httpc:request(post, 
-            {URL,[{"Content-length",length(CallPayload)}],
-             "application/x-www-form-urlencoded",CallPayload}, 
-                                      Options, []),
-
-        RespBody= if (size(Response) == 2) or (size(Response) == 3) -> 
-                          element(size(Response), Response) 
-                  end,
-        decode_call_payload(RespBody)
-    catch
-        error:Err-> 
-            error_logger:error_report([{'json_rpc:call', error}, 
-                                       {error, Err}, 
-                                       {stack, erlang:get_stacktrace()}]),
-            {error,Err}
-    end. 
-
-%%%
-%%% json-rpc.org defines such structure for making call
-%%% 
-%%% {"method":"methodname", "params": object, "id": integer}
-encode_call_payload({call, Method, Args}) when is_atom(Method) and 
-                                               is_list(Args) ->  
-    ID = element(3, erlang:now()), % id makes sense when there are many 
-                                                % requests in same
-                                                % communication channel and 
-                                                %replies can come in random 
-                                                %order here it can be changed 
-                                                %to something less expensive
-    Struct =  json:encode({struct, [{method, atom_to_list(Method)}, 
-                                    {params, {array, Args}}, 
-                                    {id, ID}]}),
-    {ok, Struct}. 
-     
-%%%
-%%% decode response structure
-%%% 
-%%% {"id":requestID,"result":object,"error":error_description}
-decode_call_payload(JSonStr) -> 
-    {ok, JSON} = json:decode_string(JSonStr),
-    Result = s(JSON, result),
-    Error = s(JSON, error),
-%    ID = s(JSON, id),    % ignored for now
-    if 
-        (Error =/= undefined) -> 
-            {error, Error};
-        true -> 
-            {ok,{response,[Result]}} % make it compliant with xmlrpc response
-    end. 
-    
-%%% lookup element in proplist 
-%%% XXX: are there ready implementation in erlang std library?
-s ({struct, List}, ElemName) -> 
+%%% lookup element in proplist
+s({struct, List}, ElemName) ->
     s(List, ElemName);
-
 s(List, ElemName) when is_list(List) ->
     case lists:keysearch(ElemName,1,List) of
-    {value,{ElemName,Val}} ->
-        Val;
-    _ ->
-        undefined
-    end. 
+        {value,{ElemName,Val}} ->
+            Val;
+        false when is_atom(ElemName) ->
+            ElemList = atom_to_list(ElemName),
+            case lists:keysearch(ElemList,1,List) of
+                {value,{ElemList,Val}} ->
+                    Val;
+                _ ->
+                    undefined
+            end;
+        _ ->
+            undefined
+    end.
 
-    
+
 % vim: tabstop=4 ft=erlang

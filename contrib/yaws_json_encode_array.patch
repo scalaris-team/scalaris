@@ -1,0 +1,62 @@
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json.erl yaws-1.90.encode_array/src/json.erl
+--- yaws-1.90/src/json.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_array/src/json.erl	2011-05-31 17:40:57.246238729 +0200
+@@ -174,11 +174,11 @@
+ 	end,
+ 	V = encode(Value),
+ 	case Acc of
+-	    [] -> [S, $:, V];
+-	    _ -> [Acc, $,, S, $:, V]
++	    [] -> lists:append([S, ":", V]);
++	    _ -> lists:append([Acc, ",", S, ":", V])
+ 	end
+     end, [], Obj),
+-    [${, M, $}].
++    lists:append(["{", M, "}"]).
+ 
+ %% Encode an Erlang tuple as a JSON array.
+ %% Order *is* significant in a JSON array!
+@@ -188,10 +188,10 @@
+ 	V = encode(E),
+ 	case Acc of
+ 	    [] -> V;
+-	    _ -> [Acc, $,, V]
++	    _ -> lists:append([Acc, ",", V])
+ 	end
+     end, [], T),
+-    [$[, M, $]].
++    lists:append(["[", M, "]"]).
+ 
+ %%% SCANNING
+ %%%
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json2.erl yaws-1.90.encode_array/src/json2.erl
+--- yaws-1.90/src/json2.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_array/src/json2.erl	2011-05-31 17:41:28.833213698 +0200
+@@ -133,11 +133,11 @@
+ 	end,
+ 	V = encode(Value),
+ 	case Acc of
+-	    [] -> [S, $:, V];
+-	    _ -> [Acc, $,, S, $:, V]
++	    [] -> lists:append([S, ":", V]);
++	    _ -> lists:append([Acc, ",", S, ":", V])
+ 	end
+     end, [], Obj),
+-    [${, M, $}].
++    lists:append(["{", M, "}"]).
+ 
+ %% Encode an Erlang tuple as a JSON array.
+ %% Order *is* significant in a JSON array!
+@@ -147,10 +147,10 @@
+ 	V = encode(E),
+ 	case Acc of
+ 	    [] -> V;
+-	    _ -> [Acc, $,, V]
++	    _ -> lists:append([Acc, ",", V])
+ 	end
+     end, [], T),
+-    [$[, M, $]].
++    lists:append(["[", M, "]"]).
+ 
+ %%% SCANNING
+ %%%

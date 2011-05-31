@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------
 %%% File    : yaws_ctl.erl
 %%% Author  : Claes Wikstrom <klacke@bluetail.com>
-%%% Purpose : 
+%%% Purpose :
 %%% Created : 29 Apr 2002 by Claes Wikstrom <klacke@bluetail.com>
 %%%----------------------------------------------------------------------
 
@@ -18,12 +18,12 @@
 
 -export([start/2, actl_trace/1]).
 -export([ls/1,hup/1,stop/1,status/1,load/1,
-         check/1,trace/1, debug_dump/1, stats/1]).
+         check/1,trace/1, debug_dump/1, stats/1, running_config/1]).
 %% internal
 -export([run/1, aloop/3, handle_a/3]).
 
 
-%% assumes the appropriate file structures 
+%% assumes the appropriate file structures
 %% are already created with the right perms
 
 start(_GC, FirstTime) when FirstTime == false ->
@@ -37,11 +37,11 @@ run(GC) ->
     %% with the same sid.
     case connect(GC#gconf.id) of
         {ok, Sock, _Key} ->
-            %% Not good, 
+            %% Not good,
             gen_tcp:close(Sock),
             e("There is already a yaws system running with the same ~n"
               " id <~p> on this computer and this user, ~n"
-              " set another id in the yaws conf file ~n", 
+              " set another id in the yaws conf file ~n",
               [GC#gconf.id]);
         {error, eacces} ->
             %% We're not allowed to open the ctl file
@@ -55,11 +55,11 @@ run(GC) ->
 rand() ->
     case os:type() of
         {win32, _} ->
-             {A1, A2, A3}=now(),
+            {A1, A2, A3}=now(),
             random:seed(A1, A2, A3),
             random:uniform(1 bsl 64);
         _ ->
-            try 
+            try
                 crypto:start(),
                 crypto:rand_uniform(0, 1 bsl 64)
             catch
@@ -126,9 +126,9 @@ w_ctl_file(Sid, Port, Key) ->
                  {ok, FI} = file:read_file_info(F),
                  ok = file:write_file_info(F, FI#file_info{mode = 8#00600})
              end of
-                     {'EXIT', _} ->
+             {'EXIT', _} ->
                  error;
-               _ ->
+             _ ->
                  ok
          end.
 
@@ -179,6 +179,9 @@ handle_a(A, GC, Key) ->
                 {stats, Key} ->
                     a_stats(A),
                     gen_tcp:close(A);
+                {running_config, Key} ->
+                    a_running_config(A),
+                    gen_tcp:close(A);
                 {Other, Key} ->
                     gen_tcp:send(A, io_lib:format("Other: ~p~n", [Other])),
                     gen_tcp:close(A);
@@ -201,8 +204,8 @@ actl_trace(What) ->
                     yaws_api:setconf(GC#gconf{trace = {true, What}},SCs),
                     io_lib:format(
                       "Turning on trace of ~p to file ~s~n",
-                      [What, 
-                       filename:join([GC#gconf.logdir, 
+                      [What,
+                       filename:join([GC#gconf.logdir,
                                       "trace." ++ atom_to_list(What)])]);
                 false when What == off ->
                     io_lib:format("Tracing is already turned off ~n",[]);
@@ -216,8 +219,8 @@ actl_trace(What) ->
                     yaws_api:setconf(GC#gconf{trace = {true, What}},SCs),
                     io_lib:format(
                       "Turning on trace of ~p to file ~s~n",
-                      [What, 
-                       filename:join([GC#gconf.logdir, 
+                      [What,
+                       filename:join([GC#gconf.logdir,
                                       "trace." ++ atom_to_list(What)])])
             end;
         false ->
@@ -238,27 +241,19 @@ a_id(Sock) ->
 a_status(Sock) ->
     gen_tcp:send(Sock, a_status()).
 a_status() ->
-    try 
-      {UpTime, L} = yaws_server:stats(),
-      {Days, {Hours, Minutes, _Secs}} = UpTime,
-      H = f("~n Uptime: ~w Days, ~w Hours, ~w Minutes  ~n",
-            [Days, Hours, Minutes]),
-      
-      T =lists:map(
-           fun({Host,IP,Hits}) ->
-                   L1= f("stats for ~p at ~p  ~n",
-                         [Host,IP]),
-                   T = "\n"
-                       "URL                  Number of hits\n",
-                   L2=lists:map(
-                        fun({Url, Hits2}) ->
-                                f("~-30s ~-7w ~n",
-                                  [Url, Hits2])
-                        end, Hits),
-                   END = "\n",
-                   [L1, T, L2, END]
-           end, L),
-        [H, T]
+    try
+        {UpTime, L} = yaws_server:stats(),
+        {Days, {Hours, Minutes, _Secs}} = UpTime,
+        UpStr = f("~n Uptime: ~w Days, ~w Hours, ~w Minutes  ~n",
+                  [Days, Hours, Minutes]),
+
+        Header = f("IP Port Connections Sessions Requests~n", []),
+        Lines  = lists:map(fun({IP0, Port, Conns, Sess, Reqs}) ->
+                                   IP = format_ip(IP0),
+                                   f("~s ~p ~p ~p ~p~n",
+                                     [IP, Port, Conns, Sess, Reqs])
+                           end, L),
+        [Header, Lines, UpStr]
     catch
         _:Err ->
             io_lib:format("Cannot get status ~p~n", [Err])
@@ -285,6 +280,23 @@ format_ip(IP) ->
 	    io_lib:format(?IPV6_FMT,
 			  [A, B, C, D, E, F, G, H])
     end.
+
+
+a_running_config(Sock) ->
+    gen_tcp:send(Sock, a_running_config()).
+a_running_config() ->
+    {ok, GC, Groups} = yaws_server:getconf(),
+    GcStr = ?format_record(GC, gconf),
+    L = lists:map(fun(Group) ->
+                          ["** GROUP ** \n",
+                           lists:map(
+                             fun(SC) ->
+                                     ?format_record(SC, sconf)
+                             end,
+                             Group)
+                          ]
+                  end, Groups),
+    ["** GLOBAL CONF ** \n", GcStr, L].
 
 a_stats(Sock) ->
     gen_tcp:send(Sock, a_stats()).
@@ -345,7 +357,7 @@ loadm([M|Ms]) ->
     [code:load_file(M)|loadm(Ms)].
 
 purge(Ms) ->
-    case purge(Ms, []) of 
+    case purge(Ms, []) of
         [] -> ok;
         L -> {cannot_purge, L}
     end.
@@ -377,9 +389,9 @@ connect_file(CtlFile) ->
                                   {packet, 2}], 2000) of
                 {ok, Socket} ->
                     case inet:port(Socket) of
-                        Port ->
+                        {ok,Port} ->
                             {error, erefused};
-                        _ ->
+                        _X ->
                             {ok, Socket, Key}
                     end;
                 Err ->
@@ -396,7 +408,7 @@ actl(SID, Term) ->
         {error, eacces} ->
             io:format("Another user is using the yaws sid <~p>, ~n"
                       "You are not allowd to read the file <~s>, ~n"
-                      "specify by <-I id> which yaws system you want "
+                      "specify by <-I id> which yaws system you want"
                       " to control~n",
                       [SID, yaws:ctl_file(SID)]),
             timer:sleep(10),
@@ -408,7 +420,7 @@ actl(SID, Term) ->
         {error, Reason} ->
             io:format("You failed to read the ctlfile ~s~n"
                       "error was: <~p>~n"
-                      "specify by <-I id> which yaws system you want "
+                      "specify by <-I id> which yaws system you want"
                       " to control~n",
                       [yaws:ctl_file(SID), Reason]),
             timer:sleep(10),
@@ -417,7 +429,7 @@ actl(SID, Term) ->
             gen_tcp:send(Socket, term_to_binary({Term, Key})),
             Ret = s_cmd(Socket, SID, 0),
             timer:sleep(40), %% sucks bigtime, we have no good way to flush io
-            case Ret of 
+            case Ret of
                 ok when Term == stop ->
                     %% wait for Yaws node to truly stop.
                     case gen_tcp:recv(Socket, 0) of
@@ -505,7 +517,7 @@ hup([SID]) ->
 
 
 %% stop a daemon
-stop([SID]) ->        
+stop([SID]) ->
     actl(SID, stop).
 
 %% query a daemon for status/stats
@@ -518,7 +530,7 @@ load(X) ->
 
 check([Id, File| IncludeDirs]) ->
     GC = yaws_config:make_default_gconf(false, undefined),
-    GC2 = GC#gconf{include_dir = lists:map(fun(X) -> atom_to_list(X) end, 
+    GC2 = GC#gconf{include_dir = lists:map(fun(X) -> atom_to_list(X) end,
                                            IncludeDirs),
                    id = atom_to_list(Id)
                   },
@@ -544,4 +556,6 @@ debug_dump([SID]) ->
 
 stats([SID]) ->
     actl(SID, stats).
+running_config([SID]) ->
+    actl(SID, running_config).
 

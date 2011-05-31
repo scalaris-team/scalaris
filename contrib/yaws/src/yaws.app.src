@@ -1,10 +1,11 @@
 {application,yaws,
  [{description,"yaws WWW server"},
-  {vsn,"%VSN%"},
-  {modules,[%MODULES%]},
+  {vsn, git},
+  {modules,[]},
   {registered, []},
   {mod,{yaws_app,[]}},
   {env, [
+         % {config, undefined},           % undefined | filename()
          % {debug, false},                % true | false
          % {trace, false},                % http | traffic | false
          % {traceoutput, false},          % true | false

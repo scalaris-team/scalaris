@@ -1,9 +1,9 @@
 %%%----------------------------------------------------------------------
 %%% File    : yaws_websockets.erl
 %%% Author  : Davide Marques <nesrait@gmail.com>
-%%% Purpose : 
+%%% Purpose :
 %%% Created :  18 Dec 2009 by Davide Marques <nesrait@gmail.com>
-%%% Modified: 
+%%% Modified:
 %%%----------------------------------------------------------------------
 
 -module(yaws_websockets).
@@ -28,17 +28,17 @@ handshake(Arg, ContentPid, SocketMode) ->
 	    Host = (Arg#arg.headers)#headers.host,
 	    {abs_path, Path} = (Arg#arg.req)#http_request.path,
 	    SC = get(sc),
-	    WebSocketLocation = 
+	    WebSocketLocation =
 		case SC#sconf.ssl of
-			undefined -> "ws://" ++ Host ++ Path;
-			_ -> "wss://" ++ Host ++ Path
+                    undefined -> "ws://" ++ Host ++ Path;
+                    _ -> "wss://" ++ Host ++ Path
 		end,
 	    Handshake = handshake(ProtocolVersion, Arg, CliSock,
                                   WebSocketLocation, Origin, Protocol),
 	    case SC#sconf.ssl of
 		undefined ->
 		    gen_tcp:send(CliSock, Handshake),
-		    inet:setopts(CliSock, [{packet, raw}, {active, SocketMode}]),
+		    inet:setopts(CliSock, [{packet, raw},{active, SocketMode}]),
 		    TakeOverResult =
 			gen_tcp:controlling_process(CliSock, ContentPid);
 		_ ->
@@ -58,7 +58,12 @@ handshake(Arg, ContentPid, SocketMode) ->
     exit(normal).
 
 handshake(ws_76, Arg, CliSock, WebSocketLocation, Origin, Protocol) ->
-    {ok, Challenge} = gen_tcp:recv(CliSock, 8),
+    {ok, Challenge} = case CliSock of
+                          {sslsocket, _, _} ->
+                              ssl:recv(CliSock, 8);
+                          _ ->
+                              gen_tcp:recv(CliSock, 8)
+                      end,
     Key1 = secret_key("sec-websocket-key1", Arg#arg.headers),
     Key2 = secret_key("sec-websocket-key2", Arg#arg.headers),
     ChallengeResponse = challenge(Key1, Key2, binary_to_list(Challenge)),
@@ -104,7 +109,7 @@ unframe_one(DataFrames) ->
 	_ -> %% Type band 16#80 =:= 16#80
 	    {Length, LenBytes} = unpack_length(DataFrames, 0, 0),
 	    <<_, _:LenBytes/bytes, Data:Length/bytes,
-	     NextFrame/bitstring>> = DataFrames,
+              NextFrame/bitstring>> = DataFrames,
 	    {ok, Data, NextFrame}
     end.
 
