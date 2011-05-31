@@ -243,7 +243,10 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             %% participants. And then takeover when a crash is
             %% actually reported.
             send_to_rtms([hd(tx_state:get_rtms(TxState))], fun(_X) ->
-            {tx_tm_rtm_propose_yourself, TxId} end), ok end, State;
+                                {tx_tm_rtm_propose_yourself, TxId} end),
+            ok
+    end,
+    State;
 
 %% this tx is finished and enough TPs were informed, delete the state
 on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
@@ -535,7 +538,6 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
 %% failure detector events
 on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    ct:pal("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     RTMs = state_get_RTMs(State),
     NewRTMs = [ case get_rtmpid(RTM) of
                     Pid ->
@@ -547,7 +549,7 @@ on({crash, Pid}, State) ->
                         rtm_entry_new(Key, unknown, I, unknown);
                     _ -> RTM
                 end
-                || RTM <- RTMs, get_rtmpid(RTM) =:= Pid ],
+                || RTM <- RTMs ],
     %% scan over all running transactions and delete this Pid
     %% if necessary, takeover the tx and try deciding with abort
     NewState = lists:foldl(
