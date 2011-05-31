@@ -41,11 +41,11 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link() ->
-	start_link([]).
+    start_link([]).
 start_link(L) ->
     %% We are dependent on erlsom
     case code:ensure_loaded(erlsom) of
-        {error, _} -> 
+        {error, _} ->
             Emsg = "could not load erlsom",
             error_logger:error_msg("~p: exiting, reason: ~s~n",
                                    [?MODULE, Emsg]),
@@ -59,7 +59,7 @@ start_link(L) ->
 handler(Args, Id, Payload, SessionValue) ->
     Headers = Args#arg.headers,
     SoapAction = yaws_soap_lib:findHeader("SOAPAction", Headers#headers.other),
-    case gen_server:call(?SERVER, {request, Id, Payload, 
+    case gen_server:call(?SERVER, {request, Id, Payload,
                                    SessionValue, SoapAction}, infinity) of
         {ok, XmlDoc, ResCode, undefined} ->
             {false, XmlDoc, ResCode};
@@ -98,18 +98,19 @@ setup(Id, WsdlFile, Prefix) when is_tuple(Id),size(Id)==2 ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init(L) -> %% [ {{Mod,Handler}, WsdlFile} ]
-	WsdlList = lists:foldl( fun( SoapSrvMod, OldList) -> 
-									setup_on_init( SoapSrvMod, OldList ) 
-							end,[],L),
+    WsdlList = lists:foldl( fun( SoapSrvMod, OldList) ->
+                                    setup_on_init( SoapSrvMod, OldList )
+                            end,[],L),
     {ok, #s{wsdl_list = WsdlList}}.
 
-setup_on_init( {Id, WsdlFile}, OldList ) when is_tuple(Id),size(Id)==2 ->
-	Wsdl = yaws_soap_lib:initModel(WsdlFile),
-	uinsert({Id, Wsdl}, OldList);
-setup_on_init( {Id, WsdlFile, Prefix}, OldList ) when is_tuple(Id),size(Id)==2 ->
-	Wsdl = yaws_soap_lib:initModel(WsdlFile, Prefix),
-	uinsert({Id, Wsdl}, OldList).
-	
+setup_on_init( {Id, WsdlFile}, OldList ) when is_tuple(Id),size(Id) == 2 ->
+    Wsdl = yaws_soap_lib:initModel(WsdlFile),
+    uinsert({Id, Wsdl}, OldList);
+setup_on_init( {Id, WsdlFile, Prefix}, OldList ) when is_tuple(Id),
+                                                      size(Id) == 2 ->
+    Wsdl = yaws_soap_lib:initModel(WsdlFile, Prefix),
+    uinsert({Id, Wsdl}, OldList).
+
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
 %%                                      {reply, Reply, State, Timeout} |
@@ -170,14 +171,14 @@ request(State, {M,F} = Id, {Req, Attachments}, SessionValue, Action) ->
     {ok, Model} = get_model(State, Id),
     %%error_logger:info_report([?MODULE, {payload, Req}]),
     case catch yaws_soap_lib:parseMessage(Req, Model) of
-        {ok, Header, Body} -> 
+        {ok, Header, Body} ->
             %% call function
-            result(Model, catch apply(M, F, [Header, Body, 
+            result(Model, catch apply(M, F, [Header, Body,
                                              Action, SessionValue,
 					     Attachments]));
         {error, Error} ->
             cli_error(Error);
-        OtherError -> 
+        OtherError ->
             srv_error(io_lib:format("Error parsing message: ~p", [OtherError]))
     end;
 request(State, {M,F} = Id, Req, SessionValue, Action) ->
@@ -185,13 +186,13 @@ request(State, {M,F} = Id, Req, SessionValue, Action) ->
     {ok, Model} = get_model(State, Id),
     Umsg = (catch erlsom_lib:toUnicode(Req)),
     case catch yaws_soap_lib:parseMessage(Umsg, Model) of
-        {ok, Header, Body} -> 
+        {ok, Header, Body} ->
             %% call function
-            result(Model, catch apply(M, F, [Header, Body, 
+            result(Model, catch apply(M, F, [Header, Body,
                                              Action, SessionValue]));
         {error, Error} ->
             cli_error(Error);
-        OtherError -> 
+        OtherError ->
             srv_error(io_lib:format("Error parsing message: ~p", [OtherError]))
     end.
 
@@ -209,11 +210,12 @@ result(_Model, false) ->   % soap notify !
 result(_Model, Error) ->
     srv_error(io_lib:format("Error processing message: ~p", [Error])).
 
-return(#wsdl{model = Model}, ResHeader, ResBody, ResCode, SessVal, Files) ->
-    return(Model, ResHeader, ResBody, ResCode, SessVal, Files);
-return(Model, ResHeader, ResBody, ResCode, SessVal, Files) when not is_list(ResBody) ->
-    return(Model, ResHeader, [ResBody], ResCode, SessVal, Files);
-return(Model, ResHeader, ResBody, ResCode, SessVal, Files) ->
+return(#wsdl{model = Model}, ResHeader, ResBody, ResCode, SessVal, undefined) ->
+    return(Model, ResHeader, ResBody, ResCode, SessVal, undefined);
+return(Model, ResHeader, ResBody, ResCode, SessVal, undefined)
+  when not is_list(ResBody) ->
+    return(Model, ResHeader, [ResBody], ResCode, SessVal, undefined);
+return(Model, ResHeader, ResBody, ResCode, SessVal, undefined) ->
     %% add envelope
     Header2 = case ResHeader of
                   undefined -> undefined;
@@ -223,31 +225,25 @@ return(Model, ResHeader, ResBody, ResCode, SessVal, Files) ->
                                 'Header' = Header2},
     case catch erlsom:write(Envelope, Model) of
         {ok, XmlDoc} ->
-	    case Files of
-		undefined ->
-		    {ok, XmlDoc, ResCode, SessVal};
-		_ ->
-		    DIME = yaws_dime:encode(XmlDoc, Files),
-		    {ok, DIME, ResCode, SessVal}
-	    end;
+            {ok, XmlDoc, ResCode, SessVal};
         {error, WriteError} ->
             srv_error(f("Error writing XML: ~p", [WriteError]));
         OtherWriteError ->
-            error_logger:error_msg("~p(~p): OtherWriteError=~p~n", 
+            error_logger:error_msg("~p(~p): OtherWriteError=~p~n",
                                    [?MODULE, ?LINE, OtherWriteError]),
             srv_error(f("Error writing XML: ~p", [OtherWriteError]))
     end.
 
 f(S,A) -> lists:flatten(io_lib:format(S,A)).
 
-cli_error(Error) -> 
-    error_logger:error_msg("~p(~p): Cli Error: ~p~n", 
+cli_error(Error) ->
+    error_logger:error_msg("~p(~p): Cli Error: ~p~n",
                            [?MODULE, ?LINE, Error]),
     Fault = yaws_soap_lib:makeFault("Client", "Client error"),
     {error, Fault, ?BAD_MESSAGE_CODE}.
 
-srv_error(Error) -> 
-    error_logger:error_msg("~p(~p): Srv Error: ~p~n", 
+srv_error(Error) ->
+    error_logger:error_msg("~p(~p): Srv Error: ~p~n",
                            [?MODULE, ?LINE, Error]),
     Fault = yaws_soap_lib:makeFault("Server", "Server error"),
     {error, Fault, ?SERVER_ERROR_CODE}.

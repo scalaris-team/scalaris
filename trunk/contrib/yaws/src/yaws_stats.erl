@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : yaws_stats.erl
 %%% Author  : Olivier Girondel <olivier@biniou.info>
-%%% Description : Statistics module for Yaws 
+%%% Description : Statistics module for Yaws
 %%%
 %%% Created : 11 Apr 2009 by Olivier Girondel <olivier@biniou.info>
 %%%-------------------------------------------------------------------
@@ -41,7 +41,7 @@ start_link() ->
 stop(Pid) ->
     gen_server:cast(Pid, {stop}).
 
-    
+
 hit() ->
     case get_stats() of
 	undefined ->

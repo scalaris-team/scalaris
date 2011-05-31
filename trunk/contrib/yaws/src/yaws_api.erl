@@ -1,7 +1,7 @@
 %%----------------------------------------------------------------------
 %%% File    : yaws_api.erl
 %%% Author  : Claes Wikstrom <klacke@hyber.org>
-%%% Purpose : 
+%%% Purpose :
 %%% Created : 24 Jan 2002 by Claes Wikstrom <klacke@hyber.org>
 %%%----------------------------------------------------------------------
 
@@ -17,14 +17,15 @@
 
 
 
--export([parse_query/1, parse_post/1, parse_multipart_post/1,
-         parse_multipart/2]).
+-export([parse_query/1, parse_post/1,
+         parse_multipart_post/1, parse_multipart_post/2,
+         parse_multipart/2, parse_multipart/3]).
 -export([code_to_phrase/1, ssi/2, redirect/1]).
 -export([setcookie/2, setcookie/3, setcookie/4, setcookie/5, setcookie/6]).
 -export([pre_ssi_files/2,  pre_ssi_string/1, pre_ssi_string/2,
          set_content_type/1,
          htmlize/1, htmlize_char/1, f/2, fl/1]).
--export([find_cookie_val/2, secs/0, 
+-export([find_cookie_val/2, secs/0,
          url_decode/1, url_decode_q_split/1,
          url_encode/1, parse_url/1, parse_url/2, format_url/1,
          format_partial_url/2]).
@@ -38,12 +39,12 @@
          stream_process_deliver_final_chunk/2, stream_process_end/2]).
 -export([websocket_send/2, websocket_receive/1,
          websocket_unframe_data/1, websocket_setopts/2]).
--export([new_cookie_session/1, new_cookie_session/2, new_cookie_session/3, 
+-export([new_cookie_session/1, new_cookie_session/2, new_cookie_session/3,
          cookieval_to_opaque/1, request_url/1,
          print_cookie_sessions/0,
          replace_cookie_session/2, delete_cookie_session/1]).
 
--export([getconf/0, 
+-export([getconf/0,
          setconf/2,
          embedded_start_conf/1, embedded_start_conf/2,
          embedded_start_conf/3, embedded_start_conf/4]).
@@ -63,11 +64,63 @@
 -export([ehtml_expand/1, ehtml_expander/1, ehtml_apply/2,
          ehtml_expander_test/0]).
 
--export([parse_set_cookie/1, format_set_cookie/1, 
+-export([parse_set_cookie/1, format_set_cookie/1,
          postvar/2, queryvar/2, getvar/2]).
 
 -export([binding/1,binding_exists/1,
          dir_listing/1, dir_listing/2, redirect_self/1]).
+
+-export([arg_clisock/1
+         , arg_client_ip_port/1
+         , arg_headers/1
+         , arg_req/1
+         , arg_clidata/1
+         , arg_server_path/1
+         , arg_querydata/1
+         , arg_appmoddata/1
+         , arg_docroot/1
+         , arg_docroot_mount/1
+         , arg_fullpath/1
+         , arg_cont/1
+         , arg_state/1
+         , arg_pid/1
+         , arg_opaque/1
+         , arg_appmod_prepath/1
+         , arg_prepath/1
+         , arg_pathinfo/1
+
+         , http_request_method/1
+         , http_request_path/1
+         , http_request_version/1
+
+         , http_response_version/1
+         , http_response_status/1
+         , http_response_phrase/1
+
+         , headers_connection/1
+         , headers_accept/1
+         , headers_host/1
+         , headers_if_modified_since/1
+         , headers_if_match/1
+         , headers_if_none_match/1
+         , headers_if_range/1
+         , headers_if_unmodified_since/1
+         , headers_range/1
+         , headers_referer/1
+         , headers_user_agent/1
+         , headers_accept_ranges/1
+         , headers_cookie/1
+         , headers_keep_alive/1
+         , headers_location/1
+         , headers_content_length/1
+         , headers_content_type/1
+         , headers_content_encoding/1
+         , headers_authorization/1
+         , headers_transfer_encoding/1
+         , headers_x_forwarded_for/1
+         , headers_other/1
+
+        ]).
 
 
 -import(lists, [map/2, flatten/1, reverse/1]).
@@ -75,6 +128,55 @@
 %% these are a bunch of function that are useful inside
 %% yaws scripts
 
+arg_clisock(#arg{clisock = X}) -> X.
+arg_client_ip_port(#arg{client_ip_port = X}) -> X.
+arg_headers(#arg{headers = X}) -> X.
+arg_req(#arg{req = X}) -> X.
+arg_clidata(#arg{clidata = X}) -> X.
+arg_server_path(#arg{server_path = X}) -> X.
+arg_querydata(#arg{querydata = X}) -> X.
+arg_appmoddata(#arg{appmoddata = X}) -> X.
+arg_docroot(#arg{docroot = X}) -> X.
+arg_docroot_mount(#arg{docroot_mount = X}) -> X.
+arg_fullpath(#arg{fullpath = X}) -> X.
+arg_cont(#arg{cont = X}) -> X.
+arg_state(#arg{state = X}) -> X.
+arg_pid(#arg{pid = X}) -> X.
+arg_opaque(#arg{opaque = X}) -> X.
+arg_appmod_prepath(#arg{appmod_prepath = X}) -> X.
+arg_prepath(#arg{prepath = X}) -> X.
+arg_pathinfo(#arg{pathinfo = X}) ->  X.
+
+http_request_method(#http_request{method = X}) -> X.
+http_request_path(#http_request{path = X}) -> X.
+http_request_version(#http_request{version = X}) -> X.
+
+http_response_version(#http_response{version = X}) -> X.
+http_response_status(#http_response{status = X}) -> X.
+http_response_phrase(#http_response{phrase = X}) -> X.
+
+headers_connection(#headers{connection = X}) -> X.
+headers_accept(#headers{accept = X}) -> X.
+headers_host(#headers{host = X}) -> X.
+headers_if_modified_since(#headers{if_modified_since = X}) -> X.
+headers_if_match(#headers{if_match = X}) -> X.
+headers_if_none_match(#headers{if_none_match = X}) -> X.
+headers_if_range(#headers{if_range = X}) -> X.
+headers_if_unmodified_since(#headers{if_unmodified_since = X}) -> X.
+headers_range(#headers{range = X}) -> X.
+headers_referer(#headers{referer = X}) -> X.
+headers_user_agent(#headers{user_agent = X}) -> X.
+headers_accept_ranges(#headers{accept_ranges = X}) -> X.
+headers_cookie(#headers{cookie = X}) -> X.
+headers_keep_alive(#headers{keep_alive = X}) -> X.
+headers_location(#headers{location = X}) -> X.
+headers_content_length(#headers{content_length = X}) -> X.
+headers_content_type(#headers{content_type = X}) -> X.
+headers_content_encoding(#headers{content_encoding = X}) -> X.
+headers_authorization(#headers{authorization = X}) -> X.
+headers_transfer_encoding(#headers{transfer_encoding = X}) -> X.
+headers_x_forwarded_for(#headers{x_forwarded_for = X}) -> X.
+headers_other(#headers{other = X}) -> X.
 
 
 %% parse the command line query data
@@ -119,22 +221,22 @@ parse_post(Arg) ->
 %% It is possible to get the server to maintain a state on behalf of the
 %% out/1 user by returning {get_more, Cont, State}.
 %%
-%% 
+%%
 %% yaws_api:parse_multipart_post/1 will return either:
-%% 
+%%
 %% {cont, Cont, Res} where Res is new result(s) from this segment. This
 %% indicates that there is more data to come and the out/1 function
 %% should return {get_more, Cont, User_state} where User_state might
 %% usefully be a File Descriptor.
 %%
 %% or {result, Res} if this is the last (or only) segment.
-%% 
+%%
 %% Res is a list of {header, Header} | {part_body, Binary} | {body, Binary}
-%% 
+%%
 %% Example usage could be:
-%% 
+%%
 %% <erl>
-%% 
+%%
 %% out(A) ->
 %%        case yaws_api:parse_multipart_post(A) of
 %%             {cont, Cont, Res} ->
@@ -144,7 +246,7 @@ parse_post(Arg) ->
 %%                    handle_res(A, Res),
 %%                    {html, f("<pre>Done </pre>",[])}
 %%        end.
-%% 
+%%
 %% handle_res(A, [{head, Name}|T]) ->
 %%      io:format("head:~p~n",[Name]),
 %%      handle_res(A, T);
@@ -156,10 +258,12 @@ parse_post(Arg) ->
 %%      handle_res(A, T);
 %% handle_res(A, []) ->
 %%      io:format("End_res~n").
-%% 
+%%
 %% </erl>
 
 parse_multipart_post(Arg) ->
+    parse_multipart_post(Arg, [list]).
+parse_multipart_post(Arg, Options) ->
     H = Arg#arg.headers,
     CT = H#headers.content_type,
     Req = Arg#arg.req,
@@ -174,15 +278,15 @@ parse_multipart_post(Arg) ->
                     case Arg#arg.cont of
                         {cont, Cont} ->
                             parse_multipart(
-                              binary_to_list(un_partial(Arg#arg.clidata)),
+                              un_partial(Arg#arg.clidata),
                               {cont, Cont});
                         undefined ->
                             LineArgs = parse_arg_line(Line),
                             {value, {_, Boundary}} =
                                 lists:keysearch(boundary, 1, LineArgs),
                             parse_multipart(
-                              binary_to_list(un_partial(Arg#arg.clidata)), 
-                              Boundary)
+                              un_partial(Arg#arg.clidata),
+                              Boundary, Options)
                     end;
                 _Other ->
                     error_logger:error_msg("Can't parse multipart if we "
@@ -195,16 +299,10 @@ parse_multipart_post(Arg) ->
             []
     end.
 
-
-
-
-
 un_partial({partial, Bin}) ->
     Bin;
 un_partial(Bin) ->
     Bin.
-
-
 
 parse_arg_line(Line) ->
     parse_arg_line(Line, []).
@@ -257,141 +355,164 @@ parse_arg_value([C|Line], Key, Value, Quote, _) ->
 %%
 
 make_parse_line_reply(Key, Value, Rest) ->
-    X = {{list_to_atom(yaws:funreverse(Key, {yaws, to_lowerchar})),
-          lists:reverse(Value)}, Rest},
-    X.
+    {{list_to_atom(yaws:funreverse(Key, {yaws, to_lowerchar})),
+      lists:reverse(Value)}, Rest}.
 
 
+-record(mp_parse_state, {
+          state,
+          boundary_ctx,
+          hdr_end_ctx,
+          old_data,
+          data_type
+         }).
 
-%%
-
-isolate_arg(Str) -> isolate_arg(Str, []).
-
-isolate_arg([$:,$ |T], L) -> {yaws:funreverse(L, {yaws, to_lowerchar}), T};
-isolate_arg([H|T], L)     -> isolate_arg(T, [H|L]).
-
-
-
-%%
-%%% Stateful parser of multipart data - allows easy re-entry
-%% States are header|body|boundary|is_end
-
+%% Stateful parser of multipart data - allows easy re-entry
 parse_multipart(Data, St) ->
-    case parse_multi(Data, St) of
+    parse_multipart(Data, St, [list]).
+parse_multipart(Data, St, Options) ->
+    case parse_multi(Data, St, Options) of
         {cont, St2, Res} ->
             {cont, {cont, St2}, lists:reverse(Res)};
         {result, Res} ->
             {result, lists:reverse(Res)}
     end.
 
-%% Re-entry
-parse_multi(Data, {cont, {boundary, Start_data, PartBoundary, 
-                          Acc, {Possible,Boundary}}}) ->
-    parse_multi(boundary, Start_data++Data, PartBoundary, Acc, [], 
-                {Possible++Data,Boundary});
-parse_multi(Data, {cont, {State, Start_data, Boundary, Acc, Tmp}}) ->
-    parse_multi(State, Start_data++Data, Boundary, Acc, [], Tmp);
+%% Reentry point
+parse_multi(Data, {cont, #mp_parse_state{old_data = OldData}=ParseState}, _) ->
+    NData = <<OldData/binary, Data/binary>>,
+    parse_multi(NData, ParseState, []);
 
-%% Initial entry point
-parse_multi(Data, Boundary) ->
-    B1 = "\r\n--"++Boundary,
-    D1 = "\r\n"++Data,
-    parse_multi(boundary, D1, B1, start, [], {D1, B1}).
-
-parse_multi(header, "\r\n\r\n"++Body, Boundary, Acc, Res, Tmp) ->
-    Header = do_header(lists:reverse(Acc)),
-    parse_multi(body, Body, Boundary, [], [{head, Header}|Res], Tmp);
-parse_multi(header, "\r\n"++Body, Boundary, [], Res, Tmp) ->
-    Header = do_header([]),
-    parse_multi(body, Body, Boundary, [], [{head, Header}|Res], Tmp);
-parse_multi(header, "\r\n\r", Boundary, Acc, Res, Tmp) ->
-    {cont, {header, "\r\n\r", Boundary, Acc, Tmp}, Res};
-parse_multi(header, "\r\n", Boundary, Acc, Res, Tmp) ->
-    {cont, {header, "\r\n", Boundary, Acc, Tmp}, Res};
-parse_multi(header, "\r", Boundary, Acc, Res, Tmp) ->
-    {cont, {header, "\r", Boundary, Acc, Tmp}, Res};
-parse_multi(header, [H|T], Boundary, Acc, Res, Tmp) ->
-    parse_multi(header, T, Boundary, [H|Acc], Res, Tmp);
-parse_multi(header, [], Boundary, Acc, Res, Tmp) ->
-    {cont, {header, [], Boundary, Acc, Tmp}, Res};
-
-parse_multi(body, [B|T], [B|T1], Acc, Res, _Tmp) ->
-    parse_multi(boundary, T, T1, Acc, Res, {[B|T], [B|T1]}); %% store in case no match
-parse_multi(body, [H|T], Boundary, Acc, Res, Tmp) ->
-    parse_multi(body, T, Boundary, [H|Acc], Res, Tmp);
-parse_multi(body, [], Boundary, [], Res, Tmp) ->  %% would be empty partial body result
-    {cont, {body, [], Boundary, [], Tmp}, Res};
-parse_multi(body, [], Boundary, Acc, Res, Tmp) ->        %% make a partial body result
-    {cont, {body, [], Boundary, [], Tmp}, [{part_body, lists:reverse(Acc)}|Res]};
-
-parse_multi(boundary, [B|T], [B|T1], Acc, Res, Tmp) ->
-    parse_multi(boundary, T, T1, Acc, Res, Tmp);
-parse_multi(boundary, [_H|_T], [_B|_T1], start, Res, {[D|T2], Bound}) -> %% false alarm
-    parse_multi(body, T2, Bound, [D], Res, []);
-parse_multi(boundary, [_H|_T], [_B|_T1], Acc, Res, {[D|T2], Bound}) -> %% false alarm
-    parse_multi(body, T2, Bound, [D|Acc], Res, []);
-parse_multi(boundary, [], [B|T1], Acc, Res, Tmp) -> %% run out of body
-    {cont, {boundary, [], [B|T1], Acc, Tmp}, Res};
-parse_multi(boundary, [], [], start, Res, {_, Bound}) ->
-    {cont, {is_end, [], Bound, [], []}, Res};
-parse_multi(boundary, [], [], Acc, Res, {_, Bound}) ->
-    {cont, {is_end, [], Bound, [], []}, [{body, lists:reverse(Acc)}|Res]};
-parse_multi(boundary, [H|T], [], start, Res, {_, Bound}) -> %% matched whole boundary!
-    parse_multi(is_end, [H|T], Bound, [], Res, []);
-parse_multi(boundary, [H|T], [], Acc, Res, {_, Bound}) -> %% matched whole boundary!
-    parse_multi(is_end, [H|T], Bound, [], [{body, lists:reverse(Acc)}|Res], []);
-
-parse_multi(is_end, "--"++_, _Boundary, _Acc, Res, _Tmp) ->
-    {result, Res};
-parse_multi(is_end, "-", Boundary, Acc, Res, Tmp) ->
-    {cont, {is_end, "-", Boundary, Acc, Tmp}, Res};
-parse_multi(is_end, "\r\n"++Next, Boundary, _Acc, Res, _Tmp) ->
-    parse_multi(header, Next, Boundary, [], Res, []);
-parse_multi(is_end, "\r", Boundary, Acc, Res, Tmp) ->
-    {cont, {is_end, "\r", Boundary, Acc, Tmp}, Res}.
-
-
-do_header([]) -> {[]};
-do_header(Head) ->
-    Fields = string:tokens(Head, "\r\n"),
-    MFields = merge_lines_822(Fields),
-    Header = lists:map(fun isolate_arg/1, MFields),
-    case lists:keysearch("content-disposition", 1, Header) of
-        {value, {_,"form-data"++Line}} ->
-            Parameters = parse_arg_line(Line),
-            {value, {_,Name}} = lists:keysearch(name, 1, Parameters),
-            {Name,
-             lists:map(fun({"content-type", Val}) ->
-                               {content_type, Val};
-                          ({"content-transfer-encoding", Val}) ->
-                               {content_transfer_encoding, Val};
-                          ({"content-id", Val}) ->
-                               {content_id, Val};
-                          ({"content-description", Val}) ->
-                               {content_description, Val};
-                          (KV) ->
-                               KV
+parse_multi(<<"--\r\n", Data/binary>>,
+            #mp_parse_state{state=boundary}=ParseState, Acc) ->
+    parse_multi(Data, ParseState, Acc);
+parse_multi(Data, #mp_parse_state{state=boundary}=ParseState, Acc) ->
+    #mp_parse_state{boundary_ctx = BoundaryCtx} = ParseState,
+    case bm_find(Data, BoundaryCtx) of
+        {0, Len} ->
+            LenPlusCRLF = Len+2,
+            <<_:LenPlusCRLF/binary, Rest/binary>> = Data,
+            NParseState = ParseState#mp_parse_state{state = start_header},
+            parse_multi(Rest, NParseState, Acc);
+        {_Pos, _Len} ->
+            {NParseState, NData} = case Data of
+                                       <<"\r\n", Rest/binary>> ->
+                                           {ParseState#mp_parse_state{
+                                              state = start_header},
+                                            Rest};
+                                       _ ->
+                                           {ParseState#mp_parse_state{
+                                              state = body}, Data}
+                                   end,
+            parse_multi(NData, NParseState, Acc);
+        nomatch ->
+            case Data of
+                <<>> ->
+                    {result, Acc};
+                <<"\r\n">> ->
+                    {result, Acc};
+                _ ->
+                    NParseState = ParseState#mp_parse_state{old_data = Data},
+                    {cont, NParseState, Acc}
+            end
+    end;
+parse_multi(Data, #mp_parse_state{state=start_header}=ParseState, Acc) ->
+    NParseState = ParseState#mp_parse_state{state = header},
+    parse_multi(Data, NParseState, Acc, [], []);
+parse_multi(Data, #mp_parse_state{state=body}=ParseState, Acc) ->
+    #mp_parse_state{boundary_ctx = BoundaryCtx} = ParseState,
+    case bm_find(Data, BoundaryCtx) of
+        {Pos, Len} ->
+            <<Body:Pos/binary, _:Len/binary, Rest/binary>> = Data,
+            BodyData = case ParseState#mp_parse_state.data_type of
+                           list ->
+                               binary_to_list(Body);
+                           binary ->
+                               Body
                        end,
-                       Parameters ++ lists:keydelete("content-disposition", 1,
-                                                     Header))};
+            NAcc = [{body, BodyData}|Acc],
+            NParseState = ParseState#mp_parse_state{state = boundary},
+            parse_multi(Rest, NParseState, NAcc);
+        nomatch ->
+            NParseState = ParseState#mp_parse_state{
+                            state = body,
+                            old_data = <<>>
+                           },
+            BodyData = case ParseState#mp_parse_state.data_type of
+                           list ->
+                               binary_to_list(Data);
+                           binary ->
+                               Data
+                       end,
+            NAcc = [{part_body, BodyData}|Acc],
+            {cont, NParseState, NAcc}
+    end;
+%% Initial entry point
+parse_multi(Data, Boundary, Options) ->
+    B1 = "\r\n--"++Boundary,
+    D1 = <<"\r\n", Data/binary>>,
+    BoundaryCtx = bm_start(B1),
+    HdrEndCtx = bm_start("\r\n\r\n"),
+    DataType = lists:foldl(fun(_, list) ->
+                                   list;
+                              (list, _) ->
+                                   list;
+                              (binary, undefined) ->
+                                   binary;
+                              (_, Acc) ->
+                                   Acc
+                           end, undefined, Options),
+    ParseState = #mp_parse_state{state = boundary,
+                                 boundary_ctx = BoundaryCtx,
+                                 hdr_end_ctx = HdrEndCtx,
+                                 data_type = DataType},
+    parse_multi(D1, ParseState, []).
+
+parse_multi(Data, #mp_parse_state{state=start_header}=ParseState, Acc, [], []) ->
+    #mp_parse_state{hdr_end_ctx = HdrEndCtx} = ParseState,
+    case bm_find(Data, HdrEndCtx) of
+        nomatch ->
+            {cont, ParseState#mp_parse_state{old_data = Data}, Acc};
         _ ->
-            {Header}
+            NParseState = ParseState#mp_parse_state{state = header},
+            parse_multi(Data, NParseState, Acc, [], [])
+    end;
+parse_multi(Data, #mp_parse_state{state=header}=ParseState, Acc, Name, Hdrs) ->
+    case erlang:decode_packet(httph_bin, Data, []) of
+        {ok, http_eoh, Rest} ->
+            Head = case Name of
+                       [] ->
+                           lists:reverse(Hdrs);
+                       _ ->
+                           {Name, lists:reverse(Hdrs)}
+                   end,
+            NParseState = ParseState#mp_parse_state{state = body},
+            parse_multi(Rest, NParseState, [{head, Head}|Acc]);
+        {ok, {http_header, _, Hdr, _, HdrVal}, Rest} when is_atom(Hdr) ->
+            Header = {case Hdr of
+                          'Content-Type' ->
+                              content_type;
+                          Else ->
+                              Else
+                      end,
+                      binary_to_list(HdrVal)},
+            parse_multi(Rest, ParseState, Acc, Name, [Header|Hdrs]);
+        {ok, {http_header, _, Hdr, _, HdrVal}, Rest} ->
+            HdrValStr = binary_to_list(HdrVal),
+            case yaws:to_lower(binary_to_list(Hdr)) of
+                "content-disposition" ->
+                    "form-data"++Params = HdrValStr,
+                    Parameters = parse_arg_line(Params),
+                    {value, {_, NewName}} = lists:keysearch(name, 1, Parameters),
+                    parse_multi(Rest, ParseState, Acc,
+                                NewName, Parameters++Hdrs);
+                LowerHdr ->
+                    parse_multi(Rest, ParseState, Acc,
+                                Name, [{LowerHdr, HdrValStr}|Hdrs])
+            end;
+        {error, _Reason}=Error ->
+            Error
     end.
-
-merge_lines_822(Lines) ->
-    merge_lines_822(Lines, []).
-
-merge_lines_822([], Acc) ->
-    lists:reverse(Acc);
-merge_lines_822([Line=" "++_|Lines], []) ->
-    merge_lines_822(Lines, [Line]);
-merge_lines_822([Line=" "++_|Lines], [Prev|Acc]) ->
-    merge_lines_822(Lines, [Prev++Line|Acc]);
-merge_lines_822(["\t"++Line|Lines], [Prev|Acc]) ->
-    merge_lines_822(Lines, [Prev++[$ |Line]|Acc]);
-merge_lines_822([Line|Lines], Acc) ->
-    merge_lines_822(Lines, [Line|Acc]).
-
 
 %% parse POST data when ENCTYPE is unset or
 %% Content-type: application/x-www-form-urlencoded
@@ -401,89 +522,46 @@ merge_lines_822([Line|Lines], Acc) ->
 %% which is used for file upload
 
 parse_post_data_urlencoded(Bin) ->
-    parse_post_data_urlencoded(Bin, ['ALLSTRINGS']).
+    do_parse_spec(Bin, nokey, [], key).
 
-parse_post_data_urlencoded(Bin, Spec) ->
-    do_parse_spec(Bin, Spec, nokey, [], key).
-
-%% Spec is a typelist of the types we expect
-%% acceptable types are
-
-%% int
-%% float
-%% string
-%% ip
-%% binary
-%% checkbox
-%% 'ALLSTRINGS' 
-
-%% special value ['ALLSTRINGS'] can be used in order to denote that
-%% the remainder of the args are all strings
 
 %% It will return a [{Key, Value}] list from the post data
-%% with the same length as the Spec or EXIT
-%% special value undefined is reserverd for non set fields
-%% Key wil always be a regular atom.
-do_parse_spec(<<$%, Hi:8, Lo:8, Tail/binary>>, Spec, Last, Cur, State) 
+
+do_parse_spec(<<$%, Hi:8, Lo:8, Tail/binary>>, Last, Cur, State)
     when Hi /= $u ->
     Hex = yaws:hex_to_integer([Hi, Lo]),
-    do_parse_spec(Tail, Spec, Last, [ Hex | Cur],  State);
-               
-do_parse_spec(<<$&, Tail/binary>>, Spec, _Last , Cur,  key) ->
+    do_parse_spec(Tail, Last, [ Hex | Cur],  State);
+
+do_parse_spec(<<$&, Tail/binary>>, _Last , Cur,  key) ->
     [{lists:reverse(Cur), undefined} |
-     do_parse_spec(Tail, Spec, nokey, [], key)];  %% cont keymode
+     do_parse_spec(Tail, nokey, [], key)];  %% cont keymode
 
-do_parse_spec(<<$&, Tail/binary>>, Spec, Last, Cur, value) ->
-    [S|Ss] = tail_spec(Spec),
-    V = {Last, coerce_type(S, Cur)},
-    [V | do_parse_spec(Tail, Ss, nokey, [], key)];
+do_parse_spec(<<$&, Tail/binary>>, Last, Cur, value) ->
+    V = {Last, lists:reverse(Cur)},
+    [V | do_parse_spec(Tail, nokey, [], key)];
 
-do_parse_spec(<<$+, Tail/binary>>, Spec, Last, Cur,  State) ->
-    do_parse_spec(Tail, Spec, Last, [$\s|Cur], State);
+do_parse_spec(<<$+, Tail/binary>>, Last, Cur,  State) ->
+    do_parse_spec(Tail, Last, [$\s|Cur], State);
 
-do_parse_spec(<<$=, Tail/binary>>, Spec, _Last, Cur, key) ->
-    do_parse_spec(Tail, Spec, lists:reverse(Cur), [], value); %% change mode
+do_parse_spec(<<$=, Tail/binary>>, _Last, Cur, key) ->
+    do_parse_spec(Tail, lists:reverse(Cur), [], value); %% change mode
 
-do_parse_spec(<<$%, $u, A:8, B:8,C:8,D:8, Tail/binary>>, 
-	       Spec, Last, Cur, State) ->
-    %% non-standard encoding for Unicode characters: %uxxxx,		     
+do_parse_spec(<<$%, $u, A:8, B:8,C:8,D:8, Tail/binary>>,
+	       Last, Cur, State) ->
+    %% non-standard encoding for Unicode characters: %uxxxx,
     Hex = yaws:hex_to_integer([A,B,C,D]),
-    do_parse_spec(Tail, Spec, Last, [ Hex | Cur],  State);
+    do_parse_spec(Tail, Last, [ Hex | Cur],  State);
 
-do_parse_spec(<<H:8, Tail/binary>>, Spec, Last, Cur, State) ->
-    do_parse_spec(Tail, Spec, Last, [H|Cur], State);
-do_parse_spec(<<>>, _Spec, nokey, Cur, _State) ->
+do_parse_spec(<<H:8, Tail/binary>>, Last, Cur, State) ->
+    do_parse_spec(Tail, Last, [H|Cur], State);
+do_parse_spec(<<>>, nokey, Cur, _State) ->
     [{lists:reverse(Cur), undefined}];
-do_parse_spec(<<>>, Spec, Last, Cur, _State) ->
-    [S|_Ss] = tail_spec(Spec),
-    [{Last, coerce_type(S, Cur)}];
-do_parse_spec(undefined,_,_,_,_) ->
+do_parse_spec(<<>>, Last, Cur, _State) ->
+    [{Last, lists:reverse(Cur)}];
+do_parse_spec(undefined,_,_,_) ->
     [];
-do_parse_spec(QueryList, Spec, Last, Cur, State) when is_list(QueryList) ->
-    do_parse_spec(list_to_binary(QueryList), Spec, Last, Cur, State).
-
-
-tail_spec(['ALLSTRINGS']) ->
-    [string, 'ALLSTRINGS'];
-tail_spec(L) ->
-    L.
-
-coerce_type(_, []) ->
-    undefined;
-coerce_type(int, Str) ->
-    list_to_integer(lists:reverse(Str));
-coerce_type(float, Str) ->
-    list_to_float(lists:reverse(Str));
-coerce_type(string, Str) ->
-    lists:reverse(Str);
-coerce_type(checkbox, "no") ->
-    on;
-coerce_type(checkbox, _Str) ->
-    off;
-coerce_type(ip, _Str) ->
-    erlang:error(nyi_ip);
-coerce_type(binary, Str) ->
-    list_to_binary(lists:reverse(Str)).
+do_parse_spec(QueryList, Last, Cur, State) when is_list(QueryList) ->
+    do_parse_spec(list_to_binary(QueryList), Last, Cur, State).
 
 
 code_to_phrase(100) -> "Continue";
@@ -551,7 +629,7 @@ ssi(DocRoot, Files) ->
                               {ok, Bin} ->
                                   Bin;
                               {error, Reason} ->
-                                  io_lib:format("Cannot include file ~p: ~p", 
+                                  io_lib:format("Cannot include file ~p: ~p",
                                                 [F, Reason])
                           end
                   end, Files),
@@ -567,7 +645,7 @@ pre_ssi_string(Str) ->
     pre_ssi_string(Str, "box").
 
 pre_ssi_string(Str, Class) ->
-    {html, ["<br><br>\n<div class=\"", Class, "\"> <pre>\n", 
+    {html, ["<br><br>\n<div class=\"", Class, "\"> <pre>\n",
             htmlize_l(Str),
             "\n</pre></div>\n<br>\n\n"]}.
 
@@ -616,7 +694,7 @@ htmlize_l([$&|Tail], Acc) ->
     htmlize_l(Tail, [$;,$p,$m,$a,$&|Acc]);
 htmlize_l([$"|Tail], Acc) ->
     htmlize_l(Tail, [$; , $t, $o,  $u,  $q  ,$&|Acc]);
-           
+
 htmlize_l([X|Tail], Acc) when is_integer(X) ->
     htmlize_l(Tail, [X|Acc]);
 htmlize_l([X|Tail], Acc) when is_binary(X) ->
@@ -665,7 +743,7 @@ setcookie(Name, Value, Path, Expire, Domain, Secure) ->
 
 
 %% This function can be passed the cookie we get in the Arg#arg.headers.cookies
-%% to search for a specific cookie 
+%% to search for a specific cookie
 %% return [] if not found
 %%        Str if found
 %% if serveral cookies with the same name are passed fron the browser,
@@ -698,14 +776,14 @@ eat_cookie(Cookie, Str) when is_list(Cookie),is_list(Str) ->
     end.
 
 %% Look for the Cookie and extract its value.
-eat_cookie2(_, [], _)    -> 
+eat_cookie2(_, [], _)    ->
     throw("not found");
-eat_cookie2([H|T], [H|R], C) -> 
+eat_cookie2([H|T], [H|R], C) ->
     eat_cookie2(T, R, C);
 eat_cookie2([H|_], [X|R], C) when H =/= X ->
     {_,Rest} = eat_until(R, $;),
     eat_cookie(C, Rest);
-eat_cookie2([], L, _) -> 
+eat_cookie2([], L, _) ->
     {Meat,_} = eat_until(L, $;),
     Meat.
 
@@ -722,7 +800,7 @@ url_decode([$%, Hi, Lo | Tail]) ->
             Hex = yaws:hex_to_integer([Hi, Lo]),
             [Hex | url_decode(Tail)];
             url_decode([$?|T]) ->
-                   %% Don't decode the query string here, that is 
+                   %% Don't decode the query string here, that is
                    %% parsed separately.
                    [$?|T];
             url_decode([H|T]) when is_integer(H) ->
@@ -740,18 +818,20 @@ path_norm(Path) ->
 path_norm_reverse("/" ++ T) -> start_dir(0, "/", T);
 path_norm_reverse(       T) -> start_dir(0,  "", T).
 
+start_dir(N, Path, [$\\|T]    ) -> start_dir(N, Path, [$/|T]);
 start_dir(N, Path, ".."       ) -> rest_dir(N, Path, "");
 start_dir(N, Path, "/"   ++ T ) -> start_dir(N    , Path, T);
 start_dir(N, Path, "./"  ++ T ) -> start_dir(N    , Path, T);
 start_dir(N, Path, "../" ++ T ) -> start_dir(N + 1, Path, T);
 start_dir(N, Path,          T ) -> rest_dir (N    , Path, T).
 
-rest_dir (_N, Path, []         ) -> case Path of 
+rest_dir (_N, Path, []         ) -> case Path of
                                         [] -> "/";
                                         _  -> Path
                                     end;
 rest_dir (0, Path, [ $/ | T ] ) -> start_dir(0    , [ $/ | Path ], T);
 rest_dir (N, Path, [ $/ | T ] ) -> start_dir(N - 1,        Path  , T);
+rest_dir (N, Path, [ $\\ | T ] ) -> rest_dir(N, Path, [$/|T]);
 rest_dir (0, Path, [  H | T ] ) -> rest_dir (0    , [  H | Path ], T);
 rest_dir (N, Path, [  _H | T ] ) -> rest_dir (N    ,        Path  , T).
 
@@ -767,10 +847,10 @@ url_decode_q_split([$%, Hi, Lo | Tail], Ack) ->
     end,
     url_decode_q_split(Tail, [Hex|Ack]);
 url_decode_q_split([$?|T], Ack) ->
-    %% Don't decode the query string here, 
+    %% Don't decode the query string here,
     %% that is parsed separately.
     {path_norm_reverse(Ack), T};
-url_decode_q_split([H|T], Ack) when H /= 0 -> 
+url_decode_q_split([H|T], Ack) when H /= 0 ->
     url_decode_q_split(T, [H|Ack]);
 url_decode_q_split([], Ack) ->
     {path_norm_reverse(Ack), []}.
@@ -808,13 +888,13 @@ is_nb_space(X) ->
 
 %% ret: {line, Line, Trail} | {lastline, Line, Trail} | need_more
 
-get_line(L) ->    
+get_line(L) ->
     get_line(L, []).
 get_line("\r\n\r\n" ++ Tail, Cur) ->
     {lastline, lists:reverse(Cur), Tail};
 get_line("\r\n" ++ Tail, Cur) when Tail /= []  ->
     case is_nb_space(hd(Tail)) of
-        true ->  %% multiline ... continue 
+        true ->  %% multiline ... continue
             get_line(Tail, [$\n, $\r | Cur]);
         false ->
             {line, lists:reverse(Cur), Tail}
@@ -976,7 +1056,7 @@ set_access_log(Bool) ->
 %% interactively turn on|off tracing to the tty (as well)
 %% typically useful in embedded mode
 set_tty_trace(Bool) ->
-    gen_server:call(yaws_log, {trace_tty, Bool}, infinity).
+    yaws_log:trace_tty(Bool).
 
 
 
@@ -993,7 +1073,7 @@ reformat_header(H) ->
                      {true, I};
                 (undefined) ->
                      false
-             end, 
+             end,
              [
               if H#headers.connection == undefined ->
                       undefined;
@@ -1152,7 +1232,7 @@ parse_url(Str, Strict) ->
         "http://" ++ Rest ->
             parse_url(host, Strict, #url{scheme = http}, Rest, []);
         "https://" ++ Rest ->
-            parse_url(host, Strict, #url{scheme = https}, Rest, []);        
+            parse_url(host, Strict, #url{scheme = https}, Rest, []);
         "ftp://" ++ Rest ->
             parse_url(host, Strict, #url{scheme = ftp}, Rest, []);
         "file://" ++ Rest ->
@@ -1165,7 +1245,7 @@ parse_url(Str, Strict) ->
 parse_url(host, Strict, U, Str, Ack) ->
     case Str of
         [] ->
-            U#url{host = lists:reverse(Ack), 
+            U#url{host = lists:reverse(Ack),
                   path = "/"
                  };
         [$/|Tail] ->
@@ -1174,8 +1254,25 @@ parse_url(host, Strict, U, Str, Ack) ->
         [$:|T] ->
             U2 = U#url{host = lists:reverse(Ack)},
             parse_url(port, Strict, U2, T,[]);
+        [$[|T] ->
+            parse_url(ipv6, Strict, U, T, [$[]);
         [H|T] ->
             parse_url(host, Strict, U, T, [H|Ack])
+    end;
+parse_url(ipv6, Strict, U, Str, Ack) ->
+    case Str of
+        [$]] ->
+            U#url{host = lists:reverse([$]|Ack]),
+                  path = "/"
+                 };
+        [$], $/|T] ->
+            U2 = U#url{host = lists:reverse([$]|Ack])},
+            parse_url(path, Strict, U2, T,"/");
+        [$], $:|T] ->
+            U2 = U#url{host = lists:reverse([$]|Ack])},
+            parse_url(port, Strict, U2, T,[]);
+        [H|T] ->
+            parse_url(ipv6, Strict, U, T, [H|Ack])
     end;
 parse_url(port, Strict, U, Str, Ack) ->
     case Str of
@@ -1200,11 +1297,11 @@ parse_url(path, Strict, U, Str, Ack) ->
     end.
 
 
-%% used to construct redir headers from partial URLs such 
+%% used to construct redir headers from partial URLs such
 %% as e.g. /foo/bar
 
 format_partial_url(Url, SC) ->
-    [if 
+    [if
          Url#url.scheme == undefined ->
              yaws:redirect_scheme(SC);
          true ->
@@ -1234,7 +1331,7 @@ format_partial_url(Url, SC) ->
 
 format_url(Url) when is_record(Url, url) ->
     [
-     if 
+     if
          Url#url.scheme == undefined ->
              "http://";
          true ->
@@ -1263,8 +1360,8 @@ is_absolute_URI(_) ->
 
 is_abs_URI1([$:|_]) ->
     true;
-is_abs_URI1([C|T]) when 
-((C>=$a) and (C=<$z)) 
+is_abs_URI1([C|T]) when
+((C>=$a) and (C=<$z))
 or ((C>=$A) and (C=<$Z))
 or ((C>=$0) and (C=<$9))
 or (C==$+) or (C==$-) or (C==$.) ->
@@ -1295,12 +1392,12 @@ ehtml_expand({ssi,File, Del, Bs}) ->
     end;
 
 
-%%!todo (low priority) - investigate whether tail-recursion would be of any 
+%%!todo (low priority) - investigate whether tail-recursion would be of any
 %% benefit here instead of the current ehtml_expand(Body) recursion.
-%%                - provide a tail_recursive version & add a file in the 
+%%                - provide a tail_recursive version & add a file in the
 %% benchmarks folder to measure it.
                                                 %
-ehtml_expand({Tag}) -> 
+ehtml_expand({Tag}) ->
     ["<", atom_to_list(Tag), " />"];
 ehtml_expand({pre_html, X}) -> X;
 ehtml_expand({Tag, Attrs}) ->
@@ -1339,7 +1436,7 @@ ehtml_attrs([{check, Name, Value} | Tail]) ->
                      is_integer(Value) -> [$",integer_to_list(Value),$"];
                      is_float(Value) -> [$",float_to_list(Value),$"]
                    end,
-                   [[$ |atom_to_list(Name)], 
+                   [[$ |atom_to_list(Name)],
                     [$=|ValueString]|ehtml_attrs(Tail)].
 
 
@@ -1447,7 +1544,7 @@ ehtml_expander({Tag, Attrs}, Before, After) ->
                         After);
 ehtml_expander({Tag, Attrs, Body}, Before, After) ->
     ehtml_expander(Body,
-                   [["\n<", atom_to_list(Tag), 
+                   [["\n<", atom_to_list(Tag),
                      ehtml_attrs_expander(Attrs), ">"]|
                     Before],
                    ["</", atom_to_list(Tag), ">"|After]);
@@ -1478,9 +1575,9 @@ ehtml_attrs_expander(Var) when is_atom(Var) ->
     [{ehtml_attrs, ehtml_var_name(Var)}].
 
 ehtml_attr_part_expander(A) when is_atom(A) ->
-    case ehtml_var_p(A) of
-        true  -> {preformatted, ehtml_var_name(A)};
-        false -> atom_to_list(A)
+    case atom_to_list(A) of
+        [$$|_Rest] -> {preformatted, ehtml_var_name(A)};
+        Other -> Other
     end;
 ehtml_attr_part_expander(I) when is_integer(I) -> integer_to_list(I);
 ehtml_attr_part_expander(S) when is_list(S) -> S.
@@ -1517,14 +1614,10 @@ ehtml_eval({Type, Var}, Env) ->
 %% Get the name part of a variable reference.
 %% e.g. ehtml_var_name('$foo') -> foo.
 ehtml_var_name(A) when is_atom(A) ->
-    case ehtml_var_p(A) of
-        true -> list_to_atom(tl(atom_to_list(A)));
-        false -> erlang:error({bad_ehtml_var_name, A})
+    case atom_to_list(A) of
+        [$$|Rest] -> list_to_atom(Rest);
+        _Other -> erlang:error({bad_ehtml_var_name, A})
     end.
-
-%% Is X a variable reference? Variable references are atoms starting with $.
-ehtml_var_p(X) when is_atom(X) -> hd(atom_to_list(X)) == $$;
-ehtml_var_p(_) -> false.
 
 ehtml_expander_test() ->
     %% Expr is a template containing variables.
@@ -1558,7 +1651,7 @@ ehtml_expander_test() ->
 %% call_cgi calls the script `Scriptfilename' (full path).  If
 %% `Exefilename' is given, it is the executable to handle this,
 %% otherwise `Scriptfilame' is assumed to be executable itself.
-%% 
+%%
 %% Note however, that these functions usually generate stream content.
 %% (If you have good use for a version generating {content, _, _}
 %% instead, contact carsten@codimi.de)
@@ -1566,26 +1659,26 @@ ehtml_expander_test() ->
 %% Also note, that they may return `get_more' and expect to be called
 %% again.
 
-call_cgi(Arg, Scriptfilename) ->                                     
+call_cgi(Arg, Scriptfilename) ->
     yaws_cgi:call_cgi(Arg, Scriptfilename).
 
-call_cgi(Arg, Exefilename, Scriptfilename) -> 
+call_cgi(Arg, Exefilename, Scriptfilename) ->
     yaws_cgi:call_cgi(Arg, Exefilename, Scriptfilename).
 
-%% call_fci_responder issues a responder role call to the FastCGI 
+%% call_fci_responder issues a responder role call to the FastCGI
 %% application server. It returns the same return value as out/1.
 %%
-%% call_fci_authorizer issues a authorizer role call to the FastCGI 
+%% call_fci_authorizer issues a authorizer role call to the FastCGI
 %% application server. It returns:
 %%
-%% {denied, Out} : Access is denied. Out is the same return value as 
+%% {denied, Out} : Access is denied. Out is the same return value as
 %% out/1.
 %%
 %% {allowed, Variables} : Access is allowed. Variables is a list of
 %% environment variables returned by the authorization server using
 %% Variable-XXX: YYY headers.
 %%
-%% Note: the FastCGI filter role is not yet supported. 
+%% Note: the FastCGI filter role is not yet supported.
 %%
 %% The following information is taken from the server configuration:
 %% - The hostname (or address) and port number of the application server.
@@ -1639,10 +1732,10 @@ deepmember(C,[N|Cs]) when C /= N ->
     deepmember(C, Cs).
 
 
-%%  Parse a Set-Cookie header. 
-%% 
+%%  Parse a Set-Cookie header.
+%%
 %%  RFC (2109) ports are from RFC 2965
-%% 
+%%
 %%  "Cookie:" cookie-version 1*((";" | ",") cookie-value)
 %%  "Set-Cookie:"  cookies
 %%  "Set-Cookie2:" cookies
@@ -1654,7 +1747,7 @@ deepmember(C,[N|Cs]) when C /= N ->
 %%  path            =       "$Path" "=" value
 %%  domain          =       "$Domain" "=" value
 %%  port            =       "$Port" "=" <"> value <">
-%% 
+%%
 %%  cookie-av       = "Comment" "=" value
 %%                  | "CommentURL" "=" <"> http_URL <">
 %%                  | "Discard"
@@ -1664,7 +1757,7 @@ deepmember(C,[N|Cs]) when C /= N ->
 %%                  | "Port" [ "=" <"> portlist <"> ]
 %%                  | "Secure"
 %%                  | "Version" "=" 1*DIGIT
-%% 
+%%
 
 parse_set_cookie(Str) ->
     parse_set_cookie(Str, #setcookie{}).
@@ -1716,7 +1809,7 @@ parse_quoted([], Acc) ->
     {lists:reverse(Acc), true, []};
 parse_quoted([$"|T], Acc) ->
     {lists:reverse(Acc), true, T};
-parse_quoted([$\\,C|T], Acc) ->    
+parse_quoted([$\\,C|T], Acc) ->
     parse_quoted(T,[C,$\\|Acc]);
 parse_quoted([C|T], Acc) ->
     parse_quoted(T,[C|Acc]).
@@ -1819,7 +1912,7 @@ postvar(ARG, Key) ->
 
 filter_parse(Key, Parse) ->
     case lists:filter(fun(KV) ->
-                              (Key == element(1, KV)) 
+                              (Key == element(1, KV))
                                   andalso
                                     (element(2, KV) /= undefined)
                       end,
@@ -1905,7 +1998,7 @@ setconf(GC0, Groups0) ->
 setconf(GC0, Groups0, CheckCertsChanged) ->
     CertsChanged = if CheckCertsChanged == true ->
                            lists:member(yes,gen_server:call(
-                                              yaws_server, 
+                                              yaws_server,
                                               check_certs, infinity));
                       true ->
                            false
@@ -1917,7 +2010,7 @@ setconf(GC0, Groups0, CheckCertsChanged) ->
         true ->
             ok
     end,
-    
+
     {GC, Groups1} = yaws_config:verify_upgrade_args(GC0, Groups0),
     Groups2 = lists:map(fun(X) -> yaws_config:add_yaws_auth(X) end, Groups1),
     {ok, OLDGC, OldGroups} = yaws_api:getconf(),
@@ -1925,7 +2018,7 @@ setconf(GC0, Groups0, CheckCertsChanged) ->
           yaws_config:can_soft_setconf(GC, Groups2, OLDGC, OldGroups)} of
         {true, true} ->
             yaws_config:soft_setconf(GC, Groups2, OLDGC, OldGroups);
-        {true, false} when OLDGC == undefined -> 
+        {true, false} ->
             yaws_config:hard_setconf(GC, Groups2);
         _ ->
             {error, need_restart}
@@ -1966,6 +2059,12 @@ embedded_start_conf(DocRoot, SL, GL, Id)
                       [[yaws:create_sconf(DocRoot, SLItem)] || SLItem <- SL]
               end,
     SoapChild = yaws_config:add_yaws_soap_srv(GC, false),
+
+    %% In case a server is started before any configuration has been set,
+    %% this makes it possible to get hold of the 'pending' configuration.
+    %% (see for example the start of the yaws_session_server)
+    ok = application:set_env(yaws, embedded_conf, [{sclist,SCList},{gc,GC}]),
+
     {ok, SCList, GC, ChildSpecs ++ SoapChild}.
 
 
@@ -1996,16 +2095,16 @@ dir_listing(Arg, RelDir) ->
 %% Returns #redir_self{} record
 redirect_self(A) ->
     SC = get(sc),
-    {Port, PortStr} = 
+    {Port, PortStr} =
         case {SC#sconf.rmethod, SC#sconf.ssl, SC#sconf.port} of
             {"https", _, 443} -> {443, ""};
             {"http", _, 80} -> {80, ""};
             {_, undefined, 80} -> {80, ""};
-            {_, undefined, Port2} -> 
+            {_, undefined, Port2} ->
                 {port, [$:|integer_to_list(Port2)]};
             {_, _SSL, 443} ->
                 {443, ""};
-            {_, _SSL, Port2} -> 
+            {_, _SSL, Port2} ->
                 {Port2, [$:|integer_to_list(Port2)]}
         end,
     H = A#arg.headers,
@@ -2015,7 +2114,7 @@ redirect_self(A) ->
                [H0, _] -> H0;
                [H1] -> H1
            end,
-    {Scheme, SchemeStr} = 
+    {Scheme, SchemeStr} =
         case {SC#sconf.ssl,SC#sconf.rmethod} of
             {_, Method} when is_list(Method) ->
                 {list_to_atom(Method), Method++"://"};
@@ -2029,3 +2128,36 @@ redirect_self(A) ->
                 scheme_str = SchemeStr,
                 port = Port,
                 port_str = PortStr}.
+
+%% Boyer-Moore searching, used for parsing multipart/form-data
+bm_start(Str) ->
+    Len = length(Str),
+    Tbl = bm_set_shifts(Str, Len),
+    {Tbl, list_to_binary(Str), lists:reverse(Str), Len}.
+
+bm_find(Bin, SearchCtx) ->
+    bm_find(Bin, SearchCtx, 0).
+bm_find(Bin, {_, _, _, Len}, Pos) when size(Bin) < (Pos + Len) ->
+    nomatch;
+bm_find(Bin, {Tbl, BStr, RevStr, Len}=SearchCtx, Pos) ->
+    case Bin of
+        <<_:Pos/binary, BStr:Len/binary, _/binary>> ->
+            {Pos, Len};
+        <<_:Pos/binary, NoMatch:Len/binary, _/binary>> ->
+            RevNoMatch = lists:reverse(binary_to_list(NoMatch)),
+            Shift = bm_next_shift(RevNoMatch, RevStr, 0, Tbl),
+            bm_find(Bin, SearchCtx, Pos+Shift)
+    end.
+
+bm_set_shifts(Str, Len) ->
+    erlang:make_tuple(256, Len, bm_set_shifts(Str, 0, Len, [])).
+bm_set_shifts(_Str, Count, Len, Acc) when Count =:= Len-1 ->
+    lists:reverse(Acc);
+bm_set_shifts([H|T], Count, Len, Acc) ->
+    Shift = Len - Count - 1,
+    bm_set_shifts(T, Count+1, Len, [{H+1,Shift}|Acc]).
+
+bm_next_shift([H|T1], [H|T2], Comparisons, Tbl) ->
+    bm_next_shift(T1, T2, Comparisons+1, Tbl);
+bm_next_shift([H|_], _, Comparisons, Tbl) ->
+    erlang:max(element(H+1, Tbl) - Comparisons, 1).

@@ -34,8 +34,9 @@
 
 %% interface for api_tx calls
 % Public Interface
--type json_value() :: {struct, [{type, string()} %% "as_is", "as_bin"
-                                | {value, client_value()}]}.
+-type json_value() :: {struct, [{type | string(), string()} %% {"type", "as_is" | "as_bin"}
+                                | {value | string(), client_value()} %% {"value", ...}
+                               ]}.
 
 -type request() :: {read, client_key()}
                  | {write, client_key(), json_value()}
@@ -132,11 +133,11 @@ value_to_json(Value) when is_binary(Value) ->
 value_to_json(Value) ->
     {value, {struct, [{type, "as_is"}, {value, Value}]}}.
 
-json_to_value({struct, [{type, "as_bin"}, {value, Value}]}) ->
+json_to_value({struct, [{"type", "as_bin"}, {"value", Value}]}) ->
     base64:decode(Value);
-json_to_value({struct, [{type, "as_is"}, {value, {array, List}}]}) ->
+json_to_value({struct, [{"type", "as_is"}, {"value", {array, List}}]}) ->
     List;
-json_to_value({struct, [{type, "as_is"}, {value, Value}]}) ->
+json_to_value({struct, [{"type", "as_is"}, {"value", Value}]}) ->
     Value.
 
 %% interface for api_pubsub calls

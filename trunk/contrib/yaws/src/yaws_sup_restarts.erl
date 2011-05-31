@@ -29,20 +29,20 @@ start_link() ->
 init([]) ->
     Sess = {yaws_session_server, {yaws_session_server, start_link, []},
             permanent, 5000, worker, [yaws_session_server]},
-    YawsRSS = {yaws_rss, 
+    YawsRSS = {yaws_rss,
                {yaws_rss, start_link, []},
                permanent, 5000, worker, [yaws_rss]},
-    
 
-    YawsEventManager = {yaws_event_manager, 
+
+    YawsEventManager = {yaws_event_manager,
                         {gen_event, start_link,[{local,yaws_event_manager}]},
                         permanent, 5000, worker, [gen_event]},
 
 
-    SendFile = case yaws_sendfile_compat:enabled() of
+    SendFile = case yaws_sendfile:enabled() of
                    true ->
-                       [{yaws_sendfile, 
-                         {yaws_sendfile_compat, start_link, []},
+                       [{yaws_sendfile,
+                         {yaws_sendfile, start_link, []},
                          permanent, 5000, worker, [yaws_sendfile]}];
                    false ->
                        []

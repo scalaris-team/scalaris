@@ -15,7 +15,7 @@ out(A) ->
         _ -> yaws_rpc:handler_session(A2, {?MODULE, handler})
     end.
 
-handler([{ip, _IP}] = _State, {call, Operation, Params}, Session) ->
+handler([{ip, _IP}] = _State, {call, Operation, {array, Params}}, Session) ->
     {true, 0, Session, {response, handler(Operation, Params)}}.
 
 handler(nop, [Value]) -> "ok";

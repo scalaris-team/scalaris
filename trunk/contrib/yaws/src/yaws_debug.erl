@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------
 %%% File    : yaws_debug.erl
 %%% Author  : Claes Wikstrom <klacke@hyber.org>
-%%% Purpose : 
+%%% Purpose :
 %%% Created :  7 Feb 2002 by Claes Wikstrom <klacke@hyber.org>
 %%%----------------------------------------------------------------------
 
@@ -24,7 +24,7 @@
          check_headers/1, nobin/1,
          do_debug_dump/1
         ]).
-         
+
 
 
 typecheck([{record, Rec, X} | Tail], File, Line) when is_atom(X),
@@ -53,8 +53,8 @@ format_record(Record, Name, Fields) ->
 
 format_record([], []) ->
     [];
-format_record([Val|Vals], [F|Fs]) when is_integer(Val); 
-                                       Val == []; 
+format_record([Val|Vals], [F|Fs]) when is_integer(Val);
+                                       Val == [];
                                        is_atom(Val);
                                        is_float(Val)->
     [io_lib:format("     ~w = ~w\n", [F,Val]),
@@ -99,8 +99,8 @@ assert(lesser,X,Y,_) when is_integer(X), is_integer(Y), X<Y ->
     ok;
 assert(max,X,Y,_) when is_integer(X), is_integer(Y), X=<Y ->
     ok;
-assert(interval,X,{Min,Max},_) when is_integer(X), is_integer(Min), 
-                                    is_integer(Max), 
+assert(interval,X,{Min,Max},_) when is_integer(X), is_integer(Min),
+                                    is_integer(Max),
                                     X>=Min, Max>=X ->
     ok;
 assert('fun', Fun, _, Failure) ->
@@ -129,7 +129,7 @@ fail({alert,File,Line,Message}) ->
 fail({{debug,Fstr}, File,Line,Fmt, Args}) ->
     Str = lists:flatten(
             io_lib:format("~s <~p> ~s:~p, pid ~w: ~n",
-                          [Fstr, node(), filename:basename(File), 
+                          [Fstr, node(), filename:basename(File),
                            Line, self()])),
 
     case (catch io:format(user, Str ++ Fmt ++ "~n", Args)) of
@@ -193,9 +193,9 @@ pids() ->
       fun(P) ->
               case process_info(P) of
                   L when is_list(L) ->
-                      {value, {_, {M1, _,_}}} = 
+                      {value, {_, {M1, _,_}}} =
                           lists:keysearch(current_function, 1, L),
-                      {value, {_, {M2, _,_}}} = 
+                      {value, {_, {M2, _,_}}} =
                           lists:keysearch(initial_call, 1, L),
                       S1= atom_to_list(M1),
                       S2 = atom_to_list(M2),
@@ -322,7 +322,7 @@ do_debug_dump(Socket) ->
     gen_version(Socket),
     gen_sep(Socket),
     %% keep proc status last, to report on hangs for the others
-    CollectOS = gen_os(Socket),		    
+    CollectOS = gen_os(Socket),
     Collect = lists:foldl(fun({F, Str}, Acc) ->
 				  Ret = collect(F, Socket, Str),
 				  gen_sep(Socket),
@@ -350,7 +350,7 @@ gen_os(Socket) ->
      gen_oscmd(Socket, top_cmd(OSType)),
      gen_oscmd(Socket, netstat_cmd(OSType))].
 
-gen_oscmd(Socket, Cmd) ->    
+gen_oscmd(Socket, Cmd) ->
     F = fun(Sock) ->
 		sock_format(Sock, "~s:~n~s~n", [Cmd, os:cmd(Cmd)])
 	end,
@@ -374,10 +374,10 @@ netstat_cmd({unix, linux})   -> "netstat -ant";
 netstat_cmd({unix, freebsd}) -> "netstat -an -p tcp";
 netstat_cmd({unix, sunos})   -> "netstat -an -P tcp";
 netstat_cmd(_)               -> "netstat -an".
-		
-gen_sep(Socket) ->    
+
+gen_sep(Socket) ->
     sock_format(Socket,"~n~s~n", [lists:duplicate(40, $*)]).
-    
+
 
 proc_status_fun() ->
     fun(Fd) ->
@@ -405,7 +405,7 @@ i2(Fd, Ps) ->
     {Reds,Msgs,Heap,Stack,Susp1,Susp2,MemSusp,_} =
         lists:foldl(fun display_info/2, {0,0,0,0,[],[],[],Fd}, Ps),
     iformat(Fd, "Total", "", "", io_lib:write(Reds), io_lib:write(Msgs),
-           io_lib:write(Heap), io_lib:write(Stack)),
+            io_lib:write(Heap), io_lib:write(Stack)),
     lists:foreach(fun(Susp) -> display_susp1(Fd, Susp) end, Susp1),
     lists:foreach(fun(Susp) -> display_susp2(Fd, Susp) end, Susp2),
     lists:foreach(fun(Susp) -> display_susp3(Fd, Susp) end, MemSusp).
@@ -440,7 +440,7 @@ display_info(Pid, {R,M,H,St,S1,S2,S3,Fd}) ->
             Heap = fetch(heap_size, Info),
             Stack = fetch(stack_size, Info),
             Mem = case process_info(Pid, memory) of
-                      false -> 0;
+                      undefined -> 0;
                       {memory, Int} -> Int
                   end,
             iformat(Fd,
@@ -487,15 +487,15 @@ display_susp1(Fd, {Pid, Reds0, LM0}) ->
             if LM1 > 0 ->
                     %% still suspicious
                     sock_format(Fd,
-                              "*** Suspicious *** : ~-12w, Qlen = ~4w/~-4w, "
-                              "Reds = ~12w/~-12w\n",
-                              [Pid, LM0, LM1, Reds0, Reds1]),
+                                "*** Suspicious *** : ~-12w, Qlen = ~4w/~-4w, "
+                                "Reds = ~12w/~-12w\n",
+                                [Pid, LM0, LM1, Reds0, Reds1]),
                     lists:foreach(
                       fun(Msg) -> sock_format(Fd, "  ~p\n",[Msg]) end,
                       Msgs),
                     gen_sep(Fd),
 		    sock_format(Fd, "\n\n\n\n*** Backtrace *** for ~w\n~s\n",
-                              [Pid,Bt]);
+                                [Pid,Bt]);
                true ->
                     ok
             end
@@ -526,12 +526,12 @@ display_susp3(Fd, {Pid, _Mem}) ->
 	    ok;
         {_, {current_function,{yaws_debug,display_susp3,2}}} ->
             ok;
-	{memory, Mem2} when Mem2 > ?MEM_LARGE ->
+	{{memory, Mem2}, _} when Mem2 > ?MEM_LARGE ->
             %% it's still too big
 	    case process_info(Pid, backtrace) of
 		{backtrace, Bin} ->
                     gen_sep(Fd),
-		    sock_format(Fd, 
+		    sock_format(Fd,
                                 "\n\n\n\n*** Backtrace (mem=~p) "
                                 "*** for ~w\n~p~n~s\n",
 				[Mem2, Pid, process_info(Pid),
@@ -599,7 +599,7 @@ collect(F, Sock, User) ->
 	    sock_format(Sock, "*** Failed to collect ~s: timeout~n", [User]),
 	    {pid, Pid}	% Let it hang for proc status, exit after
     end.
-    
+
 send_status(Sock) ->
     {InitStatus, _} = init:get_status(),
     sock_format(Sock, ["vsn: ", yaws_generated:version(), "\n"], []),
@@ -613,7 +613,7 @@ send_inet(Sock) ->
 
 
 %% This function runs a Fun that is producing IO through
-%% io:format() and collects the IO and retuns the IO as a char list   
+%% io:format() and collects the IO and retuns the IO as a char list
 %% Returns io_list() | {timeout, io_list()}
 %%
 capture_io(Fun) ->
@@ -624,9 +624,9 @@ capture_io(Fun) ->
 %%    Chars = do_capture_io(Fun),
 %%    timer:cancel(Tref),
 %%    Chars.
-    
+
 do_capture_io(Fun) ->
-    Pid = spawn(fun() -> 
+    Pid = spawn(fun() ->
                         receive run -> ok end,
                         Fun()
                 end),
@@ -645,9 +645,9 @@ collect_io(Pid, Mref, Ack) ->
         capio_timeout ->
             {timeout, Ack}
     end.
-    
 
 
-    
+
+
 
 

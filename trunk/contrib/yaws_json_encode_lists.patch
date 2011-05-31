@@ -1,0 +1,24 @@
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json.erl yaws-1.90.encode_lists/src/json.erl
+--- yaws-1.90/src/json.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_lists/src/json.erl	2011-05-31 17:20:11.043253523 +0200
+@@ -128,7 +128,7 @@
+     case is_string(L) of
+ 	yes -> encode_string(L);
+ 	unicode -> encode_string(xmerl_ucs:to_utf8(L));
+-	no -> exit({json_encode, {not_string, L}})
++	no -> encode({array, L})
+     end;
+ encode({array, Props}) when is_list(Props) -> encode_array(Props);
+ encode({struct, Props} = T) when is_list(Props) -> encode_object(T);
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json2.erl yaws-1.90.encode_lists/src/json2.erl
+--- yaws-1.90/src/json2.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_lists/src/json2.erl	2011-05-31 17:19:59.062263680 +0200
+@@ -87,7 +87,7 @@
+     case is_string(L) of
+ 	yes -> encode_string(L);
+ 	unicode -> encode_string(xmerl_ucs:to_utf8(L));
+-	no -> exit({json_encode, {not_string, L}})
++	no -> encode({array, L})
+     end;
+ encode({array, Props}) when is_list(Props) -> encode_array(Props);
+ encode({struct, Props} = T) when is_list(Props) -> encode_object(T);

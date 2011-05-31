@@ -47,7 +47,7 @@ class JSONConnection(object):
         Calls the given function with the given parameters via the JSON
         interface of Scalaris.
         """
-        params = {'version': '1.1',
+        params = {'jsonrpc': '2.0',
                   'method': function,
                   'params': params,
                   'id': 0}

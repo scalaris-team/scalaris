@@ -849,7 +849,7 @@ The following table shows how both objects look like:
 \bf Request & & \bf Result \\
 \begin{lstlisting}[language=java]
 {
-  "version": "1.1",
+  "jsonrpc": "2.0",
   "method" : "<method>",
   "params" : [<params>],
   "id"     : <number>
@@ -971,7 +971,7 @@ Make a transaction, that sets two keys & $\to$ & \\
 \begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
-{"version": "1.1",
+{"jsonrpc": "2.0",
  "params": [
   [
    { "write": { "keyA": {"type": "as_is", "value": "valueA"} } },
@@ -1018,7 +1018,7 @@ In a second transaction: Read the two keys & $\to$ & \\
 \begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
-{"version": "1.1",
+{"jsonrpc": "2.0",
  "params": [
   [
    { "read": "keyA" },
@@ -1064,7 +1064,7 @@ translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
 \begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
-{"version": "1.1",
+{"jsonrpc": "2.0",
  "params": [
   <TLOG>,
   [
