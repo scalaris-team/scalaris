@@ -19,7 +19,7 @@ diff --git a/src/jsonrpc.erl b/src/jsonrpc.erl
 index 9a37246..35d1357 100644
 --- a/src/jsonrpc.erl
 +++ b/src/jsonrpc.erl
-@@ -29,8 +29,72 @@
+@@ -29,8 +29,70 @@
  -module(jsonrpc).
  -author("Gaspar Chilingarov <nm@web.am>, Gurgen Tumanyan <barbarian@armkb.com>").
  -vsn("3").
@@ -37,8 +37,6 @@ index 9a37246..35d1357 100644
 +%%% Args -> list
 +%%%
 +call(URL, Options, Payload) ->
-+    dbg:tracer(), dbg:p(all, call),
-+    dbg:tpl(yaws_api, [{'$1',[],[{message,'$1'},{message,{caller}},{return_trace}]}]),
 +    try
 +        {ok, CallPayloadDeep} = encode_call_payload(Payload),
 +        CallPayload = lists:flatten(CallPayloadDeep),
