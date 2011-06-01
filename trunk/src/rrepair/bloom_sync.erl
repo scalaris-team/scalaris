@@ -64,7 +64,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 on({get_state_response, NodeDBInterval}, {_, SyncStruct} = State) ->
-    BloomInterval = SyncStruct#bloom_sync_struct.interval,
+    BloomInterval = SyncStruct#bloom_sync_struct.interval,    
     SyncInterval = intervals:intersection(NodeDBInterval, BloomInterval),
     case intervals:is_empty(SyncInterval) of
          true ->

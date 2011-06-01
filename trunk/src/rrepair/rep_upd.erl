@@ -95,21 +95,26 @@ on({get_chunk_response, DB}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
 %% @doc SyncStruct is build and can be send to a node for synchronization
 on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerState, Round, MonitorTable} = State) ->
     ?TRACE("~p", [SyncStruct]),
-    DhtNodePid = pid_groups:get_my(dht_node),
-    {_, _, RKey, RBr} = intervals:get_bounds(Interval),
-    Key = case RBr of
-              ')' -> RKey - 1;
-              ']' -> RKey
-          end,
-    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-    DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
-    comm:send_local(DhtNodePid, 
-                    {lookup_aux, DestKey, 0, 
-                        {send_to_group_member, ?PROCESS_NAME, 
-                            {request_sync, SyncMethod, SyncStruct}}}),
-    monitor:proc_set_value(MonitorTable, 
-                           io_lib:format("~p", [erlang:localtime()]), 
-                           io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey])),
+    _ = case intervals:is_empty(Interval) of	
+	    false ->
+		{_, _, RKey, RBr} = intervals:get_bounds(Interval),
+		Key = case RBr of
+			  ')' -> RKey - 1;
+			  ']' -> RKey
+		      end,
+		Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
+		DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
+		DhtNodePid = pid_groups:get_my(dht_node),
+		comm:send_local(DhtNodePid, 
+				{lookup_aux, DestKey, 0, 
+				 {send_to_group_member, ?PROCESS_NAME, 
+				  {request_sync, SyncMethod, SyncStruct}}}),
+		monitor:proc_set_value(MonitorTable, 
+				       io_lib:format("~p", [erlang:localtime()]), 
+				       io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey]));	    
+	    _ ->
+		ok
+    end,
     State;
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, MonitorTable} = State) ->
