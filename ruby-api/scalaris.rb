@@ -31,7 +31,7 @@ class Scalaris
     req.add_field 'Content-Type', 'application/json'
     req.body =
       {
-      :version => '1.1',
+      :jsonrpc => '2.0',
       :method => function,
       :params => params,
       :id => 0}.to_json
