@@ -322,6 +322,8 @@ parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState
             end,
     {Constraints, ParseState3} = lists:foldl(Foldl, {[], ParseState2}, ConstraintList),
     {{bounded_fun, InternalFunType, Constraints}, ParseState3};
+parse_type({paren_type, _Line, [InnerType]}, Module, ParseState) ->
+    parse_type(InnerType, Module, ParseState);
 parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
