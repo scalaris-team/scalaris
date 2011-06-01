@@ -5,9 +5,8 @@
 4a) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_lists.patch; cd -)'
 4b) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_floats.patch; cd -)'
 4c) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_unicode_keys.patch; cd -)'
-4d) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_array.patch; cd -)'
-4e) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_floats2.patch; cd -)'
-4f) cleanup: 'rm contrib/yaws/src/json*.erl.orig'
+4d) call '(cd contrib/yaws; patch -p1 < ../yaws_json_encode_floats2.patch; cd -)'
+4e) cleanup: 'rm contrib/yaws/src/json*.erl.orig'
 5) configure && make in the extracted yaws dir
 6) copy src/mime_types.erl and src/yaws_generated.erl to their respective folders in <scalaris>/contrib/yaws
 7) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
