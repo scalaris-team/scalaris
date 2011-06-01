@@ -31,7 +31,8 @@
 -include("scalaris.hrl").
 
 all() ->
-    [get_symmetric_keys_test].
+    [get_symmetric_keys_test,
+     simpleBloomSync].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -56,43 +57,52 @@ get_symmetric_keys_test(_) ->
 build_symmetric_ring(NodeCount, Config) ->
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    set_rrepair_config_parameter(),
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),    
     %Build ring with NodeCount symmetric nodes
     unittest_helper:make_ring_with_ids(
       fun() ->  get_symmetric_keys(NodeCount) end,
       [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}]}]),
     % wait for all nodes to finish their join 
     unittest_helper:check_ring_size_fully_joined(NodeCount),
-
-    %% write some data (use a function because left-over tx_timeout messages can disturb the tests):
-    Pid = erlang:spawn(fun() ->
-                               _ = [api_tx:write(erlang:integer_to_list(X), X) || X <- lists:seq(1, 100)]
-                       end),
-    unittest_helper:wait_for_process_to_die(Pid),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
+    % wait a bit for the rm-processes to settle
+    timer:sleep(500), 
+    set_rrepair_config_parameter(),
     ok.
 
 fill_symmetric_ring(DataCount, NodeCount) ->
     NodeIds = lists:sort(get_symmetric_keys(NodeCount)),
-    utils:for_to(1, 
-		 NodeCount div 4, 
-		 fun(I) ->
-			 FirstKey = lists:nth(I, NodeIds) - (DataCount + 1),
-			 %write DataCount-items to nth-Node and its symmetric replicas
-			 utils:for_to(FirstKey, 
-				      FirstKey + DataCount, 
-				      fun(Key) ->
-					      _RepKeys = ?RT:get_replica_keys(Key),
-					      %TODO WRITE VALUES
-					      ok
-				      end)
-		 end),
+    util:for_to(1, 
+		NodeCount div 4, 
+	        fun(I) ->
+			FirstKey = lists:nth(I, NodeIds) + 1,
+			%write DataCount-items to nth-Node and its symmetric replicas
+			util:for_to(FirstKey, 
+				    FirstKey + DataCount, 
+				    fun(Key) ->					      
+					    RepKeys = ?RT:get_replica_keys(Key),
+					    %write replica group
+					    lists:foreach(fun(X) -> 
+								  DBEntry = db_entry:new(X, "2", 2),
+								  %DBEntry = db_entry:new(X),
+								  api_dht_raw:unreliable_lookup(X, 
+												{set_key_entry, comm:this(), DBEntry}),
+								  receive {set_key_entry_reply, _} -> ok end
+							  end, 
+							  RepKeys),
+					    %random replica is outdated
+					    OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys)), RepKeys),
+					    api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
+					    receive {set_key_entry_reply, _} -> ok end,					      
+					    ok
+				    end)
+		end),
+    ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),
     ok.
 
 set_rrepair_config_parameter() ->
     %stop trigger
-    config:write(rep_update_interval, 100000000000),
+    config:write(rep_update_activate, false),
+    config:write(rep_update_interval, 100000),
     ok.
 
 end_per_testcase(_TestCase, _Config) ->
@@ -101,5 +111,7 @@ end_per_testcase(_TestCase, _Config) ->
     ok.
 
 simpleBloomSync(Config) ->
-    build_symmetric_ring(4, Config),
+    NodeCount = 4,
+    build_symmetric_ring(NodeCount, Config),
+    fill_symmetric_ring(10000, NodeCount),
     ok.
