@@ -38,9 +38,9 @@
                                 | {value | string(), client_value()} %% {"value", ...}
                                ]}.
 
--type request() :: {read, client_key()}
-                 | {write, client_key(), json_value()}
-                 | {commit}.
+-type request() :: {string(), client_key()} % {"read", ...}
+                 | {string(), {struct, [{client_key(), json_value()}]}} % {"write", {struct, [..., ...]}}
+                 | {string(), any()}. % {"commit", _}
 
 -type read_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
@@ -113,26 +113,29 @@ result_to_json(Result) ->
      end
     }.
 
-json_to_reqlist(JSON_ReqList) ->
-    {array, TmpReqList} = JSON_ReqList,
+-spec json_to_reqlist(JSON_ReqList::{array, [request()]}) -> [api_tx:request()].
+json_to_reqlist({array, TmpReqList}) ->
     [ case Elem of
-          {read, Key}                     -> {read, Key};
-          {write, {struct, [{Key, Val}]}} -> {write, atom_to_list(Key), json_to_value(Val)};
-          {commit, _}                     -> {commit};
-          Any                             -> Any
+          {"read", Key}                     -> {read, Key};
+          {"write", {struct, [{Key, Val}]}} -> {write, Key, json_to_value(Val)};
+          {"commit", _}                     -> {commit}
       end || {struct, [Elem]} <- TmpReqList ].
 
+-spec tlog_to_json(TLog::tx_tlog:tlog()) -> string().
 tlog_to_json(TLog) ->
     base64:encode_to_string(term_to_binary(TLog, [compressed, {minor_version, 1}])).
 
+-spec json_to_tlog(JsonTLog::string()) -> tx_tlog:tlog().
 json_to_tlog(JsonTLog) ->
     binary_to_term(base64:decode(JsonTLog)).
 
+-spec value_to_json(client_value()) -> {value, json_value()}.
 value_to_json(Value) when is_binary(Value) ->
     {value, {struct, [{type, "as_bin"}, {value, base64:encode_to_string(Value)}]}};
 value_to_json(Value) ->
     {value, {struct, [{type, "as_is"}, {value, Value}]}}.
 
+-spec json_to_value(json_value()) -> client_value().
 json_to_value({struct, [{"type", "as_bin"}, {"value", Value}]}) ->
     base64:decode(Value);
 json_to_value({struct, [{"type", "as_is"}, {"value", {array, List}}]}) ->

@@ -38,7 +38,7 @@
 -export([encode_value/1, decode_value/1]).
 
 -ifdef(with_export_type_support).
--export_type([read_result/0, write_result/0, commit_result/0, result/0]).
+-export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0]).
 -endif.
 
 -include("scalaris.hrl").
