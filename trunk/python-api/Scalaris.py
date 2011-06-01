@@ -547,7 +547,7 @@ class _ReqList(object):
         """
         Adds a commit operation to the request list.
         """
-        self.requests.append({'commit': 'commit'})
+        self.requests.append({'commit': ''})
         return self
     
     def getJSONRequests(self):

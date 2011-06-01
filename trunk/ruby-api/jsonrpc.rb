@@ -29,7 +29,7 @@ def req_list(sc)
   rlist = []
   rlist[0] = { :write => {'keyA' => sc._json_encode_value('valueA')} }
   rlist[1] = { :write => {'keyB' => sc._json_encode_value('valueB')} }
-  rlist[2] = { :commit => 'commit' }
+  rlist[2] = { :commit => '' }
 
   result = sc.json_call('req_list', [rlist])
   values = sc._json_replace_value_in_results(result['results'])
@@ -50,7 +50,7 @@ def req_list(sc)
   puts "  Modify keyA and commit."
   rlist3 = []
   rlist3[0] = { :write => {'keyA' => sc._json_encode_value('valueA2')} }
-  rlist3[1] = { :commit => 'commit' }
+  rlist3[1] = { :commit => '' }
   result = sc.json_call('req_list', [translog, rlist3])
   values = sc._json_replace_value_in_results(result['results'])
 
@@ -65,7 +65,7 @@ def req_list2(sc)
   rlist = []
   rlist[0] = { :write => {'keyA' => sc._json_encode_value('valueA')} }
   rlist[1] = { :write => {'keyB' => sc._json_encode_value('valueB')} }
-  rlist[2] = { :commit => 'commit' }
+  rlist[2] = { :commit => '' }
 
   result = sc.json_call('req_list', [rlist])
   values = sc._json_replace_value_in_results(result['results'])
@@ -81,7 +81,7 @@ def req_list2(sc)
 
   rlist3 = []
   rlist3[0] = { :write => {'keyA' => sc._json_encode_value('valueA2')} }
-  rlist3[1] = { :commit => 'commit' }
+  rlist3[1] = { :commit => '' }
   result = sc.json_call('req_list', [translog, rlist3])
   values = sc._json_replace_value_in_results(result['results'])
 
