@@ -178,11 +178,11 @@ encode_object({struct, _Props} = Obj) ->
 	end,
 	V = encode(Value),
 	case Acc of
-	    [] -> lists:append([S, ":", V]);
-	    _ -> lists:append([Acc, ",", S, ":", V])
+	    [] -> [S, $:, V];
+	    _ -> [Acc, $,, S, $:, V]
 	end
     end, [], Obj),
-    lists:append(["{", M, "}"]).
+    [${, M, $}].
 
 %% Encode an Erlang tuple as a JSON array.
 %% Order *is* significant in a JSON array!
@@ -192,10 +192,10 @@ encode_array(T) ->
 	V = encode(E),
 	case Acc of
 	    [] -> V;
-	    _ -> lists:append([Acc, ",", V])
+	    _ -> [Acc, $,, V]
 	end
     end, [], T),
-    lists:append(["[", M, "]"]).
+    [$[, M, $]].
 
 %%% SCANNING
 %%%
