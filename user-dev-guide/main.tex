@@ -874,42 +874,44 @@ supported (the given result is the \code{<result_object>} mentioned above):
 "ok"
 \end{lstlisting}
   \item[] \hspace{-1.7em}single read/write:
-  \item \code{read(Key)} - read the value at \code{Key}, result:
+  \item \code{read(<key>)} - read the value at \code{key}, result:
 \begin{lstlisting}[language=java]
 {"status": "ok", "value", <json_value>} or
 {"status": "fail", "reason": "timeout" or "not_found"}
 \end{lstlisting}
-  \item \code{write(Key, Value)} - write \code{Value} to \code{Key}, result:
+  \item \code{write(<key>, <json_value>)} - write \code{value} (inside \code{json_value}) to \code{key}, result:
 \begin{lstlisting}[language=java]
 {"status": "ok"} or
 {"status": "fail", "reason": "timeout" or "abort"}
 \end{lstlisting}
-  \item \code{test_and_set(Key, OldValue, NewValue)} - atomic test-and-set (write \code{NewValue} to \code{Key} if the current value is \code{OldValue}), result:
+  \item \code{test_and_set(<key>, OldValue, NewValue)} - atomic test-and-set
+  (write \code{NewValue} to \code{key} if the current value is \code{OldValue}
+   - both values are \code{<json_value>}), result:
 \begin{lstlisting}[language=java]
 {"status": "ok"} or
 {"status": "fail", "reason": "timeout" or "abort" or "not_found"} or
 {"status": "fail", "reason": "key_changed", "value": <json_value>}
 \end{lstlisting}
   \item[] \hspace{-1.7em}transactions:
-  \item \code{req_list(ReqList)} - process a list of requests, result:
+  \item \code{req_list(<req_list>)} - process a list of requests, result:
 \begin{lstlisting}[language=java]
 {"tlog": <tlog>,
  "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
              {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
 \end{lstlisting}
-  \item \code{req_list(TLog, ReqList)} - process a list of requests with a previous translog, result:
+  \item \code{req_list(<tlog>, <req_list>)} - process a list of requests with a previous translog, result:
 \begin{lstlisting}[language=java]
 {"tlog": <tlog>,
  "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
              {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
 \end{lstlisting}
   \item[] \hspace{-1.7em}replication layer functions:
-  \item \code{delete(Key)} - delete the value at \code{Key}, default timeout 2s, result:
+  \item \code{delete(<key>)} - delete the value at \code{key}, default timeout 2s, result:
 \begin{lstlisting}[language=java]
 {"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
 {"failure": "timeout", "ok": <number>, "results": ["ok" or "locks_set" or "undef"]}
 \end{lstlisting}
-  \item \code{delete(Key, Timeout)} - delete the value at \code{Key} with a timeout of \code{Timeout} Milliseconds, result:
+  \item \code{delete(<key>, Timeout)} - delete the value at \code{key} with a timeout of \code{Timeout} Milliseconds, result:
 \begin{lstlisting}[language=java]
 {"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
 {"failure": "timeout", "ok": <number>, "results": ["ok" or "locks_set" or "undef"]}
@@ -921,21 +923,21 @@ supported (the given result is the \code{<result_object>} mentioned above):
  "value": [{"key": <key>, "value": <json_value>, "version": <version>}]}
 \end{lstlisting}
   \item[] \hspace{-1.7em}publish/subscribe:
-  \item \code{publish(Topic, Content)} - publish \code{Content} to \code{Topic}, result:
+  \item \code{publish(Topic, Content)} - publish \code{Content} to \code{Topic} (\code{<key>}), result:
 \begin{lstlisting}[language=java]
 {"status": "ok"}
 \end{lstlisting}
-  \item \code{subscribe(Topic, URL)} - subscribe \code{URL} to \code{Topic}, result:
+  \item \code{subscribe(Topic, URL)} - subscribe \code{URL} to \code{Topic} (\code{<key>}), result:
 \begin{lstlisting}[language=java]
 {"status": "ok"} or
 {"status": "fail", "reason": "timeout" or "abort"}
 \end{lstlisting}
-  \item \code{unsubscribe(Topic, URL)} - unsubscribe \code{URL} from \code{Topic}, result:
+  \item \code{unsubscribe(Topic, URL)} - unsubscribe \code{URL} from \code{Topic} (\code{<key>}), result:
 \begin{lstlisting}[language=java]
 {"status": "ok"} or
 {"status": "fail", "reason": "timeout" or "abort" or "not_found"}
 \end{lstlisting}
-  \item \code{get_subscribers(Topic)} - get subscribers of \code{Topic}, result:
+  \item \code{get_subscribers(Topic)} - get subscribers of \code{Topic} (\code{<key>}), result:
 \begin{lstlisting}[language=java]
 [<urls>]
 \end{lstlisting}
@@ -948,6 +950,7 @@ supported (the given result is the \code{<result_object>} mentioned above):
 Note:
 \begin{lstlisting}[language=java]
 <json_value> = {"type": "as_is" or "as_bin", "value": <value>}
+<req_list> = [{"read", <key>} | {"write", {<key>: <json_value>}} | {"commit", _}]
 \end{lstlisting}
 The \code{<value>} inside \code{<json_value>} is either a base64-encoded
 string representing a binary object (if type = \code{"as_bin"}) or the value
