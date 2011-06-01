@@ -35,4 +35,4 @@ publish(URL, Topic, Content) ->
 
 -spec publish_internal(URL::string(), Topic::string(), Content::string()) -> {ok, {response, Result::[term()]}} | {error, Reason::term()}.
 publish_internal(URL, Topic, Content) ->
-    jsonrpc:call(URL, [], {call, notify, [Topic, Content]}).
+    jsonrpc:call(URL, [], {call, "notify", [Topic, Content]}).
