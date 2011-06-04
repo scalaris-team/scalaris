@@ -482,7 +482,12 @@ end_per_suite(Config) ->
     kill_new_processes(OldProcesses),
     Config.
 
--spec get_ring_data() -> [{pid(), {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, ?DB:db_as_list(), ok | timeout}].
+-spec get_ring_data() -> [{pid(), 
+                           {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, 
+                           ?DB:db_as_list(), 
+                           {prred, comm:erl_pid_plain()},
+                           {succc, comm:erl_pid_plain()},
+                           ok | timeout}].
 get_ring_data() ->
     DHTNodes = pid_groups:find_all(dht_node),
     lists:sort(
