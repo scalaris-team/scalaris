@@ -30,6 +30,16 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+-include("record_helpers.hrl").
+
+-record(rrNodeStatus, {
+                        nodeKey     = ?required(rrNodeStatus, nodeKey)      :: ?RT:key(), 
+                        nodeRange   = ?required(rrNodeStatus, nodeRange)    :: intervals:interval(),
+                        dbItemCount = 0                                     :: pos_integer(),
+                        versionSum  = 0                                     :: pos_integer()
+                      }).
+-type rrDBStatus() :: [#rrNodeStatus{}].
+
 all() ->
     [get_symmetric_keys_test,
      simpleBloomSync].
@@ -41,7 +51,18 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
--spec get_symmetric_keys(pos_integer()) -> [pos_integer()].			      
+set_rrepair_config_parameter() ->
+    %stop trigger
+    config:write(rep_update_activate, false),
+    config:write(rep_update_interval, 100000000),
+    ok.
+
+end_per_testcase(_TestCase, _Config) ->
+    %error_logger:tty(false),
+    unittest_helper:stop_ring(),
+    ok.
+
+-spec get_symmetric_keys(pos_integer()) -> [?RT:key()].			      
 get_symmetric_keys(NodeCount) ->
     B = (16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF div NodeCount) + 1,
     util:for_to_ex(0, NodeCount - 1, fun(I) -> I*B end).
@@ -72,46 +93,74 @@ build_symmetric_ring(NodeCount, Config) ->
 fill_symmetric_ring(DataCount, NodeCount) ->
     NodeIds = lists:sort(get_symmetric_keys(NodeCount)),
     util:for_to(1, 
-		NodeCount div 4, 
-	        fun(I) ->
-			FirstKey = lists:nth(I, NodeIds) + 1,
-			%write DataCount-items to nth-Node and its symmetric replicas
-			util:for_to(FirstKey, 
-				    FirstKey + DataCount, 
-				    fun(Key) ->					      
-					    RepKeys = ?RT:get_replica_keys(Key),
-					    %write replica group
-					    lists:foreach(fun(X) -> 
-								  DBEntry = db_entry:new(X, "2", 2),
-								  %DBEntry = db_entry:new(X),
-								  api_dht_raw:unreliable_lookup(X, 
-												{set_key_entry, comm:this(), DBEntry}),
-								  receive {set_key_entry_reply, _} -> ok end
-							  end, 
-							  RepKeys),
-					    %random replica is outdated
-					    OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys)), RepKeys),
-					    api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
-					    receive {set_key_entry_reply, _} -> ok end,					      
-					    ok
-				    end)
-		end),
+                NodeCount div 4, 
+                fun(I) ->
+                        FirstKey = lists:nth(I, NodeIds) + 1,
+                        %write DataCount-items to nth-Node and its symmetric replicas
+                        util:for_to(FirstKey, 
+                                    FirstKey + DataCount - 1, 
+                                    fun(Key) ->					      
+                                            RepKeys = ?RT:get_replica_keys(Key),
+                                            %write replica group
+                                            lists:foreach(fun(X) -> 
+                                                                  DBEntry = db_entry:new(X, "2", 2),
+                                                                  %DBEntry = db_entry:new(X),
+                                                                  api_dht_raw:unreliable_lookup(X, 
+                                                                                                {set_key_entry, comm:this(), DBEntry}),
+                                                                  receive {set_key_entry_reply, _} -> ok end
+                                                          end, 
+                                                          RepKeys),
+                                            %random replica is outdated
+                                            OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
+                                            api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
+                                            receive {set_key_entry_reply, _} -> ok end,					      
+                                            ok
+                                    end)
+                end),
     ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),
-    ok.
-
-set_rrepair_config_parameter() ->
-    %stop trigger
-    config:write(rep_update_activate, false),
-    config:write(rep_update_interval, 100000),
-    ok.
-
-end_per_testcase(_TestCase, _Config) ->
-    %error_logger:tty(false),
-    unittest_helper:stop_ring(),
     ok.
 
 simpleBloomSync(Config) ->
     NodeCount = 4,
+    DataCount = 10000,    
+    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
+    %Build and fill Ring
     build_symmetric_ring(NodeCount, Config),
-    fill_symmetric_ring(10000, NodeCount),
+    fill_symmetric_ring(DataCount, NodeCount),
+    %Sync Round
+    DestVersCount = NodeCount * 2 * DataCount,
+    DBStat1 = getDBStatus(),
+    ct:pal("---DBStatus---~n~.0p~n", [DBStat1]),
+    ct:pal(">>SumOutdated=[~w]", [DestVersCount - getVersionCount(DBStat1)]),
+    startSyncRound(NodeKeys),
+    timer:sleep(5000),
+    DBStat2 = getDBStatus(),
+    ct:pal("SyncR=1---DBStatus---~n~.0p~n", [DBStat2]),
+    ct:pal(">>SumOutdated=[~w]", [DestVersCount - getVersionCount(DBStat2)]),
     ok.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Analysis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+startSyncRound(NodeKeys) ->
+    lists:foreach(fun(X) ->
+                          api_dht_raw:unreliable_lookup(X, {send_to_group_member, rep_upd, {rep_update_trigger}})
+                  end, 
+                  NodeKeys),
+    ok.
+
+% @doc returns replica update specific node db information
+-spec getDBStatus() -> rrDBStatus().
+getDBStatus() ->
+    RingData = unittest_helper:get_ring_data(),
+    [ #rrNodeStatus{ nodeKey = LV, 
+                     nodeRange = intervals:new(LBr, LV, RV, RBr), 
+                     dbItemCount = length(DB),
+                     versionSum = lists:sum(lists:map(fun(X) -> db_entry:get_version(X) end, DB))
+                     } 
+    || {_Pid, {LBr, LV, RV, RBr}, DB, _Pred, _Succ, ok} = _Node <- RingData].
+
+getVersionCount(RingStatus) ->
+    lists:sum(lists:map(fun(#rrNodeStatus{ versionSum = V}) -> V end, RingStatus)).
+	
