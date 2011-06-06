@@ -134,14 +134,13 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
 on({proposer_trigger, PaxosID}, ETSTableName = State) ->
     ?TRACE("proposer:trigger for paxos id ~p with auto round increment~n", [PaxosID]),
     case pdb:get(PaxosID, ETSTableName) of
-        undefined -> ok;
+        undefined -> State;
         StateForID ->
             TmpState = proposer_state:reset_state(StateForID),
             NewState = proposer_state:inc_round(TmpState),
             pdb:set(NewState, ETSTableName),
             on({proposer_trigger, PaxosID, proposer_state:get_round(NewState)}, State)
-    end,
-    State;
+    end;
 
 %% trigger for given round is needed for initial round without auto-increment
 %% and fast forward, but be careful:
