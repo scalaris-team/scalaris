@@ -82,7 +82,7 @@ start_link(DHTNodeGroup, Role) ->
 -type rtm() :: {?RT:key(),
                 comm:mypid() | unknown,
                 Role :: non_neg_integer(),
-                Acceptor :: comm:mypid() | unknown}.
+                (Acceptor :: comm:mypid()) | unknown}.
 
 -type rtms() :: [rtm()].
 
@@ -498,7 +498,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             Maj = config:read(quorum_factor),
             RTMs = tx_state:get_rtms(TxState),
             Role = state_get_role(State),
-            Accs = rtms_get_accpids(RTMs),
+            ValidAccs = [ X || X <- rtms_get_accpids(RTMs), unknown =/= X],
             {_, _, ThisRTMsNumber, _} = lists:keyfind(comm:this(), 2, RTMs),
 
             %% add ourselves as learner and
@@ -513,17 +513,15 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
                                                       comm:this(), ItemId),
                                 %% add learner to running paxos acceptors
-                                _ = [ case unknown =/= X of
-                                          true -> comm:send(X,
-                                                            {acceptor_add_learner,
-                                                             PaxId, GLLearner});
-                                          false -> ok
-                                      end || X <- Accs],
+                                _ = [ comm:send(X,
+                                                {acceptor_add_learner,
+                                                 PaxId, GLLearner})
+                                      || X <- ValidAccs],
                                 Proposer =
                                     comm:make_global(get_my(Role, proposer)),
                                 proposer:start_paxosid(
-                                  Proposer, PaxId, _Acceptors = Accs, abort,
-                                  Maj, length(Accs) + 1, ThisRTMsNumber),
+                                  Proposer, PaxId, _Acceptors = ValidAccs, abort,
+                                  Maj, length(ValidAccs) + 1, ThisRTMsNumber),
                                 ok
                             end
                             || {PaxId, _RTLog, _TP}
@@ -681,7 +679,7 @@ my_init_TPs(TxState, ItemStates) ->
     Tid = tx_state:get_tid(TxState),
     RTMs = tx_state:get_rtms(TxState),
     CleanRTMs = rtms_get_rtmpids(RTMs),
-    Accs = rtms_get_accpids(RTMs),
+    Accs = [ X || X <- rtms_get_accpids(RTMs), unknown =/= X ],
     TM = comm:this(),
     _ = [ begin
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
