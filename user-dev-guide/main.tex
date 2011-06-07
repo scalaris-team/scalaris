@@ -1498,29 +1498,29 @@ troubleshooting, please refer to our FAQs at
 %%    is more ok, when using -smp disable? ...)
 \item Use etop and look at the total memory size and atoms generated
 \item send processes sleep or kill messages to test certain behaviour (see
-  gen\_component.erl
+  \erlmodule{gen\_component}.erl)
 \item use \code{mgmt_server:number_of_nodes(). flush().}
 \item use \code{admin_checkring(). flush().}
 \end{itemize}
 
-\section{General Erlang server loop}
-
-Servers in Erlang often use the following structure to maintain a state
-while processing received messages:
-
-\lstset{language=erlang}
-\begin{lstlisting}
-loop(State) ->
-  receive
-    Message ->
-      State1 = f(State),
-      loop(State1)
-  end.
-\end{lstlisting}
-
-The server runs an endless loop, that waits for a message, processes it and
-calls itself using tail-recursion in each branch. The loop works on a
-\code{State}, which can be modified when a message is handled.
+%% \section{General Erlang server loop}
+%% 
+%% Servers in Erlang often use the following structure to maintain a state
+%% while processing received messages:
+%% 
+%% \lstset{language=erlang}
+%% \begin{lstlisting}
+%% loop(State) ->
+%%   receive
+%%     Message ->
+%%       State1 = f(State),
+%%       loop(State1)
+%%   end.
+%% \end{lstlisting}
+%% 
+%% The server runs an endless loop, that waits for a message, processes it and
+%% calls itself using tail-recursion in each branch. The loop works on a
+%% \code{State}, which can be modified when a message is handled.
 
 \chapter{System Infrastructure}
 
