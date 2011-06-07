@@ -13,8 +13,10 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import json, httplib, urlparse, socket, base64
+import httplib, urlparse, socket, base64
 import os
+try: import simplejson as json
+except ImportError: import json
 
 if 'SCALARIS_JSON_URL' in os.environ:
     default_url = os.environ['SCALARIS_JSON_URL']
