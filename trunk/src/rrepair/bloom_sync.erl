@@ -24,7 +24,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start_bloom_sync/1]).
+-export([init/1, on/2, start_bloom_sync/2]).
 
 -ifdef(with_export_type_support).
 -export_type([bloom_sync_struct/0]).
@@ -50,6 +50,7 @@
 -type state() ::
     {
         Owner        :: comm:erl_local_pid(),
+        OwnerDhtNod  :: comm:erl_local_pid(),
         SyncStruct   :: bloom_sync_struct()
     }.
 
@@ -63,22 +64,23 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
-on({get_state_response, NodeDBInterval}, {_, SyncStruct} = State) ->
+on({get_state_response, NodeDBInterval}, {_, DhtNodePid, SyncStruct} = State) ->
     BloomInterval = SyncStruct#bloom_sync_struct.interval,    
     SyncInterval = intervals:intersection(NodeDBInterval, BloomInterval),
     case intervals:is_empty(SyncInterval) of
          true ->
             comm:send_local(self(), {shutdown, empty_interval});
          false ->
-            DhtNodePid = pid_groups:get_my(dht_node),
             comm:send_local(DhtNodePid, {get_chunk, self(), SyncInterval, 10000}) %TODO remove 10k constant
     end,
     State;
-on({get_chunk_response, {_ChunkInterval, DBList}}, {Owner, SyncStruct} = State) ->
+on({get_chunk_response, {_ChunkInterval, DBList}}, {Owner, _, SyncStruct} = State) ->	
     {_, SrcNode, KeyBF, VersBF, Round} = SyncStruct,
+	?TRACE("GET CHUNK OK - SYNC WITH [~p]", [SrcNode]),
     Diff = [ Key || {Key, _, _, _, Ver} <- DBList, Ver > -1, not ?REP_BLOOM:is_element(VersBF, Key) ],
     Missing = [ Key || Key <- Diff, not ?REP_BLOOM:is_element(KeyBF, Key) ],
-    Obsolete = lists:subtract(Diff, Missing), 
+    Obsolete = lists:subtract(Diff, Missing),
+	?TRACE("SYNC RESULT: Missing=[~p] Obsolete=[~p]", [Missing, Obsolete]),
     comm:send_local(Owner, {sync_progress_report, 
                             self(), 
                             io_lib:format("SrcNode=[~p] Round=[~p] -> MISSING=[~B] OBSOLTE=[~B]", 
@@ -87,8 +89,11 @@ on({get_chunk_response, {_ChunkInterval, DBList}}, {Owner, SyncStruct} = State) 
     State;
 on({shutdown, Reason}, {Owner, SyncStruct}) ->
     RoundId = SyncStruct#bloom_sync_struct.round,
-    comm:send_local(Owner, {sync_progress_report, self(), io_lib:format("Round=~p  - SHUTDOWN Reason=~p", [RoundId, Reason])}),
-    kill.
+    comm:send_local(Owner, {sync_progress_report, self(), io_lib:format("Round=~p - SHUTDOWN Reason=~p", [RoundId, Reason])}),
+    kill;
+on({start_sync}, {_Owner, DhtNodePid, _SyncStruct} = State) ->
+    comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
@@ -96,11 +101,11 @@ on({shutdown, Reason}, {Owner, SyncStruct}) ->
 
 %% @doc INITIALISES THE MODULE
 -spec init({comm:erl_local_pid(), bloom_sync_struct()}) -> state().
-init({_Owner, _SyncStruct} = State) ->
-    DhtNodePid = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
+init(State) ->
+	?TRACE("START BLOOM SYNC PROTOCOL", []),
+    comm:send_local(self(), {start_sync}),
     State.
 
--spec start_bloom_sync(bloom_sync_struct()) -> {ok, pid()}.
-start_bloom_sync(SyncStruct) ->
-    gen_component:start(?MODULE, {self(), SyncStruct}, []).
+-spec start_bloom_sync(bloom_sync_struct(), comm:erl_local_pid()) -> {ok, pid()}.
+start_bloom_sync(SyncStruct, DhtNodePid) ->
+    gen_component:start(?MODULE, {self(), DhtNodePid, SyncStruct}, []).
