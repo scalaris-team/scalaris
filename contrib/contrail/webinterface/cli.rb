@@ -59,8 +59,6 @@ end
 options = {}
 
 optparse = OptionParser.new do |opts|
-  options[:help] = true
-
   options[:scalaris_info] = nil
   opts.on('--scalaris-info ID', Integer, 'get info on scalaris instance ID' ) do |id|
     options[:scalaris_info] = id
@@ -98,5 +96,3 @@ puts get_scalaris_info(options[:scalaris_info]) unless options[:scalaris_info] =
 puts create_scalaris(ENV['USER']) unless options[:scalaris_create] == nil
 puts add_vm_scalaris(options[:scalaris_add_vm]) unless options[:scalaris_add_vm] == nil
 puts destroy_scalaris(options[:scalaris_destroy]) unless options[:scalaris_destroy] == nil
-
-puts optparse if options[:help]
