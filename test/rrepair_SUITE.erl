@@ -53,7 +53,7 @@ end_per_suite(Config) ->
 
 set_rrepair_config_parameter() ->
     %stop trigger
-    config:write(rep_update_activate, false),
+    config:write(rep_update_activate, true),
     config:write(rep_update_interval, 100000000),
     ok.
 

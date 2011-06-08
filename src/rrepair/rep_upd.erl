@@ -29,14 +29,15 @@
 -export_type([db_chunk/0]).
 -endif.
 
-%-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -define(PROCESS_NAME, ?MODULE).
 -define(TRIGGER_NAME, rep_update_trigger).
+-define(BLOOM_MAX_SIZE, 10000). %TODO remove 10k constant
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -82,46 +83,62 @@ on({?TRIGGER_NAME}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
     DhtNodePid = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, 10000}), %TODO remove 10k constant
+    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, ?BLOOM_MAX_SIZE}),
     State;
 
-%% @doc retriebe local node db
-on({get_chunk_response, DB}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
-    MyPid = self(),
-    _Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, DB, Round) end),    
-    ?TRACE("get_chunk: let [~p] build SyncStruct", [_Pid]),
+%% @doc retrieve local node db
+on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
+    MyPid = self(),    
+    _ = case intervals:is_empty(RestI) of
+            true -> ok;
+            _ -> 
+                ?TRACE("SPAWNING ADDITIONAL SYNC FOR RestI ~p", [RestI]),
+                DhtNodePid = pid_groups:get_my(dht_node),
+                comm:send_local(DhtNodePid, {get_chunk, self(), RestI, ?BLOOM_MAX_SIZE})
+        end,
+    %Get Interval of DBList
+    %TODO: IMPROVEMENT getChunk should return ChunkInterval 
+    %       (db is traved twice! - 1st getChunk, 2nd here)
+    ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
+    %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
+    _Pid = spawn(fun() -> build_SyncStruct(MyPid, SyncMethod, {ChunkI, DBList}, Round) end),    
+    %?TRACE("RECV Chunk let [~p] build SyncStruct", [_Pid]),
     {SyncMethod, TriggerState, Round + 1, MonitorTable};
 
 %% @doc SyncStruct is build and can be send to a node for synchronization
 on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerState, Round, MonitorTable} = State) ->
     ?TRACE("~p", [SyncStruct]),
     _ = case intervals:is_empty(Interval) of	
-	    false ->
-		{_, _, RKey, RBr} = intervals:get_bounds(Interval),
-		Key = case RBr of
-			  ')' -> RKey - 1;
-			  ']' -> RKey
-		      end,
-		Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-		DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
-		DhtNodePid = pid_groups:get_my(dht_node),
-		comm:send_local(DhtNodePid, 
-				{lookup_aux, DestKey, 0, 
-				 {send_to_group_member, ?PROCESS_NAME, 
-				  {request_sync, SyncMethod, SyncStruct}}}),
-		monitor:proc_set_value(MonitorTable, 
-				       io_lib:format("~p", [erlang:localtime()]), 
-				       io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey]));	    
-	    _ ->
-		ok
-    end,
+            false ->
+                {_, _, RKey, RBr} = intervals:get_bounds(Interval),
+                Key = case RBr of
+                          ')' -> RKey - 1;
+                          ']' -> RKey
+                      end,
+                Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
+                DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
+                DhtNodePid = pid_groups:get_my(dht_node),
+                ?TRACE("SEND SYNC REQ TO [~p]", [DestKey]),
+                comm:send_local(DhtNodePid, 
+                                {lookup_aux, DestKey, 0, 
+                                 {send_to_group_member, ?PROCESS_NAME, 
+                                  {request_sync, SyncMethod, SyncStruct}}}),
+                monitor:proc_set_value(MonitorTable, 
+                                       io_lib:format("~p", [erlang:localtime()]), 
+                                       io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey]));	    
+            _ ->
+                ok
+		end,
     State;
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, MonitorTable} = State) ->
+on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, MonitorTable} = State) ->	
     _ = case Sync_method of
             bloom ->
+                {_, _, SrcNode, _, _, _} = SyncStruct,
+                ?TRACE("RECV SYNC REQUEST FROM ~p", [SrcNode]),
                 monitor:proc_inc_value(MonitorTable, "Recv-Sync-Req-Count"),
-                bloom_sync:start_bloom_sync(SyncStruct);
+                DhtNodePid = pid_groups:get_my(dht_node),
+                bloom_sync:start_bloom_sync(SyncStruct, DhtNodePid);
             merkleTree  -> ok;
             art         -> ok
         end,
@@ -159,10 +176,10 @@ on({report_to_monitor}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = Sta
 
 %% @doc builds desired synchronization structure and replies it to SourcePid
 -spec build_SyncStruct(comm:erl_local_pid(), sync_method(), db_chunk(), Round::non_neg_integer()) -> ok.
-build_SyncStruct(SourcePid, SyncMethod, {ChunkInterval, _} = DB, Round) ->
+build_SyncStruct(SourcePid, SyncMethod, {ChunkInterval, _DBItems} = DB, Round) ->
     SyncStruct = case SyncMethod of
                      bloom ->
-                         build_bloom(DB, Round);
+                         build_bloom(DB, Round, SourcePid);
                      merkleTree ->
                          ok; %TODO
                      art ->
@@ -197,16 +214,17 @@ fill_bloom([H | T], KeyBF, VerBF) ->
     end.
 
 %% @doc Build bloom filter sync struct.
--spec build_bloom(db_chunk(), non_neg_integer()) -> sync_struct().
-build_bloom({Interval, DB}, Round) ->
+-spec build_bloom(db_chunk(), non_neg_integer(), pid()) -> sync_struct().
+build_bloom({Interval, DB}, Round, SourcePid) ->
     Fpr = 0.001,           %TODO move to config?
     ElementNum = 10,    %TODO set to node db item cout + 5%?
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
     BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
+    ?TRACE("FillBloom with [~p] Items of Interval ~p", [length(DB), Interval]),
     {KeyBF, VerBF} = fill_bloom(DB, BF1, BF2),
-    {bloom_sync_struct, Interval, comm:this(), KeyBF, VerBF, Round}.
+    {bloom_sync_struct, Interval, SourcePid, KeyBF, VerBF, Round}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
