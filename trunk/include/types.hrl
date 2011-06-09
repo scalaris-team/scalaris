@@ -13,13 +13,10 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    Type definitions of non-existing, opaque and custom types which can
+%% @doc    Type definitions of non-existing, opaque or custom types which can
 %%         be used independently from the erlang version.
 %% @end
 %% @version $Id$
-
-%% some types which may be non-existing or opaque depending on your erlang
-%% version:
 
 -ifdef(term_not_builtin).
 -type term() :: any().

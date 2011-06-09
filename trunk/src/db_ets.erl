@@ -24,7 +24,6 @@
 -include("scalaris.hrl").
 
 -behaviour(db_beh).
-% TODO: make db() opaque again once dialyzer doesn't complain about get_db/1 anymore ("matching against tuple breaks opaqueness")
 -type db_t() :: {Table::tid() | atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}.
 
 % TODO: move these functions to the behaviour and implement them in the other DBs!
