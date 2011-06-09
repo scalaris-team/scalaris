@@ -37,10 +37,10 @@
 
 % note: do not make opaque so DB implementations can rely on an entry() being a
 % tuple as defined here
--type(entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
+-type entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
                   ReadLock::non_neg_integer(), Version::?DB:version()} |
                  {Key::?RT:key(), empty_val, WriteLock::boolean(),
-                  ReadLock::non_neg_integer(), Version::-1}).
+                  ReadLock::non_neg_integer(), Version::-1}.
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
@@ -113,9 +113,6 @@ reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
     set_writelock(TmpEntry, false).
 
--spec is_empty({Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                ReadLock::non_neg_integer(), Version::?DB:version()}) -> false;
-              ({Key::?RT:key(), empty_val, WriteLock::boolean(),
-                ReadLock::non_neg_integer(), Version::-1}) -> true.
+-spec is_empty(entry()) -> boolean().
 is_empty({_Key, empty_val, _WriteLock, _ReadLock, -1}) -> true;
 is_empty(_) -> false.

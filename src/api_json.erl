@@ -194,8 +194,13 @@ dht_raw_range_read(From, To) ->
     {ErrorCode, Data} = api_dht_raw:range_read(From, To),
     {struct, [{status, atom_to_list(ErrorCode)}, {value, data_to_json(Data)}]}.
 
+-spec data_to_json(Data::[db_entry:entry()]) ->
+            {array, [{struct, [{key, ?RT:key()} | 
+                               {value, json_value()} |
+                               {version, ?DB:version()}]
+                     }]}.
 data_to_json(Data) ->
-    {array, [ {struct, [{key, Key},
-                        value_to_json(Value),
-                        {version, Version}]} ||
-              {Key, Value, _WriteLock, _ReadLock, Version} <- Data]}.
+    {array, [ {struct, [{key, db_entry:get_key(DBEntry)},
+                        value_to_json(db_entry:get_value(DBEntry)),
+                        {version, db_entry:get_version(DBEntry)}]} ||
+              DBEntry <- Data]}.
