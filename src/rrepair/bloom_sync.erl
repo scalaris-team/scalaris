@@ -25,6 +25,7 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_bloom_sync/2]).
+-export([concatKeyVer/1, concatKeyVer/2, minKey/1]).
 
 -ifdef(with_export_type_support).
 -export_type([bloom_sync_struct/0]).
@@ -74,17 +75,34 @@ on({get_state_response, NodeDBInterval}, {_, DhtNodePid, SyncStruct} = State) ->
             comm:send_local(DhtNodePid, {get_chunk, self(), SyncInterval, 10000}) %TODO remove 10k constant
     end,
     State;
-on({get_chunk_response, {_ChunkInterval, DBList}}, {Owner, _, SyncStruct} = State) ->	
-    {_, SrcNode, KeyBF, VersBF, Round} = SyncStruct,
-	?TRACE("GET CHUNK OK - SYNC WITH [~p]", [SrcNode]),
-    Diff = [ Key || {Key, _, _, _, Ver} <- DBList, Ver > -1, not ?REP_BLOOM:is_element(VersBF, Key) ],
-    Missing = [ Key || Key <- Diff, not ?REP_BLOOM:is_element(KeyBF, Key) ],
-    Obsolete = lists:subtract(Diff, Missing),
-	?TRACE("SYNC RESULT: Missing=[~p] Obsolete=[~p]", [Missing, Obsolete]),
-    comm:send_local(Owner, {sync_progress_report, 
-                            self(), 
-                            io_lib:format("SrcNode=[~p] Round=[~p] -> MISSING=[~B] OBSOLTE=[~B]", 
-                                          [SrcNode, Round, length(Missing), length(Obsolete)])}),
+on({get_chunk_response, {_, DBList}}, {Owner, _, SyncStruct} = State) ->	
+    #bloom_sync_struct{
+                       srcNode = SrcNode,
+                       keyBF = KeyBF,
+                       versBF = VersBF
+                       } = SyncStruct,
+    
+    {Obsolete, Missing} = 
+        filterPartitionMap(fun(A) -> 
+                                   db_entry:get_version(A) > -1 andalso
+                                       not ?REP_BLOOM:is_element(VersBF, concatKeyVer(A)) 
+                           end,
+                           fun(B) -> 
+                                   ?REP_BLOOM:is_element(KeyBF, minKey(db_entry:get_key(B)))
+                           end,
+                           fun(C) ->
+                                   minKey(db_entry:get_key(C))
+                           end,
+                           DBList),
+    
+    %Diff = [ minKey(db_entry:get_key(DBEntry)) || DBEntry <- DBList, 
+    %                                              db_entry:get_version(DBEntry) > -1, 
+    %                                              not ?REP_BLOOM:is_element(VersBF, concatKeyVer(DBEntry))],
+    %Missing = [ Key || Key <- Diff, not ?REP_BLOOM:is_element(KeyBF, Key) ],
+    %Obsolete = lists:subtract(Diff, Missing),
+	?TRACE("SYNC WITH [~p] RESULT: DBListLength=[~p] -> Missing=[~p] Obsolete=[~p]", 
+           [SrcNode, length(DBList), length(Missing), length(Obsolete)]),
+    comm:send_local(Owner, {sync_progress_report, self(), "ok"}),
     %TODO inform SrcNode about Diff Entries - IMPL DETAIL SYNC
     State;
 on({shutdown, Reason}, {Owner, SyncStruct}) ->
@@ -96,13 +114,42 @@ on({start_sync}, {_Owner, DhtNodePid, _SyncStruct} = State) ->
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PUBLIC HELPER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc transforms a key to its smallest associated key
+-spec minKey(?RT:key()) -> ?RT:key().
+minKey(Key) ->
+    lists:min(?RT:get_replica_keys(Key)).
+-spec concatKeyVer(db_entry:entry()) -> binary().
+concatKeyVer(DBEntry) ->
+    concatKeyVer(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
+-spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
+concatKeyVer(Key, Version) ->
+    erlang:list_to_binary([term_to_binary(Key), "#", Version]).
+
+
+filterPartitionMap(_, _, _, [], Satis, NonSatis) ->
+    {Satis, NonSatis};
+filterPartitionMap(Filter, Pred, Map, [H | T], Satis, NonSatis) ->
+    case Filter(H) of
+        true -> case Pred(H) of
+                     true -> filterPartitionMap(Filter, Pred, Map, T, [Map(H) | Satis], NonSatis);
+                     false -> filterPartitionMap(Filter, Pred, Map, T, Satis, [Map(H) | NonSatis])
+                 end;        
+        false -> filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis)
+    end.
+% @ doc filter, partition and map items of a list in one run
+-spec filterPartitionMap(fun((A) -> boolean()), fun((A) -> boolean()), fun((A) -> any()), [A]) -> {Satisfying::[any()], NonSatisfying::[any()]}.
+filterPartitionMap(Filter, Pred, Map, List) ->
+    filterPartitionMap(Filter, Pred, Map, List, [], []).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc INITIALISES THE MODULE
 -spec init({comm:erl_local_pid(), bloom_sync_struct()}) -> state().
 init(State) ->
-	?TRACE("START BLOOM SYNC PROTOCOL", []),
     comm:send_local(self(), {start_sync}),
     State.
 
