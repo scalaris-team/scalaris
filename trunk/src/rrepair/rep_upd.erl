@@ -107,7 +107,6 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerStat
 
 %% @doc SyncStruct is build and can be send to a node for synchronization
 on({get_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerState, Round, MonitorTable} = State) ->
-    ?TRACE("~p", [SyncStruct]),
     _ = case intervals:is_empty(Interval) of	
             false ->
                 {_, _, RKey, RBr} = intervals:get_bounds(Interval),
@@ -162,6 +161,7 @@ on({web_debug_info, Requestor},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({sync_progress_report, _Sender, Msg}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
     monitor:proc_set_value(MonitorTable, io_lib:format("~p", [erlang:localtime()]), Msg),
+    ?TRACE("SYNC FINISHED - REASON=[~p]", [Msg]),
     State;
 on({report_to_monitor}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
     monitor:proc_report_to_my_monitor(MonitorTable),
@@ -207,9 +207,9 @@ fill_bloom([H | T], KeyBF, VerBF) ->
         -1 ->
             fill_bloom(T, KeyBF, VerBF);
         _ ->
-            AddKey = lists:min(?RT:get_replica_keys(Key)), %map keys to their smallest associated key
+            AddKey = bloom_sync:minKey(Key),
             NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-            NewVerBF = ?REP_BLOOM:add(VerBF, erlang:list_to_binary([term_to_binary(AddKey), "#", Ver])),
+            NewVerBF = ?REP_BLOOM:add(VerBF, bloom_sync:concatKeyVer(AddKey, Ver)),
             fill_bloom(T, NewKeyBF, NewVerBF)            
     end.
 
@@ -217,12 +217,11 @@ fill_bloom([H | T], KeyBF, VerBF) ->
 -spec build_bloom(db_chunk(), non_neg_integer(), pid()) -> sync_struct().
 build_bloom({Interval, DB}, Round, SourcePid) ->
     Fpr = 0.001,           %TODO move to config?
-    ElementNum = 10,    %TODO set to node db item cout + 5%?
+    ElementNum = ?BLOOM_MAX_SIZE * 2,    %TODO set to node db item cout + 5%?
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
     BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
-    ?TRACE("FillBloom with [~p] Items of Interval ~p", [length(DB), Interval]),
     {KeyBF, VerBF} = fill_bloom(DB, BF1, BF2),
     {bloom_sync_struct, Interval, SourcePid, KeyBF, VerBF, Round}.
 

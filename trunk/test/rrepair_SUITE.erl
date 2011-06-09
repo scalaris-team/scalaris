@@ -122,7 +122,7 @@ fill_symmetric_ring(DataCount, NodeCount) ->
 
 simpleBloomSync(Config) ->
     NodeCount = 4,
-    DataCount = 10000,    
+    DataCount = 1000,    
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     %Build and fill Ring
     build_symmetric_ring(NodeCount, Config),
