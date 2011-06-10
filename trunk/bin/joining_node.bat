@@ -14,7 +14,22 @@
 ::    limitations under the License.
 
 :: Script to start a node, that joins a running Scalaris system.
+set SCRIPTDIR=%~dp0
+set params=%*
 set ID=1
+IF [%1]==[] goto start
+set ID=%1
+set params=
+:: there is no easy way to get the rest of the parameters
+:: -> loop through them and remove the first
+:loop
+shift
+if [%1]==[] goto start
+set params=%params% %1
+goto loop
+)
+:start
+
 set NODE_NAME=node%ID%
 set /a CSPORT=14195+%ID%
 set /a YAWSPORT=8000+%ID%
@@ -22,10 +37,10 @@ set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.2\bin"
+set ERLANG="C:\Program Files\erl5.8.4\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
-set SCALARISDIR=%~dp0..
+set SCALARISDIR=%SCRIPTDIR%..
 set BEAMDIR=%SCALARISDIR%\ebin
 set BACKGROUND=
 ::set BACKGROUND=-detached
@@ -33,7 +48,6 @@ set TOKEFLAGS=
 :: note: paths passed as strings to erlang applications need to be escaped!
 set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
-set NODEDOCROOTDIR=%SCALARISDIR:\=\\%\\docroot_node
 set ETCDIR=%SCALARISDIR:\=\\%\\bin
 
 @echo on
@@ -44,12 +58,14 @@ pushd %BEAMDIR%
   -pa "%BEAMDIR%" %TOKEFLAGS% %BACKGROUND% ^
   -yaws embedded true ^
   -scalaris log_path "\"%LOGDIR%\"" ^
-  -scalaris docroot "\"%NODEDOCROOTDIR%\"" ^
+  -scalaris docroot "\"%DOCROOTDIR%\"" ^
   -scalaris config "\"%ETCDIR%\\scalaris.cfg\"" ^
   -scalaris local_config "\"%ETCDIR%\\scalaris.local.cfg\"" ^
   -scalaris start_dht_node dht_node ^
   -connect_all false -hidden -name %NODE_NAME% ^
   %SCALARIS_ADDITIONAL_PARAMETERS% ^
-  -s scalaris %*
+  -s scalaris %params%
 popd
 @echo off
+
+:end
