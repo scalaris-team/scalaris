@@ -53,12 +53,10 @@ class JSONConnection(object):
                   'method': function,
                   'params': params,
                   'id': 0}
-        #print params
-        # use compact JSON encoding:
-        params_json = json.dumps(params, separators=(',',':'))
-        #print params_json
-        headers = {"Content-type": "application/json; charset=utf-8"}
         try:
+            # use compact JSON encoding:
+            params_json = json.dumps(params, separators=(',',':'))
+            headers = {"Content-type": "application/json; charset=utf-8"}
             # no need to quote - we already encode to json:
             #self._conn.request("POST", default_path, urllib.quote(params_json), headers)
             self._conn.request("POST", default_path, params_json, headers)
@@ -66,18 +64,11 @@ class JSONConnection(object):
             #print response.status, response.reason
             if (response.status < 200 or response.status >= 300):
                 raise ConnectionException(response)
-            charset = response.getheader('Content-type', default='utf-8').split('charset=')
-            if (len(charset) > 1):
-                encoding = charset[-1]
-            else:
-                encoding = 'utf-8'
-            data = response.read().decode(encoding)
+            data = response.read().decode('utf-8')
+            response_json = json.loads(data)
+            return response_json['result']
         except Exception as instance:
             raise ConnectionException(instance)
-        #print data
-        response_json = json.loads(data)
-        #print response_json
-        return response_json['result']
 
     @staticmethod
     def encode_value(value):
@@ -122,9 +113,8 @@ class JSONConnection(object):
         
     # result: {'status': 'ok'} or
     #         {'status': 'fail', 'reason': 'timeout'}
-    # op: 'read' or 'write' or 'commit', 'test_and_set'
     @staticmethod
-    def process_result_write(result, op):
+    def process_result_write(result):
         """
         Processes the result of a write operation.
         Raises the appropriate exception if the operation failed.
@@ -164,7 +154,7 @@ class JSONConnection(object):
         Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result:
-            if result['status'] == 'ok' and len(result) == 1:
+            if result == {'status': 'ok'}:
                 return None
             elif result['status'] == 'fail' and 'reason' in result:
                 if len(result) == 2:
