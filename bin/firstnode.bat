@@ -14,23 +14,28 @@
 ::    limitations under the License.
 
 :: Script to start a new Scalaris system with an initial node.
+set SCRIPTDIR=%~dp0
+set ID=0
 
+set NODE_NAME=firstnode
+set /a CSPORT=14195+%ID%
+set /a YAWSPORT=8000+%ID%
+set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %YAWSPORT%
+
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.2\bin"
+set ERLANG="C:\Program Files\erl5.8.4\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
-set SCALARISDIR=%~dp0..
+set SCALARISDIR=%SCRIPTDIR%..
 set BEAMDIR=%SCALARISDIR%\ebin
-set NODE_NAME=firstnode
 set BACKGROUND=
 ::set BACKGROUND=-detached
 set TOKEFLAGS=
 :: note: paths passed as strings to erlang applications need to be escaped!
 set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
-set NODEDOCROOTDIR=%SCALARISDIR:\=\\%\\docroot_node
 set ETCDIR=%SCALARISDIR:\=\\%\\bin
-set SCALARIS_ADDITIONAL_PARAMETERS=
 
 @echo on
 pushd %BEAMDIR%
