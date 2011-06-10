@@ -19,8 +19,6 @@ require 'net/http'
 require 'benchmark'
 require 'scalaris'
 
-$url = 'http://localhost:8000/jsonrpc.yaws'
-
 def req_list(sc)
   puts "Start sample request list run..."
 
@@ -115,7 +113,7 @@ def pubsub(sc)
   printf("subscribers: %s\n", subs.to_json)
 end
 
-sc = Scalaris.new $url
+sc = Scalaris::Scalaris.new
 
 n = 100
 

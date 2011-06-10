@@ -16,12 +16,9 @@
 require 'rubygems'
 require 'json'
 require 'net/http'
-require 'benchmark'
 require 'optparse'
 require 'pp'
 require 'scalaris'
-
-$url = 'http://localhost:8000/jsonrpc.yaws'
 
 def write(sc, key_value_list)
   key, value = key_value_list
@@ -59,7 +56,7 @@ rescue OptionParser::ParseError
   exit
 end
 
-sc = Scalaris.new $url
+sc = Scalaris::TransactionSingleOp.new
 
 pp sc.read(options[:read]) unless options[:read] == nil
 pp write(sc, options[:write]) unless options[:write] == nil
