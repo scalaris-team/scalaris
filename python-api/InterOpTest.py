@@ -14,9 +14,9 @@
 #    limitations under the License.
 
 import Scalaris
-import os,  sys
+import os, sys
 
-def read_or_write(sc,  key,  value,  mode):
+def read_or_write(sc, key, value, mode):
     try:
         if (mode == 'read'):
             print 'read(' + key + ')'
@@ -39,8 +39,8 @@ def read_or_write(sc,  key,  value,  mode):
                 print 'fail'
                 return 1
         elif (mode == 'write'):
-            print 'write(' + key + ', ' + repr(value)+ ')'
-            sc.write(key,  value)
+            print 'write(' + key + ', ' + repr(value) + ')'
+            sc.write(key, value)
             return 0
     except Scalaris.ConnectionException as instance:
         print 'failed with connection error'
@@ -62,106 +62,106 @@ def read_or_write(sc,  key,  value,  mode):
         return 1
 
 def read_write_boolean(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_bool_false", False,  mode)
-    failed += read_or_write(sc,  basekey + "_bool_true", True,  mode)
+    failed += read_or_write(sc, basekey + "_bool_false", False, mode)
+    failed += read_or_write(sc, basekey + "_bool_true", True, mode)
     
     return failed
 
 def read_write_integer(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_int_0", 0,  mode)
-    failed += read_or_write(sc,  basekey + "_int_1", 1,  mode)
-    failed += read_or_write(sc,  basekey + "_int_min",  -2147483648,  mode)
-    failed += read_or_write(sc,  basekey + "_int_max", 2147483647,  mode)
-    failed += read_or_write(sc,  basekey + "_int_max_div_2", 2147483647 // 2,  mode)
+    failed += read_or_write(sc, basekey + "_int_0", 0, mode)
+    failed += read_or_write(sc, basekey + "_int_1", 1, mode)
+    failed += read_or_write(sc, basekey + "_int_min", -2147483648, mode)
+    failed += read_or_write(sc, basekey + "_int_max", 2147483647, mode)
+    failed += read_or_write(sc, basekey + "_int_max_div_2", 2147483647 // 2, mode)
     
     return failed
 
 def read_write_long(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_long_0", 0l,  mode)
-    failed += read_or_write(sc,  basekey + "_long_1", 1l,  mode)
-    failed += read_or_write(sc,  basekey + "_long_min",  -9223372036854775808l,  mode)
-    failed += read_or_write(sc,  basekey + "_long_max", 9223372036854775807l,  mode)
-    failed += read_or_write(sc,  basekey + "_long_max_div_2", 9223372036854775807l // 2l,  mode)
+    failed += read_or_write(sc, basekey + "_long_0", 0l, mode)
+    failed += read_or_write(sc, basekey + "_long_1", 1l, mode)
+    failed += read_or_write(sc, basekey + "_long_min", -9223372036854775808l, mode)
+    failed += read_or_write(sc, basekey + "_long_max", 9223372036854775807l, mode)
+    failed += read_or_write(sc, basekey + "_long_max_div_2", 9223372036854775807l // 2l, mode)
     
     return failed
 
 def read_write_biginteger(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_bigint_0", 0,  mode)
-    failed += read_or_write(sc,  basekey + "_bigint_1", 1,  mode)
-    failed += read_or_write(sc,  basekey + "_bigint_min",  -100000000000000000000,  mode)
-    failed += read_or_write(sc,  basekey + "_bigint_max", 100000000000000000000,  mode)
-    failed += read_or_write(sc,  basekey + "_bigint_max_div_2", 100000000000000000000 // 2,  mode)
+    failed += read_or_write(sc, basekey + "_bigint_0", 0, mode)
+    failed += read_or_write(sc, basekey + "_bigint_1", 1, mode)
+    failed += read_or_write(sc, basekey + "_bigint_min", -100000000000000000000, mode)
+    failed += read_or_write(sc, basekey + "_bigint_max", 100000000000000000000, mode)
+    failed += read_or_write(sc, basekey + "_bigint_max_div_2", 100000000000000000000 // 2, mode)
     
     return failed
 
 def read_write_double(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_float_0.0", 0.0,  mode)
-    failed += read_or_write(sc,  basekey + "_float_1.5", 1.5,   mode)
-    failed += read_or_write(sc,  basekey + "_float_-1.5",  -1.5,  mode)
-    failed += read_or_write(sc,  basekey + "_float_min", 4.9E-324,  mode)
-    failed += read_or_write(sc,  basekey + "_float_max", 1.7976931348623157E308,  mode)
-    failed += read_or_write(sc,  basekey + "_float_max_div_2", 1.7976931348623157E308 / 2.0,  mode)
+    failed += read_or_write(sc, basekey + "_float_0.0", 0.0, mode)
+    failed += read_or_write(sc, basekey + "_float_1.5", 1.5, mode)
+    failed += read_or_write(sc, basekey + "_float_-1.5", -1.5, mode)
+    failed += read_or_write(sc, basekey + "_float_min", 4.9E-324, mode)
+    failed += read_or_write(sc, basekey + "_float_max", 1.7976931348623157E308, mode)
+    failed += read_or_write(sc, basekey + "_float_max_div_2", 1.7976931348623157E308 / 2.0, mode)
     
     # not supported by erlang:
-    #failed += read_or_write(sc,  basekey + "_float_neg_inf", float('-inf'),  mode)
-    #failed += read_or_write(sc,  basekey + "__float_pos_inf", float('+inf'),  mode)
-    #failed += read_or_write(sc,  basekey + "_float_nan", float('nan'),  mode)
+    #failed += read_or_write(sc, basekey + "_float_neg_inf", float('-inf'), mode)
+    #failed += read_or_write(sc, basekey + "__float_pos_inf", float('+inf'), mode)
+    #failed += read_or_write(sc, basekey + "_float_nan", float('nan'), mode)
     
     return failed
 
 def read_write_string(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_string_empty", '',  mode)
-    failed += read_or_write(sc,  basekey + "_string_foobar", 'foobar',   mode)
-    failed += read_or_write(sc,  basekey + "_string_foo\\nbar",  'foo\nbar',  mode)
-    failed += read_or_write(sc,  basekey + "_string_unicode",  u'foo\u0180\u01E3\u11E5',  mode)
+    failed += read_or_write(sc, basekey + "_string_empty", '', mode)
+    failed += read_or_write(sc, basekey + "_string_foobar", 'foobar', mode)
+    failed += read_or_write(sc, basekey + "_string_foo\\nbar", 'foo\nbar', mode)
+    failed += read_or_write(sc, basekey + "_string_unicode", u'foo\u0180\u01E3\u11E5', mode)
     
     return failed
 
 def read_write_binary(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
     # note: binary not supported by JSON
-    failed += read_or_write(sc,  basekey + "_byte_empty", bytearray(),  mode)
-    failed += read_or_write(sc,  basekey + "_byte_0", bytearray([0]),   mode)
-    failed += read_or_write(sc,  basekey + "_byte_0123",  bytearray([0,  1,  2,  3]),  mode)
+    failed += read_or_write(sc, basekey + "_byte_empty", bytearray(), mode)
+    failed += read_or_write(sc, basekey + "_byte_0", bytearray([0]), mode)
+    failed += read_or_write(sc, basekey + "_byte_0123", bytearray([0, 1, 2, 3]), mode)
     
     return failed
 
 def read_write_list(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_list_empty", [],  mode)
-    failed += read_or_write(sc,  basekey + "_list_0_1_2_3", [0,  1,  2,  3],   mode)
-    failed += read_or_write(sc,  basekey + "_list_0_123_456_65000", [0,  123,  456,  65000],   mode)
-    failed += read_or_write(sc,  basekey + "_list_0_123_456_0x10ffff", [0,  123,  456,  0x10ffff],   mode)
-    failed += read_or_write(sc,  basekey + "_list_0_foo_1.5_false",  [0,  'foo',  1.5, False],  mode)
+    failed += read_or_write(sc, basekey + "_list_empty", [], mode)
+    failed += read_or_write(sc, basekey + "_list_0_1_2_3", [0, 1, 2, 3], mode)
+    failed += read_or_write(sc, basekey + "_list_0_123_456_65000", [0, 123, 456, 65000], mode)
+    failed += read_or_write(sc, basekey + "_list_0_123_456_0x10ffff", [0, 123, 456, 0x10ffff], mode)
+    failed += read_or_write(sc, basekey + "_list_0_foo_1.5_false", [0, 'foo', 1.5, False], mode)
     # note: binary not supported in lists
-    #failed += read_or_write(sc,  basekey + "_list_0_foo_1.5_<<0123>>",  [0,  'foo',  1.5,  bytearray([0,  1,  2,  3])],  mode)
+    #failed += read_or_write(sc, basekey + "_list_0_foo_1.5_<<0123>>", [0, 'foo', 1.5, bytearray([0, 1, 2, 3])], mode)
     
     return failed
 
 def read_write_map(basekey, sc, mode):
-    failed = 0;
+    failed = 0
     
-    failed += read_or_write(sc,  basekey + "_map_empty", {},  mode)
-    failed += read_or_write(sc,  basekey + "_map_x=0_y=1", {'x': 0,  'y': 1},   mode)
-    failed += read_or_write(sc,  basekey + "_map_a=0_b=foo_c=1.5_d=foo<nl>bar_e=list0123_f=mapx0y1",
-                            {'a': 0,  'b': 'foo',  'c': 1.5,  'd': 'foo\nbar',  'e': [0,  1,  2,  3],  'f': {'x': 0,  'y': 1}},  mode)
-    failed += read_or_write(sc,  basekey + "_map_=0", {'': 0},   mode)
-    failed += read_or_write(sc,  basekey + u"_map_x=0_y=foo\u0180\u01E3\u11E5", {'x': 0,  'y': u'foo\u0180\u01E3\u11E5'},   mode)
-    failed += read_or_write(sc,  basekey + u"_map_x=0_foo\u0180\u01E3\u11E5=1", {'x': 0,  u'foo\u0180\u01E3\u11E5': 1},   mode)
+    failed += read_or_write(sc, basekey + "_map_empty", {}, mode)
+    failed += read_or_write(sc, basekey + "_map_x=0_y=1", {'x': 0, 'y': 1}, mode)
+    failed += read_or_write(sc, basekey + "_map_a=0_b=foo_c=1.5_d=foo<nl>bar_e=list0123_f=mapx0y1",
+                            {'a': 0, 'b': 'foo', 'c': 1.5, 'd': 'foo\nbar', 'e': [0, 1, 2, 3], 'f': {'x': 0, 'y': 1}}, mode)
+    failed += read_or_write(sc, basekey + "_map_=0", {'': 0}, mode)
+    failed += read_or_write(sc, basekey + u"_map_x=0_y=foo\u0180\u01E3\u11E5", {'x': 0, 'y': u'foo\u0180\u01E3\u11E5'}, mode)
+    failed += read_or_write(sc, basekey + u"_map_x=0_foo\u0180\u01E3\u11E5=1", {'x': 0, u'foo\u0180\u01E3\u11E5': 1}, mode)
     
     return failed
 
@@ -184,15 +184,15 @@ if __name__ == "__main__":
     sc = Scalaris.TransactionSingleOp()
     
     failed = 0
-    failed += read_write_boolean(basekey, sc,  mode)
-    failed += read_write_integer(basekey, sc,  mode)
-    failed += read_write_long(basekey, sc,  mode)
-    failed += read_write_biginteger(basekey, sc,  mode)
-    failed += read_write_double(basekey, sc,  mode)
-    failed += read_write_string(basekey, sc,  mode)
-    failed += read_write_binary(basekey, sc,  mode)
-    failed += read_write_list(basekey, sc,  mode)
-    failed += read_write_map(basekey, sc,  mode)
+    failed += read_write_boolean(basekey, sc, mode)
+    failed += read_write_integer(basekey, sc, mode)
+    failed += read_write_long(basekey, sc, mode)
+    failed += read_write_biginteger(basekey, sc, mode)
+    failed += read_write_double(basekey, sc, mode)
+    failed += read_write_string(basekey, sc, mode)
+    failed += read_write_binary(basekey, sc, mode)
+    failed += read_write_list(basekey, sc, mode)
+    failed += read_write_map(basekey, sc, mode)
     print ''
     
     if (failed > 0):

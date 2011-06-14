@@ -85,8 +85,10 @@ class TestReplicatedDHT(unittest.TestCase):
         rdht = ReplicatedDHT()
         
         for i in xrange(len(_testData)):
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 0)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         rdht.closeConnection()
@@ -104,13 +106,17 @@ class TestReplicatedDHT(unittest.TestCase):
         
         # now try to delete the data:
         for i in xrange(len(_testData)):
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 4)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 0)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         c.close()
@@ -128,8 +134,10 @@ class TestReplicatedDHT(unittest.TestCase):
         
         # now try to delete the data:
         for i in xrange(len(_testData)):
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 4)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         for i in xrange(len(_testData)):
@@ -137,13 +145,17 @@ class TestReplicatedDHT(unittest.TestCase):
         
         # now try to delete the data:
         for i in xrange(len(_testData)):
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 4, ['ok']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 4)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (4, 0, 0))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
             
             # try again (should be successful with 0 deletes)
-            (success, ok, results) = rdht.delete(str(_testTime) + key + str(i))
-            self.assertEqual((success, ok, results), (True, 0, ['undef']*4))
+            ok = rdht.delete(str(_testTime) + key + str(i))
+            self.assertEqual(ok, 0)
+            results = rdht.getLastDeleteResult()
+            self.assertEqual((results.ok, results.locks_set, results.undefined), (0, 0, 4))
             self._checkKeyDoesNotExist(str(_testTime) + key + str(i))
         
         c.close()

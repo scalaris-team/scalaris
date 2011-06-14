@@ -57,7 +57,7 @@ if __name__ == "__main__":
             print 'write(' + key + ', ' + value + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 3 and sys.argv[1] in ["--delete", "-d"]):
-        sc = ReplicatedDHT()
+        rdht = ReplicatedDHT()
         key = sys.argv[2]
         if len(sys.argv) >= 4:
             timeout = sys.argv[3]
@@ -65,20 +65,21 @@ if __name__ == "__main__":
             timeout = 2000
         
         try:
-            (success, ok, results) = sc.delete(key)
-            if (success):
-                print 'delete(' + key + ', ' + str(timeout) + '): ok, deleted: ' + str(ok) + ' (' + repr(results) + ')'
-            else:
-                print 'delete(' + key + ', ' + str(timeout) + '): failed, deleted: ' + str(ok) + ' (' + repr(results) + ')'
+            ok = rdht.delete(key)
+            results = rdht.getLastDeleteResult()
+            print 'delete(' + key + ', ' + str(timeout) + '): ok, deleted: ' + str(ok) + ' (' + repr(results) + ')'
+        except TimeoutException as instance:
+            results = rdht.getLastDeleteResult()
+            print 'delete(' + key + ', ' + str(timeout) + '): failed (timeout), deleted: ' + str(ok) + ' (' + repr(results) + ')'
         except UnknownException as instance:
             print 'delete(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--publish", "-p"]):
-        sc = PubSub()
+        ps = PubSub()
         topic = sys.argv[2]
         content = sys.argv[3]
         try:
-            sc.publish(topic, content)
+            ps.publish(topic, content)
             print 'publish(' + topic + ', ' + content + '): ok'
         except ConnectionException as instance:
             print 'publish(' + topic + ', ' + content + ') failed with connection error'
@@ -87,11 +88,11 @@ if __name__ == "__main__":
             print 'publish(' + topic + ', ' + content + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--subscribe", "-s"]):
-        sc = PubSub()
+        ps = PubSub()
         topic = sys.argv[2]
         url = sys.argv[3]
         try:
-            sc.subscribe(topic, url)
+            ps.subscribe(topic, url)
             print 'subscribe(' + topic + ', ' + url + '): ok'
         except ConnectionException as instance:
             print 'subscribe(' + topic + ', ' + url + ') failed with connection error'
@@ -106,11 +107,11 @@ if __name__ == "__main__":
             print 'subscribe(' + topic + ', ' + url + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--unsubscribe", "-u"]):
-        sc = PubSub()
+        ps = PubSub()
         topic = sys.argv[2]
         url = sys.argv[3]
         try:
-            sc.unsubscribe(topic, url)
+            ps.unsubscribe(topic, url)
             print 'unsubscribe(' + topic + ', ' + url + '): ok'
         except ConnectionException as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with connection error'
@@ -128,10 +129,10 @@ if __name__ == "__main__":
             print 'unsubscribe(' + topic + ', ' + url + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 3 and sys.argv[1] in ["--getsubscribers", "-g"]):
-        sc = PubSub()
+        ps = PubSub()
         topic = sys.argv[2]
         try:
-            value = sc.getSubscribers(topic)
+            value = ps.getSubscribers(topic)
             print 'getSubscribers(' + topic + ') = ' + repr(value)
         except ConnectionException as instance:
             print 'getSubscribers(' + topic + ') failed with connection error'
