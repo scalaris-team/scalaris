@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/bin/ruby -KU
 # Copyright 2008-2011 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +13,6 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-require 'rubygems'
-require 'json'
-require 'net/http'
 require 'benchmark'
 require 'scalaris'
 
