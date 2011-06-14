@@ -197,10 +197,10 @@ class JSONConnection(object):
         Processes the result of a unsubscribe operation.
         Raises the appropriate exception if the operation failed.
         """
-        if isinstance(result, dict) and 'status' in result:
-            if result == {'status': 'ok'}:
-                return None
-            elif result['status'] == 'fail' and 'reason' in result and len(result) == 2:
+        if result == {'status': 'ok'}:
+            return None
+        elif isinstance(result, dict) and 'status' in result:
+            if result['status'] == 'fail' and 'reason' in result and len(result) == 2:
                 if result['reason'] == 'timeout':
                     raise TimeoutException(result)
                 elif result['reason'] == 'abort':
@@ -228,15 +228,37 @@ class JSONConnection(object):
         """
         Processes the result of a delete operation.
         Returns the tuple
-        (<success>, <number of deleted items>, <detailed results>) on success.
+        (<success (True | 'timeout')>, <number of deleted items>, <detailed results>) on success.
         Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'ok' in result and 'results' in result:
             if 'failure' not in result:
                 return (True, result['ok'], result['results'])
             elif result['failure'] == 'timeout':
-                return (False, result['ok'], result['results'])
+                return ('timeout', result['ok'], result['results'])
         raise UnknownException(result)
+    
+    # results: ['ok' or 'locks_set' or 'undef']
+    @staticmethod
+    def create_delete_result(result):
+        """
+        Creates a new DeleteResult from the given result list.
+        """
+        ok = 0
+        locks_set = 0
+        undefined = 0
+        if isinstance(result, list):
+            for element in result:
+                if element == 'ok':
+                    ok += 1
+                elif element == 'locks_set':
+                    locks_set += 1
+                elif element == 'undef':
+                    undefined += 1
+                else:
+                    raise UnknownException('Unknown reason ' + element + 'in ' + result)
+            return DeleteResult(ok, locks_set, undefined)
+        raise UnknownException('Unknown result ' + result)
 
     # results: {'tlog': xxx,
     #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
@@ -262,6 +284,13 @@ class JSONConnection(object):
         """
         if result != 'ok':
             raise UnknownException(result)
+    
+    @staticmethod
+    def newReqList(self):
+        """
+        Returns a new ReqList object allowing multiple parallel requests.
+        """
+        return _JSONReqList()
     
     def close(self):
         self._conn.close()
@@ -344,6 +373,15 @@ class UnknownException(Exception):
     def __str__(self):
         return repr(self.raw_result)
 
+class DeleteResult(object):
+    """
+    Stores the result of a delete operation.
+    """
+    def __init__(self, ok, locks_set, undefined):
+      self.ok = ok
+      self.locks_set = locks_set
+      self.undefined = undefined
+
 class TransactionSingleOp(object):
     """
     Single write or read operations on Scalaris.
@@ -382,7 +420,7 @@ class TransactionSingleOp(object):
 
     def nop(self, value):
         """
-        No operation (may be used for measuring the JSON overhead)
+        No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
@@ -391,7 +429,7 @@ class TransactionSingleOp(object):
     def closeConnection(self):
         """
         Close the connection to Scalaris
-        (it will automatically be re-opened on the next request)
+        (it will automatically be re-opened on the next request).
         """
         self._conn.close()
 
@@ -411,7 +449,7 @@ class Transaction(object):
         """
         Returns a new ReqList object allowing multiple parallel requests.
         """
-        return _ReqList(self._conn)
+        return self._conn.newReqList()
     
     
     def req_list(self, reqlist):
@@ -425,9 +463,9 @@ class Transaction(object):
         process_result_write() and process_result_commit().
         """
         if self._tlog == None:
-            result = self._conn.call('req_list', [reqlist.getJSONRequests()])
+            result = self._conn.call('req_list', [reqlist.getRequests()])
         else:
-            result = self._conn.call('req_list', [self._tlog, reqlist.getJSONRequests()])
+            result = self._conn.call('req_list', [self._tlog, reqlist.getRequests()])
         (tlog, result) = self._conn.process_result_req_list(result)
         self._tlog = tlog
         return result
@@ -447,7 +485,7 @@ class Transaction(object):
         Processes a result element from the list returned by req_list() which
         originated from a write operation.
         Raises the appropriate exceptions if a failure occurred during the
-        operation
+        operation.
         """
         return self._conn.process_result_write(result)
 
@@ -456,7 +494,7 @@ class Transaction(object):
         Processes a result element from the list returned by req_list() which
         originated from a commit operation.
         Raises the appropriate exceptions if a failure occurred during the
-        operation
+        operation.
         """
         return self._conn.process_result_commit(result)
     
@@ -494,7 +532,7 @@ class Transaction(object):
 
     def nop(self, value):
         """
-        No operation (may be used for measuring the JSON overhead)
+        No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
@@ -503,23 +541,20 @@ class Transaction(object):
     def closeConnection(self):
         """
         Close the connection to Scalaris
-        (it will automatically be re-opened on the next request)
+        (it will automatically be re-opened on the next request).
         """
         self._conn.close()
 
-class _ReqList(object):
+class _JSONReqList(object):
     """
     Request list for use with Transaction.req_list()
     """
     
-    def __init__(self, conn):
+    def __init__(self):
         """
-        Create a new object using the given connection.
-        Note: The connection object is needed in order to encode values for
-        write operations.
+        Create a new object using a JSON connection.
         """
         self.requests = []
-        self._conn = conn
     
     def addRead(self, key):
         """
@@ -532,7 +567,7 @@ class _ReqList(object):
         """
         Adds a write operation to the request list.
         """
-        self.requests.append({'write': {key: self._conn.encode_value(value)}})
+        self.requests.append({'write': {key: JSONConnection.encode_value(value)}})
         return self
     
     def addCommit(self):
@@ -542,7 +577,7 @@ class _ReqList(object):
         self.requests.append({'commit': ''})
         return self
     
-    def getJSONRequests(self):
+    def getRequests(self):
         """
         Gets the collected requests.
         """
@@ -555,7 +590,7 @@ class PubSub(object):
     
     def __init__(self, conn = JSONConnection()):
         """
-        Create a new object using the given connection
+        Create a new object using the given connection.
         """
         self._conn = conn
 
@@ -598,7 +633,7 @@ class PubSub(object):
 
     def nop(self, value):
         """
-        No operation (may be used for measuring the JSON overhead)
+        No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
@@ -607,7 +642,7 @@ class PubSub(object):
     def closeConnection(self):
         """
         Close the connection to Scalaris
-        (it will automatically be re-opened on the next request)
+        (it will automatically be re-opened on the next request).
         """
         self._conn.close()
 
@@ -618,11 +653,12 @@ class ReplicatedDHT(object):
     
     def __init__(self, conn = JSONConnection()):
         """
-        Create a new object using the given connection
+        Create a new object using the given connection.
         """
         self._conn = conn
 
-    # returns: (Success::boolean(), ok::integer(), results:['ok' or 'locks_set' or 'undef'])
+    # returns the number of successfully deleted items
+    # use getLastDeleteResult() to get more details
     def delete(self, key, timeout = 2000):
         """
         Tries to delete the value at the given key.
@@ -632,11 +668,28 @@ class ReplicatedDHT(object):
         delete can re-appear.
         """
         result = self._conn.call('delete', [key, timeout])
-        return self._conn.process_result_delete(result)
+        (success, ok, results) = self._conn.process_result_delete(result)
+        self._lastDeleteResult = results
+        if success == True:
+            return ok
+        elif success == 'timeout':
+            raise TimeoutException(result)
+        else:
+            raise UnknownException(result)
+
+    def getLastDeleteResult(self):
+        """
+        Returns the result of the last call to delete().
+        
+        NOTE: This function traverses the result list returned by Scalaris and
+        therefore takes some time to process. It is advised to store the returned
+        result object once generated.
+        """
+        return self._conn.create_delete_result(self._lastDeleteResult)
 
     def nop(self, value):
         """
-        No operation (may be used for measuring the JSON overhead)
+        No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('nop', [value])
@@ -645,7 +698,7 @@ class ReplicatedDHT(object):
     def closeConnection(self):
         """
         Close the connection to Scalaris
-        (it will automatically be re-opened on the next request)
+        (it will automatically be re-opened on the next request).
         """
         self._conn.close()
 
@@ -655,7 +708,6 @@ def str_to_list(value):
     If the expected value of a read operation is a list, the returned value
     could be (mistakenly) a string if it is a list of integers.
     """
-    
     if (isinstance(value, str) or isinstance(value, unicode)):
         chars = list(value)
         return [ord(char) for char in chars]
