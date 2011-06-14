@@ -124,11 +124,10 @@ public class ReplicatedDHTTest {
      * @throws UnknownException
      * @throws TimeoutException
      * @throws ConnectionException
-     * @throws NodeNotFoundException
      */
     @Test
     public void testDelete_notExistingKey() throws ConnectionException,
-            TimeoutException, UnknownException, NodeNotFoundException {
+            TimeoutException, UnknownException {
         final String key = "_Delete_NotExistingKey";
         final ReplicatedDHT rdht = new ReplicatedDHT();
 
@@ -158,12 +157,11 @@ public class ReplicatedDHTTest {
      * @throws UnknownException
      * @throws TimeoutException
      * @throws ConnectionException
-     * @throws NodeNotFoundException
      * @throws AbortException
      */
     @Test
     public void testDelete1() throws ConnectionException,
-            TimeoutException, UnknownException, NodeNotFoundException, AbortException {
+            TimeoutException, UnknownException, AbortException {
         final String key = "_Delete1";
         final Connection c = ConnectionFactory.getInstance().createConnection("test");
         final ReplicatedDHT rdht = new ReplicatedDHT(c);
@@ -211,12 +209,11 @@ public class ReplicatedDHTTest {
      * @throws UnknownException
      * @throws TimeoutException
      * @throws ConnectionException
-     * @throws NodeNotFoundException
      * @throws AbortException
      */
     @Test
     public void testDelete2() throws ConnectionException,
-            TimeoutException, UnknownException, NodeNotFoundException, AbortException {
+            TimeoutException, UnknownException, AbortException {
         final String key = "_Delete2";
         final Connection c = ConnectionFactory.getInstance().createConnection("test");
         final ReplicatedDHT rdht = new ReplicatedDHT(c);

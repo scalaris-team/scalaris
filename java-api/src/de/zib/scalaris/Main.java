@@ -243,8 +243,6 @@ public class Main {
                 printException("delete failed with connection error", e, verbose);
             } catch (final TimeoutException e) {
                 printException("delete failed with timeout", e, verbose);
-            } catch (final NodeNotFoundException e) {
-                printException("delete failed with node not found", e, verbose);
             } catch (final UnknownException e) {
                 printException("delete failed with unknown error", e, verbose);
             }
@@ -403,18 +401,6 @@ public class Main {
      * @param e            the exception to print
      * @param verbose      specifies whether to include the stack trace or not
      */
-    final static void printException(final String description, final NodeNotFoundException e, final boolean verbose) {
-        printException(description, e, verbose, 6);
-    }
-
-    /**
-     * Prints the given exception with the given description and terminates the
-     * JVM.
-     *
-     * @param description  will be prepended to the error message
-     * @param e            the exception to print
-     * @param verbose      specifies whether to include the stack trace or not
-     */
     final static void printException(final String description, final AbortException e, final boolean verbose) {
         printException(description, e, verbose, 7);
     }
@@ -422,6 +408,9 @@ public class Main {
     /**
      * Prints the given exception with the given description and terminates the
      * JVM.
+     *
+     * Note: exit status 6 was used by the NodeNotFoundException which is not
+     * needed anymore - do not re-use this exit status!
      *
      * @param description  will be prepended to the error message
      * @param e            the exception to print

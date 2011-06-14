@@ -50,7 +50,7 @@ public class DeleteResult {
                     ++undef;
                 } else {
                     throw new UnknownException("Unknow reason: "
-                            + element.atomValue());
+                            + element.atomValue() + " in " + list.toString());
                 }
             }
         }
