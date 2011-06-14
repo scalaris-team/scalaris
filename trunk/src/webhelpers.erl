@@ -59,8 +59,7 @@ set_key(Key, Value) ->
 -spec delete_key(Key::?RT:key(), Timeout::pos_integer())
         -> {TimeInMs::integer(),
             Result::{ok, pos_integer(), list()} | {fail, timeout} |
-                    {fail, timeout, pos_integer(), list()} |
-                    {fail, node_not_found}}.
+                    {fail, timeout, pos_integer(), list()}}.
 delete_key(Key, Timeout) ->
     timer:tc(api_rdht, delete, [Key, Timeout]).
 

@@ -118,8 +118,6 @@ public class ReplicatedDHT {
      *             sends a message containing an invalid cookie
      * @throws TimeoutException
      *             if a timeout occurred while trying to delete the value
-     * @throws NodeNotFoundException
-     *             if no scalaris node was found
      * @throws UnknownException
      *             if any other error occurs
      *
@@ -128,7 +126,7 @@ public class ReplicatedDHT {
      * @see #delete(OtpErlangString, int)
      */
     public int delete(final OtpErlangString key) throws ConnectionException,
-    TimeoutException, NodeNotFoundException, UnknownException {
+    TimeoutException, UnknownException {
         return delete(key, 2000);
     }
 
@@ -152,15 +150,13 @@ public class ReplicatedDHT {
      *             sends a message containing an invalid cookie
      * @throws TimeoutException
      *             if a timeout occurred while trying to delete the value
-     * @throws NodeNotFoundException
-     *             if no scalaris node was found
      * @throws UnknownException
      *             if any other error occurs
      *
      * @since 2.8
      */
     public int delete(final OtpErlangString key, final int timeout) throws ConnectionException,
-    TimeoutException, NodeNotFoundException, UnknownException {
+    TimeoutException, UnknownException {
         lastDeleteResult = null;
         final OtpErlangObject received_raw = connection.doRPC("api_rdht", "delete",
                 new OtpErlangObject[] { key, new OtpErlangInt(timeout) });
@@ -171,25 +167,17 @@ public class ReplicatedDHT {
             /*
              * possible return values:
              *  - {ok, ResultsOk::pos_integer(), ResultList::[ok | undef]}
-             *  - {fail, timeout}
              *  - {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]}
-             *  - {fail, node_not_found}
              */
             if (state.equals(CommonErlangObjects.okAtom) && (received.arity() == 3)) {
                 lastDeleteResult = (OtpErlangList) received.elementAt(2);
                 final int succeeded = ((OtpErlangLong) received.elementAt(1)).intValue();
                 return succeeded;
-            } else if (state.equals(CommonErlangObjects.failAtom) && (received.arity() >= 2)) {
+            } else if (state.equals(CommonErlangObjects.failAtom) && (received.arity() == 4)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    if (received.arity() == 4) {
-                        lastDeleteResult = (OtpErlangList) received.elementAt(3);
-                        throw new TimeoutException(received_raw);
-                    } else if(received.arity() == 2) {
-                        throw new TimeoutException(received_raw);
-                    }
-                } else if (reason.equals(CommonErlangObjects.nodeNotFoundAtom)) {
-                    throw new NodeNotFoundException(received_raw);
+                    lastDeleteResult = (OtpErlangList) received.elementAt(3);
+                    throw new TimeoutException(received_raw);
                 }
             }
             throw new UnknownException(received_raw);
@@ -217,8 +205,6 @@ public class ReplicatedDHT {
      *             sends a message containing an invalid cookie
      * @throws TimeoutException
      *             if a timeout occurred while trying to delete the value
-     * @throws NodeNotFoundException
-     *             if no scalaris node was found
      * @throws UnknownException
      *             if any other error occurs
      *
@@ -227,7 +213,7 @@ public class ReplicatedDHT {
      * @see #delete(String, int)
      */
     public int delete(final String key) throws ConnectionException,
-    TimeoutException, NodeNotFoundException, UnknownException {
+    TimeoutException, UnknownException {
         return delete(key, 2000);
     }
 
@@ -251,8 +237,6 @@ public class ReplicatedDHT {
      *             sends a message containing an invalid cookie
      * @throws TimeoutException
      *             if a timeout occurred while trying to delete the value
-     * @throws NodeNotFoundException
-     *             if no scalaris node was found
      * @throws UnknownException
      *             if any other error occurs
      *
@@ -261,7 +245,7 @@ public class ReplicatedDHT {
      * @see #delete(OtpErlangString, int)
      */
     public int delete(final String key, final int timeout) throws ConnectionException,
-    TimeoutException, NodeNotFoundException, UnknownException {
+    TimeoutException, UnknownException {
         return delete(new OtpErlangString(key), timeout);
     }
 
