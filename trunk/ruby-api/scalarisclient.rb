@@ -15,7 +15,7 @@
 
 require 'optparse'
 require 'pp'
-require 'scalaris'
+require "#{File.dirname(__FILE__)}/scalaris"
 
 def write(sc, key_value_list)
   key, value = key_value_list

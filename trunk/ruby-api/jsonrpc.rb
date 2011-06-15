@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 require 'benchmark'
-require 'scalaris'
+require "#{File.dirname(__FILE__)}/scalaris"
 
 def req_list(sc)
   puts "Start sample request list run..."

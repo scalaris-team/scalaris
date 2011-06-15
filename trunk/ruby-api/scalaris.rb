@@ -161,14 +161,11 @@ module Scalaris
       start
       req = Net::HTTP::Post.new($DEFAULT_PATH)
       req.add_field('Content-Type', 'application/json; charset=utf-8')
-      # work around wrong unicode escaping for strings, i.e.
-      # send \uxxxx sequences (they will be interpreted as unicode characters)
-      # note: can not override to_json for strings (this is not done recursively, e.g. in a Hash, before ruby 1.9)
       req.body =  {
         :jsonrpc => :'2.0',
         :method => function,
         :params => params,
-        :id => 0 }.to_json.gsub('\\\\u', '\\u') 
+        :id => 0 }.to_json({:ascii_only => true})
       begin
         res = @conn.request(req)
         if res.is_a?(Net::HTTPSuccess)
