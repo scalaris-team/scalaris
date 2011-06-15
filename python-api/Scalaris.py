@@ -286,7 +286,7 @@ class JSONConnection(object):
             raise UnknownException(result)
     
     @staticmethod
-    def newReqList(self):
+    def newReqList():
         """
         Returns a new ReqList object allowing multiple parallel requests.
         """
