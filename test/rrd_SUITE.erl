@@ -23,7 +23,9 @@
 -compile(export_all).
 
 all()   -> [simple_create,
-            create_gauge
+            fill_test,
+            create_gauge,
+            create_counter
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -40,11 +42,25 @@ simple_create(_Config) ->
     ?equals(rrd:dump(DB1), [{20, 6}]),
     ok.
 
+fill_test(_Config) ->
+    Adds = [{20, 1}, {30, 2}, {40, 3}, {60, 5}],
+    DB0 = rrd:create(10, 3, gauge, 0),
+    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1), [{60, 5}, {40, 3}]),
+    ok.
+
 create_gauge(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, gauge, 0),
     DB1 = lists:foldl(fun apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{40, 2}, {30, 1}, {20, 6}]),
+    ok.
+
+create_counter(_Config) ->
+    Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
+    DB0 = rrd:create(10, 10, counter, 0),
+    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1), [{40, 2}, {30, 1}, {20, 11}]),
     ok.
 
 apply({Time, Value}, DB) ->

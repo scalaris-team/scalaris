@@ -22,6 +22,7 @@
 -vsn('$Id: util.erl 1747 2011-05-27 20:17:36Z lakedaimon300@googlemail.com $').
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
 -export_type([rrd/0]).
@@ -30,22 +31,23 @@
 
 -export([create/4, add/3]).
 
--record(rrd, {step_size :: float(),
-              count :: pos_integer(),
-              type :: timeseries_type(),
+-type timeseries_type() :: gauge | counter.
+-type fill_policy_type() :: set_undefined | keep_last_value.
+-type time() :: pos_integer(). % | {integer(), integer(), integer()}
+
+-record(rrd, {step_size     = ?required(rrd, step_size)     :: time(),
+              count         = ?required(rrd, count)         :: pos_integer(),
+              type          = ?required(rrd, type)          :: timeseries_type(),
               % index of current slot
-              current_index :: pos_integer(),
+              current_index = ?required(rrd, current_index) :: pos_integer(),
               % current slot starts at current_time and lasts for step_size
               % time units
-              current_time :: time(),
-              data :: array()
+              current_time  = ?required(rrd, current_time)  :: time(),
+              data          = ?required(rrd, data)          :: array(),
+              fill_policy   = ?required(rrd, fill_policy)   :: fill_policy_type()
             }).
 
 -opaque rrd() :: #rrd{}.
-
-
--type timeseries_type() :: gauge | counter.
--type time() :: float(). % | {integer(), integer(), integer()}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -56,12 +58,13 @@
 -spec create(StepSize::time(), Count::pos_integer(), Type::timeseries_type()) ->
     rrd().
 create(StepSize, Count, Type) ->
-    create(StepSize, Count, Type, erlang:now()).
+    create(StepSize, Count, Type, 0). %erlang:now()).
 
 -spec add_now(Value::number(), rrd()) -> rrd().
 add_now(Value, DB) ->
-    add(erlang:now(), Value, DB).
+    add(0, Value, DB). %erlang:now()
 
+-spec dump(rrd()) -> list({time(), number()}).
 dump(DB) ->
     Count = DB#rrd.count,
     StepSize = DB#rrd.step_size,
@@ -76,41 +79,67 @@ dump(DB) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %@doc StepSize in milliseconds
--spec create(StepSize::time(), Count::pos_integer(), Type::timeseries_type(),
+-spec create(SlotSize::time(), Count::pos_integer(), Type::timeseries_type(),
              StartTime::time()) -> rrd().
-create(StepSize, Count, Type, StartTime) ->
-    #rrd{step_size = StepSize, count = Count, type = Type, current_index = 0,
-         current_time = StartTime, data = array:new(Count)}.
+create(SlotSize, Count, Type, StartTime) ->
+    #rrd{step_size = SlotSize, count = Count, type = Type, current_index = 0,
+         current_time = StartTime, data = array:new(Count), fill_policy = set_undefined}.
 
+-spec add(Time::time(), Value::number(), rrd()) -> rrd().
 add(Time, Value, DB) ->
     case DB#rrd.type of
         gauge ->
-            add_gauge(Time, Value, DB);
+            add_with(Time, Value, DB, fun (_Old, New) -> New end);
         counter ->
-            add_counter(Time, Value, DB)
+            add_with(Time, Value, DB, fun (Old, New) -> Old + New end)
     end.
 
-add_gauge(Time, Value, DB) ->
+add_with(Time, Value, DB, F) ->
     StepSize = DB#rrd.step_size,
     CurrentTime = DB#rrd.current_time,
     {CurrentTimeSlot,FutureTimeSlot} = get_slot_type(Time, CurrentTime, StepSize),
     if
         CurrentTimeSlot ->
             CurrentIndex = DB#rrd.current_index,
-            DB#rrd{data = array:set(CurrentIndex, Value, DB#rrd.data)};
+            update_with(DB, CurrentIndex, Value, F);
         FutureTimeSlot ->
             Delta = (Time - CurrentTime) div StepSize,
-            CurrentIndex = DB#rrd.current_index + Delta,
+            CurrentIndex = (DB#rrd.current_index + Delta) rem DB#rrd.count,
             % fill with default ???
-            DB#rrd{data = array:set(CurrentIndex, Value, DB#rrd.data),
+            FilledDB = fill(DB,
+                              (DB#rrd.current_index + 1) rem DB#rrd.count,
+                              CurrentIndex,
+                              array:get(DB#rrd.current_index, DB#rrd.data)),
+            DB#rrd{data = array:set(CurrentIndex, Value, FilledDB#rrd.data),
                    current_index = CurrentIndex,
                    current_time = DB#rrd.current_time + Delta * StepSize};
         true -> % PastTimeSlot; ignore
             DB
     end.
 
-add_counter(Time, Value, DB) ->
-    DB.
+update_with(DB, CurrentIndex, NewValue, F) ->
+    case array:get(CurrentIndex, DB#rrd.data) of
+        undefined ->
+            DB#rrd{data = array:set(CurrentIndex, NewValue, DB#rrd.data)};
+        OldValue ->
+            DB#rrd{data = array:set(CurrentIndex, F(OldValue, NewValue), DB#rrd.data)}
+    end.
+
+% @todo
+-spec fill(rrd(), pos_integer(), pos_integer(), number()) -> rrd().
+fill(DB, _CurrentIndex, _CurrentIndex, _LastValue) ->
+    DB;
+fill(DB, CurrentGapIndex, CurrentIndex, LastValue) ->
+    case DB#rrd.fill_policy of
+        set_undefined ->
+            fill(DB#rrd{data = array:set(CurrentGapIndex, undefined, DB#rrd.data)},
+                 (CurrentGapIndex + 1) rem DB#rrd.count,
+                 CurrentIndex, LastValue);
+        keep_last_value ->
+            fill(DB#rrd{data = array:set(CurrentGapIndex, LastValue, DB#rrd.data)},
+                 (CurrentGapIndex + 1) rem DB#rrd.count,
+                 CurrentIndex, LastValue)
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -129,8 +158,8 @@ get_slot_type(Time, CurrentTime, StepSize) ->
     {CurrentSlot, FutureSlot}.
 
 dump_internal(Data,
-              Count, CurrentIndex, CurrentIndex,
-              StepSize, CurrentTime, Rest) ->
+              _Count, CurrentIndex, CurrentIndex,
+              _StepSize, CurrentTime, Rest) ->
     case array:get(CurrentIndex, Data) of
         undefined ->
             Rest;
