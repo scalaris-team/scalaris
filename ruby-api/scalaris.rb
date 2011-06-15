@@ -57,6 +57,19 @@ module InternalScalarisNopClose
   end
 end
 
+# work around floating point numbers not being printed precisely enough
+class Float
+  # note: can not override to_json (this is not done recursively, e.g. in a Hash, before ruby 1.9)
+  alias_method :orig_t_s, :to_s
+  def to_s
+    if not finite?
+      orig_to_json(*a)
+    else
+      sprintf("%#.17g", self)
+    end
+  end
+end
+
 module Scalaris
   # Exception that is thrown if a the commit of a write operation on a Scalaris
   # ring fails.
@@ -148,17 +161,18 @@ module Scalaris
       start
       req = Net::HTTP::Post.new($DEFAULT_PATH)
       req.add_field('Content-Type', 'application/json; charset=utf-8')
+      # work around wrong unicode escaping for strings, i.e.
+      # send \uxxxx sequences (they will be interpreted as unicode characters)
+      # note: can not override to_json for strings (this is not done recursively, e.g. in a Hash, before ruby 1.9)
       req.body =  {
         :jsonrpc => :'2.0',
         :method => function,
         :params => params,
-        :id => 0 }.to_json.gsub('\\\\u', '\\u') # send \uxxxx sequences (they will be interpreted as unicode inside yaws)
-      puts req.body.inspect 
+        :id => 0 }.to_json.gsub('\\\\u', '\\u') 
       begin
         res = @conn.request(req)
         if res.is_a?(Net::HTTPSuccess)
           data = res.body
-          puts data.inspect
           return JSON.parse(data)['result']
         else
           raise ConnectionError.new(res)
