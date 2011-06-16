@@ -51,11 +51,14 @@ import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     private static final int UPDATE_PAGELIST_EVERY = 400;
     private static final int MAX_SCALARIS_CONNECTIONS = 4;
+    private static final int NEW_CATS_HASH_DEF_SIZE = 100;
+    private static final int NEW_TPLS_HASH_DEF_SIZE = 100;
+    
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ArrayBlockingQueue<Transaction> scalaris_tx = new ArrayBlockingQueue<Transaction>(MAX_SCALARIS_CONNECTIONS);
     private List<String> newPages = new LinkedList<String>();
-    private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(100);
-    private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(100);
+    private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
+    private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
     
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
 
@@ -344,7 +347,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         // list of pages:
         worker = new MyScalarisAddToPageListRunnable(scalaris_key, newPages, scalaris_single);
         executor.execute(worker);
-        newPages.clear();
+        newPages = new LinkedList<String>();
         
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
@@ -352,7 +355,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key, category.getValue(), scalaris_single);
             executor.execute(worker);
         }
-        newCategories.clear();
+        newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
 
         // list of pages a template is used in:
         for (Entry<String, List<String>> template: newTemplates.entrySet()) {
@@ -360,7 +363,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key, template.getValue(), scalaris_single);
             executor.execute(worker);
         }
-        newTemplates.clear();
+        newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
         
         executor.shutdown();
         while (!executor.isTerminated()) {
