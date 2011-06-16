@@ -22,6 +22,8 @@
 # source function library
 . /etc/rc.d/init.d/functions
 
+NETMASK="255.0.0.0"
+
 # Gets IP address from a given MAC
 mac2ip() {
     mac=$1
@@ -68,7 +70,8 @@ gen_hosts() {
  
 gen_exports() {
     NETWORK=$1
-    echo "/images ${NETWORK}.0/255.255.255.0(rw,async,no_subtree_check)"
+#    echo "/images ${NETWORK}.0/255.255.255.0(rw,async,no_subtree_check)"
+    echo "/images ${NETWORK}.0/$NETMASK(rw,async,no_subtree_check)"
 }
  
 gen_hostname() {
@@ -91,7 +94,7 @@ cat <<EOT
  HWADDR=$MAC
  ONBOOT=yes
  TYPE=Ethernet
- NETMASK=255.255.255.0
+ NETMASK=$NETMASK
  IPADDR=$IP
 EOT
  
