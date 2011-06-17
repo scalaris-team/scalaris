@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -23,6 +24,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
 
@@ -76,6 +78,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
      * URL for image links
      */
     public static final String imageBaseURL = "images/image.png";
+    
+    private ConnectionFactory cFactory;
 
     /**
      * Creates the servlet. 
@@ -91,6 +95,30 @@ public class WikiServlet extends HttpServlet implements Servlet {
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
+        Properties properties = new Properties();
+        try {
+            InputStream fis = config.getServletContext().getResourceAsStream("/WEB-INF/scalaris.properties");
+            if (fis != null) {
+                properties.load(fis);
+                properties.setProperty("PropertyLoader.loadedfile", "/WEB-INF/scalaris.properties");
+                fis.close();
+            } else {
+                properties = null;
+            }
+        } catch (IOException e) {
+//            e.printStackTrace();
+            properties = null;
+        }
+        
+        if (properties != null) {
+            cFactory = new ConnectionFactory(properties);
+            cFactory.setClientNameAppendUUID(true);
+        } else {
+            cFactory = new ConnectionFactory();
+            cFactory.setClientName("wiki_renderer");
+            cFactory.setClientNameAppendUUID(true);
+        }
+        
         setupChordSharpConnection(null);
         random = new Random();
     }
@@ -103,9 +131,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
      */
     private boolean setupChordSharpConnection(HttpServletRequest request) {
         try {
-            connection = ConnectionFactory.getInstance().createConnection(
-                    "wiki_renderer", true);
-            
+            connection = cFactory.createConnection();
             TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
             siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
             namespace = new MyNamespace(siteinfo);
