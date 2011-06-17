@@ -146,7 +146,7 @@
     </java>
   </target>
 
-  <target name="dist">
+  <target name="dist" depends="build">
     <jar jarfile="scalaris-wiki.war" basedir="simplewiki"/>
   </target>
 </project>
