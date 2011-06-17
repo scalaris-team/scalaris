@@ -39,28 +39,28 @@ end_per_suite(_Config) ->
 simple_create(_Config) ->
     Adds = [{20, 5}, {25, 6}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,20}, 6}]),
     ok.
 
 fill_test(_Config) ->
     Adds = [{20, 1}, {30, 2}, {40, 3}, {60, 5}],
     DB0 = rrd:create(10, 3, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,60}, 5}, {{0,0,40}, 3}]),
     ok.
 
 create_gauge(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, 2}, {{0,0,30}, 1}, {{0,0,20}, 6}]),
     ok.
 
 create_counter(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, counter, {0,0,0}),
-    DB1 = lists:foldl(fun apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, 2}, {{0,0,30}, 1}, {{0,0,20}, 11}]),
     ok.
 
