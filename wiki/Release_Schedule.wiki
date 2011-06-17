@@ -2,7 +2,7 @@
 
 = 0.3.0 Rhinechis Scalaris (planned) =
 
-  * tx_tm_rtm handle more failure scenarios
+  * tx_tm_rtm handle more failure scenarios (done in r1793)
   * update user-dev-guide
   * clarify cs_api_v2 (return types) (done) issue 64
   * switch Java API to new cs_api_v2 (done)
