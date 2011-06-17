@@ -190,7 +190,6 @@ on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    %% @todo got replies from all reps? -> delete ets entry
     TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, MajOk, MajDeny),
     _ = case {rdht_tx_read_state:is_newly_decided(TmpEntry),
               rdht_tx_read_state:get_client(TmpEntry)} of
@@ -241,8 +240,8 @@ on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
 my_get_entry(Id, Table) ->
     case pdb:get(Id, Table) of
         undefined ->
-            msg_delay:send_local(config:read(transaction_lookup_timeout) div 1000,
-                                 self(), {timeout_id, Id}),
+%%            msg_delay:send_local(config:read(transaction_lookup_timeout) div 1000,
+%%                                 self(), {timeout_id, Id}),
             rdht_tx_read_state:new(Id);
         Any -> Any
     end.
