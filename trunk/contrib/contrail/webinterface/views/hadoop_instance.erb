@@ -1,0 +1,43 @@
+<html>
+<head>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
+<title>Hadoop Cluster</title>
+</head>
+<body>
+
+<h2>Hadoop Cluster #<%= @id %></h2>
+Created at: <%= @instance.created_at %><br>
+Head node: #<%= @instance.master_node %><br>
+
+<a href="http://<%= @master %>:8088">HUE</a>
+<a href="http://<%= @master %>:8088">Job Tracker</a>
+
+
+<h3>VMs</h3>
+<table>
+<% @instance.hadoopvms_dataset.each do |vm| %>
+<tr>
+  <td><a href="/one/vm/<%= vm.one_vm_id %>">#<%= vm.one_vm_id %></a></td>
+  <td><form action="/hadoop/<%= @id %>/<%= vm.one_vm_id %>/delete" method="post"><input type="image" src="/cnrdelete-all.png"></form></td>
+</tr>
+<% end %>
+</table>
+
+<form action="/hadoop/<%= @id %>/add" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <input id="submit" name="commit" type="submit" value="Add New Node" />
+</form>
+
+<form action="/hadoop/<%= @id %>/destroy" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <input id="submit" name="commit" type="submit" value="Destroy Cluster" />
+</form>
+
+<br/>
+<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/hadoop">Hadoop</a> <a href="/one">OpenNebula</a>
+</body>
+</html>

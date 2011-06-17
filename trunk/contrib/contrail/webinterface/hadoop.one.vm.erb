@@ -2,8 +2,8 @@
 # VM definition example
 #---------------------------------------
 
-CPU    = 0.1
-MEMORY = 1024
+CPU    = 0.4
+MEMORY = 900
 
 # --- kernel & boot device ---
 
@@ -24,19 +24,21 @@ NIC = [ network = "Private LAN" ]
 
 # --- Placement options ---
 
-REQUIREMENTS = "CPUSPEED > 1000"
+REQUIREMENTS = "CPUSPEED > 500"
 RANK         = FREECPU
 
 
 # --- Contextualization ---
 
-#CONTEXT = [
-#  ip_private = "$NIC[IP]",
-#  dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
-#  ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
-#  user_cert  = "special user certificate",
-#  TARGET     = hdb
-#]
+CONTEXT = [
+  HADOOP_FIRST="<%= @hadoopfirst %>",
+  HADOOP_MASTER="<%= @hadoopmaster %>",
+  ip_private = "$NIC[IP]",
+  dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
+  ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
+  user_cert  = "special user certificate",
+  TARGET     = sdb
+]
 
 # --- Debug ---
 GRAPHICS = [

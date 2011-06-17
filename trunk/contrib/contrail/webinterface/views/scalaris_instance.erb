@@ -1,21 +1,25 @@
 <html>
 <head>
 <link rel="stylesheet" text="text/css" href="/contrail.css">
-<title>Scalaris Instance</title>
+<title>Scalaris Cluster</title>
 </head>
 <body>
 
-<h2>Scalaris Instance</h2>
-Id: <%= @id %><br>
-
+<h2>Scalaris Cluster #<%= @id %></h2>
 Created at: <%= @instance.created_at %><br>
-
 Head node: #<%= @instance.head_node %><br>
 
+<a href="http://<%= @master %>:8000">Management Console</a>
+
 <h3>VMs</h3>
+<table>
 <% @instance.scalarisvms_dataset.each do |vm| %>
-  <li><a href="/one/vm/<%= vm.one_vm_id %>">#<%= vm.one_vm_id %></a></li>
+<tr>
+  <td><a href="/one/vm/<%= vm.one_vm_id %>">#<%= vm.one_vm_id %></a></td>
+  <td><form action="/scalaris/<%= @id %>/<%= vm.one_vm_id %>/delete" method="post"><input type="image" src="/cnrdelete-all.png"></form></td>
+</tr>
 <% end %>
+</table>
 
 <form action="/scalaris/<%= @id %>/add" method="post">
   <div style="margin:0;padding:0;display:inline">
@@ -28,7 +32,7 @@ Head node: #<%= @instance.head_node %><br>
   <div style="margin:0;padding:0;display:inline">
     <input name="_method" type="hidden" value="post" />
   </div>
-  <input id="submit" name="commit" type="submit" value="Destroy Instance" />
+  <input id="submit" name="commit" type="submit" value="Destroy Cluster" />
 </form>
 
 <br/>
