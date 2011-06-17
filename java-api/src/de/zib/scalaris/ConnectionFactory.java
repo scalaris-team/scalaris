@@ -294,7 +294,7 @@ public class ConnectionFactory {
      * Creates a connection to a scalaris erlang node specified by the given
      * parameters. Uses the given client name.
      *
-     * If {@link #clientNameAppendUUID} is specified a pseudo UUID is appended
+     * If {@link #clientNameAppendUUID} has been set, a pseudo UUID is appended
      * to the given name. BEWARE that scalaris nodes accept only one connection
      * per client name!
      *
