@@ -55,6 +55,10 @@ stop() ->
         -> {ok, Pid::pid()} | ignore |
            {error, Error::{already_started, Pid::pid()} | term()}.
 start(normal, []) ->
+    case util:app_get_env(verbose, false) of
+        true -> io:format("Running with node name ~p.~n", [node()]);
+        false -> ok
+    end,
     _ = pid_groups:start_link(),
     sup_scalaris:start_link().
 

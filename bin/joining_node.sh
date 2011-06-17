@@ -16,10 +16,13 @@
 # Script to start a node, that joins a running Scalaris system.
 ID=1
 
-if [ 1 == $# ]; then
-    ID=$1
-    shift;
+if [ 1 -le $# ]; then
+    if [ $1 != "-v" ]; then
+        ID=$1
+        shift;
+    fi;
 fi
+
 NAME="node$ID"
 CSPORT=$((14195+$ID))
 YAWSPORT=$((8000+$ID))
@@ -27,4 +30,5 @@ YAWSPORT=$((8000+$ID))
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
+echo $DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s start $*
 $DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s start $*

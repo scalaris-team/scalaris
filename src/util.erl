@@ -581,7 +581,6 @@ app_get_env(Var, Default) ->
 app_check_known() ->
     case application:get_application() of
         {ok, scalaris } -> ok;
-        {ok, scalaris2 } -> ok;
         undefined ->
             case is_unittest() of
                 true -> ok;

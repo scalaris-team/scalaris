@@ -45,6 +45,7 @@ NODE_NAME=node1
 daemonize=0
 first=0
 first_quorum=0
+verbose=0
 port=""
 yaws_port=""
 join_at=""
@@ -62,6 +63,7 @@ usage(){
     echo "    -p <port> - TCP port for the Scalaris node"
     echo "    -y <port> - TCP port for the built-in webserver"
     echo "    -k <key>  - join at the given key"
+    echo "    -v        - verbose"
     echo " services:"
     echo "    -m        - global Scalaris management server"
     echo "    -s        - Scalaris node (see also -f) (not with -g)"
@@ -257,6 +259,14 @@ scalarisstart(){
     if [ "$start_dht_node" != "" ]; then
         tmp="$tmp -scalaris start_dht_node $start_dht_node"
     fi
+    if [ "$verbose" -eq 1 ]; then
+        tmp="$tmp -scalaris verbose true"
+    fi
+    if [ "$1" == "-v" ]; then
+        # -v can be given after <cmd> and then is not handled by getopt.
+        shift
+        tmp="$tmp -scalaris verbose true"
+    fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
     export YAWSHOME="$HOME/.scalaris/$NODE_NAME"
     mkdir -p "$YAWSHOME"
@@ -305,7 +315,7 @@ debug(){
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifqmsgn:p:y:k:" optionName; do
+while getopts "dhifqmsgvn:p:y:k:" optionName; do
     case "$optionName" in
         d) daemonize=1;;
         f) first=1;;
@@ -319,6 +329,8 @@ while getopts "dhifqmsgn:p:y:k:" optionName; do
         m) start_mgmt_server=1;;
         s) start_dht_node="dht_node";;
         g) start_dht_node="group_node";;
+        v) echo setting verbose from cli
+            verbose=1;;
         [?]) echo "Wrong parameter $optionName."
             usage 1;;
     esac

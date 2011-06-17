@@ -233,6 +233,11 @@ start(Module, Args, Options) ->
 -spec start(module(), term(), list(), comm:erl_local_pid()) -> ok.
 start(Module, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
+    case util:app_get_env(verbose, false) of
+        false -> ok;
+        _ -> io:format("Starting ~p with pid ~.0p.~n",
+                       [Module, self()])
+    end,
     case lists:keyfind(pid_groups_join_as, 1, Options) of
         {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
