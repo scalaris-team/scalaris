@@ -38,6 +38,11 @@ init(Supervisor, GroupName) ->
     pid_groups:join_as(GroupName, comm_acceptor),
 
     log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), config:read(port)]),
+    case util:app_get_env(verbose, false) of
+        true -> io:format("Listening on ~p:~p.~n", [config:read(listen_ip), config:read(port)]);
+        false -> ok
+    end,
+
     LS = case config:read(listen_ip) of
              undefined ->
                  open_listen_port(config:read(port), first_ip());
