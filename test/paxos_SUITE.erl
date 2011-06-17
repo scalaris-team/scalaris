@@ -102,7 +102,10 @@ tester_fast_paxos(CountAcceptors, Count, Prefix) ->
                                  Majority, CountProposers, 0)
             || Id <- lists:seq(1, Count)],
     receive done -> ok
-    end.
+    end,
+    [ gen_component:kill(comm:make_local(X))
+      || X <- lists:flatten([Proposers, Acceptors, Learners])],
+    ok.
 
 -spec tester_paxos(CountAcceptors::pos_integer(), Count::pos_integer(), Prefix::string()) -> ok.
 tester_paxos(CountAcceptors, Count, Prefix) ->
@@ -127,7 +130,10 @@ tester_paxos(CountAcceptors, Count, Prefix) ->
                           || Id <- lists:seq(1, Count)]
               end),
     receive done -> ok
-    end.
+    end,
+    [ gen_component:kill(comm:make_local(X))
+      || X <- lists:flatten([Proposers, Acceptors, Learners])],
+    ok.
 
 test_fast_acceptors_4(_Config) ->
     Count = 10000,
@@ -223,6 +229,8 @@ test_two_proposers(_Config) ->
 
     ?assert(Res3 =:= Res4),
     ct:pal("done.~n"),
+    [ gen_component:kill(comm:make_local(X))
+      || X <- lists:flatten([Proposers, Acceptors, Learners])],
     ok.
 
 %% userdevguide-begin paxos_SUITE:random_interleaving_test
@@ -258,6 +266,8 @@ prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
             undefined -> ok;
             _ -> random:seed(OldSeed)
         end,
+    [ gen_component:kill(comm:make_local(X))
+      || X <- lists:flatten([Proposers, Acceptors, Learners])],
     true.
 
 step_until_decide(Processes, PaxId, SumSteps) ->
