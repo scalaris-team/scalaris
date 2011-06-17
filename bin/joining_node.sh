@@ -30,5 +30,4 @@ YAWSPORT=$((8000+$ID))
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-echo $DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s start $*
 $DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s start $*
