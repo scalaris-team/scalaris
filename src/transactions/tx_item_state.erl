@@ -27,6 +27,7 @@
 %% Operations on tx_item_state
 -export([new/1, new/3]).
 -export([get_txid/1]).
+-export([get_maj_for_prepared/1]).
 -export([get_itemid/1, set_itemid/2]).
 -export([get_decided/1]).
 -export([set_decided/2]).

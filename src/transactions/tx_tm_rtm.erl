@@ -93,7 +93,8 @@ start_link(DHTNodeGroup, Role) ->
      LocalAcceptor  :: pid(),
      GLocalLearner   :: comm:mypid(),
      %% reference counting on subscriptions inside RTMs
-     Subs         :: [{comm:mypid(), non_neg_integer()}]}.
+     Subs         :: [{comm:mypid(), non_neg_integer()}],
+     OpenTxNum :: non_neg_integer()}.
 
 -type state_uninit() ::
     {RTMs           :: rtms(),
@@ -103,6 +104,7 @@ start_link(DHTNodeGroup, Role) ->
      GLocalLearner  :: comm:mypid(),
      %% reference counting on subscriptions inside RTMs
      Subs         :: [{comm:mypid(), non_neg_integer()}],
+     OpenTxNum :: non_neg_integer(),
      QueuedMessages :: msg_queue:msg_queue()}.
 
 %% initialize: return initial state.
@@ -126,13 +128,13 @@ init([]) ->
             comm:send_local(pid_groups:get_my(dht_node),
                             {get_node_details, comm:this(), [node]}),
             State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner,
-                     [], msg_queue:new()},
+                     [], 0, msg_queue:new()},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/2,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, []}
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -222,8 +224,9 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     %% if the tx is slow (or a majority of tps failed)
     msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, self(),
                          {tx_tm_rtm_tid_isdone, NewTid}),
-    State;
+    state_inc_opentxnum(State);
 
+%% is the txid done?
 on({tx_tm_rtm_tid_isdone, TxId}, State) ->
     ?TRACE("tx_tm_rtm_tid_isdone ~p as ~p~n",
            [TxId, state_get_role(State)]),
@@ -242,8 +245,45 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             %% TODO: instead of direct takeover, fd:subscribe to the
             %% participants. And then takeover when a crash is
             %% actually reported.
-            send_to_rtms([hd(tx_state:get_rtms(TxState))], fun(_X) ->
-                                {tx_tm_rtm_propose_yourself, TxId} end),
+            QLen = element(2, erlang:process_info(self(), message_queue_len)),
+
+            WhatToDo =
+                case QLen > state_get_opentxnum(State) of
+                    true ->
+                        % we have replies other than 'isdone' for some
+                        % of the tx in the queue
+                        delay;
+                    false ->
+                        MessageCounts = count_messages_per_type(),
+                        NoIsDoneMsgs = lists:foldl(
+                                         fun(X,Acc) ->
+                                                 case element(1,X) of
+                                                     tx_tm_rtm_tid_isdone -> Acc;
+                                                     _ -> element(2,X) + Acc
+                                                 end end, 0, MessageCounts),
+                        case NoIsDoneMsgs > 10 of
+                            true -> delay;
+                            false ->
+                                case (QLen - NoIsDoneMsgs) < (state_get_opentxnum(State) div 2) of
+                                    true -> requeue;
+                                    false -> takeover
+                                end
+                        end
+                end,
+            case WhatToDo of
+                requeue ->
+                    comm:send_local(self(), {tx_tm_rtm_tid_isdone, TxId});
+                delay ->
+                    msg_delay:send_local((config:read(tx_timeout) * 2)
+                                             div 1000,
+                                         self(), {tx_tm_rtm_tid_isdone, TxId});
+                takeover ->
+                    %% FDSubscribe = enough_tps_registered(TxState, State),
+                    ValidRTMs = [ X || X <- tx_state:get_rtms(TxState),
+                                       unknown =/= get_rtmpid(X) ],
+                    send_to_rtms([hd(ValidRTMs)], fun(_X) ->
+                                                          {tx_tm_rtm_propose_yourself, TxId} end)
+            end,
             ok
     end,
     State;
@@ -318,19 +358,19 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
             %% @TODO if we are a rtm, we still wait for register TPs
             %% trigger same delete later on, as we do not get a new
             %% request to delete from the tm
-            ok;
+            NewState;
         true ->
             TableName = state_get_tablename(State),
             %% delete locally
             _ = [ pdb:delete(ItemId, TableName)
               || {_, ItemId} <- tx_state:get_tlog_txitemids(TxState)],
-            pdb:delete(TxId, TableName)
+            pdb:delete(TxId, TableName),
+            state_dec_opentxnum(NewState)
             %% @TODO failure cases are not handled yet. If some
             %% participants do not respond, the state is not deleted.
             %% In the future, we will handle this using msg_delay for
             %% outstanding txids to trigger a delete of the items.
-    end,
-    NewState;
+    end;
 
 %% generated by on(register_TP) via msg_delay to not increase memory
 %% footprint
@@ -777,6 +817,27 @@ my_trigger_delete_if_done(TxState) ->
             end
     end, ok.
 
+count_messages_per_type() ->
+    {_, Msg} = erlang:process_info(self(), messages),
+    lists:foldl(fun(X, Acc) ->
+                  Tag = element(1,X),
+                  case lists:keyfind(Tag, 1, Acc) of
+                      false -> [{Tag, 1} | Acc];
+                      {Tag, Num} -> lists:keyreplace(Tag, 1, Acc, {Tag, Num + 1})
+                  end end, [], Msg).
+
+%% enough_tps_registered(TxState, State) ->
+%%     BoolV =
+%%         [ begin
+%%               {ok, ItemState} = my_get_item_entry(X, State),
+%%               {_,_,TPs} =
+%%                   lists:unzip3(tx_item_state:get_paxosids_rtlogs_tps(ItemState)),
+%%               ValidTPs = [ Y || Y <- TPs, unknown =/= Y],
+%%               length(ValidTPs) >= tx_item_state:get_maj_for_prepared(ItemState)
+%%           end
+%%           || {_, X} <- tx_state:get_tlog_txitemids(TxState)],
+%%     lists:foldl(fun(X, Acc) -> Acc andalso X end, true, BoolV).
+
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
 rtms_of_same_dht_node(InRTMs) ->
     Groups = lists:usort([catch(pid_groups:group_of(
@@ -860,15 +921,21 @@ state_get_gllearner(State) -> element(5, State).
 state_get_subs(State)          -> element(6, State).
 -spec state_set_subs(state(), [{comm:mypid(), non_neg_integer()}]) -> state().
 state_set_subs(State, Val)          -> setelement(6, State, Val).
+-spec state_get_opentxnum(state()) -> non_neg_integer().
+state_get_opentxnum(State) -> element(7, State).
+-spec state_inc_opentxnum(state()) -> state().
+state_inc_opentxnum(State) -> setelement(7, State, element(7, State) + 1).
+-spec state_dec_opentxnum(state()) -> state().
+state_dec_opentxnum(State) -> setelement(7, State, element(7, State) - 1).
 -spec state_get_qmsg(state_uninit()) -> msg_queue:msg_queue().
-state_get_qmsg(State)          -> element(7, State).
+state_get_qmsg(State)          -> element(8, State).
 -spec state_set_qmsg(state_uninit(), msg_queue:msg_queue()) -> state_uninit().
-state_set_qmsg(State, Val)     -> setelement(7, State, Val).
+state_set_qmsg(State, Val)     -> setelement(8, State, Val).
 
 -spec state_to_on(state_uninit()) -> state().
 state_to_on(State) ->
-    {A, B, C, D, E, F, _G} = State,
-    {A, B, C, D, E, F}.
+    {A, B, C, D, E, F, G, _H} = State,
+    {A, B, C, D, E, F, G}.
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
