@@ -32,7 +32,7 @@
 -export([new_tlog/0, req_list/1, req_list/2, read/2, write/3, commit/1]).
 
 %% Perform single operation transactions.
--export([read/1, write/2, test_and_set/3]).
+-export([read/1, write/2, test_and_set/3, req_list_commit_each/1]).
 
 %% conversion between ?DB:value() and client_value():
 -export([encode_value/1, decode_value/1]).
@@ -131,6 +131,14 @@ test_and_set(Key, OldValue, NewValue) ->
                           Res2;
         {ok, RealOldValue} -> {fail, {key_changed, RealOldValue}}
     end.
+
+-spec req_list_commit_each([request()]) -> [result()].
+req_list_commit_each(ReqList) ->
+    [ case Req of
+          {read, Key} -> read(Key);
+          {write, Key, Value} -> write(Key, Value);
+          _ -> {fail, abort}
+      end || Req <- ReqList].
 
 -spec encode_value(client_value()) -> ?DB:value().
 encode_value(Value) when is_atom(Value) orelse is_boolean(Value) orelse
