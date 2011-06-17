@@ -1,18 +1,16 @@
 <html>
 <head>
 <link rel="stylesheet" text="text/css" href="/contrail.css">
-<title>Scalaris Instances</title>
+<title>Scalaris Cluster</title>
 </head>
 <body>
 
-<h2>Scalaris Instances</h>
+<h2>Scalaris Cluster</h>
 <ul>
 <% @instances.each do |instance| %>
   <li><a href="/scalaris/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
 <% end %>
 </ul>
-
-<h2>Create new Instance</h>
 
 <fieldset style="border: 1px black solid">
 <form action="/scalaris" method="post">
@@ -22,7 +20,7 @@
   <label for="user">User</label>:
   <input id="user" name="user" size="30" type="text" value="John" /><br />
 
-  <input id="submit" name="commit" type="submit" value="Create New Instance" />
+  <input id="submit" name="commit" type="submit" value="Create New Cluster" />
 </form>
 </fieldset>
 

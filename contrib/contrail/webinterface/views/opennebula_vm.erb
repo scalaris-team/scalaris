@@ -38,7 +38,7 @@
 </tr>
 </table>
 
-<%= @vm.to_xml %>
+<%= CGI.escapeHTML(@vm.to_xml) %>
 
 <form action="/one/vm/<%= @vm['ID']%>/delete" method="post">
   <div style="margin:0;padding:0;display:inline">

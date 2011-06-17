@@ -2,7 +2,11 @@ Requirements
 ============
 
 - ruby
-- gems ()
+- gems
+  - sinatra
+  - sequel
+  - json
+  - oca
 
 
 The user has to provide a file named "one.rb":

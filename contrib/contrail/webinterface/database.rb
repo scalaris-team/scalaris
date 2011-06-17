@@ -32,7 +32,7 @@ migration "create hadoop table" do
     String      :known_nodes
     DataTime    :created_at
     DataTime    :updated_at
-    String      :head_node
+    String      :master_node
   end
 end
 

@@ -13,8 +13,9 @@ include OpenNebula
 
 require 'database.rb'
 require 'one.rb'
-require 'scalarishelper.rb'
 require 'opennebulahelper.rb'
+require 'hadoophelper.rb'
+require 'scalarishelper.rb'
 require 'jsonrpc.rb'
 
 get '/' do
@@ -77,13 +78,6 @@ get '/one/vnet/:id' do
   erb :opennebula_vnet
 end
 
-get '/scalaris/:id' do
-  @id = params[:id].to_i
-  @instance = Scalaris[@id]
-  @ips = ScalarisHelper.get_ips(@id)
-  erb :scalaris_instance
-end
-
 get '/scalaris' do
   @instances = Scalaris.all
   erb :scalaris_list
@@ -100,6 +94,14 @@ post '/scalaris' do
   end
   @params = params.to_json
   erb :scalaris_create
+end
+
+get '/scalaris/:id' do
+  @id = params[:id].to_i
+  @instance = Scalaris[@id]
+  @ips = ScalarisHelper.get_ips(@id)
+  @master = ScalarisHelper.get_ip(@instance.head_node)
+  erb :scalaris_instance
 end
 
 post '/scalaris/:id/add' do
@@ -119,6 +121,41 @@ end
 get '/hadoop' do
   @instances = Hadoop.all
   erb :hadoop
+end
+
+post '/hadoop' do
+  if params["user"] != nil and params["user"] != ""
+    @valid = true
+    @id = HadoopHelper.create(params["user"])[1]
+  else
+    @valid = false
+    @id = ""
+    @error = "Please provide a user"
+  end
+  @params = params.to_json
+  erb :hadoop_create
+end
+
+get '/hadoop/:id' do
+  @id = params[:id].to_i
+  @instance = Hadoop[@id]
+  @ips = HadoopHelper.get_ips(@id)
+  @master = HadoopHelper.get_ip(@instance.master_node)
+  erb :hadoop_instance
+end
+
+post '/hadoop/:id/add' do
+  @id = params[:id].to_i
+  @new_vm_id = HadoopHelper.add(@id)[1]
+  @params = params.to_json
+  @instance = Hadoop[@id]
+  erb :hadoop_add
+end
+
+post '/hadoop/:id/destroy' do
+  @id = params[:id].to_i
+  HadoopHelper.destroy(@id)
+  redirect '/hadoop'
 end
 
 post '/jsonrpc' do
