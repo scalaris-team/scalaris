@@ -250,12 +250,15 @@ on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
-on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
+% @doc send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
+on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->    
     {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), HashedKey),
     EntryVersion = db_entry:get_version(Entry),
     IsNewer = EntryVersion =/= -1 andalso EntryVersion < NewVersion,
     IsNotLocked = not db_entry:get_writelock(Entry),
-    Updateable = IsNewer andalso IsNotLocked,
+    Updateable = IsNewer 
+                     andalso IsNotLocked 
+                     andalso dht_node_state:is_responsible(HashedKey, State),
     NewState = case Exists of
                    true when Updateable ->
                        UpdateEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
@@ -264,7 +267,11 @@ on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
                    _ ->
                        State
                end,
-    comm:send(Source_PID, {update_key_entry_ack, Exists andalso Updateable}),
+    ResultMsg = case Exists of
+                    true -> {update_key_entry_ack, Entry, true, Updateable};
+                    _ -> {update_key_entry_ack, HashedKey, false, false}
+                end,                    
+    comm:send(Source_PID, ResultMsg),
     NewState;
 
 %% for unit testing only: allow direct DB manipulation

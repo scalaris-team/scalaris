@@ -131,14 +131,16 @@ simpleBloomSync(Config) ->
     DestVersCount = NodeCount * 2 * DataCount,
     DBStat1 = getDBStatus(),
     ct:pal("---DBStatus---~n~.0p~n", [DBStat1]),
-    ct:pal(">>SumOutdated=[~w]", [DestVersCount - getVersionCount(DBStat1)]),
+    OutdatedStart = DestVersCount - getVersionCount(DBStat1),
+    ct:pal(">>SumOutdated=[~w]", [OutdatedStart]),
     startSyncRound(NodeKeys),
     timer:sleep(5000),
     DBStat2 = getDBStatus(),
     ct:pal("SyncR=1---DBStatus---~n~.0p~n", [DBStat2]),
-    ct:pal(">>SumOutdated=[~w]", [DestVersCount - getVersionCount(DBStat2)]),
+    OutdatedR1 = DestVersCount - getVersionCount(DBStat2),
+    ct:pal(">>SumOutdated=[~w]", [OutdatedR1]),
+    ?assert(OutdatedStart > OutdatedR1),
     ok.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Analysis
