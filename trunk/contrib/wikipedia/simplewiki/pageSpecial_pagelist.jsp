@@ -76,16 +76,23 @@ ${ pageBean.page }
                       <% if (pageBean.getFormType() == WikiPageListBean.FormType.FromToForm ) { %>
                               <tr>
                                 <td class='mw-label'><label for="nsfrom">Display pages starting at:</label> </td>
-                                <td class='mw-input'><input disabled="disabled" name="from" size="30" value="${ pageBean.fromPage }" id="nsfrom" />  </td>
+                                <td class='mw-input'><input name="from" size="30" value="${ pageBean.fromPage }" id="nsfrom" />  </td>
                               </tr>
                               <tr>
                                 <td class='mw-label'><label for="nsto">Display pages ending at:</label> </td>
-                                <td class='mw-input'><input disabled="disabled" name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
+                                <td class='mw-input'><input name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
                               </tr>
-                      <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.SinglePageForm) { %>
+                      <%
+                          } else if (pageBean.getFormType() == WikiPageListBean.FormType.TargetPageForm) {
+                      %>
                               <tr>
                                 <td class='mw-label'><label for="target">Page:</label> </td>
-                                <td class='mw-input'><input disabled="disabled" name="target" size="30" value="${ pageBean.fromPage }" id="target" />  </td>
+                                <td class='mw-input'><input name="target" size="30" value="${ pageBean.target }" id="nstarget" />  </td>
+                              </tr>
+                      <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.PagePrefixForm) { %>
+                              <tr>
+                                <td class='mw-label'><label for="prefix">Display pages with prefix:</label> </td>
+                                <td class='mw-input'><input name="prefix" size="30" value="${ pageBean.prefix }" id="nsprefix" />  </td>
                               </tr>
                       <% } %>
                               <tr>
@@ -111,7 +118,7 @@ ${ pageBean.page }
                                     <option value="15">Category talk</option>
 */ %>
                                   </select>
-                                  <input disabled="disabled" type="submit" value="Go" />    </td>
+                                  <input type="submit" value="Go" />    </td>
                               </tr>
                             </table>
                           </fieldset>

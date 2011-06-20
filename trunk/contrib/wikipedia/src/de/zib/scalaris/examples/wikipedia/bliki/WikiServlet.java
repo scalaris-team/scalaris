@@ -187,6 +187,28 @@ public class WikiServlet extends HttpServlet implements Servlet {
         if (req_title.equals("Special:Random")) {
             handleViewRandomPage(request, response);
         } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
+            String req_from = request.getParameter("from");
+            if (req_from == null) {
+                req_from = ""; // shows all pages
+                int slashIndex = req_title.indexOf('/');
+                if (slashIndex != (-1)) {
+                    req_from = req_title.substring(slashIndex + 1);
+                }
+            }
+            String req_to = request.getParameter("to");
+            if (req_to == null) {
+                req_to = ""; // shows all pages
+            }
+            WikiPageListBean value = new WikiPageListBean();
+            value.setPageHeading("All pages");
+            value.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
+            value.setFormTitle("All pages");
+            value.setFormType(FormType.FromToForm);
+            value.setFromPage(req_from);
+            value.setToPage(req_to);
+            PageListResult result = ScalarisDataHandler.getPageList(connection);
+            handleViewSpecialPageList(request, response, result, value);
+        } else if (req_title.startsWith("Special:PrefixIndex")) {
             String req_prefix = request.getParameter("prefix");
             if (req_prefix == null) {
                 req_prefix = ""; // shows all pages
@@ -199,9 +221,10 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setPageHeading("All pages");
             value.setTitle("Special:AllPages&prefix=" + req_prefix);
             value.setFormTitle("All pages");
-            value.setFormType(FormType.FromToForm);
+            value.setFormType(FormType.PagePrefixForm);
+            value.setPrefix(req_prefix);
             PageListResult result = ScalarisDataHandler.getPageList(connection);
-            handleViewSpecialPageList(request, response, result, req_prefix, value);
+            handleViewSpecialPageList(request, response, result, value);
         } else if (req_title.startsWith("Special:WhatLinksHere")) {
             String req_target = request.getParameter("target");
             if (req_target == null) {
@@ -216,9 +239,10 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setPageHeading("Pages that link to \"" + req_target + "\"");
             value.setTitle("Special:WhatLinksHere&target=" + req_target);
             value.setFormTitle("What links here");
-            value.setFormType(FormType.SinglePageForm);
+            value.setFormType(FormType.TargetPageForm);
+            value.setTarget(req_target);
             PageListResult result = ScalarisDataHandler.getPagesLinkingTo(connection, req_target);
-            handleViewSpecialPageList(request, response, result, "", value);
+            handleViewSpecialPageList(request, response, result, value);
         } else if (req_action == null || req_action.equals("view")) {
             handleViewPage(request, response, req_title);
         } else if (req_action.equals("history")) {
@@ -542,8 +566,6 @@ public class WikiServlet extends HttpServlet implements Servlet {
      *            the response of the current operation
      * @param result
      *            result from reading the page list from Scalaris
-     * @param prefix
-     *            if non-empty, only show pages with this prefix
      * @param value
      *            the page bean
      * 
@@ -551,31 +573,29 @@ public class WikiServlet extends HttpServlet implements Servlet {
      * @throws ServletException
      */
     private void handleViewSpecialPageList(HttpServletRequest request,
-            HttpServletResponse response, PageListResult result, String prefix,
+            HttpServletResponse response, PageListResult result,
             WikiPageListBean value)
             throws ServletException, IOException {
         if (result.success) {
             value.setNotice(WikiServlet.getParam_notice(request));
             Collections.sort(result.pages, String.CASE_INSENSITIVE_ORDER);
-            String last = prefix;
-            if (!prefix.isEmpty()) {
+            String prefix = value.getPrefix();
+            String from = value.getFromPage();
+            String to = value.getToPage();
+            if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty()) {
                 // only show pages with this prefix:
                 for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
                     String cur = it.next();
                     if (!cur.startsWith(prefix)) {
                         it.remove();
-                    } else {
-                        last = cur;
+                    } else if (!from.isEmpty() && cur.compareToIgnoreCase(from) <= 0) {
+                        it.remove();
+                    } else if (!to.isEmpty() && cur.compareToIgnoreCase(to) > 0) {
+                        it.remove();
                     }
                 }
             }
-            String first = prefix;
-            if (!result.pages.isEmpty()) {
-                first = result.pages.get(0);
-            }
             value.setPages(result.pages);
-            value.setFromPage(first);
-            value.setToPage(last);
             
             value.setWikiTitle(siteinfo.getSitename());
             value.setWikiNamespace(namespace);
