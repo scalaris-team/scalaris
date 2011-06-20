@@ -15,7 +15,7 @@
 <link rel="edit" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
 */ %>
-<link rel="shortcut icon" href="favicon-piece.ico" />
+<link rel="shortcut icon" href="favicon-wikipedia.ico" />
 <% /*
 <link rel="search" type="application/opensearchdescription+xml" href="https://secure.wikimedia.org/wiktionary/simple/w/opensearch_desc.php" title="Wiktionary (simple)">
 <link rel="EditURI" type="application/rsd+xml" href="https://secure.wikimedia.org/wiktionary/simple/w/api.php?action=rsd">
@@ -48,7 +48,7 @@
             <!-- bodyContent -->
             <div id="bodyContent">
                 <!-- tagline -->
-                <div id="siteSub">From Wiktionary</div>
+                <div id="siteSub">From <%= pageBean.getWikiNamespace().getMeta() %></div>
                 <!-- /tagline -->
                 <!-- subtitle -->
                 <div id="contentSub">
@@ -220,7 +220,7 @@ ${ pageBean.page }
     <form action="search" id="searchform">
         <input name="title" value="Special:Search" type="hidden" />
         <div id="simpleSearch">
-                        <input disabled="disabled" autocomplete="off" placeholder="Search" tabindex="1" id="searchInput" name="search" title="Search Wiktionary [f]" accesskey="f" type="text" />
+                        <input disabled="disabled" autocomplete="off" placeholder="Search" tabindex="1" id="searchInput" name="search" title="Search Wikipedia [f]" accesskey="f" type="text" />
                         <button disabled="disabled" id="searchButton" type="submit" name="button" title="Search the pages for this text"><img src="skins/search-ltr.png" alt="Search" /></button>
         </div>
     </form>
@@ -233,7 +233,7 @@ ${ pageBean.page }
         <!-- panel -->
             <div id="mw-panel" class="noprint collapsible-nav">
                 <!-- logo -->
-                    <div id="p-logo"><a style="background-image: url(&quot;images/Wiktionary.png&quot;);" href="wiki?title=Main Page" title="Visit the main page"></a></div>
+                    <div id="p-logo"><a style="background-image: url(&quot;images/Wikipedia.png&quot;);" href="wiki?title=Main Page" title="Visit the main page"></a></div>
                 <!-- /logo -->
                 
 <!-- navigation -->
@@ -242,16 +242,9 @@ ${ pageBean.page }
     <div class="body">
                 <ul>
                     <li id="n-mainpage"><a href="wiki?title=Main Page" title="Visit the main page [z]" accesskey="z">Main Page</a></li>
-                    <li id="n-Simple-talk"><a href="wiki?title=Wiktionary:Simple talk">Simple talk</a></li>
-                    <li id="n-portal"><a href="wiki?title=Wiktionary:Community Portal" title="About the project, what you can do, where to find things">Community portal</a></li>
                     <li id="n-recentchanges"><a href="wiki?title=Special:RecentChanges" title="The list of recent changes in the wiki [r]" accesskey="r">New changes</a></li>
                     <li id="n-randompage"><a href="wiki?title=Special:Random" title="Load a random page [x]" accesskey="x">Show any entry</a></li>
                     <li id="n-help"><a href="wiki?title=Help:Contents" title="The place to find out">Help</a></li>
-<% /*
-                    <li id="n-sitesupport"><a href="http://wikimediafoundation.org/wiki/Special:Landingcheck?landing_page=WMFJA085&amp;language=simple&amp;utm_source=donate&amp;utm_medium=sidebar&amp;utm_campaign=20101204SB002" title="Support us">Give to Wiktionary</a></li>
-*/ %>
-                    <li id="n-BE850"><a href="wiki?title=Wiktionary:Basic English alphabetical wordlist">BE850</a></li>
-                    <li id="n-BNC1"><a href="wiki?title=Wiktionary:BNC spoken freq 01HWC">BNC1</a></li>
                 </ul>
             </div>
 </div>
@@ -267,6 +260,7 @@ ${ pageBean.page }
     <h5 tabindex="2">Toolbox</h5>
     <div style="display: block;" class="body">
         <ul>
+                    <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
         </ul>
     </div>
 </div>
@@ -304,9 +298,9 @@ ${ pageBean.page }
         <!-- footer -->
         <div id="footer">
                 <ul id="footer-places">
-                    <li id="footer-places-privacy"><a href="wiki?title=Wiktionary:Privacy policy" title="Privacy policy">Privacy policy</a></li>
-                    <li id="footer-places-about"><a href="wiki?title=Wiktionary:About" title="Wiktionary:About">About Wiktionary</a></li>
-                    <li id="footer-places-disclaimer"><a href="wiki?title=Wiktionary:General disclaimer" title="Wiktionary:General disclaimer">Disclaimers</a></li>
+                    <li id="footer-places-privacy"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy" title="<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy">Privacy policy</a></li>
+                    <li id="footer-places-about"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:About" title="<%= pageBean.getWikiNamespace().getMeta() %>:About">About <%= pageBean.getWikiNamespace().getMeta() %></a></li>
+                    <li id="footer-places-disclaimer"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer" title="<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer">Disclaimers</a></li>
                 </ul>
                 <ul id="footer-icons" class="noprint">
                 </ul>
