@@ -89,11 +89,6 @@ implemented in Erlang.
 Summary:    Java-API and Java-Client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
-%if 0%{?suse_version} || 0%{?mdkversion} >= 200900
-Requires:   erlang-jinterface >= R13B01
-%else
-Requires:   erlang
-%endif
 Requires:   jakarta-commons-cli
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
