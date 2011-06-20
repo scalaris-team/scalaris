@@ -53,12 +53,14 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     private static final int MAX_SCALARIS_CONNECTIONS = 4;
     private static final int NEW_CATS_HASH_DEF_SIZE = 100;
     private static final int NEW_TPLS_HASH_DEF_SIZE = 100;
+    private static final int NEW_BLNKS_HASH_DEF_SIZE = 100;
     
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ArrayBlockingQueue<Transaction> scalaris_tx = new ArrayBlockingQueue<Transaction>(MAX_SCALARIS_CONNECTIONS);
     private List<String> newPages = new LinkedList<String>();
     private HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
     private HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
+    private HashMap<String, List<String>> newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
     
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
 
@@ -293,7 +295,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
         
         if (!revisions.isEmpty() && wikiModel != null) {
-            for (String cat_raw: revisions.get(0).parseCategories(wikiModel)) {
+            wikiModel.render(null, revisions.get(0).getText());
+            for (String cat_raw: wikiModel.getCategories().keySet()) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
                 List<String> catPages = newCategories.get(category);
                 if (catPages == null) {
@@ -302,7 +305,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
                 catPages.add(page.getTitle());
                 newCategories.put(category, catPages);
             }
-            for (String tpl_raw: revisions.get(0).parseTemplates(wikiModel)) {
+            for (String tpl_raw: wikiModel.getTemplates()) {
                 String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
                 List<String> templatePages = newTemplates.get(template);
                 if (templatePages == null) {
@@ -310,6 +313,14 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
                 }
                 templatePages.add(page.getTitle());
                 newTemplates.put(template, templatePages);
+            }
+            for (String link: wikiModel.getLinks()) {
+                List<String> backLinks = newBackLinks.get(link);
+                if (backLinks == null) {
+                    backLinks = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
+                }
+                backLinks.add(page.getTitle());
+                newBackLinks.put(link, backLinks);
             }
         }
 
@@ -364,6 +375,14 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
             executor.execute(worker);
         }
         newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
+        
+        // list of pages linking to other pages:
+        for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
+            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey());
+            worker = new MyScalarisAddToPageListRunnable(scalaris_key, backlinks.getValue(), scalaris_single);
+            executor.execute(worker);
+        }
+        newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
         
         executor.shutdown();
         while (!executor.isTerminated()) {

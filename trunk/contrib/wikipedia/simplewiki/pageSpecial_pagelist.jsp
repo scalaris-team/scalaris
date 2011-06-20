@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<title>${ pageBean.title } - ${ pageBean.wikiTitle }</title>
+<title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
 <% /* 
@@ -43,7 +43,7 @@
             <div id="siteNotice"><!-- centralNotice loads here -->${ pageBean.notice }</div>
             <!-- /sitenotice -->
             <!-- firstHeading -->
-            <h1 id="firstHeading" class="firstHeading">${ pageBean.title }</h1>
+            <h1 id="firstHeading" class="firstHeading">${ pageBean.pageHeading }</h1>
             <!-- /firstHeading -->
             <!-- bodyContent -->
             <div id="bodyContent">
@@ -68,11 +68,12 @@ ${ pageBean.page }
                   <tr>
                     <td>
                       <div class="namespaceoptions">
-                        <form method="get" action="/wiktionary/simple/w/index.php">
-                          <input type="hidden" value="Special:AllPages" name="title" />
+                        <form method="get" action="wiki">
+                          <input type="hidden" value="${ pageBean.title }" name="title" />
                           <fieldset>
-                            <legend>All pages</legend>
+                            <legend>${ pageBean.formTitle }</legend>
                             <table id="nsselect" class="allpages">
+                      <% if (pageBean.getFormType() == WikiPageListBean.FormType.FromToForm ) { %>
                               <tr>
                                 <td class='mw-label'><label for="nsfrom">Display pages starting at:</label> </td>
                                 <td class='mw-input'><input disabled="disabled" name="from" size="30" value="${ pageBean.fromPage }" id="nsfrom" />  </td>
@@ -81,6 +82,12 @@ ${ pageBean.page }
                                 <td class='mw-label'><label for="nsto">Display pages ending at:</label> </td>
                                 <td class='mw-input'><input disabled="disabled" name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
                               </tr>
+                      <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.SinglePageForm) { %>
+                              <tr>
+                                <td class='mw-label'><label for="target">Page:</label> </td>
+                                <td class='mw-input'><input disabled="disabled" name="target" size="30" value="${ pageBean.fromPage }" id="target" />  </td>
+                              </tr>
+                      <% } %>
                               <tr>
                                 <td class='mw-label'><label for="namespace">Namespace:</label>  </td>
                                 <td class='mw-input'>
@@ -111,9 +118,10 @@ ${ pageBean.page }
                         </form>
                       </div>
                     </td>
-                    <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></td>
+<% /*               <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></td> */ %>
                   </tr>
                 </table>
+
                 <table class="mw-allpages-table-chunk">
 <% if (!pageBean.getPages().isEmpty()) {
     Iterator<String> iter = pageBean.getPages().iterator();
@@ -121,19 +129,24 @@ ${ pageBean.page }
         String value = iter.next();
 %>
                   <tr>
-                    <td style="width:33%"><a href="wiki?title=<%= value %>"><%= value %></a></td>
+                    <td style="width:33%">
+                      <a href="wiki?title=<%= value %>"><%= value %></a> 
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
+                    </td>
                     <td style="width:33%">
 <%      if (iter.hasNext()) {
             value = iter.next();
 %>
-                    <a href="wiki?title=<%= value %>"><%= value %></a>
+                      <a href="wiki?title=<%= value %>"><%= value %></a> 
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
 <%      } %>
                     </td>
                     <td style="width:33%">
 <%      if (iter.hasNext()) {
             value = iter.next();
 %>
-                    <a href="wiki?title=<%= value %>"><%= value %></a>
+                      <a href="wiki?title=<%= value %>"><%= value %></a> 
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
 <%      } %>
                     </td>
                   </tr>
@@ -143,7 +156,7 @@ ${ pageBean.page }
 %>
                 </table>
                 <hr />
-                <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p>
+<% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p> */ %>
                 <div class="printfooter">
                 Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
@@ -269,30 +282,6 @@ ${ pageBean.page }
 
 <!-- LANGUAGES -->
 <!-- /LANGUAGES -->
-<!-- RENDERER -->
-<div class="portal expanded" id="p-renderer">
-    <h5 tabindex="2">Renderer</h5>
-    <div style="display: block;" class="body">
-        <ul>
-                    <li id="t-renderer-default">
-            <% if (req_render == null || req_render.equals("1")) { %>
-                        Default
-            <% } else { %>
-                        <a href="wiki?title=${ pageBean.title }&render=1" title="Default renderer (gwtwiki)">Default</a></li>
-            <% } %>
-                    </li>
-                    <li id="t-renderer-none">
-            <% if (req_render != null && req_render.equals("0")) { %>
-                        Plain
-            <% } else { %>
-                        <a href="wiki?title=${ pageBean.title }&render=0" title="No renderer (plain wiki text)">Plain</a></li>
-            <% } %>
-                    </li>
-        </ul>
-    </div>
-</div>
-
-<!-- /RENDERER -->
             </div>
         <!-- /panel -->
         <!-- footer -->
