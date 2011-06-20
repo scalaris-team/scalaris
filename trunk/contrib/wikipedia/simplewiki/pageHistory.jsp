@@ -291,7 +291,7 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
         <ul>
                     <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=${ pageBean.title }" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
           <% if (!pageBean.isNotAvailable()) { %>
-                    <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>
+<% /*               <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>*/ %>
           <% } %>
 <% /*
 <li id="feedlinks"><a id="feed-atom" href="/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;feed=atom&amp;action=history" rel="alternate" type="application/atom+xml" class="feedlink" title="Atom feed for this page">Atom</a></li>

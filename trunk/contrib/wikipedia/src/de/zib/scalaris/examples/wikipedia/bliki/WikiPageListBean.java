@@ -31,6 +31,10 @@ public class WikiPageListBean extends WikiPageBeanBase {
      */
     public enum FormType {
         /**
+         * Do not show a form.
+         */
+        NoForm,
+        /**
          * Form with From and To fields.
          */
         FromToForm,
@@ -48,7 +52,7 @@ public class WikiPageListBean extends WikiPageBeanBase {
     private String fromPage = "";
     private String toPage = "";
     private String formTitle = "Pages";
-    private FormType formType = FormType.FromToForm;
+    private FormType formType = FormType.NoForm;
     /**
      * Title for the heading of the page.
      */

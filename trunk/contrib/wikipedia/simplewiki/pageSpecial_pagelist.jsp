@@ -64,6 +64,7 @@
 
 ${ pageBean.page }
 
+                <% if (pageBean.getFormType() != WikiPageListBean.FormType.NoForm ) { %>
                 <table class="mw-allpages-table-form">
                   <tr>
                     <td>
@@ -128,6 +129,7 @@ ${ pageBean.page }
 <% /*               <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></td> */ %>
                   </tr>
                 </table>
+                <% } %>
 
                 <table class="mw-allpages-table-chunk">
 <% if (!pageBean.getPages().isEmpty()) {

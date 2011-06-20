@@ -22,8 +22,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
@@ -243,6 +247,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setTarget(req_target);
             PageListResult result = ScalarisDataHandler.getPagesLinkingTo(connection, req_target);
             handleViewSpecialPageList(request, response, result, value);
+        } else if (req_title.equals("Special:SpecialPages")) {
+            handleViewSpecialPages(request, response);
         } else if (req_action == null || req_action.equals("view")) {
             handleViewPage(request, response, req_title);
         } else if (req_action.equals("history")) {
@@ -609,6 +615,74 @@ public class WikiServlet extends HttpServlet implements Servlet {
             addToParam_notice(request, "error: unknown error getting page list for " + value.getTitle() + ": <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
         }
+    }
+
+    private void handleViewSpecialPages(HttpServletRequest request,
+            HttpServletResponse response) throws ServletException, IOException {
+        WikiPageListBean value = new WikiPageListBean();
+        value.setPageHeading("Special pages");
+        value.setTitle("Special:SpecialPages");
+        
+        Map<String /*group*/, Map<String /*title*/, String /*description*/>> specialPages = new LinkedHashMap<String, Map<String, String>>();
+        Map<String, String> curSpecialPages;
+        // Lists of pages
+        curSpecialPages = new HashMap<String, String>();
+        curSpecialPages.put("Special:AllPages", "All pages");
+        curSpecialPages.put("Special:PrefixIndex", "All pages with prefix");
+        specialPages.put("Lists of pages", curSpecialPages);
+        // Wiki data and tools
+        curSpecialPages = new HashMap<String, String>();
+        curSpecialPages.put("Special:Statistics", "Statistics");
+        curSpecialPages.put("Special:Version", "Version");
+        specialPages.put("Wiki data and tools", curSpecialPages);
+        // Redirecting special pages
+        curSpecialPages = new HashMap<String, String>();
+        curSpecialPages.put("Special:Search", "Search");
+        curSpecialPages.put("Special:Random", "Show any page");
+        specialPages.put("Redirecting special pages", curSpecialPages);
+        // Page tools
+        curSpecialPages = new HashMap<String, String>();
+        curSpecialPages.put("Special:WhatLinksHere", "What links here");
+        specialPages.put("Page tools", curSpecialPages);
+
+        StringBuilder content = new StringBuilder();
+        for (Entry<String, Map<String, String>> specialPagesInGroup: specialPages.entrySet()) {
+            String groupName = specialPagesInGroup.getKey();
+            int i = 0;
+            Iterator<Entry<String, String>> it = specialPagesInGroup.getValue().entrySet().iterator();
+            
+            content.append("<h4 class=\"mw-specialpagesgroup\"> <span class=\"mw-headline\">" + groupName + "</span></h4>");
+            content.append("<table style=\"width: 100%;\" class=\"mw-specialpages-table\">");
+            content.append(" <tbody>");
+            content.append("  <tr>");
+            content.append("   <td style=\"width: 30%; vertical-align: top;\">");
+            content.append("    <ul>");
+            int pagesInFirst = specialPagesInGroup.getValue().size() / 2 + specialPagesInGroup.getValue().size() % 2;
+            for (; i < pagesInFirst; ++i) {
+                Entry<String, String> page = it.next();
+                content.append("<li><a href=\"wiki?title=" + page.getKey() + "\" title=\"" + page.getKey() + "\">" + page.getValue() + "</a></li>");
+            }
+            content.append("    </ul>");
+            content.append("   </td>");
+            content.append("   <td style=\"width: 10%;\"></td>");
+            content.append("   <td style=\"width: 30%;\">");
+            content.append("    <ul>");
+            while(it.hasNext()) {
+                Entry<String, String> page = it.next();
+                content.append("<li><a href=\"wiki?title=" + page.getKey() + "\" title=\"" + page.getKey() + "\">" + page.getValue() + "</a></li>");
+            }
+            content.append("    </ul>");
+            content.append("   </td>");
+            content.append("   <td style=\"width: 30%;\"></td>");
+            content.append("  </tr>");
+            content.append(" </tbody>");
+            content.append("</table>");
+        }
+        
+        value.setPage(content.toString());
+        // abuse #handleViewSpecialPageList here:
+        PageListResult result = new PageListResult(new LinkedList<String>());
+        handleViewSpecialPageList(request, response, result, value);
     }
     
     /**
