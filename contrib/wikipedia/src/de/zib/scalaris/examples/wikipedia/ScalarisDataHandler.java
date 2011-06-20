@@ -111,6 +111,16 @@ public class ScalarisDataHandler {
     public final static String getTplPageListKey(String title) {
         return title + ":tpages";
     }
+    /**
+     * Gets the key to store the list of pages linking to the given title.
+     * 
+     * @param title the page's title
+     * 
+     * @return Scalaris key
+     */
+    public final static String getBackLinksPageListKey(String title) {
+        return title + ":blpages";
+    }
     
     /**
      * Common result class with a public member containing the result and a
@@ -434,12 +444,26 @@ public class ScalarisDataHandler {
      * @param connection
      *            the connection to Scalaris
      * @param title
-     *            the title of the category
+     *            the title of the template
      * 
      * @return a result object with the page list on success
      */
     public static PageListResult getPagesInTemplate(Connection connection, String title) {
         return getPageList2(connection, getTplPageListKey(title), true);
+    }
+
+    /**
+     * Retrieves a list of pages linking to the given page from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the page
+     * 
+     * @return a result object with the page list on success
+     */
+    public static PageListResult getPagesLinkingTo(Connection connection, String title) {
+        return getPageList2(connection, getBackLinksPageListKey(title), false);
     }
 
     /**
@@ -647,18 +671,22 @@ public class ScalarisDataHandler {
                 Configuration.DEFAULT_CONFIGURATION, null, new MyNamespace(siteinfo), "", "");
         Set<String> oldCats = new HashSet<String>();
         Set<String> oldTpls = new HashSet<String>();
+        Set<String> oldLnks = new HashSet<String>();
         if (curRevId != -1 && page.getCurRev() != null) {
             // get a list of previous categories and templates:
             wikiModel.render(null, page.getCurRev().getText());
             oldCats = wikiModel.getCategories().keySet();
             oldTpls = wikiModel.getTemplates();
+            oldLnks = wikiModel.getLinks();
         }
         // get new categories and templates
         wikiModel.render(null, newRev.getText());
         Set<String> newCats = wikiModel.getCategories().keySet();
         Set<String> newTpls = wikiModel.getTemplates();
+        Set<String> newLnks = wikiModel.getLinks();
         Difference catDiff = new Difference(oldCats, newCats);
         Difference tplDiff = new Difference(oldTpls, newTpls);
+        Difference lnkDiff = new Difference(oldLnks, newLnks);
 
         // write differences (categories + templates)
         SaveResult res = catDiff.writeToScalaris(scalaris_tx, new Difference.GetPageListKey() {
@@ -674,6 +702,15 @@ public class ScalarisDataHandler {
             @Override
             public String getPageListKey(String name) {
                 return getTplPageListKey(wikiModel.getTemplateNamespace() + ":" + name);
+            }
+        }, title);
+        if (!res.success) {
+            return res;
+        }
+        res = lnkDiff.writeToScalaris(scalaris_tx, new Difference.GetPageListKey() {
+            @Override
+            public String getPageListKey(String name) {
+                return getBackLinksPageListKey(name);
             }
         }, title);
         if (!res.success) {

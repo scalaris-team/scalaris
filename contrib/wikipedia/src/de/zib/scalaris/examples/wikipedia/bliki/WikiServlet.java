@@ -47,6 +47,7 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RandomTitleResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.SaveResult;
+import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -186,12 +187,38 @@ public class WikiServlet extends HttpServlet implements Servlet {
         if (req_title.equals("Special:Random")) {
             handleViewRandomPage(request, response);
         } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
-            String prefix = "";
-            int slashIndex = req_title.indexOf('/');
-            if (slashIndex != (-1)) {
-                prefix = req_title.substring(slashIndex + 1);
-            } 
-            handleViewSpecialPageList(request, response, prefix);
+            String req_prefix = request.getParameter("prefix");
+            if (req_prefix == null) {
+                req_prefix = ""; // shows all pages
+                int slashIndex = req_title.indexOf('/');
+                if (slashIndex != (-1)) {
+                    req_prefix = req_title.substring(slashIndex + 1);
+                }
+            }
+            WikiPageListBean value = new WikiPageListBean();
+            value.setPageHeading("All pages");
+            value.setTitle("Special:AllPages&prefix=" + req_prefix);
+            value.setFormTitle("All pages");
+            value.setFormType(FormType.FromToForm);
+            PageListResult result = ScalarisDataHandler.getPageList(connection);
+            handleViewSpecialPageList(request, response, result, req_prefix, value);
+        } else if (req_title.startsWith("Special:WhatLinksHere")) {
+            String req_target = request.getParameter("target");
+            if (req_target == null) {
+                req_target = ""; // will show an empty page list
+                // maybe we got the name separated with a '/' in the title:
+                int slashIndex = req_title.indexOf('/');
+                if (slashIndex != (-1)) {
+                    req_target = req_title.substring(slashIndex + 1);
+                }
+            }
+            WikiPageListBean value = new WikiPageListBean();
+            value.setPageHeading("Pages that link to \"" + req_target + "\"");
+            value.setTitle("Special:WhatLinksHere&target=" + req_target);
+            value.setFormTitle("What links here");
+            value.setFormType(FormType.SinglePageForm);
+            PageListResult result = ScalarisDataHandler.getPagesLinkingTo(connection, req_target);
+            handleViewSpecialPageList(request, response, result, "", value);
         } else if (req_action == null || req_action.equals("view")) {
             handleViewPage(request, response, req_title);
         } else if (req_action.equals("history")) {
@@ -507,26 +534,31 @@ public class WikiServlet extends HttpServlet implements Servlet {
     }
 
     /**
-     * Shows the page containing the list of pages.
+     * Shows a page containing a list of article names.
      * 
      * @param request
      *            the request of the current operation
      * @param response
      *            the response of the current operation
+     * @param result
+     *            result from reading the page list from Scalaris
+     * @param prefix
+     *            if non-empty, only show pages with this prefix
+     * @param value
+     *            the page bean
      * 
-     * @throws IOException 
-     * @throws ServletException 
+     * @throws IOException
+     * @throws ServletException
      */
     private void handleViewSpecialPageList(HttpServletRequest request,
-            HttpServletResponse response, String prefix) throws ServletException, IOException {
-        PageListResult result = ScalarisDataHandler.getPageList(connection);
-        
+            HttpServletResponse response, PageListResult result, String prefix,
+            WikiPageListBean value)
+            throws ServletException, IOException {
         if (result.success) {
-            WikiPageListBean value = new WikiPageListBean();
             value.setNotice(WikiServlet.getParam_notice(request));
-            Collections.sort(result.pages);
+            Collections.sort(result.pages, String.CASE_INSENSITIVE_ORDER);
             String last = prefix;
-            if (!prefix.equals("")) {
+            if (!prefix.isEmpty()) {
                 // only show pages with this prefix:
                 for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
                     String cur = it.next();
@@ -545,7 +577,6 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setFromPage(first);
             value.setToPage(last);
             
-            value.setTitle("Special:AllPages");
             value.setWikiTitle(siteinfo.getSitename());
             value.setWikiNamespace(namespace);
             
@@ -555,7 +586,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
                     .getRequestDispatcher("pageSpecial_pagelist.jsp");
             dispatcher.forward(request, response);
         } else {
-            addToParam_notice(request, "error: unknown error getting page list: <pre>" + result.message + "</pre>");
+            addToParam_notice(request, "error: unknown error getting page list for " + value.getTitle() + ": <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
         }
     }

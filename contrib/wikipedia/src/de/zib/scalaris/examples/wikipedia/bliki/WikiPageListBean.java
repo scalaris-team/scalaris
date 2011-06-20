@@ -19,13 +19,36 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
+ * Generic bean for lists of pages, i.e. page titles.
+ * 
  * @author Nico Kruber, kruber@zib.de
- *
  */
 public class WikiPageListBean extends WikiPageBeanBase {
+    /**
+     * Distinguishes between different form types on the page lists.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public enum FormType {
+        /**
+         * Form with From and To fields.
+         */
+        FromToForm,
+        /**
+         * Form for a single page.
+         */
+        SinglePageForm
+    }
     private List<String> pages = new LinkedList<String>();
+
     private String fromPage = "A";
     private String toPage = "z";
+    private String formTitle = "Pages";
+    private FormType formType = FormType.FromToForm;
+    /**
+     * Title for the heading of the page.
+     */
+    private String pageHeading = "";
 
     /**
      * @return the subCategories
@@ -67,5 +90,47 @@ public class WikiPageListBean extends WikiPageBeanBase {
      */
     public void setToPage(String toPage) {
         this.toPage = toPage;
+    }
+
+    /**
+     * @return the formTitle
+     */
+    public String getFormTitle() {
+        return formTitle;
+    }
+
+    /**
+     * @param formTitle the formTitle to set
+     */
+    public void setFormTitle(String formTitle) {
+        this.formTitle = formTitle;
+    }
+    
+    /**
+     * @return the formType
+     */
+    public FormType getFormType() {
+        return formType;
+    }
+
+    /**
+     * @param formType the formType to set
+     */
+    public void setFormType(FormType formType) {
+        this.formType = formType;
+    }
+
+    /**
+     * @return the pageTitle
+     */
+    public String getPageHeading() {
+        return pageHeading;
+    }
+
+    /**
+     * @param pageHeading the pageTitle to set
+     */
+    public void setPageHeading(String pageHeading) {
+        this.pageHeading = pageHeading;
     }
 }
