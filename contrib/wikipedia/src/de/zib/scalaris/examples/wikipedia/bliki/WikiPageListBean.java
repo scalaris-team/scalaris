@@ -37,18 +37,25 @@ public class WikiPageListBean extends WikiPageBeanBase {
         /**
          * Form for a single page.
          */
-        SinglePageForm
+        TargetPageForm,
+        /**
+         * Form for pages with a given prefix.
+         */
+        PagePrefixForm
     }
     private List<String> pages = new LinkedList<String>();
 
-    private String fromPage = "A";
-    private String toPage = "z";
+    private String fromPage = "";
+    private String toPage = "";
     private String formTitle = "Pages";
     private FormType formType = FormType.FromToForm;
     /**
      * Title for the heading of the page.
      */
     private String pageHeading = "";
+    
+    private String target = "";
+    private String prefix = "";
 
     /**
      * @return the subCategories
@@ -132,5 +139,33 @@ public class WikiPageListBean extends WikiPageBeanBase {
      */
     public void setPageHeading(String pageHeading) {
         this.pageHeading = pageHeading;
+    }
+
+    /**
+     * @return the target
+     */
+    public String getTarget() {
+        return target;
+    }
+
+    /**
+     * @param target the target to set
+     */
+    public void setTarget(String target) {
+        this.target = target;
+    }
+
+    /**
+     * @return the prefix
+     */
+    public String getPrefix() {
+        return prefix;
+    }
+
+    /**
+     * @param prefix the prefix to set
+     */
+    public void setPrefix(String prefix) {
+        this.prefix = prefix;
     }
 }
