@@ -57,7 +57,7 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
         true ->
             {AfterDump, _} = admin:get_dump(),
             RunTime = timer:now_diff(After, Before),
-            DiffDump = admin:diff_dump(BeforeDump, AfterDump, RunTime),
+            DiffDump = admin:diff_dump(BeforeDump, AfterDump),
             io:format("servers: ~p threads/vm: ~p iterations: ~p~n",
                       [length(ServerList), ThreadsPerVM, Iterations]),
             io:format("total time: ~p~n", [RunTime / 1000000.0]),
