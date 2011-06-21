@@ -1,6 +1,7 @@
 LATEX=pdflatex
 FILE=main.tex
 all:
+	../bin/scalarisctl -h > scalarisctl-h.out
 	$(LATEX) $(FILE) | awk -f ./latex-col.awk
 	makeindex main
 	$(LATEX) $(FILE) | awk -f ./latex-col.awk
