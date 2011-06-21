@@ -26,6 +26,8 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.Transaction.RequestList;
+
 /**
  * Unit test for the {@link Transaction} class.
  *
@@ -506,6 +508,25 @@ public class TransactionTest {
 
                 assertEquals(expected, actual);
             }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link Transaction#req_list(RequestList)} with an empty
+     * request list.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws AbortException
+     * @throws TimeoutException
+     */
+    @Test
+    public void testReqList_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
+        final Transaction t = new Transaction();
+        try {
+            t.req_list(new RequestList());
         } finally {
             t.closeConnection();
         }

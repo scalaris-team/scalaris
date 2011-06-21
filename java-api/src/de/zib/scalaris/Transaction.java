@@ -241,6 +241,15 @@ public class Transaction {
         boolean isCommit() {
             return isCommit;
         }
+
+        /**
+         * Checks whether the request list is empty.
+         *
+         * @return <tt>true</tt> is empty, <tt>false</tt> otherwise
+         */
+        boolean isEmpty() {
+            return requests.isEmpty();
+        }
     }
 
     /**
@@ -370,6 +379,9 @@ public class Transaction {
      */
     public ResultList req_list(RequestList req)
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
+        if (req.isEmpty()) {
+            return new ResultList(new OtpErlangList());
+        }
         OtpErlangObject received_raw = null;
         if (transLog == null) {
             received_raw = connection.doRPC("api_tx", "req_list",
