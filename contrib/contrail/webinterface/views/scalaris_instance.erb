@@ -12,7 +12,7 @@ Head node: #<%= @instance.head_node %><br>
 <a href="http://<%= @master %>:8000">Management Console</a>
 
 <h3>VMs</h3>
-<table>
+<table class="vmtable">
 <% @instance.scalarisvms_dataset.each do |vm| %>
 <tr>
   <td><a href="/one/vm/<%= vm.one_vm_id %>">#<%= vm.one_vm_id %></a></td>
@@ -21,11 +21,12 @@ Head node: #<%= @instance.head_node %><br>
 <% end %>
 </table>
 
+<div style="padding-top: 30px">
 <form action="/scalaris/<%= @id %>/add" method="post">
   <div style="margin:0;padding:0;display:inline">
     <input name="_method" type="hidden" value="post" />
   </div>
-  <input id="submit" name="commit" type="submit" value="Add New Instance" />
+  <input id="submit" name="commit" type="submit" value="Add Node" />
 </form>
 
 <form action="/scalaris/<%= @id %>/destroy" method="post">
@@ -34,8 +35,13 @@ Head node: #<%= @instance.head_node %><br>
   </div>
   <input id="submit" name="commit" type="submit" value="Destroy Cluster" />
 </form>
+</div>
 
 <br/>
-<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/one">OpenNebula</a>
+
+<a href="/" class="lowermenu">Main</a> 
+<a href="/scalaris" class="lowermenu">Scalaris</a> 
+<a href="/wiki" class="lowermenu">Wiki</a> 
+<a href="/one" class="lowermenu">OpenNebula</a>
 </body>
 </html>

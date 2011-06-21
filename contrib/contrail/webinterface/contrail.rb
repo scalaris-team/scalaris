@@ -16,6 +16,7 @@ require 'one.rb'
 require 'opennebulahelper.rb'
 require 'hadoophelper.rb'
 require 'scalarishelper.rb'
+require 'wikihelper.rb'
 require 'jsonrpc.rb'
 
 get '/' do
@@ -163,6 +164,37 @@ post '/jsonrpc' do
   res = JSONRPC.call(req)
   puts res
   res
+end
+
+get '/wiki' do
+  @instances = Wiki.all
+  erb :wiki
+end
+
+post '/wiki' do
+  if params["user"] != nil and params["user"] != "" and params["node"] != nil and params["node"] != ""
+    @valid = true
+    @id = WikiHelper.create(params["user"], params["node"])[1]
+  else
+    @valid = false
+    @id = ""
+    @error = "Please provide a user and a node"
+  end
+  @params = params.to_json
+  erb :wiki_create
+end
+
+get '/wiki/:id' do
+  @id = params[:id].to_i
+  @instance = Wiki[@id]
+  @master = WikiHelper.get_ip(@instance.master_node)
+  erb :wiki_instance
+end
+
+post '/wiki/:id/destroy' do
+  @id = params[:id].to_i
+  WikiHelper.destroy(@id)
+  redirect '/wiki'
 end
 
 #DB.loggers << Logger.new($stdout)

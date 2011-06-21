@@ -1,0 +1,32 @@
+<html>
+<head>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
+<title>Wiki Control Panel</title>
+</head>
+<body>
+
+<h2>Wikis</h>
+<ul>
+<% @instances.each do |instance| %>
+  <li><a href="/wiki/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
+<% end %>
+</ul>
+
+<fieldset style="border: 1px black solid">
+<form action="/wiki" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <label for="user">User</label>:
+  <input id="user" name="user" size="30" type="text" value="John" /><br />
+
+  <label for="node">Scalaris Node</label>:
+  <input id="node" name="node" size="30" type="text" value="node@10.200.0.X" /><br />
+
+  <input id="submit" name="commit" type="submit" value="Create New Wiki" />
+</form>
+</fieldset>
+
+<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/hadoop">Hadoop</a> <a href="/one">OpenNebula</a>
+</body>
+</html>

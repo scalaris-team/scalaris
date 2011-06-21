@@ -2,38 +2,19 @@ require 'erb'
 
 require 'one.rb'
 
-class HadoopHelper
-  def self.create(user)
-    description = get_description(HADOOPIMAGE, "true", "$NIC[IP]")
+class WikiHelper
+  def self.create(user, node)
+    description = get_description(WIKIIMAGE, node)
     puts description
 
     begin
       response = OpenNebulaHelper.create_vm(description)
 
       vm_id = response.to_i
-      instance = Hadoop.create(:user => user, :master_node => vm_id)
-      instance.add_hadoopvm(:one_vm_id => vm_id)
+      instance = Wiki.create(:user => user, :master_node => vm_id)
+      instance.add_wikivm(:one_vm_id => vm_id)
 
       [true, instance.id]
-    rescue Exception => e
-      [false, e.message]
-    end
-  end
-
-  def self.add(id)
-    ips = get_ips(id)
-    head_node = get_ip(Hadoop[id].master_node)
-    description = get_description(HADOOPIMAGE, "false", head_node)
-    puts description
-
-    begin
-      response = OpenNebulaHelper.create_vm(description)
-
-      instance = Hadoop[id]
-      new_vm_id = response.to_i
-      instance.add_hadoopvm(:one_vm_id => new_vm_id)
-
-      [true, response.to_i]
     rescue Exception => e
       [false, e.message]
     end
@@ -43,8 +24,8 @@ class HadoopHelper
     get_vms(id).each do |vm_id|
       OpenNebulaHelper.delete_vm vm_id
     end
-    Hadoop[id].remove_all_hadoopvms
-    Hadoop[id].destroy
+    Wiki[id].remove_all_wikivms
+    Wiki[id].destroy
   end
 
   def self.get_instance_info(id)
@@ -56,15 +37,11 @@ class HadoopHelper
 
   private
 
-  def self.get_description(image, first, master_ip)
+  def self.get_description(image, node)
     @image = image
-    @hadoopfirst = first
-    @hadoopmaster = master_ip
-    erb = ERB.new(File.read("hadoop.one.vm.erb"))
+    @node = node
+    erb = ERB.new(File.read("scalaris-wiki.one.vm.erb"))
     erb.result binding
-  end
-
-  def self.ip_to_erlang(ip)
   end
 
   def self.get_ip(one_id)
@@ -76,15 +53,15 @@ class HadoopHelper
   end
 
   def self.get_vms(id)
-    instance = Hadoop[id]
+    instance = Wiki[id]
     client = Client.new(CREDENTIALS, ENDPOINT)
     pool = VirtualMachinePool.new(client, -1)
     pool.info
     vms = []
     if instance == nil
-      raise "unknown hadoop instance"
+      raise "unknown wiki instance"
     end
-    instance.hadoopvms_dataset.each do |vm|
+    instance.wikivms_dataset.each do |vm|
       vm = pool.find {|i| i.id == vm.one_vm_id.to_i}
       if vm != nil
         vms.push vm.id
@@ -94,15 +71,15 @@ class HadoopHelper
   end
 
   def self.get_ips(id)
-    instance = Hadoop[id]
+    instance = Wiki[id]
     client = Client.new(CREDENTIALS, ENDPOINT)
     pool = VirtualMachinePool.new(client, -1)
     pool.info
     ips = []
     if instance == nil
-      raise "unknown hadoop instance"
+      raise "unknown wiki instance"
     end
-    instance.hadoopvms_dataset.each do |vm|
+    instance.wikivms_dataset.each do |vm|
       vm = pool.find {|i| i.id == vm.one_vm_id.to_i}
       if vm != nil
         ips.push Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
