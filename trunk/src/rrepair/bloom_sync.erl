@@ -49,6 +49,8 @@
          versBF   = ?required(bloom_sync_struct, versBF)    :: ?REP_BLOOM:bloomFilter(),
          round    = 0                                       :: non_neg_integer()
         }).
+-type bloom_sync_struct() :: #bloom_sync_struct{}.
+
 -record(bloom_sync_state,
         {
          ownerPid       = ?required(bloom_sync_state, ownerPid)   :: comm:erl_local_pid(),
@@ -63,8 +65,6 @@
          sendFeedback   = true                                    :: boolean(),
          step           = bloom_sync                              :: step()
          }).
-
--type bloom_sync_struct() :: #bloom_sync_struct{}.
 -type state() :: #bloom_sync_state{}.
 
 -type message() ::
