@@ -19,12 +19,11 @@ import info.bliki.wiki.filter.MagicWord;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.IntegerResult;
 
 /**
  * Gets values for magic words not handled by {@link MagicWord}.
@@ -266,22 +265,14 @@ public class MyMagicWord extends MagicWord {
          */
             
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
-            PageListResult pageCountResult = ScalarisDataHandler.getPageList(model.connection);
+            IntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
             if (pageCountResult.success) {
-                return formatStatisticNumber(rawNumber, pageCountResult.pages.size());
+                return formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
-            // simple content filter: only show pages in main namespace:
-            PageListResult pageCountResult = ScalarisDataHandler.getPageList(model.connection);
+            IntegerResult pageCountResult = ScalarisDataHandler.getArticleCount(model.connection);
             if (pageCountResult.success) {
-                for (Iterator<String> it = pageCountResult.pages.iterator(); it
-                        .hasNext();) {
-                    String title = it.next();
-                    if (!MyWikiModel.getNamespace(title).isEmpty()) {
-                        it.remove();
-                    }
-                }
-                return formatStatisticNumber(rawNumber, pageCountResult.pages.size());
+                return formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_FILES)) {
             // we currently do not store files:

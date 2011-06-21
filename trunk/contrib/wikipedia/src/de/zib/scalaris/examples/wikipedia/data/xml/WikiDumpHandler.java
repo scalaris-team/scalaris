@@ -253,7 +253,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     }
 
     /**
-     * Gets the number of imported pages
+     * Gets the number of imported pages.
      * 
      * @return the number of pages imported into Scalaris
      */

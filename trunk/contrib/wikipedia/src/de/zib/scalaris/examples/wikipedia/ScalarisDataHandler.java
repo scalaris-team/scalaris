@@ -61,6 +61,32 @@ public class ScalarisDataHandler {
         return "pages";
     }
     /**
+     * Gets the key to store the number of pages at.
+     * 
+     * @return Scalaris key
+     */
+    public final static String getPageCountKey() {
+        return "pages:count";
+    }
+    /**
+     * Gets the key to store the (complete) list of articles, i.e. pages in
+     * the main namespace) at.
+     * 
+     * @return Scalaris key
+     */
+    public final static String getArticleListKey() {
+        return "articles";
+    }
+    /**
+     * Gets the key to store the number of articles, i.e. pages in the main
+     * namespace, at.
+     * 
+     * @return Scalaris key
+     */
+    public final static String getArticleCountKey() {
+        return "articles:count";
+    }
+    /**
      * Gets the key to store {@link Revision} objects at.
      * 
      * @param title the title of the page
@@ -421,7 +447,20 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public static PageListResult getPageList(Connection connection) {
-        return getPageList2(connection, getPageListKey(), true);
+        return getPageList2(connection, getPageListKey(), false);
+    }
+
+    /**
+     * Retrieves a list of available articles, i.e. pages in the main
+     * namespace, from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * 
+     * @return a result object with the page list on success
+     */
+    public static PageListResult getArticleList(Connection connection) {
+        return getPageList2(connection, getArticleListKey(), false);
     }
 
     /**
@@ -501,6 +540,95 @@ public class ScalarisDataHandler {
     }
 
     /**
+     * Result of an operation getting an integral number.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class IntegerResult extends Result {
+        /**
+         * The number (<tt>0</tt> if not successful).
+         */
+        public int number = 0;
+        /**
+         * Creates a new successful result with the given page list.
+         * 
+         * @param number the retrieved number
+         */
+        public IntegerResult(int number) {
+            super();
+            this.number = number;
+        }
+        /**
+         * Creates a new custom result.
+         * 
+         * @param success the success status
+         * @param message the message to use
+         */
+        public IntegerResult(boolean success, String message) {
+            super(success, message);
+        }
+    }
+
+    /**
+     * Retrieves the number of available pages from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static IntegerResult getPageCount(Connection connection) {
+        return getInteger2(connection, getPageCountKey(), false);
+    }
+
+    /**
+     * Retrieves the number of available articles, i.e. pages in the main
+     * namespace, from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * 
+     * @return a result object with the number of articles on success
+     */
+    public static IntegerResult getArticleCount(Connection connection) {
+        return getInteger2(connection, getArticleCountKey(), false);
+    }
+
+    /**
+     * Retrieves an integral number from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param scalaris_key
+     *            the key under which the number is stored in Scalaris
+     * @param failNotFound
+     *            whether the operation should fail if the key is not found or
+     *            not
+     * 
+     * @return a result object with the number on success
+     */
+    private static IntegerResult getInteger2(Connection connection,
+            String scalaris_key, boolean failNotFound) {
+        if (connection == null) {
+            return new IntegerResult(false, "no connection to Scalaris");
+        }
+        
+        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
+        try {
+            int number = scalaris_single.read(scalaris_key).intValue();
+            return new IntegerResult(number);
+        } catch (NotFoundException e) {
+            if (failNotFound) {
+                return new IntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            } else {
+                return new IntegerResult(0);
+            }
+        } catch (Exception e) {
+            return new IntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+        }
+    }
+
+    /**
      * Result of an operation getting a random page title.
      * 
      * @author Nico Kruber, kruber@zib.de
@@ -542,14 +670,14 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the page list on success
      */
-    public static RandomTitleResult getRandomTitle(Connection connection, Random random) {
+    public static RandomTitleResult getRandomArticle(Connection connection, Random random) {
         if (connection == null) {
             return new RandomTitleResult(false, "no connection to Scalaris");
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
-            List<ErlangValue> pages = scalaris_single.read(getPageListKey()).listValue();
+            List<ErlangValue> pages = scalaris_single.read(getArticleListKey()).listValue();
             String randomTitle = pages.get(random.nextInt(pages.size())).stringValue();
             return new RandomTitleResult(randomTitle);
         } catch (Exception e) {

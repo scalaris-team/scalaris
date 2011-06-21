@@ -37,12 +37,14 @@ public class MyWikiModel extends WikiModel {
     protected Map<String, String> magicWordCache = new HashMap<String, String>();
     private String fExternalWikiBaseFullURL;
     
-    private static final Configuration configuration = Configuration.DEFAULT_CONFIGURATION;
+    private static final Configuration configuration = new Configuration();
     
     static {
+        // BEWARE: fields in Configuration are static -> this changes all configurations!
         configuration.addTemplateFunction("fullurl", MyFullurl.CONST);
         configuration.addTemplateFunction("localurl", MyLocalurl.CONST);
-        configuration.getInterwikiMap().remove("wiktionary"); // fix [[Wiktionary:...]] links
+        // do not use interwiki links (some may be internal - bliki however favours interwiki links)
+        configuration.getInterwikiMap().clear();
     }
     
     /**
