@@ -21,7 +21,7 @@
 
 -export([add_node/1, add_node_at_id/1, add_nodes/1, del_nodes/1, del_nodes/2,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
-         get_dump_bw/0, diff_dump/3, print_ages/0,
+         get_dump_bw/0, diff_dump/2, print_ages/0,
          check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
          number_of_nodes/0]).
 
@@ -174,8 +174,14 @@ number_of_nodes() ->
     end.
 
 %%===============================================================================
-%% comm_logger functions
-%%===============================================================================
+% % comm_logger functions
+% %===============================================================================
+% @doc returns communications information. the comm-layer logs for
+% each message-tag how many message were sent and how large were these
+% messages in total. get_dump/0 returns a map from message-tag to
+% message-count and message-size and a timestamp when the measurement
+% was started.
+-spec get_dump() -> {gb_tree(), {integer(), integer(), integer()}}.
 get_dump() ->
     Servers = util:get_proc_in_vms(admin_server),
     _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})
@@ -191,6 +197,11 @@ get_dump() ->
                          gb_trees:enter(Tag, get_aggregate(Tag, Dumps), Map)
                  end, gb_trees:empty(), Keys), StartTime}.
 
+% @doc returns communications information. similar to get_dump_bw/0 it
+% returns message statistics per message-tag, but it scales all values
+% by the elapsed time. so it returns messages per second and bytes per
+% second for each message-tag
+-spec get_dump_bw() -> list({atom(), float(), float()}).
 get_dump_bw() ->
     {Map, StartTime} = get_dump(),
     RunTime = timer:now_diff(erlang:now(), StartTime),
@@ -207,7 +218,8 @@ get_aggregate(Tag, [{Dump, _} | Rest]) ->
             {AggSize + Size, AggCount + Count}
     end.
 
-diff_dump(BeforeDump, AfterDump, _RunTime) ->
+-spec diff_dump(gb_tree(), gb_tree()) -> list({atom(), integer(), integer()}).
+diff_dump(BeforeDump, AfterDump) ->
     Tags = lists:usort(lists:flatten([gb_trees:keys(BeforeDump),
                                       gb_trees:keys(AfterDump)])),
     diff(Tags, BeforeDump, AfterDump).
