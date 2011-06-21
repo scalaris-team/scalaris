@@ -311,7 +311,6 @@ public class WikiServlet extends HttpServlet implements Servlet {
      */
     private void handleViewRandomPage(HttpServletRequest request,
             HttpServletResponse response) throws IOException {
-        // TODO: filter out template and category pages
         RandomTitleResult result = ScalarisDataHandler.getRandomArticle(connection, random);
         if (result.success) {
             response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(result.title, "UTF-8")));
