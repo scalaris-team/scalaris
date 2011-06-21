@@ -426,7 +426,7 @@ various Linux distributions.
 \subsection{Development Branch}
 
 You find the latest development version in the svn repository:
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 # Non-members may check out a read-only working copy anonymously over HTTP.
 svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
 \end{lstlisting}
@@ -552,7 +552,7 @@ need this if you already have a recent enough Erlang version
 
 \chapter{Setting up \scalaris{}}
 \label{chapter.runscalaris}
-\svnrev{r1618}
+\svnrev{r1810}
 
 \section{Runtime Configuration}
 
@@ -689,11 +689,11 @@ node and automatically contact the configured management server.
 \section{Custom startup using \code{scalarisctl}}
 
 On linux you can also use the \code{scalarisctl} script to start a
-management server and `regular' nodes directly. See
+management server and `regular' nodes directly.
 \begin{lstlisting}[language=sh]
 %> ./bin/scalarisctl -h
 \end{lstlisting}
-for a list of options accepted by \code{scalarisctl}.
+\lstinputlisting[language={}]{scalarisctl-h.out}
 
 \chapter{Using the system}
 \label{chapter.systemuse}
@@ -806,13 +806,12 @@ language-specific types of each API.
     string     & \code{string()}   & \code{String}                & \code{string}                   & \code{str}                \\
     binary     & \code{binary()}   & \code{byte[]}                & \code{string} (base64-encoded)  & \code{bytearray}          \\
     list(type) & \code{[type()]}   & \code{List<Object>}          & \code{array}                    & \code{list}               \\
-    JSON       & \code{json_obj()}\tnote{a}%
-                                   & \code{Map<String, Object>}   & \code{object}                   & \code{dict}               \\
+    JSON       & \code{json_obj()}\tnote{*} & \code{Map<String, Object>} & \code{object}            & \code{dict}               \\
     custom     & \code{any()}      & \code{OtpErlangObject}       & \emph{<unsupported>}            & \emph{<unsupported>}      \\
     \bottomrule
     \end{tabular}
     \begin{tablenotes}
-      \item[a] ~\vspace{-1.5em}%
+      \item[*] ~\vspace{-1.5em}%
 \begin{lstlisting}[language=erlang]
 json_obj() :: {struct, [Key::atom() | string(), Value::json_val()]}
 json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false | null
@@ -1140,7 +1139,7 @@ interface client. For
 convenience, we provide a wrapper script called \code{scalaris} which
 sets up the Java environment:
 
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 %> ./java-api/scalaris --help
 ./java-api/scalaris [script options] [options]
 Script Options:
@@ -1195,7 +1194,7 @@ further connection properties) by adapting the values defined in
 
 \subsection{Python command line interface}
 
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 %> ./python-api/Scalaris.py --help
 usage: Scalaris.py [Options]
  -r,--read <key>                      read an item
@@ -1247,7 +1246,7 @@ directory. This will start a Scalaris node with the default ports and test
 all Java functions part of the Java API. A typical run will look like the
 following:
 
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 %> make java-test
 [...]
 tools.test:
@@ -1332,7 +1331,7 @@ main directory. This will start a Scalaris node with the default ports and test
 all Python functions part of the Python API. A typical run will look like the
 following:
 
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 %> make python-test
 [...]
 testDoubleClose (TransactionSingleOpTest.TestTransactionSingleOp) ... ok
@@ -1411,7 +1410,7 @@ This will start a Scalaris node with the default ports, write test data using
 both the Java and the Python APIs and let each API read the data it wrote
 itself as well as the data the other API read. On success it will print
 
-\begin{lstlisting}[language=sh]
+\begin{lstlisting}[language={}]
 %> make interop-test
 [...]
 all tests successful
