@@ -155,12 +155,7 @@ public class Transaction {
          * @param key  the key to read
          *
          * @return this {@link RequestList} object
-     
-import com.ericsson.otp.erlang.OtpErlangObject;
-import com.ericsson.otp.erlang.OtpErlangString;
-
-import de.zib.scalaris.Transaction.RequestList;
-    */
+         */
         public RequestList addRead(OtpErlangObject key) {
             if (isCommit) {
                 throw new UnsupportedOperationException("No further request supported after a commit!");
