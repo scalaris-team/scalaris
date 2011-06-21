@@ -1,3 +1,7 @@
 tr.zebra:nth-child(even) {background: #CCC}
 tr.zebra:nth-child(odd) {background: #FFF}
 a:link { text-decoration:none; }
+
+a.lowermenu { font-size:70%; }
+
+table.vmtable { border: solid thin black }

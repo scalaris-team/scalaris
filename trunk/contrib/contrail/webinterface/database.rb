@@ -43,6 +43,25 @@ migration "create hadoopvms table" do
     foreign_key :hadoop_id, :hadoops
   end
 end
+
+migration "create wiki table" do
+  database.create_table :wikis do
+    primary_key :id
+    String      :user
+    String      :known_nodes
+    DataTime    :created_at
+    DataTime    :updated_at
+    String      :master_node
+  end
+end
+
+migration "create wikivms table" do
+  database.create_table :wikivms do
+    primary_key :id
+    String      :one_vm_id
+    foreign_key :wiki_id, :wikis
+  end
+end
 # you can also alter tables
 #migration "everything's better with bling" do
 #  database.alter_table :foos do
@@ -86,4 +105,22 @@ end
 
 class Hadoopvm < Sequel::Model
   many_to_one :hadoops
+end
+
+class Wiki < Sequel::Model
+  one_to_many :wikivms
+
+  def before_create
+    return false if super == false
+    self.created_at = Time.now.utc
+  end
+
+  def before_update
+    return false if super == false
+    self.updated_at = Time.now.utc
+  end
+end
+
+class Wikivm < Sequel::Model
+  many_to_one :wikis
 end

@@ -2,7 +2,7 @@
 # VM definition example
 #---------------------------------------
 
-CPU    = 0.4
+CPU    = 0.1
 MEMORY = 512
 
 # --- kernel & boot device ---
@@ -15,7 +15,7 @@ OS = [
 # --- 3 disks ---
 
 DISK = [
-  image     = "Scalaris4Contrail",
+  image     = "<%= @image %>",
   target    = "hdc"
 ]
 
@@ -25,12 +25,13 @@ NIC = [ network = "Private LAN" ]
 
 # --- Placement options ---
 
-REQUIREMENTS = "CPUSPEED > 500"
-RANK         = FREECPU
+#REQUIREMENTS = "CPUSPEED > 1000"
+#RANK         = FREECPU
 
 # --- Contextualization ---
 
 CONTEXT = [
+  SCALARIS_NODE="<%= @node %>",
   ip_private = "$NIC[IP]",
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
   ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
@@ -40,8 +41,8 @@ CONTEXT = [
 
 # --- Debugging ---
 
-GRAPHICS = [ 
-  TYPE    = "vnc",              
+GRAPHICS = [
+  TYPE    = "vnc",
   LISTEN  = "127.0.0.1",
   PORT    = "-1"
 ]

@@ -5,25 +5,33 @@
 </head>
 <body>
 
-<h2>Scalaris Cluster</h>
-<ul>
+<h2>Scalaris Clusters</h>
+<div style="padding-top:10px; padding-bottom:40px;">
+<table>
 <% @instances.each do |instance| %>
-  <li><a href="/scalaris/<%= instance.id %>"><%= instance.id %></a> <%= instance.user %></li>
+<tr>
+  <td><a href="/scalaris/<%= instance.id %>"><%= instance.id %></a></td>
+  <td><%= instance.user %></td>
+</tr>
 <% end %>
-</ul>
+</table>
+</div>
 
-<fieldset style="border: 1px black solid">
+<fieldset style="border: 1px black solid; padding-bottom: 0px">
+<legend>New Cluster</legend>
 <form action="/scalaris" method="post">
   <div style="margin:0;padding:0;display:inline">
     <input name="_method" type="hidden" value="post" />
   </div>
   <label for="user">User</label>:
-  <input id="user" name="user" size="30" type="text" value="John" /><br />
-
-  <input id="submit" name="commit" type="submit" value="Create New Cluster" />
+  <input id="user" name="user" size="30" type="text" value="John" />
+  <input id="submit" name="commit" type="submit" value="Go" />
 </form>
 </fieldset>
 
-<a href="/">Main</a> <a href="/scalaris">Scalaris</a> <a href="/one">OpenNebula</a>
+<a href="/" class="lowermenu">Main</a> 
+<a href="/scalaris" class="lowermenu">Scalaris</a> 
+<a href="/wiki" class="lowermenu">Wiki</a> 
+<a href="/one" class="lowermenu">OpenNebula</a>
 </body>
 </html>
