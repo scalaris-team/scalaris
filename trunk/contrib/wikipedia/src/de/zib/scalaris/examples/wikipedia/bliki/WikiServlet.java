@@ -496,7 +496,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         if (result.success) {
             value = renderRevision(title, result.revision, render, request);
         } else {
-            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
+//            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
             value = new WikiPageBean();
             value.setPage("Page not available.");
             value.setTitle(title);
