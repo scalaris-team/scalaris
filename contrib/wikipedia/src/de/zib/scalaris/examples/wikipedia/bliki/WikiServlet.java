@@ -210,7 +210,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setFormType(FormType.FromToForm);
             value.setFromPage(req_from);
             value.setToPage(req_to);
-            PageListResult result = ScalarisDataHandler.getPageList(connection);
+            PageListResult result = ScalarisDataHandler.getArticleList(connection);
             handleViewSpecialPageList(request, response, result, value);
         } else if (req_title.startsWith("Special:PrefixIndex")) {
             String req_prefix = request.getParameter("prefix");
@@ -227,7 +227,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setFormTitle("All pages");
             value.setFormType(FormType.PagePrefixForm);
             value.setPrefix(req_prefix);
-            PageListResult result = ScalarisDataHandler.getPageList(connection);
+            PageListResult result = ScalarisDataHandler.getArticleList(connection);
             handleViewSpecialPageList(request, response, result, value);
         } else if (req_title.startsWith("Special:WhatLinksHere")) {
             String req_target = request.getParameter("target");
