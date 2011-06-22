@@ -17,13 +17,11 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.wiki.filter.MagicWord;
 
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.IntegerResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.BigIntegerResult;
 
 /**
  * Gets values for magic words not handled by {@link MagicWord}.
@@ -265,23 +263,23 @@ public class MyMagicWord extends MagicWord {
          */
             
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
-            IntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
+            BigIntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
             if (pageCountResult.success) {
-                return formatStatisticNumber(rawNumber, pageCountResult.number);
+                return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
-            IntegerResult pageCountResult = ScalarisDataHandler.getArticleCount(model.connection);
+            BigIntegerResult pageCountResult = ScalarisDataHandler.getArticleCount(model.connection);
             if (pageCountResult.success) {
-                return formatStatisticNumber(rawNumber, pageCountResult.number);
+                return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_FILES)) {
             // we currently do not store files:
-            return formatStatisticNumber(rawNumber, 0);
+            return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFEDITS}}
 //            {{NUMBEROFVIEWS}}
         } else if (name.equals(MAGIC_NUMBER_USERS) || name.equals(MAGIC_NUMBER_ADMINS)) {
             // we currently do not support users/admins:
-            return formatStatisticNumber(rawNumber, 0);
+            return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFACTIVEUSERS}}
 //            {{PAGESINCATEGORY:categoryname}}
 //            {{PAGESINCAT:categoryname}}
@@ -370,17 +368,6 @@ public class MyMagicWord extends MagicWord {
         }
         
         return name;
-    }
-    
-    private static String formatStatisticNumber(boolean rawNumber, int number) {
-        if (rawNumber) {
-            return String.valueOf(number);
-        } else {
-            // TODO: use locale from Wiki
-            NumberFormat nf = NumberFormat.getIntegerInstance(Locale.ENGLISH);
-            nf.setGroupingUsed(true);
-            return nf.format(number);
-        }
     }
     
     private static String getPageName(String parameter, MyWikiModel model) {

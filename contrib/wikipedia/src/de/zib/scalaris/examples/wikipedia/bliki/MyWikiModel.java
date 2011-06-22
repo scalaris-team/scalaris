@@ -20,7 +20,9 @@ import info.bliki.wiki.model.WikiModel;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
@@ -201,6 +203,29 @@ public class MyWikiModel extends WikiModel {
         return (MyNamespace) super.getNamespace();
     }
     
+    /**
+     * Formats the given number using the wiki's locale.
+     * 
+     * Note: Currently, the English locale is always used.
+     * 
+     * @param rawNumber
+     *            whether the raw number should be returned
+     * @param number
+     *            the number
+     * 
+     * @return the formatted number
+     */
+    public String formatStatisticNumber(boolean rawNumber, Number number) {
+        if (rawNumber) {
+            return number.toString();
+        } else {
+            // TODO: use locale from Wiki
+            NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+            nf.setGroupingUsed(true);
+            return nf.format(number);
+        }
+    }
+
     /**
      * Splits the given full title into its namespace and page title components.
      * 

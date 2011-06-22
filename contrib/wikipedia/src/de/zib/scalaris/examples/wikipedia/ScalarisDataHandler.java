@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -152,6 +153,14 @@ public class ScalarisDataHandler {
      */
     public final static String getBackLinksPageListKey(String title) {
         return title + ":blpages";
+    }
+    /**
+     * Gets the key to store the number of page edits.
+     * 
+     * @return Scalaris key
+     */
+    public final static String getStatsPageEditsKey() {
+        return "stats:pageedits";
     }
     
     /**
@@ -550,17 +559,17 @@ public class ScalarisDataHandler {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class IntegerResult extends Result {
+    public static class BigIntegerResult extends Result {
         /**
          * The number (<tt>0</tt> if not successful).
          */
-        public int number = 0;
+        public BigInteger number = BigInteger.valueOf(0);
         /**
          * Creates a new successful result with the given page list.
          * 
          * @param number the retrieved number
          */
-        public IntegerResult(int number) {
+        public BigIntegerResult(BigInteger number) {
             super();
             this.number = number;
         }
@@ -570,7 +579,7 @@ public class ScalarisDataHandler {
          * @param success the success status
          * @param message the message to use
          */
-        public IntegerResult(boolean success, String message) {
+        public BigIntegerResult(boolean success, String message) {
             super(success, message);
         }
     }
@@ -583,7 +592,7 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the number of pages on success
      */
-    public static IntegerResult getPageCount(Connection connection) {
+    public static BigIntegerResult getPageCount(Connection connection) {
         return getInteger2(connection, getPageCountKey(), false);
     }
 
@@ -596,8 +605,21 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the number of articles on success
      */
-    public static IntegerResult getArticleCount(Connection connection) {
+    public static BigIntegerResult getArticleCount(Connection connection) {
         return getInteger2(connection, getArticleCountKey(), false);
+    }
+
+    /**
+     * Retrieves the number of available articles, i.e. pages in the main
+     * namespace, from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * 
+     * @return a result object with the number of articles on success
+     */
+    public static BigIntegerResult getStatsPageEdits(Connection connection) {
+        return getInteger2(connection, getStatsPageEditsKey(), false);
     }
 
     /**
@@ -613,24 +635,24 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the number on success
      */
-    private static IntegerResult getInteger2(Connection connection,
+    private static BigIntegerResult getInteger2(Connection connection,
             String scalaris_key, boolean failNotFound) {
         if (connection == null) {
-            return new IntegerResult(false, "no connection to Scalaris");
+            return new BigIntegerResult(false, "no connection to Scalaris");
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
-            int number = scalaris_single.read(scalaris_key).intValue();
-            return new IntegerResult(number);
+            BigInteger number = scalaris_single.read(scalaris_key).bigIntValue();
+            return new BigIntegerResult(number);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new IntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+                return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
             } else {
-                return new IntegerResult(0);
+                return new BigIntegerResult(BigInteger.valueOf(0));
             }
         } catch (Exception e) {
-            return new IntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
         }
     }
 
@@ -977,6 +999,22 @@ public class ScalarisDataHandler {
 //          e.printStackTrace();
             return new SaveResult(false, "unknown exception writing page \"" + title + "\" to Scalaris: " + e.getMessage());
         }
+        
+        // increase number of page edits (for statistics)
+        // as this is not that important, use a seperate transaction and do not fail if updating the value fails
+        try {
+            String scalaris_key = getStatsPageEditsKey();
+            BigInteger edits;
+            try {
+                edits = scalaris_tx.read(scalaris_key).bigIntValue();
+            } catch (NotFoundException e) {
+                edits = BigInteger.valueOf(0);
+            }
+            edits = edits.add(BigInteger.valueOf(1));
+            scalaris_tx.req_list(new RequestList().addWrite(scalaris_key, edits).addCommit());
+        } catch (Exception e) {
+        }
+        
         return new SaveResult();
     }
     
