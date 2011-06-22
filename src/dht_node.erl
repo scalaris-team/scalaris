@@ -146,8 +146,9 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     MyGroup = pid_groups:my_groupname(),
     Pid = pid_groups:get_my(Process),
     SupTx = pid_groups:get_my(sup_dht_node_core_tx),
-    NewPid = case Pid of
-                 failed ->
+    NewPid = case {Pid, SupTx} of
+                 {failed, failed} -> failed;
+                 {failed, SupTx} ->
                      %% start, if necessary
                      RTM_desc = util:sup_worker_desc(
                                   Process, tx_tm_rtm, start_link,
