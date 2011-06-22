@@ -99,25 +99,13 @@ ${ pageBean.page }
                               <tr>
                                 <td class='mw-label'><label for="namespace">Namespace:</label>  </td>
                                 <td class='mw-input'>
-                                  <select disabled="disabled" id="namespace" name="namespace" class="namespaceselector">
-                                    <option value="0" selected="selected">(Main)</option>
-<% /* TODO: parse options from namespace
-                                    <option value="1">Talk</option>
-                                    <option value="2">User</option>
-                                    <option value="3">User talk</option>
-                                    <option value="4">Wiktionary</option>
-                                    <option value="5">Wiktionary talk</option>
-                                    <option value="6">File</option>
-                                    <option value="7">File talk</option>
-                                    <option value="8">MediaWiki</option>
-                                    <option value="9">MediaWiki talk</option>
-                                    <option value="10">Template</option>
-                                    <option value="11">Template talk</option>
-                                    <option value="12">Help</option>
-                                    <option value="13">Help talk</option>
-                                    <option value="14">Category</option>
-                                    <option value="15">Category talk</option>
-*/ %>
+                                  <select id="namespace" name="namespace" class="namespaceselector">
+                      <% for (int i = 0; i <= 15; ++i) {
+                          String namespace = (i == 0) ? "(Main)" : pageBean.getWikiNamespace().getNamespaceByNumber(i);
+                          String selected = (pageBean.getNamespaceId() == i) ? " selected=\"selected\"" : "";
+                      %>
+                                    <option value="<%= i %>"<%= selected %>><%= namespace %></option>
+                      <% } %>
                                   </select>
                                   <input type="submit" value="Go" />    </td>
                               </tr>

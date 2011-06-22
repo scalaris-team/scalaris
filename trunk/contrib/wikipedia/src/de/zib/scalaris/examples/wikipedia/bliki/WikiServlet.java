@@ -203,6 +203,16 @@ public class WikiServlet extends HttpServlet implements Servlet {
             if (req_to == null) {
                 req_to = ""; // shows all pages
             }
+            int nsId = 0;
+            try {
+                String req_ns = request.getParameter("namespace");
+                if (req_ns == null) {
+                    req_ns = "0"; // shows all pages
+                }
+                nsId = Integer.parseInt(req_ns);
+            } catch (NumberFormatException e) {
+                // use default namespace for invalid values
+            }
             WikiPageListBean value = new WikiPageListBean();
             value.setPageHeading("All pages");
             value.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
@@ -210,7 +220,13 @@ public class WikiServlet extends HttpServlet implements Servlet {
             value.setFormType(FormType.FromToForm);
             value.setFromPage(req_from);
             value.setToPage(req_to);
-            PageListResult result = ScalarisDataHandler.getArticleList(connection);
+            PageListResult result;
+            if (nsId == 0) {
+                result = ScalarisDataHandler.getArticleList(connection);
+            } else {
+                result = ScalarisDataHandler.getPageList(connection);
+                value.setNamespaceId(nsId);
+            }
             handleViewSpecialPageList(request, response, result, value);
         } else if (req_title.startsWith("Special:PrefixIndex")) {
             String req_prefix = request.getParameter("prefix");
@@ -221,13 +237,29 @@ public class WikiServlet extends HttpServlet implements Servlet {
                     req_prefix = req_title.substring(slashIndex + 1);
                 }
             }
+            int nsId = 0;
+            try {
+                String req_ns = request.getParameter("namespace");
+                if (req_ns == null) {
+                    req_ns = "0"; // shows all pages
+                }
+                nsId = Integer.parseInt(req_ns);
+            } catch (NumberFormatException e) {
+                // use default namespace for invalid values
+            }
             WikiPageListBean value = new WikiPageListBean();
             value.setPageHeading("All pages");
-            value.setTitle("Special:AllPages&prefix=" + req_prefix);
+            value.setTitle("Special:PrefixIndex&prefix=" + req_prefix);
             value.setFormTitle("All pages");
             value.setFormType(FormType.PagePrefixForm);
             value.setPrefix(req_prefix);
-            PageListResult result = ScalarisDataHandler.getArticleList(connection);
+            PageListResult result;
+            if (nsId == 0) {
+                result = ScalarisDataHandler.getArticleList(connection);
+            } else {
+                result = ScalarisDataHandler.getPageList(connection);
+                value.setNamespaceId(nsId);
+            }
             handleViewSpecialPageList(request, response, result, value);
         } else if (req_title.startsWith("Special:WhatLinksHere")) {
             String req_target = request.getParameter("target");
@@ -584,18 +616,25 @@ public class WikiServlet extends HttpServlet implements Servlet {
         if (result.success) {
             value.setNotice(WikiServlet.getParam_notice(request));
             Collections.sort(result.pages, String.CASE_INSENSITIVE_ORDER);
-            String prefix = value.getPrefix();
+            String nsPrefix = namespace.getNamespaceByNumber(value.getNamespaceId());
+            if (!nsPrefix.isEmpty()) {
+                nsPrefix += ":";
+            }
+            String prefix = nsPrefix + value.getPrefix();
             String from = value.getFromPage();
+            String fullFrom = nsPrefix + value.getFromPage();
             String to = value.getToPage();
+            String fullTo = nsPrefix + value.getToPage();
             if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty()) {
                 // only show pages with this prefix:
                 for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
                     String cur = it.next();
-                    if (!cur.startsWith(prefix)) {
+                    // case-insensitive "startsWith" check:
+                    if (!cur.regionMatches(true, 0, prefix, 0, prefix.length())) {
                         it.remove();
-                    } else if (!from.isEmpty() && cur.compareToIgnoreCase(from) <= 0) {
+                    } else if (!from.isEmpty() && cur.compareToIgnoreCase(fullFrom) <= 0) {
                         it.remove();
-                    } else if (!to.isEmpty() && cur.compareToIgnoreCase(to) > 0) {
+                    } else if (!to.isEmpty() && cur.compareToIgnoreCase(fullTo) > 0) {
                         it.remove();
                     }
                 }

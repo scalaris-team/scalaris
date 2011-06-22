@@ -60,6 +60,7 @@ public class WikiPageListBean extends WikiPageBeanBase {
     
     private String target = "";
     private String prefix = "";
+    private int namespaceId = 0;
 
     /**
      * @return the subCategories
@@ -171,5 +172,19 @@ public class WikiPageListBean extends WikiPageBeanBase {
      */
     public void setPrefix(String prefix) {
         this.prefix = prefix;
+    }
+
+    /**
+     * @return the namespaceId
+     */
+    public int getNamespaceId() {
+        return namespaceId;
+    }
+
+    /**
+     * @param namespaceId the namespaceId to set
+     */
+    public void setNamespaceId(int namespaceId) {
+        this.namespaceId = namespaceId;
     }
 }
