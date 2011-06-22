@@ -56,27 +56,54 @@ def destroy_scalaris(id)
   json_call("destroy_scalaris", [id]).to_json
 end
 
+def get_wiki_info(id)
+  json_call("get_wiki_info", [id]).to_json
+end
+
+def create_wiki(user, node)
+  json_call("create_wiki", [user, node]).to_json
+end
+
+def destroy_wiki(id)
+  json_call("destroy_wiki", [id]).to_json
+end
+
 options = {}
 
 optparse = OptionParser.new do |opts|
   options[:scalaris_info] = nil
-  opts.on('--scalaris-info ID', Integer, 'get info on scalaris instance ID' ) do |id|
+  opts.on('--scalaris-info ID', Integer, 'get info on scalaris cluster ID' ) do |id|
     options[:scalaris_info] = id
   end
 
   options[:scalaris_create] = nil
-  opts.on('--scalaris-create', 'create new scalaris instance' ) do |key|
+  opts.on('--scalaris-create', 'create new scalaris cluster' ) do |key|
     options[:scalaris_create] = true
   end
 
   options[:scalaris_add_vm] = nil
-  opts.on('--scalaris-add-vm ID', Integer, 'add another vm to this scalaris instance' ) do |id|
+  opts.on('--scalaris-add-vm ID', Integer, 'add another vm to this scalaris cluster' ) do |id|
     options[:scalaris_add_vm] = id
   end
 
   options[:scalaris_destroy] = nil
-  opts.on('--scalaris-destroy ID', Integer, 'destroy scalaris instance ID' ) do |id|
+  opts.on('--scalaris-destroy ID', Integer, 'destroy scalaris cluster ID' ) do |id|
     options[:scalaris_destroy] = id
+  end
+
+  options[:wiki_create] = nil
+  opts.on('--wiki-create SCALARISNODE', String, 'create new wiki' ) do |node|
+    options[:wiki_create] = node
+  end
+
+  options[:wiki_destroy] = nil
+  opts.on('--wiki-destroy ID', Integer, 'destroy wiki ID' ) do |id|
+    options[:wiki_destroy] = id
+  end
+
+  options[:wiki_info] = nil
+  opts.on('--wiki-info ID', Integer, 'get info on wiki ID' ) do |id|
+    options[:wiki_info] = id
   end
 
   opts.on_tail("-h", "--help", "Show this message") do
@@ -96,3 +123,7 @@ puts get_scalaris_info(options[:scalaris_info]) unless options[:scalaris_info] =
 puts create_scalaris(ENV['USER']) unless options[:scalaris_create] == nil
 puts add_vm_scalaris(options[:scalaris_add_vm]) unless options[:scalaris_add_vm] == nil
 puts destroy_scalaris(options[:scalaris_destroy]) unless options[:scalaris_destroy] == nil
+
+puts get_wiki_info(options[:wiki_info])   unless options[:wiki_info]    == nil
+puts create_wiki(ENV['USER'], options[:wiki_create])   unless options[:wiki_create]  == nil
+puts destroy_wiki(options[:wiki_destroy]) unless options[:wiki_destroy] == nil

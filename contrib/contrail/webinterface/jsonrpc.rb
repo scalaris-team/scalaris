@@ -31,6 +31,29 @@ module JSONRPC
     "success"
   end
 
+  def self.get_wiki_info(params)
+    id = params[0].to_i
+    info = WikiHelper.get_instance_info(id)
+    info
+  end
+
+  def self.create_wiki(params)
+    user = params[0]
+    node = params[1]
+    res = WikiHelper.create(user, node)
+    if res[0] == true
+      {"wiki_id" => res[1]}
+    else
+      raise "create failed with #{res[1]}"
+    end
+  end
+
+  def self.destroy_wiki(params)
+    id = params[0].to_i
+    res = WikiHelper.destroy(id)
+    "success"
+  end
+
   def self.call(jsonreq)
     method = jsonreq["method"]
 
