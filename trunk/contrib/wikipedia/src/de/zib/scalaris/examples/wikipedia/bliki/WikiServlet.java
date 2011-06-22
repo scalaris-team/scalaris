@@ -63,6 +63,11 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  */
 public class WikiServlet extends HttpServlet implements Servlet {
     private static final long serialVersionUID = 1L;
+    
+    /**
+     * Version of the "Wikipedia on Scalaris" example implementation.
+     */
+    public static final String version = "0.3pre";
 
     private Connection connection = null; 
     private SiteInfo siteinfo = null;
@@ -100,6 +105,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
+        super.init(config);
         Properties properties = new Properties();
         try {
             InputStream fis = config.getServletContext().getResourceAsStream("/WEB-INF/scalaris.properties");
@@ -283,6 +289,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
             handleViewSpecialPages(request, response);
         } else if (req_title.equals("Special:Statistics")) {
             handleViewSpecialStatistics(request, response);
+        } else if (req_title.equals("Special:Version")) {
+            handleViewSpecialVersion(request, response);
         } else if (req_action == null || req_action.equals("view")) {
             handleViewPage(request, response, req_title);
         } else if (req_action.equals("history")) {
@@ -775,6 +783,60 @@ public class WikiServlet extends HttpServlet implements Servlet {
                 content.append("  </tr>\n");
             }
         }
+        content.append(" </tbody>\n");
+        content.append("</table>\n");
+        
+        value.setPage(content.toString());
+        // abuse #handleViewSpecialPageList here:
+        PageListResult result = new PageListResult(new LinkedList<String>());
+        handleViewSpecialPageList(request, response, result, value);
+    }
+
+    private void handleViewSpecialVersion(HttpServletRequest request,
+            HttpServletResponse response) throws ServletException, IOException {
+        WikiPageListBean value = new WikiPageListBean();
+        value.setPageHeading("Version");
+        value.setTitle("Special:Version");
+
+        StringBuilder content = new StringBuilder();
+        content.append("<h2 id=\"mw-version-license\"> <span class=\"mw-headline\" id=\"License\">License</span></h2>\n");
+        content.append("<div>\n");
+        content.append("<p>This wiki is powered by <b><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></b>, copyright © 2011 Zuse Institute Berlin</p>\n");
+        content.append("<p>\n");
+        content.append(" Licensed under the Apache License, Version 2.0 (the \"License\");</br>\n");
+        content.append(" you may not use this software except in compliance with the License.</br>\n");
+        content.append(" &nbsp;</br>\n");
+        content.append(" You may obtain a copy of the License at</br>\n");
+        content.append(" <a href=\"http://www.apache.org/licenses/LICENSE-2.0\" class=\"external text\" rel=\"nofollow\">http://www.apache.org/licenses/LICENSE-2.0</a>\n");
+        content.append("</p>\n");
+        content.append("<p>\n");
+        content.append(" Unless required by applicable law or agreed to in writing, software</br>\n");
+        content.append(" distributed under the License is distributed on an \"AS IS\" BASIS,</br>\n");
+        content.append(" WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</br>\n");
+        content.append(" See the License for the specific language governing permissions and</br>\n");
+        content.append(" limitations under the License.\n");
+        content.append("</p>\n");
+        content.append("</div>");
+        
+        content.append("<h2 id=\"mw-version-software\"> <span class=\"mw-headline\" id=\"Installed_software\">Installed software</span></h2>\n");
+        content.append("<table class=\"wikitable\" id=\"sv-software\">\n");
+        content.append(" <tbody>\n");
+        content.append("  <tr>\n");
+        content.append("   <th>Product</th>\n");
+        content.append("   <th>Version</th>\n");
+        content.append("  </tr>\n");
+        content.append("  <tr>\n");
+        content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris Wiki Example</a></td>\n");
+        content.append("   <td>" + version + "</td>\n");
+        content.append("  </tr>\n");
+        content.append("  <tr>\n");
+        content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
+        content.append("   <td>???</td>\n"); // TODO: get Scalaris version
+        content.append("  </tr>\n");
+        content.append("  <tr>\n");
+        content.append("   <td>Server</td>\n");
+        content.append("   <td>" + getServletContext().getServerInfo() + "</td>\n");
+        content.append("  </tr>\n");
         content.append(" </tbody>\n");
         content.append("</table>\n");
         

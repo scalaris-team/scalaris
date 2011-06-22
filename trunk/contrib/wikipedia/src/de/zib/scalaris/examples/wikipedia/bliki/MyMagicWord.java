@@ -221,9 +221,8 @@ public class MyMagicWord extends MagicWord {
 //            // TODO: implement
 //            return null;
 //            {{STYLEPATH}}
-//        } else if (name.equals(MAGIC_CURRENT_VERSION)) {
-//            // TODO: implement
-//            return null;
+        } else if (name.equals(MAGIC_CURRENT_VERSION)) {
+            return WikiServlet.version;
 //            {{CONTENTLANGUAGE}}
 //            {{CONTENTLANG}}
         /*
