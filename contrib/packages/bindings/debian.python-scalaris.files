@@ -1,4 +1,2 @@
 /usr/bin/scalaris-python
-/usr/lib/python2*/site-packages/Scalaris.py
-/usr/lib/python2*/site-packages/Scalaris.pyc
-/usr/lib/python2*/site-packages/Scalaris.pyo
+/usr/lib/python2*/site-packages/*

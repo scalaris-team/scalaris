@@ -206,9 +206,7 @@ rm -rf $RPM_BUILD_ROOT
 %files -n python-scalaris
 %defattr(-,root,root)
 %{_bindir}/scalaris-python
-%{python_sitelib}/Scalaris.py
-%{python_sitelib}/Scalaris.pyc
-%{python_sitelib}/Scalaris.pyo
+%{python_sitelib}/*
 %endif
 
 %if 0%{?with_python3}
@@ -219,9 +217,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{python3_sitelib}
 %dir %{python3_sitelib}/..
 %endif
-%{python3_sitelib}/Scalaris.py
-%{python3_sitelib}/Scalaris.pyc
-%{python3_sitelib}/Scalaris.pyo
+%{python3_sitelib}/*
 %endif
 
 %changelog
