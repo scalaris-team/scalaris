@@ -45,7 +45,7 @@ public class Page {
     protected Map<String, String> restrictions = new LinkedHashMap<String, String>();
     
     /**
-     * ID of the current revision.
+     * Current revision (cached).
      */
     protected Revision curRev = null;
 

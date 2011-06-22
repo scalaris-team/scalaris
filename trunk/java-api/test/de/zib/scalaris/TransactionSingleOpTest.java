@@ -28,6 +28,9 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.TransactionSingleOp.RequestList;
+import de.zib.scalaris.TransactionSingleOp.ResultList;
+
 /**
  * Unit test for the {@link TransactionSingleOp} class.
  *
@@ -976,6 +979,100 @@ public class TransactionSingleOpTest {
                 expected.add(testData[i]);
                 expected.add(testData[i + 1]);
                 assertEquals(expected, actual);
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#req_list(RequestList)} with an
+     * empty request list.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws AbortException
+     * @throws TimeoutException
+     */
+    @Test
+    public void testReqList_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
+        final TransactionSingleOp t = new TransactionSingleOp();
+        try {
+            t.req_list(new RequestList());
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#req_list(RequestList)} with a
+     * mixed request list.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws AbortException
+     * @throws TimeoutException
+     * @throws NotFoundException
+     */
+    @Test
+    public void testReqList1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+        final String key = "_ReqList1_";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            final RequestList readRequests = new RequestList();
+            final RequestList firstWriteRequests = new RequestList();
+            final RequestList writeRequests = new RequestList();
+            for (int i = 0; i < testData.length; ++i) {
+                if ((i % 2) == 0) {
+                    firstWriteRequests.addWrite(testTime + key + i, testData[i]);
+                }
+                writeRequests.addWrite(testTime + key + i, testData[i]);
+                readRequests.addRead(testTime + key + i);
+            }
+
+            ResultList results = conn.req_list(firstWriteRequests);
+            // evaluate the first write results:
+            for (int i = 0; i < firstWriteRequests.size(); ++i) {
+                results.processWriteAt(i);
+            }
+
+            final RequestList requests = new RequestList(readRequests).addAll(writeRequests);
+
+            results = conn.req_list(requests);
+
+            assertEquals(requests.size(), results.size());
+
+            // now evaluate the read results:
+            for (int i = 0; i < readRequests.size(); ++i) {
+                if ((i % 2) == 0) {
+                    final String actual = results.processReadAt(i).stringValue();
+                    assertEquals(testData[i], actual);
+                } else {
+                    try {
+                        results.processReadAt(i);
+                        // a not found exception must be thrown
+                        assertTrue(false);
+                    } catch (final NotFoundException e) {
+                    }
+                }
+            }
+
+            // now evaluate the write results:
+            for (int i = 0; i < writeRequests.size(); ++i) {
+                final int pos = readRequests.size() + i;
+                results.processWriteAt(pos);
+            }
+
+            // once again test reads - now all reads should be successful
+            results = conn.req_list(readRequests);
+
+            assertEquals(readRequests.size(), results.size());
+
+            // now evaluate the read results:
+            for (int i = 0; i < readRequests.size(); ++i) {
+                final String actual = results.processReadAt(i).stringValue();
+                assertEquals(testData[i], actual);
             }
         } finally {
             conn.closeConnection();
