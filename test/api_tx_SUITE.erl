@@ -343,7 +343,7 @@ write_test(Config) ->
                              end),
     receive {time, FirstWriteTime} -> ok
     end,
-    unittest_helper:wait_for_process_to_die(BenchPid1),
+    util:wait_for_process_to_die(BenchPid1),
     BenchPid2 = erlang:spawn(fun() ->
                                      {Time, _} = util:tc(api_tx, write, ["2", 2]),
                                      comm:send_local(Self, {time, Time}),
@@ -351,7 +351,7 @@ write_test(Config) ->
                              end),
     receive {time, SecondWriteTime} -> ok
     end,
-    unittest_helper:wait_for_process_to_die(BenchPid2),
+    util:wait_for_process_to_die(BenchPid2),
     dht_node_move_SUITE:check_size2(4  * 2),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), %doesn't matter

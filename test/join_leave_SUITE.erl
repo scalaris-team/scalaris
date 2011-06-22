@@ -115,7 +115,7 @@ add_2x3_load_test() ->
     timer:sleep(500),
     _ = admin:add_nodes(3),
     check_size(7),
-    unittest_helper:wait_for_process_to_die(BenchPid).
+    util:wait_for_process_to_die(BenchPid).
 
 add_3_rm_2_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -132,7 +132,7 @@ add_3_rm_2_load_test() ->
     _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
 %%     admin:del_nodes(2),
     check_size(2),
-    unittest_helper:wait_for_process_to_die(BenchPid).
+    util:wait_for_process_to_die(BenchPid).
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key()) -> true.
 prop_join_at(FirstId, SecondId) ->
@@ -141,7 +141,7 @@ prop_join_at(FirstId, SecondId) ->
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(BenchSlaves, BenchRuns) end),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
-    unittest_helper:wait_for_process_to_die(BenchPid),
+    util:wait_for_process_to_die(BenchPid),
     dht_node_move_SUITE:check_size2(BenchSlaves * 4),
     unittest_helper:stop_ring(),
     true.
@@ -214,7 +214,7 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
       [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     BenchPid = erlang:spawn(fun() -> bench_server:run_increment(BenchSlaves, BenchRuns) end),
-    unittest_helper:wait_for_process_to_die(BenchPid),
+    util:wait_for_process_to_die(BenchPid),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
     dht_node_move_SUITE:check_size2(BenchSlaves * 4),
