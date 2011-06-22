@@ -91,25 +91,15 @@ start_link(DHTNodeGroup, Role) ->
      TableName      :: pdb:tableid(),
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
-     GLocalLearner   :: comm:mypid(),
-     %% reference counting on subscriptions inside RTMs
-     Subs         :: [{comm:mypid(), non_neg_integer()}],
-     OpenTxNum :: non_neg_integer()}.
-
--type state_uninit() ::
-    {RTMs           :: rtms(),
-     TableName      :: pdb:tableid(),
-     Role           :: pid_groups:pidname(),
-     LocalAcceptor  :: pid(),
      GLocalLearner  :: comm:mypid(),
      %% reference counting on subscriptions inside RTMs
-     Subs         :: [{comm:mypid(), non_neg_integer()}],
-     OpenTxNum :: non_neg_integer(),
+     Subs           :: [{comm:mypid(), non_neg_integer()}],
+     OpenTxNum      :: non_neg_integer(),
      QueuedMessages :: msg_queue:msg_queue()}.
 
 %% initialize: return initial state.
 -spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...],
-                             state_uninit()}.
+                             state()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
     ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
@@ -134,7 +124,8 @@ init([]) ->
                               fun rm_loop:subscribe_dneighbor_change_filter/2,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0}
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0,
+              msg_queue:new()}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -600,7 +591,14 @@ on({crash, Pid}, State) ->
                 end, State, pdb:tab2list(state_get_tablename(State))),
 
     %% no longer use this RTM
-    state_set_RTMs(NewState, NewRTMs);
+    ValidRTMs = [ X || X <- NewRTMs, unknown =/= get_rtmpid(X) ],
+    case length(ValidRTMs) < 3 andalso tx_tm =:= state_get_role(NewState) of
+        true ->
+            gen_component:change_handler(
+              state_set_RTMs(NewState, NewRTMs),
+             on_init);
+        false -> state_set_RTMs(NewState, NewRTMs)
+    end;
 
 %% on({crash, _Pid, _Cookie},
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
@@ -638,8 +636,8 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     state_set_RTMs(State, NewRTMs).
 
 
--spec on_init(comm:message(), state_uninit())
-    -> state_uninit() |
+-spec on_init(comm:message(), state())
+    -> state() |
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 %% While initializing
 on_init({get_node_details_response, NodeDetails}, State) ->
@@ -670,8 +668,9 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
         false ->
             rtms_of_same_dht_node(NewRTMs),
             msg_queue:send(state_get_qmsg(State)),
+            NewState = state_set_qmsg(State, []),
             gen_component:change_handler(
-              state_to_on(state_set_RTMs(State, NewRTMs)), on);
+              state_set_RTMs(NewState, NewRTMs), on);
         _ -> state_set_RTMs(State, NewRTMs)
     end;
 
@@ -687,7 +686,11 @@ on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     tx_tm = state_get_role(State),
     QueuedMessages = state_get_qmsg(State),
     NewQueuedMessages = msg_queue:add(QueuedMessages, Msg),
-    state_set_qmsg(State, NewQueuedMessages).
+    state_set_qmsg(State, NewQueuedMessages);
+
+on_init({crash, _Pid} = Msg, State) ->
+    %% only in tx_tm
+    on(Msg, State).
 
 %% functions for periodic RTM updates
 -spec my_RTM_update(rtms()) -> ok.
@@ -904,18 +907,18 @@ get_my(Role, PaxosRole) ->
                 atom_to_list(Role) ++ "_" ++ atom_to_list(PaxosRole)),
     pid_groups:get_my(PidName).
 
--spec state_get_RTMs(state() | state_uninit())      -> rtms().
+-spec state_get_RTMs(state())      -> rtms().
 state_get_RTMs(State)          -> element(1, State).
--spec state_set_RTMs(state() | state_uninit(), rtms())
-                    -> state() | state_uninit().
+-spec state_set_RTMs(state(), rtms())
+                    -> state().
 state_set_RTMs(State, Val)     -> setelement(1, State, Val).
--spec state_get_tablename(state() | state_uninit()) -> pdb:tableid().
+-spec state_get_tablename(state()) -> pdb:tableid().
 state_get_tablename(State)     -> element(2, State).
--spec state_get_role(state() | state_uninit())       -> pid_groups:pidname().
+-spec state_get_role(state())       -> pid_groups:pidname().
 state_get_role(State)          -> element(3, State).
--spec state_get_lacceptor(state() | state_uninit())  -> pid().
+-spec state_get_lacceptor(state())  -> pid().
 state_get_lacceptor(State)     -> element(4, State).
--spec state_get_gllearner(state() | state_uninit()) -> comm:mypid().
+-spec state_get_gllearner(state()) -> comm:mypid().
 state_get_gllearner(State) -> element(5, State).
 -spec state_get_subs(state()) -> [{comm:mypid(), non_neg_integer()}].
 state_get_subs(State)          -> element(6, State).
@@ -927,15 +930,10 @@ state_get_opentxnum(State) -> element(7, State).
 state_inc_opentxnum(State) -> setelement(7, State, element(7, State) + 1).
 -spec state_dec_opentxnum(state()) -> state().
 state_dec_opentxnum(State) -> setelement(7, State, element(7, State) - 1).
--spec state_get_qmsg(state_uninit()) -> msg_queue:msg_queue().
+-spec state_get_qmsg(state()) -> msg_queue:msg_queue().
 state_get_qmsg(State)          -> element(8, State).
--spec state_set_qmsg(state_uninit(), msg_queue:msg_queue()) -> state_uninit().
+-spec state_set_qmsg(state(), msg_queue:msg_queue()) -> state().
 state_set_qmsg(State, Val)     -> setelement(8, State, Val).
-
--spec state_to_on(state_uninit()) -> state().
-state_to_on(State) ->
-    {A, B, C, D, E, F, G, _H} = State,
-    {A, B, C, D, E, F, G}.
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
