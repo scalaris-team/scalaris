@@ -90,8 +90,8 @@ del_nodes(Count, Graceful) ->
         -> ok | {error, running | not_found | simple_one_for_one}.
 del_single_node([], _Graceful) ->
     ok;
-del_single_node([{Key, Pid, _Type, _} | T], Graceful) ->
-    case is_list(Key) of
+del_single_node([{Id, Pid, _Type, _} | T], Graceful) ->
+    case is_list(Id) of
         true ->
             case Graceful of
                 true ->
@@ -100,8 +100,8 @@ del_single_node([{Key, Pid, _Type, _} | T], Graceful) ->
                     comm:send_local(DhtNode, {leave});
                 false ->
                     util:supervisor_terminate_childs(Pid),
-                    _ = supervisor:terminate_child(main_sup, Key),
-                    supervisor:delete_child(main_sup, Key)
+                    _ = supervisor:terminate_child(main_sup, Id),
+                    supervisor:delete_child(main_sup, Id)
             end;
         _ -> del_single_node(T, Graceful)
     end.

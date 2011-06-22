@@ -121,6 +121,8 @@ on({halt}, _State) ->
 
 on({die}, _State) ->
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    util:supervisor_terminate_childs(SupDhtNode),
     ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
     ok = supervisor:delete_child(main_sup, SupDhtNodeId),
     kill;
