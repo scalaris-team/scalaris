@@ -21,6 +21,8 @@
 
 -behaviour(gen_server).
 
+-include("scalaris.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -30,7 +32,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {start, map}).
+-record(state, {start :: {integer(), integer(), integer()},
+                map   :: gb_tree()}).
 
 %%====================================================================
 %% API
@@ -39,6 +42,7 @@
 %% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
 %% Description: Starts the server
 %%--------------------------------------------------------------------
+-spec start_link() -> {ok,pid()} | ignore | {error, any()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -46,6 +50,7 @@ start_link() ->
 %% Function: log(Tag, Size) -> ok
 %% Description: logs a message type with its size
 %%--------------------------------------------------------------------
+-spec log(atom(), integer()) -> ok.
 log(Tag, Size) ->
     gen_server:cast(?MODULE, {log, Tag, Size}).
 
@@ -53,6 +58,7 @@ log(Tag, Size) ->
 %% Function: dump() -> {gb_tree:gb_trees(), {Date, Time}}
 %% Description: gets the logging state
 %%--------------------------------------------------------------------
+-spec dump() -> {gb_tree(), {integer(), integer(), integer()}}.
 dump() ->
     gen_server:call(?MODULE, {dump}).
 
@@ -67,6 +73,7 @@ dump() ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
+-spec init(list()) -> {ok, #state{}}.
 init([]) ->
     {ok, #state{start=erlang:now(), map=gb_trees:empty()}}.
 
@@ -79,6 +86,7 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+-spec handle_call({dump}, any(), #state{}) -> {reply, any(), #state{}}.
 handle_call({dump}, _From, State) ->
     Reply = {State#state.map, State#state.start},
     {reply, Reply, State};
@@ -92,6 +100,7 @@ handle_call(_Request, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
+-spec handle_cast({log, atom(), integer()}, #state{}) -> {noreply, #state{}}.
 handle_cast({log, Tag, Size}, State) ->
     case gb_trees:lookup(Tag, State#state.map) of
         none ->
@@ -108,6 +117,7 @@ handle_cast(_Msg, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
+-spec handle_info(any(), #state{}) -> {noreply, #state{}}.
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -118,6 +128,7 @@ handle_info(_Info, State) ->
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
 %%--------------------------------------------------------------------
+-spec terminate(any(), #state{}) -> ok.
 terminate(_Reason, _State) ->
     ok.
 
@@ -125,6 +136,7 @@ terminate(_Reason, _State) ->
 %% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% Description: Convert process state when code is changed
 %%--------------------------------------------------------------------
+-spec code_change(any(), #state{}, any()) -> {ok, #state{}}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
