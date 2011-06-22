@@ -1220,6 +1220,8 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
     case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
         true ->
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+            SupDhtNode = pid_groups:get_my(sup_dht_node),
+            util:supervisor_terminate_childs(SupDhtNode),
             ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
             ok = supervisor:delete_child(main_sup, SupDhtNodeId),
             kill;
@@ -1285,6 +1287,8 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
                           "a leave operation (this doesn't make any sense!)",
                     [comm:this()]),
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+            SupDhtNode = pid_groups:get_my(sup_dht_node),
+            util:supervisor_terminate_childs(SupDhtNode),
             ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
             ok = supervisor:delete_child(main_sup, SupDhtNodeId),
             kill;

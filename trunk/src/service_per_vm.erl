@@ -44,7 +44,13 @@ dump_node_states() ->
 kill_nodes(No) ->
     Childs = lists:sublist([X || X <- supervisor:which_children(main_sup),
                                  is_list(element(1, X))], No),
-    _ = [supervisor:terminate_child(main_sup, element(1, Child)) || Child <- Childs],
+    _ = [begin
+             SupDhtNode = element(2, Child),
+             Id = element(1, Child),
+             util:supervisor_terminate_childs(SupDhtNode),
+             supervisor:terminate_child(main_sup, Id),
+             supervisor:delete_child(main_sup, Id)
+         end || Child <- Childs],
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
