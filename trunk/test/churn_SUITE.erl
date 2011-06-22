@@ -72,7 +72,7 @@ transactions_1_failure_4_nodes_read(_) ->
     ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
     % if all writes have arrived, a range read should return 4 values
-    unittest_helper:wait_for(
+    util:wait_for(
       fun() ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4
@@ -98,7 +98,7 @@ transactions_more_failures_4_nodes_read(FailedNodes) ->
     ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
     % if all writes have arrived, a range read should return 4 values
-    unittest_helper:wait_for(
+    util:wait_for(
       fun() ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4

@@ -28,9 +28,7 @@
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
          check_ring_size/1, check_ring_size_fully_joined/1,
-         wait_for/1, wait_for/2,
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
-         wait_for_process_to_die/1,
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
          get_all_children/1,
@@ -140,7 +138,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     end,
     Pid = start_process(
             fun() ->
-                    ct:pal("Trying to build Scalaris~n"),
+                    ct:pal("Trying to build Scalaris with ids~n"),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     {ok, _GroupsPid} = pid_groups:start_link(),
@@ -215,34 +213,12 @@ stop_ring(Pid) ->
     try
         begin
             error_logger:tty(false),
+            error_logger:delete_report_handler(error_logger_log4erl_h),
             log:set_log_level(none),
-            exit(Pid, kill),
-            wait_for_process_to_die(Pid),
-            % stop/wait for VM-registered processes or processes with globally
-            % registered ets tables which interfere with the creation of new
-            % rings
+            util:supervisor_terminate(main_sup),
+            catch exit(Pid, kill),
+            util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            wait_for_process_to_die(comm_server),
-            wait_for_table_to_disappear(comm_server),
-            wait_for_process_to_die(comm_layer_acceptor),
-            wait_for_process_to_die(admin_server),
-            wait_for_process_to_die(bench_server),
-            wait_for_process_to_die(mgmt_server),
-            wait_for_process_to_die(config),
-            wait_for_table_to_disappear(config_ets),
-            wait_for_process_to_die(fd),
-            wait_for_table_to_disappear(fd_hbs),
-            wait_for_process_to_die(monitor_timing),
-            wait_for_table_to_disappear(monitor_timing),
-            wait_for_process_to_die(service_per_vm),
-            wait_for_table_to_disappear(tracer),
-            wait_for_table_to_disappear(tracer_perf),
-            wait_for_table_to_disappear(webhelpers_indexed_ring),
-            % do not stop the randoms and inets apps since we do not know
-            % whether we started them in make_ring* and whether other processes
-            % still rely on it
-%%             randoms:stop(),
-%%             inets:stop(),
             catch(unregister(ct_test_ring)),
             ok
         end
@@ -254,47 +230,22 @@ stop_ring(Pid) ->
             ct:pal("exception in stop_ring: ~p~n", [Reason]),
             throw(Reason);
         error:Reason ->
-            ct:pal("exception in stop_ring: ~p~n", [Reason]),
+            ct:pal("exception in stop_ring: ~p ~p~n", [Reason, erlang:get_stacktrace()]),
             throw(Reason)
     end.
 
 -spec stop_pid_groups() -> ok.
 stop_pid_groups() ->
     gen_component:kill(pid_groups),
-    wait_for_table_to_disappear(pid_groups),
-    wait_for_table_to_disappear(pid_groups_hidden),
+    util:wait_for_table_to_disappear(pid_groups),
+    util:wait_for_table_to_disappear(pid_groups_hidden),
     catch unregister(pid_groups),
     ok.
 
--spec wait_for(fun(() -> any())) -> ok.
-wait_for(F) -> wait_for(F, 10).
-
--spec wait_for(fun(() -> any()), WaitTimeInMs::pos_integer()) -> ok.
-wait_for(F, WaitTime) ->
-    case F() of
-        true  -> ok;
-        false -> timer:sleep(WaitTime),
-                 wait_for(F)
-    end.
-
--spec wait_for_process_to_die(pid() | atom()) -> ok.
-wait_for_process_to_die(Name) when is_atom(Name) ->
-    wait_for(fun() ->
-                     case erlang:whereis(Name) of
-                         undefined -> true;
-                         Pid       -> not is_process_alive(Pid)
-                     end
-             end);
-wait_for_process_to_die(Pid) ->
-    wait_for(fun() -> not is_process_alive(Pid) end).
-
--spec wait_for_table_to_disappear(tid() | atom()) -> ok.
-wait_for_table_to_disappear(Table) ->
-    wait_for(fun() -> ets:info(Table) =:= undefined end).
 
 -spec wait_for_stable_ring() -> ok.
 wait_for_stable_ring() ->
-    wait_for(fun() ->
+    util:wait_for(fun() ->
                      R = admin:check_ring(),
                      ct:pal("CheckRing: ~p~n", [R]),
                      R =:= ok
@@ -302,7 +253,7 @@ wait_for_stable_ring() ->
 
 -spec wait_for_stable_ring_deep() -> ok.
 wait_for_stable_ring_deep() ->
-    wait_for(fun() ->
+    util:wait_for(fun() ->
                      R = admin:check_ring_deep(),
                      ct:pal("CheckRingDeep: ~p~n", [R]),
                      R =:= ok
@@ -311,7 +262,7 @@ wait_for_stable_ring_deep() ->
 -spec check_ring_size(non_neg_integer()) -> non_neg_integer().
 check_ring_size(Size) ->
     DhtModule = config:read(dht_node),
-    wait_for(
+    util:wait_for(
       fun() ->
               % note: we use a single VM in unit tests, therefore no
               % mgmt_server is needed - if one exists though, then check
@@ -334,7 +285,7 @@ check_ring_size(Size) ->
 -spec check_ring_size_fully_joined(Size::non_neg_integer()) -> ok.
 check_ring_size_fully_joined(Size) ->
     DhtModule = config:read(dht_node),
-    wait_for(
+    util:wait_for(
       fun() ->
               erlang:whereis(config) =/= undefined andalso
                   Size =:= erlang:length(
@@ -434,8 +385,10 @@ kill_new_processes(OldProcesses, Options) ->
 %%     ct:pal("Proc-New: ~.0p~n", [_OnlyNew]),
     Killed = [begin
 %%                   ct:pal("killing ~.0p~n", [Proc]),
+                  Tabs = util:ets_tables_of(X),
                   try erlang:exit(X, kill) of
-                      true -> wait_for_process_to_die(X),
+                      true -> util:wait_for_process_to_die(X),
+                              [ util:wait_for_table_to_disappear(Tab) || Tab <- Tabs ],
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end

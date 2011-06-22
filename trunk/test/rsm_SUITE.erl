@@ -64,8 +64,8 @@ deliver_1(Config) ->
     % first deliver
     Msg = {msg1},
     rsm_api:deliver(Msg, Pid),
-    unittest_helper:wait_for((rsm_app_state([Pid], [Msg])), 500),
-    unittest_helper:wait_for((rsm_version([Pid], 1)), 500),
+    util:wait_for((rsm_app_state([Pid], [Msg])), 500),
+    util:wait_for((rsm_version([Pid], 1)), 500),
 
     ok.
 
@@ -77,13 +77,13 @@ deliver_1_add_1_deliver1(Config) ->
     % first deliver
     Msg = {msg1},
     rsm_api:deliver(Msg, Pid),
-    unittest_helper:wait_for((rsm_app_state([Pid], [Msg])), 500),
+    util:wait_for((rsm_app_state([Pid], [Msg])), 500),
 
     %add node
     {ok, _SupPid2} = rsm_api:start_link("rsm_SUITE_node2", {join, [Pid]}, rsm_SUITE),
     Pid2 = comm:make_global(pid_groups:pid_of("rsm_SUITE_node2", rsm_node)),
-    unittest_helper:wait_for((rsm_size(Pid, 2)), 500),
-    unittest_helper:wait_for((rsm_version([Pid, Pid2], 2)), 500),
+    util:wait_for((rsm_size(Pid, 2)), 500),
+    util:wait_for((rsm_version([Pid, Pid2], 2)), 500),
     ok.
 
 
@@ -108,7 +108,7 @@ start_env(Config) ->
     {ok, _CommPid} = sup_comm_layer:start_link(),
     {ok, _FDPid} = fd:start_link("fd_group"),
     comm:send({{127,0,0,1}, unittest_helper:get_scalaris_port(), self()}, {foo}), %argh
-    unittest_helper:wait_for((fun () -> comm:is_valid(comm:this()) end), 500).
+    util:wait_for((fun () -> comm:is_valid(comm:this()) end), 500).
 
 rsm_size(Pid, Size) ->
     fun () ->

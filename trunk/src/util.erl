@@ -42,7 +42,18 @@
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          for_to/3, for_to_ex/3]).
--export([sup_worker_desc/3, sup_worker_desc/4, sup_supervisor_desc/3, sup_supervisor_desc/4, tc/3]).
+-export([sup_worker_desc/3,
+         sup_worker_desc/4,
+         sup_supervisor_desc/3,
+         sup_supervisor_desc/4,
+         tc/3]).
+-export([supervisor_terminate/1,
+         supervisor_terminate_childs/1,
+         wait_for/1, wait_for/2,
+         wait_for_process_to_die/1,
+         wait_for_table_to_disappear/1,
+         ets_tables_of/1]).
+
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 -export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
          p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
@@ -89,6 +100,66 @@ sup_supervisor_desc(Name, Module, Function) ->
             permanent, brutal_kill, supervisor, []}.
 sup_supervisor_desc(Name, Module, Function, Args) ->
     {Name, {Module, Function, Args}, permanent, brutal_kill, supervisor, []}.
+
+
+-spec supervisor_terminate(Supervisor::pid() | atom()) -> ok.
+supervisor_terminate(SupPid) ->
+    supervisor_terminate_childs(SupPid),
+    case is_pid(SupPid) of
+        true -> exit(SupPid, kill);
+        false -> exit(whereis(SupPid), kill)
+    end,
+    wait_for_process_to_die(SupPid),
+    ok.
+
+-spec supervisor_terminate_childs(Supervisor::pid()) -> ok.
+supervisor_terminate_childs(SupPid) ->
+    ChildSpecs = supervisor:which_children(SupPid),
+    _ = [ begin
+              case Type of
+                  supervisor ->
+                      supervisor_terminate_childs(Pid);
+                  _ -> ok
+              end,
+              Tables = ets_tables_of(Pid),
+              _ = supervisor:terminate_child(SupPid, Id),
+              wait_for_process_to_die(Pid),
+              _ = [ wait_for_table_to_disappear(Tab) || Tab <- Tables ],
+              supervisor:delete_child(SupPid, Id)
+          end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
+                  Pid =/= undefined ],
+    ok.
+
+-spec wait_for(fun(() -> any())) -> ok.
+wait_for(F) -> wait_for(F, 10).
+
+-spec wait_for(fun(() -> any()), WaitTimeInMs::pos_integer()) -> ok.
+wait_for(F, WaitTime) ->
+    case F() of
+        true  -> ok;
+        false -> timer:sleep(WaitTime),
+                 wait_for(F)
+    end.
+
+-spec wait_for_process_to_die(pid() | atom()) -> ok.
+wait_for_process_to_die(Name) when is_atom(Name) ->
+    wait_for(fun() ->
+                     case erlang:whereis(Name) of
+                         undefined -> true;
+                         Pid       -> not is_process_alive(Pid)
+                     end
+             end);
+wait_for_process_to_die(Pid) ->
+    wait_for(fun() -> not is_process_alive(Pid) end).
+
+-spec wait_for_table_to_disappear(tid() | atom()) -> ok.
+wait_for_table_to_disappear(Table) ->
+    wait_for(fun() -> ets:info(Table) =:= undefined end).
+
+-spec ets_tables_of(pid()) -> list().
+ets_tables_of(Pid) ->
+    Tabs = ets:all(),
+    [ Tab || Tab <- Tabs, ets:info(Tab, owner) =:= Pid ].
 
 %% @doc Escapes quotes in the given string.
 -spec escape_quotes(String::string()) -> string().

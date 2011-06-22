@@ -90,7 +90,7 @@ del_nodes(Count, Graceful) ->
         -> ok | {error, running | not_found | simple_one_for_one}.
 del_single_node([], _Graceful) ->
     ok;
-del_single_node([{Key, Pid, _, _} | T], Graceful) ->
+del_single_node([{Key, Pid, _Type, _} | T], Graceful) ->
     case is_list(Key) of
         true ->
             case Graceful of
@@ -99,6 +99,7 @@ del_single_node([{Key, Pid, _, _} | T], Graceful) ->
                     DhtNode = pid_groups:pid_of(Group, dht_node),
                     comm:send_local(DhtNode, {leave});
                 false ->
+                    util:supervisor_terminate_childs(Pid),
                     _ = supervisor:terminate_child(main_sup, Key),
                     supervisor:delete_child(main_sup, Key)
             end;
