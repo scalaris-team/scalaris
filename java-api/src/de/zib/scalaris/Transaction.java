@@ -15,8 +15,6 @@
  */
 package de.zib.scalaris;
 
-import java.util.ArrayList;
-import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -96,7 +94,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.4
+ * @version 3.5
  * @since 2.0
  */
 public class Transaction {
@@ -108,7 +106,7 @@ public class Transaction {
     /**
      * connection to a scalaris node
      */
-    private Connection connection;
+    private final Connection connection;
 
     /**
      * Constructor, uses the default connection returned by
@@ -127,7 +125,7 @@ public class Transaction {
      * @param conn
      *            connection to use for the transaction
      */
-    public Transaction(Connection conn) {
+    public Transaction(final Connection conn) {
         connection = conn;
     }
 
@@ -136,119 +134,35 @@ public class Transaction {
      * {@link Transaction#req_list(RequestList)}.
      *
      * @author Nico Kruber, kruber@zib.de
-     *
+     * @version 3.5
      * @since 3.4
      */
-    public static class RequestList {
-        private List<OtpErlangObject> requests = new ArrayList<OtpErlangObject>(10);
-        private boolean isCommit = false;
-
+    public static class RequestList extends de.zib.scalaris.RequestList {
         /**
          * Default constructor.
          */
         public RequestList() {
+            super();
         }
 
         /**
-         * Adds a read operation to the list of requests.
+         * Copy constructor.
          *
-         * @param key  the key to read
+         * @param other the request list to copy from
+         */
+        public RequestList(final RequestList other) {
+            super(other);
+        }
+
+        /**
+         * Adds all requests of the other request list to the end of this list.
+         *
+         * @param other another request list
          *
          * @return this {@link RequestList} object
          */
-        public RequestList addRead(OtpErlangObject key) {
-            if (isCommit) {
-                throw new UnsupportedOperationException("No further request supported after a commit!");
-            }
-            OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                    CommonErlangObjects.readAtom, key });
-            requests.add(req);
-            return this;
-        }
-
-        /**
-         * Adds a read operation to the list of requests.
-         *
-         * @param key  the key to read
-         *
-         * @return this {@link RequestList} object
-         */
-        public RequestList addRead(String key) {
-            return addRead(new OtpErlangString(key));
-        }
-
-        /**
-         * Adds a write operation to the list of requests.
-         *
-         * @param key    the key to write the value to
-         * @param value  the value to write
-         *
-         * @return this {@link RequestList} object
-         */
-        public RequestList addWrite(OtpErlangObject key, OtpErlangObject value) {
-            if (isCommit) {
-                throw new UnsupportedOperationException("No further request supported after a commit!");
-            }
-            OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                    CommonErlangObjects.writeAtom, key, value });
-            requests.add(req);
-            return this;
-        }
-
-        /**
-         * Adds a write operation to the list of requests.
-         *
-         * @param key    the key to write the value to
-         * @param value  the value to write
-         *
-         * @return this {@link RequestList} object
-         */
-        public <T>  RequestList addWrite(String key, T value) {
-            return addWrite(new OtpErlangString(key), ErlangValue.convertToErlang(value));
-        }
-
-        /**
-         * Adds a commit operation to the list of requests.
-         *
-         * @return this {@link RequestList} object
-         */
-        public RequestList addCommit() {
-            if (isCommit) {
-                throw new UnsupportedOperationException("Only one commit per request list allowed!");
-            }
-            OtpErlangTuple req = CommonErlangObjects.commitTupleAtom;
-            requests.add(req);
-            isCommit = true;
-            return this;
-        }
-
-        /**
-         * Gets the whole request list as erlang terms as required by
-         * <code>api_tx:req_list/2</code>
-         *
-         * @return an erlang list of requests
-         */
-        OtpErlangList getErlangReqList() {
-            return new OtpErlangList(requests.toArray(new OtpErlangObject[0]));
-        }
-
-        /**
-         * Returns whether the transactions contains a commit or not.
-         *
-         * @return <tt>true</tt> if the operation contains a commit,
-         *         <tt>false</tt> otherwise
-         */
-        boolean isCommit() {
-            return isCommit;
-        }
-
-        /**
-         * Checks whether the request list is empty.
-         *
-         * @return <tt>true</tt> is empty, <tt>false</tt> otherwise
-         */
-        boolean isEmpty() {
-            return requests.isEmpty();
+        public RequestList addAll(final RequestList other) {
+            return (RequestList) super.addAll_(other);
         }
     }
 
@@ -257,33 +171,22 @@ public class Transaction {
      * {@link Transaction#req_list(RequestList)}.
      *
      * @author Nico Kruber, kruber@zib.de
-     *
+     * @version 3.5
      * @since 3.4
      */
-    public final static class ResultList {
-        private OtpErlangList results = new OtpErlangList();
-
+    public static class ResultList extends de.zib.scalaris.ResultList {
         /**
          * Default constructor.
          *
          * @param results  the raw results list as returned by scalaris.
          */
-        ResultList(OtpErlangList results) {
-            this.results = results;
+        ResultList(final OtpErlangList results) {
+            super(results);
         }
 
         /**
-         * Gets the number of results in the list.
-         *
-         * @return total number of results
-         */
-        public int size() {
-            return results.arity();
-        }
-
-        /**
-         * Processes the result at the given position which originated from
-         * a read request and returns the value that has been read.
+         * Processes the result at the given position which originated from a read
+         * request and returns the value that has been read.
          *
          * @param pos
          *            the position in the result list
@@ -297,10 +200,9 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
-        public ErlangValue processReadAt(int pos) throws TimeoutException,
+        public ErlangValue processReadAt(final int pos) throws TimeoutException,
                 NotFoundException, UnknownException {
-            return new ErlangValue(
-                    CommonErlangObjects.processResult_read(results.elementAt(pos)));
+            return super.processReadAt_(pos);
         }
 
         /**
@@ -315,9 +217,9 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
-        public void processWriteAt(int pos) throws TimeoutException,
+        public void processWriteAt(final int pos) throws TimeoutException,
                 UnknownException {
-            CommonErlangObjects.processResult_write(results.elementAt(pos));
+            super.processWriteAt_(pos);
         }
 
         /**
@@ -334,19 +236,9 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
-        void processCommitAt(int pos) throws TimeoutException,
+        void processCommitAt(final int pos) throws TimeoutException,
                 AbortException, UnknownException {
-            CommonErlangObjects.processResult_commit(results.elementAt(pos));
-        }
-
-        /**
-         * Gets the raw results.
-         * (for internal use)
-         *
-         * @return results as returned by erlang
-         */
-        OtpErlangList getResults() {
-            return results;
+            super.processCommitAt_(pos);
         }
     }
 
@@ -377,7 +269,7 @@ public class Transaction {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public ResultList req_list(RequestList req)
+    public ResultList req_list(final RequestList req)
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
         if (req.isEmpty()) {
             return new ResultList(new OtpErlangList());
@@ -395,10 +287,10 @@ public class Transaction {
              * possible return values:
              *  {tx_tlog:tlog(), [{ok} | {ok, Value} | {fail, abort | timeout | not_found}]}
              */
-            OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             transLog = received.elementAt(0);
             if (received.arity() == 2) {
-                ResultList result = new ResultList((OtpErlangList) received.elementAt(1));
+                final ResultList result = new ResultList((OtpErlangList) received.elementAt(1));
                 if (req.isCommit()) {
                     if (result.size() >= 1) {
                         result.processCommitAt(result.size() - 1);
@@ -411,7 +303,7 @@ public class Transaction {
                 return result;
             }
             throw new UnknownException(received_raw);
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
@@ -443,7 +335,7 @@ public class Transaction {
      * @see #abort()
      */
     public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
-        req_list(new RequestList().addCommit());
+        req_list((RequestList) new RequestList().addCommit());
     }
 
     /**
@@ -482,16 +374,16 @@ public class Transaction {
      *
      * @since 2.9
      */
-    public ErlangValue read(OtpErlangString key)
+    public ErlangValue read(final OtpErlangString key)
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
         try {
-            ResultList result = req_list(new RequestList().addRead(key));
+            final ResultList result = req_list((RequestList) new RequestList().addRead(key));
             if (result.size() == 1) {
                 return result.processReadAt(0);
             }
             throw new UnknownException(result.getResults());
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             throw new UnknownException(e);
         }
     }
@@ -518,7 +410,7 @@ public class Transaction {
      * @see #read(OtpErlangString)
      * @since 2.9
      */
-    public ErlangValue read(String key) throws ConnectionException,
+    public ErlangValue read(final String key) throws ConnectionException,
             TimeoutException, NotFoundException, UnknownException {
         return read(new OtpErlangString(key));
     }
@@ -542,16 +434,16 @@ public class Transaction {
      *
      * @since 2.9
      */
-    public void write(OtpErlangString key, OtpErlangObject value)
+    public void write(final OtpErlangString key, final OtpErlangObject value)
             throws ConnectionException, TimeoutException, UnknownException {
         try {
-            ResultList result = req_list(new RequestList().addWrite(key, value));
+            final ResultList result = req_list((RequestList) new RequestList().addWrite(key, value));
             if (result.size() == 1) {
                 result.processWriteAt(0);
             } else {
                 throw new UnknownException(result.getResults());
             }
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             throw new UnknownException(e);
         }
     }
@@ -578,7 +470,7 @@ public class Transaction {
      * @see #write(OtpErlangString, OtpErlangObject)
      * @since 2.9
      */
-    public <T> void write(String key, T value) throws ConnectionException,
+    public <T> void write(final String key, final T value) throws ConnectionException,
             TimeoutException, UnknownException {
         write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }

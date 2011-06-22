@@ -43,65 +43,71 @@ public class ErlangValue {
     /**
      * The (internal representation of the) wrapped erlang value.
      */
-    private OtpErlangObject value;
+    private final OtpErlangObject value;
 
     /**
      * Creates a new object wrapping the given erlang value.
      *
-     * @param value  a value from erlang
+     * @param value
+     *            a value from erlang
      */
-    public ErlangValue(OtpErlangObject value) {
+    public ErlangValue(final OtpErlangObject value) {
         this.value = value;
     }
 
     /**
-     * Creates a new object from a given set of Java types.
-     * The following types are supported:
-     * native types:
+     * Creates a new object from a given set of Java types. The following types
+     * are supported: native types:
      * <ul>
-     *  <li>{@link Boolean} - {@link OtpErlangBoolean}</li>
-     *  <li>{@link Long} - {@link OtpErlangLong}</li>
-     *  <li>{@link Integer} - {@link OtpErlangLong}</li>
-     *  <li>{@link BigInteger} - {@link OtpErlangLong}</li>
-     *  <li>{@link Double} - {@link OtpErlangDouble}</li>
-     *  <li>{@link String} - {@link OtpErlangString}</li>
-     *  <li><tt>byte[]</tt> - {@link OtpErlangBinary}</li>
-     *  </ul>
+     * <li>{@link Boolean} - {@link OtpErlangBoolean}</li>
+     * <li>{@link Long} - {@link OtpErlangLong}</li>
+     * <li>{@link Integer} - {@link OtpErlangLong}</li>
+     * <li>{@link BigInteger} - {@link OtpErlangLong}</li>
+     * <li>{@link Double} - {@link OtpErlangDouble}</li>
+     * <li>{@link String} - {@link OtpErlangString}</li>
+     * <li><tt>byte[]</tt> - {@link OtpErlangBinary}</li>
+     * </ul>
      * composite types:
      * <ul>
-     *  <li>{@link List}&lt;Object&gt; with one of the native types - {@link OtpErlangList}</li>
-     *  <li>{@link Map}&lt;String, Object&gt; representing a JSON object - {@link OtpErlangTuple}</li>
-     *  </ul>
+     * <li>{@link List}&lt;Object&gt; with one of the native types -
+     * {@link OtpErlangList}</li>
+     * <li>{@link Map}&lt;String, Object&gt; representing a JSON object -
+     * {@link OtpErlangTuple}</li>
+     * </ul>
      * custom types:
      * <ul>
-     *  <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
-     *  <li>{@link ErlangValue}</li>
-     *  </ul>
+     * <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
+     * <li>{@link ErlangValue}</li>
+     * </ul>
      *
-     * @param <T>    the type of the value
-     * @param value  the value to convert to an erlang type
+     * @param <T>
+     *            the type of the value
+     * @param value
+     *            the value to convert to an erlang type
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
-    public <T> ErlangValue(T value) throws ClassCastException {
+    public <T> ErlangValue(final T value) throws ClassCastException {
         this.value = convertToErlang(value);
     }
 
     /**
      * Converts a (supported) Java type to an {@link OtpErlangObject}.
      *
-     * @param <T>    the type of the value
-     * @param value  the value to convert to an erlang type
+     * @param <T>
+     *            the type of the value
+     * @param value
+     *            the value to convert to an erlang type
      *
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
-    public static <T> OtpErlangObject convertToErlang(T value)
+    public static <T> OtpErlangObject convertToErlang(final T value)
             throws ClassCastException {
         if (value instanceof Boolean) {
             return new OtpErlangBoolean((Boolean) value);
@@ -118,12 +124,12 @@ public class ErlangValue {
         } else if (value instanceof byte[]) {
             return new OtpErlangBinary((byte[]) value);
         } else if (value instanceof List<?>) {
-            List<?> list = (List<?>) value;
+            final List<?> list = (List<?>) value;
             final int listSize = list.size();
-            OtpErlangObject[] erlValue = new OtpErlangObject[listSize];
+            final OtpErlangObject[] erlValue = new OtpErlangObject[listSize];
             int i = 0;
             // TODO: optimise for specific lists?
-            for (Object iter : list) {
+            for (final Object iter : list) {
                 erlValue[i] = convertToErlang(iter);
                 ++i;
             }
@@ -131,8 +137,9 @@ public class ErlangValue {
         } else if (value instanceof Map<?, ?>) {
             // map to JSON object notation of Scalaris
             @SuppressWarnings("unchecked")
+            final
             Map<String, Object> map = (Map<String, Object>) value;
-            ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
+            final ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
             return json_converter.toScalarisJSON(map);
         } else if (value instanceof ErlangValue) {
             return ((ErlangValue) value).value();
@@ -141,6 +148,7 @@ public class ErlangValue {
         } else {
             // map to JSON object notation of Scalaris
             @SuppressWarnings("unchecked")
+            final
             ErlangValueJSONToBean<T> json_converter = new ErlangValueJSONToBean<T>((Class<T>) value.getClass());
             return json_converter.toScalarisJSON(value);
 //            throw new ClassCastException("Unsupported type (value: " + value.toString() + ")");
@@ -153,8 +161,8 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported or the value is too big
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported or the value is too big
      *
      * @since 3.3
      */
@@ -174,13 +182,13 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported or the value is too big
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported or the value is too big
      */
     public int intValue() throws ClassCastException {
         try {
             return ((OtpErlangLong) value).intValue();
-        } catch (OtpErlangRangeException e) {
+        } catch (final OtpErlangRangeException e) {
             throw new ClassCastException("Cannot cast to int - value is too big (use longValue() or bigIntValue() instead).");
         }
     }
@@ -191,11 +199,11 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported or the value is too big
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported or the value is too big
      */
     public long longValue() throws ClassCastException {
-        OtpErlangLong longValue = (OtpErlangLong) value;
+        final OtpErlangLong longValue = (OtpErlangLong) value;
         if (longValue.isLong()) {
             return longValue.longValue();
         } else {
@@ -209,8 +217,8 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public BigInteger bigIntValue() throws ClassCastException {
         return ((OtpErlangLong) value).bigIntegerValue();
@@ -222,17 +230,17 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public double doubleValue() throws ClassCastException {
         return ((OtpErlangDouble) value).doubleValue();
     }
 
     /**
-     * Converts an {@link OtpErlangObject} to a {@link String} taking
-     * special care of empty lists which can not be converted to strings using
-     * the OTP library .
+     * Converts an {@link OtpErlangObject} to a {@link String} taking special
+     * care of empty lists which can not be converted to strings using the OTP
+     * library .
      *
      * @param value
      *            the value to convert
@@ -242,13 +250,13 @@ public class ErlangValue {
      * @throws ClassCastException
      *             if the conversion fails
      */
-    static String otpObjectToString(OtpErlangObject value)
+    static String otpObjectToString(final OtpErlangObject value)
             throws ClassCastException {
         // need special handling if OTP returned an empty list
         if (value instanceof OtpErlangList) {
             try {
                 return new OtpErlangString((OtpErlangList) value).stringValue();
-            } catch (OtpErlangException e) {
+            } catch (final OtpErlangException e) {
                 throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString: " + e.getMessage());
             }
         } else {
@@ -262,8 +270,8 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public String stringValue() throws ClassCastException {
         return otpObjectToString(value);
@@ -275,22 +283,22 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public byte[] binaryValue() throws ClassCastException {
         return ((OtpErlangBinary) value).binaryValue();
     }
 
     /**
-     * Returns a JSON object (as {@link Map}&lt;String, Object&gt;) of the wrapped
-     * erlang value.
+     * Returns a JSON object (as {@link Map}&lt;String, Object&gt;) of the
+     * wrapped erlang value.
      *
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public Map<String, Object> jsonValue() throws ClassCastException {
         /*
@@ -300,10 +308,10 @@ public class ErlangValue {
          *
          * first term must be an object!
          */
-        OtpErlangTuple value_tpl = (OtpErlangTuple) value;
-        if (value_tpl.arity() == 2
+        final OtpErlangTuple value_tpl = (OtpErlangTuple) value;
+        if ((value_tpl.arity() == 2)
                 && value_tpl.elementAt(0).equals(CommonErlangObjects.structAtom)) {
-            ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
+            final ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
             return json_converter.toJava((OtpErlangList) value_tpl.elementAt(1));
         } else {
             throw new ClassCastException("wrong tuple arity");
@@ -326,7 +334,7 @@ public class ErlangValue {
      *             if thrown if a conversion is not possible, i.e. the type is
      *             not supported
      */
-    public <T> T jsonValue(Class<T> c) throws ClassCastException {
+    public <T> T jsonValue(final Class<T> c) throws ClassCastException {
         /*
          * object(): {struct, [{key::string() | atom(), value()}]}
          * array():  {array, [value()]}
@@ -334,10 +342,10 @@ public class ErlangValue {
          *
          * first term must be an object!
          */
-        OtpErlangTuple value_tpl = (OtpErlangTuple) value;
-        if (value_tpl.arity() == 2
+        final OtpErlangTuple value_tpl = (OtpErlangTuple) value;
+        if ((value_tpl.arity() == 2)
                 && value_tpl.elementAt(0).equals(CommonErlangObjects.structAtom)) {
-            ErlangValueJSONToBean<T> json_converter = new ErlangValueJSONToBean<T>(c);
+            final ErlangValueJSONToBean<T> json_converter = new ErlangValueJSONToBean<T>(c);
             return json_converter.toJava((OtpErlangList) value_tpl.elementAt(1));
         } else {
             throw new ClassCastException("wrong tuple arity");
@@ -357,11 +365,11 @@ public class ErlangValue {
      * @throws ClassCastException
      *             if the conversion fails
      */
-    static OtpErlangList otpObjectToOtpList(OtpErlangObject value)
+    static OtpErlangList otpObjectToOtpList(final OtpErlangObject value)
             throws ClassCastException {
         // need special handling if OTP thought that the value is a string
         if (value instanceof OtpErlangString) {
-            OtpErlangString value_string = (OtpErlangString) value;
+            final OtpErlangString value_string = (OtpErlangString) value;
             return new OtpErlangList(value_string.stringValue());
         } else {
             return (OtpErlangList) value;
@@ -395,18 +403,20 @@ public class ErlangValue {
     /**
      * Returns a list of mixed Java values of the wrapped erlang value.
      *
+     * @param <T>
+     *            type of the elements in the list
      * @param converter
-     *                object that converts the list value to the desired type
+     *            object that converts the list value to the desired type
      *
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
-    public <T> List<T> listValue(ListElementConverter<T> converter) throws ClassCastException {
-        OtpErlangList list = otpObjectToOtpList(value);
-        ArrayList<T> result = new ArrayList<T>(list.arity());
+    public <T> List<T> listValue(final ListElementConverter<T> converter) throws ClassCastException {
+        final OtpErlangList list = otpObjectToOtpList(value);
+        final ArrayList<T> result = new ArrayList<T>(list.arity());
         for (int i = 0; i < list.arity(); ++i) {
             result.add(converter.convert(i, new ErlangValue(list.elementAt(i))));
         }
@@ -420,12 +430,12 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      */
     public List<ErlangValue> listValue() throws ClassCastException {
         return listValue(new ListElementConverter<ErlangValue>() {
-            public ErlangValue convert(int i, ErlangValue v) { return v; }
+            public ErlangValue convert(final int i, final ErlangValue v) { return v; }
         });
     }
 
@@ -436,14 +446,14 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      *
      * @see #listValue(ListElementConverter)
      */
     public List<Long> longListValue() throws ClassCastException {
         return listValue(new ListElementConverter<Long>() {
-            public Long convert(int i, ErlangValue v) { return v.longValue(); }
+            public Long convert(final int i, final ErlangValue v) { return v.longValue(); }
         });
     }
 
@@ -454,14 +464,14 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      *
      * @see #listValue(ListElementConverter)
      */
     public List<Double> doubleListValue() throws ClassCastException {
         return listValue(new ListElementConverter<Double>() {
-            public Double convert(int i, ErlangValue v) { return v.doubleValue(); }
+            public Double convert(final int i, final ErlangValue v) { return v.doubleValue(); }
         });
     }
 
@@ -472,14 +482,14 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      *
      * @see #listValue(ListElementConverter)
      */
     public List<String> stringListValue() throws ClassCastException {
         return listValue(new ListElementConverter<String>() {
-            public String convert(int i, ErlangValue v) { return v.stringValue(); }
+            public String convert(final int i, final ErlangValue v) { return v.stringValue(); }
         });
     }
 
@@ -490,21 +500,20 @@ public class ErlangValue {
      * @return the converted value
      *
      * @throws ClassCastException
-     *                if thrown if a conversion is not possible, i.e. the type
-     *                is not supported
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
      *
      * @see #listValue(ListElementConverter)
      */
     public List<byte[]> binaryListValue() throws ClassCastException {
         return listValue(new ListElementConverter<byte[]>() {
-            public byte[] convert(int i, ErlangValue v) { return v.binaryValue(); }
+            public byte[] convert(final int i, final ErlangValue v) { return v.binaryValue(); }
         });
     }
 
     /**
      * Returns a list of JSON objects (as an instance of the given class) of the
-     * wrapped erlang value.
-     * Provided for convenience.
+     * wrapped erlang value. Provided for convenience.
      *
      * @param <T>
      *            the type of the object to create as a list element
@@ -523,7 +532,7 @@ public class ErlangValue {
      */
     public <T> List<T> jsonListValue(final Class<T> c) throws ClassCastException {
         return listValue(new ListElementConverter<T>() {
-            public T convert(int i, ErlangValue v) { return v.jsonValue(c); }
+            public T convert(final int i, final ErlangValue v) { return v.jsonValue(c); }
         });
     }
 

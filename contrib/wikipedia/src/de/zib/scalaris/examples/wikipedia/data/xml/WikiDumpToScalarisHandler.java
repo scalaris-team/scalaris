@@ -32,8 +32,6 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
-import de.zib.scalaris.Transaction.RequestList;
-import de.zib.scalaris.Transaction.ResultList;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
@@ -188,15 +186,15 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         }
     }
     
-    private static class MyScalarisSingleWriteRunnable<T> implements Runnable {
-        private String key;
-        private T value;
+    private static class MyScalarisSingleRunnable implements Runnable {
+        private TransactionSingleOp.RequestList requests;
         private ArrayBlockingQueue<TransactionSingleOp> scalaris_single;
+        private String note;
         
-        public MyScalarisSingleWriteRunnable(String key, T value, ArrayBlockingQueue<TransactionSingleOp> scalaris_single) {
-            this.key = key;
-            this.value = value;
+        public MyScalarisSingleRunnable(TransactionSingleOp.RequestList requests, ArrayBlockingQueue<TransactionSingleOp> scalaris_single, String note) {
+            this.requests = requests;
             this.scalaris_single = scalaris_single;
+            this.note = note;
         }
         
         @Override
@@ -205,68 +203,24 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
             try {
                 scalaris_single = this.scalaris_single.take();
             } catch (InterruptedException e) {
-                System.err.println("write of " + key + " interrupted while getting connection to Scalaris");
+                System.err.println("write of " + note + " interrupted while getting connection to Scalaris");
                 throw new RuntimeException(e);
             }
             try {
-                scalaris_single.write(key, value);
+                TransactionSingleOp.ResultList results = scalaris_single.req_list(requests);
+                for (int i = 0; i < results.size(); ++i) {
+                    results.processWriteAt(i);
+                }
             } catch (ConnectionException e) {
-                System.err.println("write of key \"" + key + "\" failed with connection error");
+                System.err.println("write of " + note + " failed with connection error");
             } catch (TimeoutException e) {
-                System.err.println("write of key \"" + key + "\" failed with timeout");
+                System.err.println("write of " + note + " failed with timeout");
             } catch (AbortException e) {
-                System.err.println("write of key \"" + key + "\" failed with abort");
+                System.err.println("write of " + note + " failed with abort");
             }
             if (scalaris_single != null) {
                 try {
                     this.scalaris_single.put(scalaris_single);
-                } catch (InterruptedException e) {
-                    System.err.println("Interrupted while putting back a connection to Scalaris");
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-    }
-    
-    private static class MyScalarisTxWritePageInfoRunnable implements Runnable {
-        private Page page;
-        private List<ShortRevision> revisions_short;
-        private ArrayBlockingQueue<Transaction> scalaris_tx;
-        
-        public MyScalarisTxWritePageInfoRunnable(Page page, List<ShortRevision> revisions_short, ArrayBlockingQueue<Transaction> scalaris_tx) {
-            this.page = page;
-            this.revisions_short = revisions_short;
-            this.scalaris_tx = scalaris_tx;
-        }
-        
-        @Override
-        public void run() {
-            Transaction scalaris_tx;
-            try {
-                scalaris_tx = this.scalaris_tx.take();
-            } catch (InterruptedException e) {
-                System.err.println("write of page \"" + page.getTitle() + "\" interrupted while getting connection to Scalaris");
-                throw new RuntimeException(e);
-            }
-            try {
-                ResultList result = scalaris_tx.req_list(new RequestList().
-                        addWrite(ScalarisDataHandler.getPageKey(page.getTitle()), page).
-                        addWrite(ScalarisDataHandler.getRevListKey(page.getTitle()), revisions_short).
-                        addCommit());
-                result.processWriteAt(0);
-                result.processWriteAt(1);
-            } catch (ConnectionException e) {
-                System.err.println("write of page \"" + page.getTitle() + "\" failed with connection error");
-            } catch (TimeoutException e) {
-                System.err.println("write of page \"" + page.getTitle() + "\" failed with timeout");
-            } catch (AbortException e) {
-                System.err.println("write of page \"" + page.getTitle() + "\" failed with abort");
-            } catch (UnknownException e) {
-                System.err.println("write of page \"" + page.getTitle() + "\" failed with unknown: " + e.getMessage());
-            }
-            if (scalaris_tx != null) {
-                try {
-                    this.scalaris_tx.put(scalaris_tx);
                 } catch (InterruptedException e) {
                     System.err.println("Interrupted while putting back a connection to Scalaris");
                     throw new RuntimeException(e);
@@ -328,12 +282,14 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
 
         // do not make the translog too full -> write revisions beforehand,
         // ignore the (rest of the) page if a failure occured
+        TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         for (Revision rev : revisions) {
             String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId());
-            Runnable worker = new MyScalarisSingleWriteRunnable<Revision>(key, rev, scalaris_single);
-            executor.execute(worker);
+            requests.addWrite(key, rev);
         }
-        Runnable worker = new MyScalarisTxWritePageInfoRunnable(page, revisions_short, scalaris_tx);
+        requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle()), revisions_short);
+        requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle()), page);
+        Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
         executor.execute(worker);
         newPages.add(page.getTitle());
         ++pageCount;

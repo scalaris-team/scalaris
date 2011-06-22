@@ -100,7 +100,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * state. The number of automatic retries is adjustable (default: 3).
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.4
+ * @version 3.5
  * @since 2.0
  */
 public class TransactionSingleOp {
@@ -128,6 +128,153 @@ public class TransactionSingleOp {
      */
     public TransactionSingleOp(final Connection conn) {
         connection = conn;
+    }
+
+    /**
+     * Encapsulates requests that can be used for transactions in
+     * {@link TransactionSingleOp#req_list(RequestList)}.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.5
+     * @since 3.5
+     */
+    public static class RequestList extends de.zib.scalaris.RequestList {
+        /**
+         * Default constructor.
+         */
+        public RequestList() {
+            super();
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param other the request list to copy from
+         */
+        public RequestList(final RequestList other) {
+            super(other);
+        }
+
+        /**
+         * Throws an {@link UnsupportedOperationException} as a commit is not
+         * supported here.
+         *
+         * @return this {@link RequestList} object
+         *
+         * @throws UnsupportedOperationException
+         *             if the operation is unsupported, e.g. there may only be one
+         *             "commit" in a request list and no request after that
+         */
+        @Override
+        public RequestList addCommit() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Adds all requests of the other request list to the end of this list.
+         *
+         * @param other another request list
+         *
+         * @return this {@link RequestList} object
+         */
+        public RequestList addAll(final RequestList other) {
+            return (RequestList) super.addAll_(other);
+        }
+    }
+
+    /**
+     * Encapsulates a list of results as returned by
+     * {@link TransactionSingleOp#req_list(RequestList)}.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.5
+     * @since 3.5
+     */
+    public static class ResultList extends de.zib.scalaris.ResultList {
+        /**
+         * Default constructor.
+         *
+         * @param results  the raw results list as returned by scalaris.
+         */
+        ResultList(final OtpErlangList results) {
+            super(results);
+        }
+
+        /**
+         * Processes the result at the given position which originated from a read
+         * request and returns the value that has been read.
+         *
+         * @param pos
+         *            the position in the result list
+         *
+         * @return the stored value
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to fetch the value
+         * @throws NotFoundException
+         *             if the requested key does not exist
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public ErlangValue processReadAt(final int pos) throws TimeoutException,
+                NotFoundException, UnknownException {
+            return super.processReadAt_(pos);
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a write request.
+         *
+         * @param pos
+         *            the position in the result list
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws AbortException
+         *             if the commit failed
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public void processWriteAt(final int pos) throws TimeoutException,
+                AbortException, UnknownException {
+            super.processCommitAt_(pos);
+        }
+    }
+
+    /**
+     * Executes all requests in <code>req</code> and commits each one of them
+     * in a single transaction.
+     *
+     * @param req
+     *            the requests to issue
+     *
+     * @return results of all requests in the same order as they appear in
+     *         <code>req</code>
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public ResultList req_list(final RequestList req)
+            throws ConnectionException, UnknownException {
+        if (req.isEmpty()) {
+            return new ResultList(new OtpErlangList());
+        }
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "req_list_commit_each",
+                    new OtpErlangObject[] { req.getErlangReqList() });
+        try {
+            /*
+             * possible return values:
+             *  [{ok} | {ok, Value} | {fail, abort | timeout | not_found}]
+             */
+            return new ResultList((OtpErlangList) received_raw);
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received_raw);
+        }
     }
 
     // /////////////////////////////

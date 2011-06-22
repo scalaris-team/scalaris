@@ -34,8 +34,6 @@ import de.zib.scalaris.Connection;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
-import de.zib.scalaris.Transaction.RequestList;
-import de.zib.scalaris.Transaction.ResultList;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.Difference.GetPageListKey;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
@@ -255,34 +253,38 @@ public class ScalarisDataHandler {
         }
         
         TransactionSingleOp scalaris_single;
-        String scalaris_key;
 
         scalaris_single = new TransactionSingleOp(connection);
-
-        Page page;
-        scalaris_key = getPageKey(title);
+        TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
+        requests.addRead(getPageKey(title)).addRead(getRevListKey(title));
+        
+        TransactionSingleOp.ResultList results;
         try {
-            page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
+            results = scalaris_single.req_list(requests);
+        } catch (Exception e) {
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title) + "\" or \"" + getRevListKey(title) + "\" from Scalaris: " + e.getMessage());
+        }
+        
+        Page page;
+        try {
+            page = results.processReadAt(0).jsonValue(Page.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + scalaris_key + "\"");
+            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + getPageKey(title) + "\"");
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            //              e.printStackTrace();
-            return new PageHistoryResult(false, "unknown exception reading \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title) + "\" from Scalaris: " + e.getMessage());
         }
 
         List<ShortRevision> revisions;
-        scalaris_key = getRevListKey(title);
         try {
-            revisions = scalaris_single.read(scalaris_key).jsonListValue(ShortRevision.class);
+            revisions = results.processReadAt(1).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + scalaris_key + "\" does not exist");
+            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + getRevListKey(title) + "\" does not exist");
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            //      e.printStackTrace();
-            return new PageHistoryResult(false, "unknown exception reading \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title) + "\" from Scalaris: " + e.getMessage());
         }
         return new PageHistoryResult(page, revisions);
     }
@@ -785,10 +787,10 @@ public class ScalarisDataHandler {
         String pageInfoKey = getPageKey(title);
         String revListKey = getRevListKey(title);
         
-        RequestList requests = new RequestList().addRead(pageInfoKey)
-                .addRead(revListKey);
+        Transaction.RequestList requests = new Transaction.RequestList();
+        requests.addRead(pageInfoKey).addRead(revListKey);
         
-        ResultList results;
+        Transaction.ResultList results;
         try {
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
@@ -878,7 +880,7 @@ public class ScalarisDataHandler {
                 return getBackLinksPageListKey(name);
             }
         };
-        requests = new RequestList();
+        requests = new Transaction.RequestList();
         int catPageReads = catDiff.updatePageLists_prepare_read(requests, catPageKeygen, title);
         int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, tplPageKeygen, title);
         lnkDiff.updatePageLists_prepare_read(requests, lnkPageKeygen, title);
@@ -889,7 +891,7 @@ public class ScalarisDataHandler {
             //          e.printStackTrace();
             return new SaveResult(false, "unknown exception reading page lists for page \"" + title + "\" from Scalaris: " + e.getMessage());
         }
-        requests = new RequestList();
+        requests = new Transaction.RequestList();
         SaveResult res;
         res = catDiff.updatePageLists_prepare_write(results, requests, catPageKeygen, title, 0);
         if (!res.success) {
@@ -931,7 +933,7 @@ public class ScalarisDataHandler {
             page.setRestrictions(restrictions);
         }
         
-        requests = new RequestList();
+        requests = new Transaction.RequestList();
         // new page? -> add to page/article lists
         List<Integer> pageListWrites = new ArrayList<Integer>(2);
         List<String> pageListKeys = new LinkedList<String>();
@@ -957,7 +959,7 @@ public class ScalarisDataHandler {
                 return new SaveResult(false, "unknown exception reading page lists for page \"" + title + "\" to Scalaris: " + e.getMessage());
             }
 
-            requests = new RequestList();
+            requests = new Transaction.RequestList();
             for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
                 String pageList_key = (String) it.next();
                 String pageCount_key = (String) it.next();
@@ -1011,7 +1013,9 @@ public class ScalarisDataHandler {
                 edits = BigInteger.valueOf(0);
             }
             edits = edits.add(BigInteger.valueOf(1));
-            scalaris_tx.req_list(new RequestList().addWrite(scalaris_key, edits).addCommit());
+            requests = new Transaction.RequestList();
+            requests.addWrite(scalaris_key, edits).addCommit();
+            scalaris_tx.req_list(requests);
         } catch (Exception e) {
         }
         
@@ -1051,7 +1055,7 @@ public class ScalarisDataHandler {
         
         /**
          * Adds read operations to the given request list as required by
-         * {@link #updatePageLists_prepare_write(ResultList, RequestList, GetPageListKey, String, int)}.
+         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}.
          * 
          * @param readRequests
          *            list of requests, i.e. operations for Scalaris
@@ -1063,7 +1067,7 @@ public class ScalarisDataHandler {
          * 
          * @return the number of added requests, i.e. operations
          */
-        public int updatePageLists_prepare_read(RequestList readRequests, GetPageListKey keyGen, String title) {
+        public int updatePageLists_prepare_read(Transaction.RequestList readRequests, GetPageListKey keyGen, String title) {
             int ops = 0;
             // read old and new page lists
             for (Set<String> curList : changes) {
@@ -1078,12 +1082,12 @@ public class ScalarisDataHandler {
         /**
          * Removes <tt>title</tt> from the list of pages in the old set and adds
          * it to the new ones. Evaluates reads from
-         * {@link #updatePageLists_prepare_read(RequestList, GetPageListKey, String)}
+         * {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, GetPageListKey, String)}
          * and adds writes to the given request list.
          * 
          * @param readResults
          *            results of previous read operations by
-         *            {@link #updatePageLists_prepare_read(RequestList, GetPageListKey, String)}
+         *            {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, GetPageListKey, String)}
          * @param writeRequests
          *            list of requests, i.e. operations for Scalaris
          * @param keyGen
@@ -1096,7 +1100,7 @@ public class ScalarisDataHandler {
          * 
          * @return the result of the operation
          */
-        public SaveResult updatePageLists_prepare_write(ResultList readResults, RequestList writeRequests, GetPageListKey keyGen, String title, int firstOp) {
+        public SaveResult updatePageLists_prepare_write(Transaction.ResultList readResults, Transaction.RequestList writeRequests, GetPageListKey keyGen, String title, int firstOp) {
             String scalaris_key;
             // beware: keep order of operations in sync with readPageLists_prepare!
             // remove from old page list
@@ -1138,12 +1142,12 @@ public class ScalarisDataHandler {
         
         /**
          * Checks whether all writes from
-         * {@link #updatePageLists_prepare_write(ResultList, RequestList, GetPageListKey, String, int)}
+         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}
          * were successful.
          * 
          * @param writeResults
          *            results of previous write operations by
-         *            {@link #updatePageLists_prepare_write(ResultList, RequestList, GetPageListKey, String, int)}
+         *            {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}
          * @param keyGen
          *            object creating the Scalaris key for the page lists (based
          *            on a set entry)
@@ -1154,7 +1158,7 @@ public class ScalarisDataHandler {
          * 
          * @return the result of the operation
          */
-        public SaveResult updatePageLists_check_writes(ResultList writeResults, GetPageListKey keyGen, String title, int firstOp) {
+        public SaveResult updatePageLists_check_writes(Transaction.ResultList writeResults, GetPageListKey keyGen, String title, int firstOp) {
             // beware: keep order of operations in sync with readPageLists_prepare!
             // evaluate results changing the old and new page lists
             for (Set<String> curList : changes) {
@@ -1180,7 +1184,7 @@ public class ScalarisDataHandler {
      * 
      * @return the number of added requests, i.e. operations
      */
-    protected static int updatePageList_prepare_read(RequestList requests, String pageList_key) {
+    protected static int updatePageList_prepare_read(Transaction.RequestList requests, String pageList_key) {
         requests.addRead(pageList_key);
         return 1;
     }
@@ -1206,7 +1210,7 @@ public class ScalarisDataHandler {
      * 
      * @return the result of the operation
      */
-    protected static SaveResult updatePageList_prepare_write(ResultList readResults, RequestList writeRequests, String pageList_key, String pageCount_key, Collection<String> entriesToRemove, Collection<String> entriesToAdd, int firstOp) {
+    protected static SaveResult updatePageList_prepare_write(Transaction.ResultList readResults, Transaction.RequestList writeRequests, String pageList_key, String pageCount_key, Collection<String> entriesToRemove, Collection<String> entriesToAdd, int firstOp) {
         List<String> pages;
         try {
             pages = readResults.processReadAt(firstOp++).stringListValue();
@@ -1265,7 +1269,7 @@ public class ScalarisDataHandler {
      * 
      * @return the result of the operation
      */
-    protected static SaveResult updatePageList_check_writes(ResultList writeResults, String pageList_key, String pageCount_key, int firstOp, int writeOps) {
+    protected static SaveResult updatePageList_check_writes(Transaction.ResultList writeResults, String pageList_key, String pageCount_key, int firstOp, int writeOps) {
         try {
             for (int i = 0; i < writeOps; ++i) {
                 writeResults.processWriteAt(firstOp + i);
@@ -1294,20 +1298,21 @@ public class ScalarisDataHandler {
      * @return the result of the operation
      */
     public static SaveResult updatePageList(Transaction scalaris_tx, String pageList_key, String pageCount_key, Collection<String> entriesToRemove, Collection<String> entriesToAdd) {
-        RequestList requests;
-        ResultList results;
+        Transaction.RequestList requests;
+        Transaction.ResultList results;
 
         try {
-            requests = new RequestList();
+            requests = new Transaction.RequestList();
             updatePageList_prepare_read(requests, pageList_key);
             results = scalaris_tx.req_list(requests);
 
-            requests = new RequestList();
+            requests = new Transaction.RequestList();
             SaveResult result = updatePageList_prepare_write(results, requests, pageList_key, pageCount_key, entriesToRemove, entriesToAdd, 0);
             if (!result.success) {
                 return result;
             }
-            results = scalaris_tx.req_list(requests.addCommit());
+            requests.addCommit();
+            results = scalaris_tx.req_list(requests);
 
             result = updatePageList_check_writes(results, pageList_key, pageCount_key, 0, (Integer) result.info);
             if (!result.success) {
