@@ -76,7 +76,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                 %% send registerTP to each RTM (send with it the learner id)
                 _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId,
                                                   comm:this()}})
-                      || X <- [TM | RTMs]],
+                      || X <- [TM | RTMs], unknown =/= X],
                 %% (optimized: embed the proposer's accept message in registerTP message)
                 TmpDB;
             false ->
