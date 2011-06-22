@@ -22,6 +22,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+%%-define(TRACE_RING_DATA(X,Y), ct:pal(X,Y)).
+-define(TRACE_RING_DATA(X,Y), ok).
+
 -export([fix_cwd/0,
          get_scalaris_port/0, get_yaws_port/0,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
@@ -463,7 +466,7 @@ get_ring_data() ->
 -spec print_ring_data() -> ok.
 print_ring_data() ->
     DataAll = unittest_helper:get_ring_data(),
-    ct:pal("~.0p~n", [DataAll]).
+    ?TRACE_RING_DATA("~.0p~n", [DataAll]).
 
 -include("unittest.hrl").
 
