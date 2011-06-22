@@ -54,6 +54,7 @@ all() ->
      erlang_send_after,
      erlang_spawn,
      erlang_now,
+     os_timestamp,
      term_to_binary1,
      unicode_chars_to_binary1
     ].
@@ -278,6 +279,10 @@ erlang_spawn(_Config) ->
 
 erlang_now(_Config) ->
     iter(count(), fun() -> erlang:now() end, "erlang:now"),
+    ok.
+
+os_timestamp(_Config) ->
+    iter(count(), fun() -> os:timestamp() end, "os:timestamp"),
     ok.
 
 
