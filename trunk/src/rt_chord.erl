@@ -252,7 +252,10 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
         _ ->
             Pid = pid_groups:get_my(dht_node),
             RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
-            comm:send_local(Pid, {rt_update, RT_ext}),
+            case Pid of
+                failed -> ok;
+                _      -> comm:send_local(Pid, {rt_update, RT_ext})
+            end,
             % update failure detector:
             case ReportToFD of
                 true ->
