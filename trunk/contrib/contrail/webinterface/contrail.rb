@@ -159,13 +159,6 @@ post '/hadoop/:id/destroy' do
   redirect '/hadoop'
 end
 
-post '/jsonrpc' do
-  req = JSON.parse(request.body.read)
-  res = JSONRPC.call(req)
-  puts res
-  res
-end
-
 get '/wiki' do
   @instances = Wiki.all
   erb :wiki
@@ -195,6 +188,13 @@ post '/wiki/:id/destroy' do
   @id = params[:id].to_i
   WikiHelper.destroy(@id)
   redirect '/wiki'
+end
+
+post '/jsonrpc' do
+  req = JSON.parse(request.body.read)
+  res = JSONRPC.call(req)
+  puts res
+  res
 end
 
 #DB.loggers << Logger.new($stdout)
