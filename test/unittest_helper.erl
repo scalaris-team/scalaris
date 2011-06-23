@@ -160,7 +160,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     check_ring_size(length(Ids)),
     wait_for_stable_ring(),
     Size = check_ring_size(length(Ids)),
-    ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
+    ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
     ?TRACE_RING_DATA(),
     Pid.
 
@@ -223,6 +223,7 @@ stop_ring(Pid) ->
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
             catch(unregister(ct_test_ring)),
+            ct:pal("Scalaris ring stopped.~n"),
             ok
         end
     catch
