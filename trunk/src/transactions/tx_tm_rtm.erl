@@ -80,9 +80,9 @@ start_link(DHTNodeGroup, Role) ->
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
 -type rtm() :: {?RT:key(),
-                comm:mypid() | unknown,
+                {comm:mypid()} | unknown,
                 Role :: non_neg_integer(),
-                (Acceptor :: comm:mypid()) | unknown}.
+                {Acceptor :: comm:mypid()} | unknown}.
 
 -type rtms() :: [rtm()].
 
@@ -529,8 +529,8 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             Maj = config:read(quorum_factor),
             RTMs = tx_state:get_rtms(TxState),
             Role = state_get_role(State),
-            ValidAccs = [ X || X <- rtms_get_accpids(RTMs), unknown =/= X],
-            {_, _, ThisRTMsNumber, _} = lists:keyfind(comm:this(), 2, RTMs),
+            ValidAccs = [ X || {X} <- rtms_get_accpids(RTMs)],
+            {_, _, ThisRTMsNumber, _} = lists:keyfind({comm:this()}, 2, RTMs),
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
@@ -569,7 +569,7 @@ on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     RTMs = state_get_RTMs(State),
     NewRTMs = [ case get_rtmpid(RTM) of
-                    Pid ->
+                    {Pid} ->
                         I = get_nth(RTM),
                         Name = get_nth_rtm_name(I),
                         Key = get_rtmkey(RTM),
@@ -721,8 +721,8 @@ my_init_TPs(TxState, ItemStates) ->
     %% be used
     Tid = tx_state:get_tid(TxState),
     RTMs = tx_state:get_rtms(TxState),
-    CleanRTMs = rtms_get_rtmpids(RTMs),
-    Accs = [ X || X <- rtms_get_accpids(RTMs), unknown =/= X ],
+    CleanRTMs = [ X || {X} <-rtms_get_rtmpids(RTMs) ],
+    Accs = [ X || {X} <- rtms_get_accpids(RTMs) ],
     TM = comm:this(),
     _ = [ begin
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
@@ -844,8 +844,8 @@ count_messages_per_type() ->
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
 rtms_of_same_dht_node(InRTMs) ->
     Groups = lists:usort([catch(pid_groups:group_of(
-                                  comm:make_local(get_rtmpid(X))))
-                          || X <- InRTMs, get_rtmpid(X) =/= unknown]),
+                                  comm:make_local(element(1,get_rtmpid(X)))))
+                          || X <- InRTMs, unknown =/= get_rtmpid(X)]),
     case length(Groups) of
         4 -> false;
         _ ->
@@ -853,23 +853,23 @@ rtms_of_same_dht_node(InRTMs) ->
             true
     end.
 
--spec rtm_entry_new(?RT:key(), comm:mypid() | unknown,
-                    non_neg_integer(), comm:mypid() | unknown) -> rtm().
+-spec rtm_entry_new(?RT:key(), {comm:mypid()} | unknown,
+                    non_neg_integer(), {comm:mypid()} | unknown) -> rtm().
 rtm_entry_new(Key, RTMPid, Nth, AccPid) -> {Key, RTMPid, Nth, AccPid}.
 -spec get_rtmkey(rtm()) -> ?RT:key().
 get_rtmkey(RTMEntry) -> element(1, RTMEntry).
 -spec set_rtmkey(rtm(), ?RT:key()) -> rtm().
 set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
--spec get_rtmpid(rtm()) -> comm:mypid() | unknown.
+-spec get_rtmpid(rtm()) -> {comm:mypid()} | unknown.
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
 -spec get_nth(rtm()) -> non_neg_integer().
 get_nth(RTMEntry)    -> element(3, RTMEntry).
--spec get_accpid(rtm()) -> comm:mypid() | unknown.
+-spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
 get_accpid(RTMEntry) -> element(4, RTMEntry).
 
--spec rtms_get_rtmpids(rtms()) -> [ comm:mypid() | unknown ].
+-spec rtms_get_rtmpids(rtms()) -> [ {comm:mypid()} | unknown ].
 rtms_get_rtmpids(RTMs) -> [ get_rtmpid(X) || X <- RTMs ].
--spec rtms_get_accpids(rtms()) -> [ comm:mypid() | unknown ].
+-spec rtms_get_accpids(rtms()) -> [ {comm:mypid()} | unknown ].
 rtms_get_accpids(RTMs) -> [ get_accpid(X) || X <- RTMs ].
 
 -spec rtms_upd_entry(rtms(), ?RT:key(), comm:mypid(), comm:mypid()) -> rtms().
@@ -877,23 +877,23 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
     [ case InKey =:= get_rtmkey(Entry) of
           true ->
               RTM = get_rtmpid(Entry),
-              case InPid =/= RTM of
+              case {InPid} =/= RTM of
                   true -> case RTM of
                               unknown -> ok;
-                              _ -> fd:unsubscribe(RTM)
+                              _ -> fd:unsubscribe(element(1, RTM))
                           end,
                           fd:subscribe(InPid);
                   false -> ok
               end,
-              rtm_entry_new(InKey, InPid, get_nth(Entry), InAccPid);
+              rtm_entry_new(InKey, {InPid}, get_nth(Entry), {InAccPid});
           false -> Entry
       end || Entry <- RTMs ].
 
 -spec send_to_rtms(rtms(), fun((rtm()) -> comm:message())) -> ok.
 send_to_rtms(RTMs, MsgGen) ->
     _ = [ case get_rtmpid(RTM) of
-              unknown -> ok;
-              RTMPid  -> comm:send(RTMPid, MsgGen(RTM))
+              unknown  -> ok;
+              {RTMPid} -> comm:send(RTMPid, MsgGen(RTM))
           end || RTM <- RTMs ],
     ok.
 
