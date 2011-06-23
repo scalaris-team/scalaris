@@ -33,28 +33,19 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(comm:message(), ok) -> ok.
-on({bench_increment, Threads, Iterations, Owner}, State) ->
-    Bench = bench_fun:increment(Iterations),
-    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
+on({bench, Op, Threads, Iterations, Owner}, State) ->
+    Bench = case Op of
+                increment ->
+                    bench_fun:increment(Iterations);
+                quorum_read ->
+                    bench_fun:quorum_read(Iterations);
+                read_read ->
+                    bench_fun:read_read(Iterations)
+            end,
+    {Time, {MeanTime, Variance, MinTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
                                                         [Threads, Bench]),
     comm:send(Owner, {done, comm_server:get_local_address_port(),
-                      Time, MinTime, AvgTime, MaxTime, Aborts}),
-    State;
-
-on({bench_read, Threads, Iterations, Owner}, State) ->
-    Bench = bench_fun:quorum_read(Iterations),
-    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
-                                                        [Threads, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(),
-                      Time, MinTime, AvgTime, MaxTime, Aborts}),
-    State;
-
-on({bench_read_read, Threads, Iterations, Owner}, State) ->
-    Bench = bench_fun:read_read(Iterations),
-    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
-                                                        [Threads, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(),
-                      Time, MinTime, AvgTime, MaxTime, Aborts}),
+                      Time, MeanTime, Variance, MinTime, MaxTime, Aborts}),
     State.
 
 -spec init([]) -> ok.
@@ -76,27 +67,34 @@ start_link() ->
 % @doc spawns threads and collect statistics
 -spec run_threads(integer(),
                   fun((Parent::comm:erl_local_pid()) -> any())) ->
-    {MinTime::integer(), AvgTime::float(), MaxTime::integer(), Aborts::integer()}.
+    {Mean::float(), Variance::float(), Min::non_neg_integer(),
+     Max::non_neg_integer(), Aborts::non_neg_integer()}.
 run_threads(Threads, Bench) ->
     Self = self(),
     util:for_to(1, Threads, fun(_X) -> spawn(fun()->Bench(Self) end) end),
-    ThreadStats = util:for_to_ex(1, Threads, fun(_X) ->
-                                                     receive
-                                                         {done, Time, Aborts} ->
-                                                             {Time, Aborts}
-                                                     end
-                                             end),
-    VMStats = calc_vm_stats(ThreadStats, Threads),
-    VMStats.
+    collect(Threads).
 
-% @doc aggregate statistics from the different threads
--spec calc_vm_stats(list(), integer()) -> {integer(), float(), integer(), integer()}.
-calc_vm_stats(ThreadStats, Threads) ->
-    {FirstTime, FirstAborts} = hd(ThreadStats),
-    F = fun ({Time, Aborts}, {MinTime, AggTime, MaxTime, AggAborts}) ->
-                {util:min(Time, MinTime), AggTime + Time,
-                 util:max(Time, MaxTime), AggAborts + Aborts}
+% @doc see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
+-spec collect(pos_integer()) ->
+    {Mean::float(), Variance::float(), Min::non_neg_integer(),
+     Max::non_neg_integer(), Aborts::non_neg_integer()}.
+collect(1) ->
+    receive {done, Time, Aborts} ->
+            {Time, 0.0, Time, Time, Aborts}
+    end;
+collect(Threads) ->
+    {Mean, M2, Min, Max, Aborts} =
+        receive {done, Time, TAborts} ->
+                collect(Threads - 1, 1, Time, 0.0, Time, Time, TAborts)
         end,
-    {MinTime, AggTime, MaxTime, Aborts}
-        = lists:foldl(F, {FirstTime, 0, FirstTime, FirstAborts}, ThreadStats),
-    {MinTime, AggTime / Threads, MaxTime, Aborts}.
+    {Mean, M2 / (Threads - 1), Min, Max, Aborts}.
+
+collect(0, _N, Mean, M2, Min, Max, Aborts) ->
+    {Mean, M2, Min, Max, Aborts};
+collect(ThreadsLeft, N, Mean, M2, Min, Max, AggAborts) ->
+    receive {done, Time, Aborts} ->
+            Delta = Time - Mean,
+            NewMean = Mean + Delta / (N + 1),
+            collect(ThreadsLeft - 1, N + 1, NewMean, M2 + Delta*(Time - NewMean),
+                    util:min(Time, Min), util:max(Time, Max), AggAborts + Aborts)
+    end.
