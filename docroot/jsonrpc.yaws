@@ -29,6 +29,7 @@ handler(read, [Key])               -> api_json:tx_read(Key);
 handler(write, [Key, Value])       -> api_json:tx_write(Key, Value);
 handler(test_and_set, [Key, OldV, NewV]) ->
     api_json:tx_test_and_set(Key, OldV, NewV);
+handler(req_list_commit_each, [Param]) -> api_json:tx_req_list_commit_each(Param);
 
 handler(publish, [Topic, Content]) -> api_json:pubsub_publish(Topic, Content);
 handler(subscribe, [Topic, URL])   -> api_json:pubsub_subscribe(Topic, URL);

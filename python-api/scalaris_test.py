@@ -298,6 +298,66 @@ class TestTransactionSingleOp(unittest.TestCase):
         
         conn.close_connection()
 
+    # Test method for TransactionSingleOp.req_list(RequestList) with an
+    # empty request list.
+    def testReqList_Empty(self):
+        conn = TransactionSingleOp()
+        conn.req_list(conn.new_req_list())
+        conn.close_connection()
+
+    # Test method for TransactionSingleOp.req_list(RequestList) with a
+    # mixed request list.
+    def testReqList1(self):
+        key = "_ReqList1_"
+        conn = TransactionSingleOp()
+        
+        readRequests = conn.new_req_list()
+        firstWriteRequests = conn.new_req_list()
+        writeRequests = conn.new_req_list()
+        for i in xrange(0, len(_TEST_DATA)):
+            if (i % 2) == 0:
+                firstWriteRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
+            writeRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
+            readRequests.add_read(str(self._testTime) + key + str(i))
+        
+        results = conn.req_list(firstWriteRequests)
+        # evaluate the first write results:
+        for i in xrange(0, firstWriteRequests.size()):
+            conn.process_result_write(results[i])
+
+        requests = conn.new_req_list(readRequests).extend(writeRequests)
+        results = conn.req_list(requests)
+        self.assertEqual(requests.size(), len(results))
+
+        # now evaluate the read results:
+        for i in xrange(0, readRequests.size()):
+            if (i % 2) == 0:
+                actual = conn.process_result_read(results[i])
+                self.assertEqual(_TEST_DATA[i], actual)
+            else:
+                try:
+                    conn.process_result_read(results[i])
+                    # a not found exception must be thrown
+                    self.fail('expected a NotFoundError')
+                except scalaris.NotFoundError:
+                    pass
+
+        # now evaluate the write results:
+        for i in xrange(0, writeRequests.size()):
+            pos = readRequests.size() + i
+            conn.process_result_write(results[pos])
+
+        # once again test reads - now all reads should be successful
+        results = conn.req_list(readRequests)
+        self.assertEqual(readRequests.size(), len(results))
+
+        # now evaluate the read results:
+        for i in xrange(0, readRequests.size()):
+            actual = conn.process_result_read(results[i])
+            self.assertEqual(_TEST_DATA[i], actual)
+        
+        conn.close_connection();
+
 class TestTransaction(unittest.TestCase):
     def setUp(self):
         # The time when the test suite was started.
@@ -438,6 +498,66 @@ class TestTransaction(unittest.TestCase):
             self.assertEqual(actual, [_TEST_DATA[i], _TEST_DATA[i + 1]])
         
         t.close_connection()
+
+    # Test method for Transaction.req_list(RequestList) with an
+    # empty request list.
+    def testReqList_Empty(self):
+        conn = Transaction()
+        conn.req_list(conn.new_req_list())
+        conn.close_connection()
+
+    # Test method for Transaction.req_list(RequestList) with a
+    # mixed request list.
+    def testReqList1(self):
+        key = "_ReqList1_"
+        conn = Transaction()
+        
+        readRequests = conn.new_req_list()
+        firstWriteRequests = conn.new_req_list()
+        writeRequests = conn.new_req_list()
+        for i in xrange(0, len(_TEST_DATA)):
+            if (i % 2) == 0:
+                firstWriteRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
+            writeRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
+            readRequests.add_read(str(self._testTime) + key + str(i))
+        
+        results = conn.req_list(firstWriteRequests)
+        # evaluate the first write results:
+        for i in xrange(0, firstWriteRequests.size()):
+            conn.process_result_write(results[i])
+
+        requests = conn.new_req_list(readRequests).extend(writeRequests).add_commit()
+        results = conn.req_list(requests)
+        self.assertEqual(requests.size(), len(results))
+
+        # now evaluate the read results:
+        for i in xrange(0, readRequests.size()):
+            if (i % 2) == 0:
+                actual = conn.process_result_read(results[i])
+                self.assertEqual(_TEST_DATA[i], actual)
+            else:
+                try:
+                    conn.process_result_read(results[i])
+                    # a not found exception must be thrown
+                    self.fail('expected a NotFoundError')
+                except scalaris.NotFoundError:
+                    pass
+
+        # now evaluate the write results:
+        for i in xrange(0, writeRequests.size()):
+            pos = readRequests.size() + i
+            conn.process_result_write(results[pos])
+
+        # once again test reads - now all reads should be successful
+        results = conn.req_list(readRequests)
+        self.assertEqual(readRequests.size(), len(results))
+
+        # now evaluate the read results:
+        for i in xrange(0, readRequests.size()):
+            actual = conn.process_result_read(results[i])
+            self.assertEqual(_TEST_DATA[i], actual)
+        
+        conn.close_connection();
 
 class TestPubSub(unittest.TestCase):
     def setUp(self):
