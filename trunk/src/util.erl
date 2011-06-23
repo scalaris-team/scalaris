@@ -112,7 +112,7 @@ supervisor_terminate(SupPid) ->
     wait_for_process_to_die(SupPid),
     ok.
 
--spec supervisor_terminate_childs(Supervisor::pid()) -> ok.
+-spec supervisor_terminate_childs(Supervisor::pid() | atom()) -> ok.
 supervisor_terminate_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
     _ = [ begin
