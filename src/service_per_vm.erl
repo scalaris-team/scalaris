@@ -48,7 +48,7 @@ kill_nodes(No) ->
              SupDhtNode = element(2, Child),
              Id = element(1, Child),
              util:supervisor_terminate_childs(SupDhtNode),
-             supervisor:terminate_child(main_sup, Id),
+             _ = supervisor:terminate_child(main_sup, Id),
              supervisor:delete_child(main_sup, Id)
          end || Child <- Childs],
     ok.
