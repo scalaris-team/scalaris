@@ -20,131 +20,83 @@
 -vsn('$Id$').
 
 -behaviour(gen_component).
+
 -export([start_link/0, init/1, on/2]).
-
-%% public interface
--export([run_increment/2, run_read/2]).
-
--export([run_threads/2]).
 
 -include("scalaris.hrl").
 
-%% @doc run an increment benchmark (i++) on all nodes
--spec run_increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
-run_increment(ThreadsPerVM, Iterations) ->
-    Msg = {bench_increment, ThreadsPerVM, Iterations, comm:this()},
-    manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
+-export([run_threads/2]).
 
-%% @doc run an read benchmark on all nodes
--spec run_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
-run_read(ThreadsPerVM, Iterations) ->
-    Msg = {bench_read, ThreadsPerVM, Iterations, comm:this()},
-    manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
-
-%% @doc spread run over the available VMs and collect results
-%% (executed in clients context)
--spec manage_run(ThreadsPerVM::pos_integer(), Iterations::pos_integer(), Options::[locally | verbose | profile | {copies, non_neg_integer()}], Message::comm:message()) -> ok.
-manage_run(ThreadsPerVM, Iterations, Options, Message) ->
-    ServerList = util:get_proc_in_vms(bench_server),
-    %% io:format("~p~n", [ServerList]),
-    {BeforeDump, _} = admin:get_dump(),
-    Before = erlang:now(),
-    _ = [comm:send(Server, Message) || Server <- ServerList],
-    io:format("Collecting results... ~n"),
-    Times = [receive {done, X, Time} -> io:format("BS: ~p @ ~p~n",[Time, X]),Time end || _Server <- ServerList],
-    After = erlang:now(),
-    case lists:member(verbose, Options) of
-        true ->
-            {AfterDump, _} = admin:get_dump(),
-            RunTime = timer:now_diff(After, Before),
-            DiffDump = admin:diff_dump(BeforeDump, AfterDump),
-            io:format("servers: ~p threads/vm: ~p iterations: ~p~n",
-                      [length(ServerList), ThreadsPerVM, Iterations]),
-            io:format("total time: ~p~n", [RunTime / 1000000.0]),
-            io:format("1/s: ~p~n",
-                      [length(ServerList) * ThreadsPerVM * Iterations / RunTime * 1000000.0]),
-            Throughput = [ThreadsPerVM * Iterations / Time * 1000000.0 || Time <- Times],
-            io:format("~p~n", [Throughput]),
-            io:format("High load avg. latency: ~p ms~n", [ RunTime / 1000.0 / Iterations ]),
-            io:format("Message statistics (message name, bytes, how often): ~p~n", [DiffDump]);
-        false -> ok
-    end,
-    ok.
-
--spec run_threads(non_neg_integer(),
-                  fun((Parent::comm:erl_local_pid()) -> any())) -> ok.
-run_threads(Threads, Bench) ->
-    Self = self(),
-    util:for_to(1, Threads, fun(_X) -> spawn(fun()->Bench(Self) end) end),
-    util:for_to(1, Threads, fun(_X) -> receive {done, _} -> ok end end),
-    ok.
-
-%% read benchmark
--spec bench_read(Parent::comm:erl_local_pid(), Key::string(), Iterations::non_neg_integer(), FailedReads::non_neg_integer()) -> ok.
-bench_read(Owner, _Key, 0, _Fail) ->
-    %% io:format("repeated requests: ~p~n", [_Fail]),
-    comm:send_local(Owner , {done, ok});
-bench_read(Owner, Key, Iterations, Fail) ->
-    case api_tx:read(Key) of
-        {fail, _Reason} -> bench_read(Owner, Key, Iterations, Fail + 1);
-        {ok, _Value}    -> bench_read(Owner, Key, Iterations - 1, Fail)
-    end.
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% the server code
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(comm:message(), ok) -> ok.
 on({bench_increment, Threads, Iterations, Owner}, State) ->
-    Bench = fun (Parent) ->
-                    Key = get_and_init_key(),
-                    bench_increment:process(Parent, Key, Iterations)
-            end,
-    {Time, _} = util:tc(?MODULE, run_threads, [Threads, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
+    Bench = bench_fun:increment(Iterations),
+    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
+                                                        [Threads, Bench]),
+    comm:send(Owner, {done, comm_server:get_local_address_port(),
+                      Time, MinTime, AvgTime, MaxTime, Aborts}),
     State;
 
 on({bench_read, Threads, Iterations, Owner}, State) ->
-    Bench = fun (Parent) ->
-                    Key = get_and_init_key(),
-                    bench_read(Parent, Key, Iterations, 0)
-            end,
-    {Time, _} = util:tc(?MODULE, run_threads, [Threads, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(), Time}),
+    Bench = bench_fun:quorum_read(Iterations),
+    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
+                                                        [Threads, Bench]),
+    comm:send(Owner, {done, comm_server:get_local_address_port(),
+                      Time, MinTime, AvgTime, MaxTime, Aborts}),
+    State;
+
+on({bench_read_read, Threads, Iterations, Owner}, State) ->
+    Bench = bench_fun:read_read(Iterations),
+    {Time, {MinTime, AvgTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
+                                                        [Threads, Bench]),
+    comm:send(Owner, {done, comm_server:get_local_address_port(),
+                      Time, MinTime, AvgTime, MaxTime, Aborts}),
     State.
 
 -spec init([]) -> ok.
-init([]) -> ok.
+init([]) ->
+    % load bench module
+    _X = bench:module_info(),
+    ok.
 
 %% @doc spawns a bench_server
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_component:start_link(?MODULE, [], [{erlang_register, bench_server}]).
 
-%% helper functions
--spec retries() -> pos_integer().
-retries() -> 10.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% helper functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc spawns threads and collect statistics
+-spec run_threads(integer(),
+                  fun((Parent::comm:erl_local_pid()) -> any())) ->
+    {MinTime::integer(), AvgTime::float(), MaxTime::integer(), Aborts::integer()}.
+run_threads(Threads, Bench) ->
+    Self = self(),
+    util:for_to(1, Threads, fun(_X) -> spawn(fun()->Bench(Self) end) end),
+    ThreadStats = util:for_to_ex(1, Threads, fun(_X) ->
+                                                     receive
+                                                         {done, Time, Aborts} ->
+                                                             {Time, Aborts}
+                                                     end
+                                             end),
+    VMStats = calc_vm_stats(ThreadStats, Threads),
+    VMStats.
 
--spec get_and_init_key() -> string().
-get_and_init_key() ->
-    Key = randoms:getRandomId(),
-    get_and_init_key(Key, retries(), _TriedKeys = 1).
-
-get_and_init_key(_Key, 0, TriedKeys) ->
-    NewKey = randoms:getRandomId(),
-    io:format("geT_and_init_key choosing new key and retrying~n"),
-    timer:sleep(randoms:rand_uniform(1, 10000 * TriedKeys)),
-    get_and_init_key(NewKey, retries(), TriedKeys + 1);
-
-get_and_init_key(Key, Count, TriedKeys) ->
-    case api_tx:write(Key, 0) of
-        {ok} ->
-            Key;
-        {fail, abort} ->
-            SleepTime = randoms:rand_uniform(1, TriedKeys * 2000 * 11-Count),
-            io:format("geT_and_init_key 1 failed, retrying in ~p ms~n",
-                      [SleepTime]),
-            timer:sleep(SleepTime),
-            get_and_init_key(Key, Count - 1, TriedKeys);
-        {fail, timeout} ->
-            io:format("geT_and_init_key 2 timeout, retrying~n", []),
-            timer:sleep(TriedKeys * randoms:rand_uniform(1, 2000 * 11-Count)),
-            get_and_init_key(Key, Count - 1, TriedKeys)
-    end.
+% @doc aggregate statistics from the different threads
+-spec calc_vm_stats(list(), integer()) -> {integer(), float(), integer(), integer()}.
+calc_vm_stats(ThreadStats, Threads) ->
+    {FirstTime, FirstAborts} = hd(ThreadStats),
+    F = fun ({Time, Aborts}, {MinTime, AggTime, MaxTime, AggAborts}) ->
+                {util:min(Time, MinTime), AggTime + Time,
+                 util:max(Time, MaxTime), AggAborts + Aborts}
+        end,
+    {MinTime, AggTime, MaxTime, Aborts}
+        = lists:foldl(F, {FirstTime, 0, FirstTime, FirstAborts}, ThreadStats),
+    {MinTime, AggTime / Threads, MaxTime, Aborts}.
