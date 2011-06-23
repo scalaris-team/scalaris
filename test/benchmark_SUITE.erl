@@ -14,7 +14,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : benchmark_SUITE.erl
 %%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Runs the basic benchmarks from src/bench_server.erl
+%%% Description : Runs the basic benchmarks from src/bench.erl
 %%%               The results are stored in several files in the main
 %%%               directory, so that the buildbot can fetch the data
 %%%               from there.
@@ -50,7 +50,7 @@ run_increment_1_1000(_Config) ->
     Threads    = 1,
     Iterations = 10000,
     Start = erlang:now(),
-    bench_server:run_increment(Threads, Iterations),
+    bench:increment(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_increment_1_10000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -60,7 +60,7 @@ run_increment_10_100(_Config) ->
     Threads    = 10,
     Iterations = 1000,
     Start = erlang:now(),
-    bench_server:run_increment(Threads, Iterations),
+    bench:increment(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_increment_10_1000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -70,7 +70,7 @@ run_read_1_100000(_Config) ->
     Threads    = 1,
     Iterations = 100000,
     Start = erlang:now(),
-    bench_server:run_read(Threads, Iterations),
+    bench:quorum_read(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_read_1_100000.txt", Threads * Iterations / RunTime * 1000000.0),
@@ -80,7 +80,7 @@ run_read_10_10000(_Config) ->
     Threads    = 10,
     Iterations = 10000,
     Start = erlang:now(),
-    bench_server:run_read(Threads, Iterations),
+    bench:quorum_read(Threads, Iterations),
     Stop = erlang:now(),
     RunTime = timer:now_diff(Stop, Start),
     write_result("result_read_10_10000.txt", Threads * Iterations / RunTime * 1000000.0),
