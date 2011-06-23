@@ -22,7 +22,7 @@ MAKE = make
 VERSION=0.0.1
 OTP_ERLANG_VERSION=1.5.4
 
-.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python3 python3-compile python3-clean python3-test python3-bench interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-all install-erlang install-java install-docs install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
+.PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc python3 python3-convert python3-compile python3-clean python3-test python3-bench interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
 
 YAWS_PATH= /usr/local/lib/yaws
 
@@ -149,7 +149,7 @@ java-bench: compile java
 java-%:
 	ant -buildfile java-api/build.xml $*
 
-python:
+python: python-compile
 
 python-compile:
 	python -mcompileall python-api
@@ -203,24 +203,39 @@ python-bench: compile python
 	./bin/scalarisctl -n "pbench_node3" stop ; \
 	true
 
-python3:
-	if [ -d python3-api ]; then \
-	  rm -f python3-api/*.py ; \
-	else \
+python-doc:
+	pushd python-api ; epydoc --config=epydoc.html.cfg ; FAILED=$$? ; popd ; \
+	  if [ $$FAILED -ne 0 ]; then false ; else  true ; fi
+	pushd python-api ; epydoc --config=epydoc.pdf.cfg ; FAILED=$$? ; popd ; \
+	  if [ $$FAILED -ne 0 ]; then false ; else  true ; fi
+
+python3: python3-compile
+
+python3-convert: python3-clean
+	if [ ! -d python3-api ]; then \
 	  mkdir -p python3-api ; \
 	fi
 	cp python-api/*.py python3-api/
 	cd python3-api && 2to3 -f all -f buffer -w -n . >/dev/null
 	sed -i -e "s|#!/usr/bin/python|#!/usr/bin/python3|g" python3-api/*.py
 
-python3-compile: python3
+python3-compile: python3-convert
 	python3 -mcompileall python3-api
 	python3 -O -mcompileall python3-api
 
 python3-clean:
-	rm -f python3-api/*.py
-	rm -f python3-api/*.pyc
-	rm -f python3-api/*.pyo
+	if [ -d python3-api ]; then \
+	  rm -f python3-api/*.py ; \
+	  rm -f python3-api/*.pyc ; \
+	  rm -f python3-api/*.pyo ; \
+	  if [ -d python3-api/__pycache__ ]; then \
+	    rm -f python3-api/__pycache__/*.py ; \
+	    rm -f python3-api/__pycache__/*.pyc ; \
+	    rm -f python3-api/__pycache__/*.pyo ; \
+	    rmdir --ignore-fail-on-non-empty python3-api/__pycache__ ; \
+	  fi ; \
+	  rmdir --ignore-fail-on-non-empty python3-api/ ; \
+	fi
 
 python3-test: compile python3
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
@@ -421,6 +436,15 @@ install-java-doc: java-doc
 	           java-api/doc/de/zib/scalaris/examples/*.html
 	install -m 644 -t $(DOCDIR)/java-api/de/zib/scalaris/examples/class-use \
 	           java-api/doc/de/zib/scalaris/examples/class-use/*.html
+
+install-python-doc: python-doc
+	install -d $(DOCDIR)/python-api
+	install -d $(DOCDIR)/python-api/html
+	install -m 644 -t $(DOCDIR)/python-api/html \
+	           python-api/doc/html/*
+	install -d $(DOCDIR)/python-api/pdf
+	install -m 644 -t $(DOCDIR)/python-api/pdf \
+	           python-api/doc/pdf/*.pdf
 
 install-docs: install-doc install-java-doc
 

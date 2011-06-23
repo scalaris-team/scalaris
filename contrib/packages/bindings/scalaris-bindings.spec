@@ -163,10 +163,11 @@ Python3 bindings and Python3 command line client for scalaris
 make java
 make java-doc
 %if 0%{?with_python}
-make python-compile
+make python
+make python-doc
 %endif
 %if 0%{?with_python3}
-make python3-compile
+make python3
 %endif
 
 %install
@@ -178,6 +179,7 @@ make install-java-doc DESTDIR=$RPM_BUILD_ROOT
 make install-ruby DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python}
 make install-python DESTDIR=$RPM_BUILD_ROOT
+make install-python-doc DESTDIR=$RPM_BUILD_ROOT
 %endif
 %if 0%{?with_python3}
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
@@ -207,6 +209,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/scalaris-python
 %{python_sitelib}/*
+%doc %{_docdir}/scalaris/python-api
 %endif
 
 %if 0%{?with_python3}

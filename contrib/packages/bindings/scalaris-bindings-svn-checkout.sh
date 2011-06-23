@@ -82,7 +82,7 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.scalaris-java.conffiles ./debian.scalaris-svn-java.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-java.postrm    ./debian.scalaris-svn-java.postrm && \
   cp  ${sourcefolder}/debian.scalaris-java.postinst  ./debian.scalaris-svn-java.postinst && \
-  cp  ${sourcefolder}/debian.python-scalaris.files  ./debian.python-scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.python-scalaris.files   ./debian.python-scalaris-svn.files && \
   cp  ${sourcefolder}/debian.python3-scalaris.files  ./debian.python3-scalaris-svn.files && \
   cp  ${sourcefolder}/debian.scalaris-ruby1.8.files  ./debian.scalaris-svn-ruby1.8.files
 
