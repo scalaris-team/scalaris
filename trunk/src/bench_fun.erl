@@ -1,0 +1,170 @@
+% Copyright 2008-2011 Zuse Institute Berlin
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+%%%-------------------------------------------------------------------
+%%% File    : bench_fun.erl
+%%% Author  : Thorsten Schuett <schuett@zib.de>
+%%% Description : i++ benchmark
+%%%
+%%% Created :  25 Aug 2008 by Thorsten Schuett <schuett@zib.de>
+%%%-------------------------------------------------------------------
+-module(bench_fun).
+
+-author('schuett@zib.de').
+-vsn('$Id$').
+
+-include("scalaris.hrl").
+
+-export([increment/1, quorum_read/1, read_read/1]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% public API
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec increment(integer()) -> fun().
+increment(Iterations) ->
+    fun (Parent) ->
+            Key = get_and_init_key(),
+            Start = os:timestamp(),
+            Aborts = increment_iter(Key, Iterations, 0),
+            Stop = os:timestamp(),
+            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    end.
+
+-spec quorum_read(integer()) -> fun().
+quorum_read(Iterations) ->
+    fun (Parent) ->
+            Key = get_and_init_key(),
+            Start = os:timestamp(),
+            Aborts = read_iter(Key, Iterations, 0),
+            Stop = os:timestamp(),
+            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    end.
+
+-spec read_read(integer()) -> fun().
+read_read(Iterations) ->
+    fun (Parent) ->
+            Key1 = get_and_init_key(),
+            Key2 = get_and_init_key(),
+            Start = os:timestamp(),
+            Aborts = read_read_iter(Key1, Key2, Iterations, 0),
+            Stop = os:timestamp(),
+            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% increment
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec inc(Key::string()) -> api_tx:commit_result() | api_tx:read_result().
+inc(Key) ->
+    {TLog1, [ReadResult]} =
+        api_tx:req_list([{read, Key}]),
+    case ReadResult of
+        {ok, Value} ->
+            {_TLog, [{ok}, CommitResult]} =
+                api_tx:req_list(TLog1, [{write, Key, Value + 1}, {commit}]),
+            CommitResult;
+        Fail -> Fail
+    end.
+
+-spec increment_iter(string(), integer(), non_neg_integer()) -> any().
+increment_iter(_Key, 0, Aborts) ->
+    Aborts;
+increment_iter(Key, Iterations, Aborts) ->
+    Result = inc(Key),
+    case Result of
+        {ok}              -> increment_iter(Key, Iterations - 1, Aborts);
+        {fail, abort}     ->
+            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            increment_iter(Key, Iterations, Aborts + 1);
+        {fail, timeout}   ->
+            %% overloaded system?
+            timer:sleep(randoms:rand_uniform(1, 100 * (Aborts + 1)
+                                                   * (Aborts +1))),
+            increment_iter(Key, Iterations, Aborts + 1);
+        {fail, not_found} ->
+            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            increment_iter(Key, Iterations, Aborts + 1);
+        X -> log:log(warn, "~p", [X])
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% quorum_read
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+read_iter(_Key, 0, Aborts) ->
+    Aborts;
+read_iter(Key, Iterations, Aborts) ->
+    case api_tx:read(Key) of
+        {fail, _Reason} -> read_iter(Key, Iterations, Aborts + 1);
+        {ok, _Value}    -> read_iter(Key, Iterations - 1, Aborts)
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% read_read (reads two items in one transaction)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+read_read_tx(Key1, Key2) ->
+    {_, Result} = api_tx:req_list([{read, Key1}, {read, Key2}, {commit}]),
+    Result.
+
+read_read_iter(_Key1, _Key2, 0, Aborts) ->
+    Aborts;
+read_read_iter(Key1, Key2, Iterations, Aborts) ->
+    case read_read_tx(Key1, Key2) of
+        [{ok, 0},{ok,0},{ok}] -> read_read_iter(Key1, Key2, Iterations - 1, Aborts);
+        _ -> read_read_iter(Key1, Key2, Iterations, Aborts + 1)
+    end.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% initialize keys
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec retries() -> pos_integer().
+retries() -> 10.
+
+-spec get_and_init_key() -> string().
+get_and_init_key() ->
+    Key = randoms:getRandomId(),
+    get_and_init_key(Key, retries(), _TriedKeys = 1).
+
+get_and_init_key(_Key, 0, TriedKeys) ->
+    NewKey = randoms:getRandomId(),
+    io:format("geT_and_init_key choosing new key and retrying~n"),
+    timer:sleep(randoms:rand_uniform(1, 10000 * TriedKeys)),
+    get_and_init_key(NewKey, retries(), TriedKeys + 1);
+
+get_and_init_key(Key, Count, TriedKeys) ->
+    case api_tx:write(Key, 0) of
+        {ok} ->
+            Key;
+        {fail, abort} ->
+            SleepTime = randoms:rand_uniform(1, TriedKeys * 2000 * 11-Count),
+            io:format("geT_and_init_key 1 failed, retrying in ~p ms~n",
+                      [SleepTime]),
+            timer:sleep(SleepTime),
+            get_and_init_key(Key, Count - 1, TriedKeys);
+        {fail, timeout} ->
+            io:format("geT_and_init_key 2 timeout, retrying~n", []),
+            timer:sleep(TriedKeys * randoms:rand_uniform(1, 2000 * 11-Count)),
+            get_and_init_key(Key, Count - 1, TriedKeys)
+    end.
