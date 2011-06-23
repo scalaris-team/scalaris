@@ -32,7 +32,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public abstract class RequestList {
     protected final List<OtpErlangObject> requests = new ArrayList<OtpErlangObject>(10);
-    private final boolean isCommit = false;
+    private boolean isCommit = false;
 
     /**
      * Default constructor.
@@ -143,6 +143,7 @@ public abstract class RequestList {
         }
         final OtpErlangTuple req = CommonErlangObjects.commitTupleAtom;
         requests.add(req);
+        isCommit = true;
         return this;
     }
 
