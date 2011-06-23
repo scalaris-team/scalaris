@@ -70,7 +70,7 @@
 -type message() ::
     {get_state_response, intervals:interval()} |
     {get_chunk_response, rep_upd:db_chunk()} |
-    {diff_list, comm:erl_pid(), [{?RT:key(), ?DB:version()}]} |
+    {diff_list, comm:mypid(), [{?RT:key(), ?DB:version()}]} |
     {build_sync_struct, comm:erl_local_pid(), rep_upd:db_chunk(), non_neg_integer()} |
     {shutdown, exit_reason()}.
 
