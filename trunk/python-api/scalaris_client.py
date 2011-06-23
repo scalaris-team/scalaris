@@ -13,28 +13,28 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-from Scalaris import TransactionSingleOp, ReplicatedDHT, PubSub
-from Scalaris import ConnectionException, TimeoutException, NotFoundException, AbortException, UnknownException
+from scalaris import TransactionSingleOp, ReplicatedDHT, PubSub
+from scalaris import ConnectionError, TimeoutError, NotFoundError, AbortError, UnknownError
+import scalaris_bench
 import sys
 
 if __name__ == "__main__":
-    import sys
     if (len(sys.argv) == 3 and sys.argv[1] in ["--read", "-r"]):
         sc = TransactionSingleOp()
         key = sys.argv[2]
         try:
             value = sc.read(key)
             print 'read(' + key + ') = ' + repr(value)
-        except ConnectionException as instance:
+        except ConnectionError as instance:
             print 'read(' + key + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException as instance:
+        except TimeoutError as instance:
             print 'read(' + key + ') failed with timeout'
             sys.exit(1)
-        except NotFoundException as instance:
+        except NotFoundError as instance:
             print 'read(' + key + ') failed with not_found'
             sys.exit(1)
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'read(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--write", "-w"]):
@@ -44,16 +44,16 @@ if __name__ == "__main__":
         try:
             sc.write(key, value)
             print 'write(' + key + ', ' + value + '): ok'
-        except ConnectionException as instance:
+        except ConnectionError as instance:
             print 'write(' + key + ', ' + value + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException as instance:
+        except TimeoutError as instance:
             print 'write(' + key + ', ' + value + ') failed with timeout'
             sys.exit(1)
-        except AbortException as instance:
+        except AbortError as instance:
             print 'write(' + key + ', ' + value + ') failed with abort'
             sys.exit(1)
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'write(' + key + ', ' + value + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 3 and sys.argv[1] in ["--delete", "-d"]):
@@ -66,12 +66,12 @@ if __name__ == "__main__":
         
         try:
             ok = rdht.delete(key)
-            results = rdht.getLastDeleteResult()
+            results = rdht.get_last_delete_result()
             print 'delete(' + key + ', ' + str(timeout) + '): ok, deleted: ' + str(ok) + ' (' + repr(results) + ')'
-        except TimeoutException as instance:
-            results = rdht.getLastDeleteResult()
+        except TimeoutError as instance:
+            results = rdht.get_last_delete_result()
             print 'delete(' + key + ', ' + str(timeout) + '): failed (timeout), deleted: ' + str(ok) + ' (' + repr(results) + ')'
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'delete(' + key + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--publish", "-p"]):
@@ -81,10 +81,10 @@ if __name__ == "__main__":
         try:
             ps.publish(topic, content)
             print 'publish(' + topic + ', ' + content + '): ok'
-        except ConnectionException as instance:
+        except ConnectionError as instance:
             print 'publish(' + topic + ', ' + content + ') failed with connection error'
             sys.exit(1)
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'publish(' + topic + ', ' + content + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--subscribe", "-s"]):
@@ -94,16 +94,16 @@ if __name__ == "__main__":
         try:
             ps.subscribe(topic, url)
             print 'subscribe(' + topic + ', ' + url + '): ok'
-        except ConnectionException as instance:
+        except ConnectionError as instance:
             print 'subscribe(' + topic + ', ' + url + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException as instance:
+        except TimeoutError as instance:
             print 'subscribe(' + topic + ', ' + url + ') failed with timeout'
             sys.exit(1)
-        except AbortException as instance:
+        except AbortError as instance:
             print 'subscribe(' + topic + ', ' + url + ') failed with abort'
             sys.exit(1)
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'subscribe(' + topic + ', ' + url + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 4 and sys.argv[1] in ["--unsubscribe", "-u"]):
@@ -113,35 +113,47 @@ if __name__ == "__main__":
         try:
             ps.unsubscribe(topic, url)
             print 'unsubscribe(' + topic + ', ' + url + '): ok'
-        except ConnectionException as instance:
+        except ConnectionError as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with connection error'
             sys.exit(1)
-        except TimeoutException as instance:
+        except TimeoutError as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with timeout'
             sys.exit(1)
-        except NotFoundException as instance:
+        except NotFoundError as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with not found'
             sys.exit(1)
-        except AbortException as instance:
+        except AbortError as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with abort'
             sys.exit(1)
-        except UnknownException as instance:
+        except UnknownError as instance:
             print 'unsubscribe(' + topic + ', ' + url + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 3 and sys.argv[1] in ["--getsubscribers", "-g"]):
         ps = PubSub()
         topic = sys.argv[2]
         try:
-            value = ps.getSubscribers(topic)
-            print 'getSubscribers(' + topic + ') = ' + repr(value)
-        except ConnectionException as instance:
-            print 'getSubscribers(' + topic + ') failed with connection error'
+            value = ps.get_subscribers(topic)
+            print 'get_subscribers(' + topic + ') = ' + repr(value)
+        except ConnectionError as instance:
+            print 'get_subscribers(' + topic + ') failed with connection error'
             sys.exit(1)
-        except UnknownException as instance:
-            print 'getSubscribers(' + topic + ') failed with unknown: ' + str(instance)
+        except UnknownError as instance:
+            print 'get_subscribers(' + topic + ') failed with unknown: ' + str(instance)
             sys.exit(1)
+    elif ((len(sys.argv) == 2 or len(sys.argv) >= 4) and sys.argv[1] in ["--minibench", "-b"]):
+        if (len(sys.argv) == 2):
+            scalaris_bench.minibench(100, xrange(1, 10, 1))
+        elif (len(sys.argv) >= 4):
+            testruns = int(sys.argv[2])
+            benchmarks = []
+            for i in xrange(3, min(12, len(sys.argv))):
+                if sys.argv[i] == 'all':
+                    benchmarks = xrange(1, 10, 1)
+                else:
+                    benchmarks.append(int(sys.argv[i]))
+            scalaris_bench.minibench(testruns, benchmarks)
     else:
-        print 'usage: Scalaris.py [Options]'
+        print 'usage: scalaris.py [Options]'
         print ' -r,--read <key>                      read an item'
         print ' -w,--write <key> <value>             write an item'
         print ' -d,--delete <key> [<timeout>]        delete an item (default timeout:'
@@ -152,8 +164,11 @@ if __name__ == "__main__":
         print '                                      re-creating an item the version'
         print '                                      before the delete can re-appear.'
         print ' -p,--publish <topic> <message>       publish a new message for the given'
+        print '                                      topic'
         print ' -s,--subscribe <topic> <url>         subscribe to a topic'
         print ' -g,--getsubscribers <topic>          get subscribers of a topic'
         print ' -u,--unsubscribe <topic> <url>       unsubscribe from a topic'
         print ' -h,--help                            print this message'
-        print '                                      topic'
+        print ' -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)'
+        print '                                      [1|...|9|all] (default: all'
+        print '                                      benchmarks, 100 test runs)'

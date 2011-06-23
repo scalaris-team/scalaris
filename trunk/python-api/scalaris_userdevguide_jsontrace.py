@@ -13,14 +13,12 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import json, httplib, urlparse, socket
-import sys, os
-import base64
-import Scalaris
+import json
+import scalaris
 
-class ConnectionWithTrace(Scalaris.JSONConnection):
-    def __init__(self, url = Scalaris.default_url, timeout = Scalaris.default_timeout):
-        Scalaris.JSONConnection.__init__(self, url = Scalaris.default_url, timeout = Scalaris.default_timeout)
+class ConnectionWithTrace(scalaris.JSONConnection):
+    def __init__(self, url = scalaris.DEFAULT_URL, timeout = scalaris.DEFAULT_TIMEOUT):
+        scalaris.JSONConnection.__init__(self, url = scalaris.DEFAULT_URL, timeout = scalaris.DEFAULT_TIMEOUT)
 
     def call(self, function, params):
         params = {'version': '1.1',
@@ -34,13 +32,13 @@ class ConnectionWithTrace(Scalaris.JSONConnection):
         print json.dumps(params, indent=1)
         headers = {"Content-type": "application/json"}
         try:
-            self._conn.request("POST", Scalaris.default_path, params_json, headers)
+            self._conn.request("POST", scalaris.DEFAULT_PATH, params_json, headers)
             response = self._conn.getresponse()
             if (response.status < 200 or response.status >= 300):
-                raise ConnectionException(response)
+                raise scalaris.ConnectionError(response)
             data = response.read()
-        except socket.timeout as instance:
-            raise ConnectionException(instance)
+        except Exception as instance:
+            raise scalaris.ConnectionError(instance)
         print ''
         print 'response:'
         print json.dumps(json.loads(data), indent=1)
@@ -48,10 +46,9 @@ class ConnectionWithTrace(Scalaris.JSONConnection):
         return response_json['result']
 
 if __name__ == "__main__":
-    import sys
-    sc1 = Scalaris.Transaction(conn = ConnectionWithTrace())
-    sc1.req_list(sc1.newReqList().addWrite("keyA", "valueA").addWrite("keyB", "valueB").addCommit())
-    sc1.closeConnection()
-    sc2 = Scalaris.Transaction(conn = ConnectionWithTrace())
-    sc2.req_list(sc2.newReqList().addRead("keyA").addRead("keyB"))
-    sc2.req_list(sc2.newReqList().addWrite("keyA", "valueA2").addCommit())
+    sc1 = scalaris.Transaction(conn = ConnectionWithTrace())
+    sc1.req_list(sc1.new_req_list().add_write("keyA", "valueA").add_write("keyB", "valueB").add_commit())
+    sc1.close_connection()
+    sc2 = scalaris.Transaction(conn = ConnectionWithTrace())
+    sc2.req_list(sc2.new_req_list().add_read("keyA").add_read("keyB"))
+    sc2.req_list(sc2.new_req_list().add_write("keyA", "valueA2").add_commit())

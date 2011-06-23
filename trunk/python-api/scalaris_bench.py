@@ -13,7 +13,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import Scalaris
+import scalaris
 from datetime import datetime
 import time
 import random, string
@@ -21,16 +21,14 @@ import sys, traceback
 
 # The size of a single data item that is send to scalaris.
 _BENCH_DATA_SIZE = 1000
-# The time when the (whole) benchmark suite was started.
-_now = datetime.now()
 # This is used to create different erlang keys for each run.
-_benchTime = int(time.mktime(_now.timetuple()) * 1000 + (_now.microsecond // 1000.0))
+_benchTime = 0
 # The time at the start of a single benchmark.
 _timeAtStart = 0
 # Cut 5% off of both ends of the result list.
-_percentToRemove = 5
+_PERCENT_TO_REMOVE = 5
 # Number of transactions per test run.
-_transactionsPerTestRun = 10;
+_TRANSACTIONS_PER_TESTRUN = 10;
 
 # Returns a pre-initialized results array with values <tt>-1</tt>.
 def _getResultArray(rows, columns):
@@ -44,13 +42,13 @@ def _getResultArray(rows, columns):
 # Creates an random string or binary object from <size> random characters/bytes.
 def _getRandom(size, type):
     if type == 'string':
-        return ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(size))
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _x in xrange(size))
     elif type == 'binary':
-        return bytearray(random.randrange(0, 256) for x in xrange(size))
+        return bytearray(random.randrange(0, 256) for _x in xrange(size))
 
 # Prints a result table.
 def _printResults(columns, rows, results, testruns):
-    print 'Test runs: ' + str(testruns) + ', each using ' + str(_transactionsPerTestRun) + ' transactions'
+    print 'Test runs: ' + str(testruns) + ', each using ' + str(_TRANSACTIONS_PER_TESTRUN) + ' transactions'
     colLen = 25
     emptyFirstColumn = ''.join([' ']*colLen)
     print emptyFirstColumn + '\tspeed (transactions / second)'
@@ -90,6 +88,11 @@ def _printException():
 # * then using a new Transaction or TransactionSingleOp but re-using a single connection,
 # * and finally re-using a single Transaction or TransactionSingleOp object.
 def minibench(testruns, benchmarks):
+    # The time when the (whole) benchmark suite was started.
+    now = datetime.now()
+    # This is used to create different erlang keys for each run.
+    _benchTime = int(time.mktime(now.timetuple()) * 1000 + (now.microsecond // 1000.0))
+
     rows = ['separate connection', 're-use connection', 're-use object']
     columns = ['binary', 'string']
     results = _getResultArray(rows, columns)
@@ -271,11 +274,11 @@ def _testEnd(testruns):
 
 # Calculates the average number of transactions per second from the results
 # of executing 10 transactions per test run. Will remove the top and bottom
-# _percentToRemove percent of the sorted results array.
+# _PERCENT_TO_REMOVE percent of the sorted results array.
 # Returns the average number of transactions per second.
 def _getAvgSpeed(results):
     results.sort()
-    toRemove = int((len(results) * _percentToRemove) // 100);
+    toRemove = int((len(results) * _PERCENT_TO_REMOVE) // 100);
     avgSpeed = 0;
     for i in xrange(toRemove, (len(results) - toRemove)):
         avgSpeed += results[i]
@@ -294,12 +297,12 @@ def _transSingleOpBench1(testruns, value, name):
             try:
                 _testBegin()
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.TransactionSingleOp()
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.TransactionSingleOp()
                     tx.write(key + str(i) + str(j), value)
-                    tx.closeConnection()
+                    tx.close_connection()
                 
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -318,14 +321,14 @@ def _transSingleOpBench2(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
+                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.TransactionSingleOp(conn = conn)
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.TransactionSingleOp(conn = conn)
                     tx.write(key + str(i) + str(j), value)
                 
                 conn.close()
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -344,13 +347,13 @@ def _transSingleOpBench3(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                tx = Scalaris.TransactionSingleOp()
+                tx = scalaris.TransactionSingleOp()
                 
-                for j in xrange(_transactionsPerTestRun):
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
                     tx.write(key + str(i) + str(j), value)
                 
-                tx.closeConnection()
-                results.append(_testEnd(_transactionsPerTestRun))
+                tx.close_connection()
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -369,13 +372,13 @@ def _transBench1(testruns, value, name):
             try:
                 _testBegin()
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.Transaction()
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.Transaction()
                     tx.write(key + str(i) + str(j), value)
                     tx.commit()
-                    tx.closeConnection()
+                    tx.close_connection()
                 
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -394,15 +397,15 @@ def _transBench2(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
+                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.Transaction(conn = conn)
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.Transaction(conn = conn)
                     tx.write(key + str(i) + str(j), value)
                     tx.commit()
                 
                 conn.close()
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -421,14 +424,14 @@ def _transBench3(testruns, value, name):
         for retry in xrange(3):
             try:
                 _testBegin()
-                tx = Scalaris.Transaction()
+                tx = scalaris.Transaction()
                 
-                for j in xrange(_transactionsPerTestRun):
+                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
                     tx.write(key + str(i) + str(j), value)
                     tx.commit()
                 
-                tx.closeConnection()
-                results.append(_testEnd(_transactionsPerTestRun))
+                tx.close_connection()
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -447,20 +450,20 @@ def _transIncrementBench1(testruns, name):
         for retry in xrange(3):
             try:
                 key_i = key + str(i)
-                tx_init = Scalaris.Transaction()
+                tx_init = scalaris.Transaction()
                 tx_init.write(key_i, 0);
                 tx_init.commit();
-                tx_init.closeConnection();
+                tx_init.close_connection();
                 _testBegin()
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.Transaction()
+                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.Transaction()
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
                     tx.commit();
-                    tx.closeConnection();
+                    tx.close_connection();
                 
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -480,21 +483,21 @@ def _transIncrementBench2(testruns, name):
         for retry in xrange(3):
             try:
                 key_i = key + str(i)
-                tx_init = Scalaris.Transaction()
+                tx_init = scalaris.Transaction()
                 tx_init.write(key_i, 0);
                 tx_init.commit();
-                tx_init.closeConnection();
+                tx_init.close_connection();
                 _testBegin()
-                conn = Scalaris.JSONConnection(url = Scalaris.default_url)
+                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
                 
-                for j in xrange(_transactionsPerTestRun):
-                    tx = Scalaris.Transaction(conn = conn)
+                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
+                    tx = scalaris.Transaction(conn = conn)
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
                     tx.commit();
                 
                 conn.close()
-                results.append(_testEnd(_transactionsPerTestRun))
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
@@ -513,20 +516,20 @@ def _transIncrementBench3(testruns, name):
         for retry in xrange(3):
             try:
                 key_i = key + str(i)
-                tx_init = Scalaris.Transaction()
+                tx_init = scalaris.Transaction()
                 tx_init.write(key_i, 0);
                 tx_init.commit();
-                tx_init.closeConnection();
+                tx_init.close_connection();
                 _testBegin()
-                tx = Scalaris.Transaction()
+                tx = scalaris.Transaction()
                 
-                for j in xrange(_transactionsPerTestRun):
+                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
                     value_old = tx.read(key_i)
                     tx.write(key_i, value_old + 1)
                     tx.commit();
                     
-                tx.closeConnection();
-                results.append(_testEnd(_transactionsPerTestRun))
+                tx.close_connection();
+                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
                 break
             except:
                 # _printException()
