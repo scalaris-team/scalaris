@@ -12,16 +12,12 @@
   <Author>Nico Kruber</Author>
   <Email>kruber@zib.de</Email>
   <Sources>
-    <Source>InterOpTest.py</Source>
-    <Source>Scalaris.py</Source>
-    <Source>Benchmark.py</Source>
-    <Source>TransactionSingleOpTest.py</Source>
-    <Source>UnitTests.py</Source>
-    <Source>TransactionTest.py</Source>
-    <Source>ReplicatedDHTTest.py</Source>
-    <Source>PubSubTest.py</Source>
-    <Source>UserDevGuide_JSONtrace.py</Source>
-    <Source>ScalarisClient.py</Source>
+    <Source>scalaris.py</Source>
+    <Source>scalaris_bench.py</Source>
+    <Source>scalaris_client.py</Source>
+    <Source>scalaris_interop_test.py</Source>
+    <Source>scalaris_test.py</Source>
+    <Source>scalaris_userdevguide_jsontrace.py</Source>
   </Sources>
   <Forms>
   </Forms>
@@ -33,7 +29,7 @@
   </Interfaces>
   <Others>
   </Others>
-  <MainScript>Scalaris.py</MainScript>
+  <MainScript>scalaris.py</MainScript>
   <Vcs>
     <VcsType>None</VcsType>
   </Vcs>

@@ -13,8 +13,8 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import Scalaris
-import os, sys
+import scalaris
+import sys
 
 def read_or_write(sc, key, value, mode):
     try:
@@ -27,7 +27,7 @@ def read_or_write(sc, key, value, mode):
             # -> convert such a string to a list
             if (type(value).__name__=='list'):
                 try:
-                    actual = Scalaris.str_to_list(actual)
+                    actual = scalaris.str_to_list(actual)
                 except:
                     print 'fail'
                     return 1
@@ -42,19 +42,19 @@ def read_or_write(sc, key, value, mode):
             print 'write(' + key + ', ' + repr(value) + ')'
             sc.write(key, value)
             return 0
-    except Scalaris.ConnectionException as instance:
+    except scalaris.ConnectionError as instance:
         print 'failed with connection error'
         return 1
-    except Scalaris.TimeoutException as instance:
+    except scalaris.TimeoutError as instance:
         print 'failed with timeout'
         return 1
-    except Scalaris.AbortException as instance:
+    except scalaris.AbortError as instance:
         print 'failed with abort'
         return 1
-    except Scalaris.NotFoundException as instance:
+    except scalaris.NotFoundError as instance:
         print 'failed with not_found'
         return 1
-    except Scalaris.UnknownException as instance:
+    except scalaris.UnknownError as instance:
         print 'failed with unknown: ' + str(instance)
         return 1
     except Exception as instance:
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         print 'unknown commands: ' + str(sys.argv)
         sys.exit(1)
     
-    sc = Scalaris.TransactionSingleOp()
+    sc = scalaris.TransactionSingleOp()
     
     failed = 0
     failed += read_write_boolean(basekey, sc, mode)
