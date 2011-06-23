@@ -15,22 +15,32 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLEncoder;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.Servlet;
@@ -41,6 +51,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang.StringEscapeUtils;
+import org.xml.sax.InputSource;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
@@ -55,6 +68,8 @@ import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
 
 /**
  * Servlet for handling wiki page display and editing.
@@ -89,7 +104,11 @@ public class WikiServlet extends HttpServlet implements Servlet {
      */
     public static final String imageBaseURL = "images/image.png";
     
+    private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*\\.xml(\\.gz|\\.bz2)?$");
+    
     private ConnectionFactory cFactory;
+    
+    private String currentImport = "";
 
     /**
      * Creates the servlet. 
@@ -141,13 +160,10 @@ public class WikiServlet extends HttpServlet implements Servlet {
      *            the servlet's configuration
      */
     private boolean setupChordSharpConnection(HttpServletRequest request) {
+        TransactionSingleOp scalaris_single;
         try {
             connection = cFactory.createConnection();
-            TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
-            siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
-            namespace = new MyNamespace(siteinfo);
-            initialized = true;
-            return true;
+            scalaris_single = new TransactionSingleOp(connection);
         } catch (Exception e) {
             if (request != null) {
                 addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
@@ -155,6 +171,15 @@ public class WikiServlet extends HttpServlet implements Servlet {
                 System.out.println(e);
                 e.printStackTrace();
             }
+            return false;
+        }
+        try {
+            siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
+            namespace = new MyNamespace(siteinfo);
+            initialized = true;
+            return true;
+        } catch (Exception e) {
+            // no warning here - this probably is an empty wiki
             return false;
         }
     }
@@ -172,8 +197,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
     @Override
     protected void doGet(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
-        if (!initialized && !setupChordSharpConnection(request)) {
-            showEmptyPage(request, response);
+        if (!initialized && !setupChordSharpConnection(request) || !currentImport.isEmpty()) {
+            showImportPage(request, response);
             return;
         }
         request.setCharacterEncoding("UTF-8");
@@ -318,8 +343,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
     @Override
     protected void doPost(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
-        if (!initialized && !setupChordSharpConnection(request)) {
-            showEmptyPage(request, response);
+        if (!initialized && !setupChordSharpConnection(request) || !currentImport.isEmpty()) {
+            showImportPage(request, response);
         }
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
@@ -864,6 +889,125 @@ public class WikiServlet extends HttpServlet implements Servlet {
         request.setAttribute("pageBean", value);
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
         dispatcher.forward(request, response);
+    }
+    
+    /**
+     * Shows an empty page for testing purposes.
+     * 
+     * @param request
+     *            the request of the current operation
+     * @param response
+     *            the response of the current operation
+     * 
+     * @throws IOException 
+     * @throws ServletException 
+     */
+    private void showImportPage(HttpServletRequest request,
+            HttpServletResponse response) throws ServletException, IOException {
+        WikiPageBean value = new WikiPageBean();
+        value.setTitle("Import Wiki dump");
+        value.setNotAvailable(true);
+        request.setAttribute("pageBean", value);
+        
+        StringBuilder content = new StringBuilder();
+        String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
+        
+        if (currentImport.isEmpty()) {
+            List<String> availableDumps = new LinkedList<String>();
+            File dumpsDir = new File(dumpsPath);
+            if (dumpsDir.isDirectory()) {
+                availableDumps = Arrays.asList(dumpsDir.list(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File dir, String name) {
+                        return MATCH_WIKI_IMPORT_FILE.matcher(name).matches();
+                    }
+                }));
+            }
+
+            // get parameters:
+            String req_import = request.getParameter("import");
+            if (req_import == null || !availableDumps.contains(req_import)) {
+                content.append("<h2>Please select a wiki dump to import</h2>\n");
+                content.append("<ul>\n");
+                for (String dump: availableDumps) {
+                    content.append(" <li><a href=\"wiki?import=" + dump + "\">" + dump + "</a></li>\n");
+                }
+                content.append("</ul>\n");
+            } else {
+                content.append("<h2>Importing \"" + req_import + "\"...</h2>\n");
+                try {
+                    currentImport = req_import;
+                    // TODO: write to log file!
+                    //                PrintStream ps = System.out;
+                    PrintStream ps = new PrintStream(new FileOutputStream(dumpsPath + File.separator + req_import + "-import.log"));
+                    ps.println("starting import...");
+                    // import the dump if it exists:
+                    WikiDumpHandler handler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, 2, cFactory);
+                    handler.setUp();
+                    handler.setMsgOut(ps);
+                    InputSource is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(dumpsPath + File.separator + req_import);
+                    XMLReader reader = XMLReaderFactory.createXMLReader();
+                    reader.setContentHandler(handler);
+                    this.new ImportThread(reader, handler, is, ps).start();
+                    response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
+                    content.append("<p>Current log file (automatically refreshed every 2 seconds):</p>\n");
+                    content.append("<pre>");
+                    content.append("starting import...\n");
+                    content.append("</pre>");
+                    content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+                } catch (Exception e) {
+                    addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
+                    currentImport = "";
+                }
+            }
+        } else {
+            response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
+            content.append("<h2>Importing \"" + currentImport + "\"...</h2>\n");
+            content.append("<p>Current log file (automatically refreshed every 2 seconds):</p>\n");
+            content.append("<pre>");
+            final String logFileName = dumpsPath + File.separator + currentImport + "-import.log";
+            BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(logFileName), "UTF-8"));
+            String line;
+            while ((line = br.readLine()) != null) {
+                content.append(line);
+                content.append("\n");
+            }
+            content.append("</pre>");
+            content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+        }
+
+        value.setNotice(WikiServlet.getParam_notice(request));
+        value.setPage(content.toString());
+        
+        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
+        dispatcher.forward(request, response);
+    }
+    
+    class ImportThread extends Thread {
+        private XMLReader reader;
+        private WikiDumpHandler handler;
+        private InputSource is;
+        private PrintStream ps;
+        
+        public ImportThread(XMLReader reader, WikiDumpHandler handler, InputSource is, PrintStream ps) {
+            this.reader = reader;
+            this.handler = handler;
+            this.is = is;
+            this.ps = ps;
+        }
+        /* (non-Javadoc)
+         * @see java.lang.Thread#run()
+         */
+        @Override
+        public void run() {
+            try {
+                reader.parse(is);
+                handler.tearDown();
+            } catch (Exception e) {
+                e.printStackTrace(ps);
+            }
+            currentImport = "";
+        }
     }
 
     /**

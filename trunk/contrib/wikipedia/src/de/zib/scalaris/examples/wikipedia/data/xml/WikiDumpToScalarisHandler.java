@@ -80,13 +80,53 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      */
     public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions) throws RuntimeException {
         super(blacklist, maxRevisions);
-        
+        init(blacklist, maxRevisions, ConnectionFactory.getInstance());
+    }
+
+    /**
+     * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
+     * blacklist to stdout.
+     * 
+     * @param blacklist
+     *            a number of page titles to ignore
+     * @param maxRevisions
+     *            maximum number of revisions per page (starting with the most
+     *            recent) - <tt>-1/tt> imports all revisions
+     *            (useful to speed up the import / reduce the DB size)
+     * @param cFactory
+     *            the connection factory to use for creating new connections
+     * 
+     * @throws RuntimeException
+     *             if the connection to Scalaris fails
+     */
+    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions, ConnectionFactory cFactory) throws RuntimeException {
+        super(blacklist, maxRevisions);
+        init(blacklist, maxRevisions, cFactory);
+    }
+
+    /**
+     * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
+     * blacklist to stdout.
+     * 
+     * @param blacklist
+     *            a number of page titles to ignore
+     * @param maxRevisions
+     *            maximum number of revisions per page (starting with the most
+     *            recent) - <tt>-1/tt> imports all revisions
+     *            (useful to speed up the import / reduce the DB size)
+     * @param cFactory
+     *            the connection factory to use for creating new connections
+     * 
+     * @throws RuntimeException
+     *             if the connection to Scalaris fails
+     */
+    public void init(Set<String> blacklist, int maxRevisions, ConnectionFactory cFactory) throws RuntimeException {
         try {
             for (int i = 0; i < MAX_SCALARIS_CONNECTIONS; ++i) {
-                Connection connection = ConnectionFactory.getInstance().createConnection(
+                Connection connection = cFactory.createConnection(
                         "wiki_import", true);
                 scalaris_single.put(new TransactionSingleOp(connection));
-                connection = ConnectionFactory.getInstance().createConnection(
+                connection = cFactory.createConnection(
                         "wiki_import", true);
                 scalaris_tx.put(new Transaction(connection));
             }
@@ -300,7 +340,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         // only export page list every UPDATE_PAGELIST_EVERY pages:
         if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
             updatePageLists();
-            System.out.println("imported pages: " + pageCount);
+            msgOut.println("imported pages: " + pageCount);
         }
     }
 
