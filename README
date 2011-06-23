@@ -1,4 +1,4 @@
-# Copyright 2007-2008, 2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+# Copyright 2007-2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 # 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -13,151 +13,13 @@
 #    limitations under the License.
 README for Scalaris
 
-Scalaris is a scalable and fault-tolerant structured storage with strong data
-consistency for online databases or Web 2.0 services.
+Scalaris is a scalable, transactional, distributed and fault-tolerant
+key-value-store with strong data consistency for online databases and
+Web 2.0 services.
 
-For a more detailed description see the documentation in
+Instructions can be found in the 'Users and Developers Guide':
 user-dev-guide/main.pdf
 
-RPM
-====
-
-If you installed scalaris using rpms, the following will walk you
-through some basic tests:
-
-The following command will start scalaris on a single node:
-[root@csr-pc11 ~]# scalarisctl boot start
-Use the "-d" flag to detach the process from the current shell, i.e. run it
-as a daemon:
-[root@csr-pc11 ~]# scalarisctl -d boot start
-
-With the scalaris command line tool you can issue simple
-read/write/publish/subscribe commands. The following writes the
-key-value-pair (foo, bar) into the database.
-
-[root@csr-pc11 ~]# scalaris -w foo bar
-write(foo, bar)
-
-Using the -r parameter you can read back the value.
-
-[root@csr-pc11 ~]# scalaris -r foo
-read(foo) == bar
-
-And finally, for stopping the scalaris daemon:
-[root@csr-pc11 ~]# scalarisctl boot stop
-
-The remainder applies to the tarball.
-
-Requirements
-============
-
-You will need:
-- Erlang R13
-- GNU Make
-
-Optional:
-- java
-- ant
-
-Building
-========
-
-Execute:
-./configure
-make
-make docs
-
-Afterwards the system is built. You can either use it from the source directory
-or install it using 'make install'.
-
-Configuration
-=============
-
-Out of the box, Scalaris is configured for first tests with one Erlang
-VM on one machine.
-
-Files:
-bin/scalaris.cfg  --- default parameters, usually not to be changed
-bin/scalaris.local.cfg  --- optional file, to be adapted for distributed setups.
-bin/scalaris.local.cfg.example --- example file for bin/scalaris.local.cfg.
-
-Distributed Setup
- 
-For distributed setups, i.e. multiple servers forming one database,
-change the ip-address in the tuple {boot_host ...} to the one of the
-individual server (the boot-server).
-
-Production Setup
-
-To start scalaris into the background for production, use
-./bin/scalarisctl.
-
-Change the ip-address in the tuple {boot_host ...} to your own and adapt
-log_path (the path to the log directory).
-
-Running
-=======
-
-Open at least two shells. In the first:
-./bin/boot.sh
-
-This will start the boot server. On success http://localhost:8000
-should point to the statistics page of the boot server.
-
-In a second shell:
-./bin/cs_local.sh
-
-In a third shell:
-./bin/cs_local2.sh
-
-In a fourth shell:
-./bin/cs_local3.sh
-
-This will add 3 nodes to the network. The web pages should show the
-additional nodes.
-
-Starting nodes in same VM:
-In the Erlang-shell of the boot node do:
-> admin:add_nodes(3).
-
-
-Troubleshooting
-===============
-
-The boot server will start a web server on port 8000. Please make sure
-that no other applications is using the port.
-To check call:
-netstat -ltp | grep irdmi
-netstat -ltp | grep 8000
-Both commands will check whether an application is already using the 
-port.
-
-Firewall
-========
-
-Scalaris nodes are listening on TCP port 14195 by default. This is
-defined as an application parameter (port) that can be passed to
-Scalaris when it is started. For distributed deployments of Scalaris
-the firewall has to allow connections to this port from the outside.
-The port can be changed by setting the SCALARIS_ADDITIONAL_PARAMETERS
-environment variable to e.g. "-scalaris port <port>" before running
-scalarisctl. <port> can be a single integer, e.g. 14195, a list of integers
-(from which Scalaris chooses a free port), e.g. [14195,14196], or a tuple
-of two integers (which define a port range), e.g. {14195,14197}. Note that
-in order for the lists and tuples to be correctly passed to erlang, they
-must not contain any spaces!
-The cs_local.sh uses this method to change the port to 14196. This allows
-us to run several Scalaris nodes on the same host.
- 
-Overview of directories
-=======================
-
-bin             the executables (.sh and .beam)
-contrib         necessary third party packages
-doc             generated erlang documentation
-docroot         root directory of the integrated webserver
-java-api        a java api to Scalaris
-log             log files
-src             the erlang source code
-tests           unit tests for Scalaris
-user-dev-guide  users and developers guide
+Additional information, including download links for rpm-packages, can
+be found on the project homepage:
+http://scalaris.googlecode.com/
