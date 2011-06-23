@@ -39,6 +39,11 @@ import org.xml.sax.helpers.XMLReaderFactory;
  */
 public class Main {
     /**
+     * Default blacklist - pages with these names are not imported
+     */
+    public final static Set<String> blacklist = new HashSet<String>();
+    
+    /**
      * The main function of the application. Some articles are blacklisted and
      * will not be processed (see implementation for a list of them).
      * 
@@ -47,9 +52,7 @@ public class Main {
      */
     public static void main(String[] args) {
         try {
-            Set<String> blacklist = new HashSet<String>();
-
-            XMLReader myReader = XMLReaderFactory.createXMLReader();
+            XMLReader reader = XMLReaderFactory.createXMLReader();
 
             String filename = args[0];
             int maxRevisions = -1;
@@ -65,8 +68,8 @@ public class Main {
             WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions);
             handler.setUp();
             Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
-            myReader.setContentHandler(handler);
-            myReader.parse(getFileReader(filename));
+            reader.setContentHandler(handler);
+            reader.parse(getFileReader(filename));
             handler.tearDown();
         } catch (SAXException e) {
             System.err.println(e.getMessage());
@@ -77,7 +80,18 @@ public class Main {
         }
     }
     
-    private static InputSource getFileReader(String filename) throws FileNotFoundException, IOException {
+    /**
+     * Gets an appropriate file reader for the given file.
+     * 
+     * @param filename
+     *            the name of the file
+     * 
+     * @return a file reader
+     * 
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public static InputSource getFileReader(String filename) throws FileNotFoundException, IOException {
         InputStream is;
         if (filename.endsWith(".xml.gz")) {
             is = new GZIPInputStream(new FileInputStream(filename));

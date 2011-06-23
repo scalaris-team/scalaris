@@ -95,11 +95,11 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
                     System.out.println(",");
             }
             ++pageCount;
-            System.err.println(" " + page_xml.getRevisions().size() + " " + title);
+            msgOut.println(" " + page_xml.getRevisions().size() + " " + title);
 
             System.out.println("], []}.");
         } catch (Exception e) {
-            System.err.println(title);
+            msgOut.println(title);
             System.exit(0);
         }
     }

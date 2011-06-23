@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 
+import java.io.PrintStream;
 import java.util.Set;
 
 import org.xml.sax.Attributes;
@@ -57,6 +58,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      * The number of (successfully) processed pages.
      */
     protected int pageCount = 0;
+    
+    protected PrintStream msgOut = System.out;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -94,7 +97,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     @Override
     public void startElement(String uri, String localName, String qName,
             Attributes attributes) {
-        // System.out.println(localName);
+        // out.println(localName);
 
         /*
          * <siteinfo> <sitename>Wikipedia</sitename>
@@ -136,7 +139,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      */
     @Override
     public void characters(char[] ch, int start, int length) {
-        // System.out.println(new String(ch, start, length));
+        // out.println(new String(ch, start, length));
         if (inSiteInfo) {
             currentSiteInfo.characters(ch, start, length);
         }
@@ -275,7 +278,18 @@ public abstract class WikiDumpHandler extends DefaultHandler {
             }
             final long timeTaken = timeAtEnd - timeAtStart;
             final long speed = (pageCount * 1000) / timeTaken;
-            System.out.println("Finished import (" + speed + " pages/s)");
+            msgOut.println("Finished import (" + speed + " pages/s)");
         }
+    }
+
+    /**
+     * Sets the output writer to write status messages to (defaults to
+     * System.out).
+     * 
+     * @param msgOut
+     *            the msgOut to set
+     */
+    public void setMsgOut(PrintStream msgOut) {
+        this.msgOut = msgOut;
     }
 }
