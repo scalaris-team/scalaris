@@ -264,16 +264,30 @@ class JSONConnection(object):
     #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
     #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
     @staticmethod
-    def process_result_req_list(result):
+    def process_result_req_list_t(result):
         """
-        Processes the result of a req_list operation.
+        Processes the result of a req_list operation of the Transaction class.
         Returns the tuple (<tlog>, <result>) on success.
         Raises the appropriate exception if the operation failed.
         """
         if 'tlog' not in result or 'results' not in result or \
-            not isinstance(result['results'], list) or len(result['results']) < 1:
+            not isinstance(result['results'], list):
             raise UnknownError(result)
         return (result['tlog'], result['results'])
+
+    # results: {'tlog': xxx,
+    #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+    #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
+    @staticmethod
+    def process_result_req_list_tso(result):
+        """
+        Processes the result of a req_list operation of the TransactionSingleOp class.
+        Returns <result> on success.
+        Raises the appropriate exception if the operation failed.
+        """
+        if not isinstance(result, list):
+            raise UnknownError(result)
+        return result
     
     # result: 'ok'
     @staticmethod
@@ -286,11 +300,20 @@ class JSONConnection(object):
             raise UnknownError(result)
     
     @staticmethod
-    def new_req_list():
+    def new_req_list_t(other = None):
         """
-        Returns a new ReqList object allowing multiple parallel requests.
+        Returns a new ReqList object allowing multiple parallel requests for
+        the Transaction class.
         """
-        return _JSONReqList()
+        return _JSONReqListTransaction(other)
+    
+    @staticmethod
+    def new_req_list_tso(other = None):
+        """
+        Returns a new ReqList object allowing multiple parallel requests for
+        the TransactionSingleOp class.
+        """
+        return _JSONReqListTransactionSingleOp(other)
     
     def close(self):
         self._conn.close()
@@ -395,6 +418,46 @@ class TransactionSingleOp(object):
         Create a new object using the given connection
         """
         self._conn = conn
+    
+    def new_req_list(self, other = None):
+        """
+        Returns a new ReqList object allowing multiple parallel requests.
+        """
+        return self._conn.new_req_list_tso(other)
+    
+    def req_list(self, reqlist):
+        """
+        Issues multiple parallel requests to scalaris; each will be committed.
+        Request lists can be created using new_req_list().
+        The returned list has the following form:
+        [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+        {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
+        Elements of this list can be processed with process_result_read() and
+        process_result_write().
+        """
+        result = self._conn.call('req_list_commit_each', [reqlist.get_requests()])
+        result = self._conn.process_result_req_list_tso(result)
+        return result
+    
+    def process_result_read(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a read operation.
+        Returns the read value on success.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        return self._conn.process_result_read(result)
+
+    def process_result_write(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a write operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        # note: we need to process a commit result as the write has been committed
+        return self._conn.process_result_commit(result)
 
     def read(self, key):
         """
@@ -448,12 +511,11 @@ class Transaction(object):
         self._conn = conn
         self._tlog = None
     
-    def new_req_list(self):
+    def new_req_list(self, other = None):
         """
         Returns a new ReqList object allowing multiple parallel requests.
         """
-        return self._conn.new_req_list()
-    
+        return self._conn.new_req_list_t(other)
     
     def req_list(self, reqlist):
         """
@@ -462,15 +524,21 @@ class Transaction(object):
         The returned list has the following form:
         [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
         {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
-        The elements of this list can be processed with process_result_read(),
-        process_result_write() and process_result_commit().
+        Elements of this list can be processed with process_result_read() and
+        process_result_write().
+        A commit (at the end of the request list) will be automatically checked
+        for its success.
         """
         if self._tlog is None:
             result = self._conn.call('req_list', [reqlist.get_requests()])
         else:
             result = self._conn.call('req_list', [self._tlog, reqlist.get_requests()])
-        (tlog, result) = self._conn.process_result_req_list(result)
+        (tlog, result) = self._conn.process_result_req_list_t(result)
         self._tlog = tlog
+        if reqlist.is_commit():
+            self._process_result_commit(result[-1])
+            # transaction was successful: reset transaction log
+            self._tlog = tlog = None
         return result
     
     def process_result_read(self, result):
@@ -492,7 +560,7 @@ class Transaction(object):
         """
         return self._conn.process_result_write(result)
 
-    def process_result_commit(self, result):
+    def _process_result_commit(self, result):
         """
         Processes a result element from the list returned by req_list() which
         originated from a commit operation.
@@ -507,7 +575,7 @@ class Transaction(object):
         created operations inside the transaction.
         """
         result = self.req_list(self.new_req_list().add_commit())[0]
-        self.process_result_commit(result)
+        self._process_result_commit(result)
         # reset tlog (minor optimization which is not done in req_list):
         self._tlog = None
     
@@ -531,7 +599,7 @@ class Transaction(object):
         transaction.
         """
         result = self.req_list(self.new_req_list().add_write(key, value))[0]
-        self.process_result_commit(result)
+        self._process_result_commit(result)
 
     def nop(self, value):
         """
@@ -550,41 +618,102 @@ class Transaction(object):
 
 class _JSONReqList(object):
     """
-    Request list for use with Transaction.req_list()
+    Generic request list.
     """
     
-    def __init__(self):
+    def __init__(self, other = None):
         """
         Create a new object using a JSON connection.
         """
-        self.requests = []
+        self._requests = []
+        self._is_commit = False
+        if other is not None:
+            self.extend(other)
     
     def add_read(self, key):
         """
         Adds a read operation to the request list.
         """
-        self.requests.append({'read': key})
+        if (self._is_commit):
+            raise RuntimeError("No further request supported after a commit!")
+        self._requests.append({'read': key})
         return self
     
     def add_write(self, key, value):
         """
         Adds a write operation to the request list.
         """
-        self.requests.append({'write': {key: JSONConnection.encode_value(value)}})
+        if (self._is_commit):
+            raise RuntimeError("No further request supported after a commit!")
+        self._requests.append({'write': {key: JSONConnection.encode_value(value)}})
         return self
     
     def add_commit(self):
         """
         Adds a commit operation to the request list.
         """
-        self.requests.append({'commit': ''})
+        if (self._is_commit):
+            raise RuntimeError("Only one commit per request list allowed!")
+        self._requests.append({'commit': ''})
+        self._is_commit = True
         return self
     
     def get_requests(self):
         """
         Gets the collected requests.
         """
-        return self.requests
+        return self._requests
+
+    def is_commit(self):
+        """
+        Returns whether the transactions contains a commit or not.
+        """
+        return self._is_commit
+
+    def is_empty(self):
+        """
+        Checks whether the request list is empty.
+        """
+        return self._requests == []
+
+    def size(self):
+        """
+        Gets the number of requests in the list.
+        """
+        return len(self._requests)
+
+    def extend(self, other):
+        """
+        Adds all requests of the other request list to the end of this list.
+        
+        Use in implementation in sub-classes with according types as different
+        request lists may not be compatible with each other.
+        """
+        self._requests.extend(other._requests)
+        return self
+
+class _JSONReqListTransaction(_JSONReqList):
+    """
+    Request list for use with Transaction.req_list().
+    """
+    
+    def __init__(self, other = None):
+        _JSONReqList.__init__(self, other)
+
+class _JSONReqListTransactionSingleOp(_JSONReqList):
+    """
+    Request list for use with TransactionSingleOp.req_list() which does not
+    support commits.
+    """
+    
+    def __init__(self, other = None):
+        _JSONReqList.__init__(self, other)
+    
+    def add_commit(self):
+        """
+        Adds a commit operation to the request list.
+        """
+        raise RuntimeError("No commit allowed in TransactionSingleOp.req_list()!")
 
 class PubSub(object):
     """

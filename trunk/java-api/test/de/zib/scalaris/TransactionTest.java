@@ -569,9 +569,7 @@ public class TransactionTest {
 
             final RequestList requests = new RequestList(readRequests);
             requests.addAll(writeRequests).addCommit();
-
             results = conn.req_list(requests);
-
             assertEquals(requests.size(), results.size());
 
             // now evaluate the read results:
@@ -597,7 +595,6 @@ public class TransactionTest {
 
             // once again test reads - now all reads should be successful
             results = conn.req_list(readRequests);
-
             assertEquals(readRequests.size(), results.size());
 
             // now evaluate the read results:

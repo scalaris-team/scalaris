@@ -20,7 +20,7 @@
 -vsn('$Id$').
 
 -export([tx_req_list/1, tx_req_list/2, tx_read/1, tx_write/2,
-         tx_test_and_set/3]).
+         tx_test_and_set/3, tx_req_list_commit_each/1]).
 
 -export([pubsub_publish/2, pubsub_subscribe/2, pubsub_unsubscribe/2,
          pubsub_get_subscribers/1]).
@@ -94,6 +94,12 @@ tx_test_and_set(Key, OldValue, NewValue) ->
     NewRealValue = json_to_value(NewValue),
     Res = api_tx:test_and_set(Key, OldRealValue, NewRealValue),
     result_to_json(Res).
+
+-spec tx_req_list_commit_each({array, [request()]}) -> {array, [result()]}.
+tx_req_list_commit_each(JSON_ReqList) ->
+    ReqList = json_to_reqlist(JSON_ReqList),
+    Res = api_tx:req_list_commit_each(ReqList),
+    results_to_json(Res).
 
 results_to_json(Results) ->
     Entries = [ result_to_json(Result) || Result <- Results ],
