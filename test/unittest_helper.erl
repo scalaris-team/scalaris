@@ -392,7 +392,7 @@ kill_new_processes(OldProcesses, Options) ->
                   Tabs = util:ets_tables_of(X),
                   try erlang:exit(X, kill) of
                       true -> util:wait_for_process_to_die(X),
-                              [ util:wait_for_table_to_disappear(Tab) || Tab <- Tabs ],
+                              _ = [ util:wait_for_table_to_disappear(Tab) || Tab <- Tabs ],
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end
