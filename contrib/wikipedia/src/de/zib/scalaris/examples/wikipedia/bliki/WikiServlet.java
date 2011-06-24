@@ -63,7 +63,7 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RandomTitleResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.SaveResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -181,6 +181,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         }
         try {
             siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
+            // TODO: fix siteinfo's base url
             namespace = new MyNamespace(siteinfo);
             initialized = true;
             return true;
@@ -1113,7 +1114,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
             int newRevId = (oldVersion == -1) ? 1 : oldVersion + 1;
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary, content);
 
-            SaveResult result = ScalarisDataHandler.savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
+            SavePageResult result = ScalarisDataHandler.savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
                 // do not include the UTF-8-title directly into encodeRedirectURL since that's not 
@@ -1237,5 +1238,19 @@ public class WikiServlet extends HttpServlet implements Servlet {
         } catch (NumberFormatException e) {
             return def;
         }
+    }
+
+    /**
+     * @return the namespace
+     */
+    public final MyNamespace getNamespace() {
+        return namespace;
+    }
+
+    /**
+     * @return the siteinfo
+     */
+    public SiteInfo getSiteinfo() {
+        return siteinfo;
     }
 }
