@@ -22,6 +22,7 @@ import java.io.PrintStream;
 import java.util.Set;
 
 import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
@@ -60,6 +61,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     protected int pageCount = 0;
     
     protected PrintStream msgOut = System.out;
+    
+    protected boolean stop = false;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -96,7 +99,10 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      */
     @Override
     public void startElement(String uri, String localName, String qName,
-            Attributes attributes) {
+            Attributes attributes) throws SAXException {
+        if (stop) {
+            throw new SAXParsingInterruptedException();
+        }
         // out.println(localName);
 
         /*
@@ -138,7 +144,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      *            The number of characters to use from the character array.
      */
     @Override
-    public void characters(char[] ch, int start, int length) {
+    public void characters(char[] ch, int start, int length)
+            throws SAXException {
         // out.println(new String(ch, start, length));
         if (inSiteInfo) {
             currentSiteInfo.characters(ch, start, length);
@@ -163,7 +170,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      *            qualified names are not available.
      */
     @Override
-    public void endElement(String uri, String localName, String qName) {
+    public void endElement(String uri, String localName, String qName)
+            throws SAXException {
         if (inSiteInfo) {
             if (localName.equals("siteinfo")) {
                 inSiteInfo = false;
@@ -291,5 +299,12 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      */
     public void setMsgOut(PrintStream msgOut) {
         this.msgOut = msgOut;
+    }
+
+    /**
+     * Tells the parser to stop at the next starting element.
+     */
+    public void stopParsing() {
+        this.stop = true;
     }
 }
