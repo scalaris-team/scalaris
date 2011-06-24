@@ -24,8 +24,9 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
--export([increment/1, quorum_read/1, read_read/1]).
+-export([increment/1, increment_with_key/2, quorum_read/1, read_read/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -37,6 +38,15 @@
 increment(Iterations) ->
     fun (Parent) ->
             Key = get_and_init_key(),
+            Start = os:timestamp(),
+            Aborts = increment_iter(Key, Iterations, 0),
+            Stop = os:timestamp(),
+            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    end.
+
+-spec increment_with_key(integer(), client_key()) -> fun().
+increment_with_key(Iterations, Key) ->
+    fun (Parent) ->
             Start = os:timestamp(),
             Aborts = increment_iter(Key, Iterations, 0),
             Stop = os:timestamp(),

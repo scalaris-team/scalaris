@@ -20,20 +20,33 @@
 -vsn('$Id: bench.erl 1814 2011-06-21 15:01:58Z schuett $').
 
 %% public interface
--export([increment/2, quorum_read/2, read_read/2]).
+-export([increment/2, increment/3, quorum_read/2, read_read/2]).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 %% @doc run an increment benchmark (i++) on all nodes
 -spec increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
 increment(ThreadsPerVM, Iterations) ->
-    Msg = {bench, increment, ThreadsPerVM, Iterations, comm:this()},
+    Msg = {bench, increment, ThreadsPerVM, Iterations, comm:this(), undefined},
     manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
+
+%% @doc run an increment benchmark on all nodes (with a user-specified key)
+-spec increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
+                Key::client_key()) -> ok.
+increment(ThreadsPerVM, Iterations, Key) ->
+    case init_key(Key, 100) of
+        failed ->
+            ok;
+        _ ->
+            Msg = {bench, increment_with_key, ThreadsPerVM, Iterations, comm:this(), Key},
+            manage_run(ThreadsPerVM, Iterations, [verbose], Msg)
+    end.
 
 %% @doc run an read benchmark on all nodes
 -spec quorum_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
 quorum_read(ThreadsPerVM, Iterations) ->
-    Msg = {bench, quorum_read, ThreadsPerVM, Iterations, comm:this()},
+    Msg = {bench, quorum_read, ThreadsPerVM, Iterations, comm:this(), undefined},
     manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
 
 %% @doc run an read benchmark on all nodes
@@ -96,3 +109,22 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
         false -> ok
     end,
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% helper functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec init_key(Key::client_key(), non_neg_integer()) -> failed | client_key().
+init_key(_Key, 0) ->
+    io:format("init_key failed~n", []),
+    failed;
+init_key(Key, Count) ->
+    case api_tx:write(Key, 0) of
+        {ok} ->
+            Key;
+        {fail, abort} ->
+            init_key(Key, Count - 1);
+        {fail, timeout} ->
+            init_key(Key, Count - 1)
+    end.

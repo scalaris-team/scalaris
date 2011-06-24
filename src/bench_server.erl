@@ -33,10 +33,12 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(comm:message(), ok) -> ok.
-on({bench, Op, Threads, Iterations, Owner}, State) ->
+on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
     Bench = case Op of
                 increment ->
                     bench_fun:increment(Iterations);
+                increment_with_key ->
+                    bench_fun:increment_with_key(Iterations, Param);
                 quorum_read ->
                     bench_fun:quorum_read(Iterations);
                 read_read ->
