@@ -1,10 +1,10 @@
 #!/bin/bash
 ### BEGIN INIT INFO
 # Provides:          vmcontext 
-# Required-Start:    $local_fs 
-# Required-Stop:     $local_fs 
-# Default-Start:     2
-# Default-Stop:      0 1 6
+# Required-Start:    mountall
+# Required-Stop:     
+# Default-Start:     S
+# Default-Stop:      
 # Short-Description: set vm context (opennebula).
 # Description:       see short.
 ### END INIT INFO
@@ -26,6 +26,8 @@
 #--------------------------------------------------------------------------- #
 
 echo -n "Setting up vmcontext ..."
+
+NETMASK="255.0.0.0"
 
 # Gets IP address from a given MAC
 mac2ip() {
@@ -73,7 +75,7 @@ gen_hosts() {
  
 gen_exports() {
     NETWORK=$1
-    echo "/images ${NETWORK}.0/255.255.255.0(rw,async,no_subtree_check)"
+    echo "/images ${NETWORK}.0/$NETMASK(rw,async,no_subtree_check)"
 }
  
 gen_hostname() {
@@ -95,7 +97,7 @@ auto $DEV
 iface $DEV inet static
   address $IP
   network $NETWORK.0
-  netmask 255.255.255.0
+  netmask $NETMASK 
 EOT
  
     if [ $DEV == "eth0" ]; then
@@ -105,9 +107,7 @@ EOT
 echo ""
 }
  
- 
 IFACES=`get_interfaces`
- 
 for i in $IFACES; do
     MASTER_DEV_MAC=$i
     DEV=`get_dev $i`
@@ -133,7 +133,23 @@ for i in $IFACES; do
     gen_interface $i
 done
 ) > /etc/network/interfaces
- 
-# /bin/hostname `cat /etc/hostname`
+
+mkdir /mnt/context
+mount -o ro /dev/sr0 /mnt/context
+cp /mnt/context/context.sh /root
+umount /mnt/context
+rmdir /mnt/context
+
+source /root/context.sh
+HOSTNAME=`echo $IP_PUBLIC | sed 's/\./-/g'`
+MASTER_HOSTNAME=`echo $HADOOP_MASTER | sed 's/\./-/g'`
+/bin/hostname $HOSTNAME
+
+echo "$IP_PUBLIC $HOSTNAME" >> /etc/hosts
+if [ "x$HADOOP_FIRST" != "xtrue" ]; then
+  echo "$HADOOP_MASTER $MASTER_HOSTNAME" >> /etc/hosts
+fi
+
+
 /etc/init.d/networking restart
 echo " done."
