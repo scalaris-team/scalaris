@@ -107,7 +107,8 @@ ${ pageBean.page }
                                     <option value="<%= i %>"<%= selected %>><%= namespace %></option>
                       <% } %>
                                   </select>
-                                  <input type="submit" value="Go" />    </td>
+                                  <input type="submit" value="Go" />
+                                </td>
                               </tr>
                             </table>
                           </fieldset>

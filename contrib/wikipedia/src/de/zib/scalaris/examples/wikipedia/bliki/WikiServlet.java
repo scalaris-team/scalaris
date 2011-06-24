@@ -68,6 +68,7 @@ import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
 
@@ -77,6 +78,9 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiServlet extends HttpServlet implements Servlet {
+    private static final String MAIN_PAGE = "Main Page";
+    private static final int IMPORT_REDIRECT_EVERY = 5; // seconds
+
     private static final long serialVersionUID = 1L;
     
     /**
@@ -109,6 +113,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
     private ConnectionFactory cFactory;
     
     private String currentImport = "";
+
+    private WikiDumpHandler importHandler = null;
 
     /**
      * Creates the servlet. 
@@ -213,7 +219,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         // get parameters:
         String req_title = request.getParameter("title");
         if (req_title == null) {
-            req_title = "Main Page";
+            req_title = MAIN_PAGE;
         }
 
         
@@ -234,16 +240,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
             if (req_to == null) {
                 req_to = ""; // shows all pages
             }
-            int nsId = 0;
-            try {
-                String req_ns = request.getParameter("namespace");
-                if (req_ns == null) {
-                    req_ns = "0"; // shows all pages
-                }
-                nsId = Integer.parseInt(req_ns);
-            } catch (NumberFormatException e) {
-                // use default namespace for invalid values
-            }
+            // use default namespace (id 0) for invalid values
+            int nsId = parseInt(request.getParameter("namespace"), 0);
             WikiPageListBean value = new WikiPageListBean();
             value.setPageHeading("All pages");
             value.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
@@ -268,16 +266,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
                     req_prefix = req_title.substring(slashIndex + 1);
                 }
             }
-            int nsId = 0;
-            try {
-                String req_ns = request.getParameter("namespace");
-                if (req_ns == null) {
-                    req_ns = "0"; // shows all pages
-                }
-                nsId = Integer.parseInt(req_ns);
-            } catch (NumberFormatException e) {
-                // use default namespace for invalid values
-            }
+            // use default namespace (id 0) for invalid values
+            int nsId = parseInt(request.getParameter("namespace"), 0);
             WikiPageListBean value = new WikiPageListBean();
             value.setPageHeading("All pages");
             value.setTitle("Special:PrefixIndex&prefix=" + req_prefix);
@@ -912,7 +902,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
         StringBuilder content = new StringBuilder();
         String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
         
-        if (currentImport.isEmpty()) {
+        if (currentImport.isEmpty() || importHandler == null) {
             List<String> availableDumps = new LinkedList<String>();
             File dumpsDir = new File(dumpsPath);
             if (dumpsDir.isDirectory()) {
@@ -928,42 +918,59 @@ public class WikiServlet extends HttpServlet implements Servlet {
             String req_import = request.getParameter("import");
             if (req_import == null || !availableDumps.contains(req_import)) {
                 content.append("<h2>Please select a wiki dump to import</h2>\n");
-                content.append("<ul>\n");
+                
+                content.append("<form method=\"get\" action=\"wiki\">\n");
+                content.append("<p>\n");
+                content.append("  <select name=\"import\" size=\"10\" style=\"width:400px;\">\n");
                 for (String dump: availableDumps) {
-                    content.append(" <li><a href=\"wiki?import=" + dump + "\">" + dump + "</a></li>\n");
+                    content.append("   <option>" + dump + "</option>\n");
                 }
-                content.append("</ul>\n");
+                content.append("  </select>\n");
+                content.append(" </p>\n");
+                content.append(" Maximum number of revisions per page: <input name=\"max_revisions\" size=\"2\" value=\"2\" /></br>\n");
+                content.append(" <input type=\"submit\" value=\"Import\" />\n");
+                content.append("</form>\n");
+                content.append("<p>Note: You will be re-directed to the main page when the import finishes.</p>");
             } else {
                 content.append("<h2>Importing \"" + req_import + "\"...</h2>\n");
                 try {
                     currentImport = req_import;
-                    // TODO: write to log file!
-                    //                PrintStream ps = System.out;
+                    int maxRevisions = parseInt(request.getParameter("max_revisions"), 2);
                     PrintStream ps = new PrintStream(new FileOutputStream(dumpsPath + File.separator + req_import + "-import.log"));
                     ps.println("starting import...");
-                    // import the dump if it exists:
-                    WikiDumpHandler handler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, 2, cFactory);
-                    handler.setUp();
-                    handler.setMsgOut(ps);
+                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, maxRevisions, cFactory);
+                    importHandler.setUp();
+                    importHandler.setMsgOut(ps);
                     InputSource is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(dumpsPath + File.separator + req_import);
                     XMLReader reader = XMLReaderFactory.createXMLReader();
-                    reader.setContentHandler(handler);
-                    this.new ImportThread(reader, handler, is, ps).start();
+                    reader.setContentHandler(importHandler);
+                    this.new ImportThread(reader, importHandler, is, ps).start();
                     response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
-                    content.append("<p>Current log file (automatically refreshed every 2 seconds):</p>\n");
+                    content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
                     content.append("<pre>");
                     content.append("starting import...\n");
                     content.append("</pre>");
                     content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+                    content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
                 } catch (Exception e) {
                     addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
                     currentImport = "";
                 }
             }
         } else {
-            response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
             content.append("<h2>Importing \"" + currentImport + "\"...</h2>\n");
-            content.append("<p>Current log file (automatically refreshed every 2 seconds):</p>\n");
+            
+            String req_stop_import = request.getParameter("stop_import");
+            boolean stopImport;
+            if (req_stop_import == null || req_stop_import.isEmpty()) {
+                stopImport = false;
+                response.setHeader("Refresh", IMPORT_REDIRECT_EVERY + "; url = wiki?import=" + currentImport);
+                content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
+            } else {
+                stopImport = true;
+                importHandler.stopParsing();
+                content.append("<p>Current log file:</p>\n");
+            }
             content.append("<pre>");
             final String logFileName = dumpsPath + File.separator + currentImport + "-import.log";
             BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(logFileName), "UTF-8"));
@@ -973,7 +980,12 @@ public class WikiServlet extends HttpServlet implements Servlet {
                 content.append("\n");
             }
             content.append("</pre>");
-            content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+            if (!stopImport) {
+                content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+                content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
+            } else {
+                content.append("<p>Import has been stopped by the user. Return to <a href=\"wiki?title=" + MAIN_PAGE + "\">" + MAIN_PAGE + "</a>.</p>");
+            }
         }
 
         value.setNotice(WikiServlet.getParam_notice(request));
@@ -1003,10 +1015,15 @@ public class WikiServlet extends HttpServlet implements Servlet {
             try {
                 reader.parse(is);
                 handler.tearDown();
+                ps.println("import finished");
             } catch (Exception e) {
-                e.printStackTrace(ps);
+                if (e instanceof SAXParsingInterruptedException) {
+                    // this is ok - we told the parser to stop
+                } else {
+                    e.printStackTrace(ps);
+                }
             }
-            currentImport = "";
+            WikiServlet.this.currentImport = "";
         }
     }
 
@@ -1084,7 +1101,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
             HttpServletResponse response, String title) throws UnsupportedEncodingException, IOException, ServletException {
         String content = request.getParameter("wpTextbox1");
         String summary = request.getParameter("wpSummary");
-        int oldVersion = Integer.parseInt(request.getParameter("oldVersion"));
+        int oldVersion = parseInt(request.getParameter("oldVersion"), -1);
         boolean minorChange = Boolean.parseBoolean(request.getParameter("minor"));
 
         // save page or preview+edit page?
@@ -1185,15 +1202,9 @@ public class WikiServlet extends HttpServlet implements Servlet {
      *            the http request
      * @return the revision id or -1 on failure to parse
      */
-    public static int getParam_oldid(HttpServletRequest request) {
+    private static int getParam_oldid(HttpServletRequest request) {
         String req_oldid = request.getParameter("oldid");
-        int result;
-        try {
-            result = Integer.parseInt(req_oldid);
-        } catch (NumberFormatException e) {
-            result = -1;
-        }
-        return result;
+        return parseInt(req_oldid, -1);
     }
 
     /**
@@ -1204,7 +1215,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
      *            the http request
      * @return the renderer id
      */
-    public static int getParam_renderer(HttpServletRequest request) {
+    private static int getParam_renderer(HttpServletRequest request) {
         int render = 1;
         String req_render = request.getParameter("render");
         if (req_render == null) {
@@ -1215,5 +1226,16 @@ public class WikiServlet extends HttpServlet implements Servlet {
             render = -1;
         }
         return render;
+    }
+    
+    private final static int parseInt(String value, int def) {
+        if (value == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 }
