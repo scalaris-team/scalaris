@@ -1,5 +1,5 @@
 
-default: test
+default: binary.iso 
 
 test: binary.iso
 	kvm -cdrom binary.iso -m 1024
