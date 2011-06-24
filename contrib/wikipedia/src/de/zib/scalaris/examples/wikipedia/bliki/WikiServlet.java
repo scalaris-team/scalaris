@@ -71,6 +71,8 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
+import de.zib.scalaris.examples.wikipedia.plugin.EventHandler;
+import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
 
 /**
  * Servlet for handling wiki page display and editing.
@@ -115,6 +117,8 @@ public class WikiServlet extends HttpServlet implements Servlet {
     private String currentImport = "";
 
     private WikiDumpHandler importHandler = null;
+    
+    private List<EventHandler> eventHandlers = new LinkedList<EventHandler>();
 
     /**
      * Creates the servlet. 
@@ -165,6 +169,7 @@ public class WikiServlet extends HttpServlet implements Servlet {
      * @param config
      *            the servlet's configuration
      */
+    @SuppressWarnings("unchecked")
     private boolean setupChordSharpConnection(HttpServletRequest request) {
         TransactionSingleOp scalaris_single;
         try {
@@ -184,11 +189,33 @@ public class WikiServlet extends HttpServlet implements Servlet {
             // TODO: fix siteinfo's base url
             namespace = new MyNamespace(siteinfo);
             initialized = true;
-            return true;
         } catch (Exception e) {
             // no warning here - this probably is an empty wiki
             return false;
         }
+        final String pluginDir = getServletContext().getRealPath("/WEB-INF/plugins");
+        try {
+            PluginClassLoader pcl = new PluginClassLoader(pluginDir, new Class[] {EventHandler.class});
+            List<Class<?>> plugins = pcl.getClasses(EventHandler.class);
+            if (plugins != null) {
+                for (Class<?> clazz: plugins) {
+                    EventHandler handler;
+                    try {
+                        handler = ((Class<EventHandler>) clazz).newInstance();
+                        handler.init(this);
+                        eventHandlers.add(handler);
+                    } catch (Exception e) {
+                        System.err.println("failed to load plugin " + clazz.getCanonicalName());
+                        e.printStackTrace();
+                        continue;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("failed to load plugins");
+            e.printStackTrace();
+        }
+        return true;
     }
 
     @Override
@@ -1115,6 +1142,9 @@ public class WikiServlet extends HttpServlet implements Servlet {
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary, content);
 
             SavePageResult result = ScalarisDataHandler.savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
+            for (EventHandler handler: eventHandlers) {
+                handler.onPageSaved(result);
+            }
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
                 // do not include the UTF-8-title directly into encodeRedirectURL since that's not 
