@@ -109,6 +109,13 @@ public class MyNamespace extends Namespace {
             return siteinfo.getNamespaces().get(key.toString()).get(SiteInfo.NAMESPACE_PREFIX);
         }
     }
+
+    /**
+     * Creates a default namespace as in {@link Namespace#Namespace()}.
+     */
+    public MyNamespace() {
+        super();
+    }
     
     /**
      * Creates a wikipedia namespace based on the given site info.
@@ -131,7 +138,7 @@ public class MyNamespace extends Namespace {
         TALKSPACE_MAP.put(fNamespacesLowercase[0], null); // media
         TALKSPACE_MAP.put(fNamespacesLowercase[1], null); // special
         TALKSPACE_MAP.put(fNamespacesLowercase[2], getTalk()); // ""
-        TALKSPACE_MAP.put(fNamespacesLowercase[3], null); // talk
+        TALKSPACE_MAP.put(fNamespacesLowercase[3], getTalk()); // talk
         TALKSPACE_MAP.put(fNamespacesLowercase[4], getUser_talk()); // user
         TALKSPACE_MAP.put(fNamespacesLowercase[5], getUser_talk()); // user_talk
         TALKSPACE_MAP.put(fNamespacesLowercase[6], getMeta_talk()); // project
@@ -171,5 +178,61 @@ public class MyNamespace extends Namespace {
      */
     public SiteInfo getSiteinfo() {
         return siteinfo;
+    }
+    
+    /**
+     * Gets the talk page's name corresponding to the given page name.
+     * 
+     * @param pageName
+     *            a page name, i.e. a title
+     * 
+     * @return the name of the talk page
+     */
+    public String getTalkPageFromPageName(String pageName) {
+        String[] pnSplit = MyWikiModel.splitNsTitle(pageName);
+        String talkspace = getTalkspace(pnSplit[0]);
+        if (talkspace == null) {
+            return pnSplit[1];
+        } else {
+            return talkspace + ":" + pnSplit[1];
+        }
+    }
+    
+    /**
+     * Gets the content page's name corresponding to the given talk page name.
+     * 
+     * @param talkPageName
+     *            a talk page name, i.e. a title
+     * 
+     * @return the name of the content page
+     */
+    public String getPageNameFromTalkPage(String talkPageName) {
+        String[] pnSplit = MyWikiModel.splitNsTitle(talkPageName);
+        String namespace = pnSplit[0];
+        String talkspace = getTalkspace(namespace);
+        if (talkspace == null || !namespace.equals(talkspace)) {
+            return talkPageName;
+        } else {
+            return pnSplit[1];
+        }
+    }
+    
+    /**
+     * Checks whether the page's name is in a talk space.
+     * 
+     * @param pageName
+     *            a page name, i.e. a title
+     * 
+     * @return <tt>true</tt> if the page is a talk page, <tt>false</tt>
+     *         otherwise
+     */
+    public boolean isTalkPage(String pageName) {
+        String namespace = MyWikiModel.getNamespace(pageName);
+        String talkspace = getTalkspace(namespace);
+        if (talkspace == null || !namespace.equals(talkspace)) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }

@@ -15,7 +15,6 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
-import info.bliki.wiki.namespaces.Namespace;
 
 /**
  * Bean with common content to display in a jsp. 
@@ -36,7 +35,7 @@ public class WikiPageBeanBase {
     private String wikiTitle = "Wikipedia";
     private String wikiLang = "en";
     private String wikiLangDir = "ltr";
-    private Namespace wikiNamespace = new Namespace();
+    private MyNamespace wikiNamespace = new MyNamespace();
     protected String redirectedTo = "";
     private boolean isEditRestricted = false;
     /**
@@ -166,14 +165,14 @@ public class WikiPageBeanBase {
     /**
      * @return the wikiTalkNamespace
      */
-    public Namespace getWikiNamespace() {
+    public MyNamespace getWikiNamespace() {
         return wikiNamespace;
     }
 
     /**
      * @param wikiNamespace the wikiTalkNamespace to set
      */
-    public void setWikiNamespace(Namespace wikiNamespace) {
+    public void setWikiNamespace(MyNamespace wikiNamespace) {
         this.wikiNamespace = wikiNamespace;
     }
 
