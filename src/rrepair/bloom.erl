@@ -127,21 +127,16 @@ print_(Bloom) ->
 		  } = Bloom,
 	HCount = apply(element(1, Hfs), hfs_size, [Hfs]), 
 	io:format("BloomFilter: bloom~n"
-			  "Size~16b Bit~n"
-			  "Size~16.2f kb~n---~n"
-			  "Bits Per Item~16.2f~n"
-			  "MaxItems~12b~n"
-			  "DestFPR~13.4f~n"
-			  "---~n"
-			  "HashFunNum~10b~n"
-			  "ActItemNum~10b~n"
-			  "ActFPR~14.4f~n", 
+			  "Size~16b Bit (16.2f kb) (16.2 Bit / Item)~n"
+              "HashFunNum~10b~n"
+              "Planed > MaxItems~12b (DestFPR=13.4f)"			  
+			  "Actual > ItemNum~10b (Fpr=14.4f)~n", 
 			  [Size,
 			  (Size div 8) / 1024,
 			   Size / MaxItems,
+               HCount,
 			   MaxItems,
-			   TargetFPR,
-			   HCount,
+			   TargetFPR,			   
 			   NumItems,
 			   calc_FPR(Size, NumItems, HCount)]
 			 ),
