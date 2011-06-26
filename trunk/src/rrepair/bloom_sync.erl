@@ -71,7 +71,7 @@
     {get_state_response, intervals:interval()} |
     {get_chunk_response, rep_upd:db_chunk()} |
     {diff_list, comm:mypid(), [{?RT:key(), ?DB:version()}]} |
-    {build_sync_struct, comm:erl_local_pid(), rep_upd:db_chunk(), non_neg_integer()} |
+    {build_sync_struct, Sender::comm:erl_local_pid(), rep_upd:db_chunk(), Fpr::float(), Round::non_neg_integer()} |
     {shutdown, exit_reason()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -135,7 +135,7 @@ on({get_chunk_response, {_, DBList}}, State) ->
                            DBList),
 	?TRACE("SYNC WITH [~p] RESULT: DBListLength=[~p] -> Missing=[~p] Obsolete=[~p]", 
            [SrcNode, length(DBList), length(Missing), length(Obsolete)]),
-    %TODO possibility of DETAIL SYNC IMPL - NOW SEND COMPLETE obsolete Entries
+    %TODO possibility of DETAIL SYNC IMPL - NOW SEND COMPLETE obsolete Entries (key-val-vers)
     comm:send(SrcNode, {diff_list, comm:this(), Obsolete}),
     State#bloom_sync_state{ sendFeedback = false };
 on({diff_list, Sender, DiffList}, State) ->
@@ -167,11 +167,11 @@ on({update_key_entry_ack, Entry, Exists, Done}, State) ->
                end,
     _ = case DiffCount - 1 =:= OkCount + FailedCount of
             true when NewState#bloom_sync_state.sendFeedback ->                
-                ?TRACE("Send Feedback and Shutdown", []),
+                %?TRACE("Send Feedback and Shutdown", []),
                 comm:send(Sender, {diff_list, comm:this(), NewState#bloom_sync_state.feedback}),
                 comm:send_local(self(), {shutdown, {ok, NewState#bloom_sync_state.updatedCount}});
             true ->
-                ?TRACE("Send NO Feedback and Shutdown", []),
+                %?TRACE("Send NO Feedback and Shutdown", []),
                 comm:send_local(self(), {shutdown, {ok, NewState#bloom_sync_state.updatedCount}});
             _ ->
                 %?TRACE("UPDATE OK OK=~p  Fail=~p  Diff=~p", [OkCount, FailedCount, DiffCount]),
@@ -186,10 +186,8 @@ on({start_sync, SyncStruct}, State) ->
     DhtNodePid = State#bloom_sync_state.dhtNodePid,
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
     State#bloom_sync_state{ syncStruct = SyncStruct };
-on({build_sync_struct, Sender, {ChunkInterval, DBItems}, Round}, State) ->
-    ?TRACE("BUILD REQ REV", []),
-    Fpr = 0.001,           %TODO move to config?
-    ElementNum = ?BLOOM_MAX_SIZE * 2,    %TODO set to node db item cout + 5%?
+on({build_sync_struct, Sender, {ChunkInterval, DBItems}, Fpr, Round}, State) ->
+    ElementNum = ?BLOOM_MAX_SIZE,    %TODO set to node db item cout + 5%?
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
@@ -201,6 +199,10 @@ on({build_sync_struct, Sender, {ChunkInterval, DBItems}, Round}, State) ->
                                      versBF = VerBF,
                                      round = Round
                                    },
+    ?TRACE("Key BF", []),
+    bloom:print(KeyBF),
+    ?TRACE("VER BF", []),
+    bloom:print(VerBF),
     comm:send_local(Sender, {build_sync_struct_response, ChunkInterval, SyncStruct}),
     State.
 

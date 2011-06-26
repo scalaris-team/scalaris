@@ -102,7 +102,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerStat
     _ = case SyncMethod of
             bloom ->
                 {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid),
-                comm:send_local(Pid, {build_sync_struct, self(), {ChunkI, DBList}, Round});
+                comm:send_local(Pid, {build_sync_struct, self(), {ChunkI, DBList}, get_sync_fpr(), Round});
             merkleTree ->
                 ok; %TODO
             art ->
@@ -208,12 +208,19 @@ init(Trigger) ->
 check_config() ->
     case config:read(rep_update_activate) of
         true ->
-            config:is_module(rep_update_trigger) and
-            config:is_atom(rep_update_sync_method) and	
-            config:is_integer(rep_update_interval) and
+            config:is_module(rep_update_trigger) andalso
+            config:is_atom(rep_update_sync_method) andalso	
+            config:is_integer(rep_update_interval) andalso
+            config:is_float(rep_update_fpr) andalso
+            config:is_greater_than(rep_update_fpr, 0) andalso
+            config:is_less_than(rep_update_fpr, 1) andalso
             config:is_greater_than(rep_update_interval, 0);
         _ -> true
     end.
+
+-spec get_sync_fpr() -> float().
+get_sync_fpr() ->
+    config:read(rep_update_fpr).
 
 -spec get_sync_method() -> sync_method().
 get_sync_method() -> 
