@@ -20,7 +20,7 @@ require 'base64'
 
 # default URL and port to a scalaris node
 
-if ENV.has_key?('SCALARIS_JSON_URL')
+if ENV.has_key?('SCALARIS_JSON_URL') and not ENV['SCALARIS_JSON_URL'].empty?
   $DEFAULT_URL = ENV['SCALARIS_JSON_URL']
 else
   $DEFAULT_URL = 'http://localhost:8000'
