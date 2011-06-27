@@ -291,7 +291,7 @@ interop-test: compile java java-scalaris.test.compile python
 	JAVA_WRITE_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.python_write.log 2>&1 ; \
 	PYTHON_JSON_WRITE_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/interoptest.rb write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.ruby_write.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.ruby_write.log 2>&1 ; \
 	RUBY_JSON_WRITE_FAILED=$$? ; \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.java_read_java.log 2>&1 ; \
 	JAVA_READ_JAVA_FAILED=$$? ; \
@@ -305,11 +305,11 @@ interop-test: compile java java-scalaris.test.compile python
 	PYTHON_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.python_read_ruby.log 2>&1 ; \
 	PYTHON_JSON_READ_RUBY_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/interoptest.rb read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_java.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_java.log 2>&1 ; \
 	RUBY_JSON_READ_JAVA_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/interoptest.rb read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_python.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_python.log 2>&1 ; \
 	RUBY_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/interoptest.rb read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_ruby.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_ruby.log 2>&1 ; \
 	RUBY_JSON_READ_RUBY_JSON_FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$JAVA_WRITE_FAILED -ne 0 -o $$PYTHON_JSON_WRITE_FAILED -ne 0 -o $$RUBY_JSON_WRITE_FAILED -ne 0 -o $$JAVA_READ_JAVA_FAILED -ne 0 -o $$JAVA_READ_PYTHON_JSON_FAILED -ne 0 -o $$JAVA_READ_RUBY_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_JAVA_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_RUBY_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_JAVA_FAILED -ne 0 -o $$RUBY_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_RUBY_JSON_FAILED -ne 0 ]; then \
@@ -525,7 +525,7 @@ install-ruby:
 	install -d $(RUBYSITELIBDIR)
 	install -m 644 -t $(RUBYSITELIBDIR) ruby-api/scalaris.rb
 	install -d $(BINDIR)
-	install -m 755 ruby-api/scalarisclient.rb $(BINDIR)/scalaris-ruby
+	install -m 755 ruby-api/scalaris_client.rb $(BINDIR)/scalaris-ruby
 
 install-python:
 	install -d $(PYTHONSITELIBDIR)

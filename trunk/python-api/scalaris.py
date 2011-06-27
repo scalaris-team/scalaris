@@ -275,9 +275,8 @@ class JSONConnection(object):
             raise UnknownError(result)
         return (result['tlog'], result['results'])
 
-    # results: {'tlog': xxx,
-    #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-    #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
+    # results: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
     @staticmethod
     def process_result_req_list_tso(result):
         """
@@ -538,7 +537,7 @@ class Transaction(object):
         if reqlist.is_commit():
             self._process_result_commit(result[-1])
             # transaction was successful: reset transaction log
-            self._tlog = tlog = None
+            self._tlog = None
         return result
     
     def process_result_read(self, result):
@@ -685,9 +684,6 @@ class _JSONReqList(object):
     def extend(self, other):
         """
         Adds all requests of the other request list to the end of this list.
-        
-        Use in implementation in sub-classes with according types as different
-        request lists may not be compatible with each other.
         """
         self._requests.extend(other._requests)
         return self
