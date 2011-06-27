@@ -26,6 +26,9 @@ LICENCE_FILE="config/chroot_local-preseed/sun-licence"
 echo "sun-java6-bin shared/accepted-sun-dlj-v1-1 select true" >  $LICENCE_FILE
 echo "sun-java6-jre shared/accepted-sun-dlj-v1-1 select true" >> $LICENCE_FILE
 
+mkdir -p config/chroot_local-includes/etc/hadoop-0.20/conf.cluster
+cp cust/conf.cluster/* config/chroot_local-includes/etc/hadoop-0.20/conf.cluster
+
 install -D -m 755 cust/vmcontext config/chroot_local-includes/etc/init.d/vmcontext
 install -D -m 755 cust/start-hadoop.sh config/chroot_local-includes/etc/init.d/hadoop 
 install -D -m 755 cust/dnsupdate-client.pl config/chroot_local-includes/usr/bin/dnsupdate-client.pl
