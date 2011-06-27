@@ -111,7 +111,7 @@ public class PluginClassLoader extends ClassLoader {
             // get all Java files recursively
             File[] javaFiles = pluginDir.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
-                    return pathname.getAbsolutePath().endsWith(".java");
+                    return pathname.getPath().endsWith(".java");
                 }
             });
             
@@ -142,7 +142,7 @@ public class PluginClassLoader extends ClassLoader {
             // retrieve all policies from class files
             File[] classFiles = pluginDir.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
-                    return pathname.getAbsolutePath().endsWith(".class");
+                    return pathname.getPath().endsWith(".class");
                 }
             });
             
@@ -174,7 +174,7 @@ public class PluginClassLoader extends ClassLoader {
             // get all JAR files
             jarFiles = pluginDir.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
-                    return pathname.getAbsolutePath().endsWith(".jar");
+                    return pathname.getPath().endsWith(".jar");
                 }
             });
 
@@ -256,7 +256,7 @@ public class PluginClassLoader extends ClassLoader {
             // add all JAR files in the sub-directory
             File[] jarsInSubDir = clsFile.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
-                    return pathname.getAbsolutePath().endsWith(".jar");
+                    return pathname.getPath().endsWith(".jar");
                 }
             });
             return jarsInSubDir;
