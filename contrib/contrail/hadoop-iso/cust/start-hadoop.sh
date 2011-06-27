@@ -26,13 +26,20 @@ else
       sleep 1
     fi
   done
-
 fi
 
-sed -i "s/localhost/$HADOOP_MASTER/g" /etc/hadoop/conf/core-site.xml
+HADOOP_DIR=/etc/alternatives/hadoop-etc/conf
+sed -i "s/@HDFS_MASTER@/$HADOOP_MASTER/g" $HADOOP_DIR/core-site.xml
+sed -i "s/@MAPRED_MASTER@/$HADOOP_MASTER/g" $HADOOP_DIR/mapred-site.xml
+sed -i "s/@MAPRED_MASTER@/$HADOOP_MASTER/g" /etc/hue/hue.ini
+sed -i "s/@HDFS_MASTER@/$HADOOP_MASTER/g" /etc/hue/hue.ini
 #sed -i "s/hdfs:\/\/localhost:8020/file:\/\/\/mnt\/xtreemfs/" /etc/hadoop/conf/core-site.xml
-sed -i "s/localhost/$HADOOP_MASTER/g" /etc/hadoop/conf/mapred-site.xml
-sed -i "s/localhost/$HADOOP_MASTER/g" /etc/hue/hue.ini
+
+
+NR_CPUS=`grep processor /proc/cpuinfo | wc -l`
+let NR_TASKS=2*$NR_CPUS
+sed -i "s/@NR_MAPTASKS@/$NR_TASKS/" $HADOOP_DIR/mapred-site.xml
+sed -i "s/@NR_REDTASKS@/$NR_TASKS/" $HADOOP_DIR/mapred-site.xml
 
 
 # HDFS stuff

@@ -7,7 +7,6 @@ hadoop-0.20-jobtracker
 hadoop-0.20-tasktracker 
 sun-java6-jre 
 sun-java6-bin 
-sun-java6-jdk
 hue-common 
 hue-filebrowser 
 hue-jobbrowser 
