@@ -79,7 +79,7 @@ import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class WikiServlet extends HttpServlet implements Servlet {
+public class WikiServlet extends HttpServlet implements Servlet, WikiServletInterface {
     private static final String MAIN_PAGE = "Main Page";
     private static final int IMPORT_REDIRECT_EVERY = 5; // seconds
 
@@ -1270,17 +1270,51 @@ public class WikiServlet extends HttpServlet implements Servlet {
         }
     }
 
-    /**
-     * @return the namespace
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getNamespace()
      */
+    @Override
     public final MyNamespace getNamespace() {
         return namespace;
     }
 
-    /**
-     * @return the siteinfo
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getSiteinfo()
      */
+    @Override
     public SiteInfo getSiteinfo() {
         return siteinfo;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getVersion()
+     */
+    @Override
+    public String getVersion() {
+        return version;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getWikibaseurl()
+     */
+    @Override
+    public String getWikibaseurl() {
+        return wikiBaseURL;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getLinkbaseurl()
+     */
+    @Override
+    public String getLinkbaseurl() {
+        return linkBaseURL;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getImagebaseurl()
+     */
+    @Override
+    public String getImagebaseurl() {
+        return imageBaseURL;
     }
 }
