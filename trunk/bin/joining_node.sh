@@ -17,9 +17,10 @@
 ID=1
 
 if [ 1 -le $# ]; then
-    if [ $1 != "-v" ]; then
+    if echo $1 | grep "^[0-9]*$"> /dev/null
+    then
         ID=$1
-        shift;
+        shift
     fi;
 fi
 
