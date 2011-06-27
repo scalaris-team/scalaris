@@ -18,20 +18,7 @@ require 'json'
 require 'net/http'
 require 'base64'
 
-# default URL and port to a scalaris node
-
-if ENV.has_key?('SCALARIS_JSON_URL') and not ENV['SCALARIS_JSON_URL'].empty?
-  $DEFAULT_URL = ENV['SCALARIS_JSON_URL']
-else
-  $DEFAULT_URL = 'http://localhost:8000'
-end
-    
-# socket timeout in seconds
-$DEFAULT_TIMEOUT = 5
-# path to the json rpc page
-$DEFAULT_PATH = '/jsonrpc.yaws'
-
-module InternalScalarisSimpleException
+module InternalScalarisSimpleError
   attr_reader :raw_result
   def initialize(raw_result)
     @raw_result = raw_result
@@ -52,7 +39,7 @@ module InternalScalarisNopClose
   
   # Close the connection to Scalaris
   # (it will automatically be re-opened on the next request).
-  def closeConnection
+  def close_connection
     @conn.close()
   end
 end
@@ -71,21 +58,38 @@ class Float
 end
 
 module Scalaris
+  
+  # default URL and port to a scalaris node
+  if ENV.has_key?('SCALARIS_JSON_URL') and not ENV['SCALARIS_JSON_URL'].empty?
+    DEFAULT_URL = ENV['SCALARIS_JSON_URL']
+  else
+    DEFAULT_URL = 'http://localhost:8000'
+  end
+      
+  # socket timeout in seconds
+  DEFAULT_TIMEOUT = 5
+  # path to the json rpc page
+  DEFAULT_PATH = '/jsonrpc.yaws'
+  
+  # Base class for errors in the scalaris package.
+  class ScalarisError < StandardError
+  end
+  
   # Exception that is thrown if a the commit of a write operation on a Scalaris
   # ring fails.
-  class AbortError < StandardError
-    include InternalScalarisSimpleException
+  class AbortError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Exception that is thrown if an operation on a Scalaris ring fails because
   # a connection does not exist or has been disconnected.
-  class ConnectionError < StandardError
-    include InternalScalarisSimpleException
+  class ConnectionError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Exception that is thrown if a test_and_set operation on a Scalaris ring
   # fails because the old value did not match the expected value.
-  class KeyChangedError < StandardError
+  class KeyChangedError < ScalarisError
     attr_reader :raw_result
     attr_reader :old_value
     def initialize(raw_result, old_value)
@@ -100,26 +104,26 @@ module Scalaris
 
   # Exception that is thrown if a delete operation on a Scalaris ring fails
   # because no Scalaris node was found.
-  class NodeNotFoundError < StandardError
-    include InternalScalarisSimpleException
+  class NodeNotFoundError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Exception that is thrown if a read operation on a Scalaris ring fails
   # because the key did not exist before.
-  class NotFoundError < StandardError
-    include InternalScalarisSimpleException
+  class NotFoundError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Exception that is thrown if a read or write operation on a Scalaris ring
   # fails due to a timeout.
-  class TimeoutError < StandardError
-    include InternalScalarisSimpleException
+  class TimeoutError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Generic exception that is thrown during operations on a Scalaris ring, e.g.
   # if an unknown result has been returned.
-  class UnknownError < StandardError
-    include InternalScalarisSimpleException
+  class UnknownError < ScalarisError
+    include InternalScalarisSimpleError
   end
 
   # Stores the result of a delete operation.
@@ -137,7 +141,7 @@ module Scalaris
   # Abstracts connections to Scalaris using JSON
   class JSONConnection
     # Creates a JSON connection to the given URL using the given TCP timeout
-    def initialize(url = $DEFAULT_URL, timeout = $DEFAULT_TIMEOUT)
+    def initialize(url = DEFAULT_URL, timeout = DEFAULT_TIMEOUT)
       begin
       @uri = URI.parse(url)
       @timeout = timeout
@@ -159,7 +163,7 @@ module Scalaris
     # interface of Scalaris.
     def call(function, params)
       start
-      req = Net::HTTP::Post.new($DEFAULT_PATH)
+      req = Net::HTTP::Post.new(DEFAULT_PATH)
       req.add_field('Content-Type', 'application/json; charset=utf-8')
       req.body =  {
         :jsonrpc => :'2.0',
@@ -259,13 +263,13 @@ module Scalaris
       raise UnknownError.new(result)
     end
 
-    # Processes the result of a testAndSet operation.
+    # Processes the result of a test_and_set operation.
     # Raises the appropriate exception if the operation failed.
     # 
     # results: {'status' => 'ok'} or
     #          {'status' => 'fail', 'reason' => 'timeout' or 'abort' or 'not_found'} or
     #          {'status' => 'fail', 'reason' => 'key_changed', 'value': xxx}
-    def self.process_result_testAndSet(result)
+    def self.process_result_test_and_set(result)
       if result.is_a?(Hash) and result.has_key?('status')
         if result == {'status' => 'ok'}
           return nil
@@ -303,7 +307,7 @@ module Scalaris
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
     def self.process_result_subscribe(result)
-        process_result_commit(result)
+      process_result_commit(result)
     end
     
     # Processes the result of a unsubscribe operation.
@@ -328,12 +332,12 @@ module Scalaris
       raise UnknownError.new(result)
     end
     
-    # Processes the result of a getSubscribers operation.
+    # Processes the result of a get_subscribers operation.
     # Returns the list of subscribers on success.
     # Raises the appropriate exception if the operation failed.
     # 
     # results: [urls=str()]
-    def self.process_result_getSubscribers(result)
+    def self.process_result_get_subscribers(result)
       if result.is_a?(Array)
         return result
       end
@@ -374,11 +378,11 @@ module Scalaris
       if result.is_a?(Array)
         for element in result
           if element == 'ok':
-              ok += 1
+            ok += 1
           elsif element == 'locks_set':
-              locks_set += 1
+            locks_set += 1
           elsif element == 'undef':
-              undefined += 1
+            undefined += 1
           else
             raise UnknownError.new(:'Unknown reason ' + element + :'in ' + result)
           end
@@ -388,19 +392,32 @@ module Scalaris
       raise UnknownError.new(:'Unknown result ' + result)
     end
     
-    # Processes the result of a req_list operation.
+    # Processes the result of a req_list operation of the Transaction class.
     # Returns the Array (:tlog => <tlog>, :result => <result>) on success.
     # Raises the appropriate exception if the operation failed.
     # 
     # results: {'tlog': xxx,
     #           'results': [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
     #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
-    def self.process_result_req_list(result)
+    def self.process_result_req_list_t(result)
       if (not result.has_key?('tlog')) or (not result.has_key?('results')) or
-        (not result['results'].is_a?(Array)) or result['results'].length < 1
+        (not result['results'].is_a?(Array))
           raise UnknownError.new(result)
       end
       {:tlog => result['tlog'], :result => result['results']}
+    end
+
+    # Processes the result of a req_list operation of the TransactionSingleOp class.
+    # Returns <result> on success.
+    # Raises the appropriate exception if the operation failed.
+    # 
+    # results: [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+    #           {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]
+    def self.process_result_req_list_tso(result)
+      if not result.is_a?(Array)
+        raise UnknownError.new(result)
+      end
+      result
     end
 
     # Processes the result of a nop operation.
@@ -413,20 +430,29 @@ module Scalaris
       end
     end
     
-    # Returns a new ReqList object allowing multiple parallel requests.
-    def self.newReqList
-      JSONReqList.new()
+    # Returns a new ReqList object allowing multiple parallel requests for
+    # the Transaction class.
+    def self.new_req_list_t(other = nil)
+      JSONReqListTransaction.new(other)
+    end
+    
+    # Returns a new ReqList object allowing multiple parallel requests for
+    # the TransactionSingleOp class.
+    def self.new_req_list_tso(other = nil)
+      JSONReqListTransactionSingleOp.new(other)
     end
 
     def close
-      @conn.finish()
+      if @conn.started?
+        @conn.finish()
+      end
     end
   end
   
   # deprecated:
   class Scalaris
-    def initialize(url = $DEFAULT_URL)
-      @url = url + $DEFAULT_PATH
+    def initialize(url = DEFAULT_URL)
+      @url = url + DEFAULT_PATH
       @uri = URI.parse @url
     end
   
@@ -510,8 +536,43 @@ module Scalaris
   # Single write or read operations on Scalaris.
   class TransactionSingleOp
     # Create a new object using the given connection
-    def initialize(conn = JSONConnection.new)
+    def initialize(conn = JSONConnection.new())
       @conn = conn
+    end
+    
+    # Returns a new ReqList object allowing multiple parallel requests.
+    def new_req_list(other = nil)
+      @conn.class.new_req_list_t(other)
+    end
+    
+    # Issues multiple parallel requests to scalaris; each will be committed.
+    # Request lists can be created using new_req_list().
+    # The returned list has the following form:
+    # [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
+      # {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
+    # Elements of this list can be processed with process_result_read() and
+    # process_result_write().
+    def req_list(reqlist)
+      result = @conn.call(:req_list_commit_each, [reqlist.get_requests()])
+      @conn.class.process_result_req_list_tso(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a read operation.
+    # Returns the read value on success.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_read(result)
+      @conn.class.process_result_read(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a write operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_write(result)
+      # note: we need to process a commit result as the write has been committed
+      @conn.class.process_result_commit(result)
     end
     
     # Read the value at key
@@ -529,11 +590,11 @@ module Scalaris
 
     # Atomic test and set, i.e. if the old value at key is oldvalue, then
     # write newvalue.
-    def testAndSet(key, oldvalue, newvalue)
+    def test_and_set(key, oldvalue, newvalue)
       oldvalue = @conn.class.encode_value(oldvalue)
       newvalue = @conn.class.encode_value(newvalue)
       result = @conn.call(:test_and_set, [key, oldvalue, newvalue])
-      @conn.class.process_result_testAndSet(result)
+      @conn.class.process_result_test_and_set(result)
     end
 
     include InternalScalarisNopClose
@@ -542,18 +603,18 @@ module Scalaris
   # Write or read operations on Scalaris inside a transaction.
   class Transaction
     # Create a new object using the given connection
-    def initialize(conn = JSONConnection())
+    def initialize(conn = JSONConnection.new())
       @conn = conn
       @tlog = nil
     end
     
     # Returns a new ReqList object allowing multiple parallel requests.
-    def newReqList
-      @conn.class.newReqList()
+    def new_req_list(other = nil)
+      @conn.class.new_req_list_t(other)
     end
     
     # Issues multiple parallel requests to Scalaris.
-    # Request lists can be created using newReqList().
+    # Request lists can be created using new_req_list().
     # The returned list has the following form:
     # [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
     # {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
@@ -561,13 +622,19 @@ module Scalaris
     # process_result_write() and process_result_commit().
     def req_list(reqlist)
       if @tlog == nil
-        result = @conn.call(:req_list, [reqlist.getRequests()])
+        result = @conn.call(:req_list, [reqlist.get_requests()])
       else
-        result = @conn.call(:req_list, [@tlog, reqlist.getRequests()])
+        result = @conn.call(:req_list, [@tlog, reqlist.get_requests()])
       end
-      result = @conn.class.process_result_req_list(result)
+      result = @conn.class.process_result_req_list_t(result)
       @tlog = result[:tlog]
-      result[:result]
+      result = result[:result]
+      if reqlist.is_commit()
+        _process_result_commit(result[-1])
+        # transaction was successful: reset transaction log
+        @tlog = nil
+      end
+      result
     end
     
     # Processes a result element from the list returned by req_list() which
@@ -591,15 +658,17 @@ module Scalaris
     # originated from a commit operation.
     # Raises the appropriate exceptions if a failure occurred during the
     # operation.
-    def process_result_commit(result)
+    def _process_result_commit(result)
       @conn.class.process_result_commit(result)
     end
+
+    private :_process_result_commit
     
     # Issues a commit operation to Scalaris validating the previously
     # created operations inside the transaction.
     def commit
-      result = req_list(newReqList().addCommit())[0]
-      process_result_commit(result)
+      result = req_list(new_req_list().add_commit())[0]
+      _process_result_commit(result)
       # reset tlog (minor optimization which is not done in req_list):
       @tlog = nil
     end
@@ -612,15 +681,15 @@ module Scalaris
     # Issues a read operation to Scalaris and adds it to the current
     # transaction.
     def read(key)
-      result = req_list(newReqList().addRead(key))[0]
+      result = req_list(new_req_list().add_read(key))[0]
       return process_result_read(result)
     end
     
     # Issues a write operation to Scalaris and adds it to the current
     # transaction.
     def write(key, value, binary = false)
-      result = req_list(newReqList().addWrite(key, value, binary))[0]
-      process_result_commit(result)
+      result = req_list(new_req_list().add_write(key, value, binary))[0]
+      _process_result_commit(result)
     end
     
     include InternalScalarisNopClose
@@ -629,38 +698,93 @@ module Scalaris
   # Request list for use with Transaction.req_list()
   class JSONReqList
     # Create a new object using a JSON connection.
-    def initialize()
+    def initialize(other = nil)
       @requests = []
+      @is_commit = false
+      if not other == nil
+        concat(other)
+      end
     end
     
     # Adds a read operation to the request list.
-    def addRead(key)
+    def add_read(key)
+      if (@is_commit):
+        raise RuntimeError.new('No further request supported after a commit!')
+      end
       @requests << {'read' => key}
       self
     end
     
     # Adds a write operation to the request list.
-    def addWrite(key, value, binary = false)
+    def add_write(key, value, binary = false)
+      if (@is_commit):
+        raise RuntimeError.new('No further request supported after a commit!')
+      end
       @requests << {'write' => {key => JSONConnection.encode_value(value, binary)}}
       self
     end
     
     # Adds a commit operation to the request list.
-    def addCommit
+    def add_commit
+      if (@is_commit):
+        raise RuntimeError.new('Only one commit per request list allowed!')
+      end
       @requests << {'commit' => ''}
+      @is_commit = true
       self
     end
     
     # Gets the collected requests.
-    def getRequests
+    def get_requests
       @requests
+    end
+
+    # Returns whether the transactions contains a commit or not.
+    def is_commit()
+      @is_commit
+    end
+    
+    # Checks whether the request list is empty.
+    def is_empty()
+      @requests.empty?
+    end
+    
+    # Gets the number of requests in the list.
+    def size()
+      @requests.length
+    end
+
+    # Adds all requests of the other request list to the end of this list.
+    def concat(other)
+      @requests.concat(other.get_requests())
+      self
+    end
+  end
+
+  # Request list for use with Transaction.req_list().
+  class JSONReqListTransaction < JSONReqList
+    def initialize(other = nil)
+      super(other)
+    end
+  end
+  
+  # Request list for use with TransactionSingleOp.req_list() which does not
+  # support commits.
+  class JSONReqListTransactionSingleOp < JSONReqList
+    def initialize(other = nil)
+      super(other)
+    end
+    
+    # Adds a commit operation to the request list.
+    def add_commit()
+      raise RuntimeError.new('No commit allowed in TransactionSingleOp.req_list()!')
     end
   end
 
   # Publish and subscribe methods accessing Scalaris' pubsub system
   class PubSub
     # Create a new object using the given connection.
-    def initialize(conn = JSONConnection())
+    def initialize(conn = JSONConnection.new())
       @conn = conn
     end
     
@@ -692,9 +816,9 @@ module Scalaris
     end
     
     # Gets the list of all subscribers to topic.
-    def getSubscribers(topic)
+    def get_subscribers(topic)
       result = @conn.call(:get_subscribers, [topic])
-      @conn.class.process_result_getSubscribers(result)
+      @conn.class.process_result_get_subscribers(result)
     end
     
     include InternalScalarisNopClose
@@ -703,7 +827,7 @@ module Scalaris
   # Non-transactional operations on the replicated DHT of Scalaris
   class ReplicatedDHT
     # Create a new object using the given connection.
-    def initialize(conn = JSONConnection())
+    def initialize(conn = JSONConnection.new())
       @conn = conn
     end
     
@@ -714,7 +838,7 @@ module Scalaris
     # delete can re-appear.
     # 
     # returns the number of successfully deleted items
-    # use getLastDeleteResult() to get more details
+    # use get_last_delete_result() to get more details
     def delete(key, timeout = 2000)
       result_raw = @conn.call(:delete, [key, timeout])
       result = @conn.class.process_result_delete(result_raw)
@@ -733,7 +857,7 @@ module Scalaris
     # NOTE: This function traverses the result list returned by Scalaris and
     # therefore takes some time to process. It is advised to store the returned
     # result object once generated.
-    def getLastDeleteResult
+    def get_last_delete_result
       @conn.class.create_delete_result(@lastDeleteResult)
     end
 

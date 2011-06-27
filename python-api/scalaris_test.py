@@ -265,7 +265,7 @@ class TestTransactionSingleOp(unittest.TestCase):
             conn.test_and_set(str(self._testTime) + key + str(i), [_TEST_DATA[i], _TEST_DATA[i + 1]], [_TEST_DATA[i + 1], _TEST_DATA[i]])
         
         # now try to read the data:
-        for i in xrange(0, len(_TEST_DATA), 2):
+        for i in xrange(0, len(_TEST_DATA) - 1, 2):
             actual = conn.read(str(self._testTime) + key + str(i))
             self.assertEqual(actual, [_TEST_DATA[i + 1], _TEST_DATA[i]])
         
@@ -292,7 +292,7 @@ class TestTransactionSingleOp(unittest.TestCase):
                 self.assertEqual(exception.old_value, [_TEST_DATA[i], _TEST_DATA[i + 1]])
         
         # now try to read the data:
-        for i in xrange(0, len(_TEST_DATA), 2):
+        for i in xrange(0, len(_TEST_DATA) - 1, 2):
             actual = conn.read(str(self._testTime) + key + str(i))
             self.assertEqual(actual, [_TEST_DATA[i], _TEST_DATA[i + 1]])
         
