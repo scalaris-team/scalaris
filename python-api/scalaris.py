@@ -18,7 +18,7 @@ import os
 try: import simplejson as json
 except ImportError: import json
 
-if 'SCALARIS_JSON_URL' in os.environ:
+if 'SCALARIS_JSON_URL' in os.environ and os.environ['SCALARIS_JSON_URL'] != '':
     DEFAULT_URL = os.environ['SCALARIS_JSON_URL']
 else:
     DEFAULT_URL = 'http://localhost:8000'
