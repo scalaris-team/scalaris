@@ -16,10 +16,10 @@
 package de.zib.scalaris.examples.wikipedia.plugin;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.SavePageResult;
-import de.zib.scalaris.examples.wikipedia.bliki.WikiServlet;
+import de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface;
 
 /**
- * Simple handler of events in the {@link WikiServlet} class.
+ * Simple handler of events in the {@link de.zib.scalaris.examples.wikipedia.bliki.WikiServlet} class.
  * 
  * Note: this API is not stable and will probably change in future.
  * 
@@ -31,7 +31,7 @@ public interface EventHandler {
      * 
      * @param servlet the servlet using the plugin
      */
-    public void init(WikiServlet servlet);
+    public void init(WikiServletInterface servlet);
     
     /**
      * Will be called after the user submitted a new revision to be stored in

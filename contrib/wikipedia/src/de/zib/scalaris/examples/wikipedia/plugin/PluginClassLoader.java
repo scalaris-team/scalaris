@@ -25,6 +25,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -34,18 +35,24 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
+
 /**
- * A class loader capable of loading plugin classes from a given plugin
+ * A class loader capable of loading plug-in classes from a given plug-in
  * directory.
  * 
  * <p>
- * It allows for an efficient retrieval of plugins by means of an interface.
+ * It allows for an efficient retrieval of plug-ins by means of an interface.
  * Three requirements have to be met:
  * <ul>
- * <li>the policy needs to be assignable from any of the given policy interfaces
+ * <li>the plug-in needs to be assignable from any of the given plug-in interfaces
  * </li>
- * <li>the policy needs to be in the plug-in directory together with all its
- * dependencies.</li>
+ * <li>the policy needs to be in the plug-in directory, its dependencies need to
+ * be placed in the <tt>%lt;pluginname&gt;</tt> sub-directory of the plug-in
+ * directory.</li>
  * </ul>
  * </p>
  * 
@@ -58,9 +65,9 @@ public class PluginClassLoader extends ClassLoader {
 
     private final Map<Class<?>, List<Class<?>>> pluginMap = new HashMap<Class<?>, List<Class<?>>>();
 
-    private final Class<?>[] policyInterfaces;
+    private final Class<?>[] pluginInterfaces;
 
-    private File policyDir;
+    private File pluginDir;
 
     private File[] jarFiles = new File[0];
 
@@ -68,51 +75,84 @@ public class PluginClassLoader extends ClassLoader {
 
     private static final Pattern REMOVE_JAR_EXT = Pattern.compile("\\.jar$");
 
+    private static final Pattern REMOVE_JAVA_EXT = Pattern.compile("\\.java$");
+
     private static final Pattern REMOVE_CLASS_EXT = Pattern.compile("\\.class$");
 
     /**
-     * Instantiates a new policy class loader.
+     * Instantiates a new plug-in class loader.
      * 
-     * @param policyDirPath
-     *            the path for the directory with all (compiled) plugins
-     * @param policyInterfaces
-     *            the policy interfaces
+     * @param pluginDirPath
+     *            the path for the directory with all (compiled) plug-ins
+     * @param pluginInterfaces
+     *            the plug-in interfaces (any plug-in implementing any of these
+     *            interfaces will be loaded)
      * @throws IOException
-     *             if an error occurs while initialising the policy interfaces
-     *             or built-in policies
+     *             if an error occurs while initialising the plug-in interfaces
      */
-    public PluginClassLoader(String policyDirPath, Class<?>[] policyInterfaces)
+    public PluginClassLoader(String pluginDirPath, Class<?>[] pluginInterfaces)
             throws IOException {
-        this.policyDir = new File(policyDirPath);
-        this.policyInterfaces = policyInterfaces;
+        this.pluginDir = new File(pluginDirPath);
+        this.pluginInterfaces = pluginInterfaces;
         init();
     }
-
+    
     /**
      * Initialises the class loader. Each class in the
      * directory is loaded and checked for assignability to one of the given
-     * policy interfaces. If the check is successful, the class is added to a
+     * plug-in interfaces. If the check is successful, the class is added to a
      * map, from which it can be retrieved.
      * 
      * @throws IOException
      *             if an I/O error occurs while loading any of the classes
      */
     public void init() throws IOException {
-        if (policyDir.exists()) {
+        if (pluginDir.exists()) {
+            // get all Java files recursively
+            File[] javaFiles = pluginDir.listFiles(new FileFilter() {
+                public boolean accept(File pathname) {
+                    return pathname.getAbsolutePath().endsWith(".java");
+                }
+            });
+            
+            // compile all Java files
+            if (javaFiles.length != 0) {
+                JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+                if (compiler != null) {
+                    List<File> pluginJars = new LinkedList<File>();
+                    for (File javaFile: javaFiles) {
+                        String filename = REMOVE_JAVA_EXT.matcher(javaFile.getName()).replaceAll("");
+                        pluginJars.addAll(Arrays.asList(getPluginJars(filename)));
+                    } 
+                    String cp = buildClassPath(pluginJars);
+                    List<String> options = Arrays.asList("-cp", cp);
+                    StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
+
+                    Iterable<? extends JavaFileObject> compilationUnits = fileManager
+                            .getJavaFileObjectsFromFiles(Arrays.asList(javaFiles));
+                    if (!compiler.getTask(null, fileManager, null, options, null, compilationUnits).call()) {
+                        // note: an error is already printed to the log
+                    }
+
+                    fileManager.close();
+                }
+            }
+            
+            
             // retrieve all policies from class files
-            File[] classFiles = policyDir.listFiles(new FileFilter() {
+            File[] classFiles = pluginDir.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
                     return pathname.getAbsolutePath().endsWith(".class");
                 }
             });
             
             for (File cls : classFiles) {
-                String filename = REMOVE_CLASS_EXT.matcher(cls.getName()).replaceAll(File.separator);
-                addPluginSubdir(filename);
+                String filename = REMOVE_CLASS_EXT.matcher(cls.getName()).replaceAll("");
+                subDirs.addAll(Arrays.asList(getPluginJars(filename)));
                 try {
                     String className = cls.getAbsolutePath().substring(
-                        policyDir.getAbsolutePath().length() + 1,
-                        cls.getAbsolutePath().length() - ".class".length()).replace('/', '.');
+                        pluginDir.getAbsolutePath().length() + 1,
+                        cls.getAbsolutePath().length() - ".class".length()).replace(File.separatorChar, '.');
                     if (cache.containsKey(className)) {
                         continue;
                     }
@@ -120,7 +160,7 @@ public class PluginClassLoader extends ClassLoader {
                     // load the class
                     Class<?> clazz = loadFromStream(new FileInputStream(cls));
                     
-                    // check whether the class refers to a policy; if so,
+                    // check whether the class refers to a plug-in; if so,
                     // cache it
                     checkClass(clazz);
                     
@@ -132,7 +172,7 @@ public class PluginClassLoader extends ClassLoader {
             }
             
             // get all JAR files
-            jarFiles = policyDir.listFiles(new FileFilter() {
+            jarFiles = pluginDir.listFiles(new FileFilter() {
                 public boolean accept(File pathname) {
                     return pathname.getAbsolutePath().endsWith(".jar");
                 }
@@ -141,8 +181,8 @@ public class PluginClassLoader extends ClassLoader {
             // retrieve all policies from JAR files, add appropriate subdirs to
             // the list of directories
             for (File jar : jarFiles) {
-                String subdir = REMOVE_JAR_EXT.matcher(jar.getName()).replaceAll(File.separator);
-                addPluginSubdir(subdir);
+                String subdir = REMOVE_JAR_EXT.matcher(jar.getName()).replaceAll("");
+                subDirs.addAll(Arrays.asList(getPluginJars(subdir)));
                 JarFile jarFile = new JarFile(jar);
 
                 Enumeration<JarEntry> entries = jarFile.entries();
@@ -153,7 +193,7 @@ public class PluginClassLoader extends ClassLoader {
                             // load the class
                             Class<?> clazz = loadFromStream(jarFile.getInputStream(entry));
 
-                            // check whether the class refers to a policy; if
+                            // check whether the class refers to a plug-in; if
                             // so, cache it
                             checkClass(clazz);
                         } catch (IOException err) {
@@ -168,14 +208,47 @@ public class PluginClassLoader extends ClassLoader {
     }
 
     /**
-     * Adds the sub-directory to the class path as well as all .jar files in
-     * this directory.
+     * Uses the class path defined in the system class path, used by this class'
+     * class loader and system class loader to build a class path for
+     * compilation. Adds all given jars as well.
+     * 
+     * @param addJars
+     *            jar files to add to the class path
+     * 
+     * @return the class path as a string
+     */
+    private String buildClassPath(Collection<File> addJars) {
+        StringBuilder cp = new StringBuilder();
+        cp.append(System.getProperty("java.class.path" ));
+        
+        for (ClassLoader cl: new ClassLoader[] {this.getClass().getClassLoader(), getSystemClassLoader()}) {
+            if (cl instanceof URLClassLoader) {
+                URLClassLoader clu = (URLClassLoader) cl;
+                for (URL url: clu.getURLs()) {
+                    cp.append(File.pathSeparatorChar);
+                    cp.append(url.getPath());
+                }
+            }
+
+        }
+        for (File jarFile: addJars) {
+            cp.append(File.pathSeparatorChar);
+            cp.append(jarFile.getAbsolutePath());
+        }
+        return cp.toString();
+    }
+
+    /**
+     * Gets all jar files in the sub-directory the given plugin can place
+     * dependencies in.
      * 
      * @param pluginName
-     *            the name of the plugin (determines the sub-directory's name)
+     *            the name of the plug-in (determines the sub-directory's name)
+     * 
+     * @return all jar files (may be an empty array)
      */
-    private void addPluginSubdir(String pluginName) {
-        File clsFile = new File(policyDir + File.separator + pluginName);
+    private File[] getPluginJars(String pluginName) {
+        File clsFile = new File(pluginDir + File.separator + pluginName);
         if (clsFile.isDirectory()) {
             // add the sub-directory itself
             subDirs.add(clsFile);
@@ -186,8 +259,9 @@ public class PluginClassLoader extends ClassLoader {
                     return pathname.getAbsolutePath().endsWith(".jar");
                 }
             });
-            subDirs.addAll(Arrays.asList(jarsInSubDir));
+            return jarsInSubDir;
         }
+        return new File[0];
     }
 
     @Override
@@ -204,8 +278,8 @@ public class PluginClassLoader extends ClassLoader {
         } catch (ClassNotFoundException exc) {
         }
 
-        if (!policyDir.exists()) {
-            throw new ClassNotFoundException("the plug-in policy directory does not exist");
+        if (!pluginDir.exists()) {
+            throw new ClassNotFoundException("the plug-in directory does not exist");
         }
 
         // if the class could not be loaded by the system class loader, try
@@ -213,12 +287,12 @@ public class PluginClassLoader extends ClassLoader {
         URL[] urls = new URL[subDirs.size() + jarFiles.length];
         try {
             int i = 0;
-            // add the plugins' directories for dependencies
+            // add the plug-ins' directories for dependencies
             for (File subdir: subDirs) {
                 urls[i++] = subdir.toURI().toURL();
             }
             for (File jarFile: jarFiles) {
-                // add the plugin's directory for dependencies
+                // add the plug-in's directory for dependencies
                 urls[i++] = jarFile.toURI().toURL();
             }
         } catch (MalformedURLException err) {
@@ -247,12 +321,12 @@ public class PluginClassLoader extends ClassLoader {
     }
 
     /**
-     * Returns a list of all plugins for a given interface.
+     * Returns a list of all plug-ins for a given interface.
      * 
      * @param pluginInterface
-     *            the policy interface
+     *            the plug-in interface
      * 
-     * @return a list of plugin classes where each is assignable from the given
+     * @return a list of plug-in classes where each is assignable from the given
      *         interface
      */
     public List<Class<?>> getClasses(Class<?> pluginInterface) {
@@ -267,7 +341,7 @@ public class PluginClassLoader extends ClassLoader {
             return resource;
         }
 
-        // then try to get the resource from a plugin's folder
+        // then try to get the resource from a plug-in's folder
         for (File subDir: subDirs) {
             File file = new File(subDir.getAbsolutePath() + File.separator + name);
             if (file.exists()) {
@@ -291,7 +365,7 @@ public class PluginClassLoader extends ClassLoader {
             return stream;
         }
 
-        // then try to get the resource from a plugin's folder
+        // then try to get the resource from a plug-in's folder
         for (File subDir: subDirs) {
             File file = new File(subDir.getAbsolutePath() + File.separator + name);
             try {
@@ -317,13 +391,13 @@ public class PluginClassLoader extends ClassLoader {
     }
 
     /**
-     * Check whether the class matches any of the policy interfaces and adds
+     * Check whether the class matches any of the plug-in interfaces and adds
      * the class to the appropriate list(s) of assignable classes.
      * 
      * @param clazz the class to check
      */
     private void checkClass(Class<?> clazz) {
-        for (Class<?> ifc : policyInterfaces) {
+        for (Class<?> ifc : pluginInterfaces) {
             if (ifc.isAssignableFrom(clazz)) {
                 List<Class<?>> assignableClasses = pluginMap.get(ifc);
                 if (assignableClasses == null) {
