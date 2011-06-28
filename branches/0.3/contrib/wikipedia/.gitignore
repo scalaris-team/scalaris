@@ -1,0 +1,7 @@
+/bin
+/.settings
+/.classpath
+/.project
+/*pages-meta-history.xml*
+/*pages-meta-current.xml*
+/scalaris-wiki.war

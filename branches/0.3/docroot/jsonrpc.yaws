@@ -1,0 +1,54 @@
+<erl module=jsonrpc_mod>
+-compile(export_all).
+
+out(A) ->
+    Peer = if is_tuple(A#arg.clisock) andalso
+              element(1, A#arg.clisock) =:= sslsocket ->
+                   ssl:peername(A#arg.clisock);
+              true ->
+                   inet:peername(A#arg.clisock)
+           end,
+    {ok, {IP, _}} = Peer,
+    A2 = A#arg{state = [{ip, IP}]},
+    case A2#arg.clidata of
+        {partial,_} -> send(A2, 413); % send error code 413 (Request Entity Too Large)
+        _ -> yaws_rpc:handler_session(A2, {?MODULE, handler})
+    end.
+
+handler([{ip, _IP}] = _State, {call, Operation, {array, Params}}, Session) ->
+    {true, 0, Session, {response, handler(Operation, Params)}}.
+
+handler(nop, [Value]) -> "ok";
+
+handler(range_read, [From, To])    -> api_json:dht_raw_range_read(From, To);
+handler(delete, [Key])             -> api_json:rdht_delete(Key);
+handler(delete, [Key, Timeout])    -> api_json:rdht_delete(Key, Timeout);
+handler(req_list, [Param])         -> api_json:tx_req_list(Param);
+handler(req_list, [TLog, ReqList]) -> api_json:tx_req_list(TLog, ReqList);
+handler(read, [Key])               -> api_json:tx_read(Key);
+handler(write, [Key, Value])       -> api_json:tx_write(Key, Value);
+handler(test_and_set, [Key, OldV, NewV]) ->
+    api_json:tx_test_and_set(Key, OldV, NewV);
+handler(req_list_commit_each, [Param]) -> api_json:tx_req_list_commit_each(Param);
+
+handler(publish, [Topic, Content]) -> api_json:pubsub_publish(Topic, Content);
+handler(subscribe, [Topic, URL])   -> api_json:pubsub_subscribe(Topic, URL);
+handler(unsubscribe, [Topic, URL]) -> api_json:pubsub_unsubscribe(Topic, URL);
+handler(get_subscribers, [Topic])  -> api_json:pubsub_get_subscribers(Topic);
+
+handler(notify, [Topic, Value]) ->
+    io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
+    "ok";
+
+handler(AnyOp, AnyParams) ->
+    io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
+    {struct, [{failure, "unknownreq"}]}.
+
+send(Args, StatusCode) -> send(Args, StatusCode, "").
+
+send(_Args, StatusCode, Payload) ->
+    [{status, StatusCode},
+     {content, "application/json", Payload},
+     {header, {content_length, lists:flatlength(Payload) }}].
+
+</erl>
