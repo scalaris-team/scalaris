@@ -96,12 +96,12 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     key = "_WriteString1_"
     conn = Scalaris::TransactionSingleOp.new()
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       conn.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to read the data:
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -115,7 +115,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     key = "_WriteString2"
     conn = Scalaris::TransactionSingleOp.new()
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       conn.write(@testTime.to_s + key.to_s, $_TEST_DATA[i])
     end
     
@@ -141,12 +141,12 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     key = "_WriteList1_"
     conn = Scalaris::TransactionSingleOp.new()
 
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.write(@testTime.to_s + key + i.to_s, [$_TEST_DATA[i], $_TEST_DATA[i + 1]])
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal([$_TEST_DATA[i], $_TEST_DATA[i + 1]], actual)
     end
@@ -161,7 +161,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     conn = Scalaris::TransactionSingleOp.new()
     
     list = []
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       list = [$_TEST_DATA[i], $_TEST_DATA[i + 1]]
       conn.write(@testTime.to_s + key, list)
     end
@@ -200,17 +200,17 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     conn = Scalaris::TransactionSingleOp.new()
     
     # first write all values:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to overwrite them using test_and_set:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.test_and_set(@testTime.to_s + key + i.to_s, $_TEST_DATA[i], $_TEST_DATA[i + 1])
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal($_TEST_DATA[i + 1], actual)
     end
@@ -227,12 +227,12 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     conn = Scalaris::TransactionSingleOp.new()
     
     # first write all values:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to overwrite them using test_and_set:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       begin
         conn.test_and_set(@testTime.to_s + key + i.to_s, $_TEST_DATA[i + 1], "fail")
         assert(false, 'expected a KeyChangedError')
@@ -242,7 +242,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -278,17 +278,17 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     conn = Scalaris::TransactionSingleOp.new()
     
     # first write all values:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.write(@testTime.to_s + key + i.to_s, [$_TEST_DATA[i], $_TEST_DATA[i + 1]])
     end
     
     # now try to overwrite them using test_and_set:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.test_and_set(@testTime.to_s + key + i.to_s, [$_TEST_DATA[i], $_TEST_DATA[i + 1]], [$_TEST_DATA[i + 1], $_TEST_DATA[i]])
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal([$_TEST_DATA[i + 1], $_TEST_DATA[i]], actual)
     end
@@ -305,12 +305,12 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     conn = Scalaris::TransactionSingleOp.new()
     
     # first write all values:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       conn.write(@testTime.to_s + key + i.to_s, [$_TEST_DATA[i], $_TEST_DATA[i + 1]])
     end
     
     # now try to overwrite them using test_and_set:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       begin
         conn.test_and_set(@testTime.to_s + key + i.to_s, "fail", 1)
         assert(false, 'expected a KeyChangedError')
@@ -320,7 +320,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = conn.read(@testTime.to_s + key + i.to_s)
       assert_equal([$_TEST_DATA[i], $_TEST_DATA[i + 1]], actual)
     end
@@ -345,7 +345,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     readRequests = conn.new_req_list()
     firstWriteRequests = conn.new_req_list()
     writeRequests = conn.new_req_list()
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       if (i % 2) == 0
         firstWriteRequests.add_write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
       end
@@ -355,7 +355,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     
     results = conn.req_list(firstWriteRequests)
     # evaluate the first write results:
-    for i in 0..(firstWriteRequests.size() - 1)
+    (0..(firstWriteRequests.size() - 1)).step(2) do |i|
       conn.process_result_write(results[i])
     end
 
@@ -364,7 +364,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     assert_equal(requests.size(), results.length)
 
     # now evaluate the read results:
-    for i in 0..(readRequests.size() - 1)
+    (0..(readRequests.size() - 1)).step(2) do |i|
       if (i % 2) == 0
         actual = conn.process_result_read(results[i])
         assert_equal($_TEST_DATA[i], actual)
@@ -379,7 +379,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     end
     
     # now evaluate the write results:
-    for i in 0..(writeRequests.size() - 1)
+    (0..(writeRequests.size() - 1)).step(2) do |i|
       pos = readRequests.size() + i
       conn.process_result_write(results[pos])
     end
@@ -389,7 +389,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     assert_equal(readRequests.size(), results.length)
 
     # now evaluate the read results:
-    for i in 0..(readRequests.size() - 1)
+    (0..(readRequests.size() - 1)).step(2) do |i|
       actual = conn.process_result_read(results[i])
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -507,12 +507,12 @@ class TestTransaction < Test::Unit::TestCase
     key = "_testWriteString1_"
     t = Scalaris::Transaction.new()
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       t.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to read the data:
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       actual = t.read(@testTime.to_s + key + i.to_s)
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -520,7 +520,7 @@ class TestTransaction < Test::Unit::TestCase
     # commit the transaction and try to read the data with a new one:
     t.commit()
     t = Scalaris::Transaction.new()
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       actual = t.read(@testTime.to_s + key + i.to_s)
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -534,12 +534,12 @@ class TestTransaction < Test::Unit::TestCase
     key = "_testWriteList1_"
     t = Scalaris::Transaction.new()
 
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       t.write(@testTime.to_s + key + i.to_s, [$_TEST_DATA[i], $_TEST_DATA[i + 1]])
     end
     
     # now try to read the data:
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = t.read(@testTime.to_s + key + i.to_s)
       assert_equal([$_TEST_DATA[i], $_TEST_DATA[i + 1]], actual)
     end
@@ -549,7 +549,7 @@ class TestTransaction < Test::Unit::TestCase
     # commit the transaction and try to read the data with a new one:
     t.commit()
     t = Scalaris::Transaction.new()
-    for i in (0..($_TEST_DATA.length - 2)).step(2)
+    (0..($_TEST_DATA.length - 2)).step(2) do |i|
       actual = t.read(@testTime.to_s + key + i.to_s)
       assert_equal([$_TEST_DATA[i], $_TEST_DATA[i + 1]], actual)
     end
@@ -574,7 +574,7 @@ class TestTransaction < Test::Unit::TestCase
     readRequests = conn.new_req_list()
     firstWriteRequests = conn.new_req_list()
     writeRequests = conn.new_req_list()
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       if (i % 2) == 0
         firstWriteRequests.add_write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
       end
@@ -584,7 +584,7 @@ class TestTransaction < Test::Unit::TestCase
     
     results = conn.req_list(firstWriteRequests)
     # evaluate the first write results:
-    for i in 0..(firstWriteRequests.size() - 1)
+    (0..(firstWriteRequests.size() - 1)).each do |i|
       conn.process_result_write(results[i])
     end
 
@@ -593,7 +593,7 @@ class TestTransaction < Test::Unit::TestCase
     assert_equal(requests.size(), results.length)
 
     # now evaluate the read results:
-    for i in 0..(readRequests.size() - 1)
+    (0..(readRequests.size() - 1)).each do |i|
       if (i % 2) == 0
         actual = conn.process_result_read(results[i])
         assert_equal($_TEST_DATA[i], actual)
@@ -608,7 +608,7 @@ class TestTransaction < Test::Unit::TestCase
     end
 
     # now evaluate the write results:
-    for i in 0..(writeRequests.size() - 1)
+    (0..(writeRequests.size() - 1)).each do |i|
       pos = readRequests.size() + i
       conn.process_result_write(results[pos])
     end
@@ -618,7 +618,7 @@ class TestTransaction < Test::Unit::TestCase
     assert_equal(readRequests.size(), results.length)
 
     # now evaluate the read results:
-    for i in 0..(readRequests.size() - 1)
+    (0..(readRequests.size() - 1)).each do |i|
       actual = conn.process_result_read(results[i])
       assert_equal($_TEST_DATA[i], actual)
     end
@@ -680,7 +680,7 @@ end
       topic = "_Publish1_"
       conn = Scalaris::PubSub.new()
   
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.publish(@testTime.to_s + topic + i.to_s, $_TEST_DATA[i])
       end
       
@@ -693,7 +693,7 @@ end
       topic = "_Publish2"
       conn = Scalaris::PubSub.new()
   
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.publish(@testTime.to_s + topic, $_TEST_DATA[i])
       end
       
@@ -736,12 +736,12 @@ end
       topic = "_Subscribe1_"
       conn = Scalaris::PubSub.new()
   
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.subscribe(@testTime.to_s + topic + i.to_s, $_TEST_DATA[i])
       end
       
       # check if the subscribers were successfully saved:
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         topic1 = topic + i.to_s
         subscribers = conn.get_subscribers(@testTime.to_s + topic1)
         assert(subscribers.include?($_TEST_DATA[i]),
@@ -759,13 +759,13 @@ end
       topic = "_Subscribe2"
       conn = Scalaris::PubSub.new()
 
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.subscribe(@testTime.to_s + topic, $_TEST_DATA[i])
       end
       
       # check if the subscribers were successfully saved:
       subscribers = conn.get_subscribers(@testTime.to_s + topic)
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         assert(subscribers.include?($_TEST_DATA[i]),
                "Subscriber \"" + $_TEST_DATA[i] + "\" does not exist for topic \"" + topic + "\"")
       end
@@ -841,17 +841,17 @@ end
       conn = Scalaris::PubSub.new()
       
       # first subscribe test "urls"...
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.subscribe(@testTime.to_s + topic + i.to_s, $_TEST_DATA[i])
       end
       
       # ... then unsubscribe every second url:
-      for i in (0..($_TEST_DATA.length - 1)).step(2)
+      (0..($_TEST_DATA.length - 1)).step(2) do |i|
         conn.unsubscribe(@testTime.to_s + topic + i.to_s, $_TEST_DATA[i])
       end
       
       # check whether the subscribers were successfully saved:
-      for i in (1..($_TEST_DATA.length - 1)).step(2)
+      (1..($_TEST_DATA.length - 1)).step(2) do |i|
         topic1 = topic + i.to_s
         subscribers = conn.get_subscribers(@testTime.to_s + topic1)
         assert(subscribers.include?($_TEST_DATA[i]),
@@ -861,7 +861,7 @@ end
       end
       
       # check whether the unsubscribed urls were unsubscribed:
-      for i in (0..($_TEST_DATA.length - 1)).step(2)
+      (0..($_TEST_DATA.length - 1)).step(2) do |i|
         topic1 = topic + i.to_s
         subscribers = conn.get_subscribers(@testTime.to_s + topic1)
         assert(!(subscribers.include?($_TEST_DATA[i])),
@@ -881,26 +881,26 @@ end
       conn = Scalaris::PubSub.new()
       
       # first subscribe all test "urls"...
-      for i in 0..($_TEST_DATA.length - 1)
+      (0..($_TEST_DATA.length - 1)).each do |i|
         conn.subscribe(@testTime.to_s + topic, $_TEST_DATA[i])
       end
       
       # ... then unsubscribe every second url:
-      for i in (0..($_TEST_DATA.length - 1)).step(2)
+      (0..($_TEST_DATA.length - 1)).step(2) do |i|
         conn.unsubscribe(@testTime.to_s + topic, $_TEST_DATA[i])
       end
       
       # check whether the subscribers were successfully saved:
       subscribers = conn.get_subscribers(@testTime.to_s + topic)
       subscribers_expected = []
-      for i in (1..($_TEST_DATA.length - 1)).step(2)
+      (1..($_TEST_DATA.length - 1)).step(2) do |i|
         subscribers_expected << $_TEST_DATA[i]
         assert(subscribers.include?($_TEST_DATA[i]),
                "Subscriber \"" + $_TEST_DATA[i] + "\" does not exist for topic \"" + topic + "\"")
       end
       
       # check whether the unsubscribed urls were unsubscribed:
-      for i in (0..($_TEST_DATA.length - 1)).step(2)
+      (0..($_TEST_DATA.length - 1)).step(2) do |i|
         assert(!(subscribers.include?($_TEST_DATA[i])),
                "Subscriber \"" + $_TEST_DATA[i] + "\" should have been unsubscribed from topic \"" + topic + "\"")
       end
@@ -1197,7 +1197,7 @@ class TestReplicatedDHT < Test::Unit::TestCase
     key = "_Delete_NotExistingKey"
     rdht = Scalaris::ReplicatedDHT.new()
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
       assert_equal(0, ok)
       results = rdht.get_last_delete_result()
@@ -1218,12 +1218,12 @@ class TestReplicatedDHT < Test::Unit::TestCase
     rdht = Scalaris::ReplicatedDHT.new(conn = c)
     sc = Scalaris::TransactionSingleOp.new(conn = c)
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       sc.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to delete the data:
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
       assert_equal(4, ok)
       results = rdht.get_last_delete_result()
@@ -1253,12 +1253,12 @@ class TestReplicatedDHT < Test::Unit::TestCase
     rdht = Scalaris::ReplicatedDHT.new(conn = c)
     sc = Scalaris::TransactionSingleOp.new(conn = c)
 
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       sc.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to delete the data:
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
       assert_equal(4, ok)
       results = rdht.get_last_delete_result()
@@ -1268,12 +1268,12 @@ class TestReplicatedDHT < Test::Unit::TestCase
       _checkKeyDoesNotExist(@testTime.to_s + key + i.to_s)
     end
   
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       sc.write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
     end
     
     # now try to delete the data:
-    for i in 0..($_TEST_DATA.length - 1)
+    (0..($_TEST_DATA.length - 1)).each do |i|
       ok = rdht.delete(@testTime.to_s + key + i.to_s)
       assert_equal(4, ok)
       results = rdht.get_last_delete_result()

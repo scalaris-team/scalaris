@@ -14,6 +14,7 @@
 #    limitations under the License.
 
 require 'rubygems'
+gem 'json', '>=1.4.0'
 require 'json'
 require 'net/http'
 require 'base64'
