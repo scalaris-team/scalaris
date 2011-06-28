@@ -50,7 +50,7 @@ port=""
 yaws_port=""
 join_at=""
 start_mgmt_server=0
-start_dht_node="" # "dht_node" | "group_node"
+start_dht_node="" # "dht_node"
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -66,8 +66,7 @@ usage(){
     echo "    -v        - verbose"
     echo " services:"
     echo "    -m        - global Scalaris management server"
-    echo "    -s        - Scalaris node (see also -f) (not with -g)"
-    echo "    -g        - Scalaris2 groupnode (experimental) (not with -s)"
+    echo "    -s        - Scalaris node (see also -f)"
     echo " commands:"
     echo "    checkinstallation"
     echo "              - test installation"
@@ -328,7 +327,6 @@ while getopts "dhifqmsgvn:p:y:k:" optionName; do
         y) yaws_port=$OPTARG;;
         m) start_mgmt_server=1;;
         s) start_dht_node="dht_node";;
-        g) start_dht_node="group_node";;
         v) echo setting verbose from cli
             verbose=1;;
         [?]) echo "Wrong parameter $optionName."
