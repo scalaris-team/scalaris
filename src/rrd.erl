@@ -39,7 +39,7 @@
 
 -type timeseries_type() :: gauge | counter.
 -type fill_policy_type() :: set_undefined | keep_last_value.
--type time() :: timer:timestamp().
+-type time() :: util:time().
 -type internal_time() :: non_neg_integer().
 -type timespan() :: pos_integer().
 
