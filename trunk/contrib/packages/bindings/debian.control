@@ -2,7 +2,7 @@ Source: scalaris-bindings
 Section: unknown
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config, ruby, ruby1.8, python-dev (>= 2.6.0), python3-dev
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config, ruby, ruby1.8, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-java

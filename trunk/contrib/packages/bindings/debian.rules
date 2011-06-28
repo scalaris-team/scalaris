@@ -40,7 +40,7 @@ build-stamp:
 	fi
 	make java
 	make java-doc
-	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; make python-doc ; fi
+	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; fi
 	if [ "$(WITH_PYTHON3)" = 1 ]; then make python3 ; fi
 
 	touch build-stamp
@@ -69,7 +69,7 @@ install: build
 	make install-java DESTDIR=$(BUILD_DIR_JAVA)
 	make install-java-doc DESTDIR=$(BUILD_DIR_JAVA)
 	make install-ruby DESTDIR=$(BUILD_DIR_RUBY)
-	if [ "$(WITH_PYTHON)" = 1 ]; then make install-python DESTDIR=$(BUILD_DIR_PYTHON) ; make install-python-doc DESTDIR=$(BUILD_DIR_PYTHON) ; fi
+	if [ "$(WITH_PYTHON)" = 1 ]; then make install-python DESTDIR=$(BUILD_DIR_PYTHON) ; make install-python-doc-html DESTDIR=$(BUILD_DIR_PYTHON) ; fi
 	if [ "$(WITH_PYTHON3)" = 1 ]; then make install-python3 DESTDIR=$(BUILD_DIR_PYTHON3) ; fi
 	
 	# handle config files:
