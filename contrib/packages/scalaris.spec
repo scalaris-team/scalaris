@@ -104,10 +104,9 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %dir %{_docdir}/scalaris
-%dir %{_docdir}/scalaris/AUTHORS
-%dir %{_docdir}/scalaris/README
-%dir %{_docdir}/scalaris/LICENSE
-%doc AUTHORS README LICENSE
+%{_docdir}/scalaris/AUTHORS
+%{_docdir}/scalaris/README
+%{_docdir}/scalaris/LICENSE
 %{_bindir}/scalarisctl
 %{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
