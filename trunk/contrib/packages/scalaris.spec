@@ -85,7 +85,8 @@ make doc
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
-cp user-dev-guide/main.pdf $RPM_BUILD_ROOT/%{_docdir}/scalaris/user-dev-guide.pdf
+cp user-dev-guide/main.pdf $RPM_BUILD_ROOT%{_docdir}/scalaris/user-dev-guide.pdf
+cp AUTHORS README LICENSE $RPM_BUILD_ROOT%{_docdir}/scalaris/
 
 %pre
 getent group %{scalaris_group} >/dev/null || groupadd --system %{scalaris_group}
@@ -102,7 +103,10 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc AUTHORS README LICENSE
+%dir %{_docdir}/scalaris
+%{_docdir}/scalaris/AUTHORS
+%{_docdir}/scalaris/README
+%{_docdir}/scalaris/LICENSE
 %{_bindir}/scalarisctl
 %{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
@@ -114,7 +118,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %files doc
 %defattr(-,root,root)
-%dir %{_docdir}/scalaris
 %doc %{_docdir}/scalaris/erlang
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
 
