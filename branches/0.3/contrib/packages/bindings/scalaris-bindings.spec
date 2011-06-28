@@ -22,8 +22,13 @@ BuildRequires:  ruby >= 1.8
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  pkgconfig
 BuildRequires:  ruby(abi) >= 1.8
-%if 0%{?fedora_version} >= 12 || 0%{?rhel_version} >= 600
+%if 0%{?fedora_version} >= 12
 %define with_python 1
+%define with_python_doc 1
+%endif
+%if 0%{?rhel_version} >= 600
+%define with_python 1
+%define with_python_doc 0
 %endif
 %if 0%{?fedora_version} >= 13
 %define with_python3 1
@@ -38,6 +43,7 @@ BuildRequires:  python3-setuptools python-tools
 BuildRequires:  pkgconfig
 BuildRequires:  erlang-stack >= R13B01
 %define with_python 1
+%define with_python_doc 0
 %endif
 
 ###########################################################################################
@@ -46,6 +52,7 @@ BuildRequires:  erlang-stack >= R13B01
 %if 0%{?suse_version}
 %if 0%{?suse_version} >= 1110 || 0%{?sles_version} >= 11 
 %define with_python 1
+%define with_python_doc 1
 %if 0%{?suse_version} >= 1130 
 %else
 # py_requires is no longer needed since 11.3
@@ -69,6 +76,9 @@ BuildRequires:  ruby(abi) >= 1.8
 %{!?rb_sitelib: %global rb_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
 
 %if 0%{?with_python}
+%if 0%{?with_python_doc}
+BuildRequires:  epydoc texlive-latex
+%endif
 BuildRequires:  python-devel >= 2.6
 %{!?python_sitelib: %global python_sitelib %(python -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())')}
 %endif
@@ -164,7 +174,9 @@ make java
 make java-doc
 %if 0%{?with_python}
 make python
+%if 0%{?with_python_doc}
 make python-doc
+%endif
 %endif
 %if 0%{?with_python3}
 make python3
@@ -179,7 +191,9 @@ make install-java-doc DESTDIR=$RPM_BUILD_ROOT
 make install-ruby DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python}
 make install-python DESTDIR=$RPM_BUILD_ROOT
+%if 0%{?with_python_doc}
 make install-python-doc DESTDIR=$RPM_BUILD_ROOT
+%endif
 %endif
 %if 0%{?with_python3}
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
@@ -209,7 +223,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/scalaris-python
 %{python_sitelib}/*
+%if 0%{?with_python_doc}
 %doc %{_docdir}/scalaris/python-api
+%endif
 %endif
 
 %if 0%{?with_python3}

@@ -204,9 +204,9 @@ python-bench: compile python
 	true
 
 python-doc:
-	pushd python-api ; epydoc --config=epydoc.html.cfg ; FAILED=$$? ; popd ; \
+	cd python-api ; epydoc --config=epydoc.html.cfg ; FAILED=$$? ; cd .. ; \
 	  if [ $$FAILED -ne 0 ]; then false ; else  true ; fi
-	pushd python-api ; epydoc --config=epydoc.pdf.cfg ; FAILED=$$? ; popd ; \
+	cd python-api ; epydoc --config=epydoc.pdf.cfg ; FAILED=$$? ; cd .. ; \
 	  if [ $$FAILED -ne 0 ]; then false ; else  true ; fi
 
 python3: python3-compile
