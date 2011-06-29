@@ -29,8 +29,8 @@
 -export_type([db_chunk/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -82,7 +82,7 @@ on({?TRIGGER_NAME}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
     DhtNodePid = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, ?BLOOM_MAX_SIZE}),
+    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, get_max_items()}),
     State;
 
 %% @doc retrieve local node db
@@ -92,7 +92,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerStat
             true -> ok;
             _ -> 
                 ?TRACE("SPAWNING ADDITIONAL SYNC FOR RestI ~p", [RestI]),                
-                comm:send_local(DhtNodePid, {get_chunk, self(), RestI, ?BLOOM_MAX_SIZE})
+                comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items()})
         end,
     %Get Interval of DBList
     %TODO: IMPROVEMENT getChunk should return ChunkInterval 
@@ -101,7 +101,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerStat
     %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
     _ = case SyncMethod of
             bloom ->
-                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid),
+                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid, get_max_items()),
                 comm:send_local(Pid, {build_sync_struct, self(), {ChunkI, DBList}, get_sync_fpr(), Round});
             merkleTree ->
                 ok; %TODO
@@ -143,7 +143,7 @@ on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, Monitor
                 ?TRACE("RECV SYNC REQUEST FROM ~p", [SrcNode]),
                 monitor:proc_inc_value(MonitorTable, "Recv-Sync-Req-Count"),
                 DhtNodePid = pid_groups:get_my(dht_node),
-                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid),
+                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid, get_max_items()),
                 comm:send_local(Pid, {start_sync, SyncStruct});
             merkleTree  -> ok;
             art         -> ok
@@ -214,9 +214,15 @@ check_config() ->
             config:is_float(rep_update_fpr) andalso
             config:is_greater_than(rep_update_fpr, 0) andalso
             config:is_less_than(rep_update_fpr, 1) andalso
+            config:is_integer(rep_update_max_items) andalso
+            config:is_greater_than(rep_update_max_items, 0) andalso
             config:is_greater_than(rep_update_interval, 0);
         _ -> true
     end.
+
+-spec get_max_items() -> pos_integer().
+get_max_items() ->
+    config:read(rep_update_max_items).
 
 -spec get_sync_fpr() -> float().
 get_sync_fpr() ->

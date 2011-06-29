@@ -23,7 +23,7 @@
 
 % types
 -type itemKey() :: any().
--type hfs() 	:: hfs_t(). %todo make opaque
+-type hfs()     :: hfs_t(). %todo make opaque
 
 -ifdef(with_export_type_support).
 -export_type([hfs/0]).

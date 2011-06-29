@@ -24,10 +24,10 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-	 {new, 1},
-	 {new, 2}, 
-	 {apply_val, 2},
-	 {hfs_size, 1}
+     {new, 1},
+     {new, 2}, 
+     {apply_val, 2},
+     {hfs_size, 1}
     ];
 
 behaviour_info(_Other) ->

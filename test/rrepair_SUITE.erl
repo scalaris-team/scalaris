@@ -42,7 +42,8 @@
 
 all() ->
     [get_symmetric_keys_test,
-     simpleBloomSync].
+     simpleBloomSync,
+     extendedBloomSyncTest].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -51,21 +52,17 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-set_rrepair_config_parameter() ->
-    %stop trigger
-    config:write(rep_update_activate, true),
-    config:write(rep_update_interval, 100000000),
-    ok.
+get_rrepair_config_parameter() ->
+    [{rep_update_activate, true},
+     {rep_update_interval, 100000000}, %stop trigger
+     {rep_update_trigger, trigger_periodic},
+     {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_fpr, 0.1},
+     {rep_update_max_items, 1000}].
 
 end_per_testcase(_TestCase, _Config) ->
-    %error_logger:tty(false),
     unittest_helper:stop_ring(),
     ok.
-
--spec get_symmetric_keys(pos_integer()) -> [?RT:key()].			      
-get_symmetric_keys(NodeCount) ->
-    B = (16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF div NodeCount) + 1,
-    util:for_to_ex(0, NodeCount - 1, fun(I) -> I*B end).
 
 get_symmetric_keys_test(_) ->
     ToTest = get_symmetric_keys(4),
@@ -75,19 +72,71 @@ get_symmetric_keys_test(_) ->
     ?equals(Equal, true),
     ok.
 
+simpleBloomSync(Config) ->
+    [Start, End] = start_bloom_sync(Config, 4, 1000, 1, 0.1),
+    ?assert(Start < End),
+    ok.
+
+extendedBloomSyncTest(Config) ->
+    R1 = start_bloom_sync(Config, 4, 1000, 2, 0.2),
+    R2 = start_bloom_sync(Config, 4, 1000, 2, 0.1),
+    ?assert(lists:last(R1) =< lists:last(R2)),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Helper Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc
+%    runs the bloom filter synchronization [Rounds]-times 
+%    and records the sync degree after each round
+%    returns list of sync degrees per round, first value is initial sync degree
+% @end
+-spec start_bloom_sync([tuple()], pos_integer(), pos_integer(), pos_integer(), float()) -> [float()].
+start_bloom_sync(Config, NodeCount, DataCount, Rounds, Fpr) ->
+    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
+    DestVersCount = NodeCount * 2 * DataCount,
+    ItemCount = NodeCount * DataCount,
+    %build and fill ring
+    build_symmetric_ring(NodeCount, Config),
+    config:write(rep_update_fpr, Fpr),
+    fill_symmetric_ring(DataCount, NodeCount),
+    %measure initial sync degree
+    InitialOutdated = DestVersCount - getVersionCount(getDBStatus()),
+    %run sync rounds
+    Result = [calc_sync_degree(InitialOutdated, ItemCount) |
+                  lists:reverse(util:for_to_ex(1,
+                                               Rounds, 
+                                               fun(_I) ->
+                                                       startSyncRound(NodeKeys),
+                                                       timer:sleep(5000),
+                                                       calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
+                                                                        ItemCount)
+                                               end))],
+    ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
+    %clean up
+    unittest_helper:stop_ring(),
+    Result.
+
+-spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
+get_symmetric_keys(NodeCount) ->
+    B = (16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF div NodeCount) + 1,
+    util:for_to_ex(0, NodeCount - 1, fun(I) -> I*B end).
+
 build_symmetric_ring(NodeCount, Config) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),    
     %Build ring with NodeCount symmetric nodes
     unittest_helper:make_ring_with_ids(
       fun() ->  get_symmetric_keys(NodeCount) end,
-      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}]}]),
+      [{config, lists:flatten([{log_path, PrivDir}, 
+                               {dht_node, mockup_dht_node},
+                               get_rrepair_config_parameter()])}]),
     % wait for all nodes to finish their join 
     unittest_helper:check_ring_size_fully_joined(NodeCount),
     % wait a bit for the rm-processes to settle
-    timer:sleep(500), 
-    set_rrepair_config_parameter(),
+    timer:sleep(500),
     ok.
 
 fill_symmetric_ring(DataCount, NodeCount) ->
@@ -99,7 +148,7 @@ fill_symmetric_ring(DataCount, NodeCount) ->
                         %write DataCount-items to nth-Node and its symmetric replicas
                         util:for_to(FirstKey, 
                                     FirstKey + DataCount - 1, 
-                                    fun(Key) ->					      
+                                    fun(Key) ->
                                             RepKeys = ?RT:get_replica_keys(Key),
                                             %write replica group
                                             lists:foreach(fun(X) -> 
@@ -113,33 +162,11 @@ fill_symmetric_ring(DataCount, NodeCount) ->
                                             %random replica is outdated
                                             OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
                                             api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
-                                            receive {set_key_entry_reply, _} -> ok end,					      
+                                            receive {set_key_entry_reply, _} -> ok end,
                                             ok
                                     end)
                 end),
     ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),
-    ok.
-
-simpleBloomSync(Config) ->
-    NodeCount = 4,
-    DataCount = 1000,    
-    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    %Build and fill Ring
-    build_symmetric_ring(NodeCount, Config),
-    fill_symmetric_ring(DataCount, NodeCount),
-    %Sync Round
-    DestVersCount = NodeCount * 2 * DataCount,
-    DBStat1 = getDBStatus(),
-    ct:pal("---DBStatus---~n~.0p~n", [DBStat1]),
-    OutdatedStart = DestVersCount - getVersionCount(DBStat1),
-    ct:pal(">>SumOutdated=[~w]", [OutdatedStart]),
-    startSyncRound(NodeKeys),
-    timer:sleep(5000),
-    DBStat2 = getDBStatus(),
-    ct:pal("SyncR=1---DBStatus---~n~.0p~n", [DBStat2]),
-    OutdatedR1 = DestVersCount - getVersionCount(DBStat2),
-    ct:pal(">>SumOutdated=[~w]", [OutdatedR1]),
-    ?assert(OutdatedStart > OutdatedR1),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -156,7 +183,7 @@ startSyncRound(NodeKeys) ->
 -spec getDBStatus() -> rrDBStatus().
 getDBStatus() ->
     RingData = unittest_helper:get_ring_data(),
-    [ #rrNodeStatus{ nodeKey = LV, 
+    [ #rrNodeStatus{ nodeKey = LV,
                      nodeRange = intervals:new(LBr, LV, RV, RBr), 
                      dbItemCount = length(DB),
                      versionSum = lists:sum(lists:map(fun(X) -> db_entry:get_version(X) end, DB))
@@ -165,4 +192,11 @@ getDBStatus() ->
 
 getVersionCount(RingStatus) ->
     lists:sum(lists:map(fun(#rrNodeStatus{ versionSum = V}) -> V end, RingStatus)).
-	
+
+print_sync_status(ObsoleteCount, ItemCount) ->
+    ct:pal("SyncDegree: ~7.4f%   -- ItemsOutdated=~w",
+           [100 * calc_sync_degree(ObsoleteCount, ItemCount),
+            ObsoleteCount]).
+
+calc_sync_degree(ObsoleteCount, ItemCount) ->
+    (ItemCount - ObsoleteCount) / ItemCount.
