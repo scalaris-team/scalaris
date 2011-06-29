@@ -19,8 +19,9 @@ ERL_LIB_DIR = @ERLANG_LIB_DIR@
 SVN = svn
 CD = cd
 MAKE = make
-VERSION=0.0.1
+VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.4
+COMMONS_CLI_VERSION=1.2
 
 .PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test clean docs svn dialyzer dialyzer-all rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
 
@@ -481,6 +482,8 @@ install-java: java
 	           java-api/scalaris.jar
 	install -m 644 -t $(JAVADIR)/scalaris/lib \
 	           java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar
+	install -m 644 -t $(JAVADIR)/scalaris/lib \
+	           java-api/lib/jakarta-commons-cli-$(COMMONS_CLI_VERSION).jar
 	install -d $(ETCDIR)
 	install -m 644 java-api/scalaris-java.conf \
 	           $(ETCDIR)/scalaris-java.conf
