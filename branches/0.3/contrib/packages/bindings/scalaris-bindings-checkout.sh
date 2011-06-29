@@ -24,7 +24,7 @@ fi
 if [ ${result} -eq 0 ]; then
   tarfile="${folder}.tar.gz"
   echo "making ${tarfile} ..."
-  tar -czf ${tarfile} ${folder} --exclude-vcs --exclude=${newfoldername}/src --exclude=${newfoldername}/test --exclude=${newfoldername}/include --exclude=${newfoldername}/contrib --exclude=${newfoldername}/user-dev-guide --exclude=${newfoldername}/doc --exclude=${newfoldername}/docroot
+  tar -czf ${tarfile} ${folder} --exclude-vcs --exclude=${folder}/src --exclude=${folder}/test --exclude=${folder}/include --exclude=${folder}/contrib --exclude=${folder}/user-dev-guide --exclude=${folder}/doc --exclude=${folder}/docroot
   result=$?
 fi
 
