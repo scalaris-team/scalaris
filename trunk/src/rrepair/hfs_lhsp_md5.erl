@@ -30,8 +30,8 @@
 % types
 -behaviour(hfs_beh).
 
--type hf_number() :: integer().
--type hfs_t() :: {hfs_lhsp_md5, hf_number()}.
+-type hf_number()   :: integer().
+-type hfs_t()       :: {hfs_lhsp_md5, hf_number()}.
 
 % include
 -include("hfs_beh.hrl").
@@ -40,22 +40,22 @@
 
 % @doc returns a new lhsp hfs
 new_(_, HFCount) -> 
-	new_(HFCount).
+    new_(HFCount).
 new_(HFCount) -> 
-	{hfs_lhsp_md5, HFCount}.
+    {hfs_lhsp_md5, HFCount}.
 
 % @doc Applies Val to all hash functions in container HC
 apply_val_({hfs_lhsp_md5, K}, Val) ->
-	if
-		is_integer(Val) -> MD5 = erlang:md5(integer_to_list(Val));
-		is_float(Val) -> MD5 = erlang:md5(float_to_list(Val));
-		true -> MD5 = erlang:md5(Val)
-	end,
-	<<HF1:64, HF2:64>> = MD5,
-	[ HF1 + I * HF2 || I <- lists:seq(0, K-1, 1) ].
+    if
+        is_integer(Val) -> MD5 = erlang:md5(integer_to_list(Val));
+        is_float(Val) -> MD5 = erlang:md5(float_to_list(Val));
+        true -> MD5 = erlang:md5(Val)
+    end,
+    <<HF1:64, HF2:64>> = MD5,
+    [ HF1 + I * HF2 || I <- lists:seq(0, K-1, 1) ].
 
 % @doc Returns number of hash functions in the container
 hfs_size_(Hfs) -> 
-	{hfs_lhsp_md5, K} = Hfs,
-	K.
+    {hfs_lhsp_md5, K} = Hfs,
+    K.
 

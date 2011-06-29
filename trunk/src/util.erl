@@ -693,7 +693,7 @@ for_to(I, N, Fun) ->
        true -> ok
     end.
 
-%% for(i; I<=n; i++) { fun(i) }
+%% for(i; I<=n; i++) { Acc = [fun(i)|Acc] }
 for_to_ex(N, N, Fun, Acc) ->
     [Fun(N)|Acc];
 for_to_ex(I, N, Fun, Acc) ->

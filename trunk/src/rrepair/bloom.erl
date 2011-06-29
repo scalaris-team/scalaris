@@ -30,12 +30,12 @@
 
 %% Types
 -record(bloom, {
-                size          = 0 		                      :: integer(),		%bit-length of the bloom filter - requirement: size rem 8 = 0
-                filter        = <<>>                          :: binary(),		%length = size div 8
-                expItems      = ?required(bloom, expItems)    :: integer(),		%extected number of items
-                targetFPR     = ?required(bloom, targetFPR)   :: float(), 		%target false-positive-rate
+                size          = 0                             :: integer(),     %bit-length of the bloom filter - requirement: size rem 8 = 0
+                filter        = <<>>                          :: binary(),      %length = size div 8
+                expItems      = ?required(bloom, expItems)    :: integer(),     %extected number of items
+                targetFPR     = ?required(bloom, targetFPR)   :: float(),       %target false-positive-rate
                 hfs           = ?required(bloom, hfs)         :: ?REP_HFS:hfs(),%HashFunctionSet
-                addedItems    = 0                             :: integer()		%number of inserted items
+                addedItems    = 0                             :: integer()      %number of inserted items
                }).
 -type bloomFilter_t() :: #bloom{}.
 
@@ -45,13 +45,13 @@
 
 % @doc creates a new bloom filter
 new_(N, FPR, Hfs) ->
-	Size = resize(calc_least_size(N, FPR), 8), 	%BF bit size should fit into a number of bytes
+    Size = resize(calc_least_size(N, FPR), 8), %BF bit size should fit into a number of bytes
     #bloom{
            size = Size,
-           filter = <<0:Size>>,							   
+           filter = <<0:Size>>,
            expItems = N, 
            targetFPR = calc_FPR(Size, N, calc_HF_num(Size, N)),
-           hfs = Hfs, 							   
+           hfs = Hfs,
            addedItems = 0
           }.
 
@@ -63,9 +63,9 @@ addRange_(Bloom, Items) ->
            addedItems = FilledCount,
            filter = Filter
           } = Bloom,
-	Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]), %TODO: USE FLATTEN???
-	Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
-	NewFilter = set_Bits(Filter, Positions),
+    Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]), %TODO: USE FLATTEN???
+    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
+    NewFilter = set_Bits(Filter, Positions),
     Bloom#bloom{
                 filter = NewFilter, 
                 addedItems = FilledCount + length(Items)
@@ -73,14 +73,14 @@ addRange_(Bloom, Items) ->
 
 % @doc returns true if the bloom filter contains item
 is_element_(Bloom, Item) -> 
-	#bloom{
-		   size = BFSize,		   
-		   hfs = Hfs, 
-		   filter = Filter
-		  } = Bloom,
-	Pos = apply(element(1, Hfs), apply_val, [Hfs, Item]), 
-	Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
-	check_Bits(Filter, Positions).
+    #bloom{
+           size = BFSize,		   
+           hfs = Hfs, 
+           filter = Filter
+          } = Bloom,
+    Pos = apply(element(1, Hfs), apply_val, [Hfs, Item]), 
+    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
+    check_Bits(Filter, Positions).
 
 %% @doc joins two bloom filter, returned bloom filter represents their union
 join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR = Fpr1,
@@ -118,63 +118,64 @@ equals_(Bloom1, Bloom2) ->
 
 % @doc bloom filter debug information
 print_(Bloom) -> 
-	#bloom{
-		   expItems = MaxItems, 
-		   targetFPR = TargetFPR,
-		   size = Size,
-		   hfs = Hfs,
-		   addedItems = NumItems
-		  } = Bloom,
-	HCount = apply(element(1, Hfs), hfs_size, [Hfs]), 
-	io:format("BloomFilter: bloom~n"
-			  "Size~16b Bit (~.2f kb) (~.2 Bit / Item)~n"
-              "HashFunNum~10b~n"
-              "Planed > MaxItems~12b (DestFPR=~.4f)"			  
-			  "Actual > ItemNum~10b (Fpr=~.4f)~n", 
-			  [Size,
-			  (Size div 8) / 1024,
-			   Size / MaxItems,
+    #bloom{
+           expItems = MaxItems, 
+           targetFPR = TargetFPR,
+           size = Size,
+           hfs = Hfs,
+           addedItems = NumItems
+          } = Bloom,
+    HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
+    FullSize = byte_size(term_to_binary(Bloom)),
+    io:format("BloomFilter: bloom~n"
+              "Filter_Size: ~b Bit (~10.4f kb) (~5.2f Bit/Item)~n"
+              "StructSize: ~10.4f kb~n"
+              "HashFunNum~b~n"
+              "Planed - MaxItems=~b (DestFPR=~8.6f)~n"
+              "Actual - ItemNum=~b (Fpr=~8.6f)~n", 
+              [Size,
+               (Size div 8) / 1024,
+               Size / MaxItems,
+               FullSize / 1024,
                HCount,
-			   MaxItems,
-			   TargetFPR,			   
-			   NumItems,
-			   calc_FPR(Size, NumItems, HCount)]
-			 ),
-    ok. 
-
+               MaxItems,
+               TargetFPR,
+               NumItems,
+               calc_FPR(Size, NumItems, HCount)]),
+    ok.
 
 %% bit operations
 
 % @doc Sets all filter-bits at given positions to 1
 -spec set_Bits(binary(), [integer()]) -> binary().
 set_Bits(Filter, []) -> 
-	Filter;
+    Filter;
 set_Bits(Filter, [Pos | Positions]) -> 
-	PreByteNum = Pos div 8,
-	<<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
-	NewByte = OldByte bor (1 bsl (Pos rem 8)),
-	set_Bits(<<PreBin/binary, NewByte:8, PostBin/binary>>, Positions).
+    PreByteNum = Pos div 8,
+    <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
+    NewByte = OldByte bor (1 bsl (Pos rem 8)),
+    set_Bits(<<PreBin/binary, NewByte:8, PostBin/binary>>, Positions).
 
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [integer()]) -> boolean().
 check_Bits(_, []) -> 
-	true;
+    true;
 check_Bits(Filter, [Pos | Positions]) -> 
-	PreBytes = Pos div 8,
-	<<_:PreBytes/binary, CheckByte:8, _/binary>> = Filter,
-	case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
-		true -> check_Bits(Filter, Positions);
-		false -> false
-	end.
+    PreBytes = Pos div 8,
+    <<_:PreBytes/binary, CheckByte:8, _/binary>> = Filter,
+    case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
+        true -> check_Bits(Filter, Positions);
+        false -> false
+    end.
 
 %% helper functions
 -spec ln(X::number()) -> float().
 ln(X) -> 
-	util:log(X, math:exp(1)).
+    util:log(X, math:exp(1)).
 
 % @doc Increases Val until Val rem Div == 0.
 -spec resize(integer(), integer()) -> integer().
 resize(Val, Div) when Val rem Div == 0 -> 
-	Val;
+    Val;
 resize(Val, Div) when Val rem Div /= 0 -> 
-	resize(Val + 1, Div).
+    resize(Val + 1, Div).

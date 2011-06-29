@@ -24,14 +24,15 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start_bloom_sync/1]).
+-export([init/1, on/2, start_bloom_sync/2]).
 -export([concatKeyVer/1, concatKeyVer/2, minKey/1]).
 
 -ifdef(with_export_type_support).
 -export_type([bloom_sync_struct/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+%-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -59,6 +60,7 @@
          diffList       = []                                      :: [keyValVers()],
          diffCount      = 0                                       :: non_neg_integer(),
          diffSenderPid                                            :: comm:mypid(),
+         maxItems       = ?required(bloom_sync_state, maxItems)   :: pos_integer(), %max items in a sync structure 
          updatedCount   = 0                                       :: non_neg_integer(),
          notUpdatedCount= 0                                       :: non_neg_integer(),
          feedback       = []                                      :: [keyValVers()],
@@ -83,6 +85,7 @@ on({get_state_response, NodeDBInterval}, State) ->
                       diffList = DiffList,
                       dhtNodePid = DhtNodePid, 
                       syncStruct = SyncStruct, 
+                      maxItems = MaxItems,
                       step = Step } = State,
     _ = case Step of
             bloom_sync ->
@@ -92,7 +95,7 @@ on({get_state_response, NodeDBInterval}, State) ->
                     true ->
                         comm:send_local(self(), {shutdown, empty_interval});
                     false ->
-                        comm:send_local(DhtNodePid, {get_chunk, self(), SyncInterval, ?BLOOM_MAX_SIZE})
+                        comm:send_local(DhtNodePid, {get_chunk, self(), SyncInterval, MaxItems})
                 end;
             diff_sync -> 
                 MyPid = comm:this(),
@@ -119,7 +122,7 @@ on({get_chunk_response, {_, DBList}}, State) ->
                        keyBF = KeyBF,
                        versBF = VersBF
                        } = SyncStruct,
-    {Obsolete, Missing} = 
+    {Obsolete, _Missing} = 
         filterPartitionMap(fun(A) -> 
                                    db_entry:get_version(A) > -1 andalso
                                        not ?REP_BLOOM:is_element(VersBF, concatKeyVer(A)) 
@@ -134,7 +137,7 @@ on({get_chunk_response, {_, DBList}}, State) ->
                            end,
                            DBList),
 	?TRACE("SYNC WITH [~p] RESULT: DBListLength=[~p] -> Missing=[~p] Obsolete=[~p]", 
-           [SrcNode, length(DBList), length(Missing), length(Obsolete)]),
+           [SrcNode, length(DBList), length(_Missing), length(Obsolete)]),
     %TODO possibility of DETAIL SYNC IMPL - NOW SEND COMPLETE obsolete Entries (key-val-vers)
     comm:send(SrcNode, {diff_list, comm:this(), Obsolete}),
     State#bloom_sync_state{ sendFeedback = false };
@@ -166,7 +169,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State) ->
                        State#bloom_sync_state{ notUpdatedCount = FailedCount + 1 }
                end,
     _ = case DiffCount - 1 =:= OkCount + FailedCount of
-            true when NewState#bloom_sync_state.sendFeedback ->                
+            true when NewState#bloom_sync_state.sendFeedback ->
                 %?TRACE("Send Feedback and Shutdown", []),
                 comm:send(Sender, {diff_list, comm:this(), NewState#bloom_sync_state.feedback}),
                 comm:send_local(self(), {shutdown, {ok, NewState#bloom_sync_state.updatedCount}});
@@ -187,7 +190,7 @@ on({start_sync, SyncStruct}, State) ->
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
     State#bloom_sync_state{ syncStruct = SyncStruct };
 on({build_sync_struct, Sender, {ChunkInterval, DBItems}, Fpr, Round}, State) ->
-    ElementNum = ?BLOOM_MAX_SIZE,    %TODO set to node db item cout + 5%?
+    ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),
     BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
@@ -199,10 +202,10 @@ on({build_sync_struct, Sender, {ChunkInterval, DBItems}, Fpr, Round}, State) ->
                                      versBF = VerBF,
                                      round = Round
                                    },
-    ?TRACE("Key BF", []),
-    bloom:print(KeyBF),
-    ?TRACE("VER BF", []),
-    bloom:print(VerBF),
+    %?TRACE("Key BF", []),
+    %bloom:print(KeyBF),
+    %?TRACE("VER BF", []),
+    %bloom:print(VerBF),
     comm:send_local(Sender, {build_sync_struct_response, ChunkInterval, SyncStruct}),
     State.
 
@@ -242,8 +245,7 @@ concatKeyVer(DBEntry) ->
     concatKeyVer(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
 -spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
 concatKeyVer(Key, Version) ->
-    erlang:list_to_binary([term_to_binary(Key), "#", Version]).
-
+    term_to_binary([Key, "#", Version]).
 
 filterPartitionMap(_, _, _, [], Satis, NonSatis) ->
     {Satis, NonSatis};
@@ -269,9 +271,7 @@ filterPartitionMap(Filter, Pred, Map, List) ->
 init(State) ->    
     State.
 
--spec start_bloom_sync(comm:erl_local_pid()) -> {ok, pid()}.
-start_bloom_sync(DhtNodePid) ->
-    State = #bloom_sync_state{ ownerPid = self(), dhtNodePid = DhtNodePid },
+-spec start_bloom_sync(comm:erl_local_pid(), pos_integer()) -> {ok, pid()}.
+start_bloom_sync(DhtNodePid, MaxItems) ->
+    State = #bloom_sync_state{ ownerPid = self(), dhtNodePid = DhtNodePid, maxItems = MaxItems },
     gen_component:start(?MODULE, State, []).
-
-    

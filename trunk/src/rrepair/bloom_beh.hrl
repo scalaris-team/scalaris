@@ -71,30 +71,30 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 %       prefers smaller values (truncates decimals)
 -spec calc_HF_num(integer(), integer()) -> integer().
 calc_HF_num(M,N) -> 
-	trunc(ln(2) * (M / N)).
+    trunc(ln(2) * (M / N)).
 
 -spec calc_HF_numEx(integer(), float()) -> integer().
 calc_HF_numEx(N, FPR) ->
-	M = calc_least_size(N, FPR),
-	calc_HF_num(M,N).
+    M = calc_least_size(N, FPR),
+    calc_HF_num(M,N).
 
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate up to MaxElements.
 -spec calc_least_size(integer(), float()) -> integer().
 calc_least_size(N, FPR) -> 
-	trunc(N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2)). 
+    trunc(N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2)). 
 
 % @doc  Calculates FPR for an M-bit large BloomFilter with K Hashfuntions 
 %       and a maximum of N elements.
-% 	   FPR = (1-e^(-kn/m))^k
-% 	   M = number of BF-Bits
+%       FPR = (1-e^(-kn/m))^k
+%       M = number of BF-Bits
 -spec calc_FPR(integer(), integer(), integer()) -> float().
 calc_FPR(M, N, K) -> 
-	math:pow(1 - math:pow(math:exp(1), -K*N / M), K).
+    math:pow(1 - math:pow(math:exp(1), -K*N / M), K).
 
 
 %% private function specs - TO IMPLEMENT if behaviour is used
--spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter_t().					 
+-spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter_t().
 -spec addRange_(bloomFilter_t(), [key()]) -> bloomFilter_t().
 -spec is_element_(bloomFilter_t(), key()) -> boolean().
 -spec equals_(bloomFilter(), bloomFilter()) -> boolean().
