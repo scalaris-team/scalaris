@@ -37,7 +37,7 @@ start() ->
     _ = application:load(
           {application, scalaris,
            [{description, "scalaris"},
-            {vsn, "0.2"},
+            {vsn, "0.3.0 RC1"},
             {mod, {scalaris, []}},
             {registered, []},
             {applications, [kernel, stdlib]},
