@@ -42,8 +42,10 @@
 
 all() ->
     [get_symmetric_keys_test,
-     simpleBloomSync,
-     extendedBloomSyncTest].
+     simpleBloomSync_test,
+     bloomSync_FprCompare_check].
+
+
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -72,15 +74,17 @@ get_symmetric_keys_test(_) ->
     ?equals(Equal, true),
     ok.
 
-simpleBloomSync(Config) ->
+% @doc Bloom Synchronization should update at least one Item.
+simpleBloomSync_test(Config) ->
     [Start, End] = start_bloom_sync(Config, 4, 1000, 1, 0.1),
     ?assert(Start < End),
     ok.
 
-extendedBloomSyncTest(Config) ->
+% @doc Better Fpr should result in a higher synchronization degree.
+bloomSync_FprCompare_check(Config) ->
     R1 = start_bloom_sync(Config, 4, 1000, 2, 0.2),
     R2 = start_bloom_sync(Config, 4, 1000, 2, 0.1),
-    ?assert(lists:last(R1) =< lists:last(R2)),
+    ?assert(lists:last(R1) < lists:last(R2)),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
