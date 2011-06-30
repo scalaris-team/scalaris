@@ -21,15 +21,19 @@
 
 -behaviour(gen_component).
 
+-include("record_helpers.hrl").
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -ifdef(with_export_type_support).
--export_type([db_chunk/0]).
+-export_type([db_chunk/0, 
+              sync_stage/0, 
+              simple_detail_sync/0, 
+              keyValVers/0]).
 -endif.
 
-%-define(TRACE(X,Y), io:format("[~p] " ++ X ++ "~n", [self()] ++ Y)).
+%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,25 +47,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
+
+-type keyValVers() :: {?RT:key(), ?DB:value(), ?DB:version()}.
+-type simple_detail_sync() :: {SrcNode::comm:mypid(), [keyValVers()]}.
+
 -type sync_method() :: bloom | merkleTree | art.
+-type sync_stage()  :: reconciliation | resolution.
+-type sync_struct() :: bloom_sync:bloom_sync_struct() |
+                       simple_detail_sync() . %TODO add merkleTree + art 
 
--type sync_struct() :: %TODO add merkleTree + art
-    bloom_sync:bloom_sync_struct(). 
-
--type state() :: 
-    {
-        Sync_method     :: sync_method(),  
-        TriggerState    :: trigger:state(),
-        SyncRound       :: non_neg_integer(),
-        MonitorTable    :: pdb:tableid()
-    }.
+-record(rep_upd_state,
+        {
+         trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
+         sync_round     = 0.0                                       :: float(),
+         monitor_table  = ?required(rep_upd_state, monitor_table)   :: pdb:tableid()
+         }).
+-type state() :: #rep_upd_state{}.
 
 -type message() ::
     {?TRIGGER_NAME} |
     {get_state_response, any()} |
     {get_chunk_response, db_chunk()} |
     {build_sync_struct_response, intervals:interval(), sync_struct()} |
-    {request_sync, sync_method(), sync_struct()} |
+    {request_sync, sync_method(), sync_stage(), Feedback::boolean(), sync_struct()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {sync_progress_report, Sender::comm:erl_local_pid(), Text::string()}.
 
@@ -71,13 +79,12 @@
 
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
-on({?TRIGGER_NAME}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
+on({?TRIGGER_NAME}, State) ->
     DhtNodePid = pid_groups:get_my(dht_node),
     comm:send_local(DhtNodePid, {get_state, comm:this(), my_range}),
-    
-    NewTriggerState = trigger:next(TriggerState),
+    NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
     ?TRACE("Trigger NEXT", []),
-    {SyncMethod, NewTriggerState, Round, MonitorTable};
+    State#rep_upd_state{ trigger_state = NewTriggerState };
 
 %% @doc retrieve node responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
@@ -86,33 +93,38 @@ on({get_state_response, NodeDBInterval}, State) ->
     State;
 
 %% @doc retrieve local node db
-on({get_chunk_response, {RestI, [First | T] = DBList}}, {SyncMethod, TriggerState, Round, MonitorTable}) ->
+on({get_chunk_response, {RestI, [First | T] = DBList}}, State) ->
+    Rounds = State#rep_upd_state.sync_round,
     DhtNodePid = pid_groups:get_my(dht_node),
-    _ = case intervals:is_empty(RestI) of
-            true -> ok;
-            _ -> 
-                ?TRACE("SPAWNING ADDITIONAL SYNC FOR RestI ~p", [RestI]),                
-                comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items()})
-        end,
+    RestIEmpty = intervals:is_empty(RestI),
+    not RestIEmpty andalso
+        comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items()}),
     %Get Interval of DBList
-    %TODO: IMPROVEMENT getChunk should return ChunkInterval 
-    %       (db is traved twice! - 1st getChunk, 2nd here)
+    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traved twice! - 1st getChunk, 2nd here)
     ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
     %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
-    _ = case SyncMethod of
+    _ = case get_sync_method() of
             bloom ->
-                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid, get_max_items()),
-                comm:send_local(Pid, {build_sync_struct, self(), {ChunkI, DBList}, get_sync_fpr(), Round});
+                {ok, Pid} = bloom_sync:start_bloom_sync(get_max_items()),
+                comm:send_local(Pid, 
+                                {build_sync_struct, self(), comm:this(), {ChunkI, DBList}, get_sync_fpr(), Rounds});
             merkleTree ->
                 ok; %TODO
             art ->
                 ok %TODO
         end,    
     %?TRACE("[~p] will build SyncStruct", [Pid]),
-    {SyncMethod, TriggerState, Round + 1, MonitorTable};
+    case RestIEmpty of
+        true -> State#rep_upd_state{ sync_round = Rounds + 1 };
+        false -> State#rep_upd_state{ sync_round = Rounds + 0.1 }
+    end;
 
 %% @doc SyncStruct is build and can be send to a node for synchronization
-on({build_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerState, Round, MonitorTable} = State) ->
+on({build_sync_struct_response, Sync_Method, Interval, Sync_Struct}, State) ->
+    #rep_upd_state{
+                   sync_round = Round,
+                   monitor_table = MonitorTable
+                   } = State,
     _ = case intervals:is_empty(Interval) of	
             false ->
                 {_, _, RKey, RBr} = intervals:get_bounds(Interval),
@@ -127,24 +139,22 @@ on({build_sync_struct_response, Interval, SyncStruct}, {SyncMethod, _TriggerStat
                 comm:send_local(DhtNodePid, 
                                 {lookup_aux, DestKey, 0, 
                                  {send_to_group_member, ?PROCESS_NAME, 
-                                  {request_sync, SyncMethod, SyncStruct}}}),
+                                  {request_sync, Sync_Method, reconciliation, true, Sync_Struct}}}),
                 monitor:proc_set_value(MonitorTable, 
                                        io_lib:format("~p", [erlang:localtime()]), 
-                                       io_lib:format("SEND SyncReq Round=[~B] to Key [~p]", [Round, DestKey]));	    
+                                       io_lib:format("SEND SyncReq Round=[~w] to Key [~w]", [Round, DestKey]));	    
             _ ->
                 ok
 		end,
     State;
+
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, MonitorTable} = State) ->	
-    _ = case Sync_method of
+on({request_sync, SyncMethod, SyncStage, Feedback, SyncStruct}, State) ->
+    _ = case SyncMethod of
             bloom ->
-                {_, _, SrcNode, _, _, _} = SyncStruct,
-                ?TRACE("RECV SYNC REQUEST FROM ~p", [SrcNode]),
-                monitor:proc_inc_value(MonitorTable, "Recv-Sync-Req-Count"),
-                DhtNodePid = pid_groups:get_my(dht_node),
-                {ok, Pid} = bloom_sync:start_bloom_sync(DhtNodePid, get_max_items()),
-                comm:send_local(Pid, {start_sync, SyncStruct});
+                monitor:proc_inc_value(State#rep_upd_state.monitor_table, "Recv-Sync-Req-Count"),
+                {ok, Pid} = bloom_sync:start_bloom_sync(get_max_items()),
+                comm:send_local(Pid, {start_sync, SyncStage, Feedback, SyncStruct});
             merkleTree  -> ok;
             art         -> ok
         end,
@@ -153,10 +163,10 @@ on({request_sync, Sync_method, SyncStruct}, {_SM, _TriggerState, _Round, Monitor
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({web_debug_info, Requestor}, 
-   {SyncMethod, _TriggerState, Round, _MonitorTable} = State) ->
+on({web_debug_info, Requestor}, State) ->
+    #rep_upd_state{ sync_round = Round } = State,
     KeyValueList =
-        [{"Sync Method:", SyncMethod},
+        [{"Sync Method:", get_sync_method()},
          {"Bloom Module:", ?REP_BLOOM},
          {"Sync Round:", Round}
         ],
@@ -166,12 +176,13 @@ on({web_debug_info, Requestor},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Monitor Reporting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({sync_progress_report, _Sender, Msg}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
-    monitor:proc_set_value(MonitorTable, io_lib:format("~p", [erlang:localtime()]), Msg),
+on({sync_progress_report, _Sender, Msg}, State) ->
+    monitor:proc_set_value(State#rep_upd_state.monitor_table, 
+                           io_lib:format("~p", [erlang:localtime()]), Msg),
     ?TRACE("SYNC FINISHED - REASON=[~s]", [Msg]),
     State;
-on({report_to_monitor}, {_SyncMethod, _TriggerState, _Round, MonitorTable} = State) ->
-    monitor:proc_report_to_my_monitor(MonitorTable),
+on({report_to_monitor}, State) ->
+    monitor:proc_report_to_my_monitor(State#rep_upd_state.monitor_table),
     comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
                           self(),
                           {report_to_monitor}),
@@ -197,7 +208,8 @@ init(Trigger) ->
     comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
                           self(),
                           {report_to_monitor}),
-    {get_sync_method(), trigger:next(TriggerState), 0, monitor:proc_init(?MODULE)}.
+    #rep_upd_state{ trigger_state = trigger:next(TriggerState),
+                    monitor_table = monitor:proc_init(?MODULE)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
