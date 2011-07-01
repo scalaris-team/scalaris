@@ -1,14 +1,15 @@
-Source: scalaris
+Source: scalaris-svn
 Section: unknown
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), pkg-config
 Homepage: http://code.google.com/p/scalaris
 
-Package: scalaris
+Package: scalaris-svn
+Conflicts: scalaris
 Architecture: all
-Depends: adduser, addgroup, ${shlibs:Depends}, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
-Suggests: scalaris-java, scalaris-doc
+Depends: adduser, addgroup, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Suggests: scalaris-svn-java, scalaris-svn-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
@@ -16,10 +17,10 @@ Description: Scalable Distributed key-value store
  processing with strong consistency over replicas. Scalaris is
  implemented in Erlang.
 
-Package: scalaris-doc
+Package: scalaris-svn-doc
+Conflicts: scalaris-svn-doc
 Architecture: all
-Depends: ${shlibs:Depends}
-Recommends: scalaris (= ${binary:Version})
+Recommends: scalaris-svn (= ${binary:Version})
 Description: Documentation for scalaris
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured

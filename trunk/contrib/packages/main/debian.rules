@@ -13,10 +13,6 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
-	mkdir build_dir
-	pwd
-	if cd build_dir ; then echo "Changed"; else echo "Some Errors"; fi
-	pwd
 	./configure --prefix=/usr \
 	--sysconfdir=/etc \
 	--localstatedir=/var \
@@ -50,7 +46,7 @@ clean:
 
 	dh_clean
 
-BUILD_DIR:=$(CURDIR)/debian/scalaris
+BUILD_DIR:=$(CURDIR)/debian/scalaris-svn
 install: build
 	dh_testdir
 	dh_testroot

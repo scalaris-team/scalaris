@@ -1,10 +1,11 @@
 # norootforbuild
 
-%define pkg_version 0.0.1
+%define pkg_version 1
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
-Name:           scalaris
+Name:           scalaris-svn
+Conflicts:      scalaris
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
@@ -53,6 +54,7 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package doc
+Conflicts:  scalaris-doc
 Summary:    Documentation for scalaris
 Group:      Documentation/Other
 Requires:   %{name} == %{version}-%{release}

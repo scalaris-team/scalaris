@@ -1,4 +1,3 @@
-%doc AUTHORS README LICENSE
 /usr/bin/scalarisctl
 /usr/lib/scalaris/*
 /var/log/scalaris
