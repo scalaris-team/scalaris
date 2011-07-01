@@ -1,7 +1,7 @@
 # norootforbuild
 
-%define pkg_version 0.0.1
-Name:           scalaris-bindings
+%define pkg_version 1
+Name:           scalaris-svn-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
@@ -102,7 +102,8 @@ overlay with a non-blocking Paxos commit protocol for transaction
 processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
-%package -n scalaris-java
+%package -n scalaris-svn-java
+Conflicts:  scalaris-java scalaris-client
 Summary:    Java-API and Java-Client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
@@ -112,20 +113,20 @@ Requires:   jre >= 1.6.0
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-java
+%description -n scalaris-svn-java
 Java Bindings and command line client for scalaris
 
-%package -n ruby-scalaris
+%package -n ruby-scalaris-svn
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   ruby(abi) >= 1.8
 Requires:   rubygem-json
 
-%description -n ruby-scalaris
+%description -n ruby-scalaris-svn
 Ruby bindings and Ruby command line client for scalaris
 
 %if 0%{?with_python}
-%package -n python-scalaris
+%package -n python-scalaris-svn
 Summary:    Python-API and Python-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
@@ -135,12 +136,12 @@ Requires:   python >= 2.6
 BuildArch:  noarch
 %endif
 
-%description -n python-scalaris
+%description -n python-scalaris-svn
 Python bindings and Python command line client for scalaris
 %endif
 
 %if 0%{?with_python3}
-%package -n python3-scalaris
+%package -n python3-scalaris-svn
 Summary:    Python3-API and Python3-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python3
@@ -150,7 +151,7 @@ Requires:   python3
 BuildArch:  noarch
 %endif
 
-%description -n python3-scalaris
+%description -n python3-scalaris-svn
 Python3 bindings and Python3 command line client for scalaris
 %endif
 
@@ -208,7 +209,7 @@ make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files -n scalaris-java
+%files -n scalaris-svn-java
 %defattr(-,root,root)
 %{_javadir}/scalaris
 %dir %{_sysconfdir}/scalaris
@@ -219,13 +220,13 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
 
-%files -n ruby-scalaris
+%files -n ruby-scalaris-svn
 %defattr(-,root,root)
 %{_bindir}/scalaris-ruby
 %{rb_sitelib}/scalaris.rb
 
 %if 0%{?with_python}
-%files -n python-scalaris
+%files -n python-scalaris-svn
 %defattr(-,root,root)
 %{_bindir}/scalaris-python
 %{python_sitelib}/*
@@ -235,7 +236,7 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %if 0%{?with_python3}
-%files -n python3-scalaris
+%files -n python3-scalaris-svn
 %defattr(-,root,root)
 %{_bindir}/scalaris-python3
 %if 0%{?suse_version}
