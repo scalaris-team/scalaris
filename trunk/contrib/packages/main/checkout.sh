@@ -38,7 +38,7 @@ fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
-  sourcefolder=${folder}/contrib/packages
+  sourcefolder=${folder}/contrib/packages/main
   sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
       < ${sourcefolder}/scalaris-svn.spec              > ./scalaris-svn.spec && \
   cp  ${sourcefolder}/scalaris-svn-rpmlintrc             ./scalaris-svn-rpmlintrc
