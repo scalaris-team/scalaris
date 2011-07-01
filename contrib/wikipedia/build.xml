@@ -84,7 +84,7 @@
     <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
     <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
     <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
-    <javac debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
+    <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
       <src path="src"/>
       <classpath refid="build.classpath"/>
     </javac>
