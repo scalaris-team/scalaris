@@ -50,18 +50,18 @@ if [ ${result} -eq 0 ]; then
   sed -e "s/Version: 1-1/Version: ${revision}-1/g" \
       -e "s/scalaris-svn-bindings\\.orig\\.tar\\.gz/scalaris-svn-bindings-${revision}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris-svn-bindings\\.diff\\.tar\\.gz/scalaris-svn-bindings-${revision}\\.diff\\.tar\\.gz/g" \
-      < ${sourcefolder}/scalaris-svn-bindings.dsc      > ./scalaris-svn-bindings.dsc && \
+      < ${sourcefolder}/scalaris-svn-bindings.dsc          > ./scalaris-svn-bindings.dsc && \
   sed -e "s/(1-1)/(${revision}-1)/g" \
-      < ${sourcefolder}/debian.changelog               > ./debian.changelog && \
-  cp  ${sourcefolder}/debian.control                      ./debian.control && \
-  cp  ${sourcefolder}/debian.rules                        ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris-java.files         ./debian.scalaris-svn-java.files && \
-  cp  ${sourcefolder}/debian.scalaris-java.conffiles     ./debian.scalaris-svn-java.conffiles && \
-  cp  ${sourcefolder}/debian.scalaris-java.postrm        ./debian.scalaris-svn-java.postrm && \
-  cp  ${sourcefolder}/debian.scalaris-java.postinst      ./debian.scalaris-svn-java.postinst && \
-  cp  ${sourcefolder}/debian.python-scalaris.files       ./debian.python-scalaris-svn.files && \
-  cp  ${sourcefolder}/debian.python3-scalaris.files      ./debian.python3-scalaris-svn.files && \
-  cp  ${sourcefolder}/debian.scalaris-ruby1.8.files      ./debian.scalaris-svn-ruby1.8.files
+      < ${sourcefolder}/debian.changelog                   > ./debian.changelog && \
+  cp  ${sourcefolder}/debian.control                         ./debian.control && \
+  cp  ${sourcefolder}/debian.rules                           ./debian.rules && \
+  cp  ${sourcefolder}/debian.scalaris-svn-java.files         ./debian.scalaris-svn-java.files && \
+  cp  ${sourcefolder}/debian.scalaris-svn-java.conffiles     ./debian.scalaris-svn-java.conffiles && \
+  cp  ${sourcefolder}/debian.scalaris-svn-java.postrm        ./debian.scalaris-svn-java.postrm && \
+  cp  ${sourcefolder}/debian.scalaris-svn-java.postinst      ./debian.scalaris-svn-java.postinst && \
+  cp  ${sourcefolder}/debian.python-scalaris-svn.files       ./debian.python-scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.python3-scalaris-svn.files      ./debian.python3-scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.scalaris-svn-ruby1.8.files      ./debian.scalaris-svn-ruby1.8.files
   result=$?
 fi
 
