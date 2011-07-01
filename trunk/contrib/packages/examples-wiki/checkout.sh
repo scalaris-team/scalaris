@@ -1,7 +1,7 @@
 #!/bin/bash
 
 date=`date +"%Y%m%d"`
-name="scalaris-examples-wiki" # folder base name (without version)
+name="scalaris-svn-examples-wiki" # folder base name (without version)
 url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
 package_url="http://scalaris.googlecode.com/svn/trunk/contrib/packages/examples-wiki"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
