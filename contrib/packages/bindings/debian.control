@@ -7,7 +7,7 @@ Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-java
 Architecture: all
-Depends: ${shlibs:Depends}, java6-runtime, erlang-jinterface (>= 13.b.1)
+Depends: ${shlibs:Depends}, java6-runtime
 Description: Java-API and Java-Client for scalaris
  Java Bindings and command line client for scalaris.
 
