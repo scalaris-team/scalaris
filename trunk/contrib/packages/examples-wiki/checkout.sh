@@ -68,6 +68,8 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/debian.changelog                > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                      ./debian.control && \
   cp  ${sourcefolder}/debian.rules                        ./debian.rules && \
+  cp  ${sourcefolder}/debian.scalaris-svn-examples-wiki-tomcat5.files \
+                                                          ./debian.scalaris-svn-examples-wiki-tomcat5.files && \
   cp  ${sourcefolder}/debian.scalaris-svn-examples-wiki-tomcat6.files \
                                                           ./debian.scalaris-svn-examples-wiki-tomcat6.files
   result=$?
