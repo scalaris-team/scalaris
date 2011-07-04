@@ -68,6 +68,7 @@ Wikipedia-like application.
 
 %if 0%{?with_tomcat5}
 %package -n scalaris-svn-examples-wiki-tomcat5
+Conflicts:  scalaris-examples-wiki-tomcat5
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
@@ -81,6 +82,7 @@ Wikipedia-like application.
 
 %if 0%{?with_tomcat6}
 %package -n scalaris-svn-examples-wiki-tomcat6
+Conflicts:  scalaris-examples-wiki-tomcat6
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6

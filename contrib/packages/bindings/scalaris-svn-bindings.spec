@@ -118,6 +118,7 @@ BuildArch:  noarch
 Java Bindings and command line client for scalaris
 
 %package -n ruby-scalaris-svn
+Conflicts:  ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   ruby(abi) >= 1.8
@@ -128,6 +129,7 @@ Ruby bindings and Ruby command line client for scalaris
 
 %if 0%{?with_python}
 %package -n python-scalaris-svn
+Conflicts:  python-scalaris
 Summary:    Python-API and Python-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python >= 2.6
@@ -143,6 +145,7 @@ Python bindings and Python command line client for scalaris
 
 %if 0%{?with_python3}
 %package -n python3-scalaris-svn
+Conflicts:  python3-scalaris
 Summary:    Python3-API and Python3-client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   python3
