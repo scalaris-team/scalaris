@@ -55,6 +55,7 @@ if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder=${package_folder}
   sed -e "s/Version: 0.3.0-1/Version: ${debversion}/g" \
+      -e "s/scalaris-java (= 0.3.0-1)/scalaris-java (= ${debversion})/g" \
       -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${rpmversion}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${rpmversion}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
