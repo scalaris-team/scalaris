@@ -6,6 +6,7 @@ Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, libservlet2.5
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-svn-examples-wiki-tomcat5
+Conflicts: scalaris-examples-wiki-tomcat5
 Architecture: all
 Depends: tomcat5, scalaris-svn-java (>= 1834)
 Description: Wikipedia on Scalaris example
@@ -13,6 +14,7 @@ Description: Wikipedia on Scalaris example
  back-end for a Wikipedia-like application.
 
 Package: scalaris-svn-examples-wiki-tomcat6
+Conflicts: scalaris-examples-wiki-tomcat6
 Architecture: all
 Depends: tomcat6, scalaris-svn-java (>= 1834)
 Description: Wikipedia on Scalaris example
