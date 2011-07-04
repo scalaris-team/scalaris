@@ -13,18 +13,21 @@ Description: Java-API and Java-Client for scalaris
  Java Bindings and command line client for scalaris.
 
 Package: scalaris-svn-ruby1.8
+Conflicts: scalaris-ruby1.8
 Architecture: all
 Depends: ruby, ruby1.8
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 
 Package: python-scalaris-svn
+Conflicts: python-scalaris
 Architecture: all
 Depends: python (>= 2.6.0)
 Description: Python-API and Python-client for scalaris
  Python bindings and Python command line client for scalaris.
 
 Package: python3-scalaris-svn
+Conflicts: python3-scalaris
 Architecture: all
 Depends: python3
 Description: Python3-API and Python3-client for scalaris
