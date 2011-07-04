@@ -2,10 +2,8 @@
 set -e
 
 if [ "$1" = "purge" ]; then
-
   rm -f /etc/scalaris/scalaris-java.conf
   rm -f /etc/scalaris/scalaris.properties
-
 fi
 
 #DEBHELPER#

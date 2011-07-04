@@ -20,10 +20,6 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
-	mkdir build_dir
-	pwd
-	if cd build_dir ; then echo "Changed"; else echo "Some Errors"; fi
-	pwd
 	if [ "$(WITH_PYTHON3)" = 1 ]; then \
 	  ./configure --prefix=/usr \
 	  --sysconfdir=/etc \

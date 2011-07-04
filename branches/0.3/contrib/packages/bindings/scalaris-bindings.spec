@@ -9,6 +9,7 @@ License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
+Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
@@ -103,6 +104,7 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package -n scalaris-java
+Conflicts:  scalaris-client
 Summary:    Java-API and Java-Client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0

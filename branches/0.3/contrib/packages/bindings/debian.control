@@ -6,25 +6,26 @@ Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 1
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-java
+Conflicts: scalaris-client
 Architecture: all
-Depends: ${shlibs:Depends}, java6-runtime
+Depends: java6-runtime
 Description: Java-API and Java-Client for scalaris
  Java Bindings and command line client for scalaris.
 
 Package: scalaris-ruby1.8
 Architecture: all
-Depends: ${shlibs:Depends}, ruby, ruby1.8
+Depends: ruby, ruby1.8
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 
 Package: python-scalaris
 Architecture: all
-Depends: ${shlibs:Depends}, python (>= 2.6.0)
+Depends: python (>= 2.6.0)
 Description: Python-API and Python-client for scalaris
  Python bindings and Python command line client for scalaris.
 
 Package: python3-scalaris
 Architecture: all
-Depends: ${shlibs:Depends}, python3
+Depends: python3
 Description: Python3-API and Python3-client for scalaris
  Python3 bindings and Python3 command line client for scalaris.
