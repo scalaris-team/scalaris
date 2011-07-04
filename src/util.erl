@@ -59,6 +59,8 @@
          p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
          parallel_run/4]).
 
+-export([empty/1]).
+
 -opaque global_uid() :: {pos_integer(), comm:mypid()}.
 
 -type time() :: {MegaSecs::non_neg_integer(),
@@ -778,3 +780,6 @@ parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
                 {parallel_result, R} -> R
              end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
+
+%% empty shell_prompt_func
+empty(X) -> "".

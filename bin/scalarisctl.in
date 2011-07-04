@@ -309,7 +309,7 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME@`hostname -f`
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME@`hostname -f` $*
 }
 
 fix_paths
@@ -353,7 +353,8 @@ case $1 in
     list)
         list_erlang_processes $*;;
     debug)
-        debug $*;;
+       shift 1
+       debug $*;;
     *) usage 1;;
 esac
 
