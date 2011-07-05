@@ -639,9 +639,7 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     -> state() |
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
 on_init({get_node_details}, State) ->
-    ct:pal("Getting node details; waiting for comm:this() it is ~p~n", [comm:this()]),
     util:wait_for(fun() -> comm:is_valid(comm:this()) end),
-    ct:pal("comm:this is valid: ~p~n", [comm:this()]),
     comm:send_local(pid_groups:get_my(dht_node),
                     {get_node_details, comm:this(), [node]}),
     % update gllearner with determined ip-address
