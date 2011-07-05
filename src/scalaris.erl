@@ -19,6 +19,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 %% functions called by Erlangs init module, triggered via command line
 %% (bin/scalarisctl and erl ... '-s scalaris')
 -export([start/0, stop/0]).
@@ -37,7 +39,7 @@ start() ->
     _ = application:load(
           {application, scalaris,
            [{description, "scalaris"},
-            {vsn, "0.2"},
+            {vsn, ?SCALARIS_VERSION},
             {mod, {scalaris, []}},
             {registered, []},
             {applications, [kernel, stdlib]},
