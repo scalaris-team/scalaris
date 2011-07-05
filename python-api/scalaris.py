@@ -445,6 +445,8 @@ class TransactionSingleOp(object):
         Returns the read value on success.
         Raises the appropriate exceptions if a failure occurred during the
         operation.
+        Beware: lists of (small) integers may be (falsely) returned as a string -
+        use str_to_list() to convert such strings.
         """
         return self._conn.process_result_read(result)
 
@@ -460,14 +462,16 @@ class TransactionSingleOp(object):
 
     def read(self, key):
         """
-        Read the value at key
+        Read the value at key.
+        Beware: lists of (small) integers may be (falsely) returned as a string -
+        use str_to_list() to convert such strings.
         """
         result = self._conn.call('read', [key])
         return self._conn.process_result_read(result)
 
     def write(self, key, value):
         """
-        Write the value to key
+        Write the value to key.
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('write', [key, value])
@@ -547,6 +551,8 @@ class Transaction(object):
         Returns the read value on success.
         Raises the appropriate exceptions if a failure occurred during the
         operation.
+        Beware: lists of (small) integers may be (falsely) returned as a string -
+        use str_to_list() to convert such strings.
         """
         return self._conn.process_result_read(result)
 
@@ -586,8 +592,10 @@ class Transaction(object):
     
     def read(self, key):
         """
-        Issues a read operation to scalaris and adds it to the current
-        transaction.
+        Issues a read operation to scalaris, adds it to the current
+        transaction and returns the result.
+        Beware: lists of (small) integers may be (falsely) returned as a string -
+        use str_to_list() to convert such strings.
         """
         result = self.req_list(self.new_req_list().add_read(key))[0]
         return self.process_result_read(result)
