@@ -388,7 +388,7 @@ interop3-test: interop-test python3
 	fi
 
 clean:
-	-rm -f .make-docs
+	-rm -f .make-doc
 	-rm -rf bin/*.beam
 	-rm -rf ebin/*.beam
 	-rm -rf src/*.beam
