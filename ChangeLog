@@ -1,0 +1,69 @@
+Scalaris 0.3.0 RC1 (codename "Rhinechis Scalaris")
+==================================================
+
+API:
+
+- new API with interoperable bindings to Java, Python, Ruby, and JSON
+- support for several data types, including strings, integers, JSON
+  objects, binary objects.
+- new transaction interface with support for bundled requests for
+  better latency.
+- separate APIs to access the raw DHT, a DHT with replication, and the
+  transactional DHT
+
+Demonstrator:
+
+- added Wikipedia-hosting using Scalaris as demonstrator application
+
+Business Logic:
+
+- fault-tolerant startup: start Scalaris when a quorum of the
+  known_hosts becomes available (option -q in bin/scalarisctl)
+- perform data hand-over when nodes join/gracefully leave
+  (also works when transactions are executed concurrently)
+- added passive load balancing (when a node joins a ring, it samples
+  several other nodes and joins at the node that balances the number
+  of stored items the most)
+- completely rewritten transaction layer (more modular, more
+  extendible, less latency)
+- modularized / reimplemented Paxos algorithm, so the algorithm can
+  also be used outside transactions (e.g. used for quorum-startup)
+- switched almost all components to our component framework 'gen_component'
+- added gossiping for estimating e.g. the number of nodes or the
+  average load in a ring
+
+Infrastructure:
+
+- Vivaldi and topology inference
+- support for Erlang 13B01 and newer
+- faster TCP/IP communication between Scalaris nodes
+- completely rewritten failure detector framework for more accurate
+  detection of node failures
+- added numerous Erlang type specifications
+- extended unittests
+
+Tests:
+
+- added own random testing framework that reads type specifications
+  and scans the source code for constants to generate proper random
+  test-data
+- extended gen_component with breakpoint-support for debugging and
+  testing (perform deterministic pseudo-random message interleaving
+  tests)
+- added numerous unittests
+- added language-binding interoperability tests
+
+Documentation:
+
+- extended, but - as always - by far not enough...
+
+Bugs:
+
+- fixed countless bugs
+
+Scalaris 0.2.0 - 0.2.3
+======================
+
+- changes not explicitly recorded (see the corresponding svn
+  commit messages)
+
