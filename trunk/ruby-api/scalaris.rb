@@ -479,6 +479,8 @@ module Scalaris
     # Returns the read value on success.
     # Raises the appropriate exceptions if a failure occurred during the
     # operation.
+    # Beware: lists of (small) integers may be (falsely) returned as a string -
+    # use str_to_list() to convert such strings.
     def process_result_read(result)
       @conn.class.process_result_read(result)
     end
@@ -492,13 +494,15 @@ module Scalaris
       @conn.class.process_result_commit(result)
     end
     
-    # Read the value at key
+    # Read the value at key.
+    # Beware: lists of (small) integers may be (falsely) returned as a string -
+    # use str_to_list() to convert such strings.
     def read(key)
       result = @conn.call(:read, [key])
       @conn.class.process_result_read(result)
     end
 
-    # Write the value to key
+    # Write the value to key.
     def write(key, value, binary = false)
       value = @conn.class.encode_value(value, binary)
       result = @conn.call(:write, [key, value])
@@ -559,6 +563,8 @@ module Scalaris
     # Returns the read value on success.
     # Raises the appropriate exceptions if a failure occurred during the
     # operation.
+    # Beware: lists of (small) integers may be (falsely) returned as a string -
+    # use str_to_list() to convert such strings.
     def process_result_read(result)
       @conn.class.process_result_read(result)
     end
@@ -595,8 +601,10 @@ module Scalaris
       @tlog = nil
     end
     
-    # Issues a read operation to Scalaris and adds it to the current
-    # transaction.
+    # Issues a read operation to Scalaris, adds it to the current
+    # transaction and returns the result.
+    # Beware: lists of (small) integers may be (falsely) returned as a string -
+    # use str_to_list() to convert such strings.
     def read(key)
       result = req_list(new_req_list().add_read(key))[0]
       return process_result_read(result)
