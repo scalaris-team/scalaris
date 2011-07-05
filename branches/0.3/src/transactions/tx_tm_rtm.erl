@@ -115,8 +115,7 @@ init([]) ->
     %% start getting rtms and maintain them.
     case Role of
         tx_tm ->
-            comm:send_local(pid_groups:get_my(dht_node),
-                            {get_node_details, comm:this(), [node]}),
+            comm:send_local(self(), {get_node_details}),
             State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner,
                      [], 0, msg_queue:new()},
             %% subscribe to id changes
@@ -639,6 +638,17 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
 -spec on_init(comm:message(), state())
     -> state() |
        {'$gen_component', [{on_handler, Handler::on}], State::state()}.
+on_init({get_node_details}, State) ->
+    ct:pal("Getting node details; waiting for comm:this() it is ~p~n", [comm:this()]),
+    util:wait_for(fun() -> comm:is_valid(comm:this()) end),
+    ct:pal("comm:this is valid: ~p~n", [comm:this()]),
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {get_node_details, comm:this(), [node]}),
+    % update gllearner with determined ip-address
+    state_set_gllearner(State,
+                        comm:make_global(get_my(state_get_role(State),
+                                                learner)));
+
 %% While initializing
 on_init({get_node_details_response, NodeDetails}, State) ->
     ?TRACE("tx_tm_rtm:on_init:get_node_details_response State; ~p~n", [_State]),
@@ -918,6 +928,8 @@ state_get_tablename(State)     -> element(2, State).
 state_get_role(State)          -> element(3, State).
 -spec state_get_lacceptor(state())  -> pid().
 state_get_lacceptor(State)     -> element(4, State).
+-spec state_set_gllearner(state(), comm:mypid()) -> state().
+state_set_gllearner(State, Pid) -> setelement(5, State, Pid).
 -spec state_get_gllearner(state()) -> comm:mypid().
 state_get_gllearner(State) -> element(5, State).
 -spec state_get_subs(state()) -> [{comm:mypid(), non_neg_integer()}].
