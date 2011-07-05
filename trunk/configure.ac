@@ -1,4 +1,4 @@
-#   Copyright 2007-2008 Konrad-Zuse-Zentrum für Informationstechnik Berlin
+#   Copyright 2007-2011 Konrad-Zuse-Zentrum für Informationstechnik Berlin
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.65)
-AC_INIT(scalaris, 0.2, schuett@zib.de)
+AC_INIT(scalaris, 0.3.0+svn, schuett@zib.de)
 
 ###########################################################
 #
