@@ -13,8 +13,9 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia.bliki;
+package de.zib.scalaris.examples.wikipedia;
 
+import de.zib.scalaris.examples.wikipedia.bliki.WikiServlet;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
 /**
@@ -23,13 +24,13 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public interface WikiServletInterface {
+public interface WikiServletContext {
     /**
      * Gets the namespace of the wiki.
      * 
      * @return the namespace
      */
-    public abstract MyNamespace getNamespace();
+    public abstract NamespaceUtils getNamespace();
 
     /**
      * Gets the siteinfo of the wiki.

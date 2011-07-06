@@ -20,8 +20,8 @@ import info.bliki.wiki.filter.MagicWord;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.BigIntegerResult;
 
 /**
  * Gets values for magic words not handled by {@link MagicWord}.
