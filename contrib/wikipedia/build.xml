@@ -95,6 +95,8 @@
     <delete dir="simplewiki/WEB-INF/classes"/>
     <delete dir="simplewiki/WEB-INF/lib"/>
     <delete dir="bin/jetty-temp"/>
+    <delete file="scalaris-wiki.war"/>
+    <delete file="scalaris-wiki-plugin-api.jar"/>
   </target>
 
   <!-- starts a jetty server which provides the wiki website -->
@@ -147,6 +149,20 @@
   </target>
 
   <target name="dist" depends="build">
-    <jar jarfile="scalaris-wiki.war" basedir="simplewiki"/>
+    <jar jarfile="scalaris-wiki.war" update="false">
+      <fileset dir="simplewiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
+      <fileset dir="simplewiki" includes="WEB-INF/dumps/empty.xml" />
+    </jar>
+  </target>
+
+  <target name="plugin-api" depends="build">
+    <jar jarfile="scalaris-wiki-plugin-api.jar" update="false">
+      <fileset dir="simplewiki/WEB-INF/classes"
+        includes="de/zib/scalaris/examples/wikipedia/*.class,
+        de/zib/scalaris/examples/wikipedia/data/*.class,
+        de/zib/scalaris/examples/wikipedia/plugin/*.class"
+      excludes="de/zib/scalaris/examples/wikipedia/ScalarisDataHandler*.class,
+        de/zib/scalaris/examples/wikipedia/plugin/PluginClassLoader*.class"/>
+    </jar>
   </target>
 </project>
