@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia;
 
 import de.zib.scalaris.examples.wikipedia.bliki.WikiServlet;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 
 /**
  * Interface for classes accessing the {@link WikiServlet} class without the
@@ -69,4 +70,12 @@ public interface WikiServletContext {
      * @return the imagebaseurl
      */
     public abstract String getImagebaseurl();
+
+    /**
+     * Adds the given event handler to the list of event handlers.
+     * 
+     * @param handler
+     *            the event handler to add
+     */
+    public abstract void registerEventHandler(WikiEventHandler handler);
 }
