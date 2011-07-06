@@ -73,8 +73,9 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
-import de.zib.scalaris.examples.wikipedia.plugin.EventHandler;
+import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
+import de.zib.scalaris.examples.wikipedia.plugin.WikiPlugin;
 
 /**
  * Servlet for handling wiki page display and editing.
@@ -120,7 +121,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 
     private WikiDumpHandler importHandler = null;
     
-    private List<EventHandler> eventHandlers = new LinkedList<EventHandler>();
+    private List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
 
     /**
      * Creates the servlet. 
@@ -197,15 +198,14 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         }
         final String pluginDir = getServletContext().getRealPath("/WEB-INF/plugins");
         try {
-            PluginClassLoader pcl = new PluginClassLoader(pluginDir, new Class[] {EventHandler.class});
-            List<Class<?>> plugins = pcl.getClasses(EventHandler.class);
+            PluginClassLoader pcl = new PluginClassLoader(pluginDir, new Class[] {WikiPlugin.class});
+            List<Class<?>> plugins = pcl.getClasses(WikiPlugin.class);
             if (plugins != null) {
                 for (Class<?> clazz: plugins) {
-                    EventHandler handler;
+                    WikiPlugin plugin;
                     try {
-                        handler = ((Class<EventHandler>) clazz).newInstance();
-                        handler.init(this);
-                        eventHandlers.add(handler);
+                        plugin = ((Class<WikiPlugin>) clazz).newInstance();
+                        plugin.init(this);
                     } catch (Exception e) {
                         System.err.println("failed to load plugin " + clazz.getCanonicalName());
                         e.printStackTrace();
@@ -1144,7 +1144,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary, content);
 
             SavePageResult result = ScalarisDataHandler.savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
-            for (EventHandler handler: eventHandlers) {
+            for (WikiEventHandler handler: eventHandlers) {
                 handler.onPageSaved(result);
             }
             if (result.success) {
@@ -1318,5 +1318,15 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     @Override
     public String getImagebaseurl() {
         return imageBaseURL;
+    }
+    
+    /**
+     * Adds the given event handler to the list of event handlers.
+     * 
+     * @param handler
+     *            the event handler to add
+     */
+    public void registerEventHandler(WikiEventHandler handler) {
+        eventHandlers.add(handler);
     }
 }
