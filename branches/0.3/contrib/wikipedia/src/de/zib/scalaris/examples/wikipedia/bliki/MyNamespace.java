@@ -21,6 +21,7 @@ import info.bliki.wiki.namespaces.Namespace;
 import java.util.ListResourceBundle;
 import java.util.Map.Entry;
 
+import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
 /**
@@ -28,7 +29,7 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class MyNamespace extends Namespace {
+public class MyNamespace extends Namespace implements NamespaceUtils {
     private SiteInfo siteinfo;
     
     /**
@@ -155,13 +156,10 @@ public class MyNamespace extends Namespace {
         TALKSPACE_MAP.put(fNamespacesLowercase[17], getCategory_talk()); // category_talk
     }
 
-    /**
-     * Gets the subject/content namespace for a given namespace.
-     * 
-     * @param talkNamespace the namespace, potentially a talkspace
-     * 
-     * @return the subject/content namespace or <tt>null</tt>
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getSubjectspace(java.lang.String)
      */
+    @Override
     public String getSubjectspace(String talkNamespace) {
         for (Entry<String, String> entry: TALKSPACE_MAP.entrySet() ) {
             if (entry.getValue().equals(talkNamespace)) {
@@ -171,23 +169,18 @@ public class MyNamespace extends Namespace {
         return null;
     }
 
-    /**
-     * Gets the siteinfo object used for this namespace.
-     * 
-     * @return the siteinfo
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getSiteinfo()
      */
+    @Override
     public SiteInfo getSiteinfo() {
         return siteinfo;
     }
     
-    /**
-     * Gets the talk page's name corresponding to the given page name.
-     * 
-     * @param pageName
-     *            a page name, i.e. a title
-     * 
-     * @return the name of the talk page
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getTalkPageFromPageName(java.lang.String)
      */
+    @Override
     public String getTalkPageFromPageName(String pageName) {
         String[] pnSplit = MyWikiModel.splitNsTitle(pageName);
         String talkspace = getTalkspace(pnSplit[0]);
@@ -198,14 +191,10 @@ public class MyNamespace extends Namespace {
         }
     }
     
-    /**
-     * Gets the content page's name corresponding to the given talk page name.
-     * 
-     * @param talkPageName
-     *            a talk page name, i.e. a title
-     * 
-     * @return the name of the content page
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getPageNameFromTalkPage(java.lang.String)
      */
+    @Override
     public String getPageNameFromTalkPage(String talkPageName) {
         String[] pnSplit = MyWikiModel.splitNsTitle(talkPageName);
         String namespace = pnSplit[0];
@@ -217,15 +206,10 @@ public class MyNamespace extends Namespace {
         }
     }
     
-    /**
-     * Checks whether the page's name is in a talk space.
-     * 
-     * @param pageName
-     *            a page name, i.e. a title
-     * 
-     * @return <tt>true</tt> if the page is a talk page, <tt>false</tt>
-     *         otherwise
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#isTalkPage(java.lang.String)
      */
+    @Override
     public boolean isTalkPage(String pageName) {
         String namespace = MyWikiModel.getNamespace(pageName);
         String talkspace = getTalkspace(namespace);

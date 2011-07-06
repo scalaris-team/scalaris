@@ -36,7 +36,6 @@ import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.Difference.GetPageListKey;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -163,82 +162,6 @@ public class ScalarisDataHandler {
     }
     
     /**
-     * Common result class with a public member containing the result and a
-     * message.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class Result {
-        /**
-         * Whether an operation was a success or not.
-         */
-        public boolean success;
-        /**
-         * An additional message (mostly used with unsuccessful operations).
-         */
-        public String message;
-        /**
-         * Creates a successful result with an empty message.
-         */
-        public Result() {
-            this.success = true;
-            this.message = "";
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public Result(boolean success, String message) {
-            this.success = success;
-            this.message = message;
-        }
-    }
-    
-    /**
-     * Result of an operation getting the page history.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class PageHistoryResult extends Result {
-        /**
-         * The retrieved page on success (or <tt>null</tt>).
-         */
-        public Page page = null;
-        /**
-         * The retrieved (short) revisions on success (or <tt>null</tt>).
-         */
-        public List<ShortRevision> revisions = null;
-        /**
-         * Whether the page exists or not.
-         */
-        public boolean not_existing = false;
-
-        /**
-         * Creates a successful result with an empty message and the given
-         * revisions.
-         * 
-         * @param page      the retrieved page
-         * @param revisions the retrieved (short) revisions
-         */
-        public PageHistoryResult(Page page, List<ShortRevision> revisions) {
-            super();
-            this.page = page;
-            this.revisions = revisions;
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public PageHistoryResult(boolean success, String message) {
-            super(success, message);
-        }
-    }
-    
-    /**
      * Retrieves a page's history from Scalaris.
      * 
      * @param connection
@@ -288,59 +211,6 @@ public class ScalarisDataHandler {
             return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title) + "\" from Scalaris: " + e.getMessage());
         }
         return new PageHistoryResult(page, revisions);
-    }
-
-    /**
-     * Result of an operation getting a revision.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class RevisionResult extends Result {
-        /**
-         * Revision on success.
-         */
-        public Revision revision = null;
-        /**
-         * Page on success (if retrieved).
-         */
-        public Page page = null;
-        /**
-         * Whether the pages does not exist.
-         */
-        public boolean page_not_existing = false;
-        /**
-         * Whether the requested revision does not exist.
-         */
-        public boolean rev_not_existing = false;
-        
-        /**
-         * Creates a new successful result with no {@link #revision} or
-         * {@link #page}.
-         * 
-         * Either {@link #success} should be set to false or {@link #revision}
-         * and {@link #page} should be set for a valid result object.
-         */
-        public RevisionResult() {
-            super();
-        }
-        /**
-         * Creates a new successful result with the given revision.
-         * 
-         * @param revision the retrieved revision
-         */
-        public RevisionResult(Revision revision) {
-            super();
-            this.revision = revision;
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public RevisionResult(boolean success, String message) {
-            super(success, message);
-        }
     }
 
     /**
@@ -423,37 +293,6 @@ public class ScalarisDataHandler {
         }
         
         return result;
-    }
-
-    /**
-     * Result of an operation getting a page list.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class PageListResult extends Result {
-        /**
-         * The list of retrieved pages (empty if not successful).
-         */
-        public List<String> pages;
-        /**
-         * Creates a new successful result with the given page list.
-         * 
-         * @param pages the retrieved revision
-         */
-        public PageListResult(List<String> pages) {
-            super();
-            this.pages = pages;
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public PageListResult(boolean success, String message) {
-            super(success, message);
-            pages = new LinkedList<String>();
-        }
     }
 
     /**
@@ -558,36 +397,6 @@ public class ScalarisDataHandler {
     }
 
     /**
-     * Result of an operation getting an integral number.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class BigIntegerResult extends Result {
-        /**
-         * The number (<tt>0</tt> if not successful).
-         */
-        public BigInteger number = BigInteger.valueOf(0);
-        /**
-         * Creates a new successful result with the given page list.
-         * 
-         * @param number the retrieved number
-         */
-        public BigIntegerResult(BigInteger number) {
-            super();
-            this.number = number;
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public BigIntegerResult(boolean success, String message) {
-            super(success, message);
-        }
-    }
-
-    /**
      * Retrieves the number of available pages from Scalaris.
      * 
      * @param connection
@@ -660,38 +469,6 @@ public class ScalarisDataHandler {
     }
 
     /**
-     * Result of an operation getting a random page title.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class RandomTitleResult extends Result {
-        /**
-         * The title of a random page on success.
-         */
-        public String title;
-
-        /**
-         * Creates a new successful result with the given page title.
-         * 
-         * @param title the retrieved (random) page title
-         */
-        public RandomTitleResult(String title) {
-            super();
-            this.title = title;
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public RandomTitleResult(boolean success, String message) {
-            super(success, message);
-            title = "";
-        }
-    }
-
-    /**
      * Retrieves a random page title from Scalaris.
      * 
      * @param connection
@@ -713,74 +490,6 @@ public class ScalarisDataHandler {
             return new RandomTitleResult(randomTitle);
         } catch (Exception e) {
             return new RandomTitleResult(false, "unknown exception reading page list at \"pages\" from Scalaris: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Result of an operation saving a page, i.e. adding a new revision.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class SavePageResult extends Result {
-        /**
-         * Old version of the page (may be null).
-         */
-        public Page oldPage = null;
-        /**
-         * New version of the page (may be null).
-         */
-        public Page newPage = null;
-        /**
-         * New list of (short) revisions (may be null).
-         */
-        public List<ShortRevision> newShortRevs = null;
-        /**
-         * New number of page edists (may be null).
-         */
-        public BigInteger pageEdits = null;
-        
-        /**
-         * Creates a new successful result.
-         */
-        public SavePageResult() {
-            super();
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public SavePageResult(boolean success, String message) {
-            super(success, message);
-        }
-    }
-
-    /**
-     * Result of an operation saving a page, i.e. adding a new revision.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public static class SaveResult extends Result {
-        /**
-         * Custom object carrying any information that may be needed for
-         * further processing (may be null).
-         */
-        public Object info;
-        /**
-         * Creates a new successful result.
-         */
-        public SaveResult() {
-            super();
-        }
-        /**
-         * Creates a new custom result.
-         * 
-         * @param success the success status
-         * @param message the message to use
-         */
-        public SaveResult(boolean success, String message) {
-            super(success, message);
         }
     }
 
@@ -909,19 +618,19 @@ public class ScalarisDataHandler {
         Difference lnkDiff = new Difference(oldLnks, newLnks);
 
         // write differences (categories, templates, backlinks)
-        GetPageListKey catPageKeygen = new Difference.GetPageListKey() {
+        Difference.GetPageListKey catPageKeygen = new Difference.GetPageListKey() {
             @Override
             public String getPageListKey(String name) {
                 return getCatPageListKey(wikiModel.getCategoryNamespace() + ":" + name);
             }
         };
-        GetPageListKey tplPageKeygen = new Difference.GetPageListKey() {
+        Difference.GetPageListKey tplPageKeygen = new Difference.GetPageListKey() {
             @Override
             public String getPageListKey(String name) {
                 return getTplPageListKey(wikiModel.getTemplateNamespace() + ":" + name);
             }
         };
-        GetPageListKey lnkPageKeygen = new Difference.GetPageListKey() {
+        Difference.GetPageListKey lnkPageKeygen = new Difference.GetPageListKey() {
             @Override
             public String getPageListKey(String name) {
                 return getBackLinksPageListKey(name);
@@ -1095,7 +804,7 @@ public class ScalarisDataHandler {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    static class Difference {
+    private static class Difference {
         public Set<String> onlyOld;
         public Set<String> onlyNew;
         @SuppressWarnings("unchecked")
