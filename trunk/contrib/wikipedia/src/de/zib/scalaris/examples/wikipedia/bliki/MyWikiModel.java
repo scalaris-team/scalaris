@@ -26,8 +26,8 @@ import java.util.Locale;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
+import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
 
 /**
  * Wiki model using Scalaris to fetch (new) data, e.g. templates.
