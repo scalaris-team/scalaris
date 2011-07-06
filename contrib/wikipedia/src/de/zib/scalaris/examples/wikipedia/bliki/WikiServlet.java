@@ -58,12 +58,14 @@ import org.xml.sax.helpers.XMLReaderFactory;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
+import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
+import de.zib.scalaris.examples.wikipedia.PageListResult;
+import de.zib.scalaris.examples.wikipedia.RandomTitleResult;
+import de.zib.scalaris.examples.wikipedia.RevisionResult;
+import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageHistoryResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.PageListResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RandomTitleResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.RevisionResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.SavePageResult;
+import de.zib.scalaris.examples.wikipedia.WikiServletContext;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -79,7 +81,7 @@ import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class WikiServlet extends HttpServlet implements Servlet, WikiServletInterface {
+public class WikiServlet extends HttpServlet implements Servlet, WikiServletContext {
     private static final String MAIN_PAGE = "Main Page";
     private static final int IMPORT_REDIRECT_EVERY = 5; // seconds
 
@@ -1274,7 +1276,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletInte
      * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getNamespace()
      */
     @Override
-    public final MyNamespace getNamespace() {
+    public final NamespaceUtils getNamespace() {
         return namespace;
     }
 
