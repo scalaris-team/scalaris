@@ -1319,13 +1319,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     public String getImagebaseurl() {
         return imageBaseURL;
     }
-    
-    /**
-     * Adds the given event handler to the list of event handlers.
-     * 
-     * @param handler
-     *            the event handler to add
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getImagebaseurl()
      */
+    @Override
     public void registerEventHandler(WikiEventHandler handler) {
         eventHandlers.add(handler);
     }
