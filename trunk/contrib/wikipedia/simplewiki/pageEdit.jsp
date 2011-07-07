@@ -32,7 +32,6 @@
 <meta name="ResourceLoaderDynamicStyles" content="" />
 <link rel="stylesheet" href="skins/load.css" type="text/css" media="all" />
 <style type="text/css" media="all">a.new,#quickbar a.new{color:#ba0000}</style>
-<script type="text/javascript" src="skins/index_004.php"></script>
 </head>
 <body class="mediawiki ltr ns-0 ns-subject skin-vector">
         <div id="mw-page-base" class="noprint"></div>
