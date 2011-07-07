@@ -101,8 +101,7 @@
 -spec join_as_first(Id::?RT:key(), IdVersion::non_neg_integer(), Options::[tuple()])
         -> dht_node_state:state().
 join_as_first(Id, IdVersion, _Options) ->
-    % ugly hack to get a valid ip-address into the comm-layer
-    dht_node:trigger_known_nodes(), 
+    comm:init_and_wait_for_valid_pid(),
     log:log(info, "[ Node ~w ] joining as first: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
@@ -115,6 +114,7 @@ join_as_first(Id, IdVersion, _Options) ->
         -> {'$gen_component', [{on_handler, Handler::on_join}],
             State::{join, phase2(), msg_queue:msg_queue()}}.
 join_as_other(Id, IdVersion, Options) ->
+    comm:init_and_wait_for_valid_pid(),
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     get_known_nodes(util:get_pids_uid()),
@@ -597,6 +597,10 @@ get_known_nodes(JoinUUId) ->
             ?TRACE_SEND(Host, {get_dht_nodes, comm:this()}),
             comm:send(Host, {get_dht_nodes, comm:this()})
          end || Host <- KnownHosts],
+    % also try to get some nodes from the current erlang VM:
+    OwnServicePerVm = pid_groups:find_a(service_per_vm),
+    ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}), 
+    comm:send_local(OwnServicePerVm, {get_dht_nodes, comm:this()}),
     % timeout just in case
     msg_delay:send_local(get_known_hosts_timeout() div 1000, self(),
                          {join, known_hosts_timeout, JoinUUId}).
