@@ -35,7 +35,7 @@ is_first_vm() ->
 
 has_first_quorum() ->
     % determine own IP
-    dht_node:trigger_known_nodes(),
+    comm:init_and_wait_for_valid_pid(),
     KnownHosts = config:read(known_hosts),
     MyServicePerVM = comm:get(service_per_vm, comm:this()),
     case lists:member(MyServicePerVM, KnownHosts) of

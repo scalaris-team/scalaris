@@ -299,7 +299,7 @@ init(Options) ->
     case dht_node:is_first(Options) of
         true ->
             io:format("first~n", []),
-            trigger_known_nodes(),
+            comm:init_and_wait_for_valid_pid(),
             Interval = intervals:all(),
             View = group_paxos_utils:init_paxos(group_view:new(Interval)),
             We = group_view:get_group_node(View),
@@ -309,8 +309,9 @@ init(Options) ->
             % starts with on-handler
             group_state:new_primary(NodeState, View, DB, TriggerState);
         _ ->
-            trigger_known_nodes(),
             io:format("joining~n", []),
+            comm:init_and_wait_for_valid_pid(),
+            trigger_known_nodes(),
             TriggerState = trigger:now(trigger:init(Trigger, ?MODULE)),
             comm:send_local_after(500, self(), {known_nodes_timeout}),
             % starts with on-joining-handler
@@ -327,18 +328,10 @@ start_link(DHTNodeGroup, Options) ->
 -spec trigger_known_nodes() -> ok.
 trigger_known_nodes() ->
     KnownHosts = config:read(known_hosts),
-    % note, comm:this() may be invalid at this moment
     _ = [comm:send(KnownHost, {get_dht_nodes, comm:this()})
            || KnownHost <- KnownHosts],
     comm:send_local(pid_groups:find_a(service_per_vm),
-                    {get_dht_nodes, comm:this()}),
-    timer:sleep(100),
-    case comm:is_valid(comm:this()) of
-        true ->
-            ok;
-        false ->
-            trigger_known_nodes()
-    end.
+                    {get_dht_nodes, comm:this()}).
 
 -spec is_alive(pid()) -> boolean().
 is_alive(Pid) ->

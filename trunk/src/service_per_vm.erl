@@ -76,6 +76,10 @@ on({get_dht_nodes, Pid}, ok) ->
         false ->
             ok
     end,
+    ok;
+
+% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
+on({hi}, ok) ->
     ok.
 
 -spec get_live_dht_nodes() -> [comm:mypid()].
