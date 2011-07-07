@@ -39,6 +39,8 @@
 
 -include("scalaris.hrl").
 
+%% initialization
+-export([init_and_wait_for_valid_pid/0]).
 %% Sending messages
 -export([send/2, send_local/2, send_local_after/3, send_to_group_member/3]).
 %% Pid manipulation
@@ -259,3 +261,20 @@ get_ip(Pid) -> comm_layer:get_ip(Pid).
 %% @doc TCP_LAYER: Gets the port of the given (global) mypid().
 get_port(Pid) -> comm_layer:get_port(Pid).
 -endif.
+
+%% @doc Initializes the comm_layer by sending a message to the known_hosts. A
+%%      valid PID for comm:this/0 will be available afterwards.
+%%      (ugly hack to get a valid ip-address into the comm-layer)
+-spec init_and_wait_for_valid_pid() -> ok.
+init_and_wait_for_valid_pid() ->
+    KnownHosts = config:read(known_hosts),
+    % maybe the list of known nodes is empty and we have a mgmt_server?
+    MgmtServer = config:read(mgmt_server),
+    % note, comm:this() may be invalid at this moment
+    _ = [comm:send_to_group_member(KnownHost, service_per_vm, {hi})
+        || KnownHost <- [MgmtServer | KnownHosts]],
+    timer:sleep(100),
+    case comm:is_valid(comm:this()) of
+        true  -> ok;
+        false -> init_and_wait_for_valid_pid()
+    end.

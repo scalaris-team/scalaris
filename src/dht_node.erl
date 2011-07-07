@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 -behaviour(gen_component).
 
--export([start_link/2, on/2, on_join/2, init/1, trigger_known_nodes/0]).
+-export([start_link/2, on/2, on_join/2, init/1]).
 
 -export([is_first/1, is_alive/1, is_alive_no_join/1]).
 
@@ -429,21 +429,6 @@ start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(?MODULE, Options,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
-
-%% @doc Find existing nodes and as a side-effect initialize the comm_layer.
--spec trigger_known_nodes() -> ok.
-trigger_known_nodes() ->
-    KnownHosts = config:read(known_hosts),
-    % note, comm:this() may be invalid at this moment
-    _ = [comm:send(KnownHost, {get_dht_nodes, comm:this()})
-        || KnownHost <- KnownHosts],
-    timer:sleep(100),
-    case comm:is_valid(comm:this()) of
-        true ->
-            ok;
-        false ->
-            trigger_known_nodes()
-    end.
 
 %% @doc Checks whether this VM is marked as first, e.g. in a unit test, and
 %%      this is the first node in this VM.

@@ -120,11 +120,8 @@ on({web_debug_info, Requestor}, Nodes) ->
 init(_Options) ->
     case config:read(start_dht_node) of
         undefined ->
-            % ugly hack to get a valid ip-address into the comm-layer
-            KnownHosts = config:read(known_hosts),
-            MgmtServer = config:read(mgmt_server),
-            config:write(known_hosts, [MgmtServer | KnownHosts]),
-            dht_node:trigger_known_nodes();
+            % if a dht_node is started, it will do this job:
+            comm:init_and_wait_for_valid_pid();
         _ -> ok
     end,
     dn_cache:subscribe(),
