@@ -153,7 +153,7 @@ if __name__ == "__main__":
                     benchmarks.append(int(sys.argv[i]))
             scalaris_bench.minibench(testruns, benchmarks)
     else:
-        print 'usage: scalaris.py [Options]'
+        print 'usage: ' + sys.argv[0] + ' [Options]'
         print ' -r,--read <key>                      read an item'
         print ' -w,--write <key> <value>             write an item'
         print ' -d,--delete <key> [<timeout>]        delete an item (default timeout:'
