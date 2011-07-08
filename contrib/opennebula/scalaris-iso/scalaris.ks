@@ -4,11 +4,11 @@ timezone US/Eastern
 auth --useshadow --enablemd5
 selinux --enforcing
 firewall --disabled
-part / --size 1024
+part / --size 2048
 firstboot --disable
-bootloader --timeout=1
+bootloader --timeout=1 --append="3"
 
-repo --name=fedora-14 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-14&arch=$basearch
+repo --name=fedora-15 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-15&arch=$basearch
 repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/
 
 %packages
@@ -27,7 +27,7 @@ scalaris-svn
 ruby-scalaris-svn
 ruby
 screen
-# virt-what starting with FC15
+virt-what
 
 # for debugging
 strace
@@ -43,7 +43,7 @@ anaconda
 
 cp scalaris-contrail.init.d $INSTALL_ROOT/etc/init.d/scalaris-contrail
 cp vmcontext $INSTALL_ROOT/etc/init.d/vmcontext
-cp init-contrail.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
+cp init-contrail-scalaris.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 chmod ugo+x $INSTALL_ROOT/etc/init.d/vmcontext
 chmod ugo+x $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 
@@ -60,6 +60,10 @@ echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 # add scalaris-contrail
 /sbin/chkconfig --add scalaris-contrail
 /sbin/chkconfig --add vmcontext
-/sbin/chkconfig --del NetworkManager
+
+systemctl disable NetworkManager.service
+
+/sbin/chkconfig iptables off
+/sbin/chkconfig ip6tables off
 
 %end
