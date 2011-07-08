@@ -21,7 +21,7 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import unittest
 
 # wait that long for subscription notifications to arrive
-_NOTIFICATIONS_TIMEOUT = 60;
+_NOTIFICATIONS_TIMEOUT = 60
 
 _TEST_DATA = [
              "ahz2ieSh", "wooPhu8u", "quai9ooK", "Oquae4ee", "Airier1a", "Boh3ohv5", "ahD3Saog", "EM5ooc4i", 
@@ -44,6 +44,8 @@ _TEST_DATA = [
              "sai2aiTa", "ohKi9rie", "ei2ioChu", "aaNgah9y", "ooJai1Ie", "shoh0oH9", "Ool4Ahya", "poh0IeYa", 
              "Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
              "phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"]
+
+_TOO_LARGE_REQUEST_SIZE = 1024*1024*10 # number of bytes
 
 class TestTransactionSingleOp(unittest.TestCase):
     def setUp(self):
@@ -358,6 +360,20 @@ class TestTransactionSingleOp(unittest.TestCase):
         
         conn.close_connection();
 
+    # Test method for TransactionSingleOp.write(key, value=bytearray()) with a
+    # request that is too large.
+    def testReqTooLarge(self):
+        conn = TransactionSingleOp()
+        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        key = "_ReqTooLarge"
+        try:
+            conn.write(str(self._testTime) + key, data)
+            self.fail('The write should have failed unless yaws_max_post_data was set larger than ' + str(_TOO_LARGE_REQUEST_SIZE))
+        except scalaris.ConnectionError:
+            pass
+        
+        conn.close_connection()
+
 class TestTransaction(unittest.TestCase):
     def setUp(self):
         # The time when the test suite was started.
@@ -558,6 +574,20 @@ class TestTransaction(unittest.TestCase):
             self.assertEqual(_TEST_DATA[i], actual)
         
         conn.close_connection();
+
+    # Test method for Transaction.write(key, value=bytearray()) with a
+    # request that is too large.
+    def testReqTooLarge(self):
+        conn = Transaction()
+        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        key = "_ReqTooLarge"
+        try:
+            conn.write(str(self._testTime) + key, data)
+            self.fail('The write should have failed unless yaws_max_post_data was set larger than ' + str(_TOO_LARGE_REQUEST_SIZE))
+        except scalaris.ConnectionError:
+            pass
+        
+        conn.close_connection()
 
 class TestPubSub(unittest.TestCase):
     def setUp(self):
@@ -1054,6 +1084,20 @@ class TestPubSub(unittest.TestCase):
         # to disable logging
         def log_message(self, *args):
             pass
+
+    # Test method for PubSub.publish(key, value=bytearray()) with a
+    # request that is too large.
+    def testReqTooLarge(self):
+        conn = PubSub()
+        data = ''.join('0' for _x in xrange(_TOO_LARGE_REQUEST_SIZE))
+        key = "_ReqTooLarge"
+        try:
+            conn.publish(str(self._testTime) + key, data)
+            self.fail('The publish should have failed unless yaws_max_post_data was set larger than ' + str(_TOO_LARGE_REQUEST_SIZE))
+        except scalaris.ConnectionError:
+            pass
+        
+        conn.close_connection()
 
 class TestReplicatedDHT(unittest.TestCase):
     def setUp(self):
