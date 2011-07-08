@@ -506,8 +506,25 @@ the overlay network. Optionally, the documentation can be build:
 
 \subsection{Python-API}
 
-Python will compile required modules on demand when executing the scripts for
-the first time.
+The Python API for Python 2.* (at least 2.6) is located in the \code{python-api}
+directory. Files for Python 3.* can be created using \code{2to3} from the files
+in \code{python-api}. The following command will use \code{2to3} to convert the
+modules and place them in \code{python3-api}. 
+\begin{lstlisting}[language=sh]
+%> make python3
+\end{lstlisting}
+Both versions of python will compile required modules on demand when executing
+the scripts for the first time. However, pre-compiled modules can be created
+with:
+\begin{lstlisting}[language=sh]
+%> make python
+%> make python3
+\end{lstlisting}
+
+\subsection{Ruby-API}
+
+The Ruby API for Ruby >= 1.8 is located in the \code{ruby-api}
+directory. Compilation is not necessary.
 
 \section{Installation}
 \label{sec:install}
@@ -697,7 +714,7 @@ management server and `regular' nodes directly.
 
 \chapter{Using the system}
 \label{chapter.systemuse}
-\svnrev{r1618}
+\svnrev{r1936}
 
 \scalaris{} can be used with one of the provided command line interfaces or
 by using one of the APIs in a custom program. The following sections will
@@ -716,12 +733,13 @@ Currently we offer the following APIs:
         (connections are established using distributed Erlang)
   \item a generic \emph{JSON API}\\
         (offered by an integrated HTTP server running on each \scalaris{} node)
-  \item a \emph{Python API} using JSON to talk to \scalaris{}. 
+  \item a \emph{Python API} for Python >= 2.6 using JSON to talk to \scalaris{}. 
+  \item a \emph{Ruby API} for Ruby >= 1.8 using JSON to talk to \scalaris{}. 
 \end{itemize}
 
 Each API contains methods for accessing functions from the three layers
 \scalaris{} is composed of.
-Table~\ref{api.layers} shows the modules and classes of Erlang, Java and Python
+Table~\ref{api.layers} shows the modules and classes of Erlang, Java, Python and Ruby
 and their mapping to these layers. The appropriate JSON calls
 are shown in Section~\sieheref{sec.api.json}.
 
@@ -732,22 +750,22 @@ absolutely safe. Refer to the following thread on the mailing list:
 
 \begin{table}
   \centering
-    \begin{tabular}{lllll}
+    \begin{tabular}{p{4cm}lll}
     \toprule
-                      & Erlang                 & Java                         & Python                     \\
+                      & Erlang                 & Java                         & Python / Ruby              \\
                       & \footnotesize{module}  & \footnotesize{class in \code{de.zib.scalaris}}%
-                                                                              & \footnotesize{class in module \code{Scalaris}} \\
+                                                                              & \footnotesize{class in module \code{scalaris}} \\
     \midrule
-    Transaction Layer & \code{api_tx.erl}      & \code{Transaction},          & \code{Transaction},        \\
-                      &                        & \code{TransactionSingleOp}  & \code{TransactionSingleOp} \\
+    Transaction Layer & \code{api_tx}          & \code{Transaction},          & \code{Transaction},        \\
+                      &                        & \code{TransactionSingleOp}   & \code{TransactionSingleOp} \\
     %\cmidrule(lr){2-4}
-                      & \code{api_pubsub.erl}  & \code{PubSub}                & \code{PubSub}              \\
+                      & \code{api_pubsub}      & \code{PubSub}                & \code{PubSub}              \\
     \cmidrule(lr){1-4}
-    Replication Layer & \code{api_rdht.erl}    & \code{ReplicatedDHT}         & \code{ReplicatedDHT}       \\
+    Replication Layer & \code{api_rdht}        & \code{ReplicatedDHT}         & \code{ReplicatedDHT}       \\
     \cmidrule(lr){1-4}
-    P2P Layer         & \code{api_dht.erl}     &                              &                            \\
+    P2P Layer         & \code{api_dht}         &                              &                            \\
     %\cmidrule(lr){2-4}
-                      & \code{api_dht_raw.erl} &                              &                            \\
+                      & \code{api_dht_raw}     &                              &                            \\
     \bottomrule
     \end{tabular}
     \caption{Layered API structure}
@@ -792,22 +810,23 @@ language-specific types of each API.
 \begin{table}
   \centering
   \begin{threeparttable}[b]
-    \begin{tabular}{lllll}
+    \begin{tabular}{llllll}
     \toprule
-               & Erlang            & Java                         & JSON                            & Python                    \\
+               & Erlang            & Java                         & JSON                            & Python                    & Ruby \\
     \midrule
-    boolean    & \code{boolean()}  & \code{bool}, \code{Boolean}  & \code{true}, \code{false}       & \code{True}, \code{False} \\
-    integer    & \code{integer()}  & \code{int}, \code{Integer}   & \code{int}                      & \code{int}                \\
-               &                   & \code{long}, \code{Long}     &                                 &                           \\
-               &                   & \code{BigInteger}            &                                 &                           \\
-    float      & \code{float()}    & \code{double}, \code{Double} & \code{int frac}                 & \code{float}              \\
-               &                   &                              & \code{int exp}                  &                           \\
-               &                   &                              & \code{int frac exp}             &                           \\
-    string     & \code{string()}   & \code{String}                & \code{string}                   & \code{str}                \\
-    binary     & \code{binary()}   & \code{byte[]}                & \code{string} (base64-encoded)  & \code{bytearray}          \\
-    list(type) & \code{[type()]}   & \code{List<Object>}          & \code{array}                    & \code{list}               \\
-    JSON       & \code{json_obj()}\tnote{*} & \code{Map<String, Object>} & \code{object}            & \code{dict}               \\
-    custom     & \code{any()}      & \code{OtpErlangObject}       & \emph{<unsupported>}            & \emph{<unsupported>}      \\
+    boolean    & \code{boolean()}  & \code{bool}, \code{Boolean}  & \code{true}, \code{false}       & \code{True}, \code{False} & \code{true}, \code{false} \\
+    integer    & \code{integer()}  & \code{int}, \code{Integer}   & \code{int}                      & \code{int}                & \code{Fixnum}, \\
+               &                   & \code{long}, \code{Long}     &                                 &                           & \code{Bignum} \\
+               &                   & \code{BigInteger}            &                                 &                           & \\
+    float      & \code{float()}    & \code{double}, \code{Double} & \code{int frac}                 & \code{float}              & \code{Float} \\
+               &                   &                              & \code{int exp}                  &                           & \\
+               &                   &                              & \code{int frac exp}             &                           & \\
+    string     & \code{string()}   & \code{String}                & \code{string}                   & \code{str}                & \code{String} \\
+    binary     & \code{binary()}   & \code{byte[]}                & \code{string}                   & \code{bytearray}          & \code{String} \\
+               &                   &                              & \footnotesize{(base64-encoded)} &                           & \\
+    list(type) & \code{[type()]}   & \code{List<Object>}          & \code{array}                    & \code{list}               & \code{Array} \\
+    JSON       & \code{json_obj()}\tnote{*} & \code{Map<String, Object>} & \code{object}            & \code{dict}               & \code{Hash}\\
+    custom     & \code{any()}      & \code{OtpErlangObject}       & \emph{/}                        & \emph{/}                  & \emph{/} \\
     \bottomrule
     \end{tabular}
     \begin{tablenotes}
@@ -828,13 +847,16 @@ json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false
 \scalaris{} supports a JSON API for transactions. To minimize the necessary
 round trips between a client and \scalaris{}, it uses request lists, which
 contain all requests that can be done in parallel. The request list is then
-send to a \scalaris{} node with a POST message. The result is an opaque
-TransLog and a list containing the results of the requests. To add further
+send to a \scalaris{} node with a POST message. The result contains
+a list of the results of the requests and - in case of a transaction - a
+TransLog. To add further
 requests to the transaction, the TransLog and another list of requests may
 be send to \scalaris{}. This process may be repeated as often as necessary.
 To finish the transaction, the request list can contain a 'commit' request
 as the last element, which triggers the validation phase of the transaction
 processing.
+Request lists are also supported for single read/write operations, i.e.
+every single operation is committed on its own. 
 
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
 8000 by default and the page \code{jsonrpc.yaws} (For example at:
@@ -873,6 +895,11 @@ supported (the given result is the \code{<result_object>} mentioned above):
 "ok"
 \end{lstlisting}
   \item[] \hspace{-1.7em}single read/write:
+  \item \code{req_list_commit_each(<req_list_rw>)} - commit each request in the list, result:
+\begin{lstlisting}[language=java]
+{[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
+  {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
+\end{lstlisting}
   \item \code{read(<key>)} - read the value at \code{key}, result:
 \begin{lstlisting}[language=java]
 {"status": "ok", "value", <json_value>} or
@@ -949,11 +976,12 @@ supported (the given result is the \code{<result_object>} mentioned above):
 Note:
 \begin{lstlisting}[language=java]
 <json_value> = {"type": "as_is" or "as_bin", "value": <value>}
+<req_list_rw> = [{"read", <key>} | {"write", {<key>: <json_value>}}]
 <req_list> = [{"read", <key>} | {"write", {<key>: <json_value>}} | {"commit", _}]
 \end{lstlisting}
 The \code{<value>} inside \code{<json_value>} is either a base64-encoded
-string representing a binary object (if type = \code{"as_bin"}) or the value
-itself (otherwise).
+string representing a binary object (type = \code{"as_bin"}) or the value
+itself (type = \code{"as_is"}).
 
 \subsubsection{JSON-Example}
 
@@ -974,14 +1002,12 @@ Make a transaction, that sets two keys & $\to$ & \\
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
- "params": [
-  [
-   { "write": { "keyA": {"type": "as_is", "value": "valueA"} } },
-   { "write": { "keyB": {"type": "as_is", "value": "valueB"} } },
-   { "commit": "" }
-  ]
- ],
  "method": "req_list",
+ "params": [
+  [ { "write": { "keyA": {"type": "as_is", "value": "valueA"} } },
+    { "write": { "keyB": {"type": "as_is", "value": "valueB"} } },
+    { "commit": "" } ]
+ ],
  "id": 0
 }
 \end{lstlisting}
@@ -999,13 +1025,8 @@ Make a transaction, that sets two keys & $\to$ & \\
 \begin{lstlisting}[language=java]
 {"error": null,
  "result": {
-  "results": [
-   {"status": "ok"},
-   {"status": "ok"},
-   {"status": "ok"}
-  ],
-  "tlog": <TLOG> // this list is the translog
-                 // for further operations!
+  "results": [ {"status": "ok"}, {"status": "ok"}, {"status": "ok"} ],
+  "tlog": <TLOG> // this is the translog for further operations!
  },
  "id": 0
 }
@@ -1021,13 +1042,11 @@ In a second transaction: Read the two keys & $\to$ & \\
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
- "params": [
-  [
-   { "read": "keyA" },
-   { "read": "keyB" }
-  ]
- ],
  "method": "req_list",
+ "params": [
+  [ { "read": "keyA" },
+    { "read": "keyB" } ]
+ ],
  "id": 0
 }
 \end{lstlisting}
@@ -1067,14 +1086,12 @@ translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
+ "method": "req_list",
  "params": [
   <TLOG>,
-  [
-   { "write": { "keyA": {"type": "as_is", "value": "valueA2"} } },
-   { "commit": "" }
-  ]
+  [ { "write": { "keyA": {"type": "as_is", "value": "valueA2"} } },
+    { "commit": "" } ]
  ],
- "method": "req_list",
  "id": 0
 }
 \end{lstlisting}
@@ -1101,10 +1118,7 @@ translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
 \end{tabular} \\
 \end{longtable}
 
-A sample usage of the JSON API using Ruby can be found in
-\code{contrib/jsonrpc.rb}.
-
-Another example of how to use the JSON API is the Python API which uses JSON
+Examples of how to use the JSON API are the Python and Ruby API which use JSON
 to communicate with \scalaris{}.
 
 %\subsection{Erlang}
@@ -1112,14 +1126,14 @@ to communicate with \scalaris{}.
 \subsection{Java API}
 
 The \code{scalaris.jar} provides a Java command line client as well as a
-library for Java programs to access \scalaris{}. The library provides two
+library for Java programs to access \scalaris{}. The library provides several
 classes:
 
 \begin{itemize}
-\item \code{Scalaris} provides a high-level API similar to the command line
-       client.
-\item \code{Transaction} provides a low-level API to the transaction
-       mechanism.
+\item \code{TransactionSingleOp} provides methods for reading and writing values.
+\item \code{Transaction} provides methods for reading and writing values in transactions.
+\item \code{PubSub} provides methods for a simple topic-based pub/sub implementation on top of \scalaris{}.
+\item \code{ReplicatedDHT} provides low-level methods for accessing the replicated DHT of \scalaris{}.
 \end{itemize}
 
 For details regarding the API we refer the reader to the Javadoc:
@@ -1195,8 +1209,8 @@ further connection properties) by adapting the values defined in
 \subsection{Python command line interface}
 
 \begin{lstlisting}[language={}]
-%> ./python-api/Scalaris.py --help
-usage: Scalaris.py [Options]
+%> ./python-api/scalaris_client.py --help
+usage: ./python-api/scalaris_client.py [Options]
  -r,--read <key>                      read an item
  -w,--write <key> <value>             write an item
  -d,--delete <key> [<timeout>]        delete an item (default timeout:
@@ -1207,18 +1221,32 @@ usage: Scalaris.py [Options]
                                       re-creating an item the version
                                       before the delete can re-appear.
  -p,--publish <topic> <message>       publish a new message for the given
+                                      topic
  -s,--subscribe <topic> <url>         subscribe to a topic
  -g,--getsubscribers <topic>          get subscribers of a topic
  -u,--unsubscribe <topic> <url>       unsubscribe from a topic
  -h,--help                            print this message
-                                      topic
+ -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)
+                                      [1|...|9|all] (default: all
+                                      benchmarks, 100 test runs)
 \end{lstlisting}
+
+\subsection{Ruby command line interface}
+
+\begin{lstlisting}[language={}]
+%> ./ruby-api/scalaris_client.rb --help
+Usage: scalaris_client [options]
+    -r, --read KEY                   read key KEY
+    -w, --write KEY,VALUE            write key KEY to VALUE
+    -h, --help                       Show this message
+\end{lstlisting}
+
 
 \chapter{Testing the system}
 \svnrev{r1618}
 
 \section{Erlang unit tests}
-There are some unit tests in the \code{test} directory which test Scalaris
+There are some unit tests in the \code{test} directory which test \scalaris{}
 itself (the Erlang code). You can call them
 by running \code{make test} in the main directory. The results are stored
 in a local \code{index.html} file. 
@@ -1242,7 +1270,7 @@ been linked into the \code{index.html} file. They are however stored in the
 
 \section{Java unit tests}
 The Java unit tests can be run by executing \code{make java-test} in the main
-directory. This will start a Scalaris node with the default ports and test
+directory. This will start a \scalaris{} node with the default ports and test
 all Java functions part of the Java API. A typical run will look like the
 following:
 
@@ -1327,7 +1355,7 @@ Total time: 10 seconds
 
 \section{Python unit tests}
 The Python unit tests can be run by executing \code{make python-test} in the
-main directory. This will start a Scalaris node with the default ports and test
+main directory. This will start a \scalaris{} node with the default ports and test
 all Python functions part of the Python API. A typical run will look like the
 following:
 
@@ -1406,7 +1434,7 @@ Section~\sieheref{chapter.systemuse.apis} are fully supported by the APIs
 and yield to the appropriate types in another API, we implemented some
 interoperability tests. They can be run by executing \code{make interop-test}
 in the main directory.
-This will start a Scalaris node with the default ports, write test data using
+This will start a \scalaris{} node with the default ports, write test data using
 both the Java and the Python APIs and let each API read the data it wrote
 itself as well as the data the other API read. On success it will print
 
