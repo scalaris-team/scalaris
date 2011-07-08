@@ -21,7 +21,7 @@ class ConnectionWithTrace(scalaris.JSONConnection):
         scalaris.JSONConnection.__init__(self, url = scalaris.DEFAULT_URL, timeout = scalaris.DEFAULT_TIMEOUT)
 
     def call(self, function, params):
-        params = {'version': '1.1',
+        params = {'jsonrpc': '2.0',
                   'method': function,
                   'params': params,
                   'id': 0}

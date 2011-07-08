@@ -19,7 +19,7 @@
  * <h3>The TransactionSingleOp class</h3>
  * <p>
  * The {@link de.zib.scalaris.TransactionSingleOp} class provides methods for
- * reading, writing and deleting values, with both,
+ * reading and writing values, with both,
  * erlang objects ({@link com.ericsson.otp.erlang.OtpErlangObject}) and
  * Java objects like {@link java.lang.String}.
  * </p>
