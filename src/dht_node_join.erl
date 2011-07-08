@@ -117,8 +117,8 @@ join_as_other(Id, IdVersion, Options) ->
     comm:init_and_wait_for_valid_pid(),
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
-    get_known_nodes(util:get_pids_uid()),
     JoinUUID = util:get_pids_uid(),
+    get_known_nodes(JoinUUID),
     msg_delay:send_local(get_join_timeout() div 1000, self(),
                          {join, timeout, JoinUUID}),
     gen_component:change_handler(
