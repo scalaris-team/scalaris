@@ -67,7 +67,11 @@ class JSONConnection(object):
             data = response.read().decode('utf-8')
             response_json = json.loads(data)
             return response_json['result']
+        except ConnectionError:
+            self.close()
+            raise
         except Exception as instance:
+            self.close()
             raise ConnectionError(instance)
 
     @staticmethod
@@ -412,10 +416,12 @@ class TransactionSingleOp(object):
     Single write or read operations on scalaris.
     """
     
-    def __init__(self, conn = JSONConnection()):
+    def __init__(self, conn = None):
         """
         Create a new object using the given connection
         """
+        if conn is None:
+            conn = JSONConnection()
         self._conn = conn
     
     def new_req_list(self, other = None):
@@ -507,10 +513,12 @@ class Transaction(object):
     Write or read operations on scalaris inside a transaction.
     """
     
-    def __init__(self, conn = JSONConnection()):
+    def __init__(self, conn = None):
         """
         Create a new object using the given connection
         """
+        if conn is None:
+            conn = JSONConnection()
         self._conn = conn
         self._tlog = None
     
@@ -724,10 +732,12 @@ class PubSub(object):
     Publish and subscribe methods accessing scalaris' pubsub system
     """
     
-    def __init__(self, conn = JSONConnection()):
+    def __init__(self, conn = None):
         """
         Create a new object using the given connection.
         """
+        if conn is None:
+            conn = JSONConnection()
         self._conn = conn
 
     def publish(self, topic, content):
@@ -787,10 +797,12 @@ class ReplicatedDHT(object):
     Non-transactional operations on the replicated DHT of scalaris
     """
     
-    def __init__(self, conn = JSONConnection()):
+    def __init__(self, conn = None):
         """
         Create a new object using the given connection.
         """
+        if conn is None:
+            conn = JSONConnection()
         self._conn = conn
 
     # returns the number of successfully deleted items
