@@ -7,9 +7,9 @@ if [ -f /mnt/context.sh ]; then
 fi
 umount /mnt
 
+ADDR=`ifconfig eth0 | grep "inet addr:" | cut -d ':' -f 2 | cut -d ' ' -f 1`
 if [ "x$SCALARIS_FIRST" = xtrue ]; then
   # only eth0 for the moment
-  ADDR=`ifconfig eth0 | grep "inet addr:" | cut -d ':' -f 2 | cut -d ' ' -f 1`
   ERLANG_ADDR=`echo $ADDR | tr . ,`
 
   echo "{known_hosts, [{{$ERLANG_ADDR}, 14195, service_per_vm}]}." >> /etc/scalaris/scalaris.local.cfg
@@ -34,6 +34,6 @@ fi
 export HOME=/root
 
 # the sleep command is used to find error messages
-screen -d -m /bin/bash -c "/usr/bin/scalarisctl -s -p 14195 -y 8000 $SCALARIS_PARAMS start; sleep 365d"
+screen -d -m /bin/bash -c "/usr/bin/scalarisctl -s -n node@$ADDR -p 14195 -y 8000 $SCALARIS_PARAMS start; sleep 365d"
 
 /etc/init.d/iptables stop
