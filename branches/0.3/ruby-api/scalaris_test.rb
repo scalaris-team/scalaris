@@ -38,6 +38,8 @@ $_TEST_DATA = [
              "Uquoo0Il", "eiGh4Oop", "ooMa0ufe", "zee6Zooc", "ohhao4Ah", "Uweekek5", "aePoos9I", "eiJ9noor", 
              "phoong1E", "ianieL2h", "An7ohs4T", "Eiwoeku3", "sheiS3ao", "nei5Thiw", "uL5iewai", "ohFoh9Ae"]
 
+$_TOO_LARGE_REQUEST_SIZE = 1024*1024*10 # number of bytes
+
 class TestTransactionSingleOp < Test::Unit::TestCase
   def setup
     @testTime = (Time.now.to_f * 1000).to_i
@@ -396,6 +398,21 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     
     conn.close_connection();
   end
+
+  # Test method for TransactionSingleOp.write(key, value=bytearray()) with a
+  # request that is too large.
+  def testReqTooLarge()
+      conn = Scalaris::TransactionSingleOp.new()
+      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      key = "_ReqTooLarge"
+      begin
+        conn.write(@testTime.to_s + key, data)
+        assert(false, 'The write should have failed unless yaws_max_post_data was set larger than ' + $_TOO_LARGE_REQUEST_SIZE.to_s())
+      rescue Scalaris::ConnectionError
+      end
+      
+      conn.close_connection()
+  end
 end
 
 class TestTransaction < Test::Unit::TestCase
@@ -624,6 +641,21 @@ class TestTransaction < Test::Unit::TestCase
     end
     
     conn.close_connection();
+  end
+
+  # Test method for Transaction.write(key, value=bytearray()) with a
+  # request that is too large.
+  def testReqTooLarge()
+      conn = Scalaris::Transaction.new()
+      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      key = "_ReqTooLarge"
+      begin
+        conn.write(@testTime.to_s + key, data)
+        assert(false, 'The write should have failed unless yaws_max_post_data was set larger than ' + $_TOO_LARGE_REQUEST_SIZE.to_s())
+      rescue Scalaris::ConnectionError
+      end
+      
+      conn.close_connection()
   end
 end
 
@@ -1152,6 +1184,21 @@ end
 #        # to disable logging
 #        def log_message(self, *args):
 #            pass
+
+  # Test method for PubSub.write(key, value=bytearray()) with a
+  # request that is too large.
+  def testReqTooLarge()
+      conn = Scalaris::PubSub.new()
+      data = (0..($_TOO_LARGE_REQUEST_SIZE)).map{0}.join()
+      key = "_ReqTooLarge"
+      begin
+        conn.publish(@testTime.to_s + key, data)
+        assert(false, 'The publish should have failed unless yaws_max_post_data was set larger than ' + $_TOO_LARGE_REQUEST_SIZE.to_s())
+      rescue Scalaris::ConnectionError
+      end
+      
+      conn.close_connection()
+  end
 end
 
 class TestReplicatedDHT < Test::Unit::TestCase
