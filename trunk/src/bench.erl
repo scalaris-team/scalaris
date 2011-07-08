@@ -61,17 +61,34 @@ read_read(ThreadsPerVM, Iterations) ->
                  Options::[locally | verbose | profile | {copies, non_neg_integer()}],
                  Message::comm:message()) -> ok.
 manage_run(ThreadsPerVM, Iterations, Options, Message) ->
+    Pid = self(),
+    spawn(fun() ->
+                  Msg = setelement(5, Message, comm:this()),
+                  Res = manage_run_internal(ThreadsPerVM, Iterations, Options,
+                                            Msg),
+                  Pid ! Res
+          end),
+    receive
+        ok ->
+            ok;
+        X ->
+            io:format("unknown message ~p~n", [X]),
+            ok
+    end.
+
+-spec manage_run_internal(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
+                 Options::[locally | verbose | profile | {copies, non_neg_integer()}],
+                 Message::comm:message()) -> ok.
+manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = util:get_proc_in_vms(bench_server),
     %% io:format("~p~n", [ServerList]),
     Before = erlang:now(),
     _ = [comm:send(Server, Message) || Server <- ServerList],
+    fd:subscribe(ServerList),
     io:format("Collecting results... ~n"),
-    Statistics = [receive
-                      {done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts} ->
-                          io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
-                          {WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts};
-                      X -> io:format("~p~n", [X])
-                  end || _Server <- ServerList],
+    Statistics = collect(length(ServerList), []),
+    fd:unsubscribe(ServerList),
+    io:format("stats: ~p ~n", [Statistics]),
     {MinTP, MeanTP, MaxTP} = lists:foldl(
                                fun (Stats, {Min, Mean, Max}) ->
                                        {Min + Iterations / element(4, Stats) * 1000000.0 * ThreadsPerVM,
@@ -128,3 +145,19 @@ init_key(Key, Count) ->
         {fail, timeout} ->
             init_key(Key, Count - 1)
     end.
+
+collect(0, L) ->
+    L;
+collect(Length, L) ->
+    receive
+        {done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts} ->
+            io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
+            collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L]);
+        {crash, Pid} ->
+            io:format("ignoring ~p, because it crashed", [Pid]),
+            collect(Length - 1, L);
+        X ->
+            io:format("unknown message ~p~n", [X]),
+            collect(Length - 1, L)
+    end.
+
