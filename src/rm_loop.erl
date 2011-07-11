@@ -27,9 +27,13 @@
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 -define(TRACE1(Msg, State),
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p~n", [self(), Msg, State])).
--define(TRACE_STATE(State),
-        ?TRACE("[ ~.0p ]~n  new Neighbors: ~.0p~n",
-               [self(), nodelist:to_list(get_neighbors(State))])).
+%% -define(TRACE_STATE(OldState, NewState),
+%%         case element(1, OldState) =/= element(1, NewState) of
+%%             true -> ct:pal("[ ~.0p ]~n  new Neighbors: ~.0p~n",
+%%                [self(), nodelist:to_list(get_neighbors(NewState))]);
+%%             _    -> ok
+%%         end).
+-define(TRACE_STATE(OldState, NewState), ok).
 
 -export([init/3, on/2,
          leave/0, update_id/1,
@@ -161,7 +165,7 @@ init(Me, Pred, Succ) ->
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
     NewState = {RM_State, false, SubscrTable},
-    ?TRACE_STATE(NewState),
+    ?TRACE_STATE({null, null, null}, NewState),
     NewState.
 
 %% @doc Creates a state() object for a unit test.
@@ -266,7 +270,7 @@ on({rm, init_check_ring, Token}, {RM_State, _HasLeft, _SubscrTable} = State) ->
     comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Me}),
     State;
 
-on(Message, {RM_State, HasLeft, SubscrTable}) ->
+on(Message, {RM_State, HasLeft, SubscrTable} = _OldState) ->
     % similar to update_state/2 but handle unknown_event differently
     OldNeighborhood = ?RM:get_neighbors(RM_State),
     case ?RM:on(Message, RM_State) of
@@ -276,7 +280,7 @@ on(Message, {RM_State, HasLeft, SubscrTable}) ->
             call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable),
             update_failuredetector(OldNeighborhood, NewNeighborhood),
             NewState = {NewRM_State, HasLeft, SubscrTable},
-            ?TRACE_STATE(NewState),
+            ?TRACE_STATE(_OldState, NewState),
             NewState
     end.
 
@@ -320,14 +324,14 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 %%      subscribers and updates the failure detector if necessary.
 -spec update_state(OldState::state_t(),
                    RMFun::fun(() -> ?RM:state())) -> NewState::state().
-update_state({OldRM_State, HasLeft, SubscrTable}, RMFun) ->
+update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
     NewRM_State = RMFun(),
     NewNeighborhood = ?RM:get_neighbors(NewRM_State),
     call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable),
     update_failuredetector(OldNeighborhood, NewNeighborhood),
     NewState = {NewRM_State, HasLeft, SubscrTable},
-    ?TRACE_STATE(NewState),
+    ?TRACE_STATE(_OldState, NewState),
     NewState.
 
 % @doc Check if change of failuredetector is necessary.

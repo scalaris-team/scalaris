@@ -31,7 +31,10 @@ all() ->
      tester_join_at,
      add_9, rm_5, add_9_rm_5,
      add_2x3_load,
+     add_1_rm_1_load,
+     add_3_rm_1_load,
      add_3_rm_2_load,
+     add_3_rm_3_load,
      tester_join_at_timeouts
     ].
 
@@ -49,8 +52,14 @@ init_per_testcase(TestCase, Config) ->
         % note: the craceful leave tests only work if transactions are
         % transferred to new TMs if the TM dies or the bench_server restarts
         % the transactions
+        add_1_rm_1_load ->
+            {skip, "graceful leave not fully supported yet"};
+        add_3_rm_1_load ->
+            {skip, "graceful leave not fully supported yet"};
         add_3_rm_2_load ->
-            {skip, "no graceful leave yet"};
+            {skip, "graceful leave not fully supported yet"};
+        add_3_rm_3_load ->
+            {skip, "graceful leave not fully supported yet"};
         _ ->
             % stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
@@ -117,21 +126,34 @@ add_2x3_load_test() ->
     check_size(7),
     util:wait_for_process_to_die(BenchPid).
 
+add_1_rm_1_load(Config) ->
+    add_x_rm_y_load(Config, 1, 1).
+
+add_3_rm_1_load(Config) ->
+    add_x_rm_y_load(Config, 3, 1).
+
 add_3_rm_2_load(Config) ->
+    add_x_rm_y_load(Config, 3, 2).
+
+add_3_rm_3_load(Config) ->
+    add_x_rm_y_load(Config, 3, 3).
+
+-spec add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer()) -> ok.
+add_x_rm_y_load(Config, X, Y) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
-    stop_time(fun add_3_rm_2_load_test/0, "add_2x3_load"),
+    stop_time(fun() -> add_x_rm_y_load_test(X, Y) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
     dht_node_move_SUITE:check_size2(4).
 
-add_3_rm_2_load_test() ->
+-spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer()) -> ok.
+add_x_rm_y_load_test(X, Y) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
-    _ = admin:add_nodes(3),
-    check_size(4),
+    _ = admin:add_nodes(X),
+    check_size(X + 1),
     timer:sleep(500),
-    % let 2 nodes gracefully leave
-    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(2, pid_groups:find_all(dht_node))],
-%%     admin:del_nodes(2),
-    check_size(2),
+    % let Y nodes gracefully leave
+    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(Y, pid_groups:find_all(dht_node))],
+    check_size(X + 1 - Y),
     util:wait_for_process_to_die(BenchPid).
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key()) -> true.
