@@ -27,16 +27,15 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([send/2, this/0, is_valid/1, is_local/1, make_local/1,
-         get_ip/1, get_port/1]).
+-export([send/2, send_with_shepherd/3, this/0, is_valid/1, is_local/1, make_local/1,
+         get_ip/1, get_port/1, report_send_error/3]).
 
 -include("scalaris.hrl").
 
 -type process_id() :: {inet:ip_address(), comm_server:tcp_port(), comm:erl_pid_plain()}.
 
-%% @doc send message via tcp, if target is not in same Erlang VM.
--spec send(process_id(), comm:message()) -> ok.
-send(Target, Message) ->
+-spec send_with_shepherd(process_id(), comm:message(), comm:erl_local_pid() | unknown) -> ok.
+send_with_shepherd(Target, Message, Shepherd) ->
     IsLocal = is_local(Target),
     case is_valid(Target) of
         true when IsLocal ->
@@ -50,17 +49,23 @@ send(Target, Message) ->
                 undefined ->
                     log:log(warn,
                             "[ CC ] Cannot locally send msg to unknown named"
-                                " process ~p: ~.0p~n", [LocalTarget, Message]);
+                            " process ~p: ~.0p~n", [LocalTarget, Message]),
+                    report_send_error(Shepherd, Target, Message);
                 _ -> PID ! Message
             end,
             ok;
         true ->
-            comm_server:send(Target, Message);
+            comm_server:send(Target, Message, Shepherd);
         _ ->
             log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
             log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
             ok
     end.
+
+%% @doc send message via tcp, if target is not in same Erlang VM.
+-spec send(process_id(), comm:message()) -> ok.
+send(Target, Message) ->
+    send_with_shepherd(Target, Message, unknown).
 
 %% @doc returns process descriptor for the calling process
 -spec this() -> process_id().
@@ -101,3 +106,13 @@ get_ip({IP, _Port, _Pid}) -> IP.
 %% @doc Gets the port of the given process id.
 -spec get_port(process_id()) -> comm_server:tcp_port().
 get_port({_IP, Port, _Pid}) -> Port.
+
+-spec report_send_error(unknown | comm:erl_local_pid(), process_id(), comm:message()) -> ok.
+report_send_error(Shepherd, Target, Message) ->
+    case Shepherd of
+        unknown ->
+            ok;
+        ShepherdPid ->
+            comm:send_local(ShepherdPid, {send_error, Target, Message})
+    end,
+    ok.
