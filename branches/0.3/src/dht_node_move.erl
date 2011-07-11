@@ -625,8 +625,9 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
     Command =
         case CanSlide andalso NodesCorrect andalso not MoveDone of
             true ->
-                case slide_op:is_leave(Type, 'send') of
-                    true ->
+                SendOrReceive = slide_op:get_sendORreceive(Type),
+                case slide_op:is_leave(Type) of
+                    true when SendOrReceive =:= 'send' ->
                         % graceful leave (slide with succ, send all data)
                         % note: may also be a jump operation!
                         % TODO: check for running slide, abort it if possible, eventually extend it
@@ -653,11 +654,14 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                                 end;
                             _ -> {ok, {leave, 'send'}}
                         end;
-                    _ ->
+                    true when SendOrReceive =:= 'rcv' ->
+                        {ok, {leave, SendOrReceive}};
+                    _ when SendOrReceive =:= 'rcv' ->
+                        {ok, {slide, PredOrSucc, SendOrReceive}};
+                    _ when SendOrReceive =:= 'send' ->
                         TIdInRange = intervals:in(TId, nodelist:node_range(Neighbors)) andalso
                                          not dht_node_state:has_left(State),
-                        SendOrReceive = slide_op:get_sendORreceive(Type),
-                        case SendOrReceive =:= 'send' andalso not TIdInRange of
+                        case not TIdInRange of
                             true -> {abort, target_id_not_in_range, Type};
                             _    -> {ok, {slide, PredOrSucc, SendOrReceive}}
                         end
@@ -687,7 +691,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
         {abort, Reason, OrigType} ->
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
                         OrigType, Reason, MsgTag =/= nomsg);
-        {ok, {jump, 'send'}} -> % similar to {ok, slide, succ, 'send'}
+        {ok, {jump, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
             % TODO: activate incremental jump:
 %%             IncTargetKey = find_incremental_target_id(Neighbors, dht_node_state:get(State, db), TargetId, NewType, OtherMTE),
 %%             SlideOp = slide_op:new_sending_slide_jump(MoveFullId, IncTargetKey, TargetId, Tag, Neighbors),
@@ -698,7 +702,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                     notify_other(SlideOp1, State);
                 _ -> change_my_id(State, SlideOp)
             end;
-        {ok, {leave, 'send'}} -> % similar to {ok, slide, succ, 'send'}
+        {ok, {leave, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
             % TODO: activate incremental leave:
 %%             IncTargetKey = find_incremental_target_id(Neighbors, dht_node_state:get(State, db), TargetId, NewType, OtherMTE),
 %%             SlideOp = slide_op:new_sending_slide_leave(MoveFullId, IncTargetKey, leave, Neighbors),
@@ -709,6 +713,17 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                     notify_other(SlideOp1, State);
                 _ -> change_my_id(State, SlideOp)
             end;
+        {ok, {leave, 'rcv'} = NewType} -> % similar to {ok, {slide, pred, 'rcv'}}
+            % TODO: activate incremental leave:
+            % slide with leaving pred, receive data
+            SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
+                                         SourcePid, OtherMTE, NextOp, Neighbors),
+            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_data),
+            SlideOp2 = slide_op:set_setup_at_other(SlideOp1),
+            State1 = dht_node_state:add_msg_fwd(
+                       State, slide_op:get_interval(SlideOp2),
+                       node:pidX(slide_op:get_node(SlideOp2))),
+            notify_other(SlideOp2, State1);
         % send data to pred:
         {ok, {slide, pred, 'send'} = NewType} ->
             % slide with pred, send data
@@ -1406,8 +1421,11 @@ get_slide_op(State, MoveFullId) ->
         not_found -> not_found;
         {PredOrSucc, SlideOp} ->
             Node = dht_node_state:get(State, PredOrSucc),
-            case node:same_process(Node, slide_op:get_node(SlideOp)) orelse
-                     (slide_op:is_leave(SlideOp) andalso PredOrSucc =:= pred) of
+            NodeSlOp = slide_op:get_node(SlideOp),
+            % allow only changed pred during a leave if the new pred is not between the leaving node and the current node!
+            case node:same_process(Node, NodeSlOp) orelse
+                     (slide_op:is_leave(SlideOp) andalso PredOrSucc =:= pred andalso
+                          intervals:in(node:id(NodeSlOp), dht_node_state:get(State, my_range))) of
                 true -> {ok,             PredOrSucc, SlideOp};
                 _    -> {wrong_neighbor, PredOrSucc, SlideOp}
             end
