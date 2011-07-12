@@ -327,6 +327,15 @@ on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% handling of failed sends
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({send_error, Target, {lookup_aux, _, _, _} = Message}, State) ->
+    dht_node_lookup:lookup_aux_failed(State, Target, Message);
+
+on({send_error, Target, {lookup_fin, _, _, _} = Message}, State) ->
+    dht_node_lookup:lookup_fin_failed(State, Target, Message);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({get_yaws_info, Pid}, State) ->
