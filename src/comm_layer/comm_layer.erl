@@ -51,7 +51,14 @@ send_with_shepherd(Target, Message, Shepherd) ->
                             "[ CC ] Cannot locally send msg to unknown named"
                             " process ~p: ~.0p~n", [LocalTarget, Message]),
                     report_send_error(Shepherd, Target, Message);
-                _ -> PID ! Message
+                _ ->
+                    PID ! Message,
+                    case is_process_alive(PID) of
+                        false ->
+                            report_send_error(Shepherd, Target, Message);
+                        true ->
+                            ok
+                    end
             end,
             ok;
         true ->
@@ -111,6 +118,8 @@ get_port({_IP, Port, _Pid}) -> Port.
 report_send_error(Shepherd, Target, Message) ->
     case Shepherd of
         unknown ->
+            log:log(warn, "~.0p Connection failed, drop message ~.0p",
+                    [pid_groups:my_pidname(), Message]),
             ok;
         ShepherdPid ->
             comm:send_local(ShepherdPid, {send_error, Target, Message})

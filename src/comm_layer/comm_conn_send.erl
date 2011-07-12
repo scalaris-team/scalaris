@@ -86,8 +86,6 @@ on({send, DestPid, Message, Shepherd}, State) ->
             comm_layer:report_send_error(Shepherd,
                                          {dest_ip(State), dest_port(State), DestPid},
                                          Message),
-            log:log(warn, "~.0p Connection failed, drop message ~.0p",
-                    [pid_groups:my_pidname(), Message]),
             %%reconnect
             set_socket(State, notconnected);
         _ ->
