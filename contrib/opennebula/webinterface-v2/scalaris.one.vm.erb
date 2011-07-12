@@ -1,0 +1,51 @@
+#---------------------------------------
+# VM definition example
+#---------------------------------------
+
+CPU    = 0.1
+MEMORY = 512
+
+# --- kernel & boot device ---
+
+OS = [
+   arch = x86_64,
+   boot = cdrom
+]
+
+# --- 3 disks ---
+
+DISK = [
+  image     = "<%= @image %>",
+  target    = "hdc"
+]
+
+# --- 1 NIC ---
+
+NIC = [ network = "Private LAN" ]
+
+# --- Placement options ---
+
+#REQUIREMENTS = "CPUSPEED > 1000"
+#RANK         = FREECPU
+
+# --- Contextualization ---
+
+CONTEXT = [
+  SCALARIS_FIRST="<%= @scalarisfirst %>",
+  SCALARIS_KNOWN_HOSTS="<%= @known_hosts %>",
+  SCALARIS_MGMT_SERVER="<%= @mgmt_server %>",
+  SCALARIS_VMID="$VMID",
+  ip_private = "$NIC[IP]",
+  dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
+  ip_public  = "$NIC[IP, NETWORK=\"Private LAN\"]",
+  user_cert  = "special user certificate",
+  TARGET     = sdb
+]
+
+# --- Debugging ---
+
+GRAPHICS = [
+  TYPE    = "vnc",
+  LISTEN  = "127.0.0.1",
+  PORT    = "-1"
+]

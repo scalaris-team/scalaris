@@ -1,0 +1,14 @@
+frontend.rb:
+CREDENTIALS   = "USERNAME:PASSWORD"
+ENDPOINT      = "http://10.0.0.1:2633/RPC2"
+SCALARISIMAGE = "Scalaris4Contrail"
+HADOOPIMAGE   = "Hadoop4Contrail"
+
+manager.rb:
+CREDENTIALS   = "USERNAME:PASSWORD"
+ENDPOINT      = "http://10.0.0.1:2633/RPC2"
+SCALARISIMAGE = "Scalaris4Contrail"
+HADOOPIMAGE   = "Hadoop4Contrail"
+VMID          = "1"
+IP            = "127.0.0.1"
+TYPE          = "scalaris" | "hadoop"
