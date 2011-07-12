@@ -15,11 +15,11 @@
 %%%-------------------------------------------------------------------
 %%% File    bloom_SUITE.erl
 %%% @author Maik Lange <MLange@informatik.hu-berlin.de>
-%%% @doc    Tests for the bloom filter module.
+%%% @doc    Tests for bloom filter module.
 %%% @end
 %%% Created : 06/04/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
 %%%-------------------------------------------------------------------
-%% @version $Id: gossip_SUITE.erl 1629 2011-03-30 09:28:04Z kruber@zib.de $
+%% @version $Id: $
 
 -module(bloom_SUITE).
 
@@ -40,7 +40,9 @@ all() -> [
 		  addRange,
           join,
           equals,
-          fpr_test_parallel
+          fpr_test_parallel,
+          %fprof,
+          time_measurement
 		 ].
 
 add(_) -> 
@@ -57,8 +59,7 @@ addRange(_) ->
 	Elements = lists:seq(1,10,1),
 	BF1 = ?BLOOM:addRange(BF, Elements),
 	Results = [ ?BLOOM:is_element(BF1, Item) || Item <- Elements],
-	io:format("Elements: ~p~n", [Elements]),
-	io:format("Results: ~p~n", [Results]),
+	ct:pal("Elements: ~p~nResults: ~p~n", [Elements, Results]),
 	?equals(lists:member(false, Results), false),
     ?equals(?BLOOM:is_element(BF1, "Not"), false),
     ?equals(?BLOOM:is_element(BF1, 2), true).
@@ -74,7 +75,7 @@ join(_) ->
                                    end
                          end,
                          fun(X,Y) -> X+Y end, 0),
-    io:format("join NumFound=~B~n", [NumFound]),
+    ct:pal("join NumFound=~B~n", [NumFound]),
     ?assert(NumFound > 10 andalso NumFound =< 20),
     ok.
 
@@ -94,7 +95,7 @@ fpr_test_parallel(_) ->
                        0),
     AvgFpr = FalsePositives / ?Fpr_Test_NumTests,
     ?BLOOM:print(newBloom(?Fpr_Test_ElementNum, ?Fpr_Test_DestFPR)),
-    io:format("~nDestFpr: ~f~nMeasured Fpr: ~f~n", [?Fpr_Test_DestFPR, AvgFpr]),
+    ct:pal("~nDestFpr: ~f~nMeasured Fpr: ~f~n", [?Fpr_Test_DestFPR, AvgFpr]),
     ?assert(?Fpr_Test_DestFPR >= AvgFpr orelse ?Fpr_Test_DestFPR*1.3 >= AvgFpr),
     ok.   
 
@@ -114,6 +115,40 @@ measure_fp(DestFpr, MaxElements) ->
                          fun(X,Y) -> X+Y end,
                          0),       
 	NumFound / NumNotIn.
+
+fprof(_) ->
+    fprof:trace(start, "bloom_fprof.trace"),
+    BF = newBloom(100, 0.1),
+    _ = ?BLOOM:add(BF, 5423452345),
+    fprof:trace(stop),
+    fprof:profile(file, "bloom_fprof.trace"),
+    fprof:analyse([{dest, "bloom_fprof.analysis"}, {cols, 120}]),    
+    ok.
+
+time_measurement(_) ->
+    %parameter
+    ExecTimes = 100, 
+    BFSize = 1000, % req: mod 2 = 0
+    
+    %measure Build times
+    {BTMin, BTMax, BTMed, BTAvg} = measure_util:time_avg(fun() -> for_to_ex(1, round(BFSize / 2), fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)) end,
+                                       [], ExecTimes, false),
+    %measure join time
+    BF1 = for_to_ex(1, 
+                    round(BFSize / 2), 
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
+    BF2 = for_to_ex(round(BFSize / 2) + 1, 
+                    BFSize, 
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
+    {JTMin, JTMax, JTMed, JTAvg} = measure_util:time_avg(fun() -> ?BLOOM:join(BF1, BF2) end, [], ExecTimes, false),
+    
+    %print results
+    ct:pal("EXECUTION TIMES in microseconds~n"
+           "PARAMETER - ExecTimes=[~w] - BFSize=[~w]~n"
+           "BuildTimes - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]~n"
+           "JoinTimes  - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]",
+           [ExecTimes, BFSize, BTMin, BTMax, BTMed, BTAvg, JTMin, JTMax, JTMed, JTAvg]),
+    ok.
 
 newBloom(ElementNum, Fpr) ->
 	HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),

@@ -37,8 +37,9 @@
          is_empty/1, is_all/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
          is_left_of/2, is_right_of/2,
+         split/2,
          % operations for intervals
-         intersection/2, union/2, minus/2,
+         intersection/2, union/2, minus/2, 
          % getters for certain intervals
          get_bounds/1, get_elements/1,
          %
@@ -622,4 +623,46 @@ is_left_of(X, Y) ->
 -spec is_right_of(interval(), interval()) -> boolean().
 is_right_of(X, Y) ->
     is_left_of(Y, X).
+
+
+
+
+
+%% @doc Splits the interval in X equally sized subintervals
+%%      Precondition: interval is continous and normalized.
+%%      TODO: requires key() = integer() for division
+%% @end
+-spec split(interval(), pos_integer()) -> [interval()].
+split([all], _) -> empty();
+split([{element, _}], _) -> empty();
+split([I], 1) ->
+    [normalize_simple(I)];
+split([{interval, LBr, LKey, RKey, RBr}], X) ->
+    Cut = erlang:round(case LKey =:= ?MINUS_INFINITY of
+                           true -> RKey / X;
+                           false -> LKey + ((RKey - LKey) / X) - 1
+                       end),
+    [normalize_simple({interval, LBr, LKey, Cut, ']'})] ++
+        split([{interval, '[', Cut + 1, RKey, RBr}], X - 1);
+split(I, X) when length(I) =:= 2 ->
+    %wrapping around case
+    Left = lists:keyfind(?PLUS_INFINITY, 4, I),
+    Right = lists:keyfind(?MINUS_INFINITY, 3, I),
+    case (Left =:= false) or (Right =:= false) of
+        false -> 
+            {interval, LBr1, LKey1, ?PLUS_INFINITY, _} = Left,
+            {interval, _, ?MINUS_INFINITY, RKey2, RBr2} = Right,
+            Step = erlang:round(((?PLUS_INFINITY - LKey1) + RKey2) / X),
+            case LKey1 + Step > ?PLUS_INFINITY of
+                true ->                    
+                    Cut = Step - (?PLUS_INFINITY - LKey1),
+                    [normalize_simple({interval, LBr1, LKey1, Cut, ']'})] ++
+                        split([{interval, '[', Cut + 1, RKey2, RBr2}], X - 1);
+                false -> 
+                    [normalize_simple({interval, LBr1, LKey1, LKey1 + Step, ']'})] ++ 
+                        split([{interval, '[', LKey1 + Step + 1, RKey2, RBr2}], X - 1)
+            end;
+        true -> empty()
+    end;
+split(_, _) -> empty().
 

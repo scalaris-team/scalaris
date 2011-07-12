@@ -43,9 +43,8 @@
 all() ->
     [get_symmetric_keys_test,
      simpleBloomSync_test,
-     bloomSync_FprCompare_check].
-
-
+     bloomSync_FprCompare_check,
+     bloomSync_times].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -66,6 +65,10 @@ end_per_testcase(_TestCase, _Config) ->
     unittest_helper:stop_ring(),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Test Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 get_symmetric_keys_test(_) ->
     ToTest = get_symmetric_keys(4),
     ToBe = ?RT:get_replica_keys(0),
@@ -85,6 +88,41 @@ bloomSync_FprCompare_check(Config) ->
     R1 = start_bloom_sync(Config, 4, 1000, 2, 0.2),
     R2 = start_bloom_sync(Config, 4, 1000, 2, 0.1),
     ?assert(lists:last(R1) < lists:last(R2)),
+    ok.
+
+bloomSync_times(Config) ->
+    %Parameter
+    NodeCount = 4,
+    DataCount = 1000,
+    Rounds = 1,
+    Fpr = 0.1,
+    %start_bloom_sync measurement
+    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
+    DestVersCount = NodeCount * 2 * DataCount,
+    ItemCount = NodeCount * DataCount,
+    %Build Ring
+    {BuildRingTime, _} = timer:tc(?MODULE, build_symmetric_ring, [NodeCount, Config]),
+    config:write(rep_update_fpr, Fpr),
+    {FillTime, _} = timer:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount]),
+    %measure initial sync degree
+    {DBStatusTime, DBStatus} = timer:tc(?MODULE, getDBStatus, []),
+    {GetVersionCountTime, VersCount} = timer:tc(?MODULE, getVersionCount, [DBStatus]),
+    InitialOutdated = DestVersCount - VersCount,
+    %run sync rounds    
+    Result = [calc_sync_degree(InitialOutdated, ItemCount) |
+                  lists:reverse(util:for_to_ex(1,
+                                               Rounds, 
+                                               fun(_I) ->
+                                                       startSyncRound(NodeKeys),
+                                                       timer:sleep(5000),
+                                                       calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
+                                                                        ItemCount)
+                                               end))],
+    ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
+    %clean up
+    {StopRingTime, _} = timer:tc(unittest_helper, stop_ring, []),    
+    ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStauts = ~w~nGetVersionCount = ~w~nStopRing = ~w",
+           [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
