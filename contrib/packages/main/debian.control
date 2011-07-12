@@ -8,7 +8,7 @@ Homepage: http://code.google.com/p/scalaris
 Package: scalaris-svn
 Conflicts: scalaris
 Architecture: all
-Depends: adduser, addgroup, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
+Depends: adduser, erlang-base (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-inets (>= 13.b.1), erlang-ssl (>= 13.b.1), erlang-xmerl (>= 13.b.1)
 Suggests: scalaris-svn-java, scalaris-svn-doc
 Description: Scalable Distributed key-value store
  Scalaris is a scalable, transactional, distributed key-value store. It
