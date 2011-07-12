@@ -42,7 +42,8 @@
 %% initialization
 -export([init_and_wait_for_valid_pid/0]).
 %% Sending messages
--export([send/2, send_local/2, send_local_after/3, send_to_group_member/3]).
+-export([send/2, send_local/2, send_local_after/3, send_to_group_member/3,
+         send_with_shepherd/3]).
 %% Pid manipulation
 -export([make_global/1, make_local/1]).
 -export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
@@ -131,6 +132,16 @@ send_local_after(Delay, Pid, Message) ->
 -spec send_to_group_member(mypid(), atom(), message()) -> ok.
 send_to_group_member(DestNode, Processname, Mesg) ->
     send(DestNode, {send_to_group_member, Processname, Mesg}).
+
+-spec send_with_shepherd(mypid(), message() | group_message(), erl_local_pid()) -> ok.
+-ifdef(TCP_LAYER).
+send_with_shepherd(Pid, Message, Shepherd) ->
+    comm_layer:send_with_shepherd(Pid, Message, Shepherd).
+-endif.
+-ifdef(BUILTIN). %% @hidden
+send_with_shepherd(Pid, Message, _Shepherd) ->
+    send(Pid, Message).
+-endif.
 
 -spec make_global(erl_pid_plain()) -> mypid().
 -ifdef(TCP_LAYER).

@@ -72,7 +72,7 @@ init({DestIP, DestPort, LocalListenPort}) ->
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
-on({send, DestPid, Message}, State) ->
+on({send, DestPid, Message, Shepherd}, State) ->
     Socket = case socket(State) of
                  notconnected ->
                      log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
@@ -83,6 +83,9 @@ on({send, DestPid, Message}, State) ->
              end,
     case Socket of
         fail ->
+            comm_layer:report_send_error(Shepherd,
+                                         {dest_ip(State), dest_port(State), DestPid},
+                                         Message),
             log:log(warn, "~.0p Connection failed, drop message ~.0p",
                     [pid_groups:my_pidname(), Message]),
             %%reconnect
@@ -95,13 +98,13 @@ on({send, DestPid, Message}, State) ->
                             %% start message bundle for sending
                             %% io:format("MQL ~p~n", [MQL]),
                             MaxBundle = util:max(200, MQL div 100),
-                            T1 = set_msg_queue(State, [{DestPid, Message}]),
+                            T1 = set_msg_queue(State, {[{DestPid, Message}], [Shepherd]}),
                             T2 = set_msg_queue_len(T1, 1),
                             set_desired_bundle_size(T2, util:min(MQL,MaxBundle));
                        true ->
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
-                                     DestPid, Message),
+                                     DestPid, Message, Shepherd),
                             T1 = set_socket(State, NewSocket),
                             inc_s_msg_count(T1)
                     end;
@@ -110,20 +113,23 @@ on({send, DestPid, Message}, State) ->
                     MSBS = msgs_since_bundle_start(State),
                     case (QL + MSBS) >= DBS of
                         true ->
-                            MQueue = [{DestPid, Message} | msg_queue(State)],
+                            {MsgQueue, ShepherdQueue} = msg_queue(State),
+                            MQueue = [{DestPid, Message} | MsgQueue],
+                            SQueue = [Shepherd | ShepherdQueue],
 %%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
-                                     unpack_msg_bundle, MQueue),
+                                     unpack_msg_bundle, MQueue, SQueue),
                             T1State = set_socket(State, NewSocket),
                             T2State = inc_s_msg_count(T1State),
-                            T3State = set_msg_queue(T2State, []),
+                            T3State = set_msg_queue(T2State, {[], []}),
                             T4State = set_msg_queue_len(T3State, 0),
                             _T5State = set_msgs_since_bundle_start(T4State,0);
                         false ->
                             %% add to message bundle
-                            T1 = set_msg_queue(State, [{DestPid, Message}
-                                                       | msg_queue(State)]),
+                            {MsgQueue, ShepherdQueue} = msg_queue(State),
+                            T1 = set_msg_queue(State, {[{DestPid, Message} | MsgQueue],
+                                                       [Shepherd | ShepherdQueue]}),
                             set_msg_queue_len(T1, QL + 1)
                     end
             end
@@ -171,11 +177,11 @@ on(UnknownMessage, State) ->
     log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
     send_bundle_if_ready(State).
 
--spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message()) ->
+-spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:erl_local_pid() | unknown) ->
                    notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}]) ->
+          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], list(comm:erl_local_pid() | unknown)) ->
                    notconnected | inet:socket().
-send({Address, Port, Socket}, Pid, Message) ->
+send({Address, Port, Socket}, Pid, Message, Shepherd) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message},
                                    [{compressed, 2}, {minor_version, 1}]),
     NewSocket =
@@ -186,14 +192,20 @@ send({Address, Port, Socket}, Pid, Message) ->
                 ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
                 Socket;
             {error, closed} ->
+                report_bundle_error(Shepherd,
+                                    {Address, Port, Pid},
+                                    Message),
                 log:log(warn,"[ CC ] sending closed connection", []),
                 gen_tcp:close(Socket),
                 notconnected;
             {error, timeout} ->
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
                         [Address, Port, timeout]),
-                send({Address, Port, Socket}, Pid, Message);
+                send({Address, Port, Socket}, Pid, Message, Shepherd);
             {error, Reason} ->
+                report_bundle_error(Shepherd,
+                                    {Address, Port, Pid},
+                                    Message),
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
                         [Address, Port, Reason]),
                 gen_tcp:close(Socket),
@@ -248,12 +260,13 @@ send_bundle_if_ready(InState) ->
                 true ->
                     Socket = socket(State),
                     %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
+                    {MQueue, SQueue} = msg_queue(State),
                     NewSocket =
                         send({dest_ip(State), dest_port(State), Socket},
-                             unpack_msg_bundle, msg_queue(State)),
+                             unpack_msg_bundle, MQueue, SQueue),
                     T1State = set_socket(State, NewSocket),
                     T2State = inc_s_msg_count(T1State),
-                    T3State = set_msg_queue(T2State, []),
+                    T3State = set_msg_queue(T2State, {[], []}),
                     T4State = set_msg_queue_len(T3State, 0),
                     _T5State = set_msgs_since_bundle_start(T4State, 0);
                 false -> State
@@ -294,3 +307,23 @@ status(State) ->
          notconnected -> notconnected;
          _            -> connected
      end.
+
+report_bundle_error(Shepherd, {Address, Port, Pid}, Message) ->
+    case is_list(Shepherd) of
+        true ->
+            zip_and_foldr(fun (ShepherdX, {DestPid, MessageX}) ->
+                                  comm_layer:report_send_error(ShepherdX,
+                                                               {Address, Port, DestPid},
+                                                               MessageX)
+                          end, Shepherd, Message);
+        false ->
+            comm_layer:report_send_error(Shepherd,
+                                         {Address, Port, Pid},
+                                         Message)
+    end.
+
+zip_and_foldr(_F, [], []) ->
+    ok;
+zip_and_foldr(F, [El1 | R1] , [El2 | R2]) ->
+    zip_and_foldr(F, R1, R2),
+    F(El1, El2).
