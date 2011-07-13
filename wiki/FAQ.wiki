@@ -150,7 +150,7 @@ Note: we do not support Scalaris on Windows at the moment.
 
 == How can I change the web server port/yaws port? ==
 
-For changing the yaws port of the boot server or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/boot.sh` or `bin/cs_local?.sh`.
+For changing the yaws port of the first node or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/firstnode.sh` or `bin/joining_node.sh`.
 
 = Usage =
 
@@ -170,7 +170,7 @@ When starting a Scalaris ring we have to mark exactly one node as the first node
 
 We are currently using a command line parameter `-scalaris first true` to mark the first Scalaris node inside an Erlang VM as being the first (see `bin/scalarisctl` and `dht_node:init/1`).
 
-For a fault-tolerant setup, Scalaris is able to select the first node by itself from the list of known_hosts. Scalaris will then start, if a majority of the known hosts becomes available (See -q in `bin/scalariscrl`). In this setup no node has to be marked first explicitly.
+For a fault-tolerant setup, Scalaris is able to select the first node by itself from the list of known_hosts. Scalaris will then start, if a majority of the known hosts becomes available (See -q in `bin/scalarisctl`). In this setup no node has to be marked first explicitly.
 
 == How do I start a ring? ==
 
