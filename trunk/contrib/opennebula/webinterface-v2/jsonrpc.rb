@@ -14,13 +14,13 @@ module JSONRPC
     end
   end
 
-  def self.add_vm_scalaris(params, helper, instance)
+  def self.add_nodes(params, helper, instance)
     count = params[0].to_i
     res = helper.add(count, instance)
     if res[0] == true
       {:result => res[1]}
     else
-      {:error => "add_vm_scalaris failed with #{res[1]}"}
+      {:error => "add_nodes failed with #{res[1]}"}
     end
   end
 
@@ -30,9 +30,9 @@ module JSONRPC
     begin
       jsonres = json_call(URI.parse(url), "destroy", [])
       if jsonres['error'] == nil
-        {:result => JSON.parse(jsonres.body)["result"]}
+        {:result => jsonres["result"]}
       else
-        {:error => JSON.parse(jsonres.body)["error"]}
+        {:error => jsonres["error"]}
       end
     rescue
       {:error => $!.to_s}
