@@ -1,5 +1,0 @@
-#summary Getting scalaris to run.
-
- # svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
- # open README and follow the explanation
- # look into user-dev-guide/main.pdf
