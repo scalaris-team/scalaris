@@ -5,6 +5,7 @@ require 'sinatra'
 require 'sequel'
 require 'erb'
 require 'optparse'
+require 'json'
 
 require 'one.rb'
 require 'database.rb'
@@ -14,8 +15,8 @@ require 'hadoophelper.rb'
 
 set :views, Proc.new { File.join(root, "sc_views") }
 
-vmid = ENV['VMID']
 if TYPE == "scalaris"
+  vmid = ENV['SCALARIS_VMID']
   helper = ScalarisHelper.new
   instance = Scalaris.first(:head_node => vmid)
   if instance == nil
@@ -24,6 +25,7 @@ if TYPE == "scalaris"
   end
   puts instance.id
 elsif TYPE == "hadoop"
+  vmid = ENV['HADOOP_VMID']
   exit
 else
   exit

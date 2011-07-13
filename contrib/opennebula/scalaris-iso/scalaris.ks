@@ -25,12 +25,21 @@ rootfiles
 # for scalaris
 scalaris-svn
 ruby-scalaris-svn
-ruby
 screen
-virt-what
+
+# for manager interface
+ruby
+rubygem-sequel
+rubygem-sqlite3
+rubygem-json
+rubygem-sinatra
+rubygem-nokogiri
 
 # for debugging
 strace
+less
+virt-what
+emacs
 
 # minimization
 anaconda
@@ -47,6 +56,13 @@ cp init-contrail-scalaris.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 chmod ugo+x $INSTALL_ROOT/etc/init.d/vmcontext
 chmod ugo+x $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 
+# install webinterface
+mkdir -p $INSTALL_ROOT/var/lib/sc-manager
+cp -r ../webinterface-v2/* $INSTALL_ROOT/var/lib/sc-manager
+rm $INSTALL_ROOT/var/lib/sc-manager/opennebula.db
+
+# prepare opennebula-ruby binding
+cp oca-1.1.2.gem $INSTALL_ROOT/var/lib/sc-manager/oca-1.1.2.gem
 %post
 
 # We made firstboot a native systemd service, so it can no longer be turned
@@ -65,5 +81,7 @@ systemctl disable NetworkManager.service
 
 /sbin/chkconfig iptables off
 /sbin/chkconfig ip6tables off
+
+(cd /var/lib/sc-manager ; gem install --local oca-1.1.2)
 
 %end
