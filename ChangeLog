@@ -1,5 +1,5 @@
-Scalaris 0.3.0 RC1 (codename "Rhinechis Scalaris")
-==================================================
+Scalaris 0.3.0 (codename "Rhinechis Scalaris")
+==============================================
 
 API:
 
@@ -31,6 +31,8 @@ Business Logic:
 - switched almost all components to our component framework 'gen_component'
 - added gossiping for estimating e.g. the number of nodes or the
   average load in a ring
+- more reliable unreliable look-up
+- better ring start-up on slow networks
 
 Infrastructure:
 
