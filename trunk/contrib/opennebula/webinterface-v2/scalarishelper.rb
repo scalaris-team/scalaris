@@ -45,24 +45,42 @@ class ScalarisHelper
     end
   end
 
+  def remove(num, instance)
+    [false, "Not yet implemented"]
+  end
+
   def list(instance)
-    ips = get_ips(instance)
-    puts "x#{ips}x"
-    ips
+    ids = get_vms(instance)
+    {:peers => ids}
   end
 
   def destroy(instance)
-    get_vms(id).each do |vm_id|
+    get_vms(instance).each do |vm_id|
       OpenNebulaHelper.delete_vm vm_id
     end
-    Scalaris[id].remove_all_scalarisvms
-    Scalaris[id].destroy
+    instance.remove_all_scalarisvms
+    instance.destroy
+    "success"
   end
 
-  def get_instance_info(instance)
+  def get_node_info(instance, vmid)
     info = {}
-    info["ips"] = get_ips(instance)
     info
+  end
+
+  def get_node_performance(instance, vmid)
+    perf = {}
+    perf
+  end
+
+  def get_service_info(instance)
+    info = {}
+    info
+  end
+
+  def get_service_performance(instance)
+    perf = {}
+    perf
   end
 
   private
@@ -105,7 +123,7 @@ class ScalarisHelper
     instance.scalarisvms_dataset.each do |vm|
       vm = pool.find {|i| i.id == vm.one_vm_id.to_i}
       if vm != nil
-        vms.push vm.id
+        vms.push vm.id.to_s
       end
     end
     vms

@@ -14,6 +14,7 @@ module JSONRPC
     end
   end
 
+  # called in frontend
   def self.add_nodes(params, helper, instance)
     count = params[0].to_i
     res = helper.add(count, instance)
@@ -21,6 +22,16 @@ module JSONRPC
       {:result => res[1]}
     else
       {:error => "add_nodes failed with #{res[1]}"}
+    end
+  end
+
+  def self.remove_nodes(params, helper, instance)
+    count = params[0].to_i
+    res = helper.remove(count, instance)
+    if res[0] == true
+      {:result => res[1]}
+    else
+      {:error => "remove_nodes failed with #{res[1]}"}
     end
   end
 
@@ -37,6 +48,33 @@ module JSONRPC
     rescue
       {:error => $!.to_s}
     end
+  end
+
+  # called in manager
+  def self.destroy(params, helper, instance)
+    {:result => helper.destroy(instance)}
+  end
+
+  def self.list_nodes(params, helper, instance)
+    helper.list(instance)
+  end
+
+  def self.get_node_info(params, helper, instance)
+    vmid = params[0]
+    {:result => helper.get_node_info(instance, vmid)}
+  end
+
+  def self.get_node_performance(params, helper, instance)
+    vmid = params[0]
+    {:result => helper.get_node_performance(instance, vmid)}
+  end
+
+  def self.get_service_info(params, helper, instance)
+    {:result => helper.get_service_info(instance)}
+  end
+
+  def self.get_service_performance(params, helper, instance)
+    {:result => helper.get_service_performance(instance)}
   end
 
   def self.call(jsonreq, helper, instance)
