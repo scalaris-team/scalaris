@@ -44,13 +44,13 @@ disks. On startup, the nodes would continue from the last state after reading
 the snapshot. Then user access can be restarted.
 
 ==== Persistent storage to have an always up-to-date snapshot of the system: ==== 
-Persistency as in traditional replicated databases is not intended by our
+Persistence as in traditional replicated databases is not intended by our
 system model and thereby not possible. The best alternative would be periodic
 snapshots, that can be done also without interrupting the service.
 
 == Can I store more data in Scalaris than ram+swapspace is available in the cluster? ==
 
-Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_toke (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistency.
+Yes. We have several database backends, e.g. src/db_ets.erl (ets) and src/db_toke (tokyocabinet). The former uses the main memory for storing data, while the latter uses tokyocabinet for storing data on disk. With tokycoabinet, only your local disks should limit the total size of your database. Note however, that this still does not provide persistence.
 
 For instructions on switching the database backend to tokyocabinet see [Tokyocabinet].
 
@@ -70,13 +70,11 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 We build rpm and deb packages using checkouts from svn trunk and the latest tagged version and provide them using the openSUSE !BuildService at http://download.opensuse.org/repositories/home:/scalaris/. The available packages are listed in the following table:
 
 || *Distribution* || *Version* || *Download* ||
-|| Fedora || 12 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_12/] ||
-|| Fedora || 13 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_13/] ||
 || Fedora || 14 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/] ||
+|| Fedora || 15 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/] ||
 || Mandriva || 2009.1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2009.1/] ||
 || Mandriva || 2010 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010/] ||
 || Mandriva || 2010.1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010.1/] ||
-|| openSUSE || 11.2 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.2/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.2/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.2/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || 11.3 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || 11.4 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || openSUSE || Tumbleweed || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris-svn.ymp 1-Click Install (unstable)] ||
@@ -99,10 +97,23 @@ Inside those repositories you will also find erlang packages - you don't need th
 
 === How to add deb-based repositories (Debian, Ubuntu)? ===
 
-Please note that the openSUSE !BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list:
+Please note that the openSUSE !BuildService does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (probably in `/etc/apt/`):
 
 {{{
-deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/ ./
+deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/ ./
+}}}
+
+Then download our package signing key and add it to your system (as root):
+
+{{{
+wget http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/repodata/repomd.xml.key
+apt-key add repomd.xml.key
+}}}
+
+Afterwards, installing our Scalaris packages should be possible as usually, e.g. by calling
+{{{
+apt-get update
+apt-get install scalaris
 }}}
 
 Refer to http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
