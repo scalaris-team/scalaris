@@ -81,9 +81,4 @@
 % disable:
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
 
-
-% enable detailed time logging in cs_api (jsonrpc)
-%-define(LOG_CS_API(Timer, Time), monitor_timing:log(Timer, Time)).
--define(LOG_CS_API(Timer, Time), ok).
-
 -include("types.hrl").
