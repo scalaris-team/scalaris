@@ -15,7 +15,7 @@ scalaris_home=/var/lib/scalaris
 
 create_scalaris_user() {
   getent group $scalaris_group >/dev/null || addgroup --quiet --system $scalaris_group
-  getent passwd $scalaris_user >/dev/null || adduser --quiet --system -g $scalaris_group -d $scalaris_home -m -s /sbin/nologin -c "user for scalaris" $scalaris_user
+  getent passwd $scalaris_user >/dev/null || adduser --quiet --system --ingroup $scalaris_group --home $scalaris_home --shell /sbin/nologin $scalaris_user
   chown $scalaris_user:$scalaris_group \
     /etc/scalaris/scalaris.cfg \
     /etc/scalaris/scalaris.local.cfg \
