@@ -25,7 +25,6 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_bloom_sync/1]).
--export([concatKeyVer/1, concatKeyVer/2, minKey/1]).
 
 -ifdef(with_export_type_support).
 -export_type([bloom_sync_struct/0]).
@@ -136,13 +135,13 @@ on({get_chunk_response, {RestI, DBList}}, State) ->
     {Obsolete, _Missing} = 
         filterPartitionMap(fun(A) -> 
                                    db_entry:get_version(A) > -1 andalso
-                                       not ?REP_BLOOM:is_element(VersBF, concatKeyVer(A)) 
+                                       not ?REP_BLOOM:is_element(VersBF, rep_upd:concatKeyVer(A)) 
                            end,
                            fun(B) -> 
-                                   ?REP_BLOOM:is_element(KeyBF, minKey(db_entry:get_key(B)))
+                                   ?REP_BLOOM:is_element(KeyBF, rep_upd:minKey(db_entry:get_key(B)))
                            end,
                            fun(C) ->
-                                   { minKey(db_entry:get_key(C)), 
+                                   { rep_upd:minKey(db_entry:get_key(C)), 
                                      db_entry:get_value(C), 
                                      db_entry:get_version(C) }
                            end,
@@ -231,26 +230,15 @@ fill_bloom([H | T], KeyBF, VerBF) ->
         -1 ->
             fill_bloom(T, KeyBF, VerBF);
         _ ->
-            AddKey = bloom_sync:minKey(Key),
+            AddKey = rep_upd:minKey(Key),
             NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-            NewVerBF = ?REP_BLOOM:add(VerBF, bloom_sync:concatKeyVer(AddKey, Ver)),
+            NewVerBF = ?REP_BLOOM:add(VerBF, rep_upd:concatKeyVer(AddKey, Ver)),
             fill_bloom(T, NewKeyBF, NewVerBF)            
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PUBLIC HELPER
+% HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% @doc transforms a key to its smallest associated key
--spec minKey(?RT:key()) -> ?RT:key().
-minKey(Key) ->
-    lists:min(?RT:get_replica_keys(Key)).
--spec concatKeyVer(db_entry:entry()) -> binary().
-concatKeyVer(DBEntry) ->
-    concatKeyVer(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
--spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
-concatKeyVer(Key, Version) ->
-    term_to_binary([Key, "#", Version]).
-
 filterPartitionMap(_, _, _, [], Satis, NonSatis) ->
     {Satis, NonSatis};
 filterPartitionMap(Filter, Pred, Map, [H | T], Satis, NonSatis) ->

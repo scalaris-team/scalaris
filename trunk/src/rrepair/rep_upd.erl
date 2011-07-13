@@ -25,6 +25,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2, check_config/0]).
+-export([concatKeyVer/1, concatKeyVer/2, minKey/1]).
 
 -ifdef(with_export_type_support).
 -export_type([db_chunk/0, 
@@ -187,6 +188,20 @@ on({report_to_monitor}, State) ->
                           self(),
                           {report_to_monitor}),
     State.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PUBLIC HELPER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc transforms a key to its smallest associated key
+-spec minKey(?RT:key()) -> ?RT:key().
+minKey(Key) ->
+    lists:min(?RT:get_replica_keys(Key)).
+-spec concatKeyVer(db_entry:entry()) -> binary().
+concatKeyVer(DBEntry) ->
+    concatKeyVer(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
+-spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
+concatKeyVer(Key, Version) ->
+    term_to_binary([Key, "#", Version]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
