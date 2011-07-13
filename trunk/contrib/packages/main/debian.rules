@@ -57,10 +57,6 @@ install: build
 	make install DESTDIR=$(BUILD_DIR)
 	make install-doc DESTDIR=$(BUILD_DIR)
 	
-	# copy docs:
-	cp -t $(BUILD_DIR)/usr/share/doc/scalaris/ AUTHORS README LICENSE
-	cp user-dev-guide/main.pdf $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
-	
 	# handle config files:
 	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
 	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
@@ -69,16 +65,7 @@ install: build
 	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
 	mv    -t $(BUILD_DIR)-doc/usr/share/doc/scalaris \
 	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang
-
-# # 	for subpackage in `echo "client doc java"`
-# # 	do
-# # 	  pwd
-# # 	  ls $(BUILD_DIR)-${subpackage}.files
-# # # 	  cat $(BUILD_DIR)-${subpackage}.files | while read line; do
-# # # 		mkdir -p $(BUILD_DIR)-${subpackage}`dirname $line`
-# # # 		mv -t $(BUILD_DIR)-${subpackage}`dirname $line` $(BUILD_DIR)/$line
-# # # 	  done
-# # 	done
+	         $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
 
 # Build architecture-independent files here.
 binary-indep: build install
