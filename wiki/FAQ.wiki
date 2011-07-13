@@ -197,7 +197,7 @@ In short: deleting a key may violate one of Scalaris' fundamental assumptions - 
 
 Keys can be deleted outside transactions from Erlang and Java.
 
-In Erlang you call transstore.transaction_api:delete(Key, Timeout) which returns 
+In Erlang you call api_rdht:delete(Key) which returns 
 {ok, pos_integer(), list()} | {fail, timeout} | 
 {fail, timeout, pos_integer(), list()} | {fail, node_not_found}).
 The pos_integer() indicates how many replicas were successfully deleted, and the list contains further details.
