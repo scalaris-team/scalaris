@@ -64,7 +64,7 @@ install: build
 	# move files of the scalaris-doc package
 	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
 	mv    -t $(BUILD_DIR)-doc/usr/share/doc/scalaris \
-	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang
+	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang \
 	         $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
 
 # Build architecture-independent files here.
