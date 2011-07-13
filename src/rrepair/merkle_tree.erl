@@ -15,10 +15,12 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Merkle tree (hash tree) implementation
 %%         with configurable bucketing, branching and hashing.
-%%         The tree will evenly divide its interval with ints subnodes.
+%%         The tree will evenly divide its interval with its subnodes.
 %%         If the item count of a leaf node exceeds bucket size the node
 %%         will switch to an internal node. The items will be distributed to
 %%         its new child nodes which evenly divide the parents interval.
+%%         To finish building the structure gen_hashes has to be called to generate
+%%         the node signatures.
 %% @end
 %% @version $Id$
 
@@ -28,7 +30,7 @@
 -include("scalaris.hrl").
 
 -export([new/1, new/2, insert/3, empty/0, is_empty/1,
-         set_root_interval/2, size/1]).
+         set_root_interval/2, size/1, gen_hashes/1]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0]).
@@ -123,6 +125,30 @@ insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->
     {Hash, Count + (size_node(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generate Signatures/Hashes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec gen_hashes(merkle_tree()) -> merkle_tree().
+gen_hashes({Config, Root}) ->
+    {Config, gen_hash(Root, Config)}.
+
+gen_hash({_, Count, Bucket, I, []}, Config) ->
+    LeafHf = Config#mt_config.leaf_hf,
+    Hash = case Count > 0 of
+               true ->
+                   Bin = orddict:fold(fun(Key, Val, Acc) -> 
+                                              Acc ++ [rep_upd:concatKeyVer(rep_upd:minKey(Key), Val)] 
+                                      end, [], Bucket),
+                   LeafHf(erlang:term_to_binary(Bin));
+               _ -> LeafHf(term_to_binary(0))
+           end,
+    {Hash, Count, Bucket, I, []};
+gen_hash({_, Count, nil, I, List}, Config) ->    
+    NewChilds = lists:map(fun(X) -> gen_hash(X, Config) end, List),
+    InnerHf = Config#mt_config.inner_hf,
+    Hash = InnerHf(lists:map(fun({H, _, _, _, _}) -> H end, NewChilds)),
+    {Hash, Count, nil, I, NewChilds}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Size
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec size(merkle_tree()) -> non_neg_integer().
@@ -139,5 +165,11 @@ size_node({_, C, _, _, _}) ->
 %% Local Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 get_XOR_fun() ->
-    (fun([H|T]) -> lists:foldl(fun(X, Acc) -> X bxor Acc end, H, T) end).
+    (fun([H|T]) -> lists:foldl(fun(X, Acc) -> binary_xor(X, Acc) end, H, T) end).
 
+-spec binary_xor(binary(), binary()) -> binary().
+binary_xor(A, B) ->
+    Size = bit_size(A),
+    <<X:Size>> = A,
+    <<Y:Size>> = B,
+    <<(X bxor Y):Size>>.

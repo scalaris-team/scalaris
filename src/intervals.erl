@@ -624,45 +624,23 @@ is_left_of(X, Y) ->
 is_right_of(X, Y) ->
     is_left_of(Y, X).
 
-
-
-
-
 %% @doc Splits the interval in X equally sized subintervals
-%%      Precondition: interval is continous and normalized.
-%%      TODO: requires key() = integer() for division
+%%      Precondition: normalized interval is continous
 %% @end
 -spec split(interval(), pos_integer()) -> [interval()].
-split([all], _) -> empty();
-split([{element, _}], _) -> empty();
-split([I], 1) ->
-    [normalize_simple(I)];
-split([{interval, LBr, LKey, RKey, RBr}], X) ->
-    Cut = erlang:round(case LKey =:= ?MINUS_INFINITY of
-                           true -> RKey / X;
-                           false -> LKey + ((RKey - LKey) / X) - 1
-                       end),
-    [normalize_simple({interval, LBr, LKey, Cut, ']'})] ++
-        split([{interval, '[', Cut + 1, RKey, RBr}], X - 1);
-split(I, X) when length(I) =:= 2 ->
-    %wrapping around case
-    Left = lists:keyfind(?PLUS_INFINITY, 4, I),
-    Right = lists:keyfind(?MINUS_INFINITY, 3, I),
-    case (Left =:= false) or (Right =:= false) of
-        false -> 
-            {interval, LBr1, LKey1, ?PLUS_INFINITY, _} = Left,
-            {interval, _, ?MINUS_INFINITY, RKey2, RBr2} = Right,
-            Step = erlang:round(((?PLUS_INFINITY - LKey1) + RKey2) / X),
-            case LKey1 + Step > ?PLUS_INFINITY of
-                true ->                    
-                    Cut = Step - (?PLUS_INFINITY - LKey1),
-                    [normalize_simple({interval, LBr1, LKey1, Cut, ']'})] ++
-                        split([{interval, '[', Cut + 1, RKey2, RBr2}], X - 1);
-                false -> 
-                    [normalize_simple({interval, LBr1, LKey1, LKey1 + Step, ']'})] ++ 
-                        split([{interval, '[', LKey1 + Step + 1, RKey2, RBr2}], X - 1)
-            end;
-        true -> empty()
-    end;
-split(_, _) -> empty().
+split(I, 1) -> I;
+split(I, Parts) -> 
+    case is_continuous(I) of
+        true -> split2(get_bounds(I), Parts, []);
+        false -> erlang:throw('interval is not continuous!')
+    end.
+
+-spec split2({left_bracket(), key(), key(), right_bracket()}, pos_integer(), Acc::[interval()]) -> [interval()].
+split2({LBr, Key, Key, RBr}, _, Acc) ->
+    Acc ++ [new(LBr, Key, Key, RBr)];
+split2({LBr, LKey, RKey, RBr}, 1, Acc) ->
+    Acc ++ [new(LBr, LKey, RKey, RBr)];
+split2({LBr, LKey, RKey, RBr}, Parts, Acc) ->
+    SplitKey = ?RT:get_split_key(LKey, RKey, {1, Parts}),
+    split2({'(', SplitKey, RKey, RBr}, Parts - 1, Acc ++ [new(LBr, LKey, SplitKey, ']')]).
 
