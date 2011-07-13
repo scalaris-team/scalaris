@@ -46,6 +46,6 @@ end
 post '/jsonrpc' do
   req = JSON.parse(request.body.read)
   res = JSONRPC.call(req, nil, nil)
-  puts res
+  puts "res: #{res}"
   res
 end

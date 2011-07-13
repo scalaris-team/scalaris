@@ -18,7 +18,7 @@ class ScalarisHelper
         [false, response.to_str]
       else
         vm_id = response.to_i
-        url = "http://#{get_ip(vm_id)}:4567/"
+        url = "http://#{get_ip(vm_id)}:4567/jsonrpc"
         [true, url]
       end
     rescue Exception => e

@@ -20,7 +20,6 @@ require 'optparse'
 require 'pp'
 
 $url = 'http://localhost:4567/jsonrpc'
-#$uri = URI.parse $url
 
 def json_call(url, function, params)
   req = Net::HTTP::Post.new(url.path)
@@ -31,17 +30,17 @@ def json_call(url, function, params)
     :method => function,
     :params => params,
     :id => 0}.to_json
-  res = Net::HTTP.start(url.host, url.port){|http|http.request(req)}
-  jsonres = JSON.parse(res.body)
-  if jsonres['error'] == nil
-    JSON.parse(res.body)["result"]
-  else
-    JSON.parse(res.body)['error']
+  begin
+    res = Net::HTTP.start(url.host, url.port){|http|http.request(req)}
+    JSON.parse(res.body)
+  rescue
+    puts "#{url}: #{$!}"
+    nil
   end
 end
 
 def get_scalaris_info(url)
-  json_call(URI.parse url, "get_scalaris_info", []).to_json
+  json_call(URI.parse(url), "get_scalaris_info", []).to_json
 end
 
 def create_scalaris(url)
@@ -49,11 +48,11 @@ def create_scalaris(url)
 end
 
 def add_vm_scalaris(url, count)
-  json_call(URI.parse url, "add_vm_scalaris", [count]).to_json
+  json_call(URI.parse(url), "add_vm_scalaris", [count]).to_json
 end
 
 def destroy_scalaris(fe_url, mgmt_url)
-  json_call(URI.parse fe_url, "destroy_scalaris", [mgmt_url]).to_json
+  json_call(URI.parse(fe_url), "destroy_scalaris", [mgmt_url]).to_json
 end
 
 options = {}
