@@ -435,6 +435,10 @@ rrd-init:
 	@echo This target is deprecated
 
 install-doc: doc
+	install -d $(DOCDIR)
+	install -m 644 -t $(DOCDIR) \
+	           AUTHORS README LICENSE ChangeLog
+	install -m 644 user-dev-guide/main.pdf $(DOCDIR)/user-dev-guide.pdf
 	install -d $(DOCDIR)/erlang
 	install -m 644 -t $(DOCDIR)/erlang \
 	           doc/*.html \
