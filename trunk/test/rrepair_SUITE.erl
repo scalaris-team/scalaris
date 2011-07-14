@@ -121,7 +121,7 @@ bloomSync_times(Config) ->
     ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
     %clean up
     {StopRingTime, _} = timer:tc(unittest_helper, stop_ring, []),    
-    ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStauts = ~w~nGetVersionCount = ~w~nStopRing = ~w",
+    ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStatus = ~w~nGetVersionCount = ~w~nStopRing = ~w",
            [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
 
