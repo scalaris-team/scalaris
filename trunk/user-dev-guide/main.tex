@@ -534,38 +534,59 @@ directly from the source directory. Note: \code{make install} will install
 \scalaris{} into \code{/usr/local} and place \code{scalarisctl} into
 \code{/usr/local/bin}, by default. But it is more convenient to build an RPM
 and install it.
+On openSUSE, for example, do the following:
 
 \begin{lstlisting}{language=sh}
-svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-0.0.1
-tar -cvjf scalaris-0.0.1.tar.bz2 scalaris-0.0.1 --exclude-vcs
-cp scalaris-0.0.1.tar.bz2 /usr/src/packages/SOURCES/
-rpmbuild -ba scalaris-0.0.1/contrib/scalaris.spec
+export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
+for package in main bindings; do
+  mkdir -p ${package}
+  cd ${package}
+  svn export ${SCALARIS_SVN}/contrib/packages/${package}/checkout.sh
+  ./checkout.sh
+  cp * /usr/src/packages/SOURCES/
+  rpmbuild -ba scalaris*.spec
+  cd ..
+done
 \end{lstlisting}
+
+If any additional packages are required in order to build an RPM,
+\code{rpmbuild} will print an error.
 
 Your source and binary RPMs will be generated in
 \code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPM and DEB packages
-using checkouts from svn and provide them using the openSUSE BuildService at
+using the latest tagged version as well as checkouts from svn and provide them
+using the Open Build Service at
 \url{http://download.opensuse.org/repositories/home:/scalaris/}. Packages
 are available for
 
 \begin{itemize}
-\item Fedora 12, 13, 14,
-\item Mandriva 2009.1, 2010, 2010.1,
-\item openSUSE 11.2, 11.3, 11.4, Factory, Tumbleweed
+\item Fedora 14, 15
+\item Mandriva 2010, 2010.1,
+\item openSUSE 11.3, 11.4, Factory, Tumbleweed
 \item SLE 10, 11, 11SP1,
 \item CentOS 5.5,
 \item RHEL 5.5, 6,
 \item Debian 5.0, 6.0 and
-\item Ubuntu 9.04, 9.10, 10.04, 10.10.
+\item Ubuntu 10.04, 10.10, 11.04.
 \end{itemize}
 
 An up-to-date list of available repositories can be found at
 \url{https://code.google.com/p/scalaris/wiki/FAQ#Prebuild_packages}.
 
-Inside those repositories you will also find an Erlang package - you don't
-need this if you already have a recent enough Erlang version
-(ref. Section~\sieheref{sec.requirements})!
+For those distributions which provide a recent-enough Erlang version, we build
+the packages using their Erlang package and recommend using the same version
+that came with the distribution. In this case we do not provide Erlang packages
+in our repository.
 
+Exceptions are made for openSUSE-based and RHEL-based distributions as well as
+Debian~5.0:
+\begin{itemize}
+  \item For openSUSE, we provide the package from the \code{devel:languages:erlang}
+repository.
+  \item For RHEL-based distributions (CentOS~5, RHEL~5, RHEL~6) we included the Erlang
+package from the EPEL repository of RHEL~6.
+  \item For Debian~5.0 we included the Erlang package of Ubuntu 11.04.
+\end{itemize}
 
 \chapter{Setting up \scalaris{}}
 \label{chapter.runscalaris}
