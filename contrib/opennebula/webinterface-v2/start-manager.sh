@@ -9,5 +9,5 @@ umount /mnt
 
 cd /var/lib/sc-manager
 # the sleep command is used to find error messages
-screen -d -m /bin/bash -c "SCALARIS_VMID=$SCALARIS_VMID /var/lib/sc-manager/manager.rb; sleep 365d"
+screen -d -m /bin/bash -c "VMID=$VMID /var/lib/sc-manager/manager.rb; sleep 365d"
 cd -
