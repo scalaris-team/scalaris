@@ -626,9 +626,10 @@ smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
 is_unittest() ->
     Pid = self(),
     spawn(fun () ->
-                  case ct:get_status() of
+                  case catch ct:get_status() of
                       no_tests_running -> Pid ! {is_unittest, false};
                       {error, _} -> Pid ! {is_unittest, false};
+                      {'EXIT', {undef, _}} -> Pid ! {is_unittest, false};
                       _ -> Pid ! {is_unittest, true}
                   end
           end),
