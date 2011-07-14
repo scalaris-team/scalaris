@@ -1,9 +1,4 @@
 module JSONRPC
-  def self.get_scalaris_info(params, helper, instance)
-    info = helper.get_instance_info(instance)
-    {:result => info}
-  end
-
   def self.create_scalaris(params, helper, instance)
     user = params[0]
     res = ScalarisHelper.new.create()
@@ -11,27 +6,6 @@ module JSONRPC
       {:result => res[1]}
     else
       {:error => "create_scalaris failed with #{res[1]}"}
-    end
-  end
-
-  # called in frontend
-  def self.add_nodes(params, helper, instance)
-    count = params[0].to_i
-    res = helper.add(count, instance)
-    if res[0] == true
-      {:result => res[1]}
-    else
-      {:error => "add_nodes failed with #{res[1]}"}
-    end
-  end
-
-  def self.remove_nodes(params, helper, instance)
-    count = params[0].to_i
-    res = helper.remove(count, instance)
-    if res[0] == true
-      {:result => res[1]}
-    else
-      {:error => "remove_nodes failed with #{res[1]}"}
     end
   end
 
@@ -50,9 +24,50 @@ module JSONRPC
     end
   end
 
+  def self.create_hadoop(params, helper, instance)
+    user = params[0]
+    res = HadoopHelper.new.create()
+    if res[0] == true
+      {:result => res[1]}
+    else
+      {:error => "create_hadoop failed with #{res[1]}"}
+    end
+  end
+
+  def self.destroy_hadoop(params, helper, instance)
+    res = nil
+    url = params[0]
+    begin
+      jsonres = json_call(URI.parse(url), "destroy", [])
+      if jsonres['error'] == nil
+        {:result => jsonres["result"]}
+      else
+        {:error => jsonres["error"]}
+      end
+    rescue
+      {:error => $!.to_s}
+    end
+  end
+
   # called in manager
-  def self.destroy(params, helper, instance)
-    {:result => helper.destroy(instance)}
+  def self.add_nodes(params, helper, instance)
+    count = params[0].to_i
+    res = helper.add(count, instance)
+    if res[0] == true
+      {:result => res[1]}
+    else
+      {:error => "add_nodes failed with #{res[1]}"}
+    end
+  end
+
+  def self.remove_nodes(params, helper, instance)
+    count = params[0].to_i
+    res = helper.remove(count, instance)
+    if res[0] == true
+      {:result => res[1]}
+    else
+      {:error => "remove_nodes failed with #{res[1]}"}
+    end
   end
 
   def self.list_nodes(params, helper, instance)
@@ -75,6 +90,11 @@ module JSONRPC
 
   def self.get_service_performance(params, helper, instance)
     {:result => helper.get_service_performance(instance)}
+  end
+
+  # kinda private only called via the frontend
+  def self.destroy(params, helper, instance)
+    {:result => helper.destroy(instance)}
   end
 
   def self.call(jsonreq, helper, instance)
