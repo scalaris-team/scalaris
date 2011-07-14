@@ -62,6 +62,7 @@ cp -r ../webinterface-v2/* $INSTALL_ROOT/var/lib/sc-manager
 rm $INSTALL_ROOT/var/lib/sc-manager/opennebula.db
 
 # prepare opennebula-ruby binding
+wget -nc --no-check-certificate https://rubygems.org/downloads/oca-1.1.2.gem
 cp oca-1.1.2.gem $INSTALL_ROOT/var/lib/sc-manager/oca-1.1.2.gem
 %post
 
