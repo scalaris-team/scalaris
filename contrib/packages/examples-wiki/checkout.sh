@@ -2,7 +2,7 @@
 
 date=`date +"%Y%m%d"`
 name="scalaris-examples-wiki" # folder base name (without version)
-rpmversion=${1:-"0.2.90"}
+rpmversion=${1:-"0.3.0"}
 debversion="${rpmversion}-1"
 branchversion=${2:-"0.3"}
 url="http://scalaris.googlecode.com/svn/branches/${branchversion}/contrib/wikipedia"
