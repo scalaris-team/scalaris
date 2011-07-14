@@ -52,13 +52,7 @@ send_with_shepherd(Target, Message, Shepherd) ->
                             " process ~p: ~.0p~n", [LocalTarget, Message]),
                     report_send_error(Shepherd, Target, Message);
                 _ ->
-                    PID ! Message,
-                    case is_process_alive(PID) of
-                        false ->
-                            report_send_error(Shepherd, Target, Message);
-                        true ->
-                            ok
-                    end
+                    PID ! Message
             end,
             ok;
         true ->
