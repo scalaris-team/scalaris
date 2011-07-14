@@ -18,19 +18,19 @@ set :views, Proc.new { File.join(root, "sc_views") }
 if TYPE == "scalaris"
   vmid = ENV['SCALARIS_VMID']
   helper = ScalarisHelper.new
-  instance = Scalaris.first(:head_node => vmid)
-  if instance == nil
-    instance = Scalaris.create(:head_node => vmid)
-    instance.add_scalarisvm(:one_vm_id => vmid)
-  end
-  puts instance.id
 elsif TYPE == "hadoop"
   vmid = ENV['HADOOP_VMID']
-  exit
+  helper = HadoopHelper.new
 else
   exit
 end
 
+instance = Service.first(:master_node => vmid)
+if instance == nil
+  instance = Service.create(:master_node => vmid)
+  instance.add_vm(:one_vm_id => vmid)
+end
+puts instance.id
 
 get '/' do
   erb :index
