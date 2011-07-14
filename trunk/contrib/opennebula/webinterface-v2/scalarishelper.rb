@@ -4,63 +4,23 @@ require 'oca'
 require 'one.rb'
 require 'opennebulahelper.rb'
 
-include OpenNebula
-
-class ScalarisHelper
-  def create()
+class ScalarisHelper < OpenNebulaHelper
+  def get_master_description()
     description = get_description(SCALARISIMAGE, "true", "",
                                   "{mgmt_server, {{127,0,0,1},14195,mgmt_server}}.")
     puts description
-
-    begin
-      response = OpenNebulaHelper.create_vm(description)
-      if OpenNebula.is_error?(response)
-        [false, response.to_str]
-      else
-        vm_id = response.to_i
-        url = "http://#{get_ip(vm_id)}:4567/jsonrpc"
-        [true, url]
-      end
-    rescue Exception => e
-      [false, e.message]
-    end
+    description
   end
 
-  def add(num, instance)
-    ips = get_ips(instance)
-    head_node = get_ip(instance.head_node)
+  def get_slave_description(ips, head_node)
     mgmt_server = "{mgmt_server, {{#{head_node.gsub(/\./, ',')}}, 14195, mgmt_server}}."
     description = get_description(SCALARISIMAGE, "false", ips, mgmt_server)
     puts description
-
-    begin
-      response = OpenNebulaHelper.create_vm(description)
-
-      new_vm_id = response.to_i
-      instance.add_scalarisvm(:one_vm_id => new_vm_id)
-
-      [true, response.to_i]
-    rescue Exception => e
-      [false, e.message]
-    end
+    description
   end
 
   def remove(num, instance)
     [false, "Not yet implemented"]
-  end
-
-  def list(instance)
-    ids = get_vms(instance)
-    {:peers => ids}
-  end
-
-  def destroy(instance)
-    get_vms(instance).each do |vm_id|
-      OpenNebulaHelper.delete_vm vm_id
-    end
-    instance.remove_all_scalarisvms
-    instance.destroy
-    "success"
   end
 
   def get_node_info(instance, vmid)
@@ -94,55 +54,10 @@ class ScalarisHelper
     erb.result binding
   end
 
-  def ip_to_erlang(ip)
-  end
-
   def render_known_hosts(ips)
     nodes = ips.map {|ip|
       "{{#{ip.gsub(/\./, ',')}}, 14195, service_per_vm}"
     }.join(", ")
     "{known_hosts, [#{nodes}]}."
-  end
-
-  def get_ip(one_id)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
-    vm = pool.find {|i| i.id.to_i == one_id.to_i}
-    Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
-  end
-
-  def get_vms(instance)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
-    vms = []
-    if instance == nil
-      raise "unknown scalaris instance"
-    end
-    instance.scalarisvms_dataset.each do |vm|
-      vm = pool.find {|i| i.id == vm.one_vm_id.to_i}
-      if vm != nil
-        vms.push vm.id.to_s
-      end
-    end
-    vms
-  end
-
-  def get_ips(instance)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
-    ips = []
-    if instance == nil
-      raise "unknown scalaris instance"
-    end
-    instance.scalarisvms_dataset.each do |vm|
-      vm = pool.find {|i| i.id == vm.one_vm_id.to_i}
-      if vm != nil
-        ips.push Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
-      end
-    end
-    ips
   end
 end
