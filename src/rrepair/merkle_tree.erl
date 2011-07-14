@@ -29,8 +29,9 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/2, insert/3, empty/0, is_empty/1,
-         set_root_interval/2, size/1, gen_hashes/1]).
+-export([new/1, new/3, insert/3, empty/0, is_empty/1,
+         set_root_interval/2, size/1, gen_hashes/1,
+         get_hash/1]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0]).
@@ -39,6 +40,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
@@ -52,10 +54,9 @@
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
 -type mt_node_key()     :: binary() | nil.
 -type mt_interval()     :: intervals:interval(). 
--type mt_bucket()       :: orddict:ordered_dictionary() | nil.
+-type mt_bucket()       :: orddict:orddict() | nil.
 
--type mt_node()         ::
-                           {Hash        :: mt_node_key(),       %hash of childs/containing items 
+-type mt_node()         :: {Hash        :: mt_node_key(),       %hash of childs/containing items 
                             Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes bucket size
                             Bucket      :: mt_bucket(),         %item storage
                             Interval    :: mt_interval(),       %represented interval
@@ -74,15 +75,7 @@ empty() ->
 -spec is_empty(merkle_tree()) -> boolean().
 is_empty({_, {nil, 0, nil, I, []}}) -> intervals:is_empty(I);
 is_empty(_) -> false.
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% set_root_interval
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% @doc Returns an empty merkle tree ready for work.
--spec set_root_interval(mt_interval(), merkle_tree()) -> merkle_tree().
-set_root_interval(I, {Conf, _}) ->
-    new(I, Conf).
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% New
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -91,8 +84,28 @@ new(Interval) ->
     {#mt_config{}, {nil, 0, orddict:new(), Interval, []}}.
 
 -spec new(mt_interval(), mt_config()) -> merkle_tree().
-new(Interval, Config) ->
-    {Config, {nil, 0, orddict:new(), Interval, []}}.
+new(Interval, Conf) ->
+    {Conf, {nil, 0, orddict:new(), Interval, []}}.
+
+-spec new(mt_interval(), Branch_factor::pos_integer(), Bucket_size::pos_integer()) -> merkle_tree().
+new(Interval, BranchFactor, BucketSize) ->
+    {#mt_config{ branch_factor = BranchFactor, bucket_size = BucketSize }, 
+     {nil, 0, orddict:new(), Interval, []}}.
+    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Get hash
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
+get_hash({_, Node}) -> get_hash(Node);
+get_hash({Hash, _, _, _, _}) -> Hash.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% set_root_interval
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc Returns an empty merkle tree ready for work.
+-spec set_root_interval(mt_interval(), merkle_tree()) -> merkle_tree().
+set_root_interval(I, {Conf, _}) ->
+    new(I, Conf).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Insert
@@ -134,12 +147,8 @@ gen_hashes({Config, Root}) ->
 gen_hash({_, Count, Bucket, I, []}, Config) ->
     LeafHf = Config#mt_config.leaf_hf,
     Hash = case Count > 0 of
-               true ->
-                   Bin = orddict:fold(fun(Key, Val, Acc) -> 
-                                              Acc ++ [rep_upd:concatKeyVer(rep_upd:minKey(Key), Val)] 
-                                      end, [], Bucket),
-                   LeafHf(erlang:term_to_binary(Bin));
-               _ -> LeafHf(term_to_binary(0))
+               true -> LeafHf(erlang:term_to_binary(orddict:fetch_keys(Bucket)));
+               _    -> LeafHf(term_to_binary(0))
            end,
     {Hash, Count, Bucket, I, []};
 gen_hash({_, Count, nil, I, List}, Config) ->    
