@@ -2,8 +2,9 @@
 # VM definition example
 #---------------------------------------
 
-CPU    = 0.1
-MEMORY = 512
+CPU    = 1.5
+VCPU   = 2
+MEMORY = 1536
 
 # --- kernel & boot device ---
 
@@ -15,8 +16,7 @@ OS = [
 # --- 3 disks ---
 
 DISK = [
-  image     = "<%= @image %>",
-  target    = "hdc"
+  image     = "<%= @image %>" 
 ]
 
 # --- 1 NIC ---
@@ -25,15 +25,15 @@ NIC = [ network = "Private LAN" ]
 
 # --- Placement options ---
 
-#REQUIREMENTS = "CPUSPEED > 1000"
-#RANK         = FREECPU
+REQUIREMENTS = "CPUSPEED > 500"
+RANK         = FREECPU
+
 
 # --- Contextualization ---
 
 CONTEXT = [
-  SCALARIS_FIRST="<%= @scalarisfirst %>",
-  SCALARIS_KNOWN_HOSTS="<%= @known_hosts %>",
-  SCALARIS_MGMT_SERVER="<%= @mgmt_server %>",
+  HADOOP_FIRST="<%= @hadoopfirst %>",
+  HADOOP_MASTER="<%= @hadoopmaster %>",
   VMID="$VMID",
   ip_private = "$NIC[IP]",
   dns        = "$NETWORK[DNS, NAME=\"Private LAN\"]",
@@ -42,10 +42,10 @@ CONTEXT = [
   TARGET     = sdb
 ]
 
-# --- Debugging ---
-
+# --- Debug ---
 GRAPHICS = [
-  TYPE    = "vnc",
-  LISTEN  = "127.0.0.1",
-  PORT    = "-1"
+  type="vnc",
+  listen="127.0.0.1",
+  port="-1"
 ]
+
