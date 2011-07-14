@@ -44,7 +44,7 @@ BuildRequires:  python3-setuptools python-tools
 ##########################################################################################
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 BuildRequires:  pkgconfig
-BuildRequires:  erlang-stack >= R13B01
+BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 %define with_python 1
 %define with_python_doc_html 0
 %define with_python_doc_pdf 0
