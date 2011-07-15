@@ -208,11 +208,11 @@ fi
 # request optional jars and their dependencies via the OPT_JAR_LIST
 # variable
 if $rpm_mode && [ -x "@BUILDCLASSPATH@" ] ; then
-  LOCALCLASSPATH="$(\"@BUILDCLASSPATH@\" scalaris jakarta-commons-cli)"
+  LOCALCLASSPATH="$(@BUILDCLASSPATH@ scalaris)"
 
   # If the user requested to try to add some other jars to the classpath
   if [ -n "$OPT_JAR_LIST" ] ; then
-    _OPTCLASSPATH="$(\"@BUILDCLASSPATH@\" $OPT_JAR_LIST 2> /dev/null)"
+    _OPTCLASSPATH="$(@BUILDCLASSPATH@ $OPT_JAR_LIST 2> /dev/null)"
     if [ -n "$_OPTCLASSPATH" ] ; then 
       LOCALCLASSPATH="$LOCALCLASSPATH:$_OPTCLASSPATH"
     fi

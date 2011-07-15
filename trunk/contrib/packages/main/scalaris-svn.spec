@@ -16,14 +16,14 @@ Source0:        %{name}-%{version}.tar.gz
 Source99:       scalaris-svn-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
-BuildRequires:  erlang >= R13B01
-Requires:       erlang >= R13B01
 BuildArch:      noarch
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
+Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 %endif
@@ -43,6 +43,8 @@ Requires(pre):  shadow-utils
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
+BuildRequires:  erlang >= R13B01
+Requires:       erlang >= R13B01
 BuildRequires:  pkg-config
 Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
