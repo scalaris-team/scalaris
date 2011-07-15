@@ -56,7 +56,7 @@ rpm_mode=true
 #
 #      Start script will set the value to the directory it is located in.
 #
-SCALARIS_JAVA_HOME="@datarootdir@/java"
+SCALARIS_JAVA_HOME="@datarootdir@/java/scalaris"
 
 # 3. OPT_JAR_LIST
 #
