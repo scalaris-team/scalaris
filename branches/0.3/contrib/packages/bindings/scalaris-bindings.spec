@@ -13,14 +13,13 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-# note: erlang is still needed for configure
-BuildRequires:  erlang >= R13B01
 BuildRequires:  ruby >= 1.8
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 BuildRequires:  pkgconfig
 BuildRequires:  ruby(abi) >= 1.8
 %if 0%{?fedora_version} >= 12
@@ -43,8 +42,9 @@ BuildRequires:  python3-setuptools python-tools
 ## Mandrake, Mandriva
 ##########################################################################################
 %if 0%{?mandriva_version} || 0%{?mdkversion}
-BuildRequires:  pkgconfig
+# note: erlang is still needed for configure
 BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
+BuildRequires:  pkgconfig
 %define with_python 1
 %define with_python_doc_html 0
 %define with_python_doc_pdf 0
@@ -54,6 +54,9 @@ BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-ed
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
+# note: erlang is still needed for configure
+BuildRequires:  erlang >= R13B01
+BuildRequires:  pkg-config
 %if 0%{?suse_version} >= 1110 || 0%{?sles_version} >= 11 
 %define with_python 1
 %define with_python_doc_html 1
@@ -72,7 +75,6 @@ BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-ed
 %global python3_libdir   %{python3_prefix}/%{_lib}/python%{python3_ver}
 %global python3_sitedir  %{python3_libdir}/site-packages
 %endif
-BuildRequires:  pkg-config
 %if 0%{?suse_version} >= 1130 
 BuildRequires:  ruby(abi) >= 1.8
 %endif
