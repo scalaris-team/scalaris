@@ -121,7 +121,11 @@ Java Bindings and command line client for scalaris
 Conflicts:  ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
+%if 0%{?mandriva_version} || 0%{?mdkversion}
+Requires:   ruby >= 1.8
+%else
 Requires:   ruby(abi) >= 1.8
+%endif
 Requires:   rubygem-json
 
 %description -n ruby-scalaris-svn
