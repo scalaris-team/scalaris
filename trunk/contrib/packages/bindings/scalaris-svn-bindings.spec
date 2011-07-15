@@ -128,7 +128,8 @@ Requires:   ruby >= 1.8
 %else
 Requires:   ruby(abi) >= 1.8
 %endif
-Requires:   rubygem-json
+Requires:   rubygems
+Requires:   rubygem-json >= 1.4.0
 
 %description -n ruby-scalaris-svn
 Ruby bindings and Ruby command line client for scalaris
