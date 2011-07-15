@@ -15,7 +15,7 @@ Description: Java-API and Java-Client for scalaris
 Package: scalaris-svn-ruby1.8
 Conflicts: scalaris-ruby1.8
 Architecture: all
-Depends: ruby, ruby1.8
+Depends: ruby, ruby1.8, rubygems1.8
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 
