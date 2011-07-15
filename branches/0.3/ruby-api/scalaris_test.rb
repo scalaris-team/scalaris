@@ -13,8 +13,12 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-require "#{File.dirname(__FILE__)}/scalaris"
 require "test/unit"
+begin
+  require "#{File.dirname(__FILE__)}/scalaris"
+rescue LoadError
+  require "scalaris"
+end
 
 $_TEST_DATA = [
              "ahz2ieSh", "wooPhu8u", "quai9ooK", "Oquae4ee", "Airier1a", "Boh3ohv5", "ahD3Saog", "EM5ooc4i", 

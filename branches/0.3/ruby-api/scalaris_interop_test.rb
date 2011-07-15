@@ -13,7 +13,11 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-require "#{File.dirname(__FILE__)}/scalaris"
+begin
+  require "#{File.dirname(__FILE__)}/scalaris"
+rescue LoadError
+  require "scalaris"
+end
 
 def read_or_write(sc, key, value, mode, binary = false)
   begin

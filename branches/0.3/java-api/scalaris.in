@@ -20,6 +20,10 @@ OTP_VERSION=1.5.4
 JAKARTA_COMMONS_VERSION=1.2
 ERL=@ERL@
 
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
+
 # Extract launch and scalaris arguments, (see details below).
 scalaris_exec_args=
 no_config=false
@@ -203,12 +207,12 @@ fi
 # is discouraged as it is not java-version safe. A user should
 # request optional jars and their dependencies via the OPT_JAR_LIST
 # variable
-if $rpm_mode && [ -x @BUILDCLASSPATH@ ] ; then
-  LOCALCLASSPATH="$(@BUILDCLASSPATH@ scalaris jakarta-commons-cli)"
+if $rpm_mode && [ -x "@BUILDCLASSPATH@" ] ; then
+  LOCALCLASSPATH="$(\"@BUILDCLASSPATH@\" scalaris jakarta-commons-cli)"
 
   # If the user requested to try to add some other jars to the classpath
   if [ -n "$OPT_JAR_LIST" ] ; then
-    _OPTCLASSPATH="$(@BUILDCLASSPATH@ $OPT_JAR_LIST 2> /dev/null)"
+    _OPTCLASSPATH="$(\"@BUILDCLASSPATH@\" $OPT_JAR_LIST 2> /dev/null)"
     if [ -n "$_OPTCLASSPATH" ] ; then 
       LOCALCLASSPATH="$LOCALCLASSPATH:$_OPTCLASSPATH"
     fi
