@@ -1,0 +1,29 @@
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json.erl yaws-1.90.encode_floats2/src/json.erl
+--- yaws-1.90/src/json.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_floats2/src/json.erl	2011-05-31 17:46:28.337977063 +0200
+@@ -594,8 +594,8 @@
+ is_string([]) -> yes;
+ is_string(List) -> is_string(List, non_unicode).
+ 
+-is_string([C|Rest], non_unicode) when C >= 0, C =< 255 -> is_string(Rest, non_unicode);
+-is_string([C|Rest], _) when C =< 65000 -> is_string(Rest, unicode);
++is_string([C|Rest], non_unicode) when is_integer(C), C >= 0, C =< 255 -> is_string(Rest, non_unicode);
++is_string([C|Rest], _) when is_integer(C), C>= 0, C =< 65000 -> is_string(Rest, unicode);
+ is_string([], non_unicode) -> yes;
+ is_string([], unicode) -> unicode;
+ is_string(_, _) -> no.
+diff -U 3 -H -d -r -N -x .git -x .svn -- yaws-1.90/src/json2.erl yaws-1.90.encode_floats2/src/json2.erl
+--- yaws-1.90/src/json2.erl	2011-05-25 23:33:26.000000000 +0200
++++ yaws-1.90.encode_floats2/src/json2.erl	2011-05-31 17:47:25.398932268 +0200
+@@ -527,9 +527,9 @@
+ is_string([]) -> yes;
+ is_string(List) -> is_string(List, non_unicode).
+ 
+-is_string([C|Rest], non_unicode) when C >= 0, C =< 255 ->
++is_string([C|Rest], non_unicode) when is_integer(C), C >= 0, C =< 255 ->
+     is_string(Rest, non_unicode);
+-is_string([C|Rest], _) when C =< 65000 -> is_string(Rest, unicode);
++is_string([C|Rest], _) when is_integer(C), C =< 65000 -> is_string(Rest, unicode);
+ is_string([], non_unicode) -> yes;
+ is_string([], unicode) -> unicode;
+ is_string(_, _) -> no.
