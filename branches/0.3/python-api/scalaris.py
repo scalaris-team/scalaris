@@ -80,7 +80,7 @@ class JSONConnection(object):
         Encodes the value to the form required by the scalaris JSON API
         """
         if isinstance(value, bytearray):
-            return {'type': 'as_bin', 'value': (base64.b64encode(value)).decode('ascii')}
+            return {'type': 'as_bin', 'value': (base64.b64encode(bytes(value))).decode('ascii')}
         else:
             return {'type': 'as_is', 'value': value}
 
