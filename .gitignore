@@ -5,11 +5,10 @@
 /all_runs.html
 /index.html
 /.project
-/.pydevproject
 /.settings
 /.externalToolBuilders
 /.Makefile.swp
-/.make-doc
+/.make-docs
 /config.log
 /variables-ct*@*
 /erl_crash.dump

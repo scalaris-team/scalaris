@@ -46,7 +46,7 @@ clean:
 
 	dh_clean
 
-BUILD_DIR:=$(CURDIR)/debian/scalaris-svn
+BUILD_DIR:=$(CURDIR)/debian/scalaris
 install: build
 	dh_testdir
 	dh_testroot

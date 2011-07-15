@@ -37,9 +37,8 @@
          is_empty/1, is_all/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
          is_left_of/2, is_right_of/2,
-         split/2,
          % operations for intervals
-         intersection/2, union/2, minus/2, 
+         intersection/2, union/2, minus/2,
          % getters for certain intervals
          get_bounds/1, get_elements/1,
          %
@@ -623,24 +622,4 @@ is_left_of(X, Y) ->
 -spec is_right_of(interval(), interval()) -> boolean().
 is_right_of(X, Y) ->
     is_left_of(Y, X).
-
-%% @doc Splits the interval in X equally sized subintervals
-%%      Precondition: normalized interval is continous
-%% @end
--spec split(interval(), pos_integer()) -> [interval()].
-split(I, 1) -> I;
-split(I, Parts) -> 
-    case is_continuous(I) of
-        true -> split2(get_bounds(I), Parts, []);
-        false -> erlang:throw('interval is not continuous!')
-    end.
-
--spec split2({left_bracket(), key(), key(), right_bracket()}, pos_integer(), Acc::[interval()]) -> [interval()].
-split2({LBr, Key, Key, RBr}, _, Acc) ->
-    Acc ++ [new(LBr, Key, Key, RBr)];
-split2({LBr, LKey, RKey, RBr}, 1, Acc) ->
-    Acc ++ [new(LBr, LKey, RKey, RBr)];
-split2({LBr, LKey, RKey, RBr}, Parts, Acc) ->
-    SplitKey = ?RT:get_split_key(LKey, RKey, {1, Parts}),
-    split2({'(', SplitKey, RKey, RBr}, Parts - 1, Acc ++ [new(LBr, LKey, SplitKey, ']')]).
 

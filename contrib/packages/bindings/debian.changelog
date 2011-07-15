@@ -1,5 +1,5 @@
-scalaris-svn-bindings (1-1) unstable; urgency=low
+scalaris-bindings (0.3.0-1) stable; urgency=low
 
   * Initial Release
 
- -- Nico Kruber <kruber@zib.de>  Thu, 14 Apr 2011 18:30:00 +0100
+ -- Nico Kruber <kruber@zib.de>  Mon, 4 Jul 2011 11:30:00 +0100

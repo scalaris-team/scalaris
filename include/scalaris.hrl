@@ -23,7 +23,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.3.0+svn").
+-define(SCALARIS_VERSION, "0.3.0").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
@@ -80,9 +80,5 @@
 %-define(DEBUG_REGISTER(PROCESS,PID),erlang:register(PROCESS,PID)).
 % disable:
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
-
-% Replica Repair
--define(REP_BLOOM, bloom). % bloom filter implemenation selection 
--define(REP_HFS, hfs_lhsp_md5). %HashFunctionSet selection for usage by bloom filter
 
 -include("types.hrl").

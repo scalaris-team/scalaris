@@ -91,7 +91,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     /**
      * Version of the "Wikipedia on Scalaris" example implementation.
      */
-    public static final String version = "0.3.0+svn";
+    public static final String version = "0.3.0";
 
     private Connection connection = null; 
     private SiteInfo siteinfo = null;

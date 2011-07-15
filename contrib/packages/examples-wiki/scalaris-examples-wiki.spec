@@ -1,7 +1,7 @@
 # norootforbuild
 
-%define pkg_version 1
-Name:           scalaris-svn-examples-wiki
+%define pkg_version 0.3.0
+Name:           scalaris-examples-wiki
 Summary:        Wikipedia on Scalaris example
 Version:        %{pkg_version}
 Release:        1
@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  scalaris-svn-java >= 1834
+BuildRequires:  scalaris-java = %{version}
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -67,29 +67,27 @@ This web application demonstrates the use of Scalaris as a data-store back-end f
 Wikipedia-like application.
 
 %if 0%{?with_tomcat5}
-%package -n scalaris-svn-examples-wiki-tomcat5
-Conflicts:  scalaris-examples-wiki-tomcat5
+%package -n scalaris-examples-wiki-tomcat5
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
-Requires:   scalaris-svn-java >= 1834
+Requires:   scalaris-java = %{version}
 BuildArch:  noarch
 
-%description -n scalaris-svn-examples-wiki-tomcat5
+%description -n scalaris-examples-wiki-tomcat5
 This web application demonstrates the use of Scalaris as a data-store back-end for a
 Wikipedia-like application.
 %endif
 
 %if 0%{?with_tomcat6}
-%package -n scalaris-svn-examples-wiki-tomcat6
-Conflicts:  scalaris-examples-wiki-tomcat6
+%package -n scalaris-examples-wiki-tomcat6
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6
-Requires:   scalaris-svn-java >= 1834
+Requires:   scalaris-java = %{version}
 BuildArch:  noarch
 
-%description -n scalaris-svn-examples-wiki-tomcat6
+%description -n scalaris-examples-wiki-tomcat6
 This web application demonstrates the use of Scalaris as a data-store back-end for a
 Wikipedia-like application.
 %endif
@@ -125,13 +123,13 @@ cp -r simplewiki %{buildroot}/usr/share/tomcat6/webapps/scalaris-wiki
 rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_tomcat5}
-%files -n scalaris-svn-examples-wiki-tomcat5
+%files -n scalaris-examples-wiki-tomcat5
 %defattr(-,root,root)
 /usr/share/tomcat5/webapps/scalaris-wiki
 %endif
 
 %if 0%{?with_tomcat6}
-%files -n scalaris-svn-examples-wiki-tomcat6
+%files -n scalaris-examples-wiki-tomcat6
 %defattr(-,root,root)
 /usr/share/tomcat6/webapps/scalaris-wiki
 %endif
