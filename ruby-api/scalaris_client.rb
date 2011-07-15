@@ -15,7 +15,11 @@
 
 require 'optparse'
 require 'pp'
-require "#{File.dirname(__FILE__)}/scalaris"
+begin
+  require "#{File.dirname(__FILE__)}/scalaris"
+rescue LoadError
+  require "scalaris"
+end
 
 def write(sc, key_value_list)
   key, value = key_value_list
