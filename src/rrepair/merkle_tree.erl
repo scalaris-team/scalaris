@@ -41,6 +41,12 @@
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-type mt_node_key()     :: binary() | nil.
+-type mt_interval()     :: intervals:interval(). 
+-type mt_bucket()       :: orddict:orddict() | nil.
+-type hash_fun()        :: fun((binary()) -> mt_node_key()).
+-type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
+
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
@@ -49,12 +55,6 @@
          inner_hf       = get_XOR_fun()     :: inner_hash_fun() %hash function for inner node signature creation         
          }).
 -type mt_config() :: #mt_config{}.
-
--type hash_fun()        :: fun((binary()) -> mt_node_key()).
--type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
--type mt_node_key()     :: binary() | nil.
--type mt_interval()     :: intervals:interval(). 
--type mt_bucket()       :: orddict:orddict() | nil.
 
 -type mt_node()         :: {Hash        :: mt_node_key(),       %hash of childs/containing items 
                             Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes bucket size

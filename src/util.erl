@@ -783,4 +783,5 @@ parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
 
 %% empty shell_prompt_func
-empty(X) -> "".
+-spec empty(any()) -> [].
+empty(_) -> "".

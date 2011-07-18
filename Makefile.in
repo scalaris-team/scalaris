@@ -414,13 +414,13 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl src/*/*/*.erl test/*.erl bin/*.cfg
 
 dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl --no_native | sed -f contrib/dialyzer-col.sed
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl test/measure_util.erl --no_native | sed -f contrib/dialyzer-col.sed
 
 dialyzer-all: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test | sed -f contrib/dialyzer-col.sed
 
 %_SUITE-dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ src/*/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
 
 plt: compile
 	$(DIALYZER) --plt_info > /dev/null ; \

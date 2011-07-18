@@ -24,28 +24,34 @@
 
 -module(measure_util).
 
--export([time_avg/4]).
+-export([time_avg/4, time_timer_tc_fun/2]).
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
 %      Result = {MinTime, MaxTime, MedianTime, AverageTime}
-% @end
--spec time_avg(fun(), [term()], pos_integer(), boolean()) -> 
-                        {Min::integer(), Max::integer(), Med::integer(), Avg::integer()}.
-time_avg(Fun, Args, ExecTimes, SkipFirstValue) when ExecTimes > 0 ->
-    L = util:s_repeatAndCollect(fun() -> 
-                                        {Time, _} = timer:tc(Fun, Args), 
-                                        Time 
-                                end, 
-                                [], 
-                                ExecTimes),
-    Values = case SkipFirstValue of
-                 true -> lists:nthtail(1, L);
-                 _ -> L
-             end,        
-    Length = length(Values),
-    Min = lists:min(Values),
-    Max = lists:max(Values),
-    Med = lists:nth(round((Length / 2)), lists:sort(Values)),
-    Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Values) / Length),
+-spec time_avg(fun(), [term()], pos_integer(), boolean())
+        -> {Min::non_neg_integer(), Max::non_neg_integer(),
+            Med::non_neg_integer(), Avg::non_neg_integer()}.
+time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
+    L = util:s_repeatAndCollect(
+          fun() ->
+                  {Time, _} = timer:tc(?MODULE, time_timer_tc_fun, [Fun, Args]),
+                  Time
+          end,
+          [],
+          ExecTimes),
+    Times = case SkipFirstValue of
+                true -> lists:nthtail(1, L);
+                _ -> L
+            end,   
+    Length = length(Times),
+    Min = lists:min(Times),
+    Max = lists:max(Times),
+    Med = lists:nth(((Length + 1) div 2), lists:sort(Times)),
+    Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg}.
+
+% @doc Wrapper for Erlang before R14 which do not support timer:tc/2.
+-spec time_timer_tc_fun(Fun::fun(), Args::any()) -> any().
+time_timer_tc_fun(Fun, Args) ->
+    erlang:apply(Fun, Args).
