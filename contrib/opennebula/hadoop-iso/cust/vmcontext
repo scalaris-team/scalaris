@@ -3,8 +3,8 @@
 # Provides:          vmcontext 
 # Required-Start:    mountall
 # Required-Stop:     
-# Default-Start:     S
-# Default-Stop:      
+# Default-Start:     2
+# Default-Stop:      0 6
 # Short-Description: set vm context (opennebula).
 # Description:       see short.
 ### END INIT INFO
@@ -134,11 +134,15 @@ for i in $IFACES; do
 done
 ) > /etc/network/interfaces
 
-mkdir /mnt/context
-mount -o ro /dev/sr0 /mnt/context
-cp /mnt/context/context.sh /root
-umount /mnt/context
-rmdir /mnt/context
+SUCCESS="false"
+for DEV in /dev/sr*; do 
+  mount -o ro $DEV /mnt
+  test -f /mnt/context.sh && cp /mnt/context.sh /root && SUCCESS="true"
+  umount /mnt
+  if [ "$SUCCESS" == "true" ]; then
+    break
+  fi
+done
 
 source /root/context.sh
 HOSTNAME=`echo $IP_PUBLIC | sed 's/\./-/g'`
@@ -150,6 +154,10 @@ if [ "x$HADOOP_FIRST" != "xtrue" ]; then
   echo "$HADOOP_MASTER $MASTER_HOSTNAME" >> /etc/hosts
 fi
 
+service networking stop
+service networking start
 
-/etc/init.d/networking restart
+# do not tell anyone...
+passwd -d root
+
 echo " done."
