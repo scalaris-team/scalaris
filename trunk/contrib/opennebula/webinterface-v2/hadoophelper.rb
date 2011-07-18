@@ -41,7 +41,7 @@ class HadoopHelper < OpenNebulaHelper
 
   private
 
-  def self.get_description(image, first, master_ip)
+  def get_description(image, first, master_ip)
     @image = image
     @hadoopfirst = first
     @hadoopmaster = master_ip

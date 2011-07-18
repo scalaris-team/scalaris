@@ -51,6 +51,18 @@ def destroy_scalaris(fe_url, mgmt_url)
   json_call(URI.parse(fe_url), "destroy_scalaris", [mgmt_url]).to_json
 end
 
+def get_hadoop_info(url)
+  json_call(URI.parse(url), "get_hadoop_info", []).to_json
+end
+
+def create_hadoop(url, name)
+  json_call(URI.parse(url), "create_hadoop", [name]).to_json
+end
+
+def destroy_hadoop(fe_url, mgmt_url)
+  json_call(URI.parse(fe_url), "destroy_hadoop", [mgmt_url]).to_json
+end
+
 def add_nodes(url, count)
   json_call(URI.parse(url), "add_nodes", [count]).to_json
 end
@@ -95,6 +107,16 @@ optparse = OptionParser.new do |opts|
   options[:scalaris_destroy] = nil
   opts.on('--destroy-scalaris URL', String, 'Destroy scalaris cluster URL' ) do |url|
     options[:scalaris_destroy] = url
+  end
+
+  options[:hadoop_create] = nil
+  opts.on('--create-hadoop NAME', String, 'Create new hadoop cluster' ) do |name|
+    options[:hadoop_create] = name
+  end
+
+  options[:hadoop_destroy] = nil
+  opts.on('--destroy-hadoop URL', String, 'Destroy hadoop cluster URL' ) do |url|
+    options[:hadoop_destroy] = url
   end
 
   options[:add_nodes] = nil
@@ -146,9 +168,11 @@ rescue OptionParser::ParseError
 end
 
 puts create_scalaris(options[:url], options[:scalaris_create]) unless options[:scalaris_create] == nil
+puts create_hadoop(options[:url], options[:hadoop_create]) unless options[:hadoop_create] == nil
 puts add_nodes(options[:url], options[:add_nodes]) unless options[:add_nodes] == nil
 puts remove_nodes(options[:url], options[:remove_nodes]) unless options[:remove_nodes] == nil
 puts destroy_scalaris(options[:url], options[:scalaris_destroy]) unless options[:scalaris_destroy] == nil
+puts destroy_hadoop(options[:url], options[:hadoop_destroy]) unless options[:hadoop_destroy] == nil
 puts list_nodes(options[:url]) unless options[:list_nodes] == nil
 puts get_node_info(options[:url], options[:get_node_info]) unless options[:get_node_info] == nil
 puts get_node_performance(options[:url], options[:get_node_performance]) unless options[:get_node_performance] == nil
