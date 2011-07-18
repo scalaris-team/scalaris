@@ -9,13 +9,21 @@
 # Description:       see short.
 ### END INIT INFO
 
-test -f /root/context.sh || (echo "context.sh is missing"; exit 1)
+. /lib/lsb/init-functions
+
+
+if [ ! -f /root/context.sh ]; then
+  log_failure_msg "context.sh is missing"
+  exit 1
+fi
+
 source /root/context.sh
 
 echo "nameserver $HADOOP_MASTER" > /etc/resolv.conf
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   /etc/init.d/dnsmasq start
   /usr/bin/dnsupdate-server.pl &
+  /var/lib/sc-manager/start-manager.sh
 else
   RETVAL=1
   while [ "$RETVAL" -ne "0" ]; do
@@ -66,5 +74,6 @@ if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   /etc/init.d/hue start
 fi
 /etc/init.d/hadoop-0.20-tasktracker start
+
 
 exit 0
