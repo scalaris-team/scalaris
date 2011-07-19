@@ -33,7 +33,14 @@ all() -> [
           insert1,
           treeHash,
           branchTest
-		 ].
+         ].
+
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
 
 split(_) ->
     I1 = intervals:new('[', 1, 1000, ']'),
@@ -103,5 +110,3 @@ add_to_tree(To, To, Tree) ->
     Tree;
 add_to_tree(From, To, Tree) ->
     add_to_tree(From + 1, To, merkle_tree:insert(From, someVal, Tree)).
-
-    
