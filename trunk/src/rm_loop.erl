@@ -182,7 +182,7 @@ unittest_create_state(Neighbors, HasLeft) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the rm_loop module is fully initialized.
--spec on(message() | ?RM:custom_message(), state()) -> state() | unknown_event.
+-spec on(message() | ?RM:custom_message(), state()) -> state().
 on({rm, notify_new_pred, NewPred}, State = {RM_State, _HasLeft, _SubscrTable}) ->
     RMFun = fun() -> ?RM:new_pred(RM_State, NewPred) end,
     update_state(State, RMFun);
@@ -270,11 +270,14 @@ on({rm, init_check_ring, Token}, {RM_State, _HasLeft, _SubscrTable} = State) ->
     comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Me}),
     State;
 
-on(Message, {RM_State, HasLeft, SubscrTable} = _OldState) ->
+on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
     % similar to update_state/2 but handle unknown_event differently
     OldNeighborhood = ?RM:get_neighbors(RM_State),
     case ?RM:on(Message, RM_State) of
-        unknown_event -> unknown_event;
+        unknown_event ->
+            log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",
+                    [Message, ?MODULE, on, OldState]),
+            OldState;
         NewRM_State   ->
             NewNeighborhood = ?RM:get_neighbors(NewRM_State),
             call_subscribers(OldNeighborhood, NewNeighborhood, SubscrTable),
