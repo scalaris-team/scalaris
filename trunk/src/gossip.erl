@@ -78,7 +78,7 @@
 -export([get_values_best/0, get_values_all/0]).
 
 % interaction with the ring maintenance:
--export([rm_my_range_changed/2, rm_send_new_range/4]).
+-export([rm_my_range_changed/3, rm_send_new_range/4]).
 
 -type state() :: gossip_state:state().
 
@@ -204,7 +204,7 @@ on_inactive({activate_gossip, MyRange},
     log:log(info, "[ Gossip ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:now(TriggerState),
     rm_loop:subscribe(self(), ?MODULE,
-                      fun gossip:rm_my_range_changed/2,
+                      fun gossip:rm_my_range_changed/3,
                       fun gossip:rm_send_new_range/4, inf),
     State = gossip_state:new_state(),
     msg_queue:send(QueuedMessages),
@@ -734,8 +734,9 @@ is_leader(MyRange) ->
 %% @doc Checks whether the node's range has changed, i.e. either the node
 %%      itself or its pred changed.
 -spec rm_my_range_changed(OldNeighbors::nodelist:neighborhood(),
-                          NewNeighbors::nodelist:neighborhood()) -> boolean().
-rm_my_range_changed(OldNeighbors, NewNeighbors) ->
+                          NewNeighbors::nodelist:neighborhood(),
+                          IsSlide::rm_loop:slide()) -> boolean().
+rm_my_range_changed(OldNeighbors, NewNeighbors, _IsSlide) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
 

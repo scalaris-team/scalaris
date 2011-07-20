@@ -120,7 +120,7 @@ init([]) ->
                      [], 0, msg_queue:new()},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
-                              fun rm_loop:subscribe_dneighbor_change_filter/2,
+                              fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
         _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0,

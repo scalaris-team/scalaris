@@ -189,7 +189,7 @@ process_move_msg({move, slide, OtherType, MoveFullId, OtherNode,
                 OtherTargetNode, OtherNode, TargetId, Tag, unknown,
                 null, slide, NextOp);
 
-% notification from predecessor/successor that the move is a noop, i.e. alread
+% notification from predecessor/successor that the move is a noop, i.e. already
 % finished
 process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
@@ -961,8 +961,8 @@ change_my_id(State, SlideOp) ->
             TargetId = slide_op:get_target_id(SlideOp1),
             RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
             rm_loop:subscribe(self(), RMSubscrTag,
-                              fun(_OldNeighbors, NewNeighbors) ->
-                                      nodelist:nodeid(NewNeighbors) =:= TargetId
+                              fun(_OldN, NewN, _IsSlide) ->
+                                      nodelist:nodeid(NewN) =:= TargetId
                                       % note: no need to check the id version
                               end,
                               fun dht_node_move:rm_send_node_change/4, 1),
@@ -1041,9 +1041,9 @@ try_send_delta_to_pred(State, SlideOp) ->
             RMSubscrTag = {move, slide_op:get_id(SlideOp)},
             rm_loop:subscribe(
               self(), RMSubscrTag,
-              fun(RMOldNeighbors, RMNewNeighbors) ->
-                      RMNewPred = nodelist:pred(RMNewNeighbors),
-                      RMOldPred = nodelist:pred(RMOldNeighbors),
+              fun(RMOldN, RMNewN, _IsSlide) ->
+                      RMNewPred = nodelist:pred(RMNewN),
+                      RMOldPred = nodelist:pred(RMOldN),
                       RMOldPred =/= RMNewPred orelse
                           node:id(RMNewPred) =:= ExpPredId
               end,
@@ -1106,9 +1106,9 @@ accept_delta(State, PredOrSucc, SlideOp, ChangedData, DeletedKeys) ->
             MoveFullId = slide_op:get_id(SlideOp),
             rm_loop:subscribe(
               self(), {move, MoveFullId},
-              fun(RMOldNeighbors, RMNewNeighbors) ->
-                      RMNewPred = nodelist:pred(RMNewNeighbors),
-                      RMOldPred = nodelist:pred(RMOldNeighbors),
+              fun(RMOldN, RMNewN, _IsSlide) ->
+                      RMNewPred = nodelist:pred(RMNewN),
+                      RMOldPred = nodelist:pred(RMOldN),
                       RMOldPred =/= RMNewPred orelse
                           node:id(RMNewPred) =:= ExpPredId orelse
                           RMNewPred =/= OldPred
@@ -1165,6 +1165,7 @@ accept_delta2(State, PredOrSucc, SlideOp) ->
     comm:send(node:pidX(slide_op:get_node(SlideOp)), Msg),
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
+    rm_loop:notify_slide_finished(PredOrSucc),
     dht_node_state:set_slide(State, PredOrSucc, null).
 
 continue_slide_delta(State, PredOrSucc, SlideOp) ->
@@ -1232,6 +1233,7 @@ notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
 finish_delta_ack(State, PredOrSucc, SlideOp) ->
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
+    rm_loop:notify_slide_finished(PredOrSucc),
     case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
         true ->
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
