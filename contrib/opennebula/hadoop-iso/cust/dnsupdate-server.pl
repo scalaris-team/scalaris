@@ -10,8 +10,8 @@ sub updateDNS {
     print HOSTS $ip, " ", $host, "\n";
     close(HOSTS);
     
-    open(PF, "</var/run/dnsmasq.pid") || 
-      die("unable to open /var/run/dnsmasq.pid: $!");
+    open(PF, "</var/run/dnsmasq/dnsmasq.pid") || 
+      die("unable to open /var/run/dnsmasq/dnsmasq.pid: $!");
     $pid = <PF>;
     close(PF);
     kill 1 => $pid;

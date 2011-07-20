@@ -35,17 +35,13 @@ install -D -m 755 cust/start-hadoop.sh config/chroot_local-includes/etc/init.d/h
 install -D -m 755 cust/dnsupdate-client.pl config/chroot_local-includes/usr/bin/dnsupdate-client.pl
 install -D -m 755 cust/dnsupdate-server.pl config/chroot_local-includes/usr/bin/dnsupdate-server.pl
 
-if [ -d config/chroot_local-includes/var/lib/sc-manager ]; then
-  svn up config/chroot_local-includes/var/lib/sc-manager
-else
-  svn co http://scalaris.googlecode.com/svn/trunk/contrib/opennebula/webinterface-v2 \
-    config/chroot_local-includes/var/lib/sc-manager
-fi
+mkdir -p config/chroot_local-includes/var/lib
+rm -rf config/chroot_local-includes/var/lib/sc-manager
+svn up ../webinterface-v2
+cp -R ../webinterface-v2 config/chroot_local-includes/var/lib/sc-manager
+ 
 install -D -m 755 cust/one.rb config/chroot_local-includes/var/lib/sc-manager/one.rb
 
-#mkdir -p config/chroot_local-includes/root/.ssh
-#cat $HOME/.ssh/id_rsa.pub >> config/chroot_local-includes/root/.ssh/authorized_keys
-  
 cp cust/post-install.sh config/chroot_local-hooks/00-post-install.sh
 #test -f /usr/share/live-helper/hooks/stripped && \
 #  cp /usr/share/live-helper/hooks/stripped config/chroot_local-hooks/01-stripped

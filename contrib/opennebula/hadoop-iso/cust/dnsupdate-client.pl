@@ -2,7 +2,12 @@
 
 use Frontier::Client;
 my $argc = @ARGV;
-($argc == 2) || die "usage: $0 master_ip ip";
+if ($argc != 2) {
+  print "ARGV:";
+  for($i = 0; $i < $argc; $i++) { print " ", $ARGV[$i]; }
+  print "\n";
+  die "usage: $0 master_ip ip";
+}
   
 my $host = $ARGV[0];
 my $self_ip = $ARGV[1];
