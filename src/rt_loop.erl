@@ -99,9 +99,9 @@ init(Trigger) ->
                     -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
 on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
-    TriggerState2 = trigger:next(TriggerState),
+    TriggerState2 = trigger:now(TriggerState),
     rm_loop:subscribe(self(), ?MODULE,
-                      fun rm_loop:subscribe_dneighbor_change_filter/2,
+                      fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
                       fun ?MODULE:rm_send_update/4, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(

@@ -156,10 +156,15 @@ stabilize(Id, Succ, RT, Index, Node) ->
                    node:mk_interval_between_ids(Id, node:id(Succ)))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
-            Key = calculateKey(Id, next_index(Index)),
-            Msg = {rt_get_node, comm:this(), next_index(Index)},
-            api_dht_raw:unreliable_lookup(
-              Key, {send_to_group_member, routing_table, Msg}),
+            NextKey = calculateKey(Id, next_index(Index)),
+            CurrentKey = calculateKey(Id, Index),
+            case CurrentKey =/= NextKey of
+                true ->
+                    Msg = {rt_get_node, comm:this(), next_index(Index)},
+                    api_dht_raw:unreliable_lookup(
+                      NextKey, {send_to_group_member, routing_table, Msg});
+                _ -> ok
+            end,
             NewRT;
         _ -> RT
     end.
@@ -288,7 +293,7 @@ next_hop(State, Id) ->
         true -> node:pidX(nodelist:succ(Neighbors));
         _ ->
             % check routing table:
-    RT = dht_node_state:get(State, rt),
+            RT = dht_node_state:get(State, rt),
             RTSize = get_size(RT),
             NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
                          {value, _Key, N} ->
