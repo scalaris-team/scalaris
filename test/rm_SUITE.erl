@@ -84,7 +84,7 @@ change_id_and_check(OldId, NewId) ->
 %%     ct:pal("ct: ~p -> ~p~n", [node:id(OldNode), NewId]),
     
     comm:send(DhtNode, {rm, subscribe, self(), rm_SUITE,
-                        fun erlang:'=/='/2,
+                        fun(OldN, NewN, _IsSlide) -> OldN =/= NewN end,
                         fun(Pid, Tag, OldNeighbors, NewNeighbors) ->
                                 comm:send_local(Pid, {rm_changed, Tag, OldNeighbors, NewNeighbors})
                         end, inf}),
