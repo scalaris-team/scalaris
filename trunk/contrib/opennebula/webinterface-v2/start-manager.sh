@@ -1,11 +1,20 @@
 #!/bin/bash
 
 # get opennebula context
-mount -t iso9660 /dev/sr1 /mnt
-if [ -f /mnt/context.sh ]; then
-  . /mnt/context.sh
+if [ -f /root/context.sh ]; then
+  . /root/context.sh
+else
+  mount -t iso9660 /dev/sr1 /mnt
+  if [ -f /mnt/context.sh ]; then
+    . /mnt/context.sh
+  fi
+  umount /mnt
 fi
-umount /mnt
+
+if [ -z  "$VMID" ]; then
+  echo "oops. could not load context.sh"
+  exit 1
+fi
 
 cd /var/lib/sc-manager
 # the sleep command is used to find error messages

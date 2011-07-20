@@ -12,8 +12,10 @@ hue-filebrowser
 hue-jobbrowser 
 hue-jobsub 
 hue-plugins 
+libsasl2-2
 openssh-server
 less
+vim
 libboost-program-options1.42.0
 libboost-system1.42.0
 libboost-thread1.42.0
