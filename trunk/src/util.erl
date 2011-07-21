@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([global_uid/0, time/0]).
+-export_type([global_uid/0, time/0, time_utc/0]).
 -endif.
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
@@ -66,6 +66,8 @@
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
+
+-type time_utc() :: {{1970..10000, 1..12, 1..31}, {0..23, 0..59, 0..59}}.
 
 -type args() :: [term()].
 -type accumulatorFun(T, U) :: fun((T, U) -> U).

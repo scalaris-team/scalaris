@@ -26,7 +26,10 @@ all()   -> [simple_create,
             fill_test,
             create_gauge,
             create_counter,
-            timestamp
+            create_event,
+            timestamp,
+            add_nonexisting_timeslots,
+            reduce_timeslots
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -40,33 +43,76 @@ simple_create(_Config) ->
     Adds = [{20, 5}, {25, 6}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
-    ?equals(rrd:dump(DB1), [{{0,0,20}, 6}]),
+    ?equals(rrd:dump(DB1), [{{0,0,20}, {0,0,30}, 6}]),
     ok.
 
 fill_test(_Config) ->
     Adds = [{20, 1}, {30, 2}, {40, 3}, {60, 5}],
     DB0 = rrd:create(10, 3, gauge, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
-    ?equals(rrd:dump(DB1), [{{0,0,60}, 5}, {{0,0,40}, 3}]),
+    ?equals(rrd:dump(DB1), [{{0,0,60}, {0,0,70}, 5}, {{0,0,40}, {0,0,50}, 3}]),
     ok.
 
 create_gauge(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
-    ?equals(rrd:dump(DB1), [{{0,0,40}, 2}, {{0,0,30}, 1}, {{0,0,20}, 6}]),
+    ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 6}]),
     ok.
 
 create_counter(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, counter, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
-    ?equals(rrd:dump(DB1), [{{0,0,40}, 2}, {{0,0,30}, 1}, {{0,0,20}, 11}]),
+    ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
+    ok.
+
+create_event(_Config) ->
+    Adds = [{20, "20"}, {25, "25"}, {30, "30"}, {42, "42"}],
+    DB0 = rrd:create(10, 10, event, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, [{42, "42"}]}, {{0,0,30}, {0,0,40}, [{30, "30"}]}, {{0,0,20}, {0,0,30}, [{20, "20"}, {25, "25"}]}]),
     ok.
 
 timestamp(_Config) ->
     TS = erlang:now(),
     ?equals(TS, rrd:us2timestamp(rrd:timestamp2us(TS))),
+    ok.
+
+add_nonexisting_timeslots(_Config) ->
+    Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
+    DB0 = rrd:create(10, 10, counter, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB2 = rrd:add_nonexisting_timeslots(DB0, DB1),
+    ?equals(rrd:dump(DB2), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
+    
+    DB0a = rrd:create(10, 10, counter, {0,0,40}),
+    DB2a = rrd:add_nonexisting_timeslots(DB0a, DB1),
+    ?equals(rrd:dump(DB2a), [{{0,0,40}, {0,0,50}, 2}]),
+    
+    
+    DB0b = rrd:create(10, 10, counter, {0,0,50}),
+    DB2b = rrd:add_nonexisting_timeslots(DB0b, DB1),
+    ?equals(rrd:dump(DB2b), []),
+    
+    ok.
+
+reduce_timeslots(_Config) ->
+    Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
+    DB0 = rrd:create(10, 10, counter, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB2 = rrd:reduce_timeslots(1, DB1),
+    ?equals(rrd:dump(DB2), [{{0,0,40}, {0,0,50}, 2}]),
+
+    DB2a = rrd:reduce_timeslots(2, DB1),
+    ?equals(rrd:dump(DB2a), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}]),
+
+    DB2b = rrd:reduce_timeslots(3, DB1),
+    ?equals(rrd:dump(DB2b), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
+
+    DB2c = rrd:reduce_timeslots(4, DB1),
+    ?equals(rrd:dump(DB2c), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
+    
     ok.
 
 apply({Time, Value}, DB) ->

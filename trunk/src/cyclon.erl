@@ -52,10 +52,10 @@
 -type(state_active() :: {RandomNodes::cyclon_cache:cache(),
                          MyNode::node:node_type() | null,
                          Cycles::integer(), TriggerState::trigger:state(),
-                         MonitorTable::pdb:tableid()}).
+                         MonitorTable::monitor:table()}).
 -type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
-                           TriggerState :: trigger:state(),
-                           MonitorTable::pdb:tableid()}).
+                           TriggerState::trigger:state(),
+                           MonitorTable::monitor:table()}).
 %% -type(state() :: state_active() | state_inactive()).
 
 % accepted messages of an active cyclon process
@@ -167,8 +167,7 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState, MonitorT
     request_node_details([node, pred, succ]),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
-    comm:send_local_after(monitor:proc_get_report_interval() * 1000, self(),
-                          {report_to_monitor}),
+    monitor:proc_set_value(MonitorTable, "shuffle", rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
     gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2, MonitorTable},
                                  on_active);
 
@@ -206,7 +205,8 @@ on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState, MonitorTable} = Stat
     NewCache =
         case check_state(State) of
             fail -> Cache;
-            _    -> monitor:proc_inc_value(MonitorTable, "shuffle"),
+            _    -> MonShuffle1 = monitor:proc_get_value(MonitorTable, "shuffle"),
+                    monitor:proc_set_value(MonitorTable, "shuffle", rrd:add_now(1, MonShuffle1)),
                     enhanced_shuffle(Cache, Node)
         end,
     TriggerState2 = trigger:next(TriggerState),
@@ -256,12 +256,6 @@ on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState, _Mon
 %% on_active({flush_cache}, {_Cache, Node, _Cycles, TriggerState}) ->
 %%     request_node_details([pred, succ]),
 %%     {cyclon_cache:new(), Node, 0, TriggerState};
-
-on_active({report_to_monitor}, {_Cache, _Node, _Cycles, _TriggerState, MonitorTable} = State) ->
-    monitor:proc_report_to_my_monitor(MonitorTable),
-    comm:send_local_after(monitor:proc_get_report_interval() * 1000, self(),
-                          {report_to_monitor}),
-    State;
 
 on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState, _MonitorTable} = State) ->
     KeyValueList =

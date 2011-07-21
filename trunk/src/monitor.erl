@@ -25,21 +25,21 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([table/0]).
+-endif.
+
 -export([start_link/1, init/1, on/2, check_config/0]).
--export([proc_init/1, proc_set_value/3, proc_get_value/2,
-         proc_inc_value/2, proc_inc_value/3,
-         proc_report_to_my_monitor/1,
-         proc_get_report_interval/0]).
+-export([proc_init/1, proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
 
 -type key() :: string().
 -type internal_key() :: {'$monitor$', Key::string()}.
--type table_index() :: {ProcTable::atom(), Key::key()}.
+-type table_index() :: {ProcTable::pdb:tableid(), Key::key()}.
+-opaque table() :: {Process::atom, Table::pdb:tableid()}.
 
 -type state() :: Table::tid() | atom().
 -type message() ::
-    {proc_report, ProcTable::pdb:tableid(), LastReport::util:time(),
-     CurrentReport::util:time(), KVList::[{key(), term()}]} |
-    {purge_old_data} |
+    {proc_report, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 
@@ -47,12 +47,10 @@
 %%      other proc_* methods! 
 %%      Beware: there is only one monitor table available per process if pdb
 %%      uses erlang:put/get!
--spec proc_init(Process::atom()) -> pdb:tableid().
+-spec proc_init(Process::atom()) -> table().
 proc_init(Process) ->
     % note: make table name unique if named_table is used
-    Table = pdb:new(Process, [ordered_set, protected]),
-    pdb:set({'$monitor$:$last_report$', erlang:now()}, Table),
-    Table.
+    {Process, pdb:new(Process, [ordered_set, protected])}.
 
 %% @doc Converts the given Key avoid conflicts in case erlang:put/get is used
 %%      by pdb.
@@ -60,145 +58,123 @@ proc_init(Process) ->
 to_internal_key(Key) -> {'$monitor$', Key}.
 
 %% @doc Sets the value at Key.
--spec proc_set_value(Table::pdb:tableid(), Key::key(), Value::term()) -> ok.
-proc_set_value(Table, Key, Value) ->
-    InternalKey = to_internal_key(Key),
-    pdb:set({InternalKey, Value}, Table),
-    proc_add_to_keys_avail(Table, Key).
-
-%% @doc Keep track of the available keys by adding Key to the list of keys
-%%      stored at '$monitor$:$keys$'.
--spec proc_add_to_keys_avail(Table::pdb:tableid(), Key::key()) -> ok.
-proc_add_to_keys_avail(Table, Key) ->
-    case pdb:get('$monitor$:$keys$', Table) of
-        undefined -> pdb:set({'$monitor$:$keys$', [Key]}, Table);
-        {'$monitor$:$keys$', Keys} when is_list(Keys) ->
-            pdb:set({'$monitor$:$keys$', [Key | Keys]}, Table)
-    end.
-
-%% @doc Gets the value stored at Key.
--spec proc_get_value(Table::pdb:tableid(), Key::key()) -> term() | undefined.
-proc_get_value(Table, Key) -> proc_get_value_(Table, to_internal_key(Key)).
-
-%% @doc Gets the value stored at Key.
--spec proc_get_value_(Table::pdb:tableid(), Key::internal_key()) -> term() | undefined.
-proc_get_value_(Table, InternalKey) ->
-    case pdb:get(InternalKey, Table) of
-        undefined    -> undefined;
-        {InternalKey, Value} -> Value
-    end.
-
-%% @doc Increases the value stored at Key by 1. If there is no such value, 1
-%%      is stored.
--spec proc_inc_value(Table::pdb:tableid(), Key::key()) -> ok.
-proc_inc_value(Table, Key) -> proc_inc_value(Table, Key, 1).
-
-%% @doc Increases the value stored at Key by Inc. If there is no such value,
-%%      Inc is stored. Note: Inc may be negative in order to decrease values.
-%%      If the stored value is no number, unsupported is returned and nothing
-%%      is changed.
--spec proc_inc_value(Table::pdb:tableid(), Key::key(), Inc::number()) -> ok | unsupported.
-proc_inc_value(Table, Key, Inc) ->
+-spec proc_set_value(table(), Key::key(), Value::term()) -> ok.
+proc_set_value({Process, Table}, Key, Value) ->
     InternalKey = to_internal_key(Key),
     case pdb:get(InternalKey, Table) of
-        undefined ->
-            pdb:set({InternalKey, Inc}, Table),
-            proc_add_to_keys_avail(Table, Key);
-        {InternalKey, X} when is_number(X) ->
-            pdb:set({InternalKey, X + Inc}, Table);
-        _ -> unsupported
-    end.
-
-%% @doc Reports all collected Key/Value pairs to the process' monitor process
-%%      and resets the values and the list of stored keys.
--spec proc_report_to_my_monitor(Table::pdb:tableid()) -> ok.
-proc_report_to_my_monitor(Table) ->
-    MyMonitor = pid_groups:get_my(monitor),
-    % note: since proc_init/1 was called before, this value is present and valid:
-    LastReport = erlang:element(2, pdb:get('$monitor$:$last_report$', Table)),
-    Now = erlang:now(),
-    case pdb:get('$monitor$:$keys$', Table) of
-        undefined ->
-            comm:send_local(MyMonitor, {proc_report, Table, LastReport, Now, []});
-        {'$monitor$:$keys$', Keys} when is_list(Keys) ->
-            UKeys = lists:usort(Keys), % may not be unique
-            KVList = [begin
-                          InternalKey = to_internal_key(Key),
-                          Value = proc_get_value_(Table, InternalKey),
-                          pdb:delete(InternalKey, Table),
-                          {Key, Value}
-                      end || Key <- UKeys],
-            pdb:delete('$monitor$:$keys$', Table),
-            comm:send_local(MyMonitor, {proc_report, Table, LastReport, Now, KVList})
+        undefined    ->
+            ok;
+        {InternalKey, OldValue} ->
+            % check whether to report to the monitor
+            % (always report if a new time slot was started)
+            SlotOld = rrd:get_slot_start(0, OldValue),
+            SlotNew = rrd:get_slot_start(0, Value),
+            case SlotNew of
+                SlotOld -> ok; %nothing to do
+                _  -> 
+                    proc_report_to_my_monitor(Process, Key, OldValue, Value) % new slot -> report to monitor
+            end
     end,
-    pdb:set({'$monitor$:$last_report$', Now}, Table),
-    ok.
+    pdb:set({InternalKey, Value}, Table).
+
+%% @doc Checks whether a value exists at Key.
+-spec proc_exists_value(table(), Key::key()) -> boolean().
+proc_exists_value({_Process, Table}, Key) -> proc_exists_value_(Table, to_internal_key(Key)).
+
+%% @doc Checks whether a value exists at Key (for internal use).
+-spec proc_exists_value_(Table::pdb:tableid(), Key::internal_key()) -> boolean().
+proc_exists_value_(Table, InternalKey) ->
+    pdb:get(InternalKey, Table) =/= undefined.
+
+%% @doc Gets the value stored at Key. The key must exist!
+-spec proc_get_value(table(), Key::key()) -> rrd:rrd().
+proc_get_value({_Process, Table}, Key) -> proc_get_value_(Table, to_internal_key(Key)).
+
+%% @doc Gets the value stored at Key (for internal use). The key must exist!
+-spec proc_get_value_(Table::pdb:tableid(), Key::internal_key()) -> rrd:rrd().
+proc_get_value_(Table, InternalKey) ->
+    {InternalKey, Value} = pdb:get(InternalKey, Table),
+    Value.
+
+%% @doc Reports the given value to the process' monitor process.
+-spec proc_report_to_my_monitor(Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()) -> ok.
+proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
+    MyMonitor = pid_groups:get_my(monitor),
+    % note: it may happen that the new value created a new slot which already
+    % discarded all logged data from the previous (unreported) time slot
+    % -> send OldValue, too
+    comm:send_local(MyMonitor, {proc_report, Process, Key, OldValue, Value}).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({proc_report, ProcTable, LastReport, CurrentReport, KVList}, Table) ->
-    Data = lists:flatten(
-             [{{ProcTable, Key}, LastReport, CurrentReport, Value} || {Key, Value} <- KVList]),
-    ets:insert(Table, Data),
-    Table;
-
-on({purge_old_data}, Table) ->
-    Keys = get_all_keys(Table),
-    _ = [begin
-             Data = ets:lookup(Table, Key),
-             L = erlang:length(Data),
-             MaxPerKey = get_max_values_per_key(),
-             case L =< MaxPerKey of
-                 true -> ok;
-                 _ ->
-                     TailStart = L - get_max_values_per_key(),
-                     NewData = lists:nthtail(TailStart, Data),
-                     ets:delete(Table, Key),
-                     ets:insert(Table, NewData)
-             end
-         end || Key <- Keys],
-    msg_delay:send_local(get_purge_old_data_interval(), self(), {purge_old_data}),
+on({proc_report, ProcTable, Key, OldValue, _NewValue}, Table) ->
+    % note: reporting is always done when a new time slot is created
+    % -> use the values from the old value
+    TableIndex = {ProcTable, Key},
+    MyData = case ets:lookup(Table, TableIndex) of
+                 [{TableIndex, X}] -> X;
+                 []      ->
+                     SlotLength = rrd:get_slot_length(OldValue),
+                     OldTime = rrd:get_current_time(OldValue),
+                     rrd:create(SlotLength, get_timeslots_to_keep(),
+                                rrd:get_type(OldValue),
+                                erlang:max(OldTime, OldTime - SlotLength))
+             end,
+    NewData = rrd:add_nonexisting_timeslots(MyData, OldValue),
+    ets:insert(Table, {TableIndex, NewData}),
     Table;
 
 on({web_debug_info, Requestor}, Table) ->
     Keys = get_all_keys(Table),
     GroupedLast5 = [begin
-                        KeyDataN = get_last_n(Table, Key, 5),
-                        web_debug_info_merge_values(Key, KeyDataN)
+                        KeyData5 = get_last_n(Table, Key, 5),
+                        web_debug_info_merge_values(Key, KeyData5)
                     end || Key <- Keys],
-    comm:send_local(Requestor, {web_debug_info_reply, GroupedLast5}),
+    comm:send_local(Requestor, {web_debug_info_reply, [{"last 5 records per key:", ""} | GroupedLast5]}),
     Table.
 
--spec get_all_keys(Table::tid() | atom()) -> [{ProcTable::atom(), Key::key()}].
+-spec get_all_keys(Table::tid() | atom()) -> [table_index()].
 get_all_keys(Table) ->
-    lists:usort(ets:select(Table, [{ {'$1', '$2', '$3', '$4'},
+    lists:usort(ets:select(Table, [{ {'$1', '$2'},
                                      [],     % guard
                                      ['$1']} % result
                                   ])).
 
--spec get_last_n(Table::tid() | atom(), table_index(), N::pos_integer())
-        -> [{table_index(), LastReport::util:time(), CurrentReport::util:time(), Value::term()}].
+% @doc Reduces the rrd() data to N time slots (the key _must_ exist in the table!).
+-spec get_last_n(Table::tid() | atom(), Key::table_index(), N::pos_integer())
+        -> Value::rrd:rrd().
 get_last_n(Table, Key, N) ->
-    Data = ets:lookup(Table, Key),
-    L = erlang:length(Data),
-    lists:nthtail(erlang:max(0, L - N), Data).
+    [{Key, Data}] = ets:lookup(Table, Key),
+    rrd:reduce_timeslots(N, Data).
 
--spec web_debug_info_merge_values(table_index(),
-        [{table_index(), LastReport::util:time(), CurrentReport::util:time(), Value::term()}])
+-spec web_debug_info_dump_fun(rrd:rrd(), From::util:time(), To::util:time(), Value)
+        -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), Value, Avg::float() | undefined}.
+web_debug_info_dump_fun(DB, From_, To_, Value) ->
+    From = calendar:now_to_universal_time(From_),
+    To = calendar:now_to_universal_time(To_),
+    Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+    Avg = case rrd:get_type(DB) of
+        counter -> Value / Diff_in_s;
+        event   -> length(Value) / Diff_in_s;
+        _       -> undefined
+    end,
+    {From, To, Diff_in_s, Value, Avg}.
+
+-spec web_debug_info_merge_values(table_index(), rrd:rrd())
             -> {Key::string(), LastNValues::string()}.
 web_debug_info_merge_values(Key, Data) ->
-    ValuesLastN = 
+    ValuesLastN =
         [begin
-             Avg = case is_number(Value) of
-                       false -> "n/a";
-                       _ -> (Value / timer:now_diff(Time, PrevTime)) * 1000000
-                   end,
              lists:flatten(
-               io_lib:format(
-                 "~p UTC: ~p (avg: ~p / s)",
-                 [calendar:now_to_universal_time(Time), Value, Avg]))
-         end
-        || {_, PrevTime, Time, Value} <- Data],
+               case Avg of
+                   undefined ->
+                       io_lib:format("~p - ~p UTC (~p s): ~p",
+                                     [From, To, Diff_in_s, Value]);
+                   _ ->
+                       io_lib:format("~p - ~p UTC (~p s): ~p (avg: ~.2f / s)",
+                                     [From, To, Diff_in_s, Value, Avg])
+               end)
+         end || {From, To, Diff_in_s, Value, Avg} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
     {lists:flatten(io_lib:format("~p", [Key])), string:join(ValuesLastN, "<br />")}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -216,30 +192,15 @@ start_link(DHTNodeGroup) ->
 -spec init(null) -> state().
 init(null) ->
     TableName = pid_groups:my_groupname() ++ ":monitor",
-    msg_delay:send_local(get_purge_old_data_interval(), self(), {purge_old_data}),
-    ets:new(list_to_atom(TableName), [bag, protected]).
+    ets:new(list_to_atom(TableName), [ordered_set, protected]).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(monitor_proc_report_interval) and
-    config:is_greater_than(monitor_proc_report_interval, 0) and
+    config:is_integer(monitor_timeslots_to_keep) and
+    config:is_greater_than(monitor_timeslots_to_keep, 0).
 
-    config:is_integer(monitor_purge_old_data_interval) and
-    config:is_greater_than(monitor_purge_old_data_interval, 0) and
-
-    config:is_integer(monitor_max_values_per_key) and
-    config:is_greater_than(monitor_max_values_per_key, 0).
-
--spec proc_get_report_interval() -> Seconds::pos_integer().
-proc_get_report_interval() ->
-    config:read(monitor_proc_report_interval).
-
--spec get_purge_old_data_interval() -> Seconds::pos_integer().
-get_purge_old_data_interval() ->
-    config:read(monitor_purge_old_data_interval).
-
--spec get_max_values_per_key() -> pos_integer().
-get_max_values_per_key() ->
-    config:read(monitor_max_values_per_key).
+-spec get_timeslots_to_keep() -> pos_integer().
+get_timeslots_to_keep() ->
+    config:read(monitor_timeslots_to_keep).

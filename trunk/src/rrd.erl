@@ -15,11 +15,10 @@
 %%% @author Thorsten Schuett <schuett@zib.de>
 %%% @doc    RRD clone.
 %%% @end
-%% @version $Id: util.erl 1747 2011-05-27 20:17:36Z lakedaimon300@googlemail.com $
+%% @version $Id$
 -module(rrd).
-
 -author('schuett@zib.de').
--vsn('$Id: util.erl 1747 2011-05-27 20:17:36Z lakedaimon300@googlemail.com $').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -29,19 +28,27 @@
 -endif.
 
 % external API with transparent time handling
--export([create/3, add_now/2, dump/1]).
+-export([create/3, add_now/2, dump/1, dump_with/2]).
 
 % external API without transparent time handling
 -export([create/4, add/3]).
 
+% internal API for the monitor process
+-export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
+         get_type/1, get_slot_length/1, get_current_time/1]).
+
 % for unit-testing only
 -export([timestamp2us/1, us2timestamp/1]).
 
--type timeseries_type() :: gauge | counter.
+% gauge: record newest value of a time slot,
+% counter: sum up all values of a time slot,
+% event: record every event (incl. timestamp) in a time slot
+-type timeseries_type() :: gauge | counter | event.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: util:time().
 -type internal_time() :: non_neg_integer().
 -type timespan() :: pos_integer().
+-type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).
 
 -record(rrd, {slot_length   = ?required(rrd, slot_length)   :: timespan(),
               count         = ?required(rrd, count)         :: pos_integer(),
@@ -62,93 +69,109 @@
 % External API with transparent time handling
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%@doc SlotLength in microseconds
+% @doc SlotLength in microseconds
 -spec create(SlotLength::timespan(), Count::pos_integer(), Type::timeseries_type()) ->
     rrd().
 create(SlotLength, Count, Type) ->
     create(SlotLength, Count, Type, os:timestamp()).
 
--spec add_now(Value::number(), rrd()) -> rrd().
+% @doc Note: gauge and counter types accept only number() as value, event
+%      accepts any value.
+-spec add_now(Value::term(), rrd()) -> rrd().
 add_now(Value, DB) ->
     add(os:timestamp(), Value, DB).
 
--spec dump(rrd()) -> list({time(), number()}).
+-spec dump(rrd()) -> [{From::time(), To::time(), term()}].
 dump(DB) ->
-    Count = DB#rrd.count,
+    dump_with(DB, fun(_DB, From, To, X) -> {From, To, X} end).
+
+-spec dump_with(rrd(), fun((rrd(), From::time(), To::time(), Value::term()) -> T)) -> [T].
+dump_with(DB, F) ->
     SlotLength = DB#rrd.slot_length,
     CurrentIndex = DB#rrd.current_index,
-    dump_internal(DB#rrd.data,
-                  Count, (CurrentIndex + 1) rem Count, CurrentIndex,
-                  SlotLength, DB#rrd.current_time - (Count - 1) * SlotLength,
-                  []).
+    Count = DB#rrd.count,
+    dump_internal(DB, (CurrentIndex + 1) rem Count, CurrentIndex,
+                  DB#rrd.current_time - (Count - 1) * SlotLength, [], F).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Internal API (allows to specify timestamps explicitly
+% Internal API (allows to specify timestamps explicitly)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %@doc StepSize in milliseconds
 -spec create(SlotLength::timespan(), Count::pos_integer(), Type::timeseries_type(),
              StartTime::time() | internal_time()) -> rrd().
 create(SlotLength, Count, Type, {_, _, _} = StartTime) ->
-    #rrd{slot_length = SlotLength, count = Count, type = Type, current_index = 0,
-         current_time = timestamp2us(StartTime), data = array:new(Count),
-         fill_policy = set_undefined};
+    create(SlotLength, Count, Type, timestamp2us(StartTime));
 create(SlotLength, Count, Type, StartTime) ->
     #rrd{slot_length = SlotLength, count = Count, type = Type, current_index = 0,
          current_time = StartTime, data = array:new(Count),
          fill_policy = set_undefined}.
 
--spec add(Time::time() | internal_time(), Value::number(), rrd()) -> rrd().
+-spec gauge_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when T :: number().
+gauge_update_fun(_Time, _Old, New) -> New.
+
+-spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when T :: number().
+counter_update_fun(_Time, undefined, New) -> New;
+counter_update_fun(_Time, Old, New) -> Old + New.
+
+-spec event_update_fun(Time::internal_time(), Old::[{internal_time(), T}] | undefined, NewV) -> [{internal_time(), T | NewV}].
+event_update_fun(Time, undefined, New) -> [{Time, New}];
+event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
+
+-spec keep_old_update_fun(Time::internal_time(), Old::T | undefined, NewV) -> T | NewV.
+keep_old_update_fun(_Time, undefined, New) -> New;
+keep_old_update_fun(_Time, Old, _New) -> Old.
+
+% @doc Note: gauge and counter types accept only number() as value, event
+%      accepts any value.
+-spec add(Time::time() | internal_time(), Value::term(), rrd()) -> rrd().
 add({_, _, _} = ExternalTime, Value, DB) ->
-    Time = timestamp2us(ExternalTime),
-    case DB#rrd.type of
-        gauge ->
-            add_with(Time, Value, DB, fun (_Old, New) -> New end);
-        counter ->
-            add_with(Time, Value, DB, fun (Old, New) -> Old + New end)
-    end;
+    add(timestamp2us(ExternalTime), Value, DB);
 add(Time, Value, DB) ->
     case DB#rrd.type of
         gauge ->
-            add_with(Time, Value, DB, fun (_Old, New) -> New end);
+            add_with(Time, Value, DB, fun gauge_update_fun/3);
         counter ->
-            add_with(Time, Value, DB, fun (Old, New) -> Old + New end)
+            add_with(Time, Value, DB, fun counter_update_fun/3);
+        event ->
+            add_with(Time, Value, DB, fun event_update_fun/3)
     end.
 
--spec add_with(Time::internal_time(), Value::number(), rrd(), fun()) -> rrd().
+-spec add_with(Time::internal_time(), NewV, rrd(), update_fun(term(), NewV)) -> rrd().
 add_with(Time, Value, DB, F) ->
     SlotLength = DB#rrd.slot_length,
     CurrentTime = DB#rrd.current_time,
-    {CurrentTimeSlot,FutureTimeSlot} = get_slot_type(Time, CurrentTime, SlotLength),
+    {CurrentTimeSlot, FutureTimeSlot} = get_slot_type(Time, CurrentTime, SlotLength),
     if
         CurrentTimeSlot ->
             CurrentIndex = DB#rrd.current_index,
-            update_with(DB, CurrentIndex, Value, F);
+            update_with(DB, CurrentIndex, Time, Value, F);
         FutureTimeSlot ->
             Delta = (Time - CurrentTime) div SlotLength,
             CurrentIndex = (DB#rrd.current_index + Delta) rem DB#rrd.count,
             % fill with default ???
-            FilledDB = fill(DB,
-                              (DB#rrd.current_index + 1) rem DB#rrd.count,
-                              CurrentIndex,
-                              array:get(DB#rrd.current_index, DB#rrd.data)),
-            DB#rrd{data = array:set(CurrentIndex, Value, FilledDB#rrd.data),
+            FilledDB = fill(DB, (DB#rrd.current_index + 1) rem DB#rrd.count,
+                            CurrentIndex,
+                            array:get(DB#rrd.current_index, DB#rrd.data)),
+            DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, Value), FilledDB#rrd.data),
                    current_index = CurrentIndex,
                    current_time = DB#rrd.current_time + Delta * SlotLength};
         true -> % PastTimeSlot; ignore
             DB
     end.
 
-update_with(DB, CurrentIndex, NewValue, F) ->
+-spec update_with(rrd(), CurrentIndex::non_neg_integer(), Time::internal_time(), NewV, update_fun(term(), NewV)) -> rrd().
+update_with(DB, CurrentIndex, Time, NewValue, F) ->
     case array:get(CurrentIndex, DB#rrd.data) of
         undefined ->
-            DB#rrd{data = array:set(CurrentIndex, NewValue, DB#rrd.data)};
+            DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, NewValue), DB#rrd.data)};
         OldValue ->
-            DB#rrd{data = array:set(CurrentIndex, F(OldValue, NewValue), DB#rrd.data)}
+            DB#rrd{data = array:set(CurrentIndex, F(Time, OldValue, NewValue), DB#rrd.data)}
     end.
 
--spec fill(rrd(), pos_integer(), pos_integer(), number()) -> rrd().
-fill(DB, _CurrentIndex, _CurrentIndex, _LastValue) ->
+-spec fill(rrd(), non_neg_integer(), non_neg_integer(), term()) -> rrd().
+fill(DB, CurrentIndex, CurrentIndex, _LastValue) ->
     DB;
 fill(DB, CurrentGapIndex, CurrentIndex, LastValue) ->
     case DB#rrd.fill_policy of
@@ -164,42 +187,121 @@ fill(DB, CurrentGapIndex, CurrentIndex, LastValue) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
+% Internal API for the monitor
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Gets the start of the given slot.
+%%      Some examples of values for SlotIdx:
+%%      previous slot: -1, current slot: 0, next slot: 1
+-spec get_slot_start(SlotIdx::integer(), DB::rrd()) -> internal_time().
+get_slot_start(0, DB) ->
+    DB#rrd.current_time; % minor optimization
+get_slot_start(SlotIdx, DB) ->
+    DB#rrd.current_time + SlotIdx * DB#rrd.slot_length.
+
+%% @doc Reduces the number of time slots.
+-spec reduce_timeslots(SlotCount::pos_integer(), DB::rrd()) -> rrd().
+reduce_timeslots(SlotCount, DB) when SlotCount >= DB#rrd.count ->
+    DB#rrd{data = array:resize(SlotCount, DB#rrd.data),
+           count = SlotCount};
+reduce_timeslots(SlotCount, DB) ->
+    Count = DB#rrd.count,
+    CurrentIndex = DB#rrd.current_index,
+    NewDB = DB#rrd{data = array:new(SlotCount), count = SlotCount,
+                   current_index = 0},
+    EndIdx = (CurrentIndex + Count - SlotCount + 1) rem Count,
+    copy_data(DB, NewDB#rrd.current_index, CurrentIndex, EndIdx, NewDB).
+
+%% @doc Adds to DB all non-existing time slots from OtherDB that are newer than
+%%      or are in the current time slot of DB. Both structures must have the
+%%      same type and the same slot borders!
+-spec add_nonexisting_timeslots(DB::rrd(), OtherDB::rrd()) -> rrd().
+add_nonexisting_timeslots(DB, OtherDB)
+  when DB#rrd.type =:= OtherDB#rrd.type andalso
+       DB#rrd.slot_length =:= OtherDB#rrd.slot_length ->
+    OtherCurrentIdx = OtherDB#rrd.current_index,
+    OtherStartIdx = (OtherCurrentIdx + 1) rem OtherDB#rrd.count,
+    add_nonexisting_timeslots_internal(DB, OtherDB, OtherStartIdx, OtherCurrentIdx).
+
+-spec add_nonexisting_timeslots_internal(DB::rrd(), OtherDB::rrd(), OtherStart::non_neg_integer(), OtherEnd::non_neg_integer()) -> rrd().
+add_nonexisting_timeslots_internal(DB, OtherDB, OtherEnd, OtherEnd) ->
+    add_nonexisting_timeslots_internal2(DB, OtherDB, OtherEnd);
+add_nonexisting_timeslots_internal(DB, OtherDB, OtherIndex, OtherEnd) ->
+    NewDB = add_nonexisting_timeslots_internal2(DB, OtherDB, OtherIndex),
+    add_nonexisting_timeslots_internal(NewDB, OtherDB, (OtherIndex + 1) rem OtherDB#rrd.count, OtherEnd).
+
+-spec add_nonexisting_timeslots_internal2(DB::rrd(), OtherDB::rrd(), OtherIndex::non_neg_integer()) -> rrd().
+add_nonexisting_timeslots_internal2(DB, OtherDB, OtherIndex) ->
+    OtherCount = OtherDB#rrd.count,
+    OtherCurrentIdx = OtherDB#rrd.current_index,
+    OtherIndexTime = get_slot_start((OtherIndex - OtherCurrentIdx - OtherCount) rem OtherCount, OtherDB),
+    OtherValue = array:get(OtherIndex, OtherDB#rrd.data),
+    add_with(OtherIndexTime, OtherValue, DB, fun keep_old_update_fun/3).
+
+-spec get_slot_length(DB::rrd()) -> timespan().
+get_slot_length(DB) -> DB#rrd.slot_length.
+
+-spec get_type(DB::rrd()) -> timeseries_type().
+get_type(DB) -> DB#rrd.type.
+
+-spec get_current_time(DB::rrd()) -> internal_time().
+get_current_time(DB) ->
+    DB#rrd.current_time.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % Private API
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec is_current_slot(Time::internal_time(), CurrentTime::internal_time(), StepSize::timespan()) -> boolean().
 is_current_slot(Time, CurrentTime, StepSize) ->
     CurrentTime =< Time andalso Time < CurrentTime + StepSize.
 
+-spec is_future_slot(Time::internal_time(), CurrentTime::internal_time(), StepSize::timespan()) -> boolean().
 is_future_slot(Time, CurrentTime, StepSize) ->
     CurrentTime + StepSize =< Time.
 
+-spec get_slot_type(Time::internal_time(), CurrentTime::internal_time(), StepSize::timespan()) -> {boolean(), boolean()}.
 get_slot_type(Time, CurrentTime, StepSize) ->
     CurrentSlot = is_current_slot(Time, CurrentTime, StepSize),
     FutureSlot = is_future_slot(Time, CurrentTime, StepSize),
     {CurrentSlot, FutureSlot}.
 
-dump_internal(Data,
-              _Count, CurrentIndex, CurrentIndex,
-              _StepSize, CurrentTime, Rest) ->
+-spec dump_internal(rrd(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
+                    CurrentTime::internal_time(), Rest::[T],
+                    fun((rrd(), From::time(), To::time(), Value::term()) -> T)) -> [T].
+dump_internal(DB, EndIndex, EndIndex, CurrentTime, Rest, F) ->
+    dump_internal2(DB, EndIndex, CurrentTime, Rest, F);
+dump_internal(DB, IndexToFetch, EndIndex, CurrentTime, Rest, F) ->
+    NewRest = dump_internal2(DB, IndexToFetch, CurrentTime, Rest, F),
+    Count = DB#rrd.count,
+    dump_internal(DB, (IndexToFetch + 1) rem Count, EndIndex,
+                  CurrentTime + DB#rrd.slot_length, NewRest, F).
+
+dump_internal2(DB, CurrentIndex, CurrentTime, Rest, F) ->
+    Data = DB#rrd.data,
     case array:get(CurrentIndex, Data) of
-        undefined ->
-            Rest;
-        Value ->
-            [{us2timestamp(CurrentTime), Value} | Rest]
-    end;
-dump_internal(Data,
-              Count, IndexToFetch, CurrentIndex,
-              StepSize, CurrentTime, Rest) ->
-    case array:get(IndexToFetch, Data) of
-        undefined ->
-            dump_internal(Data, Count, (IndexToFetch + 1) rem Count, CurrentIndex,
-                          StepSize, CurrentTime + StepSize,
-                          Rest);
-        Value ->
-            dump_internal(Data, Count, (IndexToFetch + 1) rem Count, CurrentIndex,
-                          StepSize, CurrentTime + StepSize,
-                          [{us2timestamp(CurrentTime), Value} | Rest])
+        undefined -> Rest;
+        Value     -> [F(DB, us2timestamp(CurrentTime),
+                        us2timestamp(CurrentTime + DB#rrd.slot_length), Value) | Rest]
     end.
+
+-spec copy_data(rrd(), IndexToWrite::non_neg_integer(), Start::non_neg_integer(), End::non_neg_integer(), Acc::rrd()) -> rrd().
+copy_data(DB, IndexToWrite, EndIndex, EndIndex, AccDB) ->
+    copy_data2(DB, IndexToWrite, EndIndex, AccDB);
+copy_data(DB, IndexToWrite, CurrentIndex, EndIndex, AccDB) ->
+    NewAccDB = copy_data2(DB, IndexToWrite, CurrentIndex, AccDB),
+    AccCount = AccDB#rrd.count,
+    Count = DB#rrd.count,
+    copy_data(DB, (IndexToWrite + AccCount - 1) rem AccCount,
+              (CurrentIndex + Count - 1) rem Count, EndIndex, NewAccDB).
+
+-spec copy_data2(rrd(), IndexToWrite::non_neg_integer(), Start::non_neg_integer(), Acc::rrd()) -> rrd().
+copy_data2(DB, IndexToWrite, CurrentIndex, AccDB) ->
+    CurrentData = array:get(CurrentIndex, DB#rrd.data),
+    AccData = array:set(IndexToWrite, CurrentData, AccDB#rrd.data),
+    AccDB#rrd{data = AccData}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
