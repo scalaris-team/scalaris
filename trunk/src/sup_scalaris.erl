@@ -116,9 +116,6 @@ my_process_list(ServiceGroup, Options) ->
     Logger = util:sup_supervisor_desc(logger, log, start_link),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [ServiceGroup]),
-    MonitorTiming =
-        util:sup_worker_desc(monitor_timing, monitor_timing, start_link,
-                             [ServiceGroup]),
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
@@ -134,7 +131,6 @@ my_process_list(ServiceGroup, Options) ->
                     ClientsMonitor,
                     Monitor,
                     Service,
-                    MonitorTiming,
                     CommLayer,
                     FailureDetector,
                     AdminServer,

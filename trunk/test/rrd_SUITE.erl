@@ -27,6 +27,7 @@ all()   -> [simple_create,
             create_gauge,
             create_counter,
             create_event,
+            create_timing,
             timestamp,
             add_nonexisting_timeslots,
             reduce_timeslots
@@ -72,6 +73,16 @@ create_event(_Config) ->
     DB0 = rrd:create(10, 10, event, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, [{42, "42"}]}, {{0,0,30}, {0,0,40}, [{30, "30"}]}, {{0,0,20}, {0,0,30}, [{20, "20"}, {25, "25"}]}]),
+    ok.
+
+create_timing(_Config) ->
+    Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
+    DB0 = rrd:create(10, 10, timing, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3}}]),
     ok.
 
 timestamp(_Config) ->
