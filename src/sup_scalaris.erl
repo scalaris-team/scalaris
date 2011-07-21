@@ -92,6 +92,8 @@ my_process_list(ServiceGroup, Options) ->
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
+    ClientsMonitor =
+        util:sup_worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
     DHTNodeJoinAt = case util:app_get_env(join_at, random) of
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}]
@@ -112,6 +114,8 @@ my_process_list(ServiceGroup, Options) ->
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger = util:sup_supervisor_desc(logger, log, start_link),
+    Monitor =
+        util:sup_worker_desc(monitor, monitor, start_link, [ServiceGroup]),
     MonitorTiming =
         util:sup_worker_desc(monitor_timing, monitor_timing, start_link,
                              [ServiceGroup]),
@@ -127,6 +131,8 @@ my_process_list(ServiceGroup, Options) ->
     %% order in the following list is the start order
     BasicServers = [Config,
                     Logger,
+                    ClientsMonitor,
+                    Monitor,
                     Service,
                     MonitorTiming,
                     CommLayer,
