@@ -39,15 +39,16 @@ start() ->
     ganglia_loop(Last).
 
 -spec ganglia_loop(PreviousTime::util:time()) -> no_return().
-ganglia_loop(Last) ->
+ganglia_loop(_Last) ->
     % message statistics
     {Tree, _Time} = comm_logger:dump(),
     update(Tree),
     Now = erlang:now(),
-    SinceLast = timer:now_diff(Now, Last),
     % transaction statistics
-    Timers = monitor_timing:get_timers(),
-    _ = [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
+    % TODO: get statistics from the client monitor
+%%     SinceLast = timer:now_diff(Now, Last),
+%%     Timers = [],
+%%     _ = [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
     % vivaldi statistics
     monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
     timer:sleep(config:read(ganglia_interval)),
@@ -66,13 +67,13 @@ update(Tree) ->
     _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
     traverse(gb_trees:iterator(Tree)).
 
--spec update_timer(monitor_timing:timer(), SinceLast::number()) -> ok.
-update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
-    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
-    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
-    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
-    _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
-    ok.
+%% -spec update_timer({Timer::string(), Count::pos_integer(), Min::number(), Avg::number(), Max::number()}, SinceLast::number()) -> ok.
+%% update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
+%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
+%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
+%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
+%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
+%%     ok.
 
 -spec traverse(Iter1::term()) -> ok.
 traverse(Iter1) ->

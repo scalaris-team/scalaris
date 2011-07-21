@@ -42,8 +42,9 @@
 
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
-% event: record every event (incl. timestamp) in a time slot
--type timeseries_type() :: gauge | counter | event.
+% event: record every event (incl. timestamp) in a time slot,
+% timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x)}
+-type timeseries_type() :: gauge | counter | event | timing.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: util:time().
 -type internal_time() :: non_neg_integer().
@@ -75,7 +76,7 @@
 create(SlotLength, Count, Type) ->
     create(SlotLength, Count, Type, os:timestamp()).
 
-% @doc Note: gauge and counter types accept only number() as value, event
+% @doc Note: gauge, counter and timing types accept only number() as value, event
 %      accepts any value.
 -spec add_now(Value::term(), rrd()) -> rrd().
 add_now(Value, DB) ->
@@ -115,15 +116,22 @@ gauge_update_fun(_Time, _Old, New) -> New.
 counter_update_fun(_Time, undefined, New) -> New;
 counter_update_fun(_Time, Old, New) -> Old + New.
 
--spec event_update_fun(Time::internal_time(), Old::[{internal_time(), T}] | undefined, NewV) -> [{internal_time(), T | NewV}].
+-spec event_update_fun(Time::internal_time(), Old::[{internal_time(), T}] | undefined, NewV)
+        -> [{internal_time(), T | NewV}].
 event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
+
+-spec timing_update_fun(Time::internal_time(), Old::{T, T, pos_integer(), T, T} | undefined, New::T)
+        -> {T, T, pos_integer(), T, T} when T :: number().
+timing_update_fun(_Time, undefined, New) -> {New, New*New, 1, New, New};
+timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max}, New) ->
+    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New)}.
 
 -spec keep_old_update_fun(Time::internal_time(), Old::T | undefined, NewV) -> T | NewV.
 keep_old_update_fun(_Time, undefined, New) -> New;
 keep_old_update_fun(_Time, Old, _New) -> Old.
 
-% @doc Note: gauge and counter types accept only number() as value, event
+% @doc Note: gauge, counter and timing types accept only number() as value, event
 %      accepts any value.
 -spec add(Time::time() | internal_time(), Value::term(), rrd()) -> rrd().
 add({_, _, _} = ExternalTime, Value, DB) ->
@@ -135,7 +143,9 @@ add(Time, Value, DB) ->
         counter ->
             add_with(Time, Value, DB, fun counter_update_fun/3);
         event ->
-            add_with(Time, Value, DB, fun event_update_fun/3)
+            add_with(Time, Value, DB, fun event_update_fun/3);
+        timing ->
+            add_with(Time, Value, DB, fun timing_update_fun/3)
     end.
 
 -spec add_with(Time::internal_time(), NewV, rrd(), update_fun(term(), NewV)) -> rrd().
