@@ -109,10 +109,10 @@ create(SlotLength, Count, Type, StartTime) ->
          current_time = StartTime, data = array:new(Count),
          fill_policy = set_undefined}.
 
--spec gauge_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when T :: number().
+-spec gauge_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
 gauge_update_fun(_Time, _Old, New) -> New.
 
--spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when T :: number().
+-spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
 counter_update_fun(_Time, undefined, New) -> New;
 counter_update_fun(_Time, Old, New) -> Old + New.
 
@@ -122,7 +122,7 @@ event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
 
 -spec timing_update_fun(Time::internal_time(), Old::{T, T, pos_integer(), T, T} | undefined, New::T)
-        -> {T, T, pos_integer(), T, T} when T :: number().
+        -> {T, T, pos_integer(), T, T} when is_subtype(T, number()).
 timing_update_fun(_Time, undefined, New) -> {New, New*New, 1, New, New};
 timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max}, New) ->
     {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New)}.
