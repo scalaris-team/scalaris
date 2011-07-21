@@ -51,7 +51,7 @@
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
          sync_round     = 0.0                                       :: float(),
-         monitor_table  = ?required(rep_upd_state, monitor_table)   :: pdb:tableid()
+         monitor_table  = ?required(rep_upd_state, monitor_table)   :: monitor:table()
          }).
 -type state() :: #rep_upd_state{}.
 
@@ -111,7 +111,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State) ->
 on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
     #rep_upd_state{
                    sync_round = Round,
-                   monitor_table = MonitorTable
+                   monitor_table = MonTbl
                    } = State,
     _ = case intervals:is_empty(Interval) of	
             false ->
@@ -128,9 +128,8 @@ on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
                                 {lookup_aux, DestKey, 0, 
                                  {send_to_group_member, ?PROCESS_NAME, 
                                   {request_sync, reconciliation, true, Sync_Struct}}}),
-                monitor:proc_set_value(MonitorTable, 
-                                       io_lib:format("~p", [erlang:localtime()]), 
-                                       io_lib:format("SEND SyncReq Round=[~w] to Key [~w]", [Round, DestKey]));	    
+                MonDB1 = monitor:proc_get_value(MonTbl, "Send-Sync-Req"),
+                monitor:proc_set_value(MonTbl, "Send-Sync-Req", rrd:add_now({Round, DestKey}, MonDB1));	    
             _ ->
                 ok
 		end,
@@ -138,7 +137,9 @@ on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_sync, SyncStage, Feedback, SyncStruct}, State) ->
-    monitor:proc_inc_value(State#rep_upd_state.monitor_table, "Recv-Sync-Req-Count"),
+    MonTbl = State#rep_upd_state.monitor_table,
+    MonDB1 = monitor:proc_get_value(MonTbl, "Recv-Sync-Req-Count"),
+    monitor:proc_set_value(MonTbl, "Recv-Sync-Req-Count", rrd:add_now(1, MonDB1)),
     {ok, Pid} = rep_upd_sync:start_sync(get_max_items()),
     comm:send_local(Pid, {start_sync, SyncStage, Feedback, SyncStruct}),
     State;
@@ -160,15 +161,10 @@ on({web_debug_info, Requestor}, State) ->
 % Monitor Reporting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({sync_progress_report, _Sender, Msg}, State) ->
-    monitor:proc_set_value(State#rep_upd_state.monitor_table, 
-                           io_lib:format("~p", [erlang:localtime()]), Msg),
+    MonTbl = State#rep_upd_state.monitor_table,
+    MonDB1 = monitor:proc_get_value(MonTbl, "Progress"),
+    monitor:proc_set_value(MonTbl, "Progress", rrd:add_now(Msg, MonDB1)),
     ?TRACE("SYNC FINISHED - REASON=[~s]", [Msg]),
-    State;
-on({report_to_monitor}, State) ->
-    monitor:proc_report_to_my_monitor(State#rep_upd_state.monitor_table),
-    comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
-                          self(),
-                          {report_to_monitor}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,11 +198,12 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> state().
 init(Trigger) ->	
     TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    comm:send_local_after(monitor:proc_get_report_interval() * 1000, 
-                          self(),
-                          {report_to_monitor}),
+    MonitorTable = monitor:proc_init(?MODULE),
+    monitor:proc_set_value(MonitorTable, "Recv-Sync-Req-Count", rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
+    monitor:proc_set_value(MonitorTable, "Send-Sync-Req", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
+    monitor:proc_set_value(MonitorTable, "Progress", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
     #rep_upd_state{ trigger_state = trigger:next(TriggerState),
-                    monitor_table = monitor:proc_init(?MODULE)}.
+                    monitor_table = MonitorTable}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
