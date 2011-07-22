@@ -23,9 +23,9 @@
 -include("yaws_api.hrl").
 -include("scalaris.hrl").
 
--export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
-         getIndexedRingRendered/0, lookup/1, set_key/2, delete_key/2, isPost/1,
-         getVivaldiMap/0, getGossipRendered/0]).
+-export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
+         getGossipRendered/0, getVivaldiMap/0,
+         lookup/1, set_key/2, delete_key/2, isPost/1]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
@@ -62,59 +62,6 @@ set_key(Key, Value) ->
                     {fail, timeout, pos_integer(), list()}}.
 delete_key(Key, Timeout) ->
     timer:tc(api_rdht, delete, [Key, Timeout]).
-
-%%%-----------------------------Load----------------------------------
-
--spec getLoad() -> [{ok, Node::comm:mypid(), Load::node_details:load()} | {failed, Node::comm:mypid()}].
-getLoad() ->
-    mgmt_server:node_list(),
-    Nodes =
-        receive
-            {get_list_response, X} -> X
-        after 2000 -> []
-        end,
-    get_load(Nodes).
-    
--spec get_load([comm:mypid()]) -> [{ok, Node::comm:mypid(), Load::node_details:load()} | {failed, Node::comm:mypid()}].
-get_load([Head | Tail]) ->
-    comm:send(Head, {get_node_details, comm:this(), [load]}),
-    receive
-        {get_node_details_response, NodeDetails} ->
-            [{ok, Head, node_details:get(NodeDetails, load)} | get_load(Tail)]
-    after 2000 ->
-            [{failed, Head} | get_load(Tail)]
-    end;
-get_load([]) ->
-    [].
-
--spec getLoadRendered() -> html_type().
-getLoadRendered() ->
-    Load = getLoad(),
-    {table, [{bgcolor, "#cccccc"}, {border, "0"}, {cellpadding, "2"}, {cellspacing, "2"}, {width, "90%"}],
-     [{tr, [],
-       [
-        {td, [{bgcolor, "#336699"}, {width, "48%"}], {font, [{color, "white"}], "Node"}},
-        {td, [{bgcolor, "#336699"}, {valign, "top"}, {width, "16%"}], {font, [{color, "white"}], "Load"}}
-       ]},
-      renderLoad(Load)
-     ]
-    }.
-
--spec renderLoad([{failed, Node::node:node_type()} | {ok, Node::node:node_type(), non_neg_integer()}]) -> [html_type()].
-renderLoad([{ok, Node, Value} | Tail]) ->
-    [{tr, [], 
-      [
-       {td, [], io_lib:format("~p", [Node])},
-       {td, [], io_lib:format("~p", [Value])}
-      ]}, renderLoad(Tail)];
-renderLoad([{failed, Node} | Tail]) ->
-    [{tr, [], 
-      [
-       {td, [], io_lib:format("~p", [Node])},
-       {td, [], "-"}
-      ]}, renderLoad(Tail)];
-renderLoad([]) ->
-    [].
 
 %%%--------------------------Vivaldi-Map------------------------------
 
