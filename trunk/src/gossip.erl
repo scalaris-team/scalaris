@@ -74,9 +74,6 @@
          activate/1, deactivate/0,
          get_base_interval/0, check_config/0]).
 
-% helpers for creating getter messages:
--export([get_values_best/0, get_values_all/0]).
-
 % interaction with the ring maintenance:
 -export([rm_my_range_changed/3, rm_send_new_range/4]).
 
@@ -133,44 +130,6 @@ msg_get_values_best_response(Pid, BestValues) ->
 -spec msg_get_values_all_response(comm:erl_local_pid(), gossip_state:values(), gossip_state:values(), gossip_state:values()) -> ok.
 msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
     comm:send_local(Pid, {gossip_get_values_all_response, PreviousValues, CurrentValues, BestValues}).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Getters
-%
-% Functions that other processes can call to receive information from the gossip
-% process
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for the best values of the stored information.
-%%      see on_active({get_values_best, SourcePid}, FullState) and
-%%      msg_get_values_best_response/2
--spec get_values_best() -> ok.
-get_values_best() ->
-    GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_best, self()}).
-
-%% @doc Sends a (local) message to the gossip process of the requesting
-%%      process' group asking for all stored information.
-%%      see on_active({get_values_all, SourcePid}, FullState) and
-%%      msg_get_values_all_response/4
--spec get_values_all() -> ok.
-get_values_all() ->
-    GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_all, self()}).
-
-%% @doc Returns the previous state if the current state has not sufficiently
-%%      converged yet otherwise returns the current state.
--spec previous_or_current(state(), state()) -> state().
-previous_or_current(PreviousState, CurrentState) ->
-    CurrentInitialized = gossip_state:get(CurrentState, initialized),
-    MinConvergeAvgCount = get_converge_avg_count(),
-    CurrentEpsilonCount_Avg = gossip_state:get(CurrentState, converge_avg_count),
-    _BestValue =
-        case (not CurrentInitialized) orelse (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
-            true -> PreviousState;
-            false -> CurrentState
-        end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -428,6 +387,19 @@ on_active({web_debug_info, Requestor},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Returns the previous state if the current state has not sufficiently
+%%      converged yet otherwise returns the current state.
+-spec previous_or_current(state(), state()) -> state().
+previous_or_current(PreviousState, CurrentState) ->
+    CurrentInitialized = gossip_state:get(CurrentState, initialized),
+    MinConvergeAvgCount = get_converge_avg_count(),
+    CurrentEpsilonCount_Avg = gossip_state:get(CurrentState, converge_avg_count),
+    _BestValue =
+        case (not CurrentInitialized) orelse (CurrentEpsilonCount_Avg < MinConvergeAvgCount) of
+            true -> PreviousState;
+            false -> CurrentState
+        end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State update

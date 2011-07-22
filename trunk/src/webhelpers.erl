@@ -25,7 +25,7 @@
 
 -export([getLoadRendered/0, getRingChart/0, getRingRendered/0,
          getIndexedRingRendered/0, lookup/1, set_key/2, delete_key/2, isPost/1,
-         getVivaldiMap/0]).
+         getVivaldiMap/0, getGossipRendered/0]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
@@ -87,9 +87,6 @@ get_load([Head | Tail]) ->
 get_load([]) ->
     [].
 
-
-%%%-----------------------------Load----------------------------------
-
 -spec getLoadRendered() -> html_type().
 getLoadRendered() ->
     Load = getLoad(),
@@ -107,13 +104,13 @@ getLoadRendered() ->
 renderLoad([{ok, Node, Value} | Tail]) ->
     [{tr, [], 
       [
-       {td, [], io_lib:format('~p', [Node])},
-       {td, [], io_lib:format('~p', [Value])}
+       {td, [], io_lib:format("~p", [Node])},
+       {td, [], io_lib:format("~p", [Value])}
       ]}, renderLoad(Tail)];
 renderLoad([{failed, Node} | Tail]) ->
     [{tr, [], 
       [
-       {td, [], io_lib:format('~p', [Node])},
+       {td, [], io_lib:format("~p", [Node])},
        {td, [], "-"}
       ]}, renderLoad(Tail)];
 renderLoad([]) ->
@@ -314,9 +311,9 @@ getRingRendered() ->
         true ->
             {p, [],
               [
-              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+              {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
                [
-                {tr, [{bgcolor, '#000099'}],
+                {tr, [{bgcolor, "#000099"}],
                  [
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
@@ -326,17 +323,17 @@ getRingRendered() ->
                 },
                 {tr, [],
                  [
-                               {td, [], io_lib:format('~p', [statistics:get_total_load(Ring)])},
-                               {td, [], io_lib:format('~p', [statistics:get_average_load(Ring)])},
-                               {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(Ring)])},
-                               {td, [], io_lib:format('~p', [RingSize])}
+                               {td, [], io_lib:format("~p", [statistics:get_total_load(Ring)])},
+                               {td, [], io_lib:format("~p", [statistics:get_average_load(Ring)])},
+                               {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(Ring)])},
+                               {td, [], io_lib:format("~p", [RingSize])}
                            ]
                 }
                ]
               },
               {br, []},
-              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-               [{tr, [{bgcolor, '#000099'}],
+              {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
+               [{tr, [{bgcolor, "#000099"}],
                  [
                   {td, [{align, "center"}, {width,"200px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds"}}},
@@ -363,19 +360,19 @@ renderRing({ok, Details}) ->
     Load = node_details:get(Details, load),
     {tr, [], 
       [
-       {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
-       {td, [], io_lib:format('~p', [lists:map(fun node:id/1, PredList)])},
-       {td, [], io_lib:format('~p', [node:id(Node)])},
-       {td, [], io_lib:format('~p', [lists:map(fun node:id/1, SuccList)])},
-       {td, [], io_lib:format('~p', [RTSize])},
-       {td, [], io_lib:format('~p', [Load])}
+       {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
+       {td, [], io_lib:format("~p", [lists:map(fun node:id/1, PredList)])},
+       {td, [], io_lib:format("~p", [node:id(Node)])},
+       {td, [], io_lib:format("~p", [lists:map(fun node:id/1, SuccList)])},
+       {td, [], io_lib:format("~p", [RTSize])},
+       {td, [], io_lib:format("~p", [Load])}
       ]};
 renderRing({failed, Pid}) ->
     {tr, [], 
       [
        {td, [], "-"},
        {td, [], "-"},
-       {td, [], io_lib:format('- (~p)', [Pid])},
+       {td, [], io_lib:format("- (~p)", [Pid])},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}
@@ -399,9 +396,9 @@ getIndexedRingRendered() ->
         true ->
             {p, [],
               [
-              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
+              {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
                [
-                {tr, [{bgcolor, '#000099'}],
+                {tr, [{bgcolor, "#000099"}],
                  [
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
@@ -411,17 +408,17 @@ getIndexedRingRendered() ->
                 },
                 {tr, [],
                  [
-                  {td, [], io_lib:format('~p', [statistics:get_total_load(RealRing)])},
-                  {td, [], io_lib:format('~p', [statistics:get_average_load(RealRing)])},
-                  {td, [], io_lib:format('~p', [statistics:get_load_std_deviation(RealRing)])},
-                  {td, [], io_lib:format('~p', [RingSize])}
+                  {td, [], io_lib:format("~p", [statistics:get_total_load(RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(RealRing)])},
+                  {td, [], io_lib:format("~p", [RingSize])}
                  ]
                 }
                ]
               },
               {br, []},
-              {table, [{bgcolor, '#CCDCEE'}, {width, "100%"}],
-               [{tr, [{bgcolor, '#000099'}],
+              {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
+               [{tr, [{bgcolor, "#000099"}],
                  [
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds Offset"}}},
@@ -457,20 +454,20 @@ renderIndexedRing({ok, Details}) ->
     [FirstSuccIndex|_] = SuccIndices,
     {tr, [],
       [
-       {td, [], [get_flag(Hostname), io_lib:format('~p', [Hostname])]},
+       {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
        case hd(PredIndex) =:= -1 of
            true->
-               {td, [], io_lib:format('~p', [PredIndex])};
+               {td, [], io_lib:format("~p", [PredIndex])};
            false ->
-               {td, [], io_lib:format('<span style="color:red">~p</span>', [PredIndex])}
+               {td, [], io_lib:format("<span style=\"color:red\">~p</span>", [PredIndex])}
        end,
-       {td, [], io_lib:format('~p: ~p', [MyIndex, node:id(Node)])},
+       {td, [], io_lib:format("~p: ~p", [MyIndex, node:id(Node)])},
        case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of
-           true -> {td, [], io_lib:format('<span style="color:red">~p</span>', [SuccIndices])};
-           false -> {td, [], io_lib:format('~p', [SuccIndices])}
+           true -> {td, [], io_lib:format("<span style=\"color:red\">~p</span>", [SuccIndices])};
+           false -> {td, [], io_lib:format("~p", [SuccIndices])}
        end,
-       {td, [], io_lib:format('~p', [RTSize])},
-       {td, [], io_lib:format('~p', [Load])}
+       {td, [], io_lib:format("~p", [RTSize])},
+       {td, [], io_lib:format("~p", [Load])}
       ]};
 
 renderIndexedRing({failed, Pid}) ->
@@ -478,11 +475,134 @@ renderIndexedRing({failed, Pid}) ->
       [
        {td, [], "-"},
        {td, [], "-"},
-       {td, [], io_lib:format('- (~p)', [Pid])},
+       {td, [], io_lib:format("- (~p)", [Pid])},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}
       ]}.
+
+
+%%%-----------------------------Gossip----------------------------------
+
+-type gossip_pv() :: {PidName::string(), gossip_state:values()}.
+-type gossip_key() :: avgLoad | stdded | size_ldr | size_kr | minLoad | maxLoad.
+
+-spec getGossip() -> [gossip_pv()].
+getGossip() ->
+    GossipPids = pid_groups:find_all(gossip),
+    [begin
+         comm:send_local(Pid, {get_values_best, self()}),
+         receive {gossip_get_values_best_response, BestValues} ->
+                     {pid_groups:pid_to_name(Pid), BestValues}
+         end
+     end || Pid <- GossipPids].
+
+-spec getGossipRendered() -> html_type().
+getGossipRendered() ->
+    Values = getGossip(),
+    { table, [{bgcolor, "#CCDCEE"}, {width, "100%"}], renderGossip(Values) }.
+
+-spec renderGossip([gossip_pv()]) -> [html_type()].
+renderGossip([]) -> [];
+renderGossip([V1]) ->
+    renderGossip2(V1, {false, {"", V1}}, {false, {"", V1}});
+renderGossip([V1, V2]) ->
+    renderGossip2(V1, {true, V2}, {false, {"", V2}});
+renderGossip([V1, V2, V3 | Rest]) ->
+    lists:append(
+      renderGossip2(V1, {true, V2}, {true, V3}),
+      renderGossip(Rest)).
+
+-spec renderGossip2(gossip_pv(), {boolean(), gossip_pv()}, {boolean(), gossip_pv()}) -> [html_type()].
+renderGossip2(PV1, PVE2, PVE3) ->
+    [renderGossipHead(PV1, PVE2, PVE3),
+     renderGossipData(PV1, PVE2, PVE3, "Size (leader election)",
+                      size_ldr, fun(V) -> io_lib:format("~.2f", [V]) end),
+     renderGossipData(PV1, PVE2, PVE3, "Size (key range)",
+                      size_kr, fun(V) -> io_lib:format("~.2f", [V]) end),
+     renderGossipData(PV1, PVE2, PVE3, "Average load",
+                      avgLoad, fun(V) -> io_lib:format("~.2f", [V]) end),
+     renderGossipData(PV1, PVE2, PVE3, "Maximum load",
+                      maxLoad, fun(V) -> io_lib:format("~B", [V]) end),
+     renderGossipData(PV1, PVE2, PVE3, "Minimum load",
+                      minLoad, fun(V) -> io_lib:format("~B", [V]) end),
+     renderGossipData(PV1, PVE2, PVE3, "Standard deviation of the load",
+                      stddev, fun(V) -> io_lib:format("~.2f", [V]) end)
+     ].
+
+-spec renderGossipHead(gossip_pv(), {boolean(), gossip_pv()}, {boolean(), gossip_pv()}) -> html_type().
+renderGossipHead({P1, _V1}, {P2Exists, PV2}, {P3Exists, PV3}) ->
+    ValueP1 = P1,
+    {TD_V2_1, TD_V2_2} =
+        case P2Exists of
+            true ->
+                P2 = element(1, PV2),
+                {{td, [{align, "left"}], {strong, [], {font, [{color, "white"}], P2}}},
+                 {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Value"}}}};
+            _ ->
+                {{td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"},
+                 {td, [{bgcolor, "#D5DEDE"}, {align, "center"}], "&nbsp;"}}
+              end,
+    {TD_V3_1, TD_V3_2} =
+        case P3Exists of
+            true ->
+                P3 = element(1, PV3),
+                {{td, [{align, "left"}], {strong, [], {font, [{color, "white"}], P3}}},
+                 {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Value"}}}};
+            _ ->
+                {{td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"},
+                 {td, [{bgcolor, "#D5DEDE"}, {align, "center"}], "&nbsp;"}}
+              end,
+    {tr, [{bgcolor, "#000099"}],
+     [{td, [{align, "left"}], {strong, [], {font, [{color, "white"}], ValueP1}}},
+      {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Value"}}},
+      {td, [{bgcolor, "#D5DEDE"}, {width, "25pt"}], "&nbsp;"},
+      TD_V2_1, TD_V2_2,
+      {td, [{bgcolor, "#D5DEDE"}, {width, "25pt"}], "&nbsp;"},
+      TD_V3_1, TD_V3_2
+     ]}.
+
+-spec renderGossipData(gossip_pv(), {boolean(), gossip_pv()}, {boolean(), gossip_pv()},
+                       string(), gossip_key(), fun((term()) -> string())) -> html_type().
+renderGossipData({_P1, V1}, {P2Exists, PV2}, {P3Exists, PV3}, Name, Key, Fun) ->
+    ValueV1 = format_gossip_value(V1, Key, Fun),
+    {TD_V2_1, TD_V2_2} =
+        case P2Exists of
+            true ->
+                V2 = element(2, PV2),
+                {{td, [{align, "left"}], Name},
+                 {td, [{align, "left"}], format_gossip_value(V2, Key, Fun)}};
+            _ ->
+                {{td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"},
+                 {td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"}}
+        end,
+    {TD_V3_1, TD_V3_2} =
+        case P3Exists of
+            true ->
+                V3 = element(2, PV3),
+                {{td, [{align, "left"}], Name},
+                 {td, [{align, "left"}], format_gossip_value(V3, Key, Fun)}};
+            _ ->
+                {{td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"},
+                 {td, [{bgcolor, "#D5DEDE"}, {align, "left"}], "&nbsp;"}}
+        end,
+    {tr, [],
+     [{td, [{align, "left"}], Name},
+      {td, [{align, "left"}], ValueV1},
+      {td, [{bgcolor, "#D5DEDE"}, {width, "25pt"}], "&nbsp;"},
+      TD_V2_1, TD_V2_2,
+      {td, [{bgcolor, "#D5DEDE"}, {width, "25pt"}], "&nbsp;"},
+      TD_V3_1, TD_V3_2
+     ]}.
+
+-spec format_gossip_value(gossip_state:value(), Key::gossip_key(),
+                          fun((term()) -> string())) -> string().
+format_gossip_value(Value, Key, Fun) ->
+    case gossip_state:get(Value, Key) of
+        unknown -> "n/a";
+        X       -> Fun(X)
+    end.
+    
 
 %%%-----------------------------Misc----------------------------------
 

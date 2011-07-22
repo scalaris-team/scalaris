@@ -119,7 +119,7 @@ test_init(Config) ->
 test_get_values_best0(Config) ->
     pid_groups:join_as("gossip_group", gossip),
 
-    gossip:get_values_best(),
+    comm:send_local(pid_groups:get_my(gossip), {get_values_best, self()}),
     ?expect_message({get_values_best, _Pid}),
     ?expect_no_message(),
     Config.
@@ -127,7 +127,7 @@ test_get_values_best0(Config) ->
 test_get_values_all0(Config) ->
     pid_groups:join_as("gossip_group", gossip),
 
-    gossip:get_values_all(),
+    comm:send_local(pid_groups:get_my(gossip), {get_values_all, self()}),
     ?expect_message({get_values_all, _Pid}),
     ?expect_no_message(),
     Config.

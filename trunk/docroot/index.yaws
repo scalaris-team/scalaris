@@ -38,6 +38,9 @@ out(Arg) ->
     end.
 </erl>
 
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
