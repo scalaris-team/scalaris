@@ -67,7 +67,7 @@ Number of nodes:
 <p>
 <erl>
 out(A) ->
-    {ehtml, webhelpers:getRingChart()}.
+    {ehtml, webhelpers:getRingChart_google()}.
 </erl>
 </p>
 

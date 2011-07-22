@@ -23,15 +23,16 @@
 -include("yaws_api.hrl").
 -include("scalaris.hrl").
 
--export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
+-export([getRingChart/0, getRingChart_flot/0, getRingChart_google/0,
+         getRingRendered/0, getIndexedRingRendered/0,
          getGossipRendered/0, getVivaldiMap/0,
          lookup/1, set_key/2, delete_key/2, isPost/1]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
--type html_type() :: {atom(), [attribute_type()], term()}.
+-type html_type() :: {atom(), [attribute_type()], term()} | [{atom(), [attribute_type()], term()}].
 -else.
--type html_type() :: {atom(), [attribute_type()], html_type() | string()}.
+-type html_type() :: {atom(), [attribute_type()], html_type() | string()} | [{atom(), [attribute_type()], html_type() | string()}].
 -endif.
 
 %% @doc Checks whether the current request is a post operation.
@@ -203,7 +204,94 @@ pid_to_integer(Pid) ->
 %%%-----------------------------Ring----------------------------------
 
 -spec getRingChart() -> html_type().
-getRingChart() ->
+getRingChart() -> getRingChart_flot().
+
+-spec getRingChart_flot() -> html_type().
+getRingChart_flot() ->
+    RealRing = statistics:get_ring_details(),
+    Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
+    renderRingChart_flot_data(Ring).
+
+-spec renderRingChart_flot_data(Ring::[node_details:node_details(),...]) -> html_type().
+renderRingChart_flot_data(Ring) ->
+    RingSize = length(Ring),
+    Content = try
+                  Data = [ begin
+                               Me_tmp = node:id(node_details:get(Node, node)),
+                               Pred_tmp = node:id(node_details:get(Node, pred)),
+                               Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
+                               Value = io_lib:format("~f", [Diff]),
+                               Label = node_details:get(Node, hostname) ++ " (" ++
+                                           integer_to_list(node_details:get(Node, load)) ++ ")",
+                               {Label, Value}
+                           end || Node <- Ring ],
+                  DataStr =
+                      lists:flatten(
+                        ["\n",
+                         "var alpha_inc = ", io_lib:format("~f", [1 / RingSize]), ";\n",
+                         "var ring = [];\n"
+                         "var i = 0;\n"
+                         "var color = $.color.parse(\"#008080\");\n",
+                         ["ring[i] = { label: \"" ++ Label ++ "\", data: " ++ Value ++ ", color: color.toString() };\n"
+                          "i = i+1;\n"
+                          "if (color.a > 0.2) {"
+                          " color = $.color.parse(color).add('a', -alpha_inc);\n"
+                          "}"
+                          || {Label, Value} <- Data]]),
+                  PlotFun = "$.plot($(\"#ring\"), ring, {\n"
+                            " series: {\n"
+                            "  pie: {\n"
+                            "   show: true,\n"
+                            "   radius: 1,\n"
+                            "   innerRadius: 0.5,\n"
+                            "   label: {\n"
+                            "    show: true,\n"
+                            "    radius: 3/4,\n"
+                            "    formatter: function(label, series) {\n"
+                            "     return '<div style=\"font-size:8pt;text-align:center;padding:2px;color:white;\">'+label+'</div>';\n"
+                            "    },\n"
+                            "    background: {\n"
+                            "     opacity: 0.5,\n"
+                            "     color: '#000'\n"
+                            "    }\n"
+                            "   }\n"
+                            "  }\n"
+                            " },\n"
+                            " legend: {\n"
+                            "  show: false\n"
+                            " },\n"
+                            " grid: {\n"
+                            "  hoverable: true,\n"
+                            "  clickable: true\n"
+                            " }\n"
+                            "});\n"
+                            "$(\"#ring\").bind(\"plothover\", pieHover);\n"
+                            "$(\"#ring\").bind(\"plotclick\", pieClick);\n",
+                  PieHover = "function pieHover(event, pos, obj) {\n"
+                             " if (!obj)\n"
+                             "  return;\n"
+                             " percent = parseFloat(obj.series.percent).toFixed(2);\n"
+                             " $(\"#ringhover\").html('<span style=\"font-weight: bold\">'+obj.series.label+' ('+percent+'%)</span>');\n"
+                             "}\n",
+                  PieClick = "function pieClick(event, pos, obj) {\n"
+                             " if (!obj)\n"
+                             "  return;\n"
+                             " percent = parseFloat(obj.series.percent).toFixed(2);\n"
+                             " alert(''+obj.series.label+': '+percent+'%');\n"
+                             "}\n",
+                  [{script, [{type, "text/javascript"}], lists:append(["$(function() {\n", DataStr, PlotFun, "});\n", PieHover, PieClick])},
+                   {table, [],
+                    [{tr, [],
+                      [{td, [], {'div', [{id, "ring"}, {style, "width: 600px; height: 350px"}], []}},
+                       {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
+                   ]
+              catch % ?RT methods might throw
+                  throw:not_supported -> ""
+              end,
+    Content.
+
+-spec getRingChart_google() -> html_type().
+getRingChart_google() ->
     RealRing = statistics:get_ring_details(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
@@ -214,7 +302,7 @@ getRingChart() ->
             {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
         true ->
             try
-              PieURL = renderRingChart(Ring),
+              PieURL = renderRingChart_google(Ring),
               LPie = length(PieURL),
               if
                   LPie =:= 0  -> throw({urlTooShort, PieURL});
@@ -226,8 +314,8 @@ getRingChart() ->
             end
     end.
 
--spec renderRingChart(Ring::[node_details:node_details(),...]) -> string().
-renderRingChart(Ring) ->
+-spec renderRingChart_google(Ring::[node_details:node_details(),...]) -> string().
+renderRingChart_google(Ring) ->
     try
         URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
         Sizes = [ begin
@@ -308,9 +396,9 @@ renderRing({ok, Details}) ->
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
-       {td, [], io_lib:format("~p", [lists:map(fun node:id/1, PredList)])},
+       {td, [], io_lib:format("~.100p", [[node:id(N) || N <- PredList]])},
        {td, [], io_lib:format("~p", [node:id(Node)])},
-       {td, [], io_lib:format("~p", [lists:map(fun node:id/1, SuccList)])},
+       {td, [], io_lib:format("~.100p", [[node:id(N) || N <- SuccList]])},
        {td, [], io_lib:format("~p", [RTSize])},
        {td, [], io_lib:format("~p", [Load])}
       ]};
