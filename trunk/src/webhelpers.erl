@@ -30,9 +30,9 @@
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
--type html_type() :: {atom(), [attribute_type()], term()} | [{atom(), [attribute_type()], term()}].
+-opaque html_type() :: {atom(), [attribute_type()], term() | [term()]}.
 -else.
--type html_type() :: {atom(), [attribute_type()], html_type() | string()} | [{atom(), [attribute_type()], html_type() | string()}].
+-opaque html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
 -endif.
 
 %% @doc Checks whether the current request is a post operation.
@@ -203,17 +203,13 @@ pid_to_integer(Pid) ->
 
 %%%-----------------------------Ring----------------------------------
 
--spec getRingChart() -> html_type().
+-spec getRingChart() -> [html_type()].
 getRingChart() -> getRingChart_flot().
 
--spec getRingChart_flot() -> html_type().
+-spec getRingChart_flot() -> [html_type()].
 getRingChart_flot() ->
     RealRing = statistics:get_ring_details(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
-    renderRingChart_flot_data(Ring).
-
--spec renderRingChart_flot_data(Ring::[node_details:node_details(),...]) -> html_type().
-renderRingChart_flot_data(Ring) ->
     RingSize = length(Ring),
     Content = try
                   Data = [ begin
@@ -286,7 +282,7 @@ renderRingChart_flot_data(Ring) ->
                        {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
                    ]
               catch % ?RT methods might throw
-                  throw:not_supported -> ""
+                  throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
               end,
     Content.
 
@@ -520,7 +516,7 @@ renderIndexedRing({failed, Pid}) ->
 %%%-----------------------------Gossip----------------------------------
 
 -type gossip_pv() :: {PidName::string(), gossip_state:values()}.
--type gossip_key() :: avgLoad | stdded | size_ldr | size_kr | minLoad | maxLoad.
+-type gossip_key() :: avgLoad | stddev | size_ldr | size_kr | minLoad | maxLoad.
 
 -spec getGossip() -> [gossip_pv()].
 getGossip() ->
@@ -540,9 +536,9 @@ getGossipRendered() ->
 -spec renderGossip([gossip_pv()]) -> [html_type()].
 renderGossip([]) -> [];
 renderGossip([V1]) ->
-    renderGossip2(V1, {false, {"", V1}}, {false, {"", V1}});
+    renderGossip2(V1, {false, V1}, {false, V1});
 renderGossip([V1, V2]) ->
-    renderGossip2(V1, {true, V2}, {false, {"", V2}});
+    renderGossip2(V1, {true, V2}, {false, V2});
 renderGossip([V1, V2, V3 | Rest]) ->
     lists:append(
       renderGossip2(V1, {true, V2}, {true, V3}),
@@ -552,17 +548,17 @@ renderGossip([V1, V2, V3 | Rest]) ->
 renderGossip2(PV1, PVE2, PVE3) ->
     [renderGossipHead(PV1, PVE2, PVE3),
      renderGossipData(PV1, PVE2, PVE3, "Size (leader election)",
-                      size_ldr, fun(V) -> io_lib:format("~.2f", [V]) end),
+                      size_ldr, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
      renderGossipData(PV1, PVE2, PVE3, "Size (key range)",
-                      size_kr, fun(V) -> io_lib:format("~.2f", [V]) end),
+                      size_kr, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
      renderGossipData(PV1, PVE2, PVE3, "Average load",
-                      avgLoad, fun(V) -> io_lib:format("~.2f", [V]) end),
+                      avgLoad, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
      renderGossipData(PV1, PVE2, PVE3, "Maximum load",
-                      maxLoad, fun(V) -> io_lib:format("~B", [V]) end),
+                      maxLoad, fun(V) -> lists:flatten(io_lib:format("~B", [V])) end),
      renderGossipData(PV1, PVE2, PVE3, "Minimum load",
-                      minLoad, fun(V) -> io_lib:format("~B", [V]) end),
+                      minLoad, fun(V) -> lists:flatten(io_lib:format("~B", [V])) end),
      renderGossipData(PV1, PVE2, PVE3, "Standard deviation of the load",
-                      stddev, fun(V) -> io_lib:format("~.2f", [V]) end)
+                      stddev, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end)
      ].
 
 -spec renderGossipHead(gossip_pv(), {boolean(), gossip_pv()}, {boolean(), gossip_pv()}) -> html_type().
@@ -630,7 +626,7 @@ renderGossipData({_P1, V1}, {P2Exists, PV2}, {P3Exists, PV3}, Name, Key, Fun) ->
       TD_V3_1, TD_V3_2
      ]}.
 
--spec format_gossip_value(gossip_state:value(), Key::gossip_key(),
+-spec format_gossip_value(gossip_state:values(), Key::gossip_key(),
                           fun((term()) -> string())) -> string().
 format_gossip_value(Value, Key, Fun) ->
     case gossip_state:get(Value, Key) of
