@@ -15,8 +15,8 @@
       <div class="nothighlighted">
 	    <h2>Scalaris</h2>
 	  </div>
-      <div class="nothighlighted">
-	    <a  class="menua" href="index.yaws">Home</a>
+   	  <div class="nothighlighted">
+	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
       
 <erl>
@@ -38,11 +38,11 @@ out(Arg) ->
     end.
 </erl>
 
-      <div class="nothighlighted">
+      <div class="highlighted">
         <a class="menua" href="gossip.yaws">Gossip values</a>
       </div>
-	  <div class="highlighted">
-	    <a  class="menua" href="documentation.yaws">Docu</a>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
       <div class="nothighlighted">
         <a class="menua" href="debug.yaws">Debug</a>
@@ -52,12 +52,20 @@ out(Arg) ->
       </div>
     </div><div class="middle">
       <div class="middleleft">
-<h2>Documentation</h2>
+<h2>Gossip values</h2>
+
+Nodes in this VM: 
+<erl> 
+ out(Arg) ->
+    {html, integer_to_list(length(pid_groups:find_all(dht_node)))}.
+</erl>
 
 <p>
-<a name="doc" href="doc">Documentation extracted from Erlang sources.</a>
+<erl>
+out(A) ->
+    {ehtml, webhelpers:getGossipRendered()}.
+</erl>
 </p>
-
 
 Last update:
 <erl>
