@@ -84,6 +84,7 @@ We build rpm and deb packages using checkouts from the latest tagged version as 
 || SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || SLE || 11 SP1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/scalaris-svn.ymp 1-Click Install (unstable)] ||
 || CentOS || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_5/] ||
+|| CentOS || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_6/] ||
 || RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_5/] ||
 || RHEL || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_6/] ||
 || Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_5.0/] ||
