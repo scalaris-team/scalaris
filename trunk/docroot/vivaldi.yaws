@@ -18,7 +18,10 @@
       <div class="nothighlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
-	  
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+      
 <erl>
 out(Arg) ->
     case whereis(mgmt_server) of
@@ -26,9 +29,6 @@ out(Arg) ->
         _ ->
             {html,
 "      <div class=\"nothighlighted\">
-        <a class=\"menua\" href=\"ring.yaws\">Ring</a>
-      </div>
-      <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
       </div>
       <div class=\"highlighted\">
