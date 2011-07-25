@@ -23,8 +23,7 @@
 -include("yaws_api.hrl").
 -include("scalaris.hrl").
 
--export([getRingChart/0, getRingChart_flot/0, getRingChart_google/0,
-         getRingRendered/0, getIndexedRingRendered/0,
+-export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
          getGossipRendered/0, getVivaldiMap/0,
          lookup/1, set_key/2, delete_key/2, isPost/1]).
 
@@ -204,10 +203,7 @@ pid_to_integer(Pid) ->
 %%%-----------------------------Ring----------------------------------
 
 -spec getRingChart() -> [html_type()].
-getRingChart() -> getRingChart_flot().
-
--spec getRingChart_flot() -> [html_type()].
-getRingChart_flot() ->
+getRingChart() ->
     RealRing = statistics:get_ring_details(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
@@ -283,51 +279,6 @@ getRingChart_flot() ->
                   throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
               end,
     Content.
-
--spec getRingChart_google() -> html_type().
-getRingChart_google() ->
-    RealRing = statistics:get_ring_details(),
-    Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
-    RingSize = length(Ring),
-    if
-        RingSize =:= 0 ->
-            {p, [], "empty ring"};
-        RingSize =:= 1 ->
-            {img, [{src, "http://chart.apis.google.com/chart?cht=p&chco=008080&chd=t:1&chs=600x350"}], ""};
-        true ->
-            try
-              PieURL = renderRingChart_google(Ring),
-              LPie = length(PieURL),
-              if
-                  LPie =:= 0  -> throw({urlTooShort, PieURL});
-                  LPie < 1023 -> {p, [], [{img, [{src, PieURL}], ""}]};
-                  true        -> throw({urlTooLong, PieURL})
-              end
-            catch
-                _:_ -> {p, [], "Sorry, pie chart not available (too many nodes or other error)."}
-            end
-    end.
-
--spec renderRingChart_google(Ring::[node_details:node_details(),...]) -> string().
-renderRingChart_google(Ring) ->
-    try
-        URLstart = "http://chart.apis.google.com/chart?cht=p&chco=008080",
-        Sizes = [ begin
-                      Me_tmp = node:id(node_details:get(Node, node)),
-                      Pred_tmp = node:id(node_details:get(Node, pred)),
-                      Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
-                      io_lib:format("~f", [Diff])
-                  end || Node <- Ring ],
-        Hostinfos = [ node_details:get(Node, hostname) ++ " (" ++
-                          integer_to_list(node_details:get(Node, load)) ++ ")"
-                    || Node <- Ring ],
-        CHD = "chd=t:" ++ string:join(Sizes, ","),
-        CHS = "chs=600x350",
-        CHL = "chl=" ++ string:join(Hostinfos, "|"),
-        URLstart ++ "&" ++ CHD ++ "&" ++ CHS ++ "&" ++ CHL
-    catch % ?RT methods might throw
-        throw:not_supported -> ""
-    end.
 
 -spec getRingRendered() -> html_type().
 getRingRendered() ->
