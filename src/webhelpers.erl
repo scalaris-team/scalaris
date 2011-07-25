@@ -24,6 +24,7 @@
 -include("scalaris.hrl").
 
 -export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
+         get_and_cache_ring/0, flush_ring_cache/0,
          getGossipRendered/0, getVivaldiMap/0,
          lookup/1, set_key/2, delete_key/2, isPost/1]).
 
@@ -202,9 +203,24 @@ pid_to_integer(Pid) ->
 
 %%%-----------------------------Ring----------------------------------
 
+-spec get_and_cache_ring() -> statistics:ring().
+get_and_cache_ring() ->
+    case erlang:get(web_scalaris_ring) of
+        undefined ->
+            Ring = statistics:get_ring_details(),
+            erlang:put(web_scalaris_ring, Ring);
+        Ring -> ok
+    end,
+    Ring.
+
+-spec flush_ring_cache() -> ok.
+flush_ring_cache() ->
+    erlang:erase(web_scalaris_ring),
+    ok.
+
 -spec getRingChart() -> [html_type()].
 getRingChart() ->
-    RealRing = statistics:get_ring_details(),
+    RealRing = get_and_cache_ring(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
     Content = try
@@ -282,7 +298,7 @@ getRingChart() ->
 
 -spec getRingRendered() -> html_type().
 getRingRendered() ->
-    RealRing = statistics:get_ring_details(),
+    RealRing = get_and_cache_ring(),
     Ring = [X || X = {ok, _} <- RealRing],
     RingSize = length(Ring),
     if
@@ -360,7 +376,7 @@ renderRing({failed, Pid}) ->
 
 -spec getIndexedRingRendered() -> html_type().
 getIndexedRingRendered() ->
-    RealRing = statistics:get_ring_details(),
+    RealRing = get_and_cache_ring(),
     % table with mapping node_id -> index
     _ = ets:new(webhelpers_indexed_ring, [ordered_set, private, named_table]),
     _ = [begin
