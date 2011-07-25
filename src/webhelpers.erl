@@ -130,16 +130,16 @@ renderVivaldiMap(CC_list, Nodes) ->
                        [Vbx,Vby,Vbw,Vbh])++
          io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
                        [lists:nth(1, Min)-R*1.5,lists:nth(2, Min),lists:nth(1, Min)-R*1.5,lists:nth(2, Max),R*0.1])++
-        io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
+         io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
                        [lists:nth(1, Min),lists:nth(2, Max)+R*1.5,lists:nth(1, Max),lists:nth(2, Max)+R*1.5,R*0.1])++
-        io_lib:format("<text x=\"~p\" y=\"~p\" transform=\"rotate(90,~p,~p)\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
+         io_lib:format("<text x=\"~p\" y=\"~p\" transform=\"rotate(90,~p,~p)\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
                        [lists:nth(1, Min)-R*4,
                         lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
                         lists:nth(1, Min)-R*4,
                         lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
                         R*2,
                         util:floor(lists:nth(1, Max)-lists:nth(1, Min))])++
-        io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
+         io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
                        [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
                         lists:nth(2, Max)+R*4,
                          R*2,
@@ -230,19 +230,17 @@ getRingChart_flot() ->
                          "var color = $.color.parse(\"#008080\");\n",
                          ["ring[i] = { label: \"" ++ Label ++ "\", data: " ++ Value ++ ", color: color.toString() };\n"
                           "i = i+1;\n"
-                          "if (color.a > 0.2) {"
-                          " color = $.color.parse(color).add('a', -alpha_inc);\n"
-                          "}"
+                          "if (color.a > 0.2) { color = $.color.parse(color).add('a', -alpha_inc); }\n"
                           || {Label, Value} <- Data]]),
                   PlotFun = "$.plot($(\"#ring\"), ring, {\n"
                             " series: {\n"
                             "  pie: {\n"
                             "   show: true,\n"
-                            "   radius: 1,\n"
-                            "   innerRadius: 0.5,\n"
+                            "   radius: 0.9,\n"
+                            "   innerRadius: 0.4,\n"
                             "   label: {\n"
                             "    show: true,\n"
-                            "    radius: 3/4,\n"
+                            "    radius: 1.0,\n"
                             "    formatter: function(label, series) {\n"
                             "     return '<div style=\"font-size:8pt;text-align:center;padding:2px;color:white;\">'+label+'</div>';\n"
                             "    },\n"
