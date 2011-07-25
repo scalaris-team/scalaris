@@ -50,8 +50,7 @@
 -record(rep_upd_state,
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
-         sync_round     = 0.0                                       :: float(),
-         monitor_table  = ?required(rep_upd_state, monitor_table)   :: monitor:table()
+         sync_round     = 0.0                                       :: float()
          }).
 -type state() :: #rep_upd_state{}.
 
@@ -109,10 +108,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State) ->
 
 %% @doc SyncStruct is build and can be send to a node for synchronization
 on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
-    #rep_upd_state{
-                   sync_round = Round,
-                   monitor_table = MonTbl
-                   } = State,
+    #rep_upd_state{sync_round = Round} = State,
     _ = case intervals:is_empty(Interval) of	
             false ->
                 {_, _, RKey, RBr} = intervals:get_bounds(Interval),
@@ -128,8 +124,8 @@ on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
                                 {lookup_aux, DestKey, 0, 
                                  {send_to_group_member, ?PROCESS_NAME, 
                                   {request_sync, reconciliation, true, Sync_Struct}}}),
-                MonDB1 = monitor:proc_get_value(MonTbl, "Send-Sync-Req"),
-                monitor:proc_set_value(MonTbl, "Send-Sync-Req", rrd:add_now({Round, DestKey}, MonDB1));	    
+                monitor:proc_set_value(?MODULE, "Send-Sync-Req",
+                    fun(Old) -> rrd:add_now({Round, DestKey}, Old) end);
             _ ->
                 ok
 		end,
@@ -137,9 +133,8 @@ on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_sync, SyncStage, Feedback, SyncStruct}, State) ->
-    MonTbl = State#rep_upd_state.monitor_table,
-    MonDB1 = monitor:proc_get_value(MonTbl, "Recv-Sync-Req-Count"),
-    monitor:proc_set_value(MonTbl, "Recv-Sync-Req-Count", rrd:add_now(1, MonDB1)),
+    monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
+                           fun(Old) -> rrd:add_now(1, Old) end),
     {ok, Pid} = rep_upd_sync:start_sync(get_max_items()),
     comm:send_local(Pid, {start_sync, SyncStage, Feedback, SyncStruct}),
     State;
@@ -161,9 +156,8 @@ on({web_debug_info, Requestor}, State) ->
 % Monitor Reporting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({sync_progress_report, _Sender, Msg}, State) ->
-    MonTbl = State#rep_upd_state.monitor_table,
-    MonDB1 = monitor:proc_get_value(MonTbl, "Progress"),
-    monitor:proc_set_value(MonTbl, "Progress", rrd:add_now(Msg, MonDB1)),
+    monitor:proc_set_value(?MODULE, "Progress",
+                           fun(Old) -> rrd:add_now(Msg, Old) end),
     ?TRACE("SYNC FINISHED - REASON=[~s]", [Msg]),
     State.
 
@@ -198,12 +192,10 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> state().
 init(Trigger) ->	
     TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    MonitorTable = monitor:proc_init(?MODULE),
-    monitor:proc_set_value(MonitorTable, "Recv-Sync-Req-Count", rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
-    monitor:proc_set_value(MonitorTable, "Send-Sync-Req", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
-    monitor:proc_set_value(MonitorTable, "Progress", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
-    #rep_upd_state{ trigger_state = trigger:next(TriggerState),
-                    monitor_table = MonitorTable}.
+    monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count", rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
+    monitor:proc_set_value(?MODULE, "Send-Sync-Req", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
+    monitor:proc_set_value(?MODULE, "Progress", rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
+    #rep_upd_state{trigger_state = trigger:next(TriggerState)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
