@@ -66,30 +66,37 @@ start_link(CommLayerGroup, Socket) ->
 -spec init(Socket::inet:socket()) -> state().
 init(Socket) -> state_new(Socket).
 
+%% @doc Forwards a message to the given PID or named process.
+%%      Logs a warning if the process does not exist.
+-spec forward_msg(Process::pid() | atom(), Message::comm:message()) -> ok.
+forward_msg(Process, Message) ->
+    PID = case is_pid(Process) of
+              true -> Process;
+              false -> whereis(Process)
+          end,
+    case PID of
+        undefined ->
+            log:log(warn,
+                    "[ CC ] Cannot accept msg for unknown named"
+                        " process ~p: ~.0p~n", [Process, Message]);
+        _ -> PID ! Message
+    end,
+    ok.
+
 %% @doc message handler
 -spec on(message(), state()) -> state().
 on({tcp, Socket, Data}, State) ->
     case binary_to_term(Data) of
         {deliver, unpack_msg_bundle, Message} ->
             ?TRACE("Received message ~.0p", [Message]),
-            lists:foldr(fun({DestPid, Msg}, _) -> DestPid ! Msg, ok end,
+            lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg) end,
                         ok, Message),
             %% may fail, when tcp just closed
             _ = inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
         {deliver, Process, Message} ->
             ?TRACE("Received message ~.0p", [Message]),
-            PID = case is_pid(Process) of
-                      true -> Process;
-                      false -> whereis(Process)
-                  end,
-            case PID of
-                undefined ->
-                    log:log(warn,
-                            "[ CC ] Cannot accept msg for unknown named"
-                                " process ~p: ~.0p~n", [Process, Message]);
-                _ -> PID ! Message
-            end,
+            forward_msg(Process, Message),
             %% may fail, when tcp just closed
             _ = inet:setopts(Socket, [{active, once}]),
             inc_r_msg_count(State);
