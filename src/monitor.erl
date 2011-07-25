@@ -25,76 +25,63 @@
 
 -include("scalaris.hrl").
 
--ifdef(with_export_type_support).
--export_type([table/0]).
--endif.
-
 -export([start_link/1, init/1, on/2, check_config/0]).
--export([proc_init/1, proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
+-export([proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
 
 -type key() :: string().
 -type internal_key() :: {'$monitor$', Key::string()}.
--type table_index() :: {ProcTable::pdb:tableid(), Key::key()}.
--opaque table() :: {Process::atom, Table::pdb:tableid()}.
+-type table_index() :: {Process::atom(), Key::key()}.
 
 -type state() :: Table::tid() | atom().
 -type message() ::
     {proc_report, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
-
-%% @doc Initialises a process' monitor DB. Needs to be called prior to the
-%%      other proc_* methods! 
-%%      Beware: there is only one monitor table available per process if pdb
-%%      uses erlang:put/get!
--spec proc_init(Process::atom()) -> table().
-proc_init(Process) ->
-    % note: make table name unique if named_table is used
-    {Process, pdb:new(Process, [ordered_set, protected])}.
-
-%% @doc Converts the given Key avoid conflicts in case erlang:put/get is used
-%%      by pdb.
+%% @doc Converts the given Key to avoid conflicts in erlang:put/get.
 -spec to_internal_key(Key::key()) -> internal_key().
 to_internal_key(Key) -> {'$monitor$', Key}.
 
-%% @doc Sets the value at Key.
--spec proc_set_value(table(), Key::key(), Value::term()) -> ok.
-proc_set_value({Process, Table}, Key, Value) ->
-    InternalKey = to_internal_key(Key),
-    case pdb:get(InternalKey, Table) of
-        undefined    ->
-            ok;
-        {InternalKey, OldValue} ->
+-spec check_report(Process::atom(), Key::key(), Old::Value, New::Value) -> ok.
+check_report(Process, Key, OldValue, NewValue) ->
+    case OldValue of
+        undefined -> ok;
+        _ ->
             % check whether to report to the monitor
             % (always report if a new time slot was started)
             SlotOld = rrd:get_slot_start(0, OldValue),
-            SlotNew = rrd:get_slot_start(0, Value),
+            SlotNew = rrd:get_slot_start(0, NewValue),
             case SlotNew of
                 SlotOld -> ok; %nothing to do
-                _  -> 
-                    proc_report_to_my_monitor(Process, Key, OldValue, Value) % new slot -> report to monitor
+                _  -> % new slot -> report to monitor:
+                    proc_report_to_my_monitor(Process, Key, OldValue, NewValue)
             end
-    end,
-    pdb:set({InternalKey, Value}, Table).
+    end.
+
+%% @doc Sets the value at Key. Either specify a new value or an update function
+%%      which generates the new value from the old one.
+-spec proc_set_value(Process::atom(), Key::key(),
+                     NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
+proc_set_value(Process, Key, UpdateFun) when is_function(UpdateFun, 1)->
+    InternalKey = to_internal_key(Key),
+    OldValue = erlang:get(InternalKey),
+    NewValue = UpdateFun(OldValue),
+    check_report(Process, Key, OldValue, NewValue),
+    erlang:put(InternalKey, NewValue);
+proc_set_value(Process, Key, NewValue) ->
+    InternalKey = to_internal_key(Key),
+    OldValue = erlang:put(InternalKey, NewValue),
+    check_report(Process, Key, OldValue, NewValue).
 
 %% @doc Checks whether a value exists at Key.
--spec proc_exists_value(table(), Key::key()) -> boolean().
-proc_exists_value({_Process, Table}, Key) -> proc_exists_value_(Table, to_internal_key(Key)).
+-spec proc_exists_value(Process::atom(), Key::key()) -> boolean().
+proc_exists_value(_Process, Key) ->
+    erlang:get(to_internal_key(Key)) =/= undefined.
 
-%% @doc Checks whether a value exists at Key (for internal use).
--spec proc_exists_value_(Table::pdb:tableid(), Key::internal_key()) -> boolean().
-proc_exists_value_(Table, InternalKey) ->
-    pdb:get(InternalKey, Table) =/= undefined.
-
-%% @doc Gets the value stored at Key. The key must exist!
--spec proc_get_value(table(), Key::key()) -> rrd:rrd().
-proc_get_value({_Process, Table}, Key) -> proc_get_value_(Table, to_internal_key(Key)).
-
-%% @doc Gets the value stored at Key (for internal use). The key must exist!
--spec proc_get_value_(Table::pdb:tableid(), Key::internal_key()) -> rrd:rrd().
-proc_get_value_(Table, InternalKey) ->
-    {InternalKey, Value} = pdb:get(InternalKey, Table),
-    Value.
+%% @doc Gets the value stored at Key. The key must exist, otherwise no rrd()
+%%      structure is returned!
+-spec proc_get_value(Process::atom(), Key::key()) -> rrd:rrd().
+proc_get_value(_Process, Key) ->
+    erlang:get(to_internal_key(Key)).
 
 %% @doc Reports the given value to the process' monitor process.
 -spec proc_report_to_my_monitor(Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()) -> ok.
