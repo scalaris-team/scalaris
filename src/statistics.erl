@@ -113,9 +113,9 @@ get_ring_details_neighbors(RecursionLvl, Ring, Nodes) ->
     % then get their node details:
     NewRing = lists:sort(fun compare_node_details/2,
                          lists:append(Ring, get_ring_details(NewNodes))),
-    case RecursionLvl =< 1 of
+    case RecursionLvl < 1 of
         true -> NewRing;
-        _ -> % gather nodes for the next recusion:
+        _ -> % gather nodes for the next recursion:
             NextNodes =
                 lists:append(
                   [begin
