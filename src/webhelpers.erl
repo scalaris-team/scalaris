@@ -207,7 +207,11 @@ pid_to_integer(Pid) ->
 get_and_cache_ring() ->
     case erlang:get(web_scalaris_ring) of
         undefined ->
-            Ring = statistics:get_ring_details(),
+            Ring =
+                case whereis(mgmt_server) of
+                    undefined -> statistics:get_ring_details_neighbors(1); % get neighbors only
+                    _         -> statistics:get_ring_details()
+                end,
             erlang:put(web_scalaris_ring, Ring);
         Ring -> ok
     end,
@@ -218,21 +222,59 @@ flush_ring_cache() ->
     erlang:erase(web_scalaris_ring),
     ok.
 
+-spec extract_ring_info([node_details:node_details()])
+        -> [{Label::string(), Value::string(), Known::boolean()}].
+extract_ring_info([RingE]) ->
+    Me_tmp = node:id(node_details:get(RingE, node)),
+    Pred_tmp = node:id(node_details:get(RingE, pred)),
+    Label = node_details:get(RingE, hostname) ++ " (" ++
+                integer_to_list(node_details:get(RingE, load)) ++ ")",
+    case Me_tmp =:= Pred_tmp of
+        true -> [{Label, "100.00", true}];
+        _ ->
+            Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
+            Me_val = io_lib:format("~f", [Diff]),
+            Unknown_val = io_lib:format("~f", [100 - Diff]),
+            [{Label, Me_val, true}, {"unknown", Unknown_val, false}]
+    end;
+extract_ring_info([First | _Rest] = Ring) ->
+    extract_ring_info(Ring, First, []).
+
+-spec extract_ring_info(Ring::[node_details:node_details()], First::node_details:node_details(),
+                        Acc::[T | [T]]) -> [T]
+        when is_subtype(T, {Label::string(), Value::string(), Known::boolean()}).
+extract_ring_info([RingE], First, Acc) ->
+    NewAcc = [extract_ring_info2(RingE, First) | Acc],
+    lists:flatten(lists:reverse(NewAcc));
+extract_ring_info([RingE1, RingE2 | Rest], First, Acc) ->
+    NewAcc = [extract_ring_info2(RingE1, RingE2) | Acc],
+    extract_ring_info([RingE2 | Rest], First, NewAcc).
+
+-spec extract_ring_info2(RingE1::node_details:node_details(), RingE2::node_details:node_details())
+        -> [{Label::string(), Value::string(), Known::boolean()}].
+extract_ring_info2(RingE1, RingE2) ->
+    E1_Me_tmp = node:id(node_details:get(RingE1, node)),
+    E1_Pred_tmp = node:id(node_details:get(RingE1, pred)),
+    E2_Pred_tmp = node:id(node_details:get(RingE2, pred)),
+    E1_Diff = ?RT:get_range(E1_Pred_tmp, E1_Me_tmp) * 100 / ?RT:n(),
+    E1_Label = node_details:get(RingE1, hostname) ++ " (" ++
+                   integer_to_list(node_details:get(RingE1, load)) ++ ")",
+    E1_Me_val = io_lib:format("~f", [E1_Diff]),
+    case E1_Me_tmp =:= E2_Pred_tmp of
+        true -> [{E1_Label, E1_Me_val, true}];
+        _ -> % add an "unknown" slice as there is another (but unknown) node:
+            Diff2 = ?RT:get_range(E1_Me_tmp, E2_Pred_tmp) * 100 / ?RT:n(),
+            Unknown_val = io_lib:format("~f", [Diff2]),
+            [{E1_Label, E1_Me_val, true}, {"unknown", Unknown_val, false}]
+    end.
+
 -spec getRingChart() -> [html_type()].
 getRingChart() ->
     RealRing = get_and_cache_ring(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
     Content = try
-                  Data = [ begin
-                               Me_tmp = node:id(node_details:get(Node, node)),
-                               Pred_tmp = node:id(node_details:get(Node, pred)),
-                               Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
-                               Value = io_lib:format("~f", [Diff]),
-                               Label = node_details:get(Node, hostname) ++ " (" ++
-                                           integer_to_list(node_details:get(Node, load)) ++ ")",
-                               {Label, Value}
-                           end || Node <- Ring ],
+                  Data = extract_ring_info(Ring),
                   DataStr =
                       lists:flatten(
                         ["\n",
@@ -240,10 +282,21 @@ getRingChart() ->
                          "var ring = [];\n"
                          "var i = 0;\n"
                          "var color = $.color.parse(\"#008080\");\n",
-                         ["ring[i] = { label: \"" ++ Label ++ "\", data: " ++ Value ++ ", color: color.toString() };\n"
-                          "i = i+1;\n"
-                          "if (color.a > 0.2) { color = $.color.parse(color).add('a', -alpha_inc); }\n"
-                          || {Label, Value} <- Data]]),
+                         [begin
+                              Color =
+                                  case Known of
+                                      true -> "color.toString()";
+                                      _ -> "$.color.make(255, 255, 255, 1).toString()"
+                                  end,
+                              ColorInc =
+                                  case Known of
+                                      true -> "if (color.a > 0.2) { color = $.color.parse(color).add('a', -alpha_inc); }\n";
+                                      false -> ""
+                                  end,
+                              "ring[i] = { label: \"" ++ Label ++ "\", data: " ++ Value ++ ", color: " ++ Color ++ " };\n"
+                              "i = i+1;\n" ++ ColorInc
+                          end
+                          || {Label, Value, Known} <- Data]]),
                   PlotFun = "$.plot($(\"#ring\"), ring, {\n"
                             " series: {\n"
                             "  pie: {\n"

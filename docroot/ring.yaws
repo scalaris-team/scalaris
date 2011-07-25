@@ -25,6 +25,9 @@
    	  <div class="nothighlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
+      <div class="highlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
       
 <erl>
 out(Arg) ->
@@ -32,10 +35,7 @@ out(Arg) ->
         undefined -> {html, ""};
         _ ->
             {html,
-"      <div class=\"highlighted\">
-        <a class=\"menua\" href=\"ring.yaws\">Ring</a>
-      </div>
-      <div class=\"nothighlighted\">
+"      <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
       </div>
       <div class=\"nothighlighted\">
@@ -61,15 +61,16 @@ out(Arg) ->
       <div class="middleleft">
 <h2>Ring</h2>
 
-Number of nodes: 
 <erl> 
  out(Arg) ->
-    mgmt_server:number_of_nodes(),
-    receive
-        {get_list_length_response,Res} ->
-            ok
-    end,
-    {html, integer_to_list(Res)}.
+    case whereis(mgmt_server) of
+        undefined ->
+            {html, ""};
+        _ ->
+            mgmt_server:number_of_nodes(),
+            receive {get_list_length_response, Res} -> ok end,
+            {html, "Number of nodes: " ++ integer_to_list(Res)}
+    end.
 </erl>
 
 <p>

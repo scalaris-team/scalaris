@@ -25,6 +25,9 @@
       <div class="nothighlighted">
 	    <a class="menua" href="index.yaws">Home</a>
 	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
       
 <erl>
 out(Arg) ->
@@ -32,10 +35,7 @@ out(Arg) ->
         undefined -> {html, ""};
         _ ->
             {html,
-"      <div class=\"nothighlighted\">
-        <a class=\"menua\" href=\"ring.yaws\">Ring</a>
-      </div>
-      <div class=\"highlighted\">
+"      <div class=\"highlighted\">
         <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
       </div>
       <div class=\"nothighlighted\">

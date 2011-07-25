@@ -19,7 +19,10 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([get_total_load/1, get_average_load/1, get_load_std_deviation/1, get_ring_details/0, get_average_rt_size/1, get_rt_size_std_deviation/1, get_memory_usage/1, get_max_memory_usage/1]).
+-export([get_ring_details/0, get_ring_details_neighbors/1,
+         get_total_load/1, get_average_load/1, get_load_std_deviation/1,
+         get_average_rt_size/1, get_rt_size_std_deviation/1,
+         get_memory_usage/1, get_max_memory_usage/1]).
 
 -include("scalaris.hrl").
 
@@ -84,12 +87,58 @@ get_ring_details() ->
                 log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
                 throw('mgmt_server_timeout')
             end,
+    lists:sort(fun compare_node_details/2, get_ring_details(Nodes)).
+
+%% @doc Returns a sorted list of all known nodes in the neighborhoods of the
+%%      dht_node processes in this VM, recurses to their neighboring nodes if
+%%      requested.
+%%      See compare_node_details/2 for a definition of the order.
+-spec get_ring_details_neighbors(RecursionLvl::non_neg_integer()) -> ring().
+get_ring_details_neighbors(RecursionLvl) ->
+    Nodes = [comm:make_global(Pid) || Pid <- pid_groups:find_all(dht_node)],
+    get_ring_details_neighbors(RecursionLvl, [], Nodes).
+
+-spec get_ring_details_neighbors(RecursionLvl::non_neg_integer(), Ring::ring(), Nodes::[comm:mypid()]) -> ring().
+get_ring_details_neighbors(RecursionLvl, Ring, Nodes) ->
+    % first get the nodes with no details yet:
+    RingNodes = [begin
+                     case RingE of
+                         {ok, Details} ->
+                             node:pidX(node_details:get(Details, node));
+                         {failed, Pid} ->
+                             Pid
+                     end
+                 end || RingE <- Ring],
+    {_OnlyRing, _Both, NewNodes} = util:split_unique(RingNodes, Nodes),
+    % then get their node details:
+    NewRing = lists:sort(fun compare_node_details/2,
+                         lists:append(Ring, get_ring_details(NewNodes))),
+    case RecursionLvl =< 1 of
+        true -> NewRing;
+        _ -> % gather nodes for the next recusion:
+            NextNodes =
+                lists:append(
+                  [begin
+                     case RingE of
+                         {ok, Details} ->
+                             [node:pidX(Node) || Node <- node_details:get(Details, predlist)] ++
+                             [node:pidX(Node) || Node <- node_details:get(Details, succlist)];
+                         {failed, _Pid} ->
+                             []
+                     end
+                 end || RingE <- NewRing]),
+            get_ring_details_neighbors(RecursionLvl - 1, NewRing, NextNodes)
+    end.
+
+%% @doc Returns a sorted list of details about the given nodes.
+%%      See compare_node_details/2 for a definition of the order.
+-spec get_ring_details(Nodes::[comm:mypid()]) -> ring().
+get_ring_details(Nodes) ->
     _ = [begin
              SourcePid = comm:this_with_cookie(Pid),
              comm:send(Pid, {get_node_details, SourcePid})
          end || Pid <- Nodes],
-    Ring = get_node_details(Nodes, [], 0),
-    lists:sort(fun compare_node_details/2, Ring).
+    get_node_details(Nodes, [], 0).
 
 %% @doc Defines an order of ring_element() terms so that {failed, Pid} terms
 %%      are considered the smallest but sorted by their pids.
