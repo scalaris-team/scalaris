@@ -134,34 +134,38 @@ get_last_n(Table, Key, N) ->
     [{Key, Data}] = ets:lookup(Table, Key),
     rrd:reduce_timeslots(N, Data).
 
--spec web_debug_info_dump_fun(rrd:rrd(), From::util:time(), To::util:time(), Value)
-        -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), Value, Avg::float() | undefined}.
+-spec web_debug_info_dump_fun(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
+        -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), ValueStr::string(), AvgStr::string()}.
 web_debug_info_dump_fun(DB, From_, To_, Value) ->
     From = calendar:now_to_universal_time(From_),
     To = calendar:now_to_universal_time(To_),
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-    Avg = case rrd:get_type(DB) of
-        counter -> Value / Diff_in_s;
-        event   -> length(Value) / Diff_in_s;
-        _       -> undefined
-    end,
-    {From, To, Diff_in_s, Value, Avg}.
+    AvgStr =
+        case rrd:get_type(DB) of
+            counter -> io_lib:format(" (avg: ~.2f / s)", [Value / Diff_in_s]);
+            event   -> io_lib:format(" (avg: ~.2f / s)", [length(Value) / Diff_in_s]);
+            timing  -> io_lib:format(" (avg: ~.2f / s)", [element(3, Value) / Diff_in_s]);
+            _       -> ""
+        end,
+    ValueStr =
+        case rrd:get_type(DB) of
+            timing  ->
+                {Sum, Sum2, Count, Min, Max} = Value,
+                Avg = Sum / Count, Avg2 = Sum2 / Count,
+                Stddev = math:sqrt(Avg2 - (Avg * Avg)),
+                io_lib:format(" avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms",
+                              [Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000]);
+            _       -> io_lib:format(" ~p", [Value])
+        end,
+    {From, To, Diff_in_s, lists:flatten(ValueStr), lists:flatten(AvgStr)}.
 
 -spec web_debug_info_merge_values(table_index(), rrd:rrd())
             -> {Key::string(), LastNValues::string()}.
 web_debug_info_merge_values(Key, Data) ->
     ValuesLastN =
-        [begin
-             lists:flatten(
-               case Avg of
-                   undefined ->
-                       io_lib:format("~p - ~p UTC (~p s): ~p",
-                                     [From, To, Diff_in_s, Value]);
-                   _ ->
-                       io_lib:format("~p - ~p UTC (~p s): ~p (avg: ~.2f / s)",
-                                     [From, To, Diff_in_s, Value, Avg])
-               end)
-         end || {From, To, Diff_in_s, Value, Avg} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
+        [lists:flatten(io_lib:format("~p - ~p UTC (~p s): ~s~s",
+                                     [From, To, Diff_in_s, ValueStr, AvgStr]))
+         || {From, To, Diff_in_s, ValueStr, AvgStr} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
     {lists:flatten(io_lib:format("~p", [Key])), string:join(ValuesLastN, "<br />")}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
