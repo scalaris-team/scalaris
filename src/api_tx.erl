@@ -71,8 +71,8 @@ req_list(TLog, ReqList) ->
       ?MODULE, "req_list",
       fun(Old) ->
               Old2 = case Old of
-                         % 1s monitoring interval, only keep newest
-                         undefined -> rrd:create(1 * 1000000, 1, timing);
+                         % 10s monitoring interval, only keep newest
+                         undefined -> rrd:create(10 * 1000000, 1, timing);
                          _ -> Old
                      end,
               rrd:add_now(TimeInUs, Old2)
