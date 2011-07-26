@@ -26,7 +26,10 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2, check_config/0]).
+% (temporarily) storing monitoring values in the calling process:
 -export([proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
+% sending monitoring values to the monitor process
+-export([monitor_set_value/3]).
 
 -type key() :: string().
 -type internal_key() :: {'$monitor$', Key::string()}.
@@ -34,7 +37,9 @@
 
 -type state() :: Table::tid() | atom().
 -type message() ::
-    {proc_report, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
+    {report_rrd, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
+    {report_single, Process::atom(), Key::key(),
+     NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
@@ -57,11 +62,14 @@ check_report(Process, Key, OldValue, NewValue) ->
             end
     end.
 
-%% @doc Sets the value at Key. Either specify a new value or an update function
-%%      which generates the new value from the old one.
+%% @doc Sets the value at Key inside the current process.
+%%      Either specify a new value or an update function which generates the
+%%      new value from the old one.
+%%      If a new time slot is started by updating the value, then the rrd()
+%%      record is send to the monitor process.
 -spec proc_set_value(Process::atom(), Key::key(),
                      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
-proc_set_value(Process, Key, UpdateFun) when is_function(UpdateFun, 1)->
+proc_set_value(Process, Key, UpdateFun) when is_function(UpdateFun, 1) ->
     InternalKey = to_internal_key(Key),
     OldValue = erlang:get(InternalKey),
     NewValue = UpdateFun(OldValue),
@@ -71,6 +79,15 @@ proc_set_value(Process, Key, NewValue) ->
     InternalKey = to_internal_key(Key),
     OldValue = erlang:put(InternalKey, NewValue),
     check_report(Process, Key, OldValue, NewValue).
+
+%% @doc Sets the value at Key inside the monitor process of the current group.
+%%      Either specify a new value or an update function which generates the
+%%      new value from the old one.
+-spec monitor_set_value(Process::atom(), Key::key(),
+                        NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
+monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
+    MyMonitor = pid_groups:get_my(monitor),
+    comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
 
 %% @doc Checks whether a value exists at Key.
 -spec proc_exists_value(Process::atom(), Key::key()) -> boolean().
@@ -90,14 +107,14 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
     % note: it may happen that the new value created a new slot which already
     % discarded all logged data from the previous (unreported) time slot
     % -> send OldValue, too
-    comm:send_local(MyMonitor, {proc_report, Process, Key, OldValue, Value}).
+    comm:send_local(MyMonitor, {report_rrd, Process, Key, OldValue, Value}).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({proc_report, ProcTable, Key, OldValue, _NewValue}, Table) ->
+on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
     % note: reporting is always done when a new time slot is created
     % -> use the values from the old value
-    TableIndex = {ProcTable, Key},
+    TableIndex = {Process, Key},
     MyData = case ets:lookup(Table, TableIndex) of
                  [{TableIndex, X}] -> X;
                  []      ->
@@ -109,6 +126,10 @@ on({proc_report, ProcTable, Key, OldValue, _NewValue}, Table) ->
              end,
     NewData = rrd:add_nonexisting_timeslots(MyData, OldValue),
     ets:insert(Table, {TableIndex, NewData}),
+    Table;
+
+on({report_single, Process, Key, NewValue_or_UpdateFun}, Table) ->
+    proc_set_value(Process, Key, NewValue_or_UpdateFun),
     Table;
 
 on({web_debug_info, Requestor}, Table) ->
