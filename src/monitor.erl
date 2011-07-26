@@ -43,6 +43,7 @@
     {report_rrd, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {report_single, Process::atom(), Key::key(),
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
+    {get_rrd, Process::atom(), Key::key(), SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
@@ -129,7 +130,7 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
     TableIndex = {Process, Key},
     MyData = case ets:lookup(Table, TableIndex) of
                  [{TableIndex, X}] -> X;
-                 []      ->
+                 [] ->
                      SlotLength = rrd:get_slot_length(OldValue),
                      OldTime = rrd:get_current_time(OldValue),
                      rrd:create(SlotLength, get_timeslots_to_keep(),
@@ -142,6 +143,15 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
 
 on({report_single, Process, Key, NewValue_or_UpdateFun}, Table) ->
     proc_set_value(Process, Key, NewValue_or_UpdateFun),
+    Table;
+
+on({get_rrd, Process, Key, SourcePid}, Table) ->
+    TableIndex = {Process, Key},
+    MyData = case ets:lookup(Table, TableIndex) of
+                 [{TableIndex, X}] -> X;
+                 [] -> undefined
+             end,
+    comm:send(SourcePid, {get_rrd_response, MyData}),
     Table;
 
 on({web_debug_info, Requestor}, Table) ->
