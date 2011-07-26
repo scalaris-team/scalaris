@@ -62,11 +62,28 @@ new_tlog() -> tx_tlog:empty().
 req_list(ReqList) ->
     req_list(new_tlog(), ReqList).
 
-%% @doc Perform several requests inside a transaction.
+%% @doc Perform several requests inside a transaction and monitors its
+%%      execution time.
 -spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
-req_list([], [{commit}]) ->
-    {[], [{ok}]};
 req_list(TLog, ReqList) ->
+    {TimeInUs, Result} = util:tc(fun req_list2/2, [TLog, ReqList]),
+    monitor:client_monitor_set_value(
+      ?MODULE, "req_list",
+      fun(Old) ->
+              Old2 = case Old of
+                         % 1s monitoring interval, only keep newest
+                         undefined -> rrd:create(1 * 1000000, 1, timing);
+                         _ -> Old
+                     end,
+              rrd:add_now(TimeInUs, Old2)
+      end),
+    Result.
+
+%% @doc Perform several requests inside a transaction (internal implementation).
+-spec req_list2(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
+req_list2([], [{commit}]) ->
+    {[], [{ok}]};
+req_list2(TLog, ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
     %% replace operations by corresponding module names in ReqList
