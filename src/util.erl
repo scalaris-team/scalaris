@@ -46,7 +46,7 @@
          sup_worker_desc/4,
          sup_supervisor_desc/3,
          sup_supervisor_desc/4,
-         tc/3]).
+         tc/3, tc/2, tc/1]).
 -export([supervisor_terminate/1,
          supervisor_terminate_childs/1,
          wait_for/1, wait_for/2,
@@ -438,11 +438,31 @@ gb_trees_foldl_iter(_F, Acc, none) ->
 gb_trees_foldl_iter(F, Acc, {Key, Val, Iter}) ->
     gb_trees_foldl_iter(F, F(Key, Val, Acc), gb_trees:next(Iter)).
 
--spec tc(module(), atom(), list()) -> {integer(), any()}.
+%% @doc Measures the execution time (in microseconds) for an MFA
+%%      (does not catch exceptions as timer:tc/3 in older Erlang versions).
+-spec tc(module(), atom(), list()) -> {integer(), term()}.
 tc(M, F, A) ->
-    Before = erlang:now(),
+    Before = os:timestamp(),
     Val = apply(M, F, A),
-    After = erlang:now(),
+    After = os:timestamp(),
+    {timer:now_diff(After, Before), Val}.
+
+%% @doc Measures the execution time (in microseconds) for Fun(Args)
+%%      (does not catch exceptions as timer:tc/3 in older Erlang versions).
+-spec tc(Fun::fun(), Args::list()) -> {integer(), term()}.
+tc(Fun, Args) ->
+    Before = os:timestamp(),
+    Val = apply(Fun, Args),
+    After = os:timestamp(),
+    {timer:now_diff(After, Before), Val}.
+
+%% @doc Measures the execution time (in microseconds) for Fun()
+%%      (does not catch exceptions as timer:tc/3 in older Erlang versions).
+-spec tc(Fun::fun()) -> {integer(), term()}.
+tc(Fun) ->
+    Before = os:timestamp(),
+    Val = Fun(),
+    After = os:timestamp(),
     {timer:now_diff(After, Before), Val}.
 
 -spec get_pids_uid() -> pos_integer().
@@ -728,7 +748,7 @@ s_repeat(Fun, Args, Times) ->
 -spec s_repeatAndCollect(fun(), args(), pos_integer()) -> [any()].
 s_repeatAndCollect(Fun, Args, Times) ->    
     s_repeatAndAccumulate(Fun, Args, Times, fun(R, Y) -> [R | Y] end, []).
-  
+
 %% @doc Sequential repetion of function FUN with arguments ARGS TIMES-fold.
 %%      Results will be accumulated with an accumulator function ACCUFUN 
 %%      in register ACCUMULATOR.
@@ -740,7 +760,7 @@ s_repeatAndAccumulate(Fun, Args, 1, AccuFun, Accumulator) ->
 s_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
     R1 = apply(Fun, Args),
     s_repeatAndAccumulate(Fun, Args, Times - 1, AccuFun, AccuFun(R1, Accumulator)).
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % parallel repeat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

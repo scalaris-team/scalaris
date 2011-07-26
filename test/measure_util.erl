@@ -24,7 +24,7 @@
 
 -module(measure_util).
 
--export([time_avg/4, time_timer_tc_fun/2]).
+-export([time_avg/4]).
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
@@ -34,12 +34,8 @@
             Med::non_neg_integer(), Avg::non_neg_integer()}.
 time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     L = util:s_repeatAndCollect(
-          fun() ->
-                  {Time, _} = timer:tc(?MODULE, time_timer_tc_fun, [Fun, Args]),
-                  Time
-          end,
-          [],
-          ExecTimes),
+          fun() -> {Time, _} = util:tc(Fun, Args), Time end,
+          [], ExecTimes),
     Times = case SkipFirstValue of
                 true -> lists:nthtail(1, L);
                 _ -> L
@@ -50,8 +46,3 @@ time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     Med = lists:nth(((Length + 1) div 2), lists:sort(Times)),
     Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg}.
-
-% @doc Wrapper for Erlang before R14 which do not support timer:tc/2.
--spec time_timer_tc_fun(Fun::fun(), Args::any()) -> any().
-time_timer_tc_fun(Fun, Args) ->
-    erlang:apply(Fun, Args).

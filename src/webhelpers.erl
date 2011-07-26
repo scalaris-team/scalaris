@@ -48,21 +48,21 @@ isPost(A) ->
             Result::{Value::?DB:value(), Version::?DB:version()} |
                     {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
-    timer:tc(api_tx, read, [Key]).
+    util:tc(api_tx, read, [Key]).
 
 -spec set_key(Key::?RT:key(), Value::?DB:value())
         -> {TimeInMs::integer(),
             Result::commit | userabort | {fail, not_found} | {fail, timeout} |
                     {fail, fail} | {fail, abort}}.
 set_key(Key, Value) ->
-    timer:tc(api_tx, write, [Key, Value]).
+    util:tc(api_tx, write, [Key, Value]).
 
 -spec delete_key(Key::?RT:key(), Timeout::pos_integer())
         -> {TimeInMs::integer(),
             Result::{ok, pos_integer(), list()} | {fail, timeout} |
                     {fail, timeout, pos_integer(), list()}}.
 delete_key(Key, Timeout) ->
-    timer:tc(api_rdht, delete, [Key, Timeout]).
+    util:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%--------------------------Vivaldi-Map------------------------------
 

@@ -101,12 +101,12 @@ bloomSync_times(Config) ->
     DestVersCount = NodeCount * 2 * DataCount,
     ItemCount = NodeCount * DataCount,
     %Build Ring
-    {BuildRingTime, _} = timer:tc(?MODULE, build_symmetric_ring, [NodeCount, Config]),
+    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config]),
     config:write(rep_update_fpr, Fpr),
-    {FillTime, _} = timer:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount]),
+    {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount]),
     %measure initial sync degree
-    {DBStatusTime, DBStatus} = timer:tc(?MODULE, getDBStatus, []),
-    {GetVersionCountTime, VersCount} = timer:tc(?MODULE, getVersionCount, [DBStatus]),
+    {DBStatusTime, DBStatus} = util:tc(?MODULE, getDBStatus, []),
+    {GetVersionCountTime, VersCount} = util:tc(?MODULE, getVersionCount, [DBStatus]),
     InitialOutdated = DestVersCount - VersCount,
     %run sync rounds    
     Result = [calc_sync_degree(InitialOutdated, ItemCount) |
@@ -120,7 +120,7 @@ bloomSync_times(Config) ->
                                                end))],
     ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
     %clean up
-    {StopRingTime, _} = timer:tc(unittest_helper, stop_ring, []),    
+    {StopRingTime, _} = util:tc(unittest_helper, stop_ring, []),    
     ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStatus = ~w~nGetVersionCount = ~w~nStopRing = ~w",
            [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
