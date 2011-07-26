@@ -58,10 +58,10 @@
     {?TRIGGER_NAME} |
     {get_state_response, any()} |
     {get_chunk_response, db_chunk()} |
-    {build_sync_struct_response, intervals:interval(), rep_upd_sync:sync_struct()} |
-    {request_sync, rep_upd_sync:sync_stage(), Feedback::boolean(), rep_upd_sync:sync_struct()} |
+    {build_sync_struct_response, intervals:interval(), Round::float(), rep_upd_sync:sync_struct()} |
+    {request_sync, rep_upd_sync:sync_stage(), Feedback::boolean(), Round::float(), rep_upd_sync:sync_struct()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
-    {sync_progress_report, Sender::comm:erl_local_pid(), Text::string()}.
+    {sync_progress_report, Sender::comm:erl_local_pid(), Key::term(), Value::term()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -76,21 +76,35 @@ on({?TRIGGER_NAME}, State) ->
     ?TRACE("Trigger NEXT", []),
     State#rep_upd_state{ trigger_state = NewTriggerState };
 
-%% @doc retrieve node responsibility interval
+%% @doc retrieve own responsibility interval
 on({get_state_response, NodeDBInterval}, State) ->
     DhtNodePid = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, get_max_items()}),
-    State;
+    case get_sync_method() of
+        bloom -> 
+            comm:send_local(DhtNodePid, {get_chunk, self(), NodeDBInterval, get_max_items()}),
+            State;
+        merkleTree -> 
+            Round = State#rep_upd_state.sync_round,
+            {ok, Pid} = rep_upd_sync:start_sync(get_max_items(), true, Round), %TODO add sync process monitoring / should be child process
+            comm:send_local(DhtNodePid, 
+                            {lookup_aux, select_sync_node(NodeDBInterval), 0, 
+                             {send_to_group_member, ?PROCESS_NAME, 
+                              {request_sync, negotiate_interval, true, Round, {Pid, NodeDBInterval}}}}),
+            State#rep_upd_state{ sync_round = Round + 1 };    
+        art -> ok
+    end;    
 
 %% @doc retrieve local node db
+on({get_chunk_response, {_, []}}, State) ->
+    State;
 on({get_chunk_response, {RestI, [First | T] = DBList}}, State) ->
-    Rounds = State#rep_upd_state.sync_round,
+    Round = State#rep_upd_state.sync_round,
     DhtNodePid = pid_groups:get_my(dht_node),
     RestIEmpty = intervals:is_empty(RestI),
     not RestIEmpty andalso
         comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items()}),
     %Get Interval of DBList
-    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traved twice! - 1st getChunk, 2nd here)
+    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)
     ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
     %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
     SyncMethod = get_sync_method(),
@@ -98,45 +112,37 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State) ->
                bloom -> [get_sync_fpr()];
                _ -> []
            end,
-    {ok, Pid} = rep_upd_sync:start_sync(get_max_items()),
-    comm:send_local(Pid, {build_sync_struct, SyncMethod, {ChunkI, DBList}, Rounds, Args}),  
+    {ok, Pid} = rep_upd_sync:start_sync(get_max_items(), true, Round),
+    comm:send_local(Pid, {build_sync_struct, SyncMethod, {ChunkI, DBList}, Args}),
     %?TRACE("[~p] will build SyncStruct", [Pid]),
     case RestIEmpty of
-        true -> State#rep_upd_state{ sync_round = Rounds + 1 };
-        false -> State#rep_upd_state{ sync_round = Rounds + 0.1 }
+        true -> State#rep_upd_state{ sync_round = Round + 1 };
+        false -> State#rep_upd_state{ sync_round = Round + 0.1 }
     end;
 
 %% @doc SyncStruct is build and can be send to a node for synchronization
-on({build_sync_struct_response, Interval, Sync_Struct}, State) ->
-    #rep_upd_state{sync_round = Round} = State,
+on({build_sync_struct_response, Interval, Round, Sync_Struct}, State) ->
     _ = case intervals:is_empty(Interval) of	
             false ->
-                {_, _, RKey, RBr} = intervals:get_bounds(Interval),
-                Key = case RBr of
-                          ')' -> RKey - 1;
-                          ']' -> RKey
-                      end,
-                Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-                DestKey = lists:nth(random:uniform(erlang:length(Keys)), Keys),
+                DestKey = select_sync_node(Interval),
                 DhtNodePid = pid_groups:get_my(dht_node),
                 %?TRACE("SEND SYNC REQ TO [~p]", [DestKey]),
                 comm:send_local(DhtNodePid, 
                                 {lookup_aux, DestKey, 0, 
                                  {send_to_group_member, ?PROCESS_NAME, 
-                                  {request_sync, reconciliation, true, Sync_Struct}}}),
+                                  {request_sync, reconciliation, true, Round, Sync_Struct}}}),            
                 monitor:proc_set_value(?MODULE, "Send-Sync-Req",
                     fun(Old) -> rrd:add_now({Round, DestKey}, Old) end);
-            _ ->
-                ok
+            _ -> ok
 		end,
     State;
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, SyncStage, Feedback, SyncStruct}, State) ->
+on({request_sync, SyncStage, Feedback, Round, SyncStruct}, State) ->
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
-    {ok, Pid} = rep_upd_sync:start_sync(get_max_items()),
-    comm:send_local(Pid, {start_sync, SyncStage, Feedback, SyncStruct}),
+    {ok, Pid} = rep_upd_sync:start_sync(get_max_items(), false, Round),
+    comm:send_local(Pid, {start_sync_client, SyncStage, Feedback, SyncStruct}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -155,10 +161,10 @@ on({web_debug_info, Requestor}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Monitor Reporting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({sync_progress_report, _Sender, Msg}, State) ->
+on({sync_progress_report, _Sender, _Key, Value}, State) ->
     monitor:proc_set_value(?MODULE, "Progress",
-                           fun(Old) -> rrd:add_now(Msg, Old) end),
-    ?TRACE("SYNC FINISHED - REASON=[~s]", [Msg]),
+                           fun(Old) -> rrd:add_now(Value, Old) end),
+    ?TRACE("SYNC FINISHED - Key=~p REASON=[~p]", [Key, Value]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -174,6 +180,22 @@ concatKeyVer(DBEntry) ->
 -spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
 concatKeyVer(Key, Version) ->
     term_to_binary([Key, "#", Version]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INTERNAL HELPER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc selects a random associated key of an interval ending
+-spec select_sync_node(intervals:interval()) -> ?RT:key().
+select_sync_node(Interval) ->
+    {_, _, RKey, RBr} = intervals:get_bounds(Interval),
+    Key = case RBr of
+              ')' -> RKey - 1;
+              ']' -> RKey
+          end,
+    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
+    lists:nth(random:uniform(erlang:length(Keys)), Keys).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup

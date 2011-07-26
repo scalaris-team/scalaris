@@ -49,7 +49,8 @@ all() ->
      tester_not_minus, tester_not_minus2,
      tester_get_bounds, tester_get_elements,
      tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids, tester_mk_from_node_ids_continuous,
-     tester_mk_from_nodes
+     tester_mk_from_nodes,
+     tester_split_is_continuous, tester_split_is_well_formed, tester_split
      ].
 
 suite() ->
@@ -708,6 +709,49 @@ prop_get_elements(I_) ->
 
 tester_get_elements(_Config) ->
     tester:test(?MODULE, prop_get_elements, 1, 5000).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:split/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_split_is_well_formed(intervals:key(), intervals:key(), 1..100) -> boolean().
+prop_split_is_well_formed(X, Y, Parts) ->
+    I = intervals:new('[', X, Y, ']'),
+    S = intervals:split(I, Parts),
+    lists:foldl(fun(SubI, Acc) -> Acc andalso intervals:is_well_formed(SubI) end, true, S).
+
+-spec prop_split_is_continuous(intervals:key(), intervals:key(), 1..100) -> boolean().
+prop_split_is_continuous(X, Y, Parts) ->
+    I = intervals:new('[', X, Y, ']'),
+    S = intervals:split(I, Parts),
+    lists:foldl(fun(SubI, Acc) -> 
+                        Acc andalso ?implies(not intervals:is_empty(SubI), intervals:is_continuous(SubI)) 
+                end, true, S).    
+
+% funktional union ok, subset von org, nciht überlappend = adjazent
+-spec prop_split(intervals:key(), intervals:key(), 1..100) -> true.
+prop_split(X, Y, Parts) ->
+    I = intervals:new('[', X, Y, ']'),
+    S = intervals:split(I, Parts),
+    lists:foreach(fun(SubI) -> ?equals(intervals:is_subset(SubI, I), true) end, S),
+    ?equals(lists:foldl(fun(SubI, UI) -> intervals:union(SubI, UI) end, intervals:empty(), S), I),
+    [FirstI | RestI] = S,
+    _ = lists:foldl(fun(SubI, LastI) -> 
+                            ?equals(?implies(not intervals:is_empty(SubI), intervals:is_adjacent(SubI, LastI)), true),
+                            SubI 
+                    end, FirstI, RestI),
+    true.
+
+tester_split_is_continuous(_Config) ->
+    tester:test(?MODULE, prop_split_is_continuous, 3, 5000).
+
+tester_split_is_well_formed(_Config) ->
+    tester:test(?MODULE, prop_split_is_well_formed, 3, 5000).
+
+tester_split(_Config) ->
+    tester:test(?MODULE, prop_split, 3, 5000).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
