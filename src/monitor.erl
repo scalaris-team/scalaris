@@ -25,11 +25,14 @@
 
 -include("scalaris.hrl").
 
+% monitor process functions
 -export([start_link/1, init/1, on/2, check_config/0]).
-% (temporarily) storing monitoring values in the calling process:
+
+% functions (temporarily) storing monitoring values in the calling process:
 -export([proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
-% sending monitoring values to the monitor process
--export([monitor_set_value/3]).
+
+% functions sending monitoring values directly to the monitor process
+-export([monitor_set_value/3, client_monitor_set_value/3]).
 
 -type key() :: string().
 -type internal_key() :: {'$monitor$', Key::string()}.
@@ -87,6 +90,15 @@ proc_set_value(Process, Key, NewValue) ->
                         NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
 monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
     MyMonitor = pid_groups:get_my(monitor),
+    comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
+
+%% @doc Sets the value at Key inside the monitor process of the "clients_group".
+%%      Either specify a new value or an update function which generates the
+%%      new value from the old one.
+-spec client_monitor_set_value(Process::atom(), Key::key(),
+                        NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
+client_monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
+    MyMonitor = pid_groups:pid_of("clients_group", monitor),
     comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
 
 %% @doc Checks whether a value exists at Key.
@@ -156,37 +168,36 @@ get_last_n(Table, Key, N) ->
     rrd:reduce_timeslots(N, Data).
 
 -spec web_debug_info_dump_fun(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
-        -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), ValueStr::string(), AvgStr::string()}.
+        -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), ValueStr::string()}.
 web_debug_info_dump_fun(DB, From_, To_, Value) ->
     From = calendar:now_to_universal_time(From_),
     To = calendar:now_to_universal_time(To_),
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-    AvgStr =
-        case rrd:get_type(DB) of
-            counter -> io_lib:format(" (avg: ~.2f / s)", [Value / Diff_in_s]);
-            event   -> io_lib:format(" (avg: ~.2f / s)", [length(Value) / Diff_in_s]);
-            timing  -> io_lib:format(" (avg: ~.2f / s)", [element(3, Value) / Diff_in_s]);
-            _       -> ""
-        end,
     ValueStr =
         case rrd:get_type(DB) of
             timing  ->
                 {Sum, Sum2, Count, Min, Max} = Value,
+                AvgPerS = Count / Diff_in_s,
                 Avg = Sum / Count, Avg2 = Sum2 / Count,
                 Stddev = math:sqrt(Avg2 - (Avg * Avg)),
-                io_lib:format(" avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms",
-                              [Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000]);
-            _       -> io_lib:format(" ~p", [Value])
+                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms",
+                              [Count, AvgPerS, Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000]);
+            counter ->
+                io_lib:format("&nbsp;&nbsp;sum: ~p (avg: ~.2f / s)", [Value, Value / Diff_in_s]);
+            event ->
+                io_lib:format("&nbsp;&nbsp;events: ~p (avg: ~.2f / s)", [Value, length(Value) / Diff_in_s]);
+            _       ->
+                io_lib:format("&nbsp;&nbsp;~p", [Value])
         end,
-    {From, To, Diff_in_s, lists:flatten(ValueStr), lists:flatten(AvgStr)}.
+    {From, To, Diff_in_s, lists:flatten(ValueStr)}.
 
 -spec web_debug_info_merge_values(table_index(), rrd:rrd())
             -> {Key::string(), LastNValues::string()}.
 web_debug_info_merge_values(Key, Data) ->
     ValuesLastN =
-        [lists:flatten(io_lib:format("~p - ~p UTC (~p s): ~s~s",
-                                     [From, To, Diff_in_s, ValueStr, AvgStr]))
-         || {From, To, Diff_in_s, ValueStr, AvgStr} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
+        [lists:flatten(io_lib:format("~p - ~p UTC (~p s):<br/>~s",
+                                     [From, To, Diff_in_s, ValueStr]))
+         || {From, To, Diff_in_s, ValueStr} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
     {lists:flatten(io_lib:format("~p", [Key])), string:join(ValuesLastN, "<br />")}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
