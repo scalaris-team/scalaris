@@ -13,14 +13,10 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    Merkle tree (hash tree) implementation
+%% @doc    Merkle tree implementation
 %%         with configurable bucketing, branching and hashing.
-%%         The tree will evenly divide its interval with its subnodes.
-%%         If the item count of a leaf node exceeds bucket size the node
-%%         will switch to an internal node. The items will be distributed to
-%%         its new child nodes which evenly divide the parents interval.
-%%         To finish building the structure gen_hashes has to be called to generate
-%%         the node signatures.
+%%         Underlaying tree structure is an n-ary tree.
+%%         After calling gen_hashes the tree is ready to use and sealed.
 %% @end
 %% @version $Id$
 
@@ -29,8 +25,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/3, insert/3, empty/0, is_empty/1,
-         set_root_interval/2, size/1, gen_hashes/1,
+-export([new/1, new/3, insert/3, empty/0, 
+         is_empty/1, set_root_interval/2, size/1, gen_hashes/1,
          get_hash/1]).
 
 -ifdef(with_export_type_support).
@@ -68,6 +64,8 @@
 %% Empty
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @doc Insert on an empty tree fail. First operation on an empty tree should be set_interval.
+%      Returns an empty merkle tree ready for work.
+% @end
 -spec empty() -> merkle_tree().
 empty() ->
     {#mt_config{}, {nil, 0, nil, intervals:empty(), []}}.
@@ -102,7 +100,6 @@ get_hash({Hash, _, _, _, _}) -> Hash.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% set_root_interval
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% @doc Returns an empty merkle tree ready for work.
 -spec set_root_interval(mt_interval(), merkle_tree()) -> merkle_tree().
 set_root_interval(I, {Conf, _}) ->
     new(I, Conf).

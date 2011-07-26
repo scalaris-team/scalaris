@@ -624,23 +624,26 @@ is_left_of(X, Y) ->
 is_right_of(X, Y) ->
     is_left_of(Y, X).
 
-%% @doc Splits the interval in X equally sized subintervals
-%%      Precondition: normalized interval is continous
-%% @end
+%% @doc Splits an continuous interval in X equally sized subintervals
+%%      Returns: List of adjacent intervals
 -spec split(interval(), pos_integer()) -> [interval()].
-split(I, 1) -> I;
-split(I, Parts) -> 
+split(I, 1) -> [I];
+split(I, Parts) ->
     case is_continuous(I) of
-        true -> split2(get_bounds(I), Parts, []);
-        false -> erlang:throw('interval is not continuous!')
+        true -> lists:reverse(split2(intervals:get_bounds(I), Parts, []));
+        false -> erlang:throw('interval is not continuouss')
     end.
 
 -spec split2({left_bracket(), key(), key(), right_bracket()}, pos_integer(), Acc::[interval()]) -> [interval()].
 split2({LBr, Key, Key, RBr}, _, Acc) ->
-    Acc ++ [new(LBr, Key, Key, RBr)];
+    [new(LBr, Key, Key, RBr) | Acc];
 split2({LBr, LKey, RKey, RBr}, 1, Acc) ->
-    Acc ++ [new(LBr, LKey, RKey, RBr)];
+    [new(LBr, LKey, RKey, RBr) | Acc];
 split2({LBr, LKey, RKey, RBr}, Parts, Acc) ->
     SplitKey = ?RT:get_split_key(LKey, RKey, {1, Parts}),
-    split2({'(', SplitKey, RKey, RBr}, Parts - 1, Acc ++ [new(LBr, LKey, SplitKey, ']')]).
-
+    case SplitKey =:= LKey of
+        true -> [new(LBr, LKey, RKey, RBr) | Acc];
+        false -> split2({'(', SplitKey, RKey, RBr}, 
+                        Parts - 1, 
+                        [new(LBr, LKey, SplitKey, ']') | Acc])
+    end.

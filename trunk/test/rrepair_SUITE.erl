@@ -44,7 +44,8 @@ all() ->
     [get_symmetric_keys_test,
      simpleBloomSync_test,
      bloomSync_FprCompare_check,
-     bloomSync_times].
+     bloomSync_times,
+     min_nodes_rrepair].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -59,7 +60,8 @@ get_rrepair_config_parameter() ->
      {rep_update_trigger, trigger_periodic},
      {rep_update_sync_method, bloom}, %bloom, merkleTree, art
      {rep_update_fpr, 0.1},
-     {rep_update_max_items, 1000}].
+     {rep_update_max_items, 1000},
+     {rep_update_negotiate_sync_interval, false}].
 
 end_per_testcase(_TestCase, _Config) ->
     unittest_helper:stop_ring(),
@@ -124,6 +126,11 @@ bloomSync_times(Config) ->
     ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStatus = ~w~nGetVersionCount = ~w~nStopRing = ~w",
            [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
+
+min_nodes_rrepair(Config) ->
+  _R1 = start_bloom_sync(Config, 1, 1, 2, 0.2),
+  _R2 = start_bloom_sync(Config, 1, 1000, 2, 0.2),
+  ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions

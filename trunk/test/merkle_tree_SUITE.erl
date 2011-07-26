@@ -29,7 +29,6 @@
 -include("unittest.hrl").
 
 all() -> [
-          split,
           insert1,
           treeHash,
           branchTest
@@ -40,17 +39,6 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
-    ok.
-
-split(_) ->
-    I1 = intervals:new('[', 1, 1000, ']'),
-    Split1 = intervals:split(I1, 4),
-    ct:pal("Split1=~w", [Split1]),
-    ?equals(length(Split1), 4),
-    ct:pal("Split 1-1000 = ~p", [Split1]),
-    I2 = intervals:new('[', ?PLUS_INFINITY - 800, ?MINUS_INFINITY + 1200, ']'),
-    Split2 = intervals:split(I2, 4),
-    ct:pal("Split wrapping = ~p", [Split2]),
     ok.
 
 insert1(_) ->    
