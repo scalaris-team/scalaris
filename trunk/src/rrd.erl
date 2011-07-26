@@ -28,7 +28,7 @@
 -endif.
 
 % external API with transparent time handling
--export([create/3, add_now/2, dump/1, dump_with/2]).
+-export([create/3, add_now/2, dump/1, dump_with/2, dump_with/3]).
 
 % external API without transparent time handling
 -export([create/4, add/3]).
@@ -86,13 +86,20 @@ add_now(Value, DB) ->
 dump(DB) ->
     dump_with(DB, fun(_DB, From, To, X) -> {From, To, X} end).
 
--spec dump_with(rrd(), fun((rrd(), From::time(), To::time(), Value::term()) -> T)) -> [T].
-dump_with(DB, F) ->
+-type dump_fun_existing(T) :: fun((rrd(), From::time(), To::time(), Value::term()) -> T).
+-type dump_fun_nonexisting(T) :: fun((rrd(), From::time(), To::time()) -> ignore | {keep, T}).
+
+-spec dump_with(rrd(), dump_fun_existing(T)) -> [T].
+dump_with(DB, FunExist) ->
+    dump_with(DB, FunExist, fun(_DB, _From, _To) -> ignore end).
+
+-spec dump_with(rrd(), dump_fun_existing(T), dump_fun_nonexisting(U)) -> [T | U].
+dump_with(DB, FunExist, FunNotExist) ->
     SlotLength = DB#rrd.slot_length,
     CurrentIndex = DB#rrd.current_index,
     Count = DB#rrd.count,
     dump_internal(DB, (CurrentIndex + 1) rem Count, CurrentIndex,
-                  DB#rrd.current_time - (Count - 1) * SlotLength, [], F).
+                  DB#rrd.current_time - (Count - 1) * SlotLength, [], FunExist, FunNotExist).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -280,21 +287,25 @@ get_slot_type(Time, CurrentTime, StepSize) ->
 
 -spec dump_internal(rrd(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
                     CurrentTime::internal_time(), Rest::[T],
-                    fun((rrd(), From::time(), To::time(), Value::term()) -> T)) -> [T].
-dump_internal(DB, EndIndex, EndIndex, CurrentTime, Rest, F) ->
-    dump_internal2(DB, EndIndex, CurrentTime, Rest, F);
-dump_internal(DB, IndexToFetch, EndIndex, CurrentTime, Rest, F) ->
-    NewRest = dump_internal2(DB, IndexToFetch, CurrentTime, Rest, F),
+                    dump_fun_existing(T), dump_fun_nonexisting(U)) -> [T | U].
+dump_internal(DB, EndIndex, EndIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
+    dump_internal2(DB, EndIndex, CurrentTime, Rest, FunExist, FunNotExist);
+dump_internal(DB, IndexToFetch, EndIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
+    NewRest = dump_internal2(DB, IndexToFetch, CurrentTime, Rest, FunExist, FunNotExist),
     Count = DB#rrd.count,
     dump_internal(DB, (IndexToFetch + 1) rem Count, EndIndex,
-                  CurrentTime + DB#rrd.slot_length, NewRest, F).
+                  CurrentTime + DB#rrd.slot_length, NewRest, FunExist, FunNotExist).
 
-dump_internal2(DB, CurrentIndex, CurrentTime, Rest, F) ->
+dump_internal2(DB, CurrentIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
     Data = DB#rrd.data,
+    From = us2timestamp(CurrentTime),
+    To = us2timestamp(CurrentTime + DB#rrd.slot_length),
     case array:get(CurrentIndex, Data) of
-        undefined -> Rest;
-        Value     -> [F(DB, us2timestamp(CurrentTime),
-                        us2timestamp(CurrentTime + DB#rrd.slot_length), Value) | Rest]
+        undefined -> case FunNotExist(DB, From, To) of
+                         ignore -> Rest;
+                         {keep, X} -> [X | Rest]
+                     end;
+        Value     -> [FunExist(DB, From, To, Value) | Rest]
     end.
 
 -spec copy_data(rrd(), IndexToWrite::non_neg_integer(), Start::non_neg_integer(), End::non_neg_integer(), Acc::rrd()) -> rrd().
