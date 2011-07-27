@@ -283,15 +283,17 @@ pids_to_names(Pids, Timeout) ->
 -spec get_web_debug_info(groupname(), nonempty_string()) ->
    {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
 get_web_debug_info(GrpName, PidNameString) ->
-    Pid =
-        case pid_of(GrpName, list_to_atom(PidNameString)) of
-            failed -> pid_of(GrpName, PidNameString);
-            X -> X
-        end,
+    PidName = try erlang:list_to_existing_atom(PidNameString)
+              catch exit:{badarg, _} -> PidNameString
+              end,
+    Pid = case pid_of(GrpName, PidName) of
+              failed -> pid_of(GrpName, PidNameString);
+              X -> X
+          end,
     KVs =
         case Pid of
             failed -> [{"process", "unknown"}];
-            Pid ->
+            _ ->
                 comm:send_local(Pid , {web_debug_info, self()}),
                 GenCompInfo =
                     receive
