@@ -665,9 +665,8 @@ getMonitorData() ->
     end.
 
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
-        -> {TimestampMs::integer(),
-            Value::{Count::non_neg_integer(), CountPerS::float(),
-                    AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float()}}.
+        -> {TimestampMs::integer(), Count::non_neg_integer(), CountPerS::float(),
+            AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float()}.
 monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max}) ->
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
     CountPerS = Count / Diff_in_s,
@@ -676,14 +675,13 @@ monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max}) ->
     MinMs = Min / 1000,
     MaxMs = Max / 1000,
     StddevMs = math:sqrt(Avg2 - (Avg * Avg)) / 1000,
-    {rrd:timestamp2us(To_) / 1000, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs}.
+    {round(rrd:timestamp2us(To_) / 1000), Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs}.
 
 -spec monitor_timing_dump_fun_notexists(rrd:rrd(), From::util:time(), To::util:time())
-        -> {keep, {TimestampMs::integer(),
-                   Value::{Count::0, CountPerS::float(),
-                           AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float()}}}.
+        -> {keep, {TimestampMs::integer(), Count::0, CountPerS::float(),
+                   AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float()}}.
 monitor_timing_dump_fun_notexists(_DB, _From_, To_) ->
-    {keep, {rrd:timestamp2us(To_) / 1000, 0, 0.0, 0.0, 0.0, 0.0, 0.0}}.
+    {keep, {round(rrd:timestamp2us(To_) / 1000), 0, 0.0, 0.0, 0.0, 0.0, 0.0}}.
 
 %% @doc Gets the difference in seconds from UTC time to local time.
 -spec get_utc_local_diff_s() -> integer().
@@ -695,7 +693,7 @@ get_utc_local_diff_s() ->
                 calendar:now_to_local_time(SampleTime)),
     Local_s - UTC_s.
 
--spec getMonitorRendered() -> html_type().
+-spec getMonitorRendered() -> [html_type()].
 getMonitorRendered() ->
     DataDump = [{Key, rrd:dump_with(Data, fun monitor_timing_dump_fun_exists/4,
                                     fun monitor_timing_dump_fun_notexists/3)} ||
