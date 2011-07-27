@@ -573,6 +573,13 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
             wait_for_bp_leave(Message, State, NextCompState, true)
     end.
 
+handle_unknown_event({web_debug_info, Requestor}, State, ComponentState, Module, On) ->
+    GenCompInfo = lists:flatten(io_lib:format("~p", [State])),
+    comm:send_local(Requestor, {web_debug_info_reply, 
+                                [{"generic info from gen_component:", ""},
+                                 {"module", Module}, {"handler", On},
+                                 {"state", GenCompInfo}]}),
+    {State, ComponentState};
 handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
    log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,Module,On,State]),
     {State, ComponentState}.

@@ -139,10 +139,10 @@ on({unittest_report_down, Pid}, State) ->
     ?TRACE("FD: unittest_report_down p~n", [Pid]),
     forward_to_hbs(
       Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
-    State;
+    State.
 
-on({web_debug_info, _Requestor}, State) ->
-    ?TRACE("FD: web_debug_info~n", []),
+%% on({web_debug_info, _Requestor}, State) ->
+%%     ?TRACE("FD: web_debug_info~n", []),
 %% TODO: reimplement for new fd.
 %%     Subscriptions = fd_db:get_subscriptions(),
 %%     % resolve (local and remote) pids to names:
@@ -166,7 +166,7 @@ on({web_debug_info, _Requestor}, State) ->
 %%          [{pid_groups:pid_to_name(Pid),
 %%            lists:flatten(io_lib:format("~p", [X]))} || {Pid, X} <- S2]],
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-    State.
+%%     State.
 
 %%% Internal functions
 -spec my_fd_pid() -> pid() | failed.
