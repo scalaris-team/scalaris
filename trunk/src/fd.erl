@@ -135,12 +135,6 @@ on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
     forward_to_hbs(Subscriber, {del_watching_of, Pid}),
     State;
 
-on({unittest_report_down, Pid}, State) ->
-    ?TRACE("FD: unittest_report_down p~n", [Pid]),
-    forward_to_hbs(
-      Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
-    State.
-
 %% on({web_debug_info, _Requestor}, State) ->
 %%     ?TRACE("FD: web_debug_info~n", []),
 %% TODO: reimplement for new fd.
@@ -166,7 +160,13 @@ on({unittest_report_down, Pid}, State) ->
 %%          [{pid_groups:pid_to_name(Pid),
 %%            lists:flatten(io_lib:format("~p", [X]))} || {Pid, X} <- S2]],
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-%%     State.
+%%     State;
+
+on({unittest_report_down, Pid}, State) ->
+    ?TRACE("FD: unittest_report_down p~n", [Pid]),
+    forward_to_hbs(
+      Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
+    State.
 
 %%% Internal functions
 -spec my_fd_pid() -> pid() | failed.
