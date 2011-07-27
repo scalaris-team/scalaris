@@ -29,13 +29,14 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 % functions (temporarily) storing monitoring values in the calling process:
--export([proc_set_value/3, proc_get_value/2, proc_exists_value/2]).
+-export([proc_set_value/3, proc_get_value/2, proc_exists_value/2,
+         proc_check_timeslot/2, proc_check_all_timeslot/0]).
 
 % functions sending monitoring values directly to the monitor process
 -export([monitor_set_value/3, client_monitor_set_value/3]).
 
 -type key() :: string().
--type internal_key() :: {'$monitor$', Key::string()}.
+-type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.
 
 -type state() :: Table::tid() | atom().
@@ -43,17 +44,18 @@
     {report_rrd, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {report_single, Process::atom(), Key::key(),
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
+    {check_timeslots} |
     {get_rrd, Process::atom(), Key::key(), SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
--spec to_internal_key(Key::key()) -> internal_key().
-to_internal_key(Key) -> {'$monitor$', Key}.
+-spec to_internal_key(Process::atom(), Key::key()) -> internal_key().
+to_internal_key(Process, Key) -> {'$monitor$', Process, Key}.
 
 -spec check_report(Process::atom(), Key::key(), Old::Value, New::Value) -> ok.
 check_report(Process, Key, OldValue, NewValue) ->
-    case OldValue of
-        undefined -> ok;
+    case OldValue =:= undefined orelse NewValue =:= undefined of
+        true -> ok;
         _ ->
             % check whether to report to the monitor
             % (always report if a new time slot was started)
@@ -66,6 +68,20 @@ check_report(Process, Key, OldValue, NewValue) ->
             end
     end.
 
+%% @doc Keep track of the available keys by adding Key to the list of keys
+%%      stored at '$monitor$:$keys$'.
+-spec proc_add_to_keys_avail(OldValue::term() | undefined, Process::atom(), Key::key()) -> ok.
+proc_add_to_keys_avail(undefined, Process, Key) ->
+    AvailKey = '$monitor$:$keys$',
+    OldKeys = case erlang:get(AvailKey) of
+                  undefined -> [];
+                  L -> L
+              end,
+    erlang:put(AvailKey, [{Process, Key} | OldKeys]),
+    ok;
+proc_add_to_keys_avail(_OldValue, _Process, _Key) ->
+    ok.
+
 %% @doc Sets the value at Key inside the current process.
 %%      Either specify a new value or an update function which generates the
 %%      new value from the old one.
@@ -74,14 +90,16 @@ check_report(Process, Key, OldValue, NewValue) ->
 -spec proc_set_value(Process::atom(), Key::key(),
                      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)) -> ok.
 proc_set_value(Process, Key, UpdateFun) when is_function(UpdateFun, 1) ->
-    InternalKey = to_internal_key(Key),
+    InternalKey = to_internal_key(Process, Key),
     OldValue = erlang:get(InternalKey),
     NewValue = UpdateFun(OldValue),
+    proc_add_to_keys_avail(OldValue, Process, Key),
     check_report(Process, Key, OldValue, NewValue),
     erlang:put(InternalKey, NewValue);
 proc_set_value(Process, Key, NewValue) ->
-    InternalKey = to_internal_key(Key),
+    InternalKey = to_internal_key(Process, Key),
     OldValue = erlang:put(InternalKey, NewValue),
+    proc_add_to_keys_avail(OldValue, Process, Key),
     check_report(Process, Key, OldValue, NewValue).
 
 %% @doc Sets the value at Key inside the monitor process of the current group.
@@ -92,6 +110,35 @@ proc_set_value(Process, Key, NewValue) ->
 monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
     MyMonitor = pid_groups:get_my(monitor),
     comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
+
+%% @doc Advances the stored timeslots of the value at Key inside the current
+%%      process (if necessary) to the current time.
+%%      If a new time slot is started by updating the value, then the rrd()
+%%      record is send to the monitor process.
+-spec proc_check_timeslot(Process::atom(), Key::key()) -> ok.
+proc_check_timeslot(Process, Key) ->
+    InternalKey = to_internal_key(Process, Key),
+    OldValue = erlang:get(InternalKey),
+    case OldValue of
+        undefined -> ok;
+        _ ->
+            NewValue = rrd:check_timeslot_now(OldValue),
+            check_report(Process, Key, OldValue, NewValue),
+            erlang:put(InternalKey, NewValue)
+    end.
+
+%% @doc Advances the stored timeslots of the value at Key inside the current
+%%      process (if necessary) to the current time.
+%%      If a new time slot is started by updating the value, then the rrd()
+%%      record is send to the monitor process.
+-spec proc_check_all_timeslot() -> ok.
+proc_check_all_timeslot() ->
+    case erlang:get('$monitor$:$keys$') of
+        undefined -> ok;
+        AvailableKeys ->
+            _ = [proc_check_timeslot(Process, Key) || {Process, Key} <- AvailableKeys],
+            ok
+    end.
 
 %% @doc Sets the value at Key inside the monitor process of the "clients_group".
 %%      Either specify a new value or an update function which generates the
@@ -104,14 +151,14 @@ client_monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
 
 %% @doc Checks whether a value exists at Key.
 -spec proc_exists_value(Process::atom(), Key::key()) -> boolean().
-proc_exists_value(_Process, Key) ->
-    erlang:get(to_internal_key(Key)) =/= undefined.
+proc_exists_value(Process, Key) ->
+    erlang:get(to_internal_key(Process, Key)) =/= undefined.
 
 %% @doc Gets the value stored at Key. The key must exist, otherwise no rrd()
 %%      structure is returned!
 -spec proc_get_value(Process::atom(), Key::key()) -> rrd:rrd().
-proc_get_value(_Process, Key) ->
-    erlang:get(to_internal_key(Key)).
+proc_get_value(Process, Key) ->
+    erlang:get(to_internal_key(Process, Key)).
 
 %% @doc Reports the given value to the process' monitor process.
 -spec proc_report_to_my_monitor(Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()) -> ok.
@@ -143,6 +190,11 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
 
 on({report_single, Process, Key, NewValue_or_UpdateFun}, Table) ->
     proc_set_value(Process, Key, NewValue_or_UpdateFun),
+    Table;
+
+on({check_timeslots}, Table) ->
+    proc_check_all_timeslot(),
+    comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     Table;
 
 on({get_rrd, Process, Key, SourcePid}, Table) ->
@@ -224,6 +276,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
+    comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     TableName = pid_groups:my_groupname() ++ ":monitor",
     ets:new(list_to_atom(TableName), [ordered_set, protected]).
 
@@ -237,3 +290,7 @@ check_config() ->
 -spec get_timeslots_to_keep() -> pos_integer().
 get_timeslots_to_keep() ->
     config:read(monitor_timeslots_to_keep).
+
+-spec get_check_timeslots_interval() -> 10000.
+get_check_timeslots_interval() ->
+    10 * 1000. % every 10s

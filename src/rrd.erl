@@ -28,10 +28,11 @@
 -endif.
 
 % external API with transparent time handling
--export([create/3, add_now/2, dump/1, dump_with/2, dump_with/3]).
+-export([create/3, add_now/2, check_timeslot_now/1,
+         dump/1, dump_with/2, dump_with/3]).
 
 % external API without transparent time handling
--export([create/4, add/3]).
+-export([create/4, add/3, check_timeslot/2]).
 
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
@@ -81,6 +82,11 @@ create(SlotLength, Count, Type) ->
 -spec add_now(Value::term(), rrd()) -> rrd().
 add_now(Value, DB) ->
     add(os:timestamp(), Value, DB).
+
+% @doc Advances the stored timeslots (if necessary) to the current time.
+-spec check_timeslot_now(rrd()) -> rrd().
+check_timeslot_now(DB) ->
+    check_timeslot(os:timestamp(), DB).
 
 -spec dump(rrd()) -> [{From::time(), To::time(), term()}].
 dump(DB) ->
@@ -154,6 +160,13 @@ add(Time, Value, DB) ->
         timing ->
             add_with(Time, Value, DB, fun timing_update_fun/3)
     end.
+
+% @doc Advances the stored timeslots (if necessary) to the given time.
+-spec check_timeslot(Time::time() | internal_time(), rrd()) -> rrd().
+check_timeslot({_, _, _} = ExternalTime, DB) ->
+    check_timeslot(timestamp2us(ExternalTime), DB);
+check_timeslot(Time, DB) ->
+    add_with(Time, undefined, DB, fun keep_old_update_fun/3).
 
 -spec add_with(Time::internal_time(), NewV, rrd(), update_fun(term(), NewV)) -> rrd().
 add_with(Time, Value, DB, F) ->
@@ -234,9 +247,8 @@ reduce_timeslots(SlotCount, DB) ->
 %%      or are in the current time slot of DB. Both structures must have the
 %%      same type and the same slot borders!
 -spec add_nonexisting_timeslots(DB::rrd(), OtherDB::rrd()) -> rrd().
-add_nonexisting_timeslots(DB, OtherDB)
-  when DB#rrd.type =:= OtherDB#rrd.type andalso
-       DB#rrd.slot_length =:= OtherDB#rrd.slot_length ->
+add_nonexisting_timeslots(#rrd{type = T, slot_length = L} = DB,
+                          #rrd{type = T, slot_length = L} = OtherDB) ->
     OtherCurrentIdx = OtherDB#rrd.current_index,
     OtherStartIdx = (OtherCurrentIdx + 1) rem OtherDB#rrd.count,
     add_nonexisting_timeslots_internal(DB, OtherDB, OtherStartIdx, OtherCurrentIdx).
