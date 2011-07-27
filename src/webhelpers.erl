@@ -685,6 +685,16 @@ monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max}) ->
 monitor_timing_dump_fun_notexists(_DB, _From_, To_) ->
     {keep, {rrd:timestamp2us(To_) / 1000, 0, 0.0, 0.0, 0.0, 0.0, 0.0}}.
 
+%% @doc Gets the difference in seconds from UTC time to local time.
+-spec get_utc_local_diff_s() -> integer().
+get_utc_local_diff_s() ->
+    SampleTime = os:timestamp(),
+    UTC_s = calendar:datetime_to_gregorian_seconds(
+              calendar:now_to_universal_time(SampleTime)),
+    Local_s = calendar:datetime_to_gregorian_seconds(
+                calendar:now_to_local_time(SampleTime)),
+    Local_s - UTC_s.
+
 -spec getMonitorRendered() -> html_type().
 getMonitorRendered() ->
     DataDump = [{Key, rrd:dump_with(Data, fun monitor_timing_dump_fun_exists/4,
@@ -693,99 +703,101 @@ getMonitorRendered() ->
     case DataDump of
         [] -> [{p, [], "No monitoring data (yet)."}];
         [{{api_tx, "req_list"}, ReqListData}] ->
-    {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD} =
-        lists:foldr(
-          fun({Time, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs},
-              {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD}) ->
-                  {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
-                   [[Time, AvgMs] | AvgMsD], [[Time, MinMs] | MinMsD],
-                   [[Time, MaxMs] | MaxMsD], [[Time, StddevMs] | StddevMsD]}
-          end, {[], [], [], [], [], []}, ReqListData),
-    DataStr =
-        lists:flatten(
-          ["\n",
-           "var count_data = ",       io_lib:format("~.0p", [CountD]), ";\n",
-           "var count_per_s_data = ", io_lib:format("~.0p", [CountPerSD]), ";\n",
-           "var avg_ms_data = ",      io_lib:format("~.0p", [AvgMsD]), ";\n",
-           "var min_ms_data = ",      io_lib:format("~.0p", [MinMsD]), ";\n",
-           "var max_ms_data = ",      io_lib:format("~.0p", [MaxMsD]), ";\n",
-           "var stddev_ms_data = ",   io_lib:format("~.0p", [StddevMsD]), ";\n",
-           "function msFormatter(v, axis) {\n",
-           " return v.toFixed(axis.tickDecimals) +\"ms\";\n",
-           "}\n"]),
-    PlotProps = " var series = {\n"
-                "  lines: { show: true },\n"
-                "  points: { show: true, radius: 1 }\n"
-                " };\n"
-                " var xaxes = [ { mode: 'time' } ];\n"
-                " var legend = {\n"
-                "  show: true,\n"
-                "  position: 'sw',\n"
-                "  noColumns: 6,\n"
-                "  margin: [0, -50]\n"
-                " };\n"
-                " var grid = { hoverable: true };\n",
-    PlotCnt = "$.plot($(\"#reqlist_cnt\"),\n"
-              "       [ {data: count_data, label: \"Count\"},\n"
-              "         {data: count_per_s_data, label: \"Count / s\"}\n"
-              "       ], {\n"
-              " series: series,\n"
-              " xaxes: xaxes,\n"
-              " yaxes: [ { min: 0 } ],\n"
-              " legend: legend,\n"
-              " grid: grid\n"
-              "});\n"
-              "$(\"#reqlist_cnt\").bind(\"plothover\", plotHover);\n",
-    PlotLat = "$.plot($(\"#reqlist_lat\"),\n"
-              "       [ {data: avg_ms_data, label: \"Avg (ms)\"},\n"
-              "         {data: min_ms_data, label: \"Min (ms)\"},\n"
-              "         {data: max_ms_data, label: \"Max (ms)\"},\n"
-              "         {data: stddev_ms_data, label: \"Stddev (ms)\"}\n"
-              "       ], {\n"
-              " series: series,\n"
-              " xaxes: xaxes,\n"
-              " yaxes: [ { min: 0, tickFormatter: msFormatter } ],\n"
-              " legend: legend,\n"
-              " grid: grid\n"
-              "});\n"
-              "$(\"#reqlist_lat\").bind(\"plothover\", plotHover);\n",
-    ShowTooltip = "\n"
-                  "function showTooltip(x, y, contents) {\n"
-                  " $('<div id=\"tooltip\">' + contents + '</div>').css( {\n"
-                  "  position: 'absolute',\n"
-                  "  display: 'none',\n"
-                  "  top: y + 5,\n"
-                  "  left: x + 5,\n"
-                  "  border: '1px solid #fdd',\n"
-                  "  padding: '2px',\n"
-                  "  'background-color': '#fee',\n"
-                  "  opacity: 0.80\n"
-                  " }).appendTo(\"body\").fadeIn(200);\n"
-                  "}\n",
-    PlotHover = "var previousPoint = null;\n"
-                "function plotHover(event, pos, obj) {\n"
-                " if (!obj) {\n"
-                "  $(\"#tooltip\").remove();\n"
-                "  previousPoint = null;\n"
-                "  return;\n"
-                " }\n"
-                " if (previousPoint != obj.datapoint) {\n"
-                "  previousPoint = obj.datapoint;\n"
-                "  $(\"#tooltip\").remove();\n"
-                "  var x = obj.datapoint[0].toFixed(2),\n"
-                "      y = obj.datapoint[1].toFixed(2);\n"
-                "  var xDate = new Date();\n"
-                "  xDate.setTime(x)\n"
-                "  showTooltip(obj.pageX, obj.pageY,\n"
-                "              obj.series.label + \" at time \\\"\" + xDate.toUTCString() + \"\\\" = \" + y);\n"
-                " }\n"
-                "}\n",
-    [{script, [{type, "text/javascript"}],
-      lists:append([ShowTooltip, "$(function() {\n", DataStr, PlotProps, PlotCnt, PlotLat, PlotHover, "});\n"])},
-     {'p', [], ["Count"]},
-     {'div', [{id, "reqlist_cnt"}, {style, "width: 600px; height: 350px; margin-bottom:50px"}], []},
-     {'p', [], ["Latency"]},
-     {'div', [{id, "reqlist_lat"}, {style, "width: 600px; height: 350px; margin-bottom:50px"}], []}]
+            UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
+            {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD} =
+                lists:foldr(
+                  fun({TimeUTC, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs},
+                      {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD}) ->
+                          Time = TimeUTC + UtcToLocalDiff_ms,
+                          {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
+                           [[Time, AvgMs] | AvgMsD], [[Time, MinMs] | MinMsD],
+                           [[Time, MaxMs] | MaxMsD], [[Time, StddevMs] | StddevMsD]}
+                  end, {[], [], [], [], [], []}, ReqListData),
+            DataStr =
+                lists:flatten(
+                  ["\n",
+                   "var count_data = ",       io_lib:format("~.0p", [CountD]), ";\n",
+                   "var count_per_s_data = ", io_lib:format("~.0p", [CountPerSD]), ";\n",
+                   "var avg_ms_data = ",      io_lib:format("~.0p", [AvgMsD]), ";\n",
+                   "var min_ms_data = ",      io_lib:format("~.0p", [MinMsD]), ";\n",
+                   "var max_ms_data = ",      io_lib:format("~.0p", [MaxMsD]), ";\n",
+                   "var stddev_ms_data = ",   io_lib:format("~.0p", [StddevMsD]), ";\n",
+                   "function msFormatter(v, axis) {\n",
+                   " return v.toFixed(axis.tickDecimals) +\"ms\";\n",
+                   "}\n"]),
+            PlotProps = " var series = {\n"
+                        "  lines: { show: true, lineWidth: 0.5 },\n"
+                        "  points: { show: true, radius: 1 }\n"
+                        " };\n"
+                        " var xaxes = [ { mode: 'time' } ];\n"
+                        " var legend = {\n"
+                        "  show: true,\n"
+                        "  position: 'sw',\n"
+                        "  noColumns: 6,\n"
+                        "  margin: [0, -50]\n"
+                        " };\n"
+                        " var grid = { hoverable: true };\n",
+            PlotCnt = "$.plot($(\"#reqlist_cnt\"),\n"
+                      "       [ {data: count_data, label: \"Count\"},\n"
+                      "         {data: count_per_s_data, label: \"Count / s\"}\n"
+                      "       ], {\n"
+                      " series: series,\n"
+                      " xaxes: xaxes,\n"
+                      " yaxes: [ { min: 0 } ],\n"
+                      " legend: legend,\n"
+                      " grid: grid\n"
+                      "});\n"
+                      "$(\"#reqlist_cnt\").bind(\"plothover\", plotHover);\n",
+            PlotLat = "$.plot($(\"#reqlist_lat\"),\n"
+                      "       [ {data: avg_ms_data, label: \"Avg (ms)\"},\n"
+                      "         {data: min_ms_data, label: \"Min (ms)\"},\n"
+                      "         {data: max_ms_data, label: \"Max (ms)\"},\n"
+                      "         {data: stddev_ms_data, label: \"Stddev (ms)\"}\n"
+                      "       ], {\n"
+                      " series: series,\n"
+                      " xaxes: xaxes,\n"
+                      " yaxes: [ { min: 0, tickFormatter: msFormatter } ],\n"
+                      " legend: legend,\n"
+                      " grid: grid\n"
+                      "});\n"
+                      "$(\"#reqlist_lat\").bind(\"plothover\", plotHover);\n",
+            ShowTooltip = "\n"
+                          "function showTooltip(x, y, contents) {\n"
+                          " $('<div id=\"tooltip\">' + contents + '</div>').css( {\n"
+                          "  position: 'absolute',\n"
+                          "  display: 'none',\n"
+                          "  top: y + 5,\n"
+                          "  left: x + 5,\n"
+                          "  border: '1px solid #fdd',\n"
+                          "  padding: '2px',\n"
+                          "  'background-color': '#fee',\n"
+                          "  opacity: 0.80\n"
+                          " }).appendTo(\"body\").fadeIn(200);\n"
+                          "}\n",
+            PlotHover = "var previousPoint = null;\n"
+                        "function plotHover(event, pos, obj) {\n"
+                        " if (!obj) {\n"
+                        "  $(\"#tooltip\").remove();\n"
+                        "  previousPoint = null;\n"
+                        "  return;\n"
+                        " }\n"
+                        " if (previousPoint != obj.datapoint) {\n"
+                        "  previousPoint = obj.datapoint;\n"
+                        "  $(\"#tooltip\").remove();\n"
+                        "  var x = obj.datapoint[0].toFixed(2),\n"
+                        "      y = obj.datapoint[1].toFixed(2);\n"
+                        "  var xDate = new Date();\n"
+                        "  xDate.setTime(x)\n"
+                        "  showTooltip(obj.pageX, obj.pageY,\n"
+                        "              obj.series.label + \" at time \\\"\" + xDate.toUTCString() + \"\\\" = \" + y);\n"
+                        " }\n"
+                        "}\n",
+            [{script, [{type, "text/javascript"}],
+              lists:append([ShowTooltip, "$(function() {\n", DataStr, PlotProps, PlotCnt, PlotLat, PlotHover, "});\n"])},
+             {'p', [], ["Count (api_tx:req_list/2)"]},
+             {'div', [{id, "reqlist_cnt"}, {style, "width: 800px; height: 300px; margin-bottom:50px"}], []},
+             {'p', [], ["Latency (api_tx:req_list/2)"]},
+             {'div', [{id, "reqlist_lat"}, {style, "width: 800px; height: 300px; margin-bottom:50px"}], []}]
     end.
     
 
