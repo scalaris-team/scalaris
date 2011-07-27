@@ -273,80 +273,80 @@ getRingChart() ->
     RealRing = get_and_cache_ring(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
     RingSize = length(Ring),
-    Content = try
-                  Data = extract_ring_info(Ring),
-                  DataStr =
-                      lists:flatten(
-                        ["\n",
-                         "var alpha_inc = ", io_lib:format("~f", [1 / RingSize]), ";\n",
-                         "var ring = [];\n"
-                         "var i = 0;\n"
-                         "var color = $.color.parse(\"#008080\");\n",
-                         [begin
-                              Color =
-                                  case Known of
-                                      true -> "color.toString()";
-                                      _ -> "$.color.make(255, 255, 255, 1).toString()"
-                                  end,
-                              ColorInc =
-                                  case Known of
-                                      true -> "if (color.a > 0.2) { color = $.color.parse(color).add('a', -alpha_inc); }\n";
-                                      false -> ""
-                                  end,
-                              "ring[i] = { label: \"" ++ Label ++ "\", data: " ++ Value ++ ", color: " ++ Color ++ " };\n"
-                              "i = i+1;\n" ++ ColorInc
-                          end
-                          || {Label, Value, Known} <- Data]]),
-                  PlotFun = "$.plot($(\"#ring\"), ring, {\n"
-                            " series: {\n"
-                            "  pie: {\n"
-                            "   show: true,\n"
-                            "   radius: 0.9,\n"
-                            "   innerRadius: 0.4,\n"
-                            "   label: {\n"
-                            "    show: true,\n"
-                            "    radius: 1.0,\n"
-                            "    formatter: function(label, series) {\n"
-                            "     return '<div style=\"font-size:8pt;text-align:center;padding:2px;color:white;\">'+label+'</div>';\n"
-                            "    },\n"
-                            "    background: {\n"
-                            "     opacity: 0.5,\n"
-                            "     color: '#000'\n"
-                            "    }\n"
-                            "   }\n"
-                            "  }\n"
-                            " },\n"
-                            " legend: {\n"
-                            "  show: false\n"
-                            " },\n"
-                            " grid: {\n"
-                            "  hoverable: true,\n"
-                            "  clickable: true\n"
-                            " }\n"
-                            "});\n"
-                            "$(\"#ring\").bind(\"plothover\", pieHover);\n"
-                            "$(\"#ring\").bind(\"plotclick\", pieClick);\n",
-                  PieHover = "function pieHover(event, pos, obj) {\n"
-                             " if (!obj)\n"
-                             "  return;\n"
-                             " percent = parseFloat(obj.series.percent).toFixed(2);\n"
-                             " $(\"#ringhover\").html('<span style=\"font-weight: bold\">'+obj.series.label+' ('+percent+'%)</span>');\n"
-                             "}\n",
-                  PieClick = "function pieClick(event, pos, obj) {\n"
-                             " if (!obj)\n"
-                             "  return;\n"
-                             " percent = parseFloat(obj.series.percent).toFixed(2);\n"
-                             " alert(''+obj.series.label+': '+percent+'%');\n"
-                             "}\n",
-                  [{script, [{type, "text/javascript"}], lists:append(["$(function() {\n", DataStr, PlotFun, "});\n", PieHover, PieClick])},
-                   {table, [],
-                    [{tr, [],
-                      [{td, [], {'div', [{id, "ring"}, {style, "width: 600px; height: 350px"}], []}},
-                       {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
-                   ]
-              catch % ?RT methods might throw
-                  throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
-              end,
+    Content =
+        try
+            Data = extract_ring_info(Ring),
+            ColorAlphaInc = 1 / RingSize,
+            {_, DataStr0, ColorStr0} =
+                lists:foldr(
+                  fun({Label, Value, Known}, {I, DStr, CStr}) ->
+                          {CurColor, NewI} =
+                              case Known of
+                                  true ->
+                                      Alpha = case (1 - I * ColorAlphaInc) of
+                                                  X when X > 0.2 -> X;
+                                                  _ -> 0.2
+                                              end,
+                                      AlphaStr = io_lib:format("~.2f", [Alpha]),
+                                      {lists:flatten(["$.color.make(0, 128, 128, ", AlphaStr, ").toString()"]), I -1};
+                                  _ -> {"$.color.make(255, 255, 255, 1).toString()", I}
+                              end,
+                          CurData = lists:append(["{ label: \"", Label, "\", data: ", Value, " }"]),
+                          NewData = case DStr of
+                                        [] -> CurData;
+                                         _  -> lists:append([CurData, ", ", DStr])
+                                    end,
+                          NewColors = case CStr of
+                                          [] -> CurColor;
+                                         _  -> lists:append([CurColor, ", ", CStr])
+                                      end,
+                          {NewI, NewData, NewColors}
+                  end, {RingSize - 1, "", ""}, Data),
+            DataStr = lists:flatten(["var ring = [", DataStr0, "];\n"
+                                     "var colors = [", ColorStr0, "]\n"]),
+            PlotFun = "$.plot($(\"#ring\"), ring, {\n"
+                      " series: {\n"
+                      "  pie: {\n"
+                      "   show: true,\n"
+                      "   radius: 0.9,\n"
+                      "   innerRadius: 0.4,\n"
+                      "   label: {\n"
+                      "    show: true,\n"
+                      "    radius: 1.0,\n"
+                      "    formatter: function(label, series) {\n"
+                      "     return '<div style=\"font-size:8pt;text-align:center;padding:2px;color:white;\">'+label+'</div>';\n"
+                      "    },\n"
+                      "    background: { opacity: 0.5, color: '#000000' }\n"
+                      "   }\n"
+                      "  }\n"
+                      " },\n"
+                      " legend: { show: false },\n"
+                      " grid: { hoverable: true, clickable: true },\n"
+                      " colors: colors\n"
+                      "});\n"
+                      "$(\"#ring\").bind(\"plothover\", pieHover);\n"
+                      "$(\"#ring\").bind(\"plotclick\", pieClick);\n",
+            PieHover = "function pieHover(event, pos, obj) {\n"
+                       " if (!obj)\n"
+                       "  return;\n"
+                       " percent = parseFloat(obj.series.percent).toFixed(2);\n"
+                       " $(\"#ringhover\").html('<span style=\"font-weight: bold\">'+obj.series.label+' ('+percent+'%)</span>');\n"
+                       "}\n",
+            PieClick = "function pieClick(event, pos, obj) {\n"
+                       " if (!obj)\n"
+                       "  return;\n"
+                       " percent = parseFloat(obj.series.percent).toFixed(2);\n"
+                       " alert(''+obj.series.label+': '+percent+'%');\n"
+                       "}\n",
+            [{script, [{type, "text/javascript"}], lists:append(["$(function() {\n", DataStr, PlotFun, "});\n", PieHover, PieClick])},
+             {table, [],
+              [{tr, [],
+                [{td, [], {'div', [{id, "ring"}, {style, "width: 600px; height: 350px"}], []}},
+                 {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
+            ]
+        catch % ?RT methods might throw
+            throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
+        end,
     Content.
 
 -spec getRingRendered() -> html_type().
