@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--export([increment/1, increment_with_key/2, quorum_read/1, read_read/1]).
+-export([increment/1, increment_with_histo/1, increment_with_key/2, quorum_read/1, read_read/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -41,6 +41,18 @@ increment(Iterations) ->
             Start = os:timestamp(),
             Aborts = increment_iter(Key, Iterations, 0),
             Stop = os:timestamp(),
+            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    end.
+
+-spec increment_with_histo(integer()) -> fun().
+increment_with_histo(Iterations) ->
+    fun (Parent) ->
+            Key = get_and_init_key(),
+            Start = os:timestamp(),
+            H = histogram:create(20),
+            {Aborts, H2} = increment_with_histo_iter(H, Key, Iterations, 0),
+            Stop = os:timestamp(),
+            io:format("~p~n", [histogram:get_data(H2)]),
             comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
     end.
 
@@ -109,6 +121,31 @@ increment_iter(Key, Iterations, Aborts) ->
         {fail, not_found} ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_iter(Key, Iterations, Aborts + 1);
+        X -> log:log(warn, "~p", [X])
+    end.
+
+-spec increment_with_histo_iter(histogram:histogram(), string(), integer(), non_neg_integer()) -> any().
+increment_with_histo_iter(H, _Key, 0, Aborts) ->
+    {Aborts, H};
+increment_with_histo_iter(H, Key, Iterations, Aborts) ->
+    Before = os:timestamp(),
+    Result = inc(Key),
+    After = os:timestamp(),
+    case Result of
+        {ok}              -> increment_with_histo_iter(
+                               histogram:add(timer:now_diff(After, Before) / 1000, H),
+                               Key, Iterations - 1, Aborts);
+        {fail, abort}     ->
+            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
+        {fail, timeout}   ->
+            %% overloaded system?
+            timer:sleep(randoms:rand_uniform(1, 100 * (Aborts + 1)
+                                                   * (Aborts +1))),
+            increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
+        {fail, not_found} ->
+            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         X -> log:log(warn, "~p", [X])
     end.
 
