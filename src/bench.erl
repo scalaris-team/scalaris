@@ -20,7 +20,7 @@
 -vsn('$Id: bench.erl 1814 2011-06-21 15:01:58Z schuett $').
 
 %% public interface
--export([increment/2, increment/3, quorum_read/2, read_read/2]).
+-export([increment/2, increment_with_histo/2, increment/3, quorum_read/2, read_read/2]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -29,6 +29,12 @@
 -spec increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
 increment(ThreadsPerVM, Iterations) ->
     Msg = {bench, increment, ThreadsPerVM, Iterations, comm:this(), undefined},
+    manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
+
+%% @doc run an increment benchmark (i++) on all nodes
+-spec increment_with_histo(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
+increment_with_histo(ThreadsPerVM, Iterations) ->
+    Msg = {bench, increment_with_histo, ThreadsPerVM, Iterations, comm:this(), undefined},
     manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
 
 %% @doc run an increment benchmark on all nodes (with a user-specified key)

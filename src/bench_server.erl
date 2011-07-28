@@ -35,6 +35,8 @@
 -spec on(comm:message(), ok) -> ok.
 on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
     Bench = case Op of
+                increment_with_histo ->
+                    bench_fun:increment_with_histo(Iterations);
                 increment ->
                     bench_fun:increment(Iterations);
                 increment_with_key ->
