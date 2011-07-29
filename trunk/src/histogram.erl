@@ -20,6 +20,10 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-ifdef(with_export_type_support).
+-export_type([histogram/0]).
+-endif.
+
 % external API
 -export([create/1, add/2, get_data/1]).
 
