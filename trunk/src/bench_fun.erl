@@ -36,43 +36,38 @@
 
 -spec increment(integer()) -> fun().
 increment(Iterations) ->
-    fun (Parent) ->
+    fun(Parent) ->
             Key = get_and_init_key(),
-            Start = os:timestamp(),
-            Aborts = increment_iter(Key, Iterations, 0),
-            Stop = os:timestamp(),
-            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+            {Diff, Aborts} = util:tc(fun increment_iter/3, [Key, Iterations, 0]),
+            comm:send_local(Parent, {done, Diff, Aborts})
     end.
 
 -spec increment_with_histo(integer()) -> fun().
 increment_with_histo(Iterations) ->
-    fun (Parent) ->
+    fun(Parent) ->
             Key = get_and_init_key(),
-            Start = os:timestamp(),
-            H = histogram:create(20),
-            {Aborts, H2} = increment_with_histo_iter(H, Key, Iterations, 0),
-            Stop = os:timestamp(),
+            {Diff, {Aborts, H2}} =
+                util:tc(fun() ->
+                                H = histogram:create(20),
+                                increment_with_histo_iter(H, Key, Iterations, 0)
+                        end),
             io:format("~p~n", [histogram:get_data(H2)]),
-            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+            comm:send_local(Parent, {done, Diff, Aborts})
     end.
 
 -spec increment_with_key(integer(), client_key()) -> fun().
 increment_with_key(Iterations, Key) ->
-    fun (Parent) ->
-            Start = os:timestamp(),
-            Aborts = increment_iter(Key, Iterations, 0),
-            Stop = os:timestamp(),
-            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+    fun(Parent) ->
+            {Diff, Aborts} = util:tc(fun increment_iter/3, [Key, Iterations, 0]),
+            comm:send_local(Parent, {done, Diff, Aborts})
     end.
 
 -spec quorum_read(integer()) -> fun().
 quorum_read(Iterations) ->
     fun (Parent) ->
             Key = get_and_init_key(),
-            Start = os:timestamp(),
-            Aborts = read_iter(Key, Iterations, 0),
-            Stop = os:timestamp(),
-            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+            {Diff, Aborts} = util:tc(fun read_iter/3, [Key, Iterations, 0]),
+            comm:send_local(Parent, {done, Diff, Aborts})
     end.
 
 -spec read_read(integer()) -> fun().
@@ -80,10 +75,8 @@ read_read(Iterations) ->
     fun (Parent) ->
             Key1 = get_and_init_key(),
             Key2 = get_and_init_key(),
-            Start = os:timestamp(),
-            Aborts = read_read_iter(Key1, Key2, Iterations, 0),
-            Stop = os:timestamp(),
-            comm:send_local(Parent, {done, timer:now_diff(Stop, Start), Aborts})
+            {Diff, Aborts} = util:tc(fun read_read_iter/4, [Key1, Key2, Iterations, 0]),
+            comm:send_local(Parent, {done, Diff, Aborts})
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
