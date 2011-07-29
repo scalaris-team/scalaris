@@ -75,6 +75,8 @@ init(Options) ->
         util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
+    MonitorPerf =
+        util:sup_worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
     RepUpdate = case config:read(rep_update_activate) of
                     true -> util:sup_worker_desc(rep_upd, rep_upd,
                                                  start_link, [DHTNodeGroup]);
@@ -93,6 +95,7 @@ init(Options) ->
                 DC_Clustering,
                 Gossip,
                 SupDHTNodeCore_AND,
+                MonitorPerf,
                 RepUpdate
           ])}}.
 %% userdevguide-end sup_dht_node:init
