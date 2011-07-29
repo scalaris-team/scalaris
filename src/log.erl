@@ -74,15 +74,15 @@ start_link() ->
     end,
     Link.
 
--spec log(Level::log_level(), LogMsg::any()) -> any().
+-spec log(Level::log_level(), LogMsg::string()) -> any().
 log(Level, Log) ->
     log4erl:log(Level,Log).
 
--spec log(Level::log_level(), LogMsg::any(), Data::any()) -> any().
+-spec log(Level::log_level(), LogMsg::string(), Data::list()) -> any().
 log(Level, Log, Data) ->
     log4erl:log(Level, Log, Data).
 
--spec log(Logger::atom(), Level::log_level(), LogMsg::any(), Data::any()) -> any().
+-spec log(Logger::atom(), Level::log_level(), LogMsg::string(), Data::list()) -> any().
 log(Logger, Level, Log, Data) ->
     log4erl:log(Logger, Level, Log, Data).
 
