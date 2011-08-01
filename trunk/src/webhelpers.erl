@@ -658,18 +658,22 @@ format_gossip_value(Value, Key, Fun) ->
 -spec getMonitorData() -> html_type().
 getMonitorData() ->
     ClientMonitor = pid_groups:pid_of("clients_group", monitor),
-    {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, HistMsD} =
+    {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
         statistics:getMonitorStats(ClientMonitor, api_tx, "req_list"),
+    AvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
+                                          [Time, Avg, Avg - Min, Max - Avg]
+                                  end, AvgMsD, MinMsD, MaxMsD),
     DataStr =
         lists:flatten(
           ["\n",
-           "var count_data = ",       io_lib:format("~p", [CountD]), ";\n",
+%%            "var count_data = ",       io_lib:format("~p", [CountD]), ";\n",
            "var count_per_s_data = ", io_lib:format("~p", [CountPerSD]), ";\n",
-           "var avg_ms_data = ",      io_lib:format("~p", [AvgMsD]), ";\n",
-           "var min_ms_data = ",      io_lib:format("~p", [MinMsD]), ";\n",
-           "var max_ms_data = ",      io_lib:format("~p", [MaxMsD]), ";\n",
-           "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n",
-           "var hist_ms_data = ",     io_lib:format("~p", [HistMsD]), ";\n"]),
+           "var avg_min_max_ms_data = ",      io_lib:format("~p", [AvgMinMaxMsD]), ";\n",
+%%            "var avg_ms_data = ",      io_lib:format("~p", [AvgMsD]), ";\n",
+%%            "var min_ms_data = ",      io_lib:format("~p", [MinMsD]), ";\n",
+%%            "var max_ms_data = ",      io_lib:format("~p", [MaxMsD]), ";\n",
+%%            "var hist_ms_data = ",     io_lib:format("~p", [HistMsD]), ";\n",
+           "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n"]),
     {script, [{type, "text/javascript"}], DataStr}.
     
 
