@@ -653,7 +653,7 @@ check_round(PreviousState, State, MyRange) ->
 
 %% @doc Sends the local node's dht_node a request to tell us some information
 %%      about itself. The node will respond with a
-%%      {{get_node_details_response, NodeDetails}, local_info} message.
+%%      {get_node_details_response, NodeDetails} message.
 -spec request_local_info() -> ok.
 request_local_info() ->
     % ask for local load:

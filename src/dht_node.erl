@@ -309,21 +309,30 @@ on({start_bulk_owner, I, Msg}, State) ->
     bulkowner:bulk_owner(State, I, Msg),
     State;
 
-on({bulkowner_deliver, Range, {bulk_read_entry, Issuer}}, State) ->
+on({bulkowner_deliver, Range, Msg}, State) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
 
     F = fun({FwdInt, FwdPid}, AccI) ->
                 case intervals:is_subset(FwdInt, AccI) of
                     true ->
                         FwdRange = intervals:intersection(AccI, FwdInt),
-                        comm:send(FwdPid, {bulkowner_deliver, FwdRange, {bulk_read_entry, Issuer}}),
+                        comm:send(FwdPid, {bulkowner_deliver, FwdRange, Msg}),
                         intervals:minus(AccI, FwdRange);
                     _    -> AccI
                 end
         end,
     MyRange = lists:foldl(F, Range, MsgFwd),
-    Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
-    comm:send(Issuer, {bulk_read_entry_response, MyRange, Data}),
+    case intervals:is_empty(MyRange) of
+        true -> ok;
+        _ ->
+            case Msg of
+                {bulk_read_entry, Issuer} ->
+                    Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
+                    comm:send(Issuer, {bulk_read_entry_response, MyRange, Data});
+                {send_to_group_member, _Proc, _Msg} ->
+                    comm:send_local(self(), Msg)
+            end
+    end,
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

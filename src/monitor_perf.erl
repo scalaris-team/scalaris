@@ -29,7 +29,10 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -type state() :: null.
--type message() :: {bench}.
+-type message() ::
+    {bench} |
+    {propagate} |
+    {get_node_details_response, node_details:node_details()}.
 
 -spec run_bench() -> ok.
 run_bench() ->
@@ -53,6 +56,41 @@ run_bench() ->
 on({bench}, State) ->
     msg_delay:send_local(get_bench_interval(), self(), {bench}),
     run_bench(),
+    State;
+
+on({propagate}, State) ->
+    msg_delay:send_local(get_gather_interval(), self(), {propagate}),
+    DHT_Node = pid_groups:get_my(dht_node),
+    comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
+    State;
+
+on({get_node_details_response, NodeDetails}, State) ->
+    MyRange = node_details:get(NodeDetails, my_range),
+    case is_leader(MyRange) of
+        false -> ok;
+        _ ->
+            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
+            Rest = intervals:minus(intervals:all(), MyRange),
+            bulkowner:issue_bulk_owner(Rest, Msg)
+    end,
+    State;
+
+on({gather_stats, SourcePid}, State) ->
+    This = comm:this_with_cookie(SourcePid),
+    comm:send_local(pid_groups:get_my(monitor),
+                    {get_rrd, ?MODULE, "read_read", This}),
+    State;
+
+on({{get_rrd_response, undefined}, _SourcePid}, State) ->
+    State;
+
+on({{get_rrd_response, DB}, SourcePid}, State) ->
+    comm:send(SourcePid, {gather_stats_response, rrd:reduce_timeslots(1, DB)}),
+    State;
+
+on({gather_stats_response, DB}, State) ->
+    % TODO
+    ct:pal("new rrd: ~p~n", [DB]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,7 +109,17 @@ start_link(DHTNodeGroup) ->
 init(null) ->
     FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
     msg_delay:send_local(FirstDelay, self(), {bench}),
+    msg_delay:send_local(get_gather_interval(), self(), {propagate}),
     null.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Miscellaneous
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether the node is the current leader.
+-spec is_leader(MyRange::intervals:interval()) -> boolean().
+is_leader(MyRange) ->
+    intervals:in(?RT:hash_key("0"), MyRange).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
@@ -83,3 +131,7 @@ check_config() ->
 -spec get_bench_interval() -> pos_integer().
 get_bench_interval() ->
     config:read(monitor_perf_interval).
+
+-spec get_gather_interval() -> pos_integer().
+get_gather_interval() -> 10.
+    %config:read(monitor_perf_interval).

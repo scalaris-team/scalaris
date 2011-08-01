@@ -30,7 +30,7 @@
 -spec issue_bulk_owner(I::intervals:interval(), Msg::comm:message()) -> ok.
 issue_bulk_owner(I, Msg) ->
     DHTNode = pid_groups:find_a(dht_node),
-    comm:send_local(DHTNode , {start_bulk_owner, I, Msg}).
+    comm:send_local(DHTNode, {start_bulk_owner, I, Msg}).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
 -spec bulk_owner(State::dht_node_state:state(), I::intervals:interval(), Msg::comm:message()) -> ok.
