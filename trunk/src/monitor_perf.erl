@@ -29,7 +29,7 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -type state() :: null.
--type message() :: {init | bench}.
+-type message() :: {bench}.
 
 -spec run_bench() -> ok.
 run_bench() ->
@@ -50,17 +50,8 @@ run_bench() ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({init}, State) ->
-    % prefer timer:send_interval/2:
-    case timer:send_interval(get_bench_interval() * 1000, {bench}) of
-        {ok, _TRef} -> ok;
-        {error, Reason} ->
-            log:log(warn, "timer:send_interval/2 failed: ~p", [Reason]),
-            msg_delay:send_local(get_bench_interval(), self(), {init})
-    end,
-    run_bench(),
-    State;
 on({bench}, State) ->
+    msg_delay:send_local(get_bench_interval(), self(), {bench}),
     run_bench(),
     State.
 
@@ -79,7 +70,7 @@ start_link(DHTNodeGroup) ->
 -spec init(null) -> state().
 init(null) ->
     FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
-    msg_delay:send_local(FirstDelay, self(), {init}),
+    msg_delay:send_local(FirstDelay, self(), {bench}),
     null.
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
