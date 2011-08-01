@@ -64,12 +64,88 @@ out(Arg) ->
       <div class="middleleft">
 <h2>Monitoring</h2>
 
-<p>
 <erl>
 out(A) ->
-    {ehtml, webhelpers:getMonitorRendered()}.
+    {ehtml, webhelpers:getMonitorData()}.
 </erl>
-</p>
+
+<script type="text/javascript">
+function showTooltip(x, y, contents) {
+ $('<div id="tooltip">' + contents + '</div>').css( {
+  position: 'absolute',
+  display: 'none',
+  top: y + 5,
+  left: x + 5,
+  border: '1px solid #fdd',
+  padding: '2px',
+  'background-color': '#fee',
+  opacity: 0.80
+ }).appendTo("body").fadeIn(200);
+}
+$(function() {
+ function msFormatter(v, axis) {
+  return v.toFixed(axis.tickDecimals) +"ms";
+ }
+ var series = {
+  lines: { show: true, lineWidth: 0.5 },
+  points: { show: true, radius: 1 }
+ };
+ var xaxes = [ { mode: 'time' } ];
+ var legend = {
+  show: true,
+  position: 'sw',
+  noColumns: 6,
+  margin: [0, -50]
+ };
+ var grid = { hoverable: true };
+ $.plot($("#reqlist_cnt"),
+        [ {data: count_data, label: "Count"},
+          {data: count_per_s_data, label: "Count / s"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0 } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#reqlist_cnt").bind("plothover", plotHover);
+ $.plot($("#reqlist_lat"),
+        [ {data: avg_ms_data, label: "Avg (ms)"},
+          {data: min_ms_data, label: "Min (ms)"},
+          {data: max_ms_data, label: "Max (ms)"},
+          {data: stddev_ms_data, label: "Stddev (ms)"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0, tickFormatter: msFormatter } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#reqlist_lat").bind("plothover", plotHover);
+ var previousPoint = null;
+ function plotHover(event, pos, obj) {
+  if (!obj) {
+   $("#tooltip").remove();
+   previousPoint = null;
+   return;
+  }
+  if (previousPoint != obj.datapoint) {
+   previousPoint = obj.datapoint;
+   $("#tooltip").remove();
+   var x = obj.datapoint[0].toFixed(2),
+       y = obj.datapoint[1].toFixed(2);
+   var xDate = new Date();
+   xDate.setTime(x)
+   showTooltip(obj.pageX, obj.pageY,
+               obj.series.label + " at time \"" + xDate.toUTCString() + "\" = " + y);
+  }
+ }
+});
+</script>
+<p>Count (api_tx:req_list/2)</p>
+<div id="reqlist_cnt" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Latency (api_tx:req_list/2)</p>
+<div id="reqlist_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 
 Last update:
 <erl>
