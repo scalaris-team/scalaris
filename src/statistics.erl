@@ -22,7 +22,8 @@
 -export([get_ring_details/0, get_ring_details_neighbors/1,
          get_total_load/1, get_average_load/1, get_load_std_deviation/1,
          get_average_rt_size/1, get_rt_size_std_deviation/1,
-         get_memory_usage/1, get_max_memory_usage/1]).
+         get_memory_usage/1, get_max_memory_usage/1,
+         getMonitorStats/3]).
 
 -include("scalaris.hrl").
 
@@ -214,3 +215,71 @@ is_valid({ok, _}) ->
     true;
 is_valid({failed, _}) ->
     false.
+
+%%%-----------------------------Monitor-------------------------------
+
+-spec getMonitorData(Monitor::pid(), Process::atom(), Key::string()) -> [rrd:rrd()].
+getMonitorData(Monitor, Process, Key) ->
+    comm:send_local(Monitor, {get_rrd, Process, Key, comm:this()}),
+    receive
+        {get_rrd_response, undefined} -> [];
+        {get_rrd_response, DB}        -> [DB]
+    end.
+
+-spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
+        -> {TimestampMs::integer(), Count::non_neg_integer(), CountPerS::float(),
+            AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float(),
+            HistMs::[[TimeMs1_Count2::float() | pos_integer()]]}.
+monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max, Hist}) ->
+    Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+    CountPerS = Count / Diff_in_s,
+    Avg = Sum / Count, Avg2 = Sum2 / Count,
+    AvgMs = Avg / 1000,
+    MinMs = Min / 1000,
+    MaxMs = Max / 1000,
+    StddevMs = math:sqrt(Avg2 - (Avg * Avg)) / 1000,
+    HistMs = [[TimeUs / 1000, HistCount] || {TimeUs, HistCount} <- histogram:get_data(Hist)],
+    {round(rrd:timestamp2us(To_) / 1000), Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs, HistMs}.
+
+-spec monitor_timing_dump_fun_notexists(rrd:rrd(), From::util:time(), To::util:time())
+        -> {keep, {TimestampMs::integer(), Count::0, CountPerS::float(),
+                   AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float(),
+                   HistMs::[{TimeMs::float(), Count::pos_integer()}]}}.
+monitor_timing_dump_fun_notexists(_DB, _From_, To_) ->
+    {keep, {round(rrd:timestamp2us(To_) / 1000), 0, 0.0, 0.0, 0.0, 0.0, 0.0, []}}.
+
+%% @doc Gets the difference in seconds from UTC time to local time.
+-spec get_utc_local_diff_s() -> integer().
+get_utc_local_diff_s() ->
+    SampleTime = os:timestamp(),
+    UTC_s = calendar:datetime_to_gregorian_seconds(
+              calendar:now_to_universal_time(SampleTime)),
+    Local_s = calendar:datetime_to_gregorian_seconds(
+                calendar:now_to_local_time(SampleTime)),
+    Local_s - UTC_s.
+
+-type time_list(Value) :: [[Time1_Value2::float() | Value]].
+-spec getMonitorStats(Monitor::pid(), Process::atom(), Key::string())
+        -> {CountD::time_list(non_neg_integer()),
+            CountPerSD::time_list(float()), AvgMsD::time_list(float()),
+            MinMsD::time_list(float()), MaxMsD::time_list(float()),
+            StddevMsD::time_list(float()),
+            HistMsD::[[Time::float() | [[TimeMs1_Count2::float() | pos_integer()]]]]}.
+getMonitorStats(Monitor, Process, Key) ->
+    DataDump = [rrd:dump_with(DB, fun monitor_timing_dump_fun_exists/4,
+                              fun monitor_timing_dump_fun_notexists/3) ||
+                DB <- getMonitorData(Monitor, Process, Key)],
+    case DataDump of
+        [] -> {[], [], [], [], [], [], []};
+        [ReqListData] ->
+            UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
+            lists:foldr(
+              fun({TimeUTC, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs, HistMs},
+                  {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, HistMsD}) ->
+                      Time = TimeUTC + UtcToLocalDiff_ms,
+                      {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
+                       [[Time, AvgMs] | AvgMsD], [[Time, MinMs] | MinMsD],
+                       [[Time, MaxMs] | MaxMsD], [[Time, StddevMs] | StddevMsD],
+                       [[Time, HistMs] | HistMsD]}
+              end, {[], [], [], [], [], [], []}, ReqListData)
+    end.
