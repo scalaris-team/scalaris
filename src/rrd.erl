@@ -38,8 +38,8 @@
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
          get_type/1, get_slot_length/1, get_current_time/1]).
 
-% for unit-testing only
--export([timestamp2us/1, us2timestamp/1]).
+% misc
+-export([timestamp2us/1, us2timestamp/1, check_config/0]).
 
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
@@ -134,11 +134,15 @@ counter_update_fun(_Time, Old, New) -> Old + New.
 event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
 
--spec timing_update_fun(Time::internal_time(), Old::{T, T, pos_integer(), T, T} | undefined, New::T)
-        -> {T, T, pos_integer(), T, T} when is_subtype(T, number()).
-timing_update_fun(_Time, undefined, New) -> {New, New*New, 1, New, New};
-timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max}, New) ->
-    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New)}.
+-type timing_type(T) :: {Sum::T, Sum2::T, Count::pos_integer(), Min::T, Max::T, Hist::histogram:histogram()}.
+-spec timing_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
+        -> timing_type(T) when is_subtype(T, number()).
+timing_update_fun(_Time, undefined, New) ->
+    Hist = histogram:create(get_timing_hist_size()),
+    {New, New*New, 1, New, New, histogram:add(New, Hist)};
+timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
+    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New),
+     histogram:add(New, Hist)}.
 
 -spec keep_old_update_fun(Time::internal_time(), Old::T | undefined, NewV) -> T | NewV.
 keep_old_update_fun(_Time, undefined, New) -> New;
@@ -353,3 +357,20 @@ us2timestamp(Time) ->
     Secs = Time2 rem 1000000,
     MegaSecs = (Time2 - Secs) div 1000000,
     {MegaSecs, Secs, MicroSecs}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% miscellaneous
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Checks whether config parameters of the rrd module exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:is_integer(rrd_timing_hist_size) and
+    config:is_greater_than_equal(rrd_timing_hist_size, 0).
+
+-spec get_timing_hist_size() -> non_neg_integer().
+get_timing_hist_size() ->
+    config:read(rrd_timing_hist_size).

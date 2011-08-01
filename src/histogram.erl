@@ -27,22 +27,27 @@
 % external API
 -export([create/1, add/2, get_data/1]).
 
+% private API
 -export([resize/1, insert/2, find_smallest_interval/1, merge_interval/2]).
+
+-include("record_helpers.hrl").
 
 -type data_item() :: {float(), pos_integer()}.
 -type data_list() :: list(data_item()).
--record(histogram, {size :: pos_integer(),
-                    data :: list()}).
+-record(histogram, {size = ?required(histogram, size):: non_neg_integer(),
+                    data = [] :: data_list()}).
 
 -opaque histogram() :: #histogram{}.
 
--spec create(Size::pos_integer()) -> histogram().
+-spec create(Size::non_neg_integer()) -> histogram().
 create(Size) ->
-    #histogram{size=Size, data = []}.
+    #histogram{size = Size}.
 
 -spec add(Value::float(), Histogram::histogram()) -> histogram().
-add(Value, Histogram) ->
-    resize(Histogram#histogram{data=insert({Value, 1}, Histogram#histogram.data)}).
+add(_Value, Histogram = #histogram{size = 0}) ->
+    Histogram;
+add(Value, Histogram = #histogram{data = OldData}) ->
+    resize(Histogram#histogram{data = insert({Value, 1}, OldData)}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
@@ -54,12 +59,10 @@ get_data(Histogram) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec resize(Histogram::histogram()) -> histogram().
-resize(Histogram) ->
-    ExpectedSize = Histogram#histogram.size,
-    ActualSize = length(Histogram#histogram.data),
+resize(Histogram = #histogram{data = Data, size = ExpectedSize}) ->
+    ActualSize = length(Data),
     if
         ActualSize > ExpectedSize ->
-            Data = Histogram#histogram.data,
             SmallestInterval = find_smallest_interval(Data),
             NewHistogram = Histogram#histogram{data = merge_interval(SmallestInterval, Data)},
             resize(NewHistogram);
