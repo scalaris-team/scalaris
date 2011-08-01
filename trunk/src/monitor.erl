@@ -238,12 +238,12 @@ web_debug_info_dump_fun(DB, From_, To_, Value) ->
     ValueStr =
         case rrd:get_type(DB) of
             timing  ->
-                {Sum, Sum2, Count, Min, Max} = Value,
+                {Sum, Sum2, Count, Min, Max, Hist} = Value,
                 AvgPerS = Count / Diff_in_s,
                 Avg = Sum / Count, Avg2 = Sum2 / Count,
                 Stddev = math:sqrt(Avg2 - (Avg * Avg)),
-                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms",
-                              [Count, AvgPerS, Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000]);
+                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms<br />&nbsp;&nbsp;hist:~p",
+                              [Count, AvgPerS, Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000, histogram:get_data(Hist)]);
             counter ->
                 io_lib:format("&nbsp;&nbsp;sum: ~p (avg: ~.2f / s)", [Value, Value / Diff_in_s]);
             event ->
@@ -257,7 +257,7 @@ web_debug_info_dump_fun(DB, From_, To_, Value) ->
             -> {Key::string(), LastNValues::string()}.
 web_debug_info_merge_values(Key, Data) ->
     ValuesLastN =
-        [lists:flatten(io_lib:format("~p - ~p UTC (~p s):<br/>~s",
+        [lists:flatten(io_lib:format("~p - ~p UTC (~p s):<br/>~s~n",
                                      [From, To, Diff_in_s, ValueStr]))
          || {From, To, Diff_in_s, ValueStr} <- rrd:dump_with(Data, fun web_debug_info_dump_fun/4)],
     {lists:flatten(io_lib:format("~p", [Key])), string:join(ValuesLastN, "<br />")}.
@@ -280,7 +280,7 @@ init(null) ->
     TableName = pid_groups:my_groupname() ++ ":monitor",
     ets:new(list_to_atom(TableName), [ordered_set, protected]).
 
-%% @doc Checks whether config parameters of the rm_tman process exist and are
+%% @doc Checks whether config parameters of the monitor process exist and are
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->

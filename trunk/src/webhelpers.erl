@@ -667,7 +667,7 @@ getMonitorData() ->
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
         -> {TimestampMs::integer(), Count::non_neg_integer(), CountPerS::float(),
             AvgMs::float(), MinMs::float(), MaxMs::float(), StddevMs::float()}.
-monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max}) ->
+monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max, _Hist}) ->
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
     CountPerS = Count / Diff_in_s,
     Avg = Sum / Count, Avg2 = Sum2 / Count,
