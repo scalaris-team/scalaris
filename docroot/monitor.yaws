@@ -15,6 +15,8 @@
     <script language="javascript" type="text/javascript" src="flot/jquery.flot.min.js"></script>
     <script language="javascript" type="text/javascript" src="flot/jquery.flot.pie.min.js"></script>
     <script language="javascript" type="text/javascript" src="flot/jquery.colorhelpers.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.navigate.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.errorbars.min.js"></script>
   </head>
   <body onload="load()" onunload="GUnload()">
 
@@ -98,28 +100,29 @@ $(function() {
   margin: [0, -50]
  };
  var grid = { hoverable: true };
- $.plot($("#reqlist_cnt"),
-        [ {data: count_data, label: "Count"},
-          {data: count_per_s_data, label: "Count / s"}
-        ], {
+ $.plot($("#reqlist_cnt"), [ {data: count_per_s_data, label: "Count / s"} ], {
   series: series,
   xaxes: xaxes,
   yaxes: [ { min: 0 } ],
   legend: legend,
-  grid: grid
+  grid: grid,
+  zoom: {interactive: true}, pan: {interactive: true}
  });
  $("#reqlist_cnt").bind("plothover", plotHover);
+ var asym_yerrbars = { 
+  errorbars: "y", 
+  yerr: {show: false, asymmetric: true, upperCap: "-", lowerCap: "-"}
+ };
  $.plot($("#reqlist_lat"),
-        [ {data: avg_ms_data, label: "Avg (ms)"},
-          {data: min_ms_data, label: "Min (ms)"},
-          {data: max_ms_data, label: "Max (ms)"},
+        [ {data: avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
           {data: stddev_ms_data, label: "Stddev (ms)"}
         ], {
   series: series,
   xaxes: xaxes,
   yaxes: [ { min: 0, tickFormatter: msFormatter } ],
   legend: legend,
-  grid: grid
+  grid: grid,
+  zoom: {interactive: true}, pan: {interactive: true}
  });
  $("#reqlist_lat").bind("plothover", plotHover);
  var previousPoint = null;
@@ -133,11 +136,13 @@ $(function() {
    previousPoint = obj.datapoint;
    $("#tooltip").remove();
    var x = obj.datapoint[0].toFixed(2),
-       y = obj.datapoint[1].toFixed(2);
+       y = obj.datapoint[1].toFixed(2),
+       ymin = (obj.datapoint[1] - obj.datapoint[2]).toFixed(2),
+       ymax = (obj.datapoint[1] + obj.datapoint[3]).toFixed(2);
    var xDate = new Date();
    xDate.setTime(x)
    showTooltip(obj.pageX, obj.pageY,
-               obj.series.label + " at time \"" + xDate.toUTCString() + "\" = " + y);
+               xDate.toUTCString() + ": <br />" + obj.series.label + " = " + y + ", min: " + ymin + ", max: " + ymax);
   }
  }
 });
