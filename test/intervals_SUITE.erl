@@ -58,27 +58,12 @@ suite() ->
      {timetrap, {seconds, 10}}
     ].
 
--spec spawn_config_processes(Config::[tuple()]) -> pid().
-spawn_config_processes(Config) ->
-    ok = unittest_helper:fix_cwd(),
-    unittest_helper:start_process(
-      fun() ->
-              {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              ConfigOptions = unittest_helper:prepare_config([{config, [{log_path, PrivDir}]}]),
-              {ok, _ConfigPid} = config:start_link2(ConfigOptions),
-              {ok, _LogPid} = log:start_link()
-      end).
-
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    Pid = spawn_config_processes(Config2),
-    [{wrapper_pid, Pid} | Config2].
+    unittest_helper:start_minimal_procs(Config2, [], false).
 
 end_per_suite(Config) ->
-    {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
-    error_logger:tty(false),
-    log:set_log_level(none),
-    exit(Pid, kill),
+    unittest_helper:stop_minimal_procs(Config),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
