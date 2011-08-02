@@ -70,22 +70,28 @@ get_entry2_({DB, _CKInt, _CKDB}, Key) ->
     end.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry_({DB, CKInt, CKDB}, Entry) ->
-    Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
-    {gb_trees:enter(Key, Entry, DB), CKInt, CKDB}.
+set_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+    case db_entry:is_null(Entry) of
+        true -> delete_entry_(State, Entry);
+        _    -> Key = db_entry:get_key(Entry),
+                case intervals:in(Key, CKInt) of
+                    false -> ok;
+                    _     -> ?CKETS:insert(CKDB, {Key})
+                end,
+                {gb_trees:enter(Key, Entry, DB), CKInt, CKDB}
+    end.
 
 %% @doc Updates an existing (!) entry in the DB.
-update_entry_({DB, CKInt, CKDB}, Entry) ->
-    Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
-    {gb_trees:update(Key, Entry, DB), CKInt, CKDB}.
+update_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+    case db_entry:is_null(Entry) of
+        true -> delete_entry_(State, Entry);
+        _    -> Key = db_entry:get_key(Entry),
+                case intervals:in(Key, CKInt) of
+                    false -> ok;
+                    _     -> ?CKETS:insert(CKDB, {Key})
+                end,
+                {gb_trees:update(Key, Entry, DB), CKInt, CKDB}
+    end.
 
 %% @doc Removes all values with the given entry's key from the DB.
 delete_entry_({DB, CKInt, CKDB}, Entry) ->

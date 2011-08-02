@@ -29,7 +29,7 @@
          get_writelock/1, set_writelock/1, unset_writelock/1,
          get_version/1, inc_version/1, set_version/2,
          reset_locks/1,
-         is_empty/1]).
+         is_empty/1, is_null/1]).
 
 -ifdef(with_export_type_support).
 -export_type([entry/0]).
@@ -113,6 +113,14 @@ reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
     set_writelock(TmpEntry, false).
 
+%% @doc Returns whether the item is an empty_val item with version -1.
+%%      Note: The number of read or write locks does not matter here!
 -spec is_empty(entry()) -> boolean().
 is_empty({_Key, empty_val, _WriteLock, _ReadLock, -1}) -> true;
 is_empty(_) -> false.
+
+%% @doc Returns whether the item is an empty_val item with version -1 and no
+%%      read or write locks.
+-spec is_null(entry()) -> boolean().
+is_null({_Key, empty_val, false, 0, -1}) -> true;
+is_null(_) -> false.

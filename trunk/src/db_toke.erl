@@ -118,14 +118,18 @@ get_entry2_({{DB, _FileName}, _CKInt, _CKDB}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 set_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
-    Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
-    ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
-                         erlang:term_to_binary(Entry, [{minor_version, 1}])),
-    State.
+    case db_entry:is_null(Entry) of
+        true -> delete_entry_(State, Entry);
+        _    -> 
+            Key = db_entry:get_key(Entry),
+            case intervals:in(Key, CKInt) of
+                false -> ok;
+                _     -> ?CKETS:insert(CKDB, {Key})
+            end,
+            ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
+                                 erlang:term_to_binary(Entry, [{minor_version, 1}])),
+            State
+    end.
 
 %% @doc Updates an existing (!) entry in the DB.
 update_entry_(State, Entry) ->

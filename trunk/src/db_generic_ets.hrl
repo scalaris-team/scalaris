@@ -42,14 +42,18 @@ get_entry2_({DB, _CKInt, _CKDB}, Key) ->
     Result.
 
 %% @doc Inserts a complete entry into the DB.
+%%      Note: is the Entry is a null entry, it will be deleted!
 set_entry_(State = {DB, CKInt, CKDB}, Entry) ->
-    Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
-    ?ETS:insert(DB, Entry),
-    State.
+    case db_entry:is_null(Entry) of
+        true -> delete_entry_(State, Entry);
+        _    -> Key = db_entry:get_key(Entry),
+                case intervals:in(Key, CKInt) of
+                    false -> ok;
+                    _     -> ?CKETS:insert(CKDB, {Key})
+                end,
+                ?ETS:insert(DB, Entry),
+                State
+    end.
 
 %% @doc Updates an existing (!) entry in the DB.
 %%      TODO: use ets:update_element here?
