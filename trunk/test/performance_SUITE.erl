@@ -70,40 +70,15 @@ groups() ->
 init_per_group(GroupName, Config) ->
     case GroupName of
         with_config ->
-            Pid = spawn_config_processes(Config),
-            [{config_pid, Pid} | Config];
+            unittest_helper:start_minimal_procs(Config, [], false);
         _ -> Config
     end.
 
 end_per_group(GroupName, Config) ->
     case GroupName of
-        with_config ->
-            case lists:keyfind(config_pid, 1, Config) of
-                false -> ok;
-                {config_pid, Pid} -> stop_config_processes(Pid)
-            end;
+        with_config -> unittest_helper:stop_minimal_procs(Config);
         _ -> ok
     end.
-
--spec spawn_config_processes(Config::[tuple()]) -> pid().
-spawn_config_processes(Config) ->
-    ok = unittest_helper:fix_cwd(),
-    unittest_helper:start_process(
-      fun() ->
-              {ok, _GroupsPid} = pid_groups:start_link(),
-              {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-              ConfigOptions = unittest_helper:prepare_config([{config, [{log_path, PrivDir}]}]),
-              {ok, _ConfigPid} = config:start_link2(ConfigOptions),
-              {ok, _LogPid} = log:start_link()
-      end).
-
--spec stop_config_processes(pid()) -> ok.
-stop_config_processes(Pid) ->
-    error_logger:tty(false),
-    log:set_log_level(none),
-    exit(Pid, kill),
-    unittest_helper:stop_pid_groups(),
-    ok.
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -350,6 +325,7 @@ pid_groups_lookup(_Config) ->
     error_logger:tty(false),
     log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
+    error_logger:tty(true),
     ok.
 
 pid_groups_lookup_by_pid(_Config) ->
@@ -361,6 +337,7 @@ pid_groups_lookup_by_pid(_Config) ->
     error_logger:tty(false),
     log:set_log_level(none),
     unittest_helper:stop_pid_groups(),
+    error_logger:tty(true),
     ok.
 
 term_to_binary1(_Config) ->

@@ -35,9 +35,12 @@ all()   -> [simple_create,
 suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
-    Config.
+    Config2 = unittest_helper:init_per_suite(Config),
+    unittest_helper:start_minimal_procs(Config2, [{rrd_timing_hist_size, 0}], false).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    unittest_helper:stop_minimal_procs(Config),
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 simple_create(_Config) ->
@@ -80,9 +83,9 @@ create_timing(_Config) ->
     DB0 = rrd:create(10, 10, timing, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1),
-            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42}},
-             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30}},
-             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3}}]),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[]}}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[]}}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[]}}}]),
     ok.
 
 timestamp(_Config) ->

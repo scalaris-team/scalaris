@@ -35,26 +35,10 @@ suite() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    ok = unittest_helper:fix_cwd(),
-    error_logger:tty(true),
-    Pid = unittest_helper:start_process(
-            fun() ->
-                    {ok, _GroupsPid} = pid_groups:start_link(),
-                    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                    ConfigOptions = unittest_helper:prepare_config([{config, [{log_path, PrivDir}]}]),
-                    {ok, _ConfigPid} = config:start_link2(ConfigOptions),
-                    {ok, _LogPid} = log:start_link(),
-                    {ok, _CommPid} = sup_comm_layer:start_link(),
-                    comm_server:set_local_address({127,0,0,1}, unittest_helper:get_scalaris_port())
-            end),
-    [{wrapper_pid, Pid} | Config2].
+    unittest_helper:start_minimal_procs(Config2, [], true).
 
 end_per_suite(Config) ->
-    {wrapper_pid, Pid} = lists:keyfind(wrapper_pid, 1, Config),
-    error_logger:tty(false),
-    log:set_log_level(none),
-    exit(Pid, kill),
-    unittest_helper:stop_pid_groups(),
+    unittest_helper:stop_minimal_procs(Config),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 

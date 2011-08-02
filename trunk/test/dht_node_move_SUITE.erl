@@ -94,7 +94,6 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
-    %error_logger:tty(false),
     unittest_helper:stop_ring(),
     ok.
 

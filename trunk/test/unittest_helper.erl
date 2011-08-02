@@ -40,7 +40,8 @@
          get_ring_data/0, print_ring_data/0,
          macro_equals/4, macro_equals/5,
          expect_no_message_timeout/1,
-         prepare_config/1]).
+         prepare_config/1,
+         start_minimal_procs/3, stop_minimal_procs/1]).
 
 -include("scalaris.hrl").
 
@@ -223,6 +224,7 @@ stop_ring(Pid) ->
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
             catch(unregister(ct_test_ring)),
+            error_logger:tty(true),
             ct:pal("Scalaris ring stopped.~n"),
             ok
         end
@@ -332,6 +334,44 @@ start_subprocess(StartFun, RunFun) ->
         {started, Node} -> Node
     end.
 
+%% @doc Starts the minimal number of processes in order for non-ring unit tests
+%%      to be able to execute (pid_groups, config, log).
+-spec start_minimal_procs(CTConfig, ConfigOptions::[{atom(), term()}],
+                          StartCommServer::boolean()) -> CTConfig when is_subtype(CTConfig, list()).
+start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
+    ok = unittest_helper:fix_cwd(),
+    Pid = unittest_helper:start_process(
+            fun() ->
+                    {ok, _GroupsPid} = pid_groups:start_link(),
+                    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
+                    ConfigOptions2 = unittest_helper:prepare_config(
+                                       [{config, [{log_path, PrivDir} | ConfigOptions]}]),
+                    {ok, _ConfigPid} = config:start_link2(ConfigOptions2),
+                    {ok, _LogPid} = log:start_link(),
+                    case StartCommServer of
+                        true ->
+                            {ok, _CommPid} = sup_comm_layer:start_link(),
+                            Port = unittest_helper:get_scalaris_port(),
+                            comm_server:set_local_address({127,0,0,1}, Port);
+                        false -> ok
+                    end
+            end),
+    [{wrapper_pid, Pid} | CTConfig].
+
+%% @doc Stops the processes started by start_minimal_procs/3 given the
+%%      ct config term.
+-spec stop_minimal_procs(term()) -> ok.
+stop_minimal_procs(CTConfig)  ->
+    case lists:keyfind(wrapper_pid, 1, CTConfig) of
+        {wrapper_pid, Pid} ->
+            error_logger:tty(false),
+            log:set_log_level(none),
+            exit(Pid, kill),
+            unittest_helper:stop_pid_groups(),
+            error_logger:tty(true);
+        false -> ok
+    end.
+
 -spec get_all_children(Supervisor::pid()) -> [pid()].
 get_all_children(Supervisor) ->
     AllChilds = [X || X = {_, Pid, _, _} <- supervisor:which_children(Supervisor),
@@ -430,13 +470,13 @@ init_per_suite(Config) ->
 -spec end_per_suite([tuple()]) -> [tuple()].
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
-    %error_logger:tty(false),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
     randoms:stop(),
     _ = inets:stop(),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
+    error_logger:tty(true),
     Config.
 
 -spec get_ring_data() -> [{pid(), 
