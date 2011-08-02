@@ -25,7 +25,7 @@
 -endif.
 
 % external API
--export([create/1, add/2, get_data/1]).
+-export([create/1, add/2, add/3, get_data/1]).
 
 % private API
 -export([resize/1, insert/2, find_smallest_interval/1, merge_interval/2]).
@@ -44,10 +44,14 @@ create(Size) ->
     #histogram{size = Size}.
 
 -spec add(Value::float(), Histogram::histogram()) -> histogram().
-add(_Value, Histogram = #histogram{size = 0}) ->
+add(Value, Histogram) ->
+    add(Value, 1, Histogram).
+
+-spec add(Value::float(), Count::pos_integer(), Histogram::histogram()) -> histogram().
+add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
-add(Value, Histogram = #histogram{data = OldData}) ->
-    resize(Histogram#histogram{data = insert({Value, 1}, OldData)}).
+add(Value, Count, Histogram = #histogram{data = OldData}) ->
+    resize(Histogram#histogram{data = insert({Value, Count}, OldData)}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
