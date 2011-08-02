@@ -24,7 +24,7 @@
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([rrd/0]).
+-export_type([rrd/0, timing_type/1, internal_time/0]).
 -endif.
 
 % external API with transparent time handling
@@ -36,7 +36,8 @@
 
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
-         get_type/1, get_slot_length/1, get_current_time/1]).
+         get_type/1, get_slot_length/1, get_current_time/1,
+         add_with/4, set_new_update_fun/3, keep_old_update_fun/3]).
 
 % misc
 -export([timestamp2us/1, us2timestamp/1, check_config/0]).
@@ -122,8 +123,8 @@ create(SlotLength, Count, Type, StartTime) ->
          current_time = StartTime, data = array:new(Count),
          fill_policy = set_undefined}.
 
--spec gauge_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
-gauge_update_fun(_Time, _Old, New) -> New.
+-spec set_new_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
+set_new_update_fun(_Time, _Old, New) -> New.
 
 -spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
 counter_update_fun(_Time, undefined, New) -> New;
@@ -156,7 +157,7 @@ add({_, _, _} = ExternalTime, Value, DB) ->
 add(Time, Value, DB) ->
     case DB#rrd.type of
         gauge ->
-            add_with(Time, Value, DB, fun gauge_update_fun/3);
+            add_with(Time, Value, DB, fun set_new_update_fun/3);
         counter ->
             add_with(Time, Value, DB, fun counter_update_fun/3);
         event ->

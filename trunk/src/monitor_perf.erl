@@ -28,11 +28,15 @@
 % monitor process functions
 -export([start_link/1, init/1, on/2, check_config/0]).
 
--type state() :: null.
+-type state() :: {Round::non_neg_integer(), Stats::rrd:rrd()}.
 -type message() ::
     {bench} |
     {propagate} |
-    {get_node_details_response, node_details:node_details()}.
+    {get_node_details_response, node_details:node_details()} |
+    {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
+    {{get_rrd_response, DB::rrd:rrd() | undefined}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
+    {gather_stats_response, Round::pos_integer(), Data::rrd:timing_type(number())} |
+    {report_value, Round::pos_integer(), Stats::rrd:rrd()}.
 
 -spec run_bench() -> ok.
 run_bench() ->
@@ -67,30 +71,52 @@ on({propagate}, State) ->
 on({get_node_details_response, NodeDetails}, State) ->
     MyRange = node_details:get(NodeDetails, my_range),
     case is_leader(MyRange) of
-        false -> ok;
+        false -> State;
         _ ->
-            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
-            Rest = intervals:minus(intervals:all(), MyRange),
-            bulkowner:issue_bulk_owner(Rest, Msg)
-    end,
-    State;
+            % start a new timeslot and gather stats...
+            {Round, Stats} = State,
+            NewRound = Round + 1,
+            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewRound}},
+            bulkowner:issue_bulk_owner(intervals:all(), Msg),
+            NewStats = rrd:check_timeslot_now(Stats),
+            broadcast_value(Stats, NewStats, Round),
+            {NewRound, NewStats}
+    end;
 
-on({gather_stats, SourcePid}, State) ->
-    This = comm:this_with_cookie(SourcePid),
+on({gather_stats, SourcePid, Round}, State) ->
+    This = comm:this_with_cookie({SourcePid, Round}),
     comm:send_local(pid_groups:get_my(monitor),
                     {get_rrd, ?MODULE, "read_read", This}),
     State;
 
-on({{get_rrd_response, undefined}, _SourcePid}, State) ->
+on({{get_rrd_response, undefined}, _Cookie}, State) ->
     State;
 
-on({{get_rrd_response, DB}, SourcePid}, State) ->
-    comm:send(SourcePid, {gather_stats_response, rrd:reduce_timeslots(1, DB)}),
+on({{get_rrd_response, DB}, {SourcePid, Round}}, State) ->
+    DB2 = rrd:reduce_timeslots(1, DB),
+    DataL = rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end),
+    case DataL of
+        [Data] -> comm:send(SourcePid, {gather_stats_response, Round, Data});
+        []     -> ok
+    end,
     State;
 
-on({gather_stats_response, DB}, State) ->
-    % TODO
-    ct:pal("new rrd: ~p~n", [DB]),
+on({gather_stats_response, Round, Data}, {Round, Stats}) ->
+    Time = rrd:get_current_time(Stats),
+    {Round, rrd:add_with(Time, Data, Stats, fun timing_update_fun/3)};
+on({gather_stats_response, _Round, _Data}, State) ->
+    State;
+
+on({report_value, Round, Stats}, {OldRound, OldStats}) when OldRound < Round ->
+    Time = rrd:get_current_time(Stats),
+    DataL = rrd:dump_with(Stats, fun(_DB, _From, _To, X) -> X end),
+    NewStats = case DataL of
+        [Data] -> rrd:add_with(Time, Data, OldStats, fun timing_update_fun/3);
+        []     -> OldStats
+    end,
+    {Round, NewStats};
+
+on({report_value, _Round, _Stats}, State) ->
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -110,11 +136,35 @@ init(null) ->
     FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
-    null.
+    {0, rrd:create(get_gather_interval() * 1000000, 60, timing)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec timing_update_fun(Time::rrd:internal_time(), Old::rrd:timing_type(T) | undefined, New::rrd:timing_type(T))
+        -> rrd:timing_type(T) when is_subtype(T, number()).
+timing_update_fun(_Time, undefined, New) ->
+    New;
+timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
+                  {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
+    NewHist2 = lists:foldl(fun({V, C}, Acc) ->
+                                  histogram:add(V, C, Acc)
+                          end, Hist, histogram:get_data(NewHist)),
+    {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
+     erlang:min(Min, NewMin), erlang:max(Max, NewMax), NewHist2}.
+
+broadcast_value(OldStats, Stats, OldRound) ->
+    % broadcast the latest value only if a new time slot was started
+    SlotOld = rrd:get_slot_start(0, OldStats),
+    SlotNew = rrd:get_slot_start(0, Stats),
+    case SlotNew of
+        SlotOld -> ok; %nothing to do
+        _  -> % new slot -> broadcast latest value only:
+            DB2 = rrd:reduce_timeslots(1, OldStats),
+            Msg = {send_to_group_member, monitor_perf, {report_value, OldRound, DB2}},
+            bulkowner:issue_bulk_owner(intervals:all(), Msg)
+    end.
 
 %% @doc Checks whether the node is the current leader.
 -spec is_leader(MyRange::intervals:interval()) -> boolean().
@@ -132,6 +182,7 @@ check_config() ->
 get_bench_interval() ->
     config:read(monitor_perf_interval).
 
+%% @doc Gets the interval of executing a broadcast gathering all nodes' stats
+%%      (in seconds).
 -spec get_gather_interval() -> pos_integer().
-get_gather_interval() -> 10.
-    %config:read(monitor_perf_interval).
+get_gather_interval() -> 60.
