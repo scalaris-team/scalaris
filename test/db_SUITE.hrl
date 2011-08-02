@@ -263,13 +263,16 @@ tester_new(_Config) ->
 prop_set_entry(DBEntry) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry),
+    IsNullEntry = db_entry:is_null(DBEntry),
     check_entry(DB2, db_entry:get_key(DBEntry), DBEntry,
                 {ok, db_entry:get_value(DBEntry), db_entry:get_version(DBEntry)},
-                true, "check_entry_set_entry_1"),
+                not IsNullEntry, "check_entry_set_entry_1"),
     case not db_entry:is_empty(DBEntry) andalso
              not (db_entry:get_writelock(DBEntry) andalso db_entry:get_readlock(DBEntry) > 0) andalso
              db_entry:get_version(DBEntry) >= 0 of
-        true -> check_db(DB2, {true, []}, 1, [DBEntry], "check_db_set_entry_1");
+        true -> check_db(DB2, {true, []}, 1, [DBEntry], "check_db_set_entry_0");
+        _ when IsNullEntry ->
+                check_db(DB2, {true, []}, 0, [], "check_db_set_entry_1");
         _    -> check_db(DB2, {false, [DBEntry]}, 1, [DBEntry], "check_db_set_entry_2")
     end,
     ?TEST_DB:close(DB2),
@@ -290,14 +293,17 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
     DB3 = ?TEST_DB:update_entry(DB2, DBEntry2),
+    IsNullEntry = db_entry:is_null(DBEntry2),
     check_entry(DB3, db_entry:get_key(DBEntry2), DBEntry2,
                 {ok, db_entry:get_value(DBEntry2), db_entry:get_version(DBEntry2)},
-                true, "check_entry_set_entry_1"),
+                not IsNullEntry, "check_entry_update_entry_1"),
     case not db_entry:is_empty(DBEntry2) andalso
              not (db_entry:get_writelock(DBEntry2) andalso db_entry:get_readlock(DBEntry2) > 0) andalso
              db_entry:get_version(DBEntry2) >= 0 of
-        true -> check_db(DB3, {true, []}, 1, [DBEntry2], "check_db_set_entry_1");
-        _    -> check_db(DB3, {false, [DBEntry2]}, 1, [DBEntry2], "check_db_set_entry_2")
+        true -> check_db(DB3, {true, []}, 1, [DBEntry2], "check_db_update_entry_0");
+        _ when IsNullEntry ->
+                check_db(DB3, {true, []}, 0, [], "check_db_update_entry_1");
+        _    -> check_db(DB3, {false, [DBEntry2]}, 1, [DBEntry2], "check_db_update_entry_2")
     end,
     ?TEST_DB:close(DB3),
     true.
@@ -329,14 +335,17 @@ prop_delete_entry2(DBEntry1, DBEntry2) ->
     DB3 = ?TEST_DB:delete_entry(DB2, DBEntry2),
     case db_entry:get_key(DBEntry1) =/= db_entry:get_key(DBEntry2) of
         true ->
+            IsNullEntry = db_entry:is_null(DBEntry1),
             check_entry(DB3, db_entry:get_key(DBEntry1), DBEntry1,
                 {ok, db_entry:get_value(DBEntry1), db_entry:get_version(DBEntry1)},
-                true, "check_entry_delete_entry2_1"),
+                not IsNullEntry, "check_entry_delete_entry2_1"),
             case not db_entry:is_empty(DBEntry1) andalso
                      not (db_entry:get_writelock(DBEntry1) andalso db_entry:get_readlock(DBEntry1) > 0) andalso
                      db_entry:get_version(DBEntry1) >= 0 of
                 true -> check_db(DB3, {true, []}, 1, [DBEntry1], "check_db_delete_entry2_1a");
-                _    -> check_db(DB3, {false, [DBEntry1]}, 1, [DBEntry1], "check_db_delete_entry2_1b")
+                _ when IsNullEntry ->
+                        check_db(DB3, {true, []}, 0, [], "check_db_delete_entry2_1b");
+                _    -> check_db(DB3, {false, [DBEntry1]}, 1, [DBEntry1], "check_db_delete_entry2_1c")
             end;
         _    ->
             check_entry(DB3, db_entry:get_key(DBEntry1), db_entry:new(db_entry:get_key(DBEntry1)),
