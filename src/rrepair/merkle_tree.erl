@@ -25,9 +25,10 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/3, insert/3, empty/0, 
+-export([new/1, new/3, insert/3, empty/0,
+         lookup/2, 
          is_empty/1, set_root_interval/2, size/1, gen_hashes/1,
-         get_hash/1]).
+         get_hash/1, get_interval/1]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0]).
@@ -52,11 +53,12 @@
          }).
 -type mt_config() :: #mt_config{}.
 
--type mt_node()         :: {Hash        :: mt_node_key(),       %hash of childs/containing items 
-                            Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes bucket size
-                            Bucket      :: mt_bucket(),         %item storage
-                            Interval    :: mt_interval(),       %represented interval
-                            Child_list  :: [mt_node()]}.
+-type mt_node() :: { Hash        :: mt_node_key(),       %hash of childs/containing items 
+                     Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes bucket size
+                     Bucket      :: mt_bucket(),         %item storage
+                     Interval    :: mt_interval(),       %represented interval
+                     Child_list  :: [mt_node()]
+                    }.
 
 -opaque merkle_tree() :: {mt_config(), Root::mt_node()}.
 
@@ -89,13 +91,42 @@ new(Interval, Conf) ->
 new(Interval, BranchFactor, BucketSize) ->
     {#mt_config{ branch_factor = BranchFactor, bucket_size = BucketSize }, 
      {nil, 0, orddict:new(), Interval, []}}.
-    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Lookup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec lookup(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
+lookup(I, {_, Root}) ->
+    lookup(I, Root);
+lookup(I, {_, _, _, I, _} = Node) ->
+    Node;
+lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
+    case intervals:is_subset(I, NodeI) of
+        true when length(ChildList) =:= 0 -> Node;
+        true -> 
+            IChilds = lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
+            case length(IChilds) of
+                0 -> not_found;
+                1 -> [IChild] = IChilds, 
+                     lookup(I, IChild);
+                _ -> erlang:throw('tree interval not correct splitted')
+            end;
+        false -> not_found
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Get hash
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
 get_hash({_, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Get interval
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec get_interval(merkle_tree() | mt_node()) -> intervals:interval().
+get_interval({_, Node}) -> get_interval(Node);
+get_interval({_, _, _, I, _}) -> I.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% set_root_interval

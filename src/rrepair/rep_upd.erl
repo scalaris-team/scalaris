@@ -85,7 +85,8 @@ on({get_state_response, NodeDBInterval}, State) ->
             State;
         merkleTree -> 
             Round = State#rep_upd_state.sync_round,
-            {ok, Pid} = rep_upd_sync:start_sync(get_max_items(), true, Round), %TODO add sync process monitoring / should be child process
+            {ok, Pid} = rep_upd_sync:start_sync(get_max_items(), true, Round),
+            %get dest node pid and start failure detector
             comm:send_local(DhtNodePid, 
                             {lookup_aux, select_sync_node(NodeDBInterval), 0, 
                              {send_to_group_member, ?PROCESS_NAME, 
