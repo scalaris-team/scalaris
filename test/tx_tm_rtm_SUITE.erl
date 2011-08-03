@@ -34,7 +34,7 @@ all() ->
      all_tp_crash
     ].
 
-suite() -> [{timetrap, {seconds, 120}}].
+suite() -> [{timetrap, {seconds, 90}}].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -334,7 +334,7 @@ all_tp_crash(_) ->
     %% ct:pal("written initial value and setting breakpoints now~n"),
     Proposers = pid_groups:find_all(paxos_proposer),
 
-    %% break oll TPs (majority) after proposer initialize:
+    %% break all TPs (majority) after proposer initialize:
     [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
       || Proposer <- Proposers],
     %% ct:pal("Breakpoints set~n"),
