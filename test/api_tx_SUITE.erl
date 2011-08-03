@@ -219,7 +219,12 @@ write_2(_Config) ->
     ?equals(api_tx:read("write_2_WriteKey"), {ok, "Value2"}),
 
     %% invalid key
-    ?equals_pattern(catch api_tx:write([a,b,c], "Value"), {'EXIT',{badarg,_}}),
+    try ?RT:hash_key([a,b,c]) of
+        _ -> ?equals(catch api_tx:write([a,b,c], "Value"), {ok})
+    catch
+        error:badarg ->
+            ?equals_pattern(catch api_tx:write([a,b,c], "Value"), {'EXIT',{badarg, _}})
+    end,
     ok.
 
 test_and_set_3(_Config) ->
