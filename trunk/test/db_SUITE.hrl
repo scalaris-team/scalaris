@@ -212,7 +212,9 @@ update_entries(_Config) ->
                                 db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
                                 db_entry:new(3, "Value3", 2),
                                 db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)]).
+                                db_entry:new(5, "Value5", 2)]),
+    prop_update_entry({239309376718523519117394992299371645018, empty_val, false, 0, -1},
+                      <<6>>, false, 7, 4).
 
 changed_keys(_Config) ->
     DB = ?TEST_DB:new(),
@@ -292,18 +294,24 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:set_entry(DB, DBEntry1),
-    DB3 = ?TEST_DB:update_entry(DB2, DBEntry2),
-    IsNullEntry = db_entry:is_null(DBEntry2),
-    check_entry(DB3, db_entry:get_key(DBEntry2), DBEntry2,
-                {ok, db_entry:get_value(DBEntry2), db_entry:get_version(DBEntry2)},
-                not IsNullEntry, "check_entry_update_entry_1"),
-    case not db_entry:is_empty(DBEntry2) andalso
-             not (db_entry:get_writelock(DBEntry2) andalso db_entry:get_readlock(DBEntry2) > 0) andalso
-             db_entry:get_version(DBEntry2) >= 0 of
-        true -> check_db(DB3, {true, []}, 1, [DBEntry2], "check_db_update_entry_0");
-        _ when IsNullEntry ->
-                check_db(DB3, {true, []}, 0, [], "check_db_update_entry_1");
-        _    -> check_db(DB3, {false, [DBEntry2]}, 1, [DBEntry2], "check_db_update_entry_2")
+    case db_entry:is_null(DBEntry1) of
+        true -> % update not possible
+            DB3 = DB2,
+            ok; 
+        false ->
+            DB3 = ?TEST_DB:update_entry(DB2, DBEntry2),
+            IsNullEntry = db_entry:is_null(DBEntry2),
+            check_entry(DB3, db_entry:get_key(DBEntry2), DBEntry2,
+                        {ok, db_entry:get_value(DBEntry2), db_entry:get_version(DBEntry2)},
+                        not IsNullEntry, "check_entry_update_entry_1"),
+            case not db_entry:is_empty(DBEntry2) andalso
+                     not (db_entry:get_writelock(DBEntry2) andalso db_entry:get_readlock(DBEntry2) > 0) andalso
+                     db_entry:get_version(DBEntry2) >= 0 of
+                true -> check_db(DB3, {true, []}, 1, [DBEntry2], "check_db_update_entry_0");
+                _ when IsNullEntry ->
+                    check_db(DB3, {true, []}, 0, [], "check_db_update_entry_1");
+                _    -> check_db(DB3, {false, [DBEntry2]}, 1, [DBEntry2], "check_db_update_entry_2")
+            end
     end,
     ?TEST_DB:close(DB3),
     true.
@@ -792,14 +800,19 @@ prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
                              end, lists:reverse(Data)),
     UpdateElement = util:randomelem(UniqueData),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(UpdateElement)),
-    DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
-    
     UpdatedElement = db_entry:inc_version(db_entry:set_value(UpdateElement, UpdateVal)),
-    DB4 = ?TEST_DB:update_entry(DB3, UpdatedElement),
-    check_changes(DB4, ChangesInterval, "changed_update_entry_1"),
-    check_entry_in_changes(DB4, ChangesInterval, UpdatedElement, Old, "changed_update_entry_2"),
     
-    DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_update_entry_3"),
+    case element(1, Old) of
+        false -> % element does not exist, i.e. was a null entry, -> cannot update
+            DB5 = DB2;
+        _ ->
+            DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
+            DB4 = ?TEST_DB:update_entry(DB3, UpdatedElement),
+            check_changes(DB4, ChangesInterval, "changed_update_entry_1"),
+            check_entry_in_changes(DB4, ChangesInterval, UpdatedElement, Old, "changed_update_entry_2"),
+            
+            DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_update_entry_3")
+    end,
 
     ?TEST_DB:close(DB5),
     true.
@@ -816,7 +829,7 @@ prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
     
     DB4 = ?TEST_DB:delete_entry(DB3, Entry),
     check_changes(DB4, ChangesInterval, "delete_entry_1"),
-    check_key_in_deleted(DB4, ChangesInterval, db_entry:get_key(Entry), Old, "delete_entry_2"),
+    check_key_in_deleted_no_locks(DB4, ChangesInterval, db_entry:get_key(Entry), Old, "delete_entry_2"),
     
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_entry_3"),
 
@@ -872,7 +885,7 @@ prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
     
     {DB4, _Status} = ?TEST_DB:delete(DB3, Key),
     check_changes(DB4, ChangesInterval, "delete_1"),
-    check_key_in_deleted(DB4, ChangesInterval, Key, Old, "delete_2"),
+    check_key_in_deleted_no_locks(DB4, ChangesInterval, Key, Old, "delete_2"),
     
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_3"),
 
@@ -1219,146 +1232,6 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
     ?TEST_DB:close(DB9),
     true.
 
-get_random_interval_from_changes(DB) ->
-    {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-    case ChangedEntries =/= [] orelse DeletedKeys =/= [] of
-        true ->
-            intervals:new(util:randomelem(
-                            lists:append(
-                              [db_entry:get_key(E) || E <- ChangedEntries],
-                              DeletedKeys)));
-        _    -> intervals:empty()
-    end.
-
--spec check_stop_record_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> ?TEST_DB:db().
-check_stop_record_changes(DB, ChangesInterval, Note) ->
-    I1 = get_random_interval_from_changes(DB),
-    DB2 = ?TEST_DB:stop_record_changes(DB, I1),
-    check_changes(DB2, intervals:minus(ChangesInterval, I1), Note ++ "a"),
-
-    DB3 = ?TEST_DB:stop_record_changes(DB2),
-    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, Note ++ "b"),
-
-    DB3.
-
-
-%% @doc Checks that all entries returned by ?TEST_DB:get_changes/1 are in the
-%%      given interval.
--spec check_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> true.
-check_changes(DB, ChangesInterval, Note) ->
-    {ChangedEntries1, DeletedKeys1} = ?TEST_DB:get_changes(DB),
-    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), ChangesInterval) end,
-               ChangedEntries1) of
-        false ->
-            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                     ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries1,
-                      ChangesInterval, lists:flatten(Note)]);
-        _ -> ok
-    end,
-    case lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys1) of
-        false ->
-            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                     ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys1,
-                      ChangesInterval, lists:flatten(Note)]);
-        _ -> ok
-    end,
-    check_changes2(DB, ChangesInterval, ChangesInterval, Note),
-    % select some random key from the changed entries and try get_changes/2
-    % with an interval that does not contain this key
-    case ChangedEntries1 =/= [] orelse DeletedKeys1 =/= [] of
-        true ->
-            SomeKey = util:randomelem(
-                        lists:append(
-                          [db_entry:get_key(E) || E <- ChangedEntries1],
-                          DeletedKeys1)),
-            check_changes2(DB, ChangesInterval, intervals:minus(ChangesInterval, intervals:new(SomeKey)), Note);
-        _    -> true
-    end.
-
-%% @doc Checks that all entries returned by ?TEST_DB:get_changes/2 are in the
-%%      given interval GetChangesInterval and also ChangesInterval.
--spec check_changes2(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), GetChangesInterval::intervals:interval(), Note::string()) -> true.
-check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
-    {ChangedEntries2, DeletedKeys2} = ?TEST_DB:get_changes(DB, GetChangesInterval),
-    FinalInterval = intervals:intersection(ChangesInterval, GetChangesInterval),
-    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), FinalInterval) end,
-               ChangedEntries2) of
-        false ->
-            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                     ["element(1, ?TEST_DB:get_changes(DB, FinalInterval))",
-                      ChangedEntries2, FinalInterval, lists:flatten(Note)]);
-        _ -> ok
-    end,
-    case lists:all(fun(E) -> intervals:in(E, FinalInterval) end, DeletedKeys2) of
-        false ->
-            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
-                     ["element(2, ?TEST_DB:get_changes(DB, FinalInterval))",
-                      DeletedKeys2, FinalInterval, lists:flatten(Note)]);
-        _ -> ok
-    end,
-    true.
-
-%% @doc Checks that a key is present exactly once in the list of deleted
-%%      keys returned by ?TEST_DB:get_changes/1 if no lock is set on a
-%%      previously existing entry.
--spec check_key_in_deleted(
-        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Key::?RT:key(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> true.
-check_key_in_deleted(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
-    case intervals:in(Key, ChangesInterval) andalso OldExists andalso
-             (db_entry:get_writelock(OldEntry) =:= false andalso
-                  db_entry:get_readlock(OldEntry) =:= 0) of
-        true ->
-            {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-            case length([K || K <- DeletedKeys, K =:= Key]) of
-                1 -> true;
-                _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
-                              "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
-                              [DeletedKeys, Key, lists:flatten(Note)])
-            end;
-        _    -> true
-    end.
-
-%% @doc Checks that all given keys are present exactly once in the list of
-%%      deleted keys returned by ?TEST_DB:get_changes/1.
--spec check_keys_in_deleted(
-        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(),
-        Keys::[{?RT:key(), OldExists::boolean()}], Note::string()) -> true.
-check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
-    {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-    [begin
-         case intervals:in(Key, ChangesInterval) andalso OldExists of
-             true ->
-                 case length([K || K <- DeletedKeys, K =:= Key]) of
-                     1 -> ok;
-                     _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
-                                   "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
-                                   [DeletedKeys, Key, lists:flatten(Note)])
-                 end;
-             _    -> true
-         end
-     end || {Key, OldExists} <- Keys],
-    true.
-
-%% @doc Checks that an entry is present exactly once in the list of changed
-%%      entries returned by ?TEST_DB:get_changes/1.
--spec check_entry_in_changes(
-        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
-check_entry_in_changes(DB, ChangesInterval, NewEntry, {_OldExists, OldEntry}, Note) ->
-    case intervals:in(db_entry:get_key(NewEntry), ChangesInterval) andalso 
-             OldEntry =/= NewEntry of
-        true ->
-            {ChangedEntries, _DeletedKeys} = ?TEST_DB:get_changes(DB),
-            case length([E || E <- ChangedEntries, E =:= NewEntry]) of
-                1 -> ok;
-                _ -> ?ct_fail("~s evaluated to \"~w\" and did not contain 1x entry ~w~n(~s)~n",
-                              ["element(1, ?TEST_DB:get_changes(DB))",
-                               ChangedEntries, NewEntry, lists:flatten(Note)])
-            end;
-        _    -> ok
-    end.
-
 tester_changed_keys_get_entry(_Config) ->
     tester:test(?MODULE, prop_changed_keys_get_entry, 3, rw_suite_runs(1000)).
 
@@ -1485,3 +1358,163 @@ check_db2(DB, ExpLoad, ExpData, ExpCKData, Note) ->
     ?equals_w_note(lists:sort(?TEST_DB:get_data(DB)), lists:sort(ExpData), Note),
     ?equals_w_note(?TEST_DB:get_changes(DB), ExpCKData, Note),
     true.
+
+get_random_interval_from_changes(DB) ->
+    {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    case ChangedEntries =/= [] orelse DeletedKeys =/= [] of
+        true ->
+            intervals:new(util:randomelem(
+                            lists:append(
+                              [db_entry:get_key(E) || E <- ChangedEntries],
+                              DeletedKeys)));
+        _    -> intervals:empty()
+    end.
+
+-spec check_stop_record_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> ?TEST_DB:db().
+check_stop_record_changes(DB, ChangesInterval, Note) ->
+    I1 = get_random_interval_from_changes(DB),
+    DB2 = ?TEST_DB:stop_record_changes(DB, I1),
+    check_changes(DB2, intervals:minus(ChangesInterval, I1), Note ++ "a"),
+
+    DB3 = ?TEST_DB:stop_record_changes(DB2),
+    ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, Note ++ "b"),
+
+    DB3.
+
+
+%% @doc Checks that all entries returned by ?TEST_DB:get_changes/1 are in the
+%%      given interval.
+-spec check_changes(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Note::string()) -> true.
+check_changes(DB, ChangesInterval, Note) ->
+    {ChangedEntries1, DeletedKeys1} = ?TEST_DB:get_changes(DB),
+    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), ChangesInterval) end,
+               ChangedEntries1) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(1, ?TEST_DB:get_changes(DB))", ChangedEntries1,
+                      ChangesInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    case lists:all(fun(E) -> intervals:in(E, ChangesInterval) end, DeletedKeys1) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(2, ?TEST_DB:get_changes(DB))", DeletedKeys1,
+                      ChangesInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    check_changes2(DB, ChangesInterval, ChangesInterval, Note),
+    % select some random key from the changed entries and try get_changes/2
+    % with an interval that does not contain this key
+    case ChangedEntries1 =/= [] orelse DeletedKeys1 =/= [] of
+        true ->
+            SomeKey = util:randomelem(
+                        lists:append(
+                          [db_entry:get_key(E) || E <- ChangedEntries1],
+                          DeletedKeys1)),
+            check_changes2(DB, ChangesInterval, intervals:minus(ChangesInterval, intervals:new(SomeKey)), Note);
+        _    -> true
+    end.
+
+%% @doc Checks that all entries returned by ?TEST_DB:get_changes/2 are in the
+%%      given interval GetChangesInterval and also ChangesInterval.
+-spec check_changes2(DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), GetChangesInterval::intervals:interval(), Note::string()) -> true.
+check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
+    {ChangedEntries2, DeletedKeys2} = ?TEST_DB:get_changes(DB, GetChangesInterval),
+    FinalInterval = intervals:intersection(ChangesInterval, GetChangesInterval),
+    case lists:all(fun(E) -> intervals:in(db_entry:get_key(E), FinalInterval) end,
+               ChangedEntries2) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(1, ?TEST_DB:get_changes(DB, FinalInterval))",
+                      ChangedEntries2, FinalInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    case lists:all(fun(E) -> intervals:in(E, FinalInterval) end, DeletedKeys2) of
+        false ->
+            ?ct_fail("~s evaluated to \"~w\" and contains elements not in ~w~n(~s)~n",
+                     ["element(2, ?TEST_DB:get_changes(DB, FinalInterval))",
+                      DeletedKeys2, FinalInterval, lists:flatten(Note)]);
+        _ -> ok
+    end,
+    true.
+
+%% @doc Checks that a key is present exactly once in the list of deleted
+%%      keys returned by ?TEST_DB:get_changes/1 if no lock is set on a
+%%      previously existing entry.
+-spec check_key_in_deleted_no_locks(
+        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Key::?RT:key(),
+        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> true.
+check_key_in_deleted_no_locks(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
+    case intervals:in(Key, ChangesInterval) andalso OldExists andalso
+             (db_entry:get_writelock(OldEntry) =:= false andalso
+                  db_entry:get_readlock(OldEntry) =:= 0) of
+        true ->
+            {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+            check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note);
+        _    -> true
+    end.
+
+%% @doc Checks that all given keys are present exactly once in the list of
+%%      deleted keys returned by ?TEST_DB:get_changes/1.
+-spec check_keys_in_deleted(
+        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(),
+        Keys::[{?RT:key(), OldExists::boolean()}], Note::string()) -> true.
+check_keys_in_deleted(DB, ChangesInterval, Keys, Note) ->
+    {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    [check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note)
+    || {Key, OldExists} <- Keys],
+    true.
+
+-spec check_key_in_deleted_internal(
+        DeletedKeys::intervals:interval(), ChangesInterval::intervals:interval(),
+        Key::?RT:key(), OldExists::boolean(), Note::string()) -> true.
+check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note) ->
+    case intervals:in(Key, ChangesInterval) andalso OldExists of
+        true ->
+            case length([K || K <- DeletedKeys, K =:= Key]) of
+                1 -> ok;
+                _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
+                              "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                              [DeletedKeys, Key, lists:flatten(Note)])
+            end;
+        _    -> true
+    end.
+
+%% @doc Checks that an entry is present exactly once in the list of changed
+%%      entries returned by ?TEST_DB:get_changes/1.
+-spec check_entry_in_changed_entries(
+        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
+        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
+check_entry_in_changed_entries(DB, ChangesInterval, NewEntry, {_OldExists, OldEntry}, Note) ->
+    {ChangedEntries, _DeletedKeys} = ?TEST_DB:get_changes(DB),
+    check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntry, OldEntry, Note).
+
+-spec check_entry_in_changed_entries_internal(
+        ChangedEntries::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
+        NewEntry::db_entry:entry(), OldEntry::db_entry:entry(), Note::string()) -> ok.
+check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntry, OldEntry, Note) ->
+    case intervals:in(db_entry:get_key(NewEntry), ChangesInterval) andalso
+             OldEntry =/= NewEntry of
+        true ->
+            case length([E || E <- ChangedEntries, E =:= NewEntry]) of
+                1 -> ok;
+                _ -> ?ct_fail("~s evaluated to \"~w\" and did not contain 1x entry ~w~n(~s)~n",
+                              ["element(1, ?TEST_DB:get_changes(DB))",
+                               ChangedEntries, NewEntry, lists:flatten(Note)])
+            end;
+        _    -> ok
+    end.
+
+%% @doc Checks that an entry is present exactly once in the list of changed
+%%      entries returned by ?TEST_DB:get_changes/1.
+-spec check_entry_in_changes(
+        DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
+        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
+check_entry_in_changes(DB, ChangesInterval, NewEntry, {OldExists, OldEntry}, Note) ->
+    {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
+    case db_entry:is_null(NewEntry) of
+        true ->
+            check_key_in_deleted_internal(DeletedKeys, ChangesInterval, db_entry:get_key(NewEntry), OldExists, Note);
+        _ ->
+            check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntry, OldEntry, Note)
+    end.
