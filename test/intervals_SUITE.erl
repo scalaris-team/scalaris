@@ -69,8 +69,8 @@ end_per_suite(Config) ->
 
 new(_Config) ->
     ?assert(intervals:is_well_formed(intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'))),
-    ?equals(intervals:new(?MINUS_INFINITY), intervals:new('(',?PLUS_INFINITY,?MINUS_INFINITY,']')),
-    ?equals(intervals:new(?PLUS_INFINITY), intervals:new('[',?PLUS_INFINITY,?MINUS_INFINITY,')')).
+    ?equals(intervals:new(?MINUS_INFINITY), intervals:new('[',?MINUS_INFINITY,?MINUS_INFINITY,']')),
+    ?equals(intervals:new(?PLUS_INFINITY), intervals:empty()).
 
 is_empty(_Config) ->
     NotEmpty = intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'),
@@ -96,7 +96,7 @@ tc1(_Config) ->
                 intervals:new('[', ?MINUS_INFINITY,
                               42312921949186639748260586507533448975, ']'),
                 intervals:new('[', 316058952221211684850834434588481137334,
-                              ?PLUS_INFINITY, ']')),
+                              ?PLUS_INFINITY, ')')),
               intervals:new('[', 316058952221211684850834434588481137334,
                             127383513679421255614104238365475501839, ']'))),
 
@@ -117,7 +117,7 @@ tc1(_Config) ->
 normalize(_Config) ->
     % some tests that have once failed:
     % attention: manually defined intervals may have to be adapted to changes in the intervals module!
-    ?equals(intervals:normalize([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {element,?MINUS_INFINITY}, {interval,'[', ?PLUS_INFINITY,4,']'}, {interval,'(', ?MINUS_INFINITY, ?PLUS_INFINITY,']'}]),
+    ?equals(intervals:normalize([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {element,?MINUS_INFINITY}, {interval,'[', ?PLUS_INFINITY,4,']'}, {interval,'(', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}]),
             intervals:all()),
     
     ?equals(intervals:normalize([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {element,?MINUS_INFINITY}, {interval,'[', ?PLUS_INFINITY,4,']'}]),
@@ -240,7 +240,7 @@ prop_new2_bounds(X, Y) ->
     I = intervals:new('[', X, Y, ']'),
     case intervals:is_all(I) of
         false -> ?equals(intervals:get_bounds(I), {'[', X, Y, ']'});
-        true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'})
+        true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'})
     end,
     true.
 
@@ -281,25 +281,29 @@ prop_new4_continuous(XBr, X, Y, YBr) ->
     Interval = intervals:new(XBr, X, Y, YBr),
     ?implies(not intervals:is_empty(Interval), intervals:is_continuous(Interval)).
 
--spec prop_new4_bounds(intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()) -> true.
-prop_new4_bounds(XBr, X, Y, YBr) ->
+-spec prop_new4_bounds(intervals:left_bracket(), intervals:key(), {intervals:key(), intervals:right_bracket()} | {plus_infinity, ')'}) -> true.
+prop_new4_bounds(XBr, X, {Y_, YBr}) ->
+    Y = case Y_ of
+            plus_infinity -> ?PLUS_INFINITY; % workaround if this is not precise enough for a type def
+            _             -> Y_
+        end,
     I = intervals:new(XBr, X, Y, YBr),
     % convert brackets if ?MINUS_INFINITY or ?PLUS_INFINITY are involved
     % (they will be converted due to normalization)
     {Ye, YBre} = case {Y, YBr} of
-                     {?MINUS_INFINITY, ')'} -> {?PLUS_INFINITY, ']'};
-                     _                     -> {Y, YBr}
+                     {?MINUS_INFINITY, ')'} -> {?PLUS_INFINITY, ')'};
+                     _                      -> {Y, YBr}
                  end,
     {Xe, XBre} = case {X, XBr} of
                      {?PLUS_INFINITY, '('} -> {?MINUS_INFINITY, '['};
-                     _                    -> {X, XBr}
+                     _                     -> {X, XBr}
                  end,
     case intervals:is_empty(I) of
         true -> true;
         false ->
             case intervals:is_all(I) of
                 false -> ?equals(intervals:get_bounds(I), {XBre, Xe, Ye, YBre});
-                true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'})
+                true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'})
             end,
             true
     end.
@@ -314,8 +318,8 @@ prop_new4(XBr, X, Y, YBr) ->
             ?assert(not intervals:is_empty(I)),
             ?equals(?implies(XBr =:= '[', intervals:in(X, I)), true),
             ?equals(?implies(XBr =:= '(', not intervals:in(X, I)), true),
-            ?equals(?implies(YBr =:= ']', intervals:in(Y, I)), true),
-            ?equals(?implies(YBr =:= ')', not intervals:in(Y, I)), true)
+            ?equals(?implies(YBr =:= ']' andalso Y =/= ?PLUS_INFINITY, intervals:in(Y, I)), true),
+            ?equals(?implies(YBr =:= ')' orelse Y =:= ?PLUS_INFINITY, not intervals:in(Y, I)), true)
     end,
     true.
 
@@ -326,7 +330,7 @@ tester_new4_continuous(_Config) ->
     tester:test(?MODULE, prop_new4_continuous, 4, 5000).
 
 tester_new4_bounds(_Config) ->
-    tester:test(?MODULE, prop_new4_bounds, 4, 5000).
+    tester:test(?MODULE, prop_new4_bounds, 3, 5000).
 
 tester_new4(_Config) ->
     tester:test(?MODULE, prop_new4, 4, 5000).
@@ -458,9 +462,9 @@ prop_union_continuous(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
              intervals:in(A0, B) orelse intervals:in(A1, B),
     % unions of continuous intervals wrapping around are continuous
     C5 = intervals:is_continuous(A) andalso intervals:is_continuous(B) andalso
-             {A1, A1Br, B0, B0Br} =:= {?PLUS_INFINITY, ']', ?MINUS_INFINITY, '['},
+             {A1, A1Br, B0, B0Br} =:= {?PLUS_INFINITY, ')', ?MINUS_INFINITY, '['},
     C6 = intervals:is_continuous(A) andalso intervals:is_continuous(B) andalso
-             {B1, B1Br, A0, A0Br} =:= {?PLUS_INFINITY, ']', ?MINUS_INFINITY, '['},
+             {B1, B1Br, A0, A0Br} =:= {?PLUS_INFINITY, ')', ?MINUS_INFINITY, '['},
     % if any C* is true, the union must be continuous, if all are false it is not
     % note: split this into several checks for better error messages
     ?equals(?implies(C1, ContinuousUnion), true),
@@ -519,8 +523,8 @@ prop_is_adjacent(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
              {A, B1Br, B1} =:= {intervals:new(A1), ')', A1} orelse
              % special cases for intervals with ?PLUS_INFINITY or ?MINUS_INFINITY
              % (cases with A0=:=B1 or A1=:=B0 have already been handled above)
-             {A0Br, A0, B1, B1Br} =:= {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'} orelse
-             {B0Br, B0, A1, A1Br} =:= {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'} orelse
+             {A0Br, A0, B1, B1Br} =:= {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'} orelse
+             {B0Br, B0, A1, A1Br} =:= {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'} orelse
              {A0Br, A0, B1, B1Br} =:= {'(', ?PLUS_INFINITY, ?MINUS_INFINITY, ')'} orelse
              {B0Br, B0, A1, A1Br} =:= {'(', ?PLUS_INFINITY, ?MINUS_INFINITY, ')'} orelse
              {A, B} =:= {intervals:new(?MINUS_INFINITY), intervals:new(?PLUS_INFINITY)} orelse
@@ -556,7 +560,7 @@ tester_is_left_right_of(_Config) ->
     tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000).
 
 is_left_right_of(_Config) ->
-    X = [{interval,'[',17, ?PLUS_INFINITY, ']'}],
+    X = [{interval,'[',17, ?PLUS_INFINITY, ')'}],
     Y = [{interval,'[',?MINUS_INFINITY,17,')'}],
     ?equals(intervals:is_adjacent(X, Y), true), % @17
     ?equals(intervals:is_left_of(X, Y), true),
@@ -616,7 +620,7 @@ prop_minus2(XBr, X, Y, YBr) ->
                     case I =:= intervals:new(X) of
                         true  -> intervals:union(
                                    intervals:new('[', ?MINUS_INFINITY, X, ')'),
-                                   intervals:new('(', X, ?PLUS_INFINITY, ']'));
+                                   intervals:new('(', X, ?PLUS_INFINITY, ')'));
                         false -> intervals:new(switch_br2(YBr), Y, X, switch_br2(XBr))
                     end
             end,
@@ -672,7 +676,7 @@ prop_get_bounds(I_) ->
     I = intervals:normalize(I_),
     ?implies(intervals:is_continuous(I),
              case intervals:get_bounds(I) of
-                 {'(', Key, Key, ')'} -> I =:= intervals:union(intervals:new('(', Key, ?PLUS_INFINITY, ']'),
+                 {'(', Key, Key, ')'} -> I =:= intervals:union(intervals:new('(', Key, ?PLUS_INFINITY, ')'),
                                                                intervals:new('[', ?MINUS_INFINITY, Key, ')'));
                  {LBr, L, R, RBr}     -> I =:= intervals:new(LBr, L, R, RBr)
              end).
