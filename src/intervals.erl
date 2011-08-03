@@ -80,11 +80,11 @@ empty() -> [].
 
 %% @doc Creates an interval covering the whole key space.
 -spec all() -> interval().
-all() -> [all].
+all() -> normalize_simple(all).
 
 %% @doc Creates an interval covering a single element.
 -spec new(key()) -> interval().
-new(X) -> [{element, X}].
+new(X) -> normalize_simple({element, X}).
 
 %% @doc Creates a new interval depending on the given brackets, i.e.:
 %%      - closed interval [A, B],
@@ -592,12 +592,12 @@ is_between('(', Begin, X, End, ')') ->
 
 %% @doc A &gt; B
 -spec greater_than(A::key(), B::key()) -> boolean().
-greater_than(X, X)              -> false;
+greater_than(X, X)               -> false;
 greater_than(?MINUS_INFINITY, _) -> false;
 greater_than(?PLUS_INFINITY, _)  -> true;
 greater_than(_, ?PLUS_INFINITY)  -> false;
 greater_than(_, ?MINUS_INFINITY) -> true;
-greater_than(X, Y)              -> X > Y.
+greater_than(X, Y)               -> X > Y.
 
 %% @doc A &gt;= B
 -spec greater_equals_than(A::key(), B::key()) -> boolean().
