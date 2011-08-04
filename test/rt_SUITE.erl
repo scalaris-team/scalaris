@@ -43,11 +43,13 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
+number_to_key(N) -> call_helper_fun(number_to_key, [N]).
+
 next_hop(_Config) ->
-    MyNode = node:new(self(), call_helper_fun(number_to_key, [0]), 0),
+    MyNode = node:new(self(), number_to_key(0), 0),
     pid_groups:join_as("rt_SUITE", dht_node),
-    Succ = node:new(fake_dht_node(".succ"), call_helper_fun(number_to_key, [1]), 0),
-    Pred = node:new(fake_dht_node(".pred"), call_helper_fun(number_to_key, [1000000]), 0),
+    Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
+    Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
     Neighbors = nodelist:new_neighborhood(Pred, MyNode, Succ),
     DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {2, 2}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
@@ -78,11 +80,11 @@ next_hop(_Config) ->
     ok.
 
 next_hop2(_Config) ->
-    MyNode = node:new(self(), call_helper_fun(number_to_key, [0]), 0),
+    MyNode = node:new(self(), number_to_key(0), 0),
     pid_groups:join_as("rt_SUITE", dht_node),
-    Succ = node:new(fake_dht_node(".succ"), call_helper_fun(number_to_key, [1]), 0),
-    SuccSucc = node:new(fake_dht_node(".succ.succ"), call_helper_fun(number_to_key, [2]), 0),
-    Pred = node:new(fake_dht_node(".pred"), call_helper_fun(number_to_key, [1000000]), 0),
+    Succ = node:new(fake_dht_node(".succ"), number_to_key(1), 0),
+    SuccSucc = node:new(fake_dht_node(".succ.succ"), number_to_key(2), 0),
+    Pred = node:new(fake_dht_node(".pred"), number_to_key(1000000), 0),
     DHTNodes = [fake_dht_node(io_lib:format(".node~B", [X])) || X <- lists:seq(1, 6)],
     RT_Keys = [{1, 1}, {4, 3}, {8, 4}, {16, 5}, {32, 6}, {64, 7}],
     RT = call_helper_fun(create_rt, [RT_Keys, [node:pidX(Succ) | DHTNodes]]),

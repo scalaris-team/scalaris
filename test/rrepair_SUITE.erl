@@ -47,6 +47,11 @@ all() ->
      bloomSync_times,
      min_nodes_rrepair].
 
+suite() ->
+    [
+     {timetrap, {seconds, 60}}
+    ].
+
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
