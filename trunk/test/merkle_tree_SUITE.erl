@@ -34,6 +34,11 @@ all() -> [
           branchTest
          ].
 
+suite() ->
+    [
+     {timetrap, {seconds, 10}}
+    ].
+
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
@@ -42,14 +47,14 @@ end_per_suite(Config) ->
     ok.
 
 insert1(_) ->    
-    Tree1 = build_tree(intervals:new('[', 1, 1000, ']'), [{1, 63}]),
+    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),[{1, 63}]),
     ?equals(merkle_tree:size(Tree1), 1),
     Tree2 = add_to_tree(950, 1000, Tree1),
     ?equals(merkle_tree:size(Tree2), 3),
     ok.
 
 treeHash(_) ->
-    Interval = intervals:new('[', 1, 1000, ']'),
+    Interval = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
     Tree1 = build_tree(Interval, [{450, 500}, {1, 63}]),
     Tree2 = build_tree(Interval, [{450, 500}, {1, 63}]),
     Tree3 = build_tree(Interval, [{451, 500}, {1, 63}]),
@@ -64,7 +69,7 @@ treeHash(_) ->
     ok.
 
 branchTest(_) ->
-    Interval = intervals:new('[', 1, 100, ']'),
+    Interval = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100), ']'),
     Tree1 = build_tree(Interval, {3, 5}, [{1, 5}, {50, 55}]),
     Tree2 = build_tree(Interval, {3, 10}, [{1, 10}, {50, 60}]),
     Tree3 = build_tree(Interval, {10, 10}, [{1, 10}, {11, 15}, {40, 49}, {90, 99}]),
@@ -97,4 +102,4 @@ build_tree(Interval, Config, KeyIntervalList) ->
 add_to_tree(To, To, Tree) ->
     Tree;
 add_to_tree(From, To, Tree) ->
-    add_to_tree(From + 1, To, merkle_tree:insert(From, someVal, Tree)).
+    add_to_tree(From + 1, To, merkle_tree:insert(rt_SUITE:number_to_key(From), someVal, Tree)).
