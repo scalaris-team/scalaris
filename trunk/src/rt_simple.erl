@@ -117,7 +117,7 @@ get_range(Begin, End) -> get_range_(Begin, End).
 
 %% @doc Helper for get_range/2 to make dialyzer happy with internal use of
 %%      get_range/2 in the other methods, e.g. get_split_key/3.
--spec get_range_(Begin::key_t(), End::key_t()) -> number().
+-spec get_range_(Begin::key_t(), End::key_t() | ?PLUS_INFINITY_TYPE) -> number().
 get_range_(Begin, Begin) -> n_(); % I am the only node
 get_range_(?MINUS_INFINITY, ?PLUS_INFINITY) -> n_(); % special case, only node
 get_range_(Begin, End) when End > Begin -> End - Begin;

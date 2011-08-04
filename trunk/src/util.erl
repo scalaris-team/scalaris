@@ -174,9 +174,9 @@ escape_quotes(String) ->
 escape_quotes_($", Rest) -> [$\\, $" | Rest];
 escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
--spec max(?PLUS_INFINITY, any()) -> ?PLUS_INFINITY;
-         (any(), ?PLUS_INFINITY) -> ?PLUS_INFINITY;
-         (T | ?MINUS_INFINITY, T | ?MINUS_INFINITY) -> T.
+-spec max(?PLUS_INFINITY_TYPE, any()) -> ?PLUS_INFINITY_TYPE;
+         (any(), ?PLUS_INFINITY_TYPE) -> ?PLUS_INFINITY_TYPE;
+         (T | ?MINUS_INFINITY_TYPE, T | ?MINUS_INFINITY_TYPE) -> T.
 max(?PLUS_INFINITY, _) -> ?PLUS_INFINITY;
 max(_, ?PLUS_INFINITY) -> ?PLUS_INFINITY;
 max(?MINUS_INFINITY, X) -> X;
@@ -187,9 +187,9 @@ max(A, B) ->
         false -> B
     end.
 
--spec min(?MINUS_INFINITY, any()) -> ?MINUS_INFINITY;
-         (any(), ?MINUS_INFINITY) -> ?MINUS_INFINITY;
-         (T | ?PLUS_INFINITY, T | ?PLUS_INFINITY) -> T.
+-spec min(?MINUS_INFINITY_TYPE, any()) -> ?MINUS_INFINITY_TYPE;
+         (any(), ?MINUS_INFINITY_TYPE) -> ?MINUS_INFINITY_TYPE;
+         (T | ?PLUS_INFINITY_TYPE, T | ?PLUS_INFINITY_TYPE) -> T.
 min(?MINUS_INFINITY, _) -> ?MINUS_INFINITY;
 min(_, ?MINUS_INFINITY) -> ?MINUS_INFINITY;
 min(?PLUS_INFINITY, X) -> X;

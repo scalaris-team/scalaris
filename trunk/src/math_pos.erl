@@ -26,7 +26,7 @@
 -type position_var() :: [non_neg_integer()].
 
 -export([plus/3, minus/3, divide/3, multiply/3,
-         make_same_length/3, remove_zeros/2]).
+         make_same_length/3, remove_zeros/3]).
 
 %% @doc A + B
 -spec plus(A::position_var(), B::position_var(), Base::pos_integer()) -> position_var().
@@ -108,23 +108,30 @@ divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
 
 %% @doc Bring two lists to the same length by appending or prepending 0's.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back)
-        -> {A::position_var(), B::position_var()}.
+        -> {A::position_var(), B::position_var(),
+            AddedToA::non_neg_integer(), AddedToB::non_neg_integer()}.
 make_same_length(A, B, AddTo) ->
-    A_l = erlang:length(A),
-    B_l = erlang:length(B),
+    A_l = erlang:length(A), B_l = erlang:length(B),
     MaxLength = erlang:max(A_l, B_l),
+    AddToALength = MaxLength - A_l, AddToBLength = MaxLength - B_l,
+    AddToA = lists:duplicate(AddToALength, 0),
+    AddToB = lists:duplicate(AddToBLength, 0),
     case AddTo of
-        back ->
-            {lists:append(A, lists:duplicate(MaxLength - A_l, 0)),
-             lists:append(B, lists:duplicate(MaxLength - B_l, 0))};
-        front ->
-            {lists:append(lists:duplicate(MaxLength - A_l, 0), A),
-             lists:append(lists:duplicate(MaxLength - B_l, 0), B)}
+        back -> {lists:append(A, AddToA), lists:append(B, AddToB),
+                 AddToALength, AddToBLength};
+        front -> {lists:append(AddToA, A), lists:append(AddToB, B),
+                 AddToALength, AddToBLength}
     end.
 
 %% @doc Remove leading or trailing 0's.
--spec remove_zeros(A::position_var(), RemoveFrom::front | back) -> A::position_var().
-remove_zeros(A, back) ->
-    lists:reverse(lists:dropwhile(fun(C) -> C =:= 0 end, lists:reverse(A)));
-remove_zeros(A, front) ->
-    lists:dropwhile(fun(C) -> C =:= 0 end, A).
+-spec remove_zeros(A::position_var(), RemoveFrom::front | back, MaxToRemove::non_neg_integer() | all)
+        -> A::position_var().
+remove_zeros(A, back, C) -> lists:reverse(remove_zeros_front(lists:reverse(A), C));
+remove_zeros(A, front, C) -> remove_zeros_front(A, C).
+
+-spec remove_zeros_front(A::position_var(), MaxToRemove::non_neg_integer() | all) -> position_var().
+remove_zeros_front(A, 0) -> A;
+remove_zeros_front([], _) -> [];
+remove_zeros_front([0 | R], all) -> remove_zeros_front(R, all);
+remove_zeros_front([0 | R], C) -> remove_zeros_front(R, C - 1);
+remove_zeros_front(A, _) -> A.
