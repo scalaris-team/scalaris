@@ -58,8 +58,8 @@
 -spec get_replica_keys(key()) -> [key()].
 
 -spec n() -> number().
--spec get_range(Begin::key(), End::key()) -> number().
--spec get_split_key(Begin::key(), End::key(), SplitFraction::{Num::0..100, Denom::0..100}) -> key().
+-spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
+-spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
 
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 

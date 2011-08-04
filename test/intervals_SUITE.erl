@@ -69,8 +69,7 @@ end_per_suite(Config) ->
 
 new(_Config) ->
     ?assert(intervals:is_well_formed(intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'))),
-    ?equals(intervals:new(?MINUS_INFINITY), intervals:new('[',?MINUS_INFINITY,?MINUS_INFINITY,']')),
-    ?equals(intervals:new(?PLUS_INFINITY), intervals:empty()).
+    ?equals(intervals:new(?MINUS_INFINITY), intervals:new('[',?MINUS_INFINITY,?MINUS_INFINITY,']')).
 
 is_empty(_Config) ->
     NotEmpty = intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'),
@@ -91,25 +90,21 @@ intersection(_Config) ->
 
 tc1(_Config) ->
     % some tests that have once failed:
+    Key1 = ?RT:hash_key("b"),
+    Key2 = ?RT:get_split_key(?MINUS_INFINITY, Key1, {1, 2}), % smaller than Key1
+    Key3 = ?RT:get_split_key(Key1, ?PLUS_INFINITY, {1, 2}), % larger than Key1
     ?assert(intervals:is_subset(
               intervals:union(
-                intervals:new('[', ?MINUS_INFINITY,
-                              42312921949186639748260586507533448975, ']'),
-                intervals:new('[', 316058952221211684850834434588481137334,
-                              ?PLUS_INFINITY, ')')),
-              intervals:new('[', 316058952221211684850834434588481137334,
-                            127383513679421255614104238365475501839, ']'))),
+                intervals:new('[', ?MINUS_INFINITY, Key2, ']'),
+                intervals:new('[', Key3, ?PLUS_INFINITY, ')')),
+              intervals:new('[', Key3, Key1, ']'))),
 
     ?assert(intervals:is_subset(
-              intervals:union(
-                intervals:new(187356034246551717222654062087646951235),
-                intervals:new(36721483204272088954146455621100499974)),
-              intervals:new('[', 36721483204272088954146455621100499974,
-                            187356034246551717222654062087646951235, ']'))),
+              intervals:union(intervals:new(Key1), intervals:new(Key3)),
+              intervals:new('[', Key1, Key3, ']'))),
 
-    ?equals(intervals:union([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}],
-                            [{interval,'[',?MINUS_INFINITY,4,']'},
-                             {element,?PLUS_INFINITY}]),
+    ?equals(intervals:union([{interval,'(', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}],
+                            [{interval,'[', ?MINUS_INFINITY, ?RT:hash_key("4"), ']'}]),
             intervals:all()),
 
     ok.
@@ -560,8 +555,9 @@ tester_is_left_right_of(_Config) ->
     tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000).
 
 is_left_right_of(_Config) ->
-    X = [{interval,'[',17, ?PLUS_INFINITY, ')'}],
-    Y = [{interval,'[',?MINUS_INFINITY,17,')'}],
+    MiddleKey = ?RT:hash_key("17"),
+    X = [{interval,'[', MiddleKey, ?PLUS_INFINITY, ')'}],
+    Y = [{interval,'[', ?MINUS_INFINITY, MiddleKey, ')'}],
     ?equals(intervals:is_adjacent(X, Y), true), % @17
     ?equals(intervals:is_left_of(X, Y), true),
     ?equals(intervals:is_left_of(Y, X), true),
