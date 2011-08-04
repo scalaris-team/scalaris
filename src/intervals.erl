@@ -54,8 +54,8 @@
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
 -type key() :: ?RT:key() | ?MINUS_INFINITY. % ?MINUS_INFINITY unnecessary (should be included in ?RT:key()) but needed for fewer dialyzer warnings
--type simple_interval() :: {element, key()} | all | simple_interval2().
 -type simple_interval2() :: {interval, left_bracket(), key(), key(), right_bracket()} | {interval, left_bracket(), key(), ?PLUS_INFINITY, ')'}.
+-type simple_interval() :: {element, key()} | all | simple_interval2().
 -opaque interval() :: [simple_interval()].
 
 % @type interval() = [simple_interval()].
