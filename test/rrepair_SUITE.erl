@@ -66,6 +66,7 @@ get_rrepair_config_parameter() ->
      {rep_update_sync_method, bloom}, %bloom, merkleTree, art
      {rep_update_fpr, 0.1},
      {rep_update_max_items, 1000},
+     {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
 
 end_per_testcase(_TestCase, _Config) ->
@@ -207,7 +208,6 @@ fill_symmetric_ring(DataCount, NodeCount) ->
                                             %write replica group
                                             lists:foreach(fun(X) -> 
                                                                   DBEntry = db_entry:new(X, "2", 2),
-                                                                  %DBEntry = db_entry:new(X),
                                                                   api_dht_raw:unreliable_lookup(X, 
                                                                                                 {set_key_entry, comm:this(), DBEntry}),
                                                                   receive {set_key_entry_reply, _} -> ok end
