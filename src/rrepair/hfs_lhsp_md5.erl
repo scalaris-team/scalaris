@@ -46,7 +46,9 @@ new_(HFCount) ->
 
 % @doc Applies Val to all hash functions in container HC
 apply_val_({hfs_lhsp_md5, K}, Val) ->
-    <<HF1:64, HF2:64>> = erlang:md5(erlang:term_to_binary(Val)),
+    ValBin = term_to_binary(Val),
+    HF1 = erlang:adler32(ValBin),
+    <<HF2:128>> = erlang:md5(ValBin),    
     [ HF1 + I * HF2 || I <- lists:seq(0, K-1, 1) ].
 
 % @doc Returns number of hash functions in the container
