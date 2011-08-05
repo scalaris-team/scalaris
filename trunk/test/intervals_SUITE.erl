@@ -55,7 +55,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 15}}
     ].
 
 init_per_suite(Config) ->
