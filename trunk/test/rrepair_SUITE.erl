@@ -77,12 +77,13 @@ end_per_testcase(_TestCase, _Config) ->
 % Test Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_symmetric_keys_test(_) ->
-    ToTest = get_symmetric_keys(4),
-    ToBe = ?RT:get_replica_keys(0),
+get_symmetric_keys_test(Config) ->
+    Config2 = unittest_helper:start_minimal_procs(Config, [], true),
+    ToTest = lists:sort(get_symmetric_keys(4)),
+    ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
+    unittest_helper:stop_minimal_procs(Config2),
     ct:pal("GeneratedKeys = ~w~nRT-GetReplicaKeys = ~w", [ToTest, ToBe]),
-    Equal = lists:foldl(fun(I, Acc) -> lists:member(I, ToBe) andalso Acc end, true, ToTest),
-    ?equals(Equal, true),
+    ?equals(ToTest, ToBe),
     ok.
 
 % @doc Bloom Synchronization should update at least one Item.
@@ -175,8 +176,7 @@ start_bloom_sync(Config, NodeCount, DataCount, Rounds, Fpr) ->
 
 -spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
 get_symmetric_keys(NodeCount) ->
-    B = (16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF div NodeCount) + 1,
-    util:for_to_ex(0, NodeCount - 1, fun(I) -> I*B end).
+    [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
 build_symmetric_ring(NodeCount, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -197,28 +197,28 @@ build_symmetric_ring(NodeCount, Config) ->
 fill_symmetric_ring(DataCount, NodeCount) ->
     NodeIds = lists:sort(get_symmetric_keys(NodeCount)),
     util:for_to(1, 
-                NodeCount div 4, 
-                fun(I) ->
-                        FirstKey = lists:nth(I, NodeIds) + 1,
-                        %write DataCount-items to nth-Node and its symmetric replicas
-                        util:for_to(FirstKey, 
-                                    FirstKey + DataCount - 1, 
-                                    fun(Key) ->
-                                            RepKeys = ?RT:get_replica_keys(Key),
-                                            %write replica group
-                                            lists:foreach(fun(X) -> 
-                                                                  DBEntry = db_entry:new(X, "2", 2),
-                                                                  api_dht_raw:unreliable_lookup(X, 
-                                                                                                {set_key_entry, comm:this(), DBEntry}),
-                                                                  receive {set_key_entry_reply, _} -> ok end
-                                                          end, 
-                                                          RepKeys),
-                                            %random replica is outdated
-                                            OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
-                                            api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
-                                            receive {set_key_entry_reply, _} -> ok end,
-                                            ok
-                                    end)
+                NodeCount div 4,
+                fun(N) ->
+                        From = lists:nth(N, NodeIds),
+                        To = lists:nth(N + 1, NodeIds),
+                        % write DataCount items to nth-Node and its symmetric replicas
+                        [begin
+                             Key = element(2, intervals:get_bounds(I)),
+                             RepKeys = ?RT:get_replica_keys(Key),
+                             %write replica group
+                             lists:foreach(fun(X) -> 
+                                                   DBEntry = db_entry:new(X, "2", 2),
+                                                   api_dht_raw:unreliable_lookup(X, 
+                                                                                 {set_key_entry, comm:this(), DBEntry}),
+                                                   receive {set_key_entry_reply, _} -> ok end
+                                           end, 
+                                           RepKeys),
+                             %random replica is outdated
+                             OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
+                             api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
+                             receive {set_key_entry_reply, _} -> ok end,
+                             ok
+                         end || I <- intervals:split(intervals:new('[', From, To, ']'), DataCount)]
                 end),
     ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),
     ok.

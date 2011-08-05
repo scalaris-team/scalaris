@@ -46,12 +46,7 @@ new_(HFCount) ->
 
 % @doc Applies Val to all hash functions in container HC
 apply_val_({hfs_lhsp_md5, K}, Val) ->
-    if
-        is_integer(Val) -> MD5 = erlang:md5(integer_to_list(Val));
-        is_float(Val) -> MD5 = erlang:md5(float_to_list(Val));
-        true -> MD5 = erlang:md5(Val)
-    end,
-    <<HF1:64, HF2:64>> = MD5,
+    <<HF1:64, HF2:64>> = erlang:md5(erlang:term_to_binary(Val)),
     [ HF1 + I * HF2 || I <- lists:seq(0, K-1, 1) ].
 
 % @doc Returns number of hash functions in the container
