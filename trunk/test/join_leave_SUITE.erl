@@ -171,7 +171,7 @@ prop_join_at(FirstId, SecondId) ->
 tester_join_at(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
-    prop_join_at(0, 0),
+    prop_join_at(rt_SUITE:number_to_key(0), rt_SUITE:number_to_key(0)),
     tester:test(?MODULE, prop_join_at, 2, 5).
 
 % TODO: simulate more message drops,
