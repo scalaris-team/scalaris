@@ -99,18 +99,9 @@ my_process_list(ServiceGroup, Options) ->
                          Id     -> [{{dht_node, id}, Id}]
                      end,
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
-    DHTNode =
-        case DHTNodeModule of
-            dht_node ->
-                util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
-                                         [[{my_sup_dht_node_id, dht_node}
-                                           | DHTNodeOptions]]);
-            group_node ->
-                util:sup_supervisor_desc(group_node, sup_group_node, start_link,
-                                         [[{my_sup_dht_node_id, group_node}
-                                           | DHTNodeOptions]]);
-            _ -> []
-        end,
+    DHTNode = util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
+                                       [[{my_sup_dht_node_id, dht_node}
+                                         | DHTNodeOptions]]),
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
     Logger = util:sup_supervisor_desc(logger, log, start_link),

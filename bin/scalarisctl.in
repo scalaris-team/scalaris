@@ -50,7 +50,7 @@ port=""
 yaws_port=""
 join_at=""
 start_mgmt_server=0
-start_dht_node="" # "dht_node" | "group_node"
+start_dht_node="" # "dht_node"
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -66,12 +66,11 @@ usage(){
     echo "    -v        - verbose"
     echo " services:"
     echo "    -m        - global Scalaris management server"
-    echo "    -s        - Scalaris node (see also -f) (not with -g)"
-    echo "    -g        - Scalaris2 groupnode (experimental) (not with -s)"
+    echo "    -s        - Scalaris node (see also -f)"
     echo " commands:"
     echo "    checkinstallation"
     echo "              - test installation"
-    echo "    start     - start services (see -m, -s and -g)"
+    echo "    start     - start services (see -m, and -s)"
     echo "    stop      - stop a scalaris process defined by its name (see -n)"
     echo "    restart   - restart a scalaris process by its name (see -n)"
     echo ""
@@ -315,7 +314,7 @@ debug(){
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifqmsgvn:p:y:k:" optionName; do
+while getopts "dhifqmsvn:p:y:k:" optionName; do
     case "$optionName" in
         d) daemonize=1;;
         f) first=1;;
@@ -328,7 +327,6 @@ while getopts "dhifqmsgvn:p:y:k:" optionName; do
         y) yaws_port=$OPTARG;;
         m) start_mgmt_server=1;;
         s) start_dht_node="dht_node";;
-        g) start_dht_node="group_node";;
         v) echo setting verbose from cli
             verbose=1;;
         [?]) echo "Wrong parameter $optionName."
