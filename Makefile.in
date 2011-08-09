@@ -516,6 +516,7 @@ install-erlang: compile
 	fi
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/icons \
+	           $(DOCROOTDIR)/flot \
 	           $(DOCROOTDIR)/images/default \
 	           $(DOCROOTDIR)/images/default/dd \
 	           $(DOCROOTDIR)/images/default/panel \
@@ -526,6 +527,8 @@ install-erlang: compile
 	           docroot/*.css \
 	           docroot/*.js \
 	           docroot/*.gif
+	install -m 644 -t $(DOCROOTDIR)/flot \
+	           docroot/flot/*
 	install -m 644 -t $(DOCROOTDIR)/icons \
 	           docroot/icons/*.gif
 	install -m 644 -t $(DOCROOTDIR)/images/default/dd \
