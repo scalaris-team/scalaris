@@ -222,8 +222,8 @@ is_valid({failed, _}) ->
 getMonitorData(Monitor, Process, Key) ->
     comm:send_local(Monitor, {get_rrd, Process, Key, comm:this()}),
     receive
-        {get_rrd_response, undefined} -> [];
-        {get_rrd_response, DB}        -> [DB]
+        {get_rrd_response, Process, Key, undefined} -> [];
+        {get_rrd_response, Process, Key, DB}        -> [DB]
     end.
 
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
