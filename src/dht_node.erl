@@ -189,7 +189,7 @@ on({lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
+on({lookup_fin, Key, Hops, Msg}, State) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
     FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
     case FwdList of
@@ -229,7 +229,7 @@ on(CompleteMsg = {lookup_fin, Key, Hops, Msg}, State) ->
                     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
                     State
             end;
-        [Pid] -> comm:send(Pid, CompleteMsg),
+        [Pid] -> comm:send(Pid, {lookup_fin, Key, Hops + 1, Msg}),
                  State
     end;
 
