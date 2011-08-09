@@ -195,7 +195,11 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
     case FwdList of
         []    ->
             case dht_node_state:is_db_responsible(Key, State) of
-                true -> gen_component:post_op(State, Msg);
+                true ->
+                    monitor:proc_set_value(
+                      ?MODULE, "lookup_hops",
+                      fun(Old) -> monitor_lookup_update_fun(Old, Hops) end),
+                    gen_component:post_op(State, Msg);
                 false ->
                     % it is possible that we received the message due to a
                     % forward while sliding and before the other node removed
@@ -469,3 +473,12 @@ is_alive_no_join(Pid) ->
             (SlideSucc =:= null orelse not slide_op:is_join(SlideSucc))
     catch _:_ -> false
     end.
+
+-spec monitor_lookup_update_fun(Old::rrd:rrd() | undefined, Hops::non_neg_integer()) -> New::rrd:rrd().
+monitor_lookup_update_fun(Old, Hops) ->
+    Old2 = case Old of
+               % 1m monitoring interval, only keep newest
+               undefined -> rrd:create(60 * 1000000, 1, {timing, count});
+               _ -> Old
+           end,
+    rrd:add_now(Hops, Old2).
