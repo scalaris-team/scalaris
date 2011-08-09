@@ -45,8 +45,8 @@
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
 % event: record every event (incl. timestamp) in a time slot,
-% timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x)}
--type timeseries_type() :: gauge | counter | event | timing.
+% timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x), histogram(x)}
+-type timeseries_type() :: gauge | counter | event | {timing, us | ms | s | count}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: util:time().
 -type internal_time() :: non_neg_integer().
@@ -162,7 +162,7 @@ add(Time, Value, DB) ->
             add_with(Time, Value, DB, fun counter_update_fun/3);
         event ->
             add_with(Time, Value, DB, fun event_update_fun/3);
-        timing ->
+        {timing, _} ->
             add_with(Time, Value, DB, fun timing_update_fun/3)
     end.
 

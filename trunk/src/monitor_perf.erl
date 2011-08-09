@@ -34,7 +34,7 @@
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
     {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
-    {{get_rrd_response, DB::rrd:rrd() | undefined}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
+    {{get_rrd_response, Process::atom(), Key::string(), DB::rrd:rrd() | undefined}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
     {gather_stats_response, Round::pos_integer(), Data::rrd:timing_type(number())} |
     {report_value, Round::pos_integer(), Stats::rrd:rrd()}.
 
@@ -49,7 +49,7 @@ run_bench() ->
       fun(Old) ->
               Old2 = case Old of
                          % 1m monitoring interval, only keep newest
-                         undefined -> rrd:create(60 * 1000000, 1, timing);
+                         undefined -> rrd:create(60 * 1000000, 1, {timing, us});
                          _ -> Old
                      end,
               rrd:add_now(TimeInUs, Old2)
@@ -89,10 +89,10 @@ on({gather_stats, SourcePid, Round}, State) ->
                     {get_rrd, ?MODULE, "read_read", This}),
     State;
 
-on({{get_rrd_response, undefined}, _Cookie}, State) ->
+on({{get_rrd_response, _Process, _Key, undefined}, _Cookie}, State) ->
     State;
 
-on({{get_rrd_response, DB}, {SourcePid, Round}}, State) ->
+on({{get_rrd_response, _Process, _Key, DB}, {SourcePid, Round}}, State) ->
     DB2 = rrd:reduce_timeslots(1, DB),
     DataL = rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end),
     case DataL of
@@ -136,7 +136,7 @@ init(null) ->
     FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
-    {0, rrd:create(get_gather_interval() * 1000000, 60, timing)}.
+    {0, rrd:create(get_gather_interval() * 1000000, 60, {timing, us})}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous

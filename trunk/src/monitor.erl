@@ -46,6 +46,7 @@
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
     {check_timeslots} |
     {get_rrd, Process::atom(), Key::key(), SourcePid::comm:mypid()} |
+    {get_rrds, [{Process::atom(), Key::key()},...], SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
@@ -198,12 +199,14 @@ on({check_timeslots}, Table) ->
     Table;
 
 on({get_rrd, Process, Key, SourcePid}, Table) ->
-    TableIndex = {Process, Key},
-    MyData = case ets:lookup(Table, TableIndex) of
-                 [{TableIndex, X}] -> X;
-                 [] -> undefined
-             end,
-    comm:send(SourcePid, {get_rrd_response, MyData}),
+    MyData = get_rrd(Table, {Process, Key}),
+    comm:send(SourcePid, {get_rrd_response, Process, Key, MyData}),
+    Table;
+
+on({get_rrds, TableIndexes, SourcePid}, Table) ->
+    MyData = [{Process, Key, get_rrd(Table, TableIndex)}
+             || {Process, Key} = TableIndex <- TableIndexes],
+    comm:send(SourcePid, {get_rrds_response, MyData}),
     Table;
 
 on({web_debug_info, Requestor}, Table) ->
@@ -214,6 +217,13 @@ on({web_debug_info, Requestor}, Table) ->
                     end || Key <- Keys],
     comm:send_local(Requestor, {web_debug_info_reply, [{"last 5 records per key:", ""} | GroupedLast5]}),
     Table.
+
+-spec get_rrd(Table::tid() | atom(), TableIndex::table_index()) -> rrd:rrd() | undefined.
+get_rrd(Table, TableIndex) ->
+    case ets:lookup(Table, TableIndex) of
+        [{TableIndex, X}] -> X;
+        [] -> undefined
+    end.
 
 -spec get_all_keys(Table::tid() | atom()) -> [table_index()].
 get_all_keys(Table) ->
@@ -237,13 +247,17 @@ web_debug_info_dump_fun(DB, From_, To_, Value) ->
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
     ValueStr =
         case rrd:get_type(DB) of
-            timing  ->
+            {timing, Unit} ->
                 {Sum, Sum2, Count, Min, Max, Hist} = Value,
                 AvgPerS = Count / Diff_in_s,
                 Avg = Sum / Count, Avg2 = Sum2 / Count,
                 Stddev = math:sqrt(Avg2 - (Avg * Avg)),
-                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f ms, min: ~.2f ms, max: ~.2f ms, stddev: ~.2f ms<br />&nbsp;&nbsp;hist:~p",
-                              [Count, AvgPerS, Avg / 1000, Min / 1000, Max / 1000, Stddev / 1000, histogram:get_data(Hist)]);
+                UnitStr = case Unit of
+                              count -> "";
+                              _     -> " " ++ erlang:atom_to_list(Unit)
+                          end,
+                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f~s, min: ~.2f~s, max: ~.2f~s, stddev: ~.2f~s<br />&nbsp;&nbsp;hist:~p",
+                              [Count, AvgPerS, Avg, UnitStr, float(Min), UnitStr, float(Max), UnitStr, Stddev, UnitStr, histogram:get_data(Hist)]);
             counter ->
                 io_lib:format("&nbsp;&nbsp;sum: ~p (avg: ~.2f / s)", [Value, Value / Diff_in_s]);
             event ->
