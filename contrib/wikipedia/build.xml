@@ -124,7 +124,7 @@
   </target>
 
   <target name="scalaris.properties.get.node" unless="scalaris.node">
-    <input addproperty="scalaris.node" defaultvalue="node1@localhost,node2@localhost,node3@localhost,node4@localhost" message="URL to a scalaris node"/>
+    <input addproperty="scalaris.node" defaultvalue="firstnode@localhost,node1@localhost,node2@localhost,node3@localhost,node4@localhost" message="URL to a scalaris node"/>
   </target>
   <target name="scalaris.properties.get.cookie" unless="scalaris.cookie">
     <input addproperty="scalaris.cookie" defaultvalue="chocolate chip cookie" message="Cookie the scalaris node uses for connections"/>
