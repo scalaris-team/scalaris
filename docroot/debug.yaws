@@ -55,7 +55,7 @@ out(Arg) ->
         <a class="menua" href="gossip.yaws">Gossip values</a>
       </div>
       <div class="nothighlighted">
-        <a class="menua" href="monitor.yaws">Monitoring</a>
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
       </div>
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>

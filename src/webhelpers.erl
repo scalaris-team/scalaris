@@ -25,7 +25,7 @@
 
 -export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
          get_and_cache_ring/0, flush_ring_cache/0,
-         getGossipRendered/0, getVivaldiMap/0, getMonitorData/0,
+         getGossipRendered/0, getVivaldiMap/0, getMonitorClientData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1]).
 
 -opaque attribute_type() :: {atom(), string()}.
@@ -655,8 +655,8 @@ format_gossip_value(Value, Key, Fun) ->
 
 %%%-----------------------------Monitoring----------------------------------
 
--spec getMonitorData() -> html_type().
-getMonitorData() ->
+-spec getMonitorClientData() -> html_type().
+getMonitorClientData() ->
     ClientMonitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getMonitorStats(ClientMonitor, [{api_tx, "req_list"}]) of
