@@ -44,6 +44,9 @@ out(Arg) ->
       <div class="nothighlighted">
         <a class="menua" href="monitor_client.yaws">Client Monitor</a>
       </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
 	  <div class="nothighlighted">
 	    <a class="menua" href="documentation.yaws">Docu</a>
 	  </div>
