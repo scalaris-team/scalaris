@@ -27,11 +27,12 @@
 
 -export([new/1, new/3, insert/3, empty/0,
          lookup/2, 
-         is_empty/1, set_root_interval/2, size/1, gen_hashes/1,
-         get_hash/1, get_interval/1]).
+         set_root_interval/2, size/1, gen_hashes/1,
+         is_empty/1, is_leaf/1, get_bucket/1,
+         get_hash/1, get_interval/1, get_childs/1]).
 
 -ifdef(with_export_type_support).
--export_type([mt_config/0, merkle_tree/0]).
+-export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
 -endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -60,7 +61,8 @@
                      Child_list  :: [mt_node()]
                     }.
 
--opaque merkle_tree() :: {mt_config(), Root::mt_node()}.
+%-opaque merkle_tree() :: {mt_config(), Root::mt_node()}.
+-type merkle_tree() :: {mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Empty
@@ -115,18 +117,29 @@ lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Get hash
+%% Getter for mt_node / merkle_tree (root)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
 get_hash({_, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Get interval
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_interval(merkle_tree() | mt_node()) -> intervals:interval().
 get_interval({_, Node}) -> get_interval(Node);
 get_interval({_, _, _, I, _}) -> I.
+
+-spec get_childs(merkle_tree() | mt_node()) -> [mt_node()].
+get_childs({_, Node}) -> get_childs(Node);
+get_childs({_, _, _, _, Childs}) -> Childs.
+
+-spec is_leaf(merkle_tree() | mt_node()) -> boolean().
+is_leaf({_, Node}) -> is_leaf(Node);
+is_leaf({_, _, _, _, []}) -> true;
+is_leaf(_) -> false.
+
+-spec get_bucket(merkle_tree | mt_node()) -> [{Key::term(), Value::term()}].
+get_bucket({_, Root}) -> get_bucket(Root);
+get_bucket({_, C, Bucket, _, []}) when C > 0 -> orddict:to_list(Bucket);
+get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% set_root_interval

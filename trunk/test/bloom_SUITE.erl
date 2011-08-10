@@ -105,6 +105,7 @@ measure_fp(DestFpr, MaxElements) ->
 	BF = newBloom(MaxElements, DestFpr),
     BF1 = for_to_ex(1, MaxElements, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, BF),
 	NumNotIn = trunc(10 / DestFpr),
+    %count found items which should not be in the bloom filter 
     NumFound = for_to_ex(MaxElements + 1, 
                          MaxElements + 1 + NumNotIn, 
                          fun(I) -> case ?BLOOM:is_element(BF1, I) of
@@ -113,7 +114,7 @@ measure_fp(DestFpr, MaxElements) ->
                                    end
                          end,
                          fun(X,Y) -> X+Y end,
-                         0),       
+                         0),
 	NumFound / NumNotIn.
 
 fprof(_) ->

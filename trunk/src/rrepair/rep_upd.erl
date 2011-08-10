@@ -30,8 +30,8 @@
 -export_type([db_chunk/0, sync_method/0]).
 -endif.
 
-%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -54,7 +54,7 @@
 
 -type message() ::
     {?TRIGGER_NAME} |
-    {request_sync, Round::float(), rep_upd_sync:sync_stage(), Feedback::boolean(), sync_method(), rep_upd_sync:sync_struct()} |
+    {request_sync, Round::float(), rep_upd_sync:sync_stage(), sync_method(), rep_upd_sync:sync_struct()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {sync_progress_report, Sender::comm:erl_local_pid(), Key::term(), Value::term()}.
 
@@ -66,20 +66,25 @@
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round }) ->
     {ok, Pid} = rep_upd_sync:start_sync(true, Round),
-    comm:send_local(Pid, {start_sync_master, get_sync_method(), build_struct}),
+    case get_sync_method() of
+        bloom -> comm:send_local(Pid, {start_sync, get_sync_method(), build_struct});
+        merkleTree -> comm:send_local(Pid, {start_sync, get_sync_method(), req_shared_interval});
+        _ -> ok
+    end,
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
     ?TRACE("Trigger NEXT", []),
     State#rep_upd_state{ trigger_state = NewTriggerState, sync_round = Round + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, Round, SyncStage, Feedback, SyncMethod, SyncStruct}, State) ->
+on({request_sync, Round, SyncStage, SyncMethod, SyncStruct}, State) ->
+    ?TRACE("SYNC REQ recv", []),
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
     {ok, Pid} = rep_upd_sync:start_sync(false, Round),
-    comm:send_local(Pid, {start_sync_client, SyncStage, Feedback, SyncMethod, SyncStruct}),
+    comm:send_local(Pid, {start_sync, SyncMethod, SyncStage, SyncStruct}),
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({web_debug_info, Requestor}, State) ->
@@ -98,7 +103,7 @@ on({web_debug_info, Requestor}, State) ->
 on({sync_progress_report, _Sender, _Key, Value}, State) ->
     monitor:proc_set_value(?MODULE, "Progress",
                            fun(Old) -> rrd:add_now(Value, Old) end),
-    ?TRACE("SYNC FINISHED - Key=~p REASON=[~p]", [Key, Value]),
+    ?TRACE("SYNC FINISHED - Key=~p REASON=[~p]", [_Key, Value]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
