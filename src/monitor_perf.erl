@@ -62,10 +62,10 @@ run_bench() ->
       fun(Old) ->
               Old2 = case Old of
                          % 1m monitoring interval, only keep newest
-                         undefined -> rrd:create(60 * 1000000, 1, {timing, us});
+                         undefined -> rrd:create(60 * 1000000, 1, {timing, ms});
                          _ -> Old
                      end,
-              rrd:add_now(TimeInUs, Old2)
+              rrd:add_now(TimeInUs / 1000, Old2)
       end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
@@ -193,7 +193,7 @@ init(null) ->
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
     Now = os:timestamp(),
-    State = #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, us}, Now),
+    State = #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
     {State, State}.
 
