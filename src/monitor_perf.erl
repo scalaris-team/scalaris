@@ -43,7 +43,8 @@
     {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
     {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
     {gather_stats_response, Round::pos_integer(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
-    {report_value, StatsOneRound::#state{}}.
+    {report_value, StatsOneRound::#state{}} |
+    {get_rrds, [{Process::atom(), Key::string()},...], SourcePid::comm:mypid()}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -149,6 +150,21 @@ on({report_value, OtherState} = _Msg, {AllNodes, Leader} = _State)
 
 on({report_value, _OtherState} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    State;
+
+on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
+    MyData = lists:flatten(
+               [begin
+                    Value = case FullKey of
+                                {?MODULE, "read_read"} ->
+                                    AllNodes#state.perf_rr;
+                                {dht_node, "lookup_hops"} ->
+                                    AllNodes#state.perf_lh;
+                                _ -> undefined
+                            end,
+                    {Process, Key, Value}
+                end || {Process, Key} = FullKey <- KeyList]),
+    comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 
 on({web_debug_info, Requestor} = _Msg, {AllNodes, Leader} = State) ->
