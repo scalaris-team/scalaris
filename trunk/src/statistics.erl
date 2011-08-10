@@ -23,7 +23,7 @@
          get_total_load/1, get_average_load/1, get_load_std_deviation/1,
          get_average_rt_size/1, get_rt_size_std_deviation/1,
          get_memory_usage/1, get_max_memory_usage/1,
-         getMonitorStats/3]).
+         getMonitorStats/2]).
 
 -include("scalaris.hrl").
 
@@ -218,12 +218,12 @@ is_valid({failed, _}) ->
 
 %%%-----------------------------Monitor-------------------------------
 
--spec getMonitorData(Monitor::pid(), Process::atom(), Key::string()) -> [rrd:rrd()].
-getMonitorData(Monitor, Process, Key) ->
-    comm:send_local(Monitor, {get_rrd, Process, Key, comm:this()}),
+-spec getMonitorData(Monitor::pid(), [{Process::atom(), Key::string()}]) -> [{Process::atom(), Key::string(), rrd:rrd()}].
+getMonitorData(Monitor, Keys) ->
+    comm:send_local(Monitor, {get_rrds, Keys, comm:this()}),
     receive
-        {get_rrd_response, Process, Key, undefined} -> [];
-        {get_rrd_response, Process, Key, DB}        -> [DB]
+        {get_rrds_response, DataL} -> [Data || Data = {_Process, _Key, Value} <- DataL,
+                                               Value =/= undefined]
     end.
 
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
@@ -259,27 +259,27 @@ get_utc_local_diff_s() ->
     Local_s - UTC_s.
 
 -type time_list(Value) :: [[Time1_Value2::float() | Value]].
--spec getMonitorStats(Monitor::pid(), Process::atom(), Key::string())
-        -> {CountD::time_list(non_neg_integer()),
-            CountPerSD::time_list(float()), AvgMsD::time_list(float()),
-            MinMsD::time_list(float()), MaxMsD::time_list(float()),
-            StddevMsD::time_list(float()),
-            HistMsD::[[Time::float() | [[TimeMs1_Count2::float() | pos_integer()]]]]}.
-getMonitorStats(Monitor, Process, Key) ->
-    DataDump = [rrd:dump_with(DB, fun monitor_timing_dump_fun_exists/4,
-                              fun monitor_timing_dump_fun_notexists/3) ||
-                DB <- getMonitorData(Monitor, Process, Key)],
-    case DataDump of
-        [] -> {[], [], [], [], [], [], []};
-        [ReqListData] ->
-            UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
-            lists:foldr(
-              fun({TimeUTC, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs, HistMs},
-                  {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, HistMsD}) ->
-                      Time = TimeUTC + UtcToLocalDiff_ms,
-                      {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
-                       [[Time, AvgMs] | AvgMsD], [[Time, MinMs] | MinMsD],
-                       [[Time, MaxMs] | MaxMsD], [[Time, StddevMs] | StddevMsD],
-                       [[Time, HistMs] | HistMsD]}
-              end, {[], [], [], [], [], [], []}, ReqListData)
-    end.
+-spec getMonitorStats(Monitor::pid(), [{Process::atom(), Key::string()}])
+        -> [{Process::atom(), Key::string(),
+             {CountD::time_list(non_neg_integer()),
+              CountPerSD::time_list(float()), AvgMsD::time_list(float()),
+              MinMsD::time_list(float()), MaxMsD::time_list(float()),
+              StddevMsD::time_list(float()),
+              HistMsD::[[Time::float() | [[TimeMs1_Count2::float() | pos_integer()]]]]}}].
+getMonitorStats(Monitor, Keys) ->
+    UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
+    [begin
+         Dump = rrd:dump_with(DB, fun monitor_timing_dump_fun_exists/4,
+                              fun monitor_timing_dump_fun_notexists/3),
+         Value =
+             lists:foldr(
+               fun({TimeUTC, Count, CountPerS, AvgMs, MinMs, MaxMs, StddevMs, HistMs},
+                   {CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, HistMsD}) ->
+                       Time = TimeUTC + UtcToLocalDiff_ms,
+                       {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
+                        [[Time, AvgMs] | AvgMsD], [[Time, MinMs] | MinMsD],
+                        [[Time, MaxMs] | MaxMsD], [[Time, StddevMs] | StddevMsD],
+                        [[Time, HistMs] | HistMsD]}
+               end, {[], [], [], [], [], [], []}, Dump),
+         {Process, Key, Value}
+     end || {Process, Key, DB} <- getMonitorData(Monitor, Keys)].

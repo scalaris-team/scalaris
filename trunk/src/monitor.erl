@@ -45,7 +45,6 @@
     {report_single, Process::atom(), Key::key(),
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
     {check_timeslots} |
-    {get_rrd, Process::atom(), Key::key(), SourcePid::comm:mypid()} |
     {get_rrds, [{Process::atom(), Key::key()},...], SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
@@ -196,11 +195,6 @@ on({report_single, Process, Key, NewValue_or_UpdateFun}, Table) ->
 on({check_timeslots}, Table) ->
     proc_check_all_timeslot(),
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
-    Table;
-
-on({get_rrd, Process, Key, SourcePid}, Table) ->
-    MyData = get_rrd(Table, {Process, Key}),
-    comm:send(SourcePid, {get_rrd_response, Process, Key, MyData}),
     Table;
 
 on({get_rrds, TableIndexes, SourcePid}, Table) ->

@@ -659,7 +659,10 @@ format_gossip_value(Value, Key, Fun) ->
 getMonitorData() ->
     ClientMonitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
-        statistics:getMonitorStats(ClientMonitor, api_tx, "req_list"),
+        case statistics:getMonitorStats(ClientMonitor, [{api_tx, "req_list"}]) of
+            []                           -> {[], [], [], [], [], [], []};
+            [{api_tx, "req_list", Data}] -> Data
+        end,
     AvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
