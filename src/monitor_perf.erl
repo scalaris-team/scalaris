@@ -30,7 +30,7 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -record(state,
-        {round   = 0                         :: non_neg_integer(),
+        {id      = ?required(state, id)      :: util:global_uid(),
          perf_rr = ?required(state, perf_rr) :: rrd:rrd(),
          perf_lh = ?required(state, perf_lh) :: rrd:rrd()
         }).
@@ -40,9 +40,9 @@
     {bench} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
-    {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
-    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
-    {gather_stats_response, Round::pos_integer(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
+    {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()} |
+    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
+    {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
     {report_value, StatsOneRound::#state{}} |
     {get_rrds, [{Process::atom(), Key::string()},...], SourcePid::comm:mypid()}.
 
@@ -89,22 +89,22 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
         false -> State;
         _ ->
             % start a new timeslot and gather stats...
-            NewRound = Leader#state.round + 1,
-            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewRound}},
+            NewId = util:get_global_uid(),
+            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewId}},
             bulkowner:issue_bulk_owner(intervals:all(), Msg),
             Leader1 = check_timeslots(Leader),
             broadcast_values(Leader, Leader1),
-            {AllNodes, Leader1#state{round = NewRound}}
+            {AllNodes, Leader1#state{id = NewId}}
     end;
 
-on({gather_stats, SourcePid, Round} = _Msg, State) ->
+on({gather_stats, SourcePid, Id} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    This = comm:this_with_cookie({SourcePid, Round}),
+    This = comm:this_with_cookie({SourcePid, Id}),
     comm:send_local(pid_groups:get_my(monitor),
                     {get_rrds, [{?MODULE, "read_read"}, {dht_node, "lookup_hops"}], This}),
     State;
 
-on({{get_rrds_response, DBs}, {SourcePid, Round}} = _Msg, State) ->
+on({{get_rrds_response, DBs}, {SourcePid, Id}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     DataL = lists:flatten(
               [begin
@@ -116,12 +116,12 @@ on({{get_rrds_response, DBs}, {SourcePid, Round}} = _Msg, State) ->
                end || {Process, Key, DB} <- DBs, DB =/= undefined]),
     case DataL of
         [] -> ok;
-        _  -> comm:send(SourcePid, {gather_stats_response, Round, DataL})
+        _  -> comm:send(SourcePid, {gather_stats_response, Id, DataL})
     end,
     State;
 
-on({gather_stats_response, Round, DataL} = _Msg, {AllNodes, Leader} = _State)
-  when Round =:= Leader#state.round->
+on({gather_stats_response, Id, DataL} = _Msg, {AllNodes, Leader} = _State)
+  when Id =:= Leader#state.id ->
     ?TRACE1(_Msg, _State),
     Leader1 =
         lists:foldl(
@@ -138,19 +138,14 @@ on({gather_stats_response, Round, DataL} = _Msg, {AllNodes, Leader} = _State)
                   end
           end, Leader, DataL),
     {AllNodes, Leader1};
-on({gather_stats_response, _Round, _Data} = _Msg, State) ->
+on({gather_stats_response, _Id, _Data} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     State;
 
-on({report_value, OtherState} = _Msg, {AllNodes, Leader} = _State)
-  when OtherState#state.round > AllNodes#state.round ->
+on({report_value, OtherState} = _Msg, {AllNodes, Leader} = _State) ->
     ?TRACE1(_Msg, _State),
     AllNodes1 = integrate_values(OtherState, AllNodes),
     {AllNodes1, Leader};
-
-on({report_value, _OtherState} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    State;
 
 on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
     MyData = lists:flatten(
@@ -193,7 +188,8 @@ init(null) ->
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
     Now = os:timestamp(),
-    State = #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
+    State = #state{id = util:get_global_uid(),
+                   perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
     {State, State}.
 
@@ -245,7 +241,7 @@ reduce_timeslots(N, State) ->
 integrate_values(OtherState, MyState) ->
     MyPerfRR1 = integrate_value(OtherState#state.perf_rr, MyState#state.perf_rr),
     MyPerfLH1 = integrate_value(OtherState#state.perf_lh, MyState#state.perf_lh),
-    MyState#state{round = OtherState#state.round,
+    MyState#state{id = OtherState#state.id,
                   perf_rr = MyPerfRR1, perf_lh = MyPerfLH1}.
 
 -spec integrate_value(OtherDB::rrd:rrd(), MyDB::rrd:rrd()) -> rrd:rrd().
