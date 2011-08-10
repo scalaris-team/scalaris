@@ -35,7 +35,7 @@
          perf_lh = ?required(state, perf_lh) :: rrd:rrd()
         }).
 
--type state() :: #state{}.
+-type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}}.
 -type message() ::
     {bench} |
     {propagate} |
@@ -43,7 +43,7 @@
     {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
     {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
     {gather_stats_response, Round::pos_integer(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
-    {report_value, StatsOneRound::state()}.
+    {report_value, StatsOneRound::#state{}}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -82,18 +82,18 @@ on({propagate} = _Msg, State) ->
     comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
     State;
 
-on({get_node_details_response, NodeDetails} = _Msg, State) ->
+on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) ->
     ?TRACE1(_Msg, State),
     case is_leader(node_details:get(NodeDetails, my_range)) of
         false -> State;
         _ ->
             % start a new timeslot and gather stats...
-            NewRound = State#state.round + 1,
+            NewRound = Leader#state.round + 1,
             Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewRound}},
             bulkowner:issue_bulk_owner(intervals:all(), Msg),
-            State1 = check_timeslots(State),
-            broadcast_values(State, State1),
-            State1#state{round = NewRound}
+            Leader1 = check_timeslots(Leader),
+            broadcast_values(Leader, Leader1),
+            {AllNodes, Leader1#state{round = NewRound}}
     end;
 
 on({gather_stats, SourcePid, Round} = _Msg, State) ->
@@ -119,31 +119,44 @@ on({{get_rrds_response, DBs}, {SourcePid, Round}} = _Msg, State) ->
     end,
     State;
 
-on({gather_stats_response, Round, DataL} = _Msg, State) when Round =:= State#state.round->
-    ?TRACE1(_Msg, State),
-    lists:foldl(
-      fun(Data, A) ->
-              case Data of
-                  {?MODULE, "read_read", PerfRR} ->
-                      DB = A#state.perf_rr,
-                      T = rrd:get_current_time(DB),
-                      A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun timing_update_fun/3)};
-                  {dht_node, "lookup_hops", PerfLH} ->
-                      DB = A#state.perf_lh,
-                      T = rrd:get_current_time(DB),
-                      A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)}
-              end
-      end, State, DataL);
+on({gather_stats_response, Round, DataL} = _Msg, {AllNodes, Leader} = _State)
+  when Round =:= Leader#state.round->
+    ?TRACE1(_Msg, _State),
+    Leader1 =
+        lists:foldl(
+          fun(Data, A) ->
+                  case Data of
+                      {?MODULE, "read_read", PerfRR} ->
+                          DB = A#state.perf_rr,
+                          T = rrd:get_current_time(DB),
+                          A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun timing_update_fun/3)};
+                      {dht_node, "lookup_hops", PerfLH} ->
+                          DB = A#state.perf_lh,
+                          T = rrd:get_current_time(DB),
+                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)}
+                  end
+          end, Leader, DataL),
+    {AllNodes, Leader1};
 on({gather_stats_response, _Round, _Data} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     State;
 
-on({report_value, OtherState} = _Msg, State) when OtherState#state.round > State#state.round ->
-    ?TRACE1(_Msg, State),
-    integrate_values(OtherState, State);
+on({report_value, OtherState} = _Msg, {AllNodes, Leader} = _State)
+  when OtherState#state.round > AllNodes#state.round ->
+    ?TRACE1(_Msg, _State),
+    AllNodes1 = integrate_values(OtherState, AllNodes),
+    {AllNodes1, Leader};
 
 on({report_value, _OtherState} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    State;
+
+on({web_debug_info, Requestor} = _Msg, {AllNodes, Leader} = State) ->
+    ?TRACE1(_Msg, _State),
+    KeyValueList =
+        [{"all nodes", lists:flatten(io_lib:format("~p", [AllNodes]))},
+         {"leader",    lists:flatten(io_lib:format("~p", [Leader]))}],
+    comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -164,8 +177,9 @@ init(null) ->
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
     Now = os:timestamp(),
-    #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, us}, Now),
-           perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)}.
+    State = #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, us}, Now),
+                   perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
+    {State, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
@@ -185,12 +199,12 @@ timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
     {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
      erlang:min(Min, NewMin), erlang:max(Max, NewMax), NewHist2}.
 
--spec check_timeslots(state()) -> state().
+-spec check_timeslots(#state{}) -> #state{}.
 check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH}) ->
     State#state{perf_rr = rrd:check_timeslot_now(PerfRR),
                 perf_lh = rrd:check_timeslot_now(PerfLH)}.
 
--spec broadcast_values(OldState::state(), NewState::state()) -> ok.
+-spec broadcast_values(OldState::#state{}, NewState::#state{}) -> ok.
 broadcast_values(OldState, NewState) ->
     % broadcast the latest value only if a new time slot was started
     OldPerfRR = OldState#state.perf_rr,
@@ -206,12 +220,12 @@ broadcast_values(OldState, NewState) ->
         _ -> ok %nothing to do
     end.
 
--spec reduce_timeslots(N::pos_integer(), State::state()) -> state().
+-spec reduce_timeslots(N::pos_integer(), State::#state{}) -> #state{}.
 reduce_timeslots(N, State) ->
     State#state{perf_rr = rrd:reduce_timeslots(N, State#state.perf_rr),
                 perf_lh = rrd:reduce_timeslots(N, State#state.perf_lh)}.
 
--spec integrate_values(OtherState::state(), MyState::state()) -> state().
+-spec integrate_values(OtherState::#state{}, MyState::#state{}) -> #state{}.
 integrate_values(OtherState, MyState) ->
     MyPerfRR1 = integrate_value(OtherState#state.perf_rr, MyState#state.perf_rr),
     MyPerfLH1 = integrate_value(OtherState#state.perf_lh, MyState#state.perf_lh),
