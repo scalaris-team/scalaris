@@ -32,7 +32,8 @@
 -record(state,
         {id      = ?required(state, id)      :: util:global_uid(),
          perf_rr = ?required(state, perf_rr) :: rrd:rrd(),
-         perf_lh = ?required(state, perf_lh) :: rrd:rrd()
+         perf_lh = ?required(state, perf_lh) :: rrd:rrd(),
+         perf_tx = ?required(state, perf_tx) :: rrd:rrd()
         }).
 
 -type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}}.
@@ -42,6 +43,7 @@
     {get_node_details_response, node_details:node_details()} |
     {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()} |
     {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
+    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]}} |
     {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
     {report_value, StatsOneRound::#state{}} |
     {get_rrds, [{Process::atom(), Key::string()},...], SourcePid::comm:mypid()}.
@@ -106,10 +108,18 @@ on({gather_stats, SourcePid, Id} = _Msg, State) ->
 
 on({{get_rrds_response, DBs}, {SourcePid, Id}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    DataL = process_rrds(DBs),
-    case DataL of
+    MyMonData = process_rrds(DBs),
+    This = comm:this_with_cookie({SourcePid, Id, MyMonData}),
+    comm:send_local(pid_groups:pid_of("clients_group", monitor),
+                    {get_rrds, [{api_tx, "req_list"}], This}),
+    State;
+
+on({{get_rrds_response, DBs}, {SourcePid, Id, MyMonData}} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    AllData = lists:append([MyMonData, process_rrds(DBs)]),
+    case AllData of
         [] -> ok;
-        _  -> comm:send(SourcePid, {gather_stats_response, Id, DataL})
+        _  -> comm:send(SourcePid, {gather_stats_response, Id, AllData})
     end,
     State;
 
@@ -127,7 +137,11 @@ on({gather_stats_response, Id, DataL} = _Msg, {AllNodes, Leader} = _State)
                       {dht_node, "lookup_hops", PerfLH} ->
                           DB = A#state.perf_lh,
                           T = rrd:get_current_time(DB),
-                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)}
+                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)};
+                      {api_tx, "req_list", PerfTX} ->
+                          DB = A#state.perf_tx,
+                          T = rrd:get_current_time(DB),
+                          A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun timing_update_fun/3)}
                   end
           end, Leader, DataL),
     {AllNodes, Leader1};
@@ -148,6 +162,8 @@ on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
                                     AllNodes#state.perf_rr;
                                 {dht_node, "lookup_hops"} ->
                                     AllNodes#state.perf_lh;
+                                {api_tx, "req_list"} ->
+                                    AllNodes#state.perf_tx;
                                 _ -> undefined
                             end,
                     {Process, Key, Value}
@@ -183,7 +199,8 @@ init(null) ->
     Now = os:timestamp(),
     State = #state{id = util:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
-                   perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
+                   perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
+                   perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
     {State, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -205,19 +222,18 @@ timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
      erlang:min(Min, NewMin), erlang:max(Max, NewMax), NewHist2}.
 
 -spec check_timeslots(#state{}) -> #state{}.
-check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH}) ->
+check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH, perf_tx = PerfTX}) ->
     State#state{perf_rr = rrd:check_timeslot_now(PerfRR),
-                perf_lh = rrd:check_timeslot_now(PerfLH)}.
+                perf_lh = rrd:check_timeslot_now(PerfLH),
+                perf_tx = rrd:check_timeslot_now(PerfTX)}.
 
 -spec broadcast_values(OldState::#state{}, NewState::#state{}) -> ok.
 broadcast_values(OldState, NewState) ->
     % broadcast the latest value only if a new time slot was started
-    OldPerfRR = OldState#state.perf_rr,
-    NewPerfRR = NewState#state.perf_rr,
-    OldPerfLH = OldState#state.perf_lh,
-    NewPerfLH = NewState#state.perf_lh,
-    case rrd:get_slot_start(0, OldPerfRR) =/= rrd:get_slot_start(0, NewPerfRR) orelse
-             rrd:get_slot_start(0, OldPerfLH) =/= rrd:get_slot_start(0, NewPerfLH) of
+    PerfRRNewSlot = rrd:get_slot_start(0, OldState#state.perf_rr) =/= rrd:get_slot_start(0, NewState#state.perf_rr),
+    PerfLHNewSlot = rrd:get_slot_start(0, OldState#state.perf_lh) =/= rrd:get_slot_start(0, NewState#state.perf_lh),
+    PerfTXNewSlot = rrd:get_slot_start(0, OldState#state.perf_tx) =/= rrd:get_slot_start(0, NewState#state.perf_tx),
+    case PerfRRNewSlot orelse PerfLHNewSlot orelse PerfTXNewSlot of
         true -> % new slot -> broadcast latest values only:
             SendState = reduce_timeslots(1, OldState),
             Msg = {send_to_group_member, monitor_perf, {report_value, SendState}},
@@ -228,14 +244,16 @@ broadcast_values(OldState, NewState) ->
 -spec reduce_timeslots(N::pos_integer(), State::#state{}) -> #state{}.
 reduce_timeslots(N, State) ->
     State#state{perf_rr = rrd:reduce_timeslots(N, State#state.perf_rr),
-                perf_lh = rrd:reduce_timeslots(N, State#state.perf_lh)}.
+                perf_lh = rrd:reduce_timeslots(N, State#state.perf_lh),
+                perf_tx = rrd:reduce_timeslots(N, State#state.perf_tx)}.
 
 -spec integrate_values(OtherState::#state{}, MyState::#state{}) -> #state{}.
 integrate_values(OtherState, MyState) ->
     MyPerfRR1 = integrate_value(OtherState#state.perf_rr, MyState#state.perf_rr),
     MyPerfLH1 = integrate_value(OtherState#state.perf_lh, MyState#state.perf_lh),
+    MyPerfTX1 = integrate_value(OtherState#state.perf_tx, MyState#state.perf_tx),
     MyState#state{id = OtherState#state.id,
-                  perf_rr = MyPerfRR1, perf_lh = MyPerfLH1}.
+                  perf_rr = MyPerfRR1, perf_lh = MyPerfLH1, perf_tx = MyPerfTX1}.
 
 -spec integrate_value(OtherDB::rrd:rrd(), MyDB::rrd:rrd()) -> rrd:rrd().
 integrate_value(OtherDB, MyDB) ->

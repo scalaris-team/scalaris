@@ -131,6 +131,31 @@ $(function() {
   zoom: {interactive: true}, pan: {interactive: true}
  });
  $("#lh_count").bind("plothover", plotHover);
+ $.plot($("#tx_count"), [ {data: tx_count_per_s_data, label: "Count / s"} ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0 } ],
+  legend: legend,
+  grid: grid,
+  zoom: {interactive: true}, pan: {interactive: true}
+ });
+ $("#tx_count").bind("plothover", plotHover);
+ var asym_yerrbars = { 
+  errorbars: "y", 
+  yerr: {show: false, asymmetric: true, upperCap: "-", lowerCap: "-"}
+ };
+ $.plot($("#tx_lat"),
+        [ {data: tx_avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
+          {data: tx_stddev_ms_data, label: "Stddev (ms)"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0, tickFormatter: msFormatter } ],
+  legend: legend,
+  grid: grid,
+  zoom: {interactive: true}, pan: {interactive: true}
+ });
+ $("#tx_lat").bind("plothover", plotHover);
  var previousPoint = null;
  function plotHover(event, pos, obj) {
   if (!obj) {
@@ -153,6 +178,10 @@ $(function() {
  }
 });
 </script>
+<p>Count (api_tx:req_list/2)</p>
+<div id="tx_count" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Latency (api_tx:req_list/2)</p>
+<div id="tx_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 <p>Latency read-read-commit (monitor_perf:run_bench/2)</p>
 <div id="rr_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 <p>Lookup Hop Count</p>
