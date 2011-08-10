@@ -42,10 +42,15 @@
 
 all() ->
     [get_symmetric_keys_test,
-     simpleBloomSync_test,
+     keyVerCoding,
+     mapInterval,
+     bloomSync_simple,
      bloomSync_FprCompare_check,
      bloomSync_times,
-     min_nodes_rrepair].
+     bloomSync_min_nodes
+     %merkleSync_simple,
+     %merkleSync_min_nodes
+     ].
 
 suite() ->
     [
@@ -69,6 +74,26 @@ get_rrepair_config_parameter() ->
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
 
+get_bloom_RepUpd_config() ->
+    [{rep_update_activate, true},
+     {rep_update_interval, 100000000}, %stop trigger
+     {rep_update_trigger, trigger_periodic},
+     {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_fpr, 0.1},
+     {rep_update_max_items, 1000},
+     {rep_update_sync_feedback, true},
+     {rep_update_negotiate_sync_interval, false}].
+
+get_merkle_tree_RepUpd_config() ->
+    [{rep_update_activate, true},
+     {rep_update_interval, 100000000}, %stop trigger
+     {rep_update_trigger, trigger_periodic},
+     {rep_update_sync_method, merkleTree}, %bloom, merkleTree, art
+     {rep_update_fpr, 0.1},
+     {rep_update_max_items, 100000},
+     {rep_update_sync_feedback, true},
+     {rep_update_negotiate_sync_interval, true}].
+
 end_per_testcase(_TestCase, _Config) ->
     unittest_helper:stop_ring(),
     ok.
@@ -86,16 +111,50 @@ get_symmetric_keys_test(Config) ->
     ?equals(ToTest, ToBe),
     ok.
 
+keyVerCoding(_) ->
+    KeyOrg = 180000001,
+    Coded = rep_upd_sync:concatKeyVer(KeyOrg, 4),
+    {Key, Ver} = rep_upd_sync:decodeKeyVer(Coded),
+    ct:pal("Coded=[~p] ; decoded key=[~p] val=[~p]", [Coded, Key, Ver]),
+    ?equals(Key, KeyOrg),
+    ?equals(Ver, 4),
+    ok.
+
+mapInterval(_) ->
+    IOrg = intervals:new("[", 1, 1000 ,"]"),
+    U1 = rep_upd_sync:mapInterval(IOrg, 2),
+    U2 = rep_upd_sync:mapInterval(U1, 3),
+    U3 = rep_upd_sync:mapInterval(U1, 1),
+    ct:pal("Org=~p~nQ2=~p~nQ=~p~n;ReOrg=~p", [IOrg, U1, U2, U3]),
+    Key = 43645675475457,
+    ct:pal("Key=~p~n[~p,~p,~p,~p]", 
+           [?RT:get_replica_keys(Key), 
+            rep_upd_sync:map_key_to_quadrant(Key, 1),
+            rep_upd_sync:map_key_to_quadrant(Key, 2),
+            rep_upd_sync:map_key_to_quadrant(Key, 3),
+            rep_upd_sync:map_key_to_quadrant(Key, 4)]),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bloom Filter Tests
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc Bloom Synchronization should update at least one Item.
-simpleBloomSync_test(Config) ->
-    [Start, End] = start_bloom_sync(Config, 4, 1000, 1, 0.1),
+bloomSync_simple(Config) ->
+    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, get_bloom_RepUpd_config()),
     ?assert(Start < End),
     ok.
 
+% @doc Check rep upd with only one node
+bloomSync_min_nodes(Config) ->
+  _R1 = start_sync(Config, 1, 1, 2, 0.2, get_bloom_RepUpd_config()),
+  _R2 = start_sync(Config, 1, 1000, 2, 0.2, get_bloom_RepUpd_config()),
+  ok.
+
 % @doc Better Fpr should result in a higher synchronization degree.
 bloomSync_FprCompare_check(Config) ->
-    R1 = start_bloom_sync(Config, 4, 1000, 2, 0.2),
-    R2 = start_bloom_sync(Config, 4, 1000, 2, 0.1),
+    R1 = start_sync(Config, 4, 1000, 2, 0.2, get_bloom_RepUpd_config()),
+    R2 = start_sync(Config, 4, 1000, 2, 0.1, get_bloom_RepUpd_config()),
     ?assert(lists:last(R1) < lists:last(R2)),
     ok.
 
@@ -110,7 +169,7 @@ bloomSync_times(Config) ->
     DestVersCount = NodeCount * 2 * DataCount,
     ItemCount = NodeCount * DataCount,
     %Build Ring
-    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config]),
+    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_bloom_RepUpd_config()]),
     config:write(rep_update_fpr, Fpr),
     {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount]),
     %measure initial sync degree
@@ -134,10 +193,19 @@ bloomSync_times(Config) ->
            [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
 
-min_nodes_rrepair(Config) ->
-  _R1 = start_bloom_sync(Config, 1, 1, 2, 0.2),
-  _R2 = start_bloom_sync(Config, 1, 1000, 2, 0.2),
-  ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Merkle Tree Tests
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+merkleSync_simple(Config) ->
+    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, get_merkle_tree_RepUpd_config()),
+    ?assert(Start < End),
+    ok.
+
+merkleSync_min_nodes(Config) ->
+  _R1 = start_sync(Config, 1, 1, 2, 0.2, get_merkle_tree_RepUpd_config()),
+  _R2 = start_sync(Config, 1, 1000, 2, 0.2, get_merkle_tree_RepUpd_config()),    
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
@@ -148,13 +216,13 @@ min_nodes_rrepair(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_bloom_sync([tuple()], pos_integer(), pos_integer(), pos_integer(), float()) -> [float()].
-start_bloom_sync(Config, NodeCount, DataCount, Rounds, Fpr) ->
+-spec start_sync([tuple()], pos_integer(), pos_integer(), pos_integer(), float(), [tuple()]) -> [float()].
+start_sync(Config, NodeCount, DataCount, Rounds, Fpr, RepUpdConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     DestVersCount = NodeCount * 2 * DataCount,
     ItemCount = NodeCount * DataCount,
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config),
+    build_symmetric_ring(NodeCount, Config, RepUpdConfig),
     config:write(rep_update_fpr, Fpr),
     fill_symmetric_ring(DataCount, NodeCount),
     %measure initial sync degree
@@ -165,11 +233,12 @@ start_bloom_sync(Config, NodeCount, DataCount, Rounds, Fpr) ->
                                                Rounds, 
                                                fun(_I) ->
                                                        startSyncRound(NodeKeys),
-                                                       timer:sleep(5000),
+                                                       timer:sleep(300),
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],
-    ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
+    SyncMethod = lists:keyfind(rep_update_sync_method, 1, RepUpdConfig),
+    ct:pal(">>[~p] SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [SyncMethod, Rounds, Fpr, Result]),
     %clean up
     unittest_helper:stop_ring(),
     Result.
@@ -178,7 +247,7 @@ start_bloom_sync(Config, NodeCount, DataCount, Rounds, Fpr) ->
 get_symmetric_keys(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
-build_symmetric_ring(NodeCount, Config) ->
+build_symmetric_ring(NodeCount, Config, RepUpdConfig) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
@@ -187,7 +256,7 @@ build_symmetric_ring(NodeCount, Config) ->
       fun() ->  get_symmetric_keys(NodeCount) end,
       [{config, lists:flatten([{log_path, PrivDir}, 
                                {dht_node, mockup_dht_node},
-                               get_rrepair_config_parameter()])}]),
+                               RepUpdConfig])}]),
     % wait for all nodes to finish their join 
     unittest_helper:check_ring_size_fully_joined(NodeCount),
     % wait a bit for the rm-processes to settle
