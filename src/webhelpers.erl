@@ -25,7 +25,8 @@
 
 -export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
          get_and_cache_ring/0, flush_ring_cache/0,
-         getGossipRendered/0, getVivaldiMap/0, getMonitorClientData/0,
+         getGossipRendered/0, getVivaldiMap/0,
+         getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1]).
 
 -opaque attribute_type() :: {atom(), string()}.
@@ -677,6 +678,30 @@ getMonitorClientData() ->
 %%            "var max_ms_data = ",      io_lib:format("~p", [MaxMsD]), ";\n",
 %%            "var hist_ms_data = ",     io_lib:format("~p", [HistMsD]), ";\n",
            "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n"]),
+    {script, [{type, "text/javascript"}], DataStr}.
+
+-spec getMonitorRingData() -> html_type().
+getMonitorRingData() ->
+    Monitor = pid_groups:find_a(monitor_perf),
+    case statistics:getMonitorStats(Monitor, [{monitor_perf, "read_read"}, {dht_node, "lookup_hops"}]) of
+        [] -> DataRR = DataLH = {[], [], [], [], [], [], []}, ok;
+        [{monitor_perf, "read_read", DataRR}, {dht_node, "lookup_hops", DataLH}] -> ok
+    end,
+    {_RRCountD, _RRCountPerSD, RRAvgMsD, RRMinMsD, RRMaxMsD, RRStddevMsD, _RRHistMsD} = DataRR,
+    {_LHCountD, _LHCountPerSD, LHAvgCountD, LHMinCountD, LHMaxCountD, LHStddevCountD, _LHHistCountD} = DataLH,
+    RRAvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
+                                          [Time, Avg, Avg - Min, Max - Avg]
+                                  end, RRAvgMsD, RRMinMsD, RRMaxMsD),
+    LHAvgMinMaxCountD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
+                                          [Time, Avg, Avg - Min, Max - Avg]
+                                  end, LHAvgCountD, LHMinCountD, LHMaxCountD),
+    DataStr =
+        lists:flatten(
+          ["\n",
+           "var rr_avg_min_max_ms_data = ",    io_lib:format("~p", [RRAvgMinMaxMsD]), ";\n",
+           "var rr_stddev_ms_data = ",         io_lib:format("~p", [RRStddevMsD]), ";\n",
+           "var lh_avg_min_max_count_data = ", io_lib:format("~p", [LHAvgMinMaxCountD]), ";\n",
+           "var lh_stddev_count_data = ",      io_lib:format("~p", [LHStddevCountD]), ";\n"]),
     {script, [{type, "text/javascript"}], DataStr}.
     
 

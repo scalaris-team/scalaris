@@ -50,10 +50,10 @@ out(Arg) ->
       <div class="nothighlighted">
         <a class="menua" href="gossip.yaws">Gossip values</a>
       </div>
-      <div class="highlighted">
+      <div class="nothighlighted">
         <a class="menua" href="monitor_client.yaws">Client Monitor</a>
       </div>
-      <div class="nothighlighted">
+      <div class="highlighted">
         <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
       </div>
 	  <div class="nothighlighted">
@@ -67,11 +67,11 @@ out(Arg) ->
       </div>
     </div><div class="middle">
       <div class="middleleft">
-<h2>Client Monitor</h2>
+<h2>Ring Monitor</h2>
 
 <erl>
 out(A) ->
-    {ehtml, webhelpers:getMonitorClientData()}.
+    {ehtml, webhelpers:getMonitorRingData()}.
 </erl>
 
 <script type="text/javascript">
@@ -103,22 +103,13 @@ $(function() {
   margin: [0, -50]
  };
  var grid = { hoverable: true };
- $.plot($("#reqlist_cnt"), [ {data: count_per_s_data, label: "Count / s"} ], {
-  series: series,
-  xaxes: xaxes,
-  yaxes: [ { min: 0 } ],
-  legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
- });
- $("#reqlist_cnt").bind("plothover", plotHover);
  var asym_yerrbars = { 
   errorbars: "y", 
   yerr: {show: false, asymmetric: true, upperCap: "-", lowerCap: "-"}
  };
- $.plot($("#reqlist_lat"),
-        [ {data: avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
-          {data: stddev_ms_data, label: "Stddev (ms)"}
+ $.plot($("#rr_lat"),
+        [ {data: rr_avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
+          {data: rr_stddev_ms_data, label: "Stddev (ms)"}
         ], {
   series: series,
   xaxes: xaxes,
@@ -127,7 +118,19 @@ $(function() {
   grid: grid,
   zoom: {interactive: true}, pan: {interactive: true}
  });
- $("#reqlist_lat").bind("plothover", plotHover);
+ $("#rr_lat").bind("plothover", plotHover);
+ $.plot($("#lh_count"),
+        [ {data: lh_avg_min_max_count_data, label: "Avg", points: asym_yerrbars},
+          {data: lh_stddev_count_data, label: "Stddev"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0 } ],
+  legend: legend,
+  grid: grid,
+  zoom: {interactive: true}, pan: {interactive: true}
+ });
+ $("#lh_count").bind("plothover", plotHover);
  var previousPoint = null;
  function plotHover(event, pos, obj) {
   if (!obj) {
@@ -150,10 +153,10 @@ $(function() {
  }
 });
 </script>
-<p>Count (api_tx:req_list/2)</p>
-<div id="reqlist_cnt" style="width: 800px; height: 300px; margin-bottom:50px"></div>
-<p>Latency (api_tx:req_list/2)</p>
-<div id="reqlist_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Latency read-read-commit (monitor_perf:run_bench/2)</p>
+<div id="rr_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Lookup Hop Count</p>
+<div id="lh_count" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 
 Last update:
 <erl>
