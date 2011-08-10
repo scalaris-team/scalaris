@@ -23,20 +23,32 @@
 
 -behaviour(gen_component).
 
+-include("record_helpers.hrl").
 -include("scalaris.hrl").
 
 % monitor process functions
 -export([start_link/1, init/1, on/2, check_config/0]).
 
--type state() :: {Round::non_neg_integer(), Stats::rrd:rrd()}.
+-record(state,
+        {round   = 0                         :: non_neg_integer(),
+         perf_rr = ?required(state, perf_rr) :: rrd:rrd(),
+         perf_lh = ?required(state, perf_lh) :: rrd:rrd()
+        }).
+
+-type state() :: #state{}.
 -type message() ::
     {bench} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
     {gather_stats, SourcePid::comm:mypid(), Round::pos_integer()} |
-    {{get_rrd_response, Process::atom(), Key::string(), DB::rrd:rrd() | undefined}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
-    {gather_stats_response, Round::pos_integer(), Data::rrd:timing_type(number())} |
-    {report_value, Round::pos_integer(), Stats::rrd:rrd()}.
+    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Round::pos_integer()}} |
+    {gather_stats_response, Round::pos_integer(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
+    {report_value, StatsOneRound::state()}.
+
+%-define(TRACE(X,Y), ct:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+-define(TRACE1(Msg, State),
+        ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
 
 -spec run_bench() -> ok.
 run_bench() ->
@@ -57,66 +69,81 @@ run_bench() ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({bench}, State) ->
+on({bench} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     msg_delay:send_local(get_bench_interval(), self(), {bench}),
     run_bench(),
     State;
 
-on({propagate}, State) ->
+on({propagate} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
     DHT_Node = pid_groups:get_my(dht_node),
     comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
     State;
 
-on({get_node_details_response, NodeDetails}, State) ->
-    MyRange = node_details:get(NodeDetails, my_range),
-    case is_leader(MyRange) of
+on({get_node_details_response, NodeDetails} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    case is_leader(node_details:get(NodeDetails, my_range)) of
         false -> State;
         _ ->
             % start a new timeslot and gather stats...
-            {Round, Stats} = State,
-            NewRound = Round + 1,
+            NewRound = State#state.round + 1,
             Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewRound}},
             bulkowner:issue_bulk_owner(intervals:all(), Msg),
-            NewStats = rrd:check_timeslot_now(Stats),
-            broadcast_value(Stats, NewStats, Round),
-            {NewRound, NewStats}
+            State1 = check_timeslots(State),
+            broadcast_values(State, State1),
+            State1#state{round = NewRound}
     end;
 
-on({gather_stats, SourcePid, Round}, State) ->
+on({gather_stats, SourcePid, Round} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     This = comm:this_with_cookie({SourcePid, Round}),
     comm:send_local(pid_groups:get_my(monitor),
-                    {get_rrd, ?MODULE, "read_read", This}),
+                    {get_rrds, [{?MODULE, "read_read"}, {dht_node, "lookup_hops"}], This}),
     State;
 
-on({{get_rrd_response, _Process, _Key, undefined}, _Cookie}, State) ->
-    State;
-
-on({{get_rrd_response, _Process, _Key, DB}, {SourcePid, Round}}, State) ->
-    DB2 = rrd:reduce_timeslots(1, DB),
-    DataL = rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end),
+on({{get_rrds_response, DBs}, {SourcePid, Round}} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    DataL = lists:flatten(
+              [begin
+                   DB2 = rrd:reduce_timeslots(1, DB),
+                   case rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end) of
+                       []     -> [];
+                       [Data] -> {Process, Key, Data}
+                   end
+               end || {Process, Key, DB} <- DBs, DB =/= undefined]),
     case DataL of
-        [Data] -> comm:send(SourcePid, {gather_stats_response, Round, Data});
-        []     -> ok
+        [] -> ok;
+        _  -> comm:send(SourcePid, {gather_stats_response, Round, DataL})
     end,
     State;
 
-on({gather_stats_response, Round, Data}, {Round, Stats}) ->
-    Time = rrd:get_current_time(Stats),
-    {Round, rrd:add_with(Time, Data, Stats, fun timing_update_fun/3)};
-on({gather_stats_response, _Round, _Data}, State) ->
+on({gather_stats_response, Round, DataL} = _Msg, State) when Round =:= State#state.round->
+    ?TRACE1(_Msg, State),
+    lists:foldl(
+      fun(Data, A) ->
+              case Data of
+                  {?MODULE, "read_read", PerfRR} ->
+                      DB = A#state.perf_rr,
+                      T = rrd:get_current_time(DB),
+                      A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun timing_update_fun/3)};
+                  {dht_node, "lookup_hops", PerfLH} ->
+                      DB = A#state.perf_lh,
+                      T = rrd:get_current_time(DB),
+                      A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)}
+              end
+      end, State, DataL);
+on({gather_stats_response, _Round, _Data} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     State;
 
-on({report_value, Round, Stats}, {OldRound, OldStats}) when OldRound < Round ->
-    Time = rrd:get_current_time(Stats),
-    DataL = rrd:dump_with(Stats, fun(_DB, _From, _To, X) -> X end),
-    NewStats = case DataL of
-        [Data] -> rrd:add_with(Time, Data, OldStats, fun timing_update_fun/3);
-        []     -> OldStats
-    end,
-    {Round, NewStats};
+on({report_value, OtherState} = _Msg, State) when OtherState#state.round > State#state.round ->
+    ?TRACE1(_Msg, State),
+    integrate_values(OtherState, State);
 
-on({report_value, _Round, _Stats}, State) ->
+on({report_value, _OtherState} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -136,16 +163,20 @@ init(null) ->
     FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
     msg_delay:send_local(FirstDelay, self(), {bench}),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
-    {0, rrd:create(get_gather_interval() * 1000000, 60, {timing, us})}.
+    Now = os:timestamp(),
+    #state{perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, us}, Now),
+           perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec timing_update_fun(Time::rrd:internal_time(), Old::rrd:timing_type(T) | undefined, New::rrd:timing_type(T))
-        -> rrd:timing_type(T) when is_subtype(T, number()).
+-spec timing_update_fun(Time::rrd:internal_time(), Old::rrd:timing_type(T) | undefined, New::rrd:timing_type(T) | undefined)
+        -> rrd:timing_type(T) | undefined when is_subtype(T, number()).
 timing_update_fun(_Time, undefined, New) ->
     New;
+timing_update_fun(_Time, Old, undefined) ->
+    Old;
 timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
                   {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
     NewHist2 = lists:foldl(fun({V, C}, Acc) ->
@@ -154,16 +185,47 @@ timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
     {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
      erlang:min(Min, NewMin), erlang:max(Max, NewMax), NewHist2}.
 
-broadcast_value(OldStats, Stats, OldRound) ->
+-spec check_timeslots(state()) -> state().
+check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH}) ->
+    State#state{perf_rr = rrd:check_timeslot_now(PerfRR),
+                perf_lh = rrd:check_timeslot_now(PerfLH)}.
+
+-spec broadcast_values(OldState::state(), NewState::state()) -> ok.
+broadcast_values(OldState, NewState) ->
     % broadcast the latest value only if a new time slot was started
-    SlotOld = rrd:get_slot_start(0, OldStats),
-    SlotNew = rrd:get_slot_start(0, Stats),
-    case SlotNew of
-        SlotOld -> ok; %nothing to do
-        _  -> % new slot -> broadcast latest value only:
-            DB2 = rrd:reduce_timeslots(1, OldStats),
-            Msg = {send_to_group_member, monitor_perf, {report_value, OldRound, DB2}},
-            bulkowner:issue_bulk_owner(intervals:all(), Msg)
+    OldPerfRR = OldState#state.perf_rr,
+    NewPerfRR = NewState#state.perf_rr,
+    OldPerfLH = OldState#state.perf_lh,
+    NewPerfLH = NewState#state.perf_lh,
+    case rrd:get_slot_start(0, OldPerfRR) =/= rrd:get_slot_start(0, NewPerfRR) orelse
+             rrd:get_slot_start(0, OldPerfLH) =/= rrd:get_slot_start(0, NewPerfLH) of
+        true -> % new slot -> broadcast latest values only:
+            SendState = reduce_timeslots(1, OldState),
+            Msg = {send_to_group_member, monitor_perf, {report_value, SendState}},
+            bulkowner:issue_bulk_owner(intervals:all(), Msg);
+        _ -> ok %nothing to do
+    end.
+
+-spec reduce_timeslots(N::pos_integer(), State::state()) -> state().
+reduce_timeslots(N, State) ->
+    State#state{perf_rr = rrd:reduce_timeslots(N, State#state.perf_rr),
+                perf_lh = rrd:reduce_timeslots(N, State#state.perf_lh)}.
+
+-spec integrate_values(OtherState::state(), MyState::state()) -> state().
+integrate_values(OtherState, MyState) ->
+    MyPerfRR1 = integrate_value(OtherState#state.perf_rr, MyState#state.perf_rr),
+    MyPerfLH1 = integrate_value(OtherState#state.perf_lh, MyState#state.perf_lh),
+    MyState#state{round = OtherState#state.round,
+                  perf_rr = MyPerfRR1, perf_lh = MyPerfLH1}.
+
+-spec integrate_value(OtherDB::rrd:rrd(), MyDB::rrd:rrd()) -> rrd:rrd().
+integrate_value(OtherDB, MyDB) ->
+    DataL = rrd:dump_with(OtherDB, fun(_DB, _From, _To, X) -> X end),
+    case DataL of
+        [Data] -> 
+            Time = rrd:get_current_time(OtherDB),
+            rrd:add_with(Time, Data, MyDB, fun timing_update_fun/3);
+        []     -> MyDB
     end.
 
 %% @doc Checks whether the node is the current leader.
