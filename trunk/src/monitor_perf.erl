@@ -106,14 +106,7 @@ on({gather_stats, SourcePid, Id} = _Msg, State) ->
 
 on({{get_rrds_response, DBs}, {SourcePid, Id}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    DataL = lists:flatten(
-              [begin
-                   DB2 = rrd:reduce_timeslots(1, DB),
-                   case rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end) of
-                       []     -> [];
-                       [Data] -> {Process, Key, Data}
-                   end
-               end || {Process, Key, DB} <- DBs, DB =/= undefined]),
+    DataL = process_rrds(DBs),
     case DataL of
         [] -> ok;
         _  -> comm:send(SourcePid, {gather_stats_response, Id, DataL})
@@ -258,6 +251,23 @@ integrate_value(OtherDB, MyDB) ->
 -spec is_leader(MyRange::intervals:interval()) -> boolean().
 is_leader(MyRange) ->
     intervals:in(?RT:hash_key("0"), MyRange).
+
+-spec process_rrds(DBs::[{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]) ->
+          [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}].
+process_rrds(DBs) ->
+    lists:flatten(
+      [begin
+           % DB slot length may be different -> try to gather data from our full time span:
+           Slots = erlang:max(1, (get_gather_interval() * 1000000) div rrd:get_slot_length(DB)),
+           DB2 = rrd:reduce_timeslots(Slots, DB),
+           DBDump = rrd:dump_with(DB2, fun(_DB, _From, _To, X) -> X end),
+           case DBDump of
+               []      -> [];
+               [H | T] ->
+                   Data = lists:foldl(fun(E, A) -> timing_update_fun(0, A, E) end, H, T),
+                   {Process, Key, Data}
+           end
+       end || {Process, Key, DB} <- DBs, DB =/= undefined]).
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are
 %%      valid.
