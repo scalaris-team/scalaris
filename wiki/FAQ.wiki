@@ -104,7 +104,7 @@ Exceptions are made for openSUSE-based and RHEL-based distributions as well as D
 
 For e.g. openSUSE 11.4 execute the following command as root:
 {{{
-zypper addrepo http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/ scalaris
+zypper addrepo --refresh http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/ scalaris
 }}}
 You can then either install Scalaris through YaST or use the command-line tool zypper: `zypper install scalaris`.
 
