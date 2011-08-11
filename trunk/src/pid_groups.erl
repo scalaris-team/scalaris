@@ -284,7 +284,7 @@ pids_to_names(Pids, Timeout) ->
    {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
 get_web_debug_info(GrpName, PidNameString) ->
     PidName = try erlang:list_to_existing_atom(PidNameString)
-              catch exit:{badarg, _} -> PidNameString
+              catch error:badarg -> PidNameString
               end,
     Pid = case pid_of(GrpName, PidName) of
               failed -> pid_of(GrpName, PidNameString);
