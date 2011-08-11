@@ -122,7 +122,7 @@ encode(null) -> "null";
 encode(undefined) -> "null";
 encode(B) when is_binary(B) -> encode_string(B);
 encode(I) when is_integer(I) -> integer_to_list(I);
-encode(F) when is_float(F) -> erlang:float_to_list(F);
+encode(F) when is_float(F) -> float_to_list(F);
 encode(L) when is_list(L) ->
     case is_string(L) of
 	yes -> encode_string(L);
@@ -166,16 +166,16 @@ encode_string([C | Cs], Acc) ->
 encode_object({struct, _Props} = Obj) ->
     M = obj_fold(fun({Key, Value}, Acc) ->
 	S = case Key of
-            B when is_binary(B) -> encode_string(B);
-	    L when is_list(L) ->
-            case is_string(L) of
-                yes -> encode_string(L);
-                unicode -> encode_string(xmerl_ucs:to_utf8(L));
-                no -> exit({json_encode, {bad_key, Key}})
-            end;
-	    A when is_atom(A) -> encode_string(atom_to_list(A));
-            _ -> exit({json_encode, {bad_key, Key}})
-	end,
+                B when is_binary(B) -> encode_string(B);
+                L when is_list(L) ->
+                    case is_string(L) of
+                        yes -> encode_string(L);
+                        unicode -> encode_string(xmerl_ucs:to_utf8(L));
+                        no -> exit({json_encode, {bad_key, Key}})
+                    end;
+                A when is_atom(A) -> encode_string(atom_to_list(A));
+                _ -> exit({json_encode, {bad_key, Key}})
+            end,
 	V = encode(Value),
 	case Acc of
 	    [] -> [S, $:, V];
@@ -578,8 +578,8 @@ obj_is_key(Key, {struct, Props}) ->
 
 obj_store(KeyList, Value, {struct, Props}) when is_list(Props) ->
 	Key = try list_to_atom(KeyList)
-          catch error:badarg -> KeyList
-          end,
+              catch error:badarg -> KeyList
+              end,
     {struct, [{Key, Value} | proplists:delete(Key, Props)]}.
 
 %% Create an object from a list of Key/Value pairs.

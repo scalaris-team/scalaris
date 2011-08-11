@@ -956,6 +956,7 @@ acceptor(GS) ->
     end.
 acceptor0(GS, Top) ->
     ?TC([{record, GS, gs}]),
+    put(gserv_pid, Top),
     put(gc, GS#gs.gconf),
     X = do_accept(GS),
     Top ! {self(), next, X},
@@ -1182,9 +1183,11 @@ init_db() ->
     put(init_db, lists:keydelete(init_db, 1, get())).
 
 erase_transients() ->
-    %% flush all messages. If exit message found, rethrow it
+    %% flush all messages.
+    %% If exit signal is received from the gserv process, rethrow it
+    Top = get(gserv_pid),
     Fun = fun(G) -> receive
-                        {'EXIT', _From, Reason} -> exit(Reason);
+                        {'EXIT', Top, Reason} -> exit(Reason);
                         _X -> G(G)
                     after 0 -> ok
                     end
@@ -1560,8 +1563,13 @@ handle_request(CliSock, ARG, _N)
                             _           -> ok
                         end
                 end, State#rewrite_response.headers),
-    accumulate_content(State#rewrite_response.content),
-    deliver_accumulated(ARG, CliSock, decide, undefined, final),
+    case State#rewrite_response.content of
+        <<>> ->
+            deliver_accumulated(CliSock);
+        _ ->
+            accumulate_content(State#rewrite_response.content),
+            deliver_accumulated(ARG, CliSock, decide, undefined, final)
+    end,
     done_or_continue();
 
 handle_request(CliSock, ARG, N) ->
@@ -1755,21 +1763,21 @@ set_auth_user(ARG, User) ->
 
 
 filter_auths(Auths, Req_dir) ->
-    filter_auths(Auths, Req_dir, {0, []}).
-
-filter_auths([], _, {_, Auths}) ->
-    Auths;
-filter_auths([A|T], Req_dir, {N, Auths}) ->
-    case lists:prefix(A#auth.dir, Req_dir) of
-        true ->
-            case length(A#auth.dir) of
-                N1 when N1 < N -> filter_auths(T, Req_dir, {N, Auths});
-                N1 when N1 > N -> filter_auths(T, Req_dir, {N1, [A]});
-                N1             -> filter_auths(T, Req_dir, {N1, [A|Auths]})
-            end;
-        false ->
-            filter_auths(T, Req_dir, {N, Auths})
+    case filter_auths(Auths, Req_dir, []) of
+        [] when Req_dir =:= "/" ->
+            [];
+        [] ->
+            filter_auths(Auths, filename:dirname(Req_dir));
+        As ->
+            As
     end.
+
+filter_auths([], _, Auths) ->
+    lists:reverse(Auths);
+filter_auths([A=#auth{dir=Req_dir}|T], Req_dir, Auths) ->
+    filter_auths(T, Req_dir, [A|Auths]);
+filter_auths([_|T], Req_dir, Auths) ->
+    filter_auths(T, Req_dir, Auths).
 
 
 %% Call is_auth(...)/5 with a default value.
@@ -2511,8 +2519,6 @@ deliver_416(CliSock, _Req, Tot) ->
 deliver_501(CliSock, Req) ->
     deliver_xxx(CliSock, Req, 501). % Not implemented
 
-
-
 do_yaws(CliSock, ARG, UT, N) ->
     Key = UT#urltype.getpath, %% always flat
     Mtime = mtime(UT#urltype.finfo),
@@ -2577,7 +2583,7 @@ get_chunked_client_data(CliSock,SSL) ->
         Len == 0 ->
             _Tmp=yaws:do_recv(CliSock, 2, SSL),%% flush last crnl
             <<>>;
-        Len < SC#sconf.partial_post_size ->
+        Len =< SC#sconf.partial_post_size ->
             B = yaws:get_chunk(CliSock, Len, 0, SSL),
             yaws:eat_crnl(CliSock,SSL),
             {partial, list_to_binary(B)};
@@ -3019,6 +3025,47 @@ handle_out_reply({ehtml, E}, _LineNo, _YawsFile,  _UT, ARG) ->
           end,
     Res;
 
+handle_out_reply({exhtml, E}, _LineNo, _YawsFile,  _UT, A) ->
+    N = count_trailing_spaces(),
+    Res = case yaws_exhtml:format(E, N) of
+             {ok, Val} ->
+                 accumulate_content(Val);
+             {error, ErrStr} ->
+                 handle_crash(A,ErrStr)
+         end,
+    Res;
+
+handle_out_reply({exhtml, Value2StringF, E}, _LineNo, _YawsFile,  _UT, A) ->
+    N = count_trailing_spaces(),
+    Res = case yaws_exhtml:format(E, N, Value2StringF) of
+             {ok, Val} ->
+                 accumulate_content(Val);
+             {error, ErrStr} ->
+                 handle_crash(A,ErrStr)
+         end,
+    Res;
+
+handle_out_reply({sexhtml, E}, _LineNo, _YawsFile,  _UT, A) ->
+    Res = case yaws_exhtml:sformat(E) of
+             {ok, Val} ->
+                 accumulate_content(Val);
+             {error, ErrStr} ->
+                 handle_crash(A,ErrStr)
+         end,
+    Res;
+
+handle_out_reply({sexhtml, Value2StringF, E},
+                _LineNo, _YawsFile,  _UT, A) ->
+    Res = case yaws_exhtml:sformat(E, Value2StringF) of
+             {ok, Val} ->
+                 accumulate_content(Val);
+             {error, ErrStr} ->
+                 handle_crash(A,ErrStr)
+         end,
+    Res;
+
+
+
 handle_out_reply({content, MimeType, Cont}, _LineNo,_YawsFile, _UT, _ARG) ->
     yaws:outh_set_content_type(MimeType),
     accumulate_content(Cont);
@@ -3184,6 +3231,18 @@ handle_out_reply_l([Reply|T], LineNo, YawsFile, UT, ARG, _Res) ->
 handle_out_reply_l([], _LineNo, _YawsFile, _UT, _ARG, Res) ->
     Res.
 
+
+count_trailing_spaces() ->
+    case get(acc_content) of
+        undefined -> 0;
+        discard -> 0;
+        List ->
+            Binary = first_binary(List),
+            yaws_exhtml:count_trailing_spaces(Binary)
+    end.
+
+first_binary([Binary|_]) when is_binary(Binary) -> Binary;
+first_binary([List|_Rest]) when is_list(List) -> first_binary(List).
 
 
 
