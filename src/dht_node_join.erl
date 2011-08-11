@@ -466,6 +466,26 @@ process_join_state({web_debug_info, Requestor} = _Msg,
     ?TRACE_SEND(Requestor, {web_debug_info_reply, KeyValueList}),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
+
+process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
+    case get_connections(JoinState) of
+        [] -> comm:send_local_after(100, self(), FullMsg);
+        [{_, Pid} | _] ->
+            % integrate the list of processes for which the send previously failed:
+            Self = comm:self_with_cookie({send_failed, []}),
+            comm:send_with_shepherd(Pid, {lookup_aux, Key, Hops + 1, Msg}, Self)
+    end,
+    State;
+process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}}, {send_failed, FailedPids}}, {join, JoinState, _QueuedMessages} = State) ->
+    Connections = get_connections(JoinState),
+    case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
+        failed -> comm:send_local_after(100, self(), {lookup_aux, Key, Hops + 1, Msg});
+        {ok, Pid} ->
+            % integrate the list of processes for which the send previously failed:
+            Self = comm:self_with_cookie({send_failed, [Target | FailedPids]}),
+            comm:send_with_shepherd(Pid, {lookup_aux, Key, Hops + 1, Msg}, Self)
+    end,
+    State;
     
 % Catch all other messages until the join procedure is complete
 process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
