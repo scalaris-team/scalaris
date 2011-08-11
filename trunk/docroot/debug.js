@@ -18,8 +18,7 @@ function createStore(group, id){
 
 Ext.onReady(function() {
 	// Note: For the purposes of following along with the tutorial, all 
-	// new code should be placed inside this method.  Delete the following
-	// line after you have verified that Ext is installed correctly.
+	// new code should be placed inside this method.
 
 	      var processTreeLoader = new Ext.tree.TreeLoader({
 		baseParams: {requestAction: 'processTree'},
@@ -44,14 +43,6 @@ Ext.onReady(function() {
 		});
 
 	      treePanel.setRootNode(processTreeRoot);
-
-var myData = [
-		['Apple',29.89,0.24,0.81],
-		['Ext',83.81,0.28,0.34],
-		['Google',71.72,0.02,0.03],
-		['Microsoft',52.55,0.01],
-		['Yahoo!',29.01]
-	];
  
 var myReader = new Ext.data.ArrayReader({}, [
 {name: 'key'},

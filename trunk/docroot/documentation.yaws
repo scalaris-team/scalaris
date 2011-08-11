@@ -9,7 +9,7 @@
     <style type="text/css">@import url(ie55-.css);</style>
   <![endif]-->
   </head>
-  <body onload="load()" onunload="GUnload()">
+  <body>
 
     <div class="menubar">
       <div class="nothighlighted">
