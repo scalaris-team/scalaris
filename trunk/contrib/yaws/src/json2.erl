@@ -81,7 +81,7 @@ encode(null) -> "null";
 encode(undefined) -> "null";
 encode(B) when is_binary(B) -> encode_string(B);
 encode(I) when is_integer(I) -> integer_to_list(I);
-encode(F) when is_float(F) -> erlang:float_to_list(F);
+encode(F) when is_float(F) -> float_to_list(F);
 encode(L) when is_list(L) ->
     case is_string(L) of
 	yes -> encode_string(L);
@@ -125,16 +125,16 @@ encode_string([C | Cs], Acc) ->
 encode_object({struct, _Props} = Obj) ->
     M = obj_fold(fun({Key, Value}, Acc) ->
 	S = case Key of
-            B when is_binary(B) -> encode_string(B);
-	    L when is_list(L) ->
-            case is_string(L) of
-                yes -> encode_string(L);
-                unicode -> encode_string(xmerl_ucs:to_utf8(L));
-                no -> exit({json_encode, {bad_key, Key}})
-            end;
-	    A when is_atom(A) -> encode_string(atom_to_list(A));
-            _ -> exit({json_encode, {bad_key, Key}})
-	end,
+                B when is_binary(B) -> encode_string(B);
+                L when is_list(L) ->
+                    case is_string(L) of
+                        yes -> encode_string(L);
+                        unicode -> encode_string(xmerl_ucs:to_utf8(L));
+                        no -> exit({json_encode, {bad_key, Key}})
+                    end;
+                A when is_atom(A) -> encode_string(atom_to_list(A));
+                _ -> exit({json_encode, {bad_key, Key}})
+            end,
 	V = encode(Value),
 	case Acc of
 	    [] -> [S, $:, V];
@@ -585,6 +585,17 @@ test() ->
 %% Legitimate changes to the encoding routines may require tweaks to
 %% the reference JSON strings in e2j_test_vec().
 
+%% This clause handles floats specially due to the need for fuzzy matching
+%% to avoid slight differences due to conversions. Rather than direct
+%% comparison as done in the more general clause below, here we allow a
+%% small relative difference between expected and actual.
+test_e2j(E, J) when is_float(E) ->
+    J2 = lists:flatten(encode(E)),
+    E2 = list_to_float(J2),
+    E1 = list_to_float(J),
+    Rel = abs(E2 - E1)/E,
+    true = Rel < 0.005,
+    ok;
 test_e2j(E, J) ->
     J2 = lists:flatten(encode(E)),
     J = J2,					% raises error if unequal
