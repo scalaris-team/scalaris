@@ -21,7 +21,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id $
 
--module(rrepair_SUITE).
+-module(rep_upd_SUITE).
 
 -author('malange@informatik.hu-berlin.de').
 
@@ -42,13 +42,13 @@
 
 all() ->
     [get_symmetric_keys_test,
-     keyVerCoding,
+     blobCoding,
      mapInterval,
      bloomSync_simple,
      bloomSync_FprCompare_check,
      bloomSync_times,
-     bloomSync_min_nodes
-     %merkleSync_simple,
+     bloomSync_min_nodes,
+     merkleSync_simple
      %merkleSync_min_nodes
      ].
 
@@ -111,28 +111,25 @@ get_symmetric_keys_test(Config) ->
     ?equals(ToTest, ToBe),
     ok.
 
-keyVerCoding(_) ->
+blobCoding(_) ->
     KeyOrg = 180000001,
-    Coded = rep_upd_sync:concatKeyVer(KeyOrg, 4),
-    {Key, Ver} = rep_upd_sync:decodeKeyVer(Coded),
+    Coded = rep_upd_sync:encodeBlob(KeyOrg, 4),
+    {Key, Ver} = rep_upd_sync:decodeBlob(Coded),
     ct:pal("Coded=[~p] ; decoded key=[~p] val=[~p]", [Coded, Key, Ver]),
     ?equals(Key, KeyOrg),
     ?equals(Ver, 4),
     ok.
 
 mapInterval(_) ->
-    IOrg = intervals:new("[", 1, 1000 ,"]"),
-    U1 = rep_upd_sync:mapInterval(IOrg, 2),
-    U2 = rep_upd_sync:mapInterval(U1, 3),
-    U3 = rep_upd_sync:mapInterval(U1, 1),
-    ct:pal("Org=~p~nQ2=~p~nQ=~p~n;ReOrg=~p", [IOrg, U1, U2, U3]),
-    Key = 43645675475457,
-    ct:pal("Key=~p~n[~p,~p,~p,~p]", 
-           [?RT:get_replica_keys(Key), 
-            rep_upd_sync:map_key_to_quadrant(Key, 1),
-            rep_upd_sync:map_key_to_quadrant(Key, 2),
-            rep_upd_sync:map_key_to_quadrant(Key, 3),
-            rep_upd_sync:map_key_to_quadrant(Key, 4)]),
+    K = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7, 8}),
+    I = intervals:new('[', K, ?MINUS_INFINITY ,']'),
+    ct:pal("I1=~p", [I]),
+    lists:foreach(fun(X) -> 
+                          MappedI = rep_upd_sync:mapInterval(I, X),
+                          ?equals(intervals:is_empty(intervals:intersection(I, MappedI)),true),
+                          ?equals(rep_upd_sync:get_interval_quadrant(MappedI), X)
+                  end, 
+                  [1,2,3]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

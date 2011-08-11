@@ -35,6 +35,9 @@
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
 -endif.
 
+-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -50,7 +53,8 @@
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 64                :: pos_integer(),   %max items in a leaf
          leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = get_XOR_fun()     :: inner_hash_fun() %hash function for inner node signature creation         
+         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation
+         gen_hash_on    = value             :: value | key      %node hash will be generated on value or an key         
          }).
 -type mt_config() :: #mt_config{}.
 
@@ -169,14 +173,16 @@ insert_to_node(Key, Val, {_, Count, Bucket, Interval, []}, Config)
     NewLeafs = lists:map(fun(I) -> 
                               NewBucket = orddict:filter(fun(K, _) -> intervals:in(K, I) end, Bucket),
                               {nil, orddict:size(NewBucket), NewBucket, I, []}
-                         end, ChildI), 
+                         end, ChildI),
     insert_to_node(Key, Val, {nil, 1 + Config#mt_config.branch_factor, nil, Interval, NewLeafs}, Config);
 
-insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->    
-    {[Dest], Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
-    OldSize = size_node(Dest),
+insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->
+    {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
+    length(_Dest) =:= 0 andalso ct:pal("THIS SHOULD NOT HAPPEN!"),
+    Dest = hd(_Dest),
+    OldSize = node_size(Dest),
     NewDest = insert_to_node(Key, Val, Dest, Config),
-    {Hash, Count + (size_node(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}.
+    {Hash, Count + (node_size(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generate Signatures/Hashes
@@ -185,11 +191,17 @@ insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->
 gen_hashes({Config, Root}) ->
     {Config, gen_hash(Root, Config)}.
 
-gen_hash({_, Count, Bucket, I, []}, Config) ->
+gen_hash({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp }) ->
     LeafHf = Config#mt_config.leaf_hf,
     Hash = case Count > 0 of
-               true -> LeafHf(erlang:term_to_binary(orddict:fetch_keys(Bucket)));
-               _    -> LeafHf(term_to_binary(0))
+               true ->
+                   ToHash = case HashProp of
+                                key -> orddict:fetch_keys(Bucket);
+                                value -> lists:map(fun({_, V}) -> V end, 
+                                                   orddict:to_list(Bucket))
+                            end,
+                   LeafHf(erlang:term_to_binary(ToHash));
+               _ -> LeafHf(term_to_binary(0))
            end,
     {Hash, Count, Bucket, I, []};
 gen_hash({_, Count, nil, I, List}, Config) ->    
@@ -203,12 +215,12 @@ gen_hash({_, Count, nil, I, List}, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec size(merkle_tree()) -> non_neg_integer().
 size({_, Root}) ->
-    size_node(Root).
+    node_size(Root).
 
--spec size_node(mt_node()) -> non_neg_integer().
-size_node({_, _, _, _, []}) ->
+-spec node_size(mt_node()) -> non_neg_integer().
+node_size({_, _, _, _, []}) ->
     1;
-size_node({_, C, _, _, _}) ->
+node_size({_, C, _, _, _}) ->
     C.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

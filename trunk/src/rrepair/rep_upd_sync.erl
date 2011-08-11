@@ -27,7 +27,11 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_sync/2, check_config/0]).
--export([concatKeyVer/2, decodeKeyVer/1, mapInterval/2, map_key_to_quadrant/2]).
+
+%exports for testing
+-export([encodeBlob/2, decodeBlob/1, 
+         mapInterval/2, map_key_to_quadrant/2, 
+         get_key_quadrant/1, get_interval_quadrant/1]).
 
 -ifdef(with_export_type_support).
 -export_type([sync_struct/0, sync_stage/0]).
@@ -107,6 +111,9 @@
     {get_state_response, intervals:interval()} |
     {get_chunk_response, rep_upd:db_chunk()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
+    {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
+    {check_node_response, ok | not_found} |
+    {check_node_response, fail, intervals:interval(), [merkle_tree:mt_node_key()] | is_leaf} |
     {start_sync, rep_upd:sync_method(), sync_stage()} |
     {start_sync, rep_upd:sync_method(), sync_stage(), sync_struct()} |
     {shutdown, exit_reason()} |
@@ -138,10 +145,8 @@ on({get_state_response, MyInterval}, State =
 on({get_state_response, MyInterval}, State = 
        #rep_upd_sync_state{ sync_stage = req_shared_interval,
                             sync_master = false,
-                            sync_struct = {MasterOwnerPid, SrcInterval},
-                            sync_round = Round,                            
-                            dhtNodePid = DhtNodePid,
-                            ownerRemotePid = OwnerPid }) ->
+                            sync_struct = {MasterOwnerPid, SrcInterval},                        
+                            dhtNodePid = DhtNodePid }) ->
     fd:subscribe(MasterOwnerPid),    
     MyIMapped = mapInterval(MyInterval, 1),
     SrcIMapped = mapInterval(SrcInterval, 1),
@@ -153,13 +158,7 @@ on({get_state_response, MyInterval}, State =
             comm:send_local(self(), {shutdown, intersection_empty});
         false ->
             comm:send_local(DhtNodePid, 
-                            {get_chunk, self(), Intersection, get_max_items()}),
-            comm:send(MasterOwnerPid, 
-                      {request_sync, 
-                       Round, 
-                       res_shared_interval, 
-                       merkleTree, 
-                       {OwnerPid, comm:this(), Intersection}})
+                            {get_chunk, self(), Intersection, get_max_items()})
     end,
     State#rep_upd_sync_state{ sync_stage = build_struct,
                               sync_struct = {MasterOwnerPid, Intersection} };
@@ -203,7 +202,6 @@ on({get_state_response, NodeDBInterval}, State =
                           }) ->
     %simple detail sync case
     MyPid = comm:this(),
-    ?TRACE("SIMPLE DETAIL SYNC", []),
     erlang:spawn(lists, 
                  foreach, 
                  [fun({MinKey, Val, Vers}) ->
@@ -241,12 +239,13 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
     %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)
     ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
     %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
-    {BuildTime, SyncStruct} = util:tc(
-                                fun() -> build_sync_struct(bloom, 
-                                                           {ChunkI, DBList}, 
-                                                           {get_sync_fpr(), 
-                                                            State#rep_upd_sync_state.ownerRemotePid}) 
-                                end),
+    {BuildTime, SyncStruct} = util:tc(fun() -> 
+                                              build_sync_struct(
+                                                bloom, 
+                                                {ChunkI, DBList}, 
+                                                {get_sync_fpr(), 
+                                                 State#rep_upd_sync_state.ownerRemotePid}) 
+                                      end),
     case SyncMaster of
         true ->
             DestKey = select_sync_node(ChunkI),
@@ -268,6 +267,8 @@ on({get_chunk_response, {_RestI, DBList}}, State =
                             sync_pid = SrcPid,
                             sync_struct = {DestOwnerPid, Interval},
                             sync_master = IsMaster,
+                            ownerRemotePid = OwnerPid,
+                            sync_round = Round,
                             sync_stats = Stats }) ->
     {BuildTime, Tree} = util:tc(
                           fun() -> build_sync_struct(merkleTree, 
@@ -277,9 +278,17 @@ on({get_chunk_response, {_RestI, DBList}}, State =
     %TODO handle RestI
     ToCompare = case IsMaster of
                    true ->
-                       comm:send(SrcPid, {check_node, merkle_tree:get_interval(Tree), merkle_tree:get_hash(Tree)}),
+                       comm:send(SrcPid, {check_node, 
+                                          comm:this(), 
+                                          merkle_tree:get_interval(Tree), 
+                                          merkle_tree:get_hash(Tree)}),
                        1;
-                   false -> 0
+                   false -> 
+                       comm:send(DestOwnerPid, {request_sync, 
+                                                Round, 
+                                                res_shared_interval, 
+                                                merkleTree, 
+                                                {OwnerPid, comm:this(), Interval}})
                end,
     State#rep_upd_sync_state{ sync_stage = reconciliation, 
                               sync_struct = Tree, 
@@ -382,15 +391,17 @@ on({shutdown, Reason}, State = #rep_upd_sync_state{ sync_round = Round }) ->
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_node, Interval, Hash}, State =
-       #rep_upd_sync_state{ sync_struct = {_, Tree}, sync_pid = SrcPid}) ->
-   Node = merkle_tree:lookup(Interval, Tree),
-   case Node of
-       not_found -> comm:send(SrcPid, 
-                              {check_node_response, not_found});
-       _ ->
-           IsLeaf = merkle_tree:is_leaf(Node),
-           case merkle_tree:get_hash(Node) =:= Hash of
+on({check_node, SrcPid, Interval, Hash}, State =
+       #rep_upd_sync_state{ sync_struct = SyncStruct }) ->
+    {_, Tree} = SyncStruct,
+    Node = merkle_tree:lookup(Interval, Tree),
+    case Node of
+        not_found ->
+            comm:send(SrcPid, 
+                      {check_node_response, not_found});
+        _ ->
+            IsLeaf = merkle_tree:is_leaf(Node),
+            case merkle_tree:get_hash(Node) =:= Hash of
                 true ->
                     comm:send(SrcPid, 
                               {check_node_response, ok});
@@ -405,8 +416,8 @@ on({check_node, Interval, Hash}, State =
                     comm:send(SrcPid, 
                               {check_node_response, fail, Interval, ChildHashs})
             end
-   end,
-   State;
+    end,
+    State#rep_upd_sync_state{ sync_pid = SrcPid };
 
 on({check_node_response, Result}, State = 
        #rep_upd_sync_state{
@@ -470,7 +481,8 @@ on({check_node_response, fail, I, ChildHashs}, State =
                         lists:foreach(
                           fun(X) -> 
                                   comm:send(SrcPid, 
-                                            {check_node, 
+                                            {check_node,
+                                             comm:this(), 
                                              merkle_tree:get_interval(X), 
                                              merkle_tree:get_hash(X)}) 
                           end, 
@@ -499,8 +511,9 @@ build_sync_struct(bloom, {I, DBItems}, {Fpr, SrcNodePid}) ->
                       };
 build_sync_struct(merkleTree, {I, DBItems}, {DestRepUpdPid}) ->
     _Tree = lists:foldl(
-              fun({Key, Val, _, _, Ver}, Tree) -> 
-                      merkle_tree:insert(concatKeyVer(minKey(Key), Ver), Val, Tree)
+              fun({Key, Val, _, _, Ver}, Tree) ->
+                      MinKey = minKey(Key),
+                      merkle_tree:insert(MinKey, encodeBlob(Ver, Val), Tree)
               end, 
               merkle_tree:new(I), 
               DBItems),
@@ -522,7 +535,7 @@ fill_bloom([{_, _, _, _, -1} | T], KeyBF, VerBF) ->
 fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
     AddKey = minKey(Key),
     NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-    NewVerBF = ?REP_BLOOM:add(VerBF, concatKeyVer(AddKey, Ver)),
+    NewVerBF = ?REP_BLOOM:add(VerBF, encodeBlob(AddKey, Ver)),
     fill_bloom(T, NewKeyBF, NewVerBF).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -547,9 +560,9 @@ reconcileNode(Node, Conf) ->
     ok.
 -spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> ok.
 reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
-    ToSync = lists:map(fun({Key, Val}) -> 
-                               {K, Ver} = decodeKeyVer(Key),
-                               {K, Val, Ver}
+    ToSync = lists:map(fun({Key, Value}) -> 
+                               {Ver, Val} = decodeBlob(Value),
+                               {Key, Val, Ver}
                        end, 
                        merkle_tree:get_bucket(Node)),
     comm:send(DestPid, 
@@ -578,8 +591,8 @@ filterPartitionMap(Filter, Pred, Map, [H | T], Satis, NonSatis) ->
 % @doc selects a random associated key of an interval ending
 -spec select_sync_node(intervals:interval()) -> ?RT:key().
 select_sync_node(Interval) ->
-    {_, LKey, RKey, _RBr} = intervals:get_bounds(Interval),
-    %Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 10)}),    
+    {_, _LKey, RKey, _RBr} = intervals:get_bounds(Interval),
+    %Key = ?RT:get_split_key(_LKey, RKey, {1, randoms:rand_uniform(1, 10)}), %TODO    
     Key = case _RBr of
               ')' -> RKey - 1;
               ']' -> RKey
@@ -599,7 +612,7 @@ map_key_to_quadrant(Key, N) ->
 -spec get_key_quadrant(?RT:key()) -> pos_integer().
 get_key_quadrant(Key) ->
     Keys = lists:sort(?RT:get_replica_keys(Key)),
-    {Found, Q} = lists:foldl(fun(X, {Status, Nr} = Acc) ->
+    {_, Q} = lists:foldl(fun(X, {Status, Nr} = Acc) ->
                                      case X =:= Key of
                                          true when Status =:= no -> {yes, Nr};
                                          false when Status =/= yes -> {no, Nr + 1};
@@ -612,41 +625,44 @@ get_key_quadrant(Key) ->
 -spec get_interval_quadrant(intervals:interval()) -> pos_integer().
 get_interval_quadrant(I) ->
     {_, LKey, _, _} = intervals:get_bounds(I),
-    get_key_quadrant(LKey).
+    get_key_quadrant(LKey).        
+
+-spec add_quadrants_to_key(?RT:key(), non_neg_integer(), pos_integer()) -> ?RT:key().
+add_quadrants_to_key(Key, Add, RepFactor) ->
+    Q = get_key_quadrant(Key),
+    Dest = Q + Add,
+    Rep = RepFactor + 1,
+    case Dest div Rep of
+        1 -> map_key_to_quadrant(Key, (Dest rem Rep) + 1);
+        0 -> map_key_to_quadrant(Key, Dest)
+    end.            
 
 % @doc Maps an arbitrary Interval to an Interval laying or starting in 
 %      the given RepQuadrant. The replication degree of X divides the keyspace into X replication qudrants.
 %      Interval has to be continuous!
 -spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
 mapInterval(I, Q) ->
-    ?TRACE("mapInterval Q = ~p", [Q]),
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
-    RQ = get_key_quadrant(RKey),
-    if 
-        LQ =:= Q -> I;
-        LQ =:= RQ -> intervals:new(LBr, map_key_to_quadrant(LKey, Q), map_key_to_quadrant(RKey, Q), RBr);
-        true -> %interval spans over multiple quadrants
-            RepFactor = config:read(replication_factor),
-            QDiff = erlang:abs(LQ - Q),
-            _RToQ = (RQ + QDiff) rem RepFactor,
-            RToQ = case _RToQ =:= 0 of
-                       true -> 1;
-                       false -> _RToQ
-                   end,
-            intervals:new(LBr, map_key_to_quadrant(LKey, Q), map_key_to_quadrant(RKey, RToQ), RBr)
-    end.
+    RepFactor = length(?RT:get_replica_keys(?MINUS_INFINITY)),
+    QDiff = (RepFactor - LQ + Q) rem RepFactor,
+    %intervals:new(LBr, key_add(LKey, QDiff), key_add(RKey, QDiff), RBr).
+    intervals:new(LBr, 
+                  add_quadrants_to_key(LKey, QDiff, RepFactor), 
+                  add_quadrants_to_key(RKey, QDiff, RepFactor),
+                  RBr).
 
 -spec concatKeyVer(db_entry:entry()) -> binary().
 concatKeyVer(DBEntry) ->
-    concatKeyVer(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
--spec concatKeyVer(?RT:key(), ?DB:version()) -> binary().
-concatKeyVer(Key, Version) ->
-    term_to_binary([Key, "#", Version]).
+    encodeBlob(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
 
--spec decodeKeyVer(binary()) -> {Key::?RT:key(), ?DB:version()} | fail.
-decodeKeyVer(Key) ->
-    L = binary_to_term(Key),
+-spec encodeBlob(?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()) -> binary().
+encodeBlob(A, B) -> 
+    term_to_binary([A, "#", B]).
+
+-spec decodeBlob(binary()) -> {?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()} | fail.
+decodeBlob(Blob) ->
+    L = binary_to_term(Blob),
     case length(L) of
         3 -> {hd(L), lists:last(L)};
        _ -> fail
