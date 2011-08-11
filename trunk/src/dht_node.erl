@@ -344,6 +344,8 @@ on({bulkowner_deliver, Range, Msg}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({send_error, Target, {lookup_aux, _, _, _} = Message}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
+on({{send_error, Target, {lookup_aux, _, _, _} = Message}, {send_failed, _Pids}}, State) ->
+    dht_node_lookup:lookup_aux_failed(State, Target, Message);
 
 on({send_error, Target, {lookup_fin, _, _, _} = Message}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);

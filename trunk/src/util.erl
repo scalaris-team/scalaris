@@ -30,6 +30,7 @@
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
          logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
+         first_matching/2,
          get_stacktrace/0, dump/0, dump2/0, dump3/0,
          minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
@@ -397,6 +398,14 @@ shuffle_helper([_|_] = _List, Acc, 0, _ListSize) ->
 shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, ListSize), List),
     shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1).
+
+-spec first_matching(List::[T], Pred::fun((T) -> boolean())) -> {ok, T} | failed.
+first_matching([], _Pred) -> failed;
+first_matching([H | R], Pred) ->
+    case Pred(H) of
+        true -> {ok, H};
+        _    -> first_matching(R, Pred)
+    end.
 
 %% @doc Find the largest key in GBTree that is smaller than Key.
 %%      Note: gb_trees offers only linear traversal or lookup of exact keys -
