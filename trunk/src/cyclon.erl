@@ -291,7 +291,12 @@ enhanced_shuffle(Cache, Node) ->
 -spec request_node_details([node_details:node_details_name()]) -> ok.
 request_node_details(Details) ->
     DHT_Node = pid_groups:get_my(dht_node),
-    comm:send_local(DHT_Node, {get_node_details, comm:this(), Details}).
+    This = comm:this(),
+    case comm:is_valid(This) of
+        true ->
+            comm:send_local(DHT_Node, {get_node_details, comm:this(), Details});
+        false -> ok
+    end.
 
 %% @doc Checks the current state. If the cache is empty or the current node is
 %%      unknown, the local dht_node will be asked for these values and the check

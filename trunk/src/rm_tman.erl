@@ -304,8 +304,12 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     
     % TODO: add a local cache of contacted nodes in order not to contact them again
     ThisWithCookie = comm:this_with_cookie(rm),
-    _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]})
-           || Node <- NewNodes],
+    case comm:is_valid(ThisWithCookie) of
+        true ->
+            _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]})
+                 || Node <- NewNodes];
+        false -> ok
+    end,
     OldNeighborhood2.
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
