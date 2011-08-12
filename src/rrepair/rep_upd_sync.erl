@@ -261,7 +261,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
                                   SyncStats#rep_upd_sync_stats{ buildTime = BuildTime } 
                             };
 
-on({get_chunk_response, {_RestI, DBList}}, State = 
+on({get_chunk_response, {RestI, DBList}}, State = 
        #rep_upd_sync_state{ sync_stage = build_struct,
                             sync_method = merkleTree,
                             sync_pid = SrcPid,
@@ -276,7 +276,7 @@ on({get_chunk_response, {_RestI, DBList}}, State =
                                                      {DestOwnerPid}) 
                           end),
     length(RestI) > 0 andalso
-        ?TRACE("MERKLE TREE SYNC - RESTI not null"), %TODO handle RestI send getchunk
+        ?TRACE("MERKLE TREE SYNC - RESTI not null", []), %TODO handle RestI send getchunk
     ToCompare = case IsMaster of
                    true ->
                        comm:send(SrcPid, {check_node, 
