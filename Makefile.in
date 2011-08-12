@@ -127,16 +127,16 @@ java-test: compile java
 
 java-bench: compile java
 # replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 0 -n "jbench_boot" \
 	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "jbench_node1" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "jbench_node2" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "jbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
@@ -184,16 +184,16 @@ python-test: compile python
 
 python-bench: compile python
 # replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 0 -n "pbench_boot" \
 	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "pbench_node1" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "pbench_node2" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "pbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
@@ -263,16 +263,16 @@ python3-test: compile python3
 
 python3-bench: compile python3
 # replicas for key 0 in rt_chord: [0, 85070591730234615865843651857942052864, 170141183460469231731687303715884105728, 255211775190703847597530955573826158592]
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 0 -n "p3bench_boot" \
 	-p $(SCALARIS_UNITTEST_PORT) -y $(SCALARIS_UNITTEST_YAWS_PORT) -m -s -f start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 85070591730234615865843651857942052864 -n "p3bench_node1" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+1)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 170141183460469231731687303715884105728 -n "p3bench_node2" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+2)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) -s start ; \
-	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_srver {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
+	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k 255211775190703847597530955573826158592 -n "p3bench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
