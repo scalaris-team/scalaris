@@ -64,14 +64,14 @@
 
 -type simple_detail_sync() :: {simple_detail_sync, SrcNode::comm:mypid(), [keyValVers()]}.
 
+-type internal_buffer_struct() :: intervals:interval() |  
+                                  {comm:mypid(), comm:mypid(), intervals:interval()} |
+                                  {comm:mypid(), intervals:interval()}.
+
 -type sync_struct() :: bloom_sync_struct() |
                        merkle_sync_struct() |
                        simple_detail_sync() |
                        internal_buffer_struct().
-
--type internal_buffer_struct() :: intervals:interval() |  
-                                  {comm:mypid(), comm:mypid(), intervals:interval()} |
-                                  {comm:mypid(), intervals:interval()}.
 
 -record(rep_upd_sync_stats,
         {
