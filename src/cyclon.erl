@@ -67,6 +67,10 @@
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
+% prevent warnings in the log by mis-using comm:send_with_shepherd/3
+%-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_to_group_member(Pid, Process, Msg)).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_with_shepherd(Pid, {send_to_group_member, Process, Msg} , self())).
+
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
 -spec activate() -> ok.
@@ -220,6 +224,10 @@ on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) 
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
+on_active({send_error, _Target, {send_to_group_member, cyclon, {cy_subset, _, _}}}, State) ->
+    % ignore - the entry for this node will age and will be removed when it is old enough
+    State;
+
 on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     %io:format("subset_response~n", []),
     % this is received at node P -> integrate results of node Q
@@ -253,7 +261,6 @@ on_active({get_subset_rand, N, Pid}, {Cache, _Node, _Cycles, _TriggerState} = St
 %% on_active({flush_cache}, {_Cache, Node, _Cycles, TriggerState}) ->
 %%     request_node_details([pred, succ]),
 %%     {cyclon_cache:new(), Node, 0, TriggerState};
-
 on_active({web_debug_info, Requestor}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     KeyValueList =
         [{"cache_size", cyclon_cache:size(Cache)},
@@ -270,7 +277,7 @@ enhanced_shuffle(Cache, Node) ->
     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
     ForSend = cyclon_cache:add_node(Node, 0, Subset),
     %io:format("~p",[length(ForSend)]),
-    comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
+    ?SEND_TO_GROUP_MEMBER(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
     NewCache.
 
 %% %% @doc simple shuffle without age
@@ -281,7 +288,7 @@ enhanced_shuffle(Cache, Node) ->
 %%     Subset = cyclon_cache:get_random_subset(get_shuffle_length() - 1, NewCache),
 %%     ForSend = cyclon_cache:add_node(Node, 0, Subset),
 %%     %io:format("~p",[length(ForSend)]),
-%%     comm:send_to_group_member(node:pidX(NodeQ), cyclon, {cy_subset, comm:this(), ForSend}),
+%%     ?SEND(node:pidX(NodeQ), {cy_subset, comm:this(), ForSend}),
 %%     NewCache.
 
 %% @doc Sends the local node's dht_node a request to tell us some information
