@@ -38,6 +38,10 @@
 
 -type(state() :: {fix_queue:fix_queue(), gb_set(), trigger:state()}).
 
+% prevent warnings in the log by mis-using comm:send_with_shepherd/3
+%-define(SEND(Pid, Msg), comm:send(Pid, Msg)).
+-define(SEND(Pid, Msg), comm:send_with_shepherd(Pid, Msg, self())).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -85,7 +89,7 @@ on({trigger}, {Queue, Subscriber, TriggerState}) ->
                                         true -> node:pidX(X);
                                         _    -> X
                                     end,
-                              comm:send(Pid, {ping, comm:this_with_cookie(X)})
+                              ?SEND(Pid, {ping, comm:this_with_cookie(X)})
                       end, Queue),
     NewTriggerState = trigger:next(TriggerState),
     {Queue, Subscriber, NewTriggerState};
@@ -122,6 +126,10 @@ on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
 
 on({unsubscribe, Node}, {Queue, Subscriber, TriggerState}) ->
     {Queue, gb_sets:del_element(Node, Subscriber), TriggerState};
+
+on({send_error, _Target, {ping, _}}, State) ->
+    % ignore (we expect failed messages and only hope for availability)
+    State;
 
 on({web_debug_info, Requestor}, {Queue, Subscriber, _TriggerState} = State) ->
     KeyValueList =
