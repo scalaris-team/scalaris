@@ -307,7 +307,8 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     case comm:is_valid(ThisWithCookie) of
         true ->
             _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]})
-                 || Node <- NewNodes];
+                 || Node <- NewNodes],
+            ok;
         false -> ok
     end,
     OldNeighborhood2.
