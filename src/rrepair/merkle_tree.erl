@@ -178,7 +178,7 @@ insert_to_node(Key, Val, {_, Count, Bucket, Interval, []}, Config)
 
 insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->
     {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
-    length(_Dest) =:= 0 andalso ct:pal("THIS SHOULD NOT HAPPEN!"),
+    length(_Dest) =:= 0 andalso ?TRACE("THIS SHOULD NOT HAPPEN! Key=~p ; NodeI=~p", [Key, Interval]),
     Dest = hd(_Dest),
     OldSize = node_size(Dest),
     NewDest = insert_to_node(Key, Val, Dest, Config),
