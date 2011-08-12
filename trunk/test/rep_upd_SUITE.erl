@@ -40,6 +40,12 @@
                       }).
 -type rrDBStatus() :: [#rrNodeStatus{}].
 
+% TEST CASE TYPES:
+%   simple - run one sync round
+%   times - measure sync time (building, protocol)
+%   parts - get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
+%   min_nodes - sync in an one node ring
+
 all() ->
     [get_symmetric_keys_test,
      blobCoding,
@@ -47,9 +53,11 @@ all() ->
      bloomSync_simple,
      bloomSync_FprCompare_check,
      bloomSync_times,
+     bloomSync_parts,
      bloomSync_min_nodes,
-     merkleSync_simple
-     %merkleSync_min_nodes
+     merkleSync_simple,
+     merkleSync_parts,
+     merkleSync_min_nodes
      ].
 
 suite() ->
@@ -144,14 +152,25 @@ bloomSync_simple(Config) ->
 
 % @doc Check rep upd with only one node
 bloomSync_min_nodes(Config) ->
-  _R1 = start_sync(Config, 1, 1, 2, 0.2, get_bloom_RepUpd_config()),
-  _R2 = start_sync(Config, 1, 1000, 2, 0.2, get_bloom_RepUpd_config()),
-  ok.
+    BConf = get_bloom_RepUpd_config(),    
+    [Start1, End1] = start_sync(Config, 1, 1, 1, 0.2, BConf),
+    [Start2, End2] = start_sync(Config, 1, 1000, 1, 0.2, BConf),
+    ?assert(Start1 =:= End1),
+    ?assert(Start2 =:= End2),
+    ok.
+
+bloomSync_parts(Config) ->
+    OldConf = get_bloom_RepUpd_config(),
+    BConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 400}),
+    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, BConf),
+    ?assert(Start < End),
+    ok.    
 
 % @doc Better Fpr should result in a higher synchronization degree.
 bloomSync_FprCompare_check(Config) ->
-    R1 = start_sync(Config, 4, 1000, 2, 0.2, get_bloom_RepUpd_config()),
-    R2 = start_sync(Config, 4, 1000, 2, 0.1, get_bloom_RepUpd_config()),
+    BConf = get_bloom_RepUpd_config(),    
+    R1 = start_sync(Config, 4, 1000, 2, 0.2, BConf),
+    R2 = start_sync(Config, 4, 1000, 2, 0.1, BConf),
     ?assert(lists:last(R1) < lists:last(R2)),
     ok.
 
@@ -200,8 +219,16 @@ merkleSync_simple(Config) ->
     ok.
 
 merkleSync_min_nodes(Config) ->
-  _R1 = start_sync(Config, 1, 1, 2, 0.2, get_merkle_tree_RepUpd_config()),
-  _R2 = start_sync(Config, 1, 1000, 2, 0.2, get_merkle_tree_RepUpd_config()),    
+    MConf = get_merkle_tree_RepUpd_config(),
+    [Start, End] = start_sync(Config, 1, 1, 1, 0.2, MConf),
+    ?assert(Start =:= End),
+    ok.
+
+merkleSync_parts(Config) ->
+    OldConf = get_merkle_tree_RepUpd_config(),
+    MConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
+    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, MConf),
+    ?assert(Start < End),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
