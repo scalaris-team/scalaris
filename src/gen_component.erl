@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 %% breakpoint tracing
-%-define(TRACE_BP(X,Y), io:format("~p", [self()]), io:format(X,Y)).
+%-define(TRACE_BP(X,Y), ct:pal("~p", [self()]), ct:pal(X,Y)).
 -define(TRACE_BP(X,Y), ok).
 %% userdevguide-begin gen_component:trace_bp_steps
 %-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)). %% output on console
@@ -581,7 +581,9 @@ handle_unknown_event({web_debug_info, Requestor}, State, ComponentState, Module,
                                  {"state", GenCompInfo}]}),
     {State, ComponentState};
 handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
-   log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,Module,On,State]),
+   log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p"
+           " in pid ~p ~.0p~n in State ~.0p",
+           [UnknownMessage,Module,On,self(), pid_groups:group_and_name_of(self()), State]),
     {State, ComponentState}.
 
 bp_state_new() ->
