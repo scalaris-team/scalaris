@@ -94,8 +94,7 @@ start_link(DHTNodeGroup, Role) ->
      GLocalLearner  :: comm:mypid(),
      %% reference counting on subscriptions inside RTMs
      Subs           :: [{comm:mypid(), non_neg_integer()}],
-     OpenTxNum      :: non_neg_integer(),
-     QueuedMessages :: msg_queue:msg_queue()}.
+     OpenTxNum      :: non_neg_integer()}.
 
 %% initialize: return initial state.
 -spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...],
@@ -117,14 +116,13 @@ init([]) ->
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
             State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner,
-                     [], 0, msg_queue:new()},
+                     [], 0},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, on_init);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0,
-              msg_queue:new()}
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -675,10 +673,7 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     case lists:keymember(unknown, 2, NewRTMs) of %% filled all entries?
         false ->
             rtms_of_same_dht_node(NewRTMs),
-            msg_queue:send(state_get_qmsg(State)),
-            NewState = state_set_qmsg(State, []),
-            gen_component:change_handler(
-              state_set_RTMs(NewState, NewRTMs), on);
+            gen_component:change_handler(state_set_RTMs(State, NewRTMs), on);
         _ -> state_set_RTMs(State, NewRTMs)
     end;
 
@@ -692,9 +687,12 @@ on_init({new_node_id, Id}, State) ->
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     %% only in tx_tm
     tx_tm = state_get_role(State),
-    QueuedMessages = state_get_qmsg(State),
-    NewQueuedMessages = msg_queue:add(QueuedMessages, Msg),
-    state_set_qmsg(State, NewQueuedMessages);
+    %% forward request to a node which is ready to serve requests
+    DHTNode = pid_groups:get_my(dht_node),
+    %% there, redirect message to tx_tm
+    RedirectMsg = {send_to_group_member, tx_tm, Msg},
+    comm:send_local(DHTNode, {lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
+    State;
 
 on_init({crash, _Pid} = Msg, State) ->
     %% only in tx_tm
@@ -940,10 +938,6 @@ state_get_opentxnum(State) -> element(7, State).
 state_inc_opentxnum(State) -> setelement(7, State, element(7, State) + 1).
 -spec state_dec_opentxnum(state()) -> state().
 state_dec_opentxnum(State) -> setelement(7, State, element(7, State) - 1).
--spec state_get_qmsg(state()) -> msg_queue:msg_queue().
-state_get_qmsg(State)          -> element(8, State).
--spec state_set_qmsg(state(), msg_queue:msg_queue()) -> state().
-state_set_qmsg(State, Val)     -> setelement(8, State, Val).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
