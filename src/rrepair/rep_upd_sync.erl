@@ -275,7 +275,8 @@ on({get_chunk_response, {_RestI, DBList}}, State =
                                                      {Interval, DBList}, 
                                                      {DestOwnerPid}) 
                           end),
-    %TODO handle RestI
+    length(RestI) > 0 andalso
+        ?TRACE("MERKLE TREE SYNC - RESTI not null"), %TODO handle RestI send getchunk
     ToCompare = case IsMaster of
                    true ->
                        comm:send(SrcPid, {check_node, 
@@ -644,12 +645,11 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 mapInterval(I, Q) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
-    RepFactor = length(?RT:get_replica_keys(?MINUS_INFINITY)),
+    RepFactor = length(?RT:get_replica_keys(LKey)),
     QDiff = (RepFactor - LQ + Q) rem RepFactor,
-    %intervals:new(LBr, key_add(LKey, QDiff), key_add(RKey, QDiff), RBr).
     intervals:new(LBr, 
                   add_quadrants_to_key(LKey, QDiff, RepFactor), 
-                  add_quadrants_to_key(RKey, QDiff, RepFactor),
+                  add_quadrants_to_key(RKey, QDiff, RepFactor), 
                   RBr).
 
 -spec concatKeyVer(db_entry:entry()) -> binary().
