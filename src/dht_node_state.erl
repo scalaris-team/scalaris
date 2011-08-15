@@ -41,7 +41,12 @@
          add_msg_fwd/3,
          rm_msg_fwd/2,
          add_db_range/3,
-         rm_db_range/2]).
+         rm_db_range/2,
+         % bulk owner:
+         add_bulkowner_reply_msg/5,
+         take_bulkowner_reply_msgs/1,
+         get_bulkowner_reply_timer/1,
+         set_bulkowner_reply_timer/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0]).
@@ -60,7 +65,9 @@
                 slide_succ = null :: slide_op:slide_op() | null,
                 msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
                 % additional range to respond to during a move:
-                db_range   = []   :: [{intervals:interval(), slide_op:id()}]
+                db_range   = []   :: [{intervals:interval(), slide_op:id()}],
+                bulkowner_reply_timer   = null :: null | reference(),
+                bulkowner_reply_ids = []   :: [comm:mypid()]
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -264,6 +271,30 @@ add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
 -spec rm_db_range(State::state(), SlideId::slide_op:id()) -> state().
 rm_db_range(State = #state{db_range=DBRange}, SlideId) ->
     State#state{db_range = [X || X = {_, Id} <- DBRange, Id =/= SlideId]}.
+
+add_bulkowner_reply_msg(State = #state{bulkowner_reply_ids = IDs}, Id, Target, Msg, Parents) ->
+    PrevMsgs = case erlang:get({'$bulkowner_reply_msg', Id}) of
+                   undefined    -> [];
+                   {_, _, X, _} -> X
+               end,
+    % parent, target information should be the same - use the latest
+    _ = erlang:put({'$bulkowner_reply_msg', Id}, {Id, Target, [Msg | PrevMsgs], Parents}),
+    State#state{bulkowner_reply_ids = [Id | IDs]}.
+
+take_bulkowner_reply_msgs(State = #state{bulkowner_reply_ids = IDs}) ->
+    {State#state{bulkowner_reply_ids = []},
+     [erlang:erase({'$bulkowner_reply_msg', Id}) || Id <- IDs]}.
+
+get_bulkowner_reply_timer(#state{bulkowner_reply_timer = null}) ->
+    null;
+get_bulkowner_reply_timer(#state{bulkowner_reply_timer = Timer}) ->
+    case erlang:read_timer(Timer) of
+        false -> null;
+        _     -> Timer
+    end.
+
+set_bulkowner_reply_timer(State, Timer) ->
+    State#state{bulkowner_reply_timer = Timer}.
 
 %%% util
 -spec dump(state()) -> ok.

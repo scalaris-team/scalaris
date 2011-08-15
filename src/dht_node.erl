@@ -32,9 +32,12 @@
 -endif.
 
 -type(bulkowner_message() ::
-      {bulk_owner, I::intervals:interval(), Msg::comm:message()} |
-      {start_bulk_owner, I::intervals:interval(), Msg::comm:message()} |
-      {bulkowner_deliver, Range::intervals:interval(), {bulk_read_entry, Issuer::comm:mypid()}}).
+      {start_bulk_owner, Id::util:global_uid(), I::intervals:interval(), Msg::comm:message()} |
+      {bulk_owner, Id::util:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid(),...]} |
+      {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid(),...]} |
+      {bulkowner_reply, Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()]} |
+      {bulkowner_reply_process_all} |
+      {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), [comm:message()], Parents::[comm:mypid()]}).
 
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
@@ -305,22 +308,22 @@ on({drop_data, Data, Sender}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bulk owner messages (see bulkowner.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({bulk_owner, I, Msg}, State) ->
-    bulkowner:bulk_owner(State, I, Msg),
+on({start_bulk_owner, Id, I, Msg}, State) ->
+    bulkowner:bulk_owner(State, Id, I, Msg, []),
     State;
 
-on({start_bulk_owner, I, Msg}, State) ->
-    bulkowner:bulk_owner(State, I, Msg),
+on({bulk_owner, Id, I, Msg, Parents}, State) ->
+    bulkowner:bulk_owner(State, Id, I, Msg, Parents),
     State;
 
-on({bulkowner_deliver, Range, Msg}, State) ->
+on({bulkowner_deliver, Id, Range, Msg, Parents}, State) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
 
     F = fun({FwdInt, FwdPid}, AccI) ->
                 case intervals:is_subset(FwdInt, AccI) of
                     true ->
                         FwdRange = intervals:intersection(AccI, FwdInt),
-                        comm:send(FwdPid, {bulkowner_deliver, FwdRange, Msg}),
+                        comm:send(FwdPid, {bulkowner_deliver, Id, FwdRange, Msg, Parents}),
                         intervals:minus(AccI, FwdRange);
                     _    -> AccI
                 end
@@ -332,11 +335,53 @@ on({bulkowner_deliver, Range, Msg}, State) ->
             case Msg of
                 {bulk_read_entry, Issuer} ->
                     Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
-                    comm:send(Issuer, {bulk_read_entry_response, MyRange, Data});
-                {send_to_group_member, _Proc, _Msg} ->
-                    comm:send_local(self(), Msg)
+                    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
+                    % for aggregation using a tree, activate this instead:
+                    % bulkowner:issue_send_reply(Id, Issuer, ReplyMsg, Parents);
+                    comm:send(Issuer, {bulkowner_reply, Id, ReplyMsg});
+                {send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
+                    comm:send_local(pid_groups:get_my(Proc),
+                                    {bulkowner_deliver, Id, Range, Msg1, Parents})
             end
     end,
+    State;
+
+on({bulkowner_reply, Id, Target, Msg, Parents}, State) ->
+    State1 =
+        case dht_node_state:get_bulkowner_reply_timer(State) =:= null of
+            true ->
+                Timer = comm:send_local_after(100, self(), {bulkowner_reply_process_all}),
+                dht_node_state:set_bulkowner_reply_timer(State, Timer);
+            false ->
+                State
+        end,
+    dht_node_state:add_bulkowner_reply_msg(State1, Id, Target, Msg, Parents);
+
+on({bulkowner_reply_process_all}, State) ->
+    {State1, Replies} = dht_node_state:take_bulkowner_reply_msgs(State),
+    _ = [begin
+             case Msgs of
+                 [] -> ok;
+                 [{bulk_read_entry_response, _HRange, _HData} | _] ->
+                     comm:send_local(self(),
+                                     {bulkowner_gather, Id, Target, Msgs, Parents});
+                 [{send_to_group_member, Proc, _Msg} | _] ->
+                     Msgs1 = [Msg1 || {send_to_group_member, _Proc, Msg1} <- Msgs],
+                     comm:send_local(pid_groups:get_my(Proc),
+                                     {bulkowner_gather, Id, Target, Msgs1, Parents})
+             end
+         end || {Id, Target, Msgs, Parents} <- Replies],
+    State1;
+
+on({bulkowner_gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HData} | T], Parents}, State) ->
+    Msg = lists:foldl(
+            fun({bulk_read_entry_response, Range, Data},
+                {bulk_read_entry_response, AccRange, AccData}) ->
+                    {bulk_read_entry_response,
+                     intervals:union(Range, AccRange),
+                     lists:append(Data, AccData)}
+            end, H, T),
+    bulkowner:send_reply(Id, Target, Msg, Parents, self()),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -346,6 +391,9 @@ on({send_error, Target, {lookup_aux, _, _, _} = Message}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
 on({{send_error, Target, {lookup_aux, _, _, _} = Message}, {send_failed, _Pids}}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
+on({send_error, FailedTarget, {bulkowner_reply, Id, Target, Msg, Parents}}, State) ->
+    bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
+    State;
 
 on({send_error, Target, {lookup_fin, _, _, _} = Message}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);

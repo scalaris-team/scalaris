@@ -47,21 +47,23 @@ count(_Config) ->
     ?equals(api_tx:write("j", 3), {ok}),
     ?equals(api_tx:write("k", 5), {ok}),
     ?equals(api_tx:write("l", 7), {ok}),
-    bulkowner:issue_bulk_owner(intervals:all(), {bulk_read_entry, comm:this()}),
-    ?equals(collect(0), 68),
+    Id = util:get_global_uid(),
+    bulkowner:issue_bulk_owner(Id, intervals:all(), {bulk_read_entry, comm:this()}),
+    ?equals(collect(Id, 0), 68),
+    ?expect_no_message(),
     ok.
 
-collect(Sum) ->
+collect(Id, Sum) ->
     if
         Sum < 68 ->
 %%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
             receive
-            {bulk_read_entry_response, _NowDone, Data} ->
-                collect(Sum + reduce(Data))
+                {bulkowner_reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
+                collect(Id, Sum + reduce(Data))
             end;
         Sum == 68 ->
             receive
-                {bulk_read_entry_response, _NowDone, Data} ->
+                {bulkowner_reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
                     Sum + reduce(Data)
             after 1000 ->
                     Sum

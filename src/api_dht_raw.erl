@@ -58,22 +58,23 @@ range_read(From, To) ->
 %% @doc Read a range of key-value pairs in the given interval.
 -spec range_read(intervals:interval()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(Interval) ->
-    bulkowner:issue_bulk_owner(Interval,
+    Id = util:get_global_uid(),
+    bulkowner:issue_bulk_owner(Id, Interval,
                                {bulk_read_entry, comm:this()}),
     TimerRef = comm:send_local_after(config:read(range_read_timeout), self(),
-                                     {range_read_timeout}),
-    range_read_loop(Interval, intervals:empty(), [], TimerRef).
+                                     {range_read_timeout, Id}),
+    range_read_loop(Interval, Id, intervals:empty(), [], TimerRef).
 
--spec range_read_loop(Interval::intervals:interval(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
-range_read_loop(Interval, Done, Data, TimerRef) ->
+-spec range_read_loop(Interval::intervals:interval(), Id::util:global_uid(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
+range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     receive
-        {range_read_timeout} ->
+        {range_read_timeout, Id} ->
             {timeout, lists:flatten(Data)};
-        {bulk_read_entry_response, NowDone, NewData} ->
+        {bulkowner_reply, Id, {bulk_read_entry_response, NowDone, NewData}} ->
             Done2 = intervals:union(NowDone, Done),
             case intervals:is_subset(Interval, Done2) of
                 false ->
-                    range_read_loop(Interval, Done2, [NewData | Data], TimerRef);
+                    range_read_loop(Interval, Id, Done2, [NewData | Data], TimerRef);
                 true ->
                     % cancel timeout
                     _ = erlang:cancel_timer(TimerRef),
