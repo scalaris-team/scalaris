@@ -25,6 +25,8 @@
 -spec start_link() -> {ok, Pid::pid()} | ignore |
                       {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
+    % preload api_json module to make atoms known to list_to_existing_atom/1
+    _X = api_json:module_info(),
     Id = io_lib:format("yaws@~p", [node()]),
     Docroot = config:read(docroot),
     GconfList = [{max_connections, 800},
@@ -38,7 +40,7 @@ start_link() ->
                  {partial_post_size, config:read(yaws_max_post_data)},
                  {flags, [{access_log, false}]} % {deflate, true}
                 ],
-    
+
     % load yaws application (required by yaws_api:embedded_start_conf)
     _ = application:load(
           {application, yaws,
@@ -49,10 +51,10 @@ start_link() ->
             {mod, {yaws_app, []}},
             {env, []},
             {applications, [kernel, stdlib]}]}),
-    
+
     {ok, SCList, GC, ChildSpecs} =
         yaws_api:embedded_start_conf(Docroot, SconfList, GconfList, Id),
-    
+
     case util:app_get_env(verbose, false) of
         true ->
             io:format("Yaws listening at port ~p.~n", [config:read(yaws_port)]);
@@ -63,7 +65,7 @@ start_link() ->
 
     %% now configure Yaws
     yaws_api:setconf(GC, SCList),
-    
+
     X.
 
 -spec init(ChildSpecs) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
@@ -79,7 +81,7 @@ check_config() ->
     config:is_string(docroot) and
     config:is_string(log_path) and
     config:is_port(yaws_port) and
-        
+
     case config:read(yaws_max_post_data) of
         nolimit -> true;
         _ -> config:is_integer(yaws_max_post_data) and
