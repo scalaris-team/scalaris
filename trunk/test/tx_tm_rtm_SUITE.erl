@@ -29,8 +29,9 @@ all() ->
      abort_prepared_w,
      abort_prepared_rc,
      abort_prepared_rmc,
-     abort_prepared_wmc,%,
-     tm_crash, tp_crash,
+     abort_prepared_wmc,
+     tm_crash,
+     tp_crash,
      all_tp_crash
     ].
 
@@ -45,6 +46,42 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+init_per_testcase(TestCase, Config) ->
+    _ = case TestCase of
+            tm_crash ->
+                %% stop ring from previous test case (may ran into a timeout)
+                unittest_helper:stop_ring(),
+                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+                timer:sleep(500);
+            tp_crash ->
+                %% stop ring from previous test case (may ran into a timeout)
+                unittest_helper:stop_ring(),
+                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+                timer:sleep(500);
+            all_tp_crash ->
+                %% stop ring from previous test case (may ran into a timeout)
+                unittest_helper:stop_ring(),
+                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+                timer:sleep(500);
+            _ -> ok
+        end,
+    Config.
+
+end_per_testcase(TestCase, Config) ->
+    _ = case TestCase of
+            tm_crash ->
+                unittest_helper:stop_ring();
+            tp_crash ->
+                unittest_helper:stop_ring();
+            all_tp_crash ->
+                unittest_helper:stop_ring();
+            _ -> ok
+        end,
+    Config.
 
 causes() -> [readlock, writelock, versiondec, versioninc, none].
 
@@ -266,6 +303,11 @@ get_db_entries(Keys) ->
       end
       || X <- Keys ].
 
+bp_cond_tm_crash(Message, _State) ->
+    case Message of
+        {tx_tm_rtm_commit, _, _, [{rdht_tx_read,"a",value, _, 0}]} -> true;
+        _ -> false
+    end.
 
 tm_crash(_) ->
     ct:pal("Starting tm_crash~n"),
@@ -273,7 +315,8 @@ tm_crash(_) ->
     %% ct:pal("written initial value and setting breakpoints now~n"),
     TMs = pid_groups:find_all(tx_tm),
     %% all TMs break at next commit request:
-    _ = [ gen_component:bp_set(X, tx_tm_rtm_commit, tm_crash) || X <- TMs ],
+    _ = [ gen_component:bp_set_cond(X, fun tx_tm_rtm_SUITE:bp_cond_tm_crash/2,
+                                    tm_crash) || X <- TMs ],
     %% ct:pal("Breakpoints set~n"),
     _ = [ gen_component:bp_barrier(X) || X <- TMs ],
     %% ct:pal("Barriers set~n"),
@@ -283,28 +326,33 @@ tm_crash(_) ->
     %% got the request.
     Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- TMs ],
 
-    %% report all tx_tms as failed
-    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
+    %% report all tx_tms as failed after the commit has started...
+    _ = [ spawn(fun() ->
+                        timer:sleep(1500),
+                        comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
+                end)
           || X <- TMs ],
 
-    %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
 
-    ct:pal("Res: ~p~n", [Res]),
+    ?equals_pattern(Res, {_,[_,{ok}]}),
 
     _ = [ erlang:exit(Pid, kill) || Pid <- Pids ],
 
     _ = [ gen_component:bp_del(X, tm_crash) || X <- TMs ],
 
-    [ gen_component:bp_cont(X) || X <- TMs ].
-%%ok.
+    [ gen_component:bp_cont(X) || X <- TMs ],
+    ok.
 
 tp_crash(_) ->
     ct:pal("Starting tp_crash, simulated by holding the dht_node_proposer~n"),
     api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
-    Proposers = pid_groups:find_all(paxos_proposer),
+    AllProposers = pid_groups:find_all(paxos_proposer),
+    Proposers = [X || X <- AllProposers,
+                      "basic_services" =/= pid_groups:group_of(X)],
     Proposer = hd(Proposers),
+    %% ct:pal("Selected ~p~n", [pid_groups:group_and_name_of(Proposer)]),
     %% break one TP (minority) after proposer initialize:
     gen_component:bp_set(Proposer, proposer_initialize, tp_crash),
     %% ct:pal("Breakpoints set~n"),
@@ -332,8 +380,9 @@ all_tp_crash(_) ->
     ct:pal("Starting all_tp_crash, simulated by holding the dht_node_proposers~n"),
     api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
-    Proposers = pid_groups:find_all(paxos_proposer),
-
+    AllProposers = pid_groups:find_all(paxos_proposer),
+    Proposers = [X || X <- AllProposers,
+                      "basic_services" =/= pid_groups:group_of(X)],
     %% break all TPs (majority) after proposer initialize:
     [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
       || Proposer <- Proposers],
