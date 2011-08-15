@@ -19,18 +19,43 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([tx_req_list/1, tx_req_list/2, tx_read/1, tx_write/2,
-         tx_test_and_set/3, tx_req_list_commit_each/1]).
-
--export([pubsub_publish/2, pubsub_subscribe/2, pubsub_unsubscribe/2,
-         pubsub_get_subscribers/1]).
-
--export([rdht_delete/1, rdht_delete/2]).
-
--export([dht_raw_range_read/2]).
+-export([handler/2]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
+
+%% main handler for json calls
+-spec handler(atom(), list()) -> any().
+handler(nop, [_Value]) -> "ok";
+
+handler(range_read, [From, To])          -> dht_raw_range_read(From, To);
+handler(delete, [Key])                   -> rdht_delete(Key);
+handler(delete, [Key, Timeout])          -> rdht_delete(Key, Timeout);
+handler(req_list, [Param])               -> tx_req_list(Param);
+handler(req_list, [TLog, ReqList])       -> tx_req_list(TLog, ReqList);
+handler(read, [Key])                     -> tx_read(Key);
+handler(write, [Key, Value])             -> tx_write(Key, Value);
+handler(test_and_set, [Key, OldV, NewV]) -> tx_test_and_set(Key, OldV, NewV);
+handler(req_list_commit_each, [Param])   -> tx_req_list_commit_each(Param);
+
+handler(publish, [Topic, Content])       -> pubsub_publish(Topic, Content);
+handler(subscribe, [Topic, URL])         -> pubsub_subscribe(Topic, URL);
+handler(unsubscribe, [Topic, URL])       -> pubsub_unsubscribe(Topic, URL);
+handler(get_subscribers, [Topic])        -> pubsub_get_subscribers(Topic);
+
+handler(get_node_info, [])               -> get_node_info();
+handler(get_node_performance, [])        -> get_node_performance();
+handler(get_service_info, [])            -> get_service_info();
+handler(get_service_performance, [])     -> get_service_performance();
+
+handler(notify, [Topic, Value]) ->
+    io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
+    "ok";
+
+handler(AnyOp, AnyParams) ->
+    io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
+    {struct, [{failure, "unknownreq"}]}.
+
 
 %% interface for api_tx calls
 % Public Interface
@@ -210,3 +235,16 @@ data_to_json(Data) ->
                         value_to_json(db_entry:get_value(DBEntry)),
                         {version, db_entry:get_version(DBEntry)}]} ||
               DBEntry <- Data]}.
+
+%% interface for monitoring calls
+get_node_info() ->
+    {struct, [{status, "ok"}, {value, api_monitoring:get_node_info()}]}.
+
+get_node_performance() ->
+    {struct, [{status, "ok"}, {value, api_monitoring:get_node_performance()}]}.
+
+get_service_info() ->
+    {struct, [{status, "ok"}, {value, api_monitoring:get_service_info()}]}.
+
+get_service_performance() ->
+    {struct, [{status, "ok"}, {value, api_monitoring:get_service_performance()}]}.
