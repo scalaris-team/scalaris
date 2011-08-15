@@ -41,11 +41,12 @@
     {bench} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
-    {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()} |
+    {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
     {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
     {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]}} |
-    {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]} |
-    {report_value, StatsOneRound::#state{}} |
+    {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
+    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]}} |
+    {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
     {get_rrds, [{Process::atom(), Key::string()},...], SourcePid::comm:mypid()}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
@@ -92,38 +93,64 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
         _ ->
             % start a new timeslot and gather stats...
             NewId = util:get_global_uid(),
-            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this(), NewId}},
-            bulkowner:issue_bulk_owner(intervals:all(), Msg),
+            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
+            bulkowner:issue_bulk_owner(NewId, intervals:all(), Msg),
             Leader1 = check_timeslots(Leader),
             broadcast_values(Leader, Leader1),
             {AllNodes, Leader1#state{id = NewId}}
     end;
 
-on({gather_stats, SourcePid, Id} = _Msg, State) ->
+on({bulkowner_deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    This = comm:this_with_cookie({SourcePid, Id}),
+    This = comm:this_with_cookie({SourcePid, Id, Range, Parents}),
     comm:send_local(pid_groups:get_my(monitor),
                     {get_rrds, [{?MODULE, "read_read"}, {dht_node, "lookup_hops"}], This}),
     State;
 
-on({{get_rrds_response, DBs}, {SourcePid, Id}} = _Msg, State) ->
+on({{get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     MyMonData = process_rrds(DBs),
-    This = comm:this_with_cookie({SourcePid, Id, MyMonData}),
+    This = comm:this_with_cookie({SourcePid, Id, Range, Parents, MyMonData}),
     comm:send_local(pid_groups:pid_of("clients_group", monitor),
                     {get_rrds, [{api_tx, "req_list"}], This}),
     State;
 
-on({{get_rrds_response, DBs}, {SourcePid, Id, MyMonData}} = _Msg, State) ->
+on({{get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     AllData = lists:append([MyMonData, process_rrds(DBs)]),
     case AllData of
         [] -> ok;
-        _  -> comm:send(SourcePid, {gather_stats_response, Id, AllData})
+        _  -> ReplyMsg = {send_to_group_member, monitor_perf, {gather_stats_response, AllData}},
+              bulkowner:issue_send_reply(Id, SourcePid, ReplyMsg, Parents)
     end,
     State;
 
-on({gather_stats_response, Id, DataL} = _Msg, {AllNodes, Leader} = _State)
+on({bulkowner_gather, Id, Target, Msgs, Parents}, State) ->
+    {PerfRR, PerfLH, PerfTX} =
+        lists:foldl(
+             fun({gather_stats_response, Data1},
+                 {PerfRR1, PerfLH1, PerfTX1}) ->
+                     lists:foldl(
+                       fun(Data2, {PerfRR2, PerfLH2, PerfTX2}) ->
+                               case Data2 of
+                                   {?MODULE, "read_read", PerfRR3} ->
+                                       {timing_update_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
+                                   {dht_node, "lookup_hops", PerfLH3} ->
+                                       {PerfRR2, timing_update_fun(0, PerfLH2, PerfLH3), PerfTX2};
+                                   {api_tx, "req_list", PerfTX3} ->
+                                       {PerfRR2, PerfLH2, timing_update_fun(0, PerfTX2, PerfTX3)}
+                               end
+                       end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
+             end, {undefined, undefined, undefined}, Msgs),
+    
+    Msg = {send_to_group_member, monitor_perf,
+           {gather_stats_response, [{?MODULE, "read_read", PerfRR},
+                                    {dht_node, "lookup_hops", PerfLH},
+                                    {api_tx, "req_list", PerfTX}]}},
+    bulkowner:send_reply(Id, Target, Msg, Parents, pid_groups:get_my(dht_node)),
+    State;
+
+on({bulkowner_reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Leader} = _State)
   when Id =:= Leader#state.id ->
     ?TRACE1(_Msg, _State),
     Leader1 =
@@ -145,11 +172,11 @@ on({gather_stats_response, Id, DataL} = _Msg, {AllNodes, Leader} = _State)
                   end
           end, Leader, DataL),
     {AllNodes, Leader1};
-on({gather_stats_response, _Id, _Data} = _Msg, State) ->
+on({bulkowner_reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     State;
 
-on({report_value, OtherState} = _Msg, {AllNodes, Leader} = _State) ->
+on({bulkowner_deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg, {AllNodes, Leader} = _State) ->
     ?TRACE1(_Msg, _State),
     AllNodes1 = integrate_values(OtherState, AllNodes),
     {AllNodes1, Leader};
@@ -237,7 +264,7 @@ broadcast_values(OldState, NewState) ->
         true -> % new slot -> broadcast latest values only:
             SendState = reduce_timeslots(1, OldState),
             Msg = {send_to_group_member, monitor_perf, {report_value, SendState}},
-            bulkowner:issue_bulk_owner(intervals:all(), Msg);
+            bulkowner:issue_bulk_owner(util:get_global_uid(), intervals:all(), Msg);
         _ -> ok %nothing to do
     end.
 

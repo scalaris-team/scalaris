@@ -241,6 +241,7 @@ groups() ->
 -spec tab2list() -> [{{groupname(), pidname()}, pid()}].
 tab2list() -> ets:tab2list(?MODULE).
 
+%% @doc Resolve a local pid to its name.
 -spec pid_to_name(pid() | {groupname(), pidname()}) -> string().
 pid_to_name(Pid) when is_pid(Pid) ->
     case pid_groups:group_and_name_of(Pid) of
