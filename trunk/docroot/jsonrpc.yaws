@@ -16,33 +16,7 @@ out(A) ->
     end.
 
 handler([{ip, _IP}] = _State, {call, Operation, {array, Params}}, Session) ->
-    {true, 0, Session, {response, handler(Operation, Params)}}.
-
-handler(nop, [Value]) -> "ok";
-
-handler(range_read, [From, To])    -> api_json:dht_raw_range_read(From, To);
-handler(delete, [Key])             -> api_json:rdht_delete(Key);
-handler(delete, [Key, Timeout])    -> api_json:rdht_delete(Key, Timeout);
-handler(req_list, [Param])         -> api_json:tx_req_list(Param);
-handler(req_list, [TLog, ReqList]) -> api_json:tx_req_list(TLog, ReqList);
-handler(read, [Key])               -> api_json:tx_read(Key);
-handler(write, [Key, Value])       -> api_json:tx_write(Key, Value);
-handler(test_and_set, [Key, OldV, NewV]) ->
-    api_json:tx_test_and_set(Key, OldV, NewV);
-handler(req_list_commit_each, [Param]) -> api_json:tx_req_list_commit_each(Param);
-
-handler(publish, [Topic, Content]) -> api_json:pubsub_publish(Topic, Content);
-handler(subscribe, [Topic, URL])   -> api_json:pubsub_subscribe(Topic, URL);
-handler(unsubscribe, [Topic, URL]) -> api_json:pubsub_unsubscribe(Topic, URL);
-handler(get_subscribers, [Topic])  -> api_json:pubsub_get_subscribers(Topic);
-
-handler(notify, [Topic, Value]) ->
-    io:format("Got pubsub notify ~p -> ~p~n", [Topic, Value]),
-    "ok";
-
-handler(AnyOp, AnyParams) ->
-    io:format("Unknown request = ~p(~p)~n", [AnyOp, AnyParams]),
-    {struct, [{failure, "unknownreq"}]}.
+    {true, 0, Session, {response, api_json:handler(Operation, Params)}}.
 
 send(Args, StatusCode) -> send(Args, StatusCode, "").
 
