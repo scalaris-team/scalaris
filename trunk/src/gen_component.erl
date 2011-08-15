@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 %% breakpoint tracing
-%-define(TRACE_BP(X,Y), ct:pal("~p", [self()]), ct:pal(X,Y)).
+%-define(TRACE_BP(X,Y), ct:pal(X,Y)).
 -define(TRACE_BP(X,Y), ok).
 %% userdevguide-begin gen_component:trace_bp_steps
 %-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)). %% output on console
@@ -457,12 +457,15 @@ handle_gen_component_message(Message, Module, On, State, ComponentState) ->
     end.
 
 gc_state_bp_set_cond({Options, Slowest, BPState}, Cond, BPName) ->
+    ?TRACE_BP("Set bp ~p with name ~p~n", [Cond, BPName]),
     {Options, Slowest, bp_state_bp_set_cond(BPState, Cond, BPName)}.
 
 gc_state_bp_set({Options, Slowest, BPState}, MsgTag, BPName) ->
+    ?TRACE_BP("Set bp ~p with name ~p~n", [MsgTag, BPName]),
     {Options, Slowest, bp_state_bp_set(BPState, MsgTag, BPName)}.
 
 gc_state_bp_del({Options, Slowest, BPState}, BPName) ->
+    ?TRACE_BP("Del bp ~p~n", [BPName]),
     {Options, Slowest, bp_state_bp_del(BPState, BPName)}.
 
 gc_state_bp_hold_back({Options, Slowest, BPState}, Message) ->
