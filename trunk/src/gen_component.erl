@@ -55,6 +55,30 @@
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
+-type bp_name() :: atom().
+
+-type bp_message() ::
+          {'$gen_component', bp, breakpoint, step, pid()}
+        | {'$gen_component', bp, breakpoint, cont}
+        | {'$gen_component', bp, msg_in_bp_waiting, pid()}
+        | {'$gen_component', bp, barrier}
+        | {'$gen_component', bp, bp_set_cond, fun(), bp_name()}
+        | {'$gen_component', bp, bp_set, comm:message_tag(), bp_name()}
+        | {'$gen_component', bp, bp_del, bp_name()}.
+
+-type bp() ::
+        {bp, MsgTag :: comm:message_tag(), bp_name()}
+      | {bp_cond, Condition :: fun(), bp_name()}.
+
+-type bp_state() :: {[bp()],
+                     boolean(),
+                     [bp_message()],
+                     boolean(),
+                     pid() | unknown}.
+
+-type component_state() ::
+        {Options :: list(), Slowest :: float(), bp_state()}.
+
 %% userdevguide-begin gen_component:behaviour
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
@@ -152,22 +176,23 @@ change_handler(State, Handler) when is_atom(Handler) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% @doc perform a post op, i.e. handle a message directly after another
--spec post_op(State, Message::comm:message())
-        -> {'$gen_component', [{post_op, Message::comm:message()}], State}.
+-spec post_op(State, comm:message())
+        -> {'$gen_component', [{post_op, comm:message()}], State}.
 post_op(State, Message) ->
     {'$gen_component', [{post_op, Message}], State}.
 
 %% requests regarding breakpoint processing
--spec bp_set(Pid::comm:erl_local_pid(), MsgTag::comm:message_tag(), BPName::any()) -> ok.
+-spec bp_set(pid(), comm:message_tag(), bp_name()) -> ok.
 bp_set(Pid, MsgTag, BPName) ->
     Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName},
     ok.
 
 %% @doc Module:Function(Message, State, Params) will be evaluated to decide
 %% whether a BP is reached. Params can be used as a payload.
--spec bp_set_cond(Pid::comm:erl_local_pid(),
-                  Cond::{module(), atom(), 2} | fun((comm:message(), State::any()) -> boolean()),
-                  BPName::any()) -> ok.
+-spec bp_set_cond(pid(),
+                  Cond::{module(), atom(), 2}
+                      | fun((comm:message(), State::any()) -> boolean()),
+                  bp_name()) -> ok.
 bp_set_cond(Pid, {_Module, _Function, _Params = 2} = Cond, BPName) ->
     Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
     ok;
@@ -175,12 +200,12 @@ bp_set_cond(Pid, Cond, BPName) when is_function(Cond) ->
     Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
     ok.
 
--spec bp_del(Pid::comm:erl_local_pid(), BPName::any()) -> ok.
+-spec bp_del(pid(), bp_name()) -> ok.
 bp_del(Pid, BPName) ->
     Pid ! {'$gen_component', bp, bp_del, BPName},
     ok.
 
--spec bp_step(Pid::comm:erl_local_pid()) -> {module(), On::atom(), comm:message()}.
+-spec bp_step(pid()) -> {module(), On::atom(), comm:message()}.
 bp_step(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, step, self()},
     receive {'$gen_component', bp, breakpoint, step_done,
@@ -190,13 +215,13 @@ bp_step(Pid) ->
             {Module, On, Message}
     end.
 
--spec bp_cont(Pid::comm:erl_local_pid()) -> ok.
+-spec bp_cont(pid()) -> ok.
 bp_cont(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, cont},
     ok.
 
 %% @doc delay further breakpoint requests until a breakpoint actually occurs
--spec bp_barrier(Pid::comm:erl_local_pid()) -> ok.
+-spec bp_barrier(pid()) -> ok.
 bp_barrier(Pid) ->
     Pid ! {'$gen_component', bp, barrier},
     ok.
@@ -230,7 +255,7 @@ start(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec start(module(), term(), list(), comm:erl_local_pid()) -> ok.
+-spec start(module(), term(), list(), pid()) -> ok.
 start(Module, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
     case util:app_get_env(verbose, false) of
@@ -300,6 +325,8 @@ start(Module, Args, Options, Supervisor) ->
             erlang:Level(Reason)
     end.
 
+-spec try_loop(module(), atom(), term(), component_state()) ->
+                      no_return().
 try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     try loop(Module, On, State, ComponentState)
     catch Level:Reason ->
@@ -310,11 +337,13 @@ try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
               try_loop(Module, On, State, ComponentState)
     end.
 
+-spec loop(module(), atom(), term(), component_state()) -> ok.
 loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     ?CALLING_RECEIVE(Module),
     receive Msg -> loop(Module, On, Msg, State, ComponentState)
     end.
-    
+
+-spec loop(module(), atom(), comm:message(), term(), component_state()) -> ok.
 loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     case ReceivedMsg of
         %%%%%%%%%%%%%%%%%%%%
@@ -413,7 +442,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                 end
     end.
 
--spec handle_gen_component_message(Message::tuple(), Module::module(), Handler::atom(), State::term(), ComponentState) -> ComponentState.
+-spec handle_gen_component_message(Message::tuple(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
 handle_gen_component_message(Message, Module, On, State, ComponentState) ->
     {_Options, _Slowest, BPState} = ComponentState,
     case Message of
@@ -456,28 +485,39 @@ handle_gen_component_message(Message, Module, On, State, ComponentState) ->
             ComponentState
     end.
 
+-spec gc_state_bp_set_cond(component_state(),fun(),atom())
+                          -> component_state().
 gc_state_bp_set_cond({Options, Slowest, BPState}, Cond, BPName) ->
     ?TRACE_BP("Set bp ~p with name ~p~n", [Cond, BPName]),
     {Options, Slowest, bp_state_bp_set_cond(BPState, Cond, BPName)}.
 
+-spec gc_state_bp_set(component_state(),comm:message_tag(),atom())
+                     -> component_state().
 gc_state_bp_set({Options, Slowest, BPState}, MsgTag, BPName) ->
     ?TRACE_BP("Set bp ~p with name ~p~n", [MsgTag, BPName]),
     {Options, Slowest, bp_state_bp_set(BPState, MsgTag, BPName)}.
 
+-spec gc_state_bp_del(component_state(), atom())
+                     -> component_state().
 gc_state_bp_del({Options, Slowest, BPState}, BPName) ->
     ?TRACE_BP("Del bp ~p~n", [BPName]),
     {Options, Slowest, bp_state_bp_del(BPState, BPName)}.
 
+-spec gc_state_bp_hold_back(component_state(), bp_message())
+                           -> component_state().
 gc_state_bp_hold_back({Options, Slowest, BPState}, Message) ->
     ?TRACE_BP("Enqueued bp op ~p -> ~p~n", [Message,
     {Options, Slowest, bp_state_hold_back(BPState, Message)}]),
     {Options, Slowest, bp_state_hold_back(BPState, Message)}.
 %    NewQueue = lists:append(Queue, [Message]),
 
+-spec handle_breakpoint(comm:message(), any(), component_state())
+                           -> component_state().
 handle_breakpoint(Message, State, ComponentState) ->
     BPActive = bp_active(Message, State, ComponentState),
     wait_for_bp_leave(Message, State, ComponentState, BPActive).
 
+-spec bp_active(comm:message(), any(), component_state()) -> boolean().
 bp_active(_Message, _State,
           {_Options, _Slowest,
            {[] = _BPs, false = _BPActive, _HB_BP_Ops, false = _BPStepped, unknown}}
@@ -509,6 +549,8 @@ bp_active(Message, State,
         bp_active(Message, State,
                   {Options, Slowest, {RemainingBPs, BPActive, HB_BP_Ops, BPStepped, StepperPid}}).
 
+-spec wait_for_bp_leave(comm:message(), any(), component_state(), boolean())
+                       -> component_state().
 wait_for_bp_leave(_Message, _State, ComponentState, _BP_Active = false) ->
     ComponentState;
 wait_for_bp_leave(Message, State, ComponentState, _BP_Active = true) ->
@@ -534,6 +576,9 @@ wait_for_bp_leave(Message, State, ComponentState, _BP_Active = true) ->
       Message, State,
       {Options, Slowest, {BPs, true, tl(Queue), BPStepped, StepperPid}}, hd(Queue), FromQueue).
 
+-spec handle_bp_request_in_bp(comm:message(), any(), component_state(),
+                              bp_message(), boolean())
+                             -> component_state().
 handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
     ?TRACE_BP("Handle bp request in bp ~p ~n", [BPMsg]),
     {Options, Slowest, BPState} = ComponentState,
@@ -569,16 +614,18 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
             wait_for_bp_leave(Message, State, NextCompState, true);
         {'$gen_component', bp, bp_del, BPName} ->
             NextCompState =
-                case bp_state_get_queue(BPState) of
+                case {bp_state_get_queue(BPState), FromQueue} of
                     {[_H|_T], false} -> gc_state_bp_hold_back(ComponentState, BPMsg);
                     _ -> gc_state_bp_del(ComponentState, BPName)
                 end,
             wait_for_bp_leave(Message, State, NextCompState, true)
     end.
 
+-spec handle_unknown_event(Message::tuple(), any(), component_state(),
+                           module(), atom()) -> {any(), component_state()}.
 handle_unknown_event({web_debug_info, Requestor}, State, ComponentState, Module, On) ->
     GenCompInfo = lists:flatten(io_lib:format("~p", [State])),
-    comm:send_local(Requestor, {web_debug_info_reply, 
+    comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
                                  {"module", Module}, {"handler", On},
                                  {"state", GenCompInfo}]}),
@@ -589,34 +636,52 @@ handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
            [UnknownMessage,Module,On,self(), pid_groups:group_and_name_of(self()), State]),
     {State, ComponentState}.
 
+-spec bp_state_new() -> bp_state().
 bp_state_new() ->
     {_BPs = [], _BPActive = false,
      _BP_HB_Q = [], _BPStepped = false,
      _BPStepperPid = unknown}.
+-spec bp_state_get_bps(bp_state()) -> [bp()].
 bp_state_get_bps(BPState) -> element(1, BPState).
+-spec bp_state_set_bps(bp_state(), [bp()]) -> bp_state().
 bp_state_set_bps(BPState, Val) -> setelement(1, BPState, Val).
+-spec bp_state_get_bpactive(bp_state()) -> boolean().
 bp_state_get_bpactive(BPState) -> element(2, BPState).
+-spec bp_state_set_bpactive(bp_state(), boolean()) -> bp_state().
 bp_state_set_bpactive(BPState, Val) -> setelement(2, BPState, Val).
+-spec bp_state_get_queue(bp_state()) -> [bp_message()].
 bp_state_get_queue(BPState) -> element(3, BPState).
+-spec bp_state_set_queue(bp_state(), [bp_message()]) -> bp_state().
 bp_state_set_queue(BPState, Val) -> setelement(3, BPState, Val).
+-spec bp_state_get_bpstepped(bp_state()) -> boolean().
 bp_state_get_bpstepped(BPState) -> element(4, BPState).
+-spec bp_state_set_bpstepped(bp_state(), boolean()) -> bp_state().
 bp_state_set_bpstepped(BPState, Val) -> setelement(4, BPState, Val).
+-spec bp_state_get_bpstepper(bp_state()) -> pid() | 'unknown'.
 bp_state_get_bpstepper(BPState) -> element(5, BPState).
+-spec bp_state_set_bpstepper(bp_state(), pid() | 'unknown') -> bp_state().
 bp_state_set_bpstepper(BPState, Val) -> setelement(5, BPState, Val).
+-spec bp_state_bp_set_cond(bp_state(), fun(), bp_name()) -> bp_state().
 bp_state_bp_set_cond(BPState, Cond, BPName) ->
     NewBPs = [ {bp_cond, Cond, BPName} | bp_state_get_bps(BPState)],
     bp_state_set_bps(BPState, NewBPs).
+
+-spec bp_state_bp_set(bp_state(), comm:message_tag(), bp_name()) -> bp_state().
 bp_state_bp_set(BPState, MsgTag, BPName) ->
     NewBPs = [ {bp, MsgTag, BPName} | bp_state_get_bps(BPState)],
     bp_state_set_bps(BPState, NewBPs).
+-spec bp_state_bp_del(bp_state(), bp_name()) -> bp_state().
 bp_state_bp_del(BPState, BPName) ->
     NewBPs = lists:keydelete(BPName, 3, bp_state_get_bps(BPState)),
     bp_state_set_bps(BPState, NewBPs).
+-spec bp_state_hold_back(bp_state(), bp_message()) -> bp_state().
 bp_state_hold_back(BPState, Message) ->
     NewQueue = lists:append(bp_state_get_queue(BPState), [Message]),
     bp_state_set_queue(BPState, NewQueue).
 
 %% @doc release the bp_step function when we executed a bp_step
+-spec bp_step_done(module(), atom(), comm:message(), component_state())
+                  -> component_state().
 bp_step_done(Module, On, Message, ComponentState) ->
     {Options, Slowest, BPState} = ComponentState,
     case {bp_state_get_bpactive(BPState),
