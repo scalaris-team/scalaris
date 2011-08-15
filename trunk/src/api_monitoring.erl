@@ -28,13 +28,20 @@
 get_node_info() ->
     %MyMonitor = pid_groups:pid_of("clients_group", monitor),
     %statistics:getMonitorStats(MyMonitor, Keys),
-    [{erlang_version,erlang:system_info(otp_release)},
+    [{scalaris_version, ?SCALARIS_VERSION},
+     {erlang_version, erlang:system_info(otp_release)},
      {dht_nodes, length(pid_groups:find_all(dht_node))}].
 
 -spec get_node_performance() -> list().
 get_node_performance() ->
-    %MyMonitor = pid_groups:pid_of("clients_group", monitor),
-    [].
+    Monitor = pid_groups:pid_of("clients_group", monitor),
+    {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
+        case statistics:getMonitorStats(Monitor, [{api_tx, "req_list"}]) of
+            []                           -> {[], [], [], [], [], [], []};
+            [{api_tx, "req_list", Data}] -> Data
+        end,
+    [{latency_avg, AvgMsD},
+     {latency_stddev, StddevMsD}].
 
 -spec get_service_info() -> list().
 get_service_info() ->
@@ -44,4 +51,11 @@ get_service_info() ->
 
 -spec get_service_performance() -> list().
 get_service_performance() ->
-    [].
+    Monitor = pid_groups:find_a(monitor_perf),
+    {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
+        case statistics:getMonitorStats(Monitor, [{api_tx, "req_list"}]) of
+            []                           -> {[], [], [], [], [], [], []};
+            [{api_tx, "req_list", Data}] -> Data
+        end,
+    [{latency_avg, AvgMsD},
+     {latency_stddev, StddevMsD}].
