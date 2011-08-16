@@ -33,8 +33,9 @@
 % to work.
 -include("db_beh.hrl").
 
-
 -define(CKETS, ets).
+
+-include("db_common.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% public functions
@@ -65,6 +66,138 @@ close_({DB, _CKInt, CKDB}, _Delete) ->
 %%      supported by ets though).
 get_name_(_State) ->
     "".
+
+%% @doc Gets an entry from the DB. If there is no entry with the given key,
+%%      an empty entry will be returned. The first component of the result
+%%      tuple states whether the value really exists in the DB.
+get_entry2_({DB, _CKInt, _CKDB}, Key) ->
+%%    Start = erlang:now(),
+    Result = case ets:lookup(DB, Key) of
+                 [Entry] -> {true, Entry};
+                 []      -> {false, db_entry:new(Key)}
+             end,
+%%     Stop = erlang:now(),
+%%     Span = timer:now_diff(Stop, Start),
+%%     case ets:lookup(profiling, db_read_lookup) of
+%%         [] ->
+%%             ets:insert(profiling, {db_read_lookup, Span});
+%%         [{_, Sum}] ->
+%%             ets:insert(profiling, {db_read_lookup, Sum + Span})
+%%     end,
+    Result.
+
+%% @doc Inserts a complete entry into the DB.
+%%      Note: is the Entry is a null entry, it will be deleted!
+set_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+    case db_entry:is_null(Entry) of
+        true -> delete_entry_(State, Entry);
+        _    -> Key = db_entry:get_key(Entry),
+                case intervals:in(Key, CKInt) of
+                    false -> ok;
+                    _     -> ?CKETS:insert(CKDB, {Key})
+                end,
+                ets:insert(DB, Entry),
+                State
+    end.
+
+%% @doc Updates an existing (!) entry in the DB.
+%%      TODO: use ets:update_element here?
+update_entry_(State, Entry) ->
+    set_entry_(State, Entry).
+
+%% @doc Removes all values with the given entry's key from the DB.
+delete_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+    Key = db_entry:get_key(Entry),
+    case intervals:in(Key, CKInt) of
+        false -> ok;
+        _     -> ?CKETS:insert(CKDB, {Key})
+    end,
+    ets:delete(DB, Key),
+    State.
+
+%% @doc Returns the number of stored keys.
+get_load_({DB, _CKInt, _CKDB}) ->
+    ets:info(DB, size).
+
+%% @doc Returns the number of stored keys in the given interval.
+get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
+    IsEmpty = intervals:is_empty(Interval),
+    IsAll = intervals:is_all(Interval),
+    if
+        IsEmpty -> 0;
+        IsAll   -> get_load_(State);
+        true    ->
+            F = fun(DBEntry, Load) ->
+                        case intervals:in(db_entry:get_key(DBEntry), Interval) of
+                            true -> Load + 1;
+                            _    -> Load
+                        end
+                end,
+            ets:foldl(F, 0, DB)
+    end.
+
+%% @doc adds keys
+add_data_(State = {DB, CKInt, CKDB}, Data) ->
+    _ = case intervals:is_empty(CKInt) of
+            true -> ok;
+            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
+                       Entry <- Data,
+                       intervals:in(db_entry:get_key(Entry), CKInt)]
+        end,
+    ets:insert(DB, Data),
+    State.
+
+%% @doc Splits the database into a database (first element) which contains all
+%%      keys in MyNewInterval and a list of the other values (second element).
+%%      Note: removes all keys not in MyNewInterval from the list of changed
+%%      keys!
+split_data_(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
+    F = fun (DBEntry, HisList) ->
+                Key = db_entry:get_key(DBEntry),
+                case intervals:in(Key, MyNewInterval) of
+                    true -> HisList;
+                    _    -> ets:delete(DB, Key),
+                            ?CKETS:delete(CKDB, Key),
+                            case db_entry:is_empty(DBEntry) of
+                                false -> [DBEntry | HisList];
+                                _     -> HisList
+                            end
+                end
+        end,
+    HisList = ets:foldl(F, [], DB),
+    {State, HisList}.
+
+%% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
+%%      which FilterFun returns true.
+get_entries_({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+    F = fun (DBEntry, Data) ->
+                 case FilterFun(DBEntry) of
+                     true -> [ValueFun(DBEntry) | Data];
+                     _    -> Data
+                 end
+        end,
+    ets:foldl(F, [], DB).
+
+%% @doc Deletes all objects in the given Range or (if a function is provided)
+%%      for which the FilterFun returns true from the DB.
+delete_entries_(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+    F = fun(DBEntry, _) ->
+                case FilterFun(DBEntry) of
+                    false -> ok;
+                    _     -> Key = db_entry:get_key(DBEntry),
+                             ets:delete(DB, Key),
+                             case intervals:in(Key, CKInt) of
+                                 true -> ?CKETS:insert(CKDB, {Key});
+                                 _    -> ok
+                             end,
+                             ok
+                end
+        end,
+    ets:foldl(F, ok, DB),
+    State;
+delete_entries_(State, Interval) ->
+    delete_entries_(State,
+                    fun(E) -> intervals:in(db_entry:get_key(E), Interval) end).
 
 %% @doc Returns all DB entries.
 get_data_({DB, _CKInt, _CKDB}) ->
@@ -243,6 +376,3 @@ delete_chunk_(DB, Interval, ChunkSize) ->
     {Next, Chunk} = get_chunk_(DB, Interval, ChunkSize),
     DB2 = lists:foldl(fun (Entry, DB1) -> delete_entry(DB1, Entry) end, DB, Chunk),
     {Next, DB2}.
-
--define(ETS, ets).
--include("db_generic_ets.hrl").
