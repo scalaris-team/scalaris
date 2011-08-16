@@ -24,6 +24,12 @@
 -type db_name() :: string().
 -opaque db() :: db_t(). % define db_t in the DB-implementation!
 
+-type subscr_action_t() :: write | delete | split.
+-type subscr_element() :: close_db | {Operation::subscr_action_t(), Key::?RT:key()}.
+-type subscr_changes_fun_t() :: fun((DB::db_t(), Operation::subscr_action_t(), Key::?RT:key()) -> any()).
+-type subscr_remove_fun_t() :: fun(() -> any()).
+-type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
+
 -ifdef(with_export_type_support).
 -export_type([db/0, value/0, version/0, kvv_list/0,
               db_as_list/0]).
@@ -38,6 +44,8 @@
 -export([delete_entries/2]).
 -export([get_load/1, get_load/2, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
+-export([set_subscription/5, set_subscription/2,
+         get_subscription/2, remove_subscription/2]).
 -export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
          get_changes/1, get_changes/2]).
 
@@ -123,6 +131,21 @@ get_data(DB) -> get_data_(DB).
 
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 add_data(DB, Data) -> add_data_(DB, Data).
+
+% subscriptions:
+-spec set_subscription(DB::db(), Tag::any(), I::intervals:interval(), ChangesFun::subscr_changes_fun_t(), RemSubscrFun::subscr_remove_fun_t()) -> db().
+set_subscription(DB, Tag, I, ChangesFun, RemSubscrFun) ->
+    set_subscription_(DB, Tag, I, ChangesFun, RemSubscrFun).
+
+-spec set_subscription(DB::db(), subscr_t()) -> db().
+set_subscription(DB, SubscrTuple) ->
+    set_subscription_(DB, SubscrTuple).
+
+-spec get_subscription(DB::db(), Tag::any()) -> [subscr_t()].
+get_subscription(DB, Tag) -> get_subscription_(DB, Tag).
+
+-spec remove_subscription(DB::db(), Tag::any()) -> db().
+remove_subscription(DB, Tag) -> remove_subscription_(DB, Tag).
 
 % recording changes to the DB:
 -spec record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().

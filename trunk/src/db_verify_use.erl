@@ -38,11 +38,13 @@
 %% -define(TRACE2(Fun, Par1, Par2), io:format("~w: ~w(~w, ~w)~n", [self(), Fun, Par1, Par2])).
 %% -define(TRACE3(Fun, Par1, Par2, Par3), io:format("~w: ~w(~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3])).
 %% -define(TRACE4(Fun, Par1, Par2, Par3, Par4), io:format("~w: ~w(~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4])).
+%% -define(TRACE5(Fun, Par1, Par2, Par3, Par4, Par5), io:format("~w: ~w(~w, ~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4, Par5])).
 -define(TRACE0(Fun), ok).
 -define(TRACE1(Fun, Par1), ok).
 -define(TRACE2(Fun, Par1, Par2), ok).
 -define(TRACE3(Fun, Par1, Par2, Par3), ok).
 -define(TRACE4(Fun, Par1, Par2, Par3, Par4), ok).
+-define(TRACE5(Fun, Par1, Par2, Par3, Par4, Par5), ok).
 -spec verify_counter(Counter::non_neg_integer()) -> ok.
 verify_counter(Counter) ->
     case erlang:get(?MODULE) of
@@ -177,6 +179,32 @@ get_data_({DB, Counter} = _DB_) ->
     ?TRACE1(get_data, _DB_),
     verify_counter(Counter),
     ?BASE_DB:get_data(DB).
+
+%% doc Adds a subscription for the given interval under Tag (overwrites an
+%%     existing subscription with that tag).
+set_subscription_({DB, Counter} = _DB_, Tag, I, ChangesFun, RemSubscrFun) ->
+    ?TRACE5(set_subscription, _DB_, Tag, I, ChangesFun, RemSubscrFun),
+    verify_counter(Counter),
+    {?BASE_DB:set_subscription(DB, Tag, I, ChangesFun, RemSubscrFun), update_counter(Counter)}.
+
+%% doc Adds a subscription for the given interval under Tag (overwrites an
+%%     existing subscription with that tag).
+set_subscription_({DB, Counter} = _DB_, SubscrTuple) ->
+    ?TRACE2(set_subscription, _DB_, SubscrTuple),
+    verify_counter(Counter),
+    {?BASE_DB:set_subscription(DB, SubscrTuple), update_counter(Counter)}.
+
+%% doc Gets a subscription stored under Tag (empty list if there is none).
+get_subscription_({DB, Counter} = _DB_, Tag) ->
+    ?TRACE2(get_data, _DB_, Tag),
+    verify_counter(Counter),
+    ?BASE_DB:get_subscription(DB, Tag).
+
+%% doc Removes a subscription stored under Tag (if there is one).
+remove_subscription_({DB, Counter} = _DB_, Tag) ->
+    ?TRACE2(get_data, _DB_, Tag),
+    verify_counter(Counter),
+    {?BASE_DB:remove_subscription(DB, Tag), update_counter(Counter)}.
 
 %% @doc Adds the new interval to the interval to record changes for.
 %%      Changed entries can then be gathered by get_changes/1.

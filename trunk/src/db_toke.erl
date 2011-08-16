@@ -23,7 +23,7 @@
 
 -behaviour(db_beh).
 
--type db_t() :: {{DB::pid(), FileName::string()}, RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}.
+-type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom()}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -75,9 +75,10 @@ new_db(FileName, TokeOptions) ->
     case toke_drv:new(DB) of
         ok ->
             RandomName = randoms:getRandomId(),
-            CKDBname = list_to_atom("db_ck_" ++ RandomName), % changed keys
+            SubscrName = "db_" ++ RandomName ++ ":subscribers",
             case toke_drv:open(DB, FileName, TokeOptions) of
-                ok     -> {{DB, FileName}, intervals:empty(), ?CKETS:new(CKDBname, [ordered_set, private | ?DB_ETS_ADDITIONAL_OPS])};
+                ok     -> {{DB, FileName},
+                           ets:new(list_to_atom(SubscrName), [ordered_set, private])};
                 Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                           erlang:error({toke_failed, Error2})
             end;
@@ -87,7 +88,8 @@ new_db(FileName, TokeOptions) ->
     end.
 
 %% @doc Deletes all contents of the given DB.
-close_({{DB, FileName}, _CKInt, CKDB}, Delete) ->
+close_(State = {{DB, FileName}, _Subscr}, Delete) ->
+    call_subscribers(State, close_db),
     toke_drv:close(DB),
     toke_drv:delete(DB),
     toke_drv:stop(DB),
@@ -99,35 +101,31 @@ close_({{DB, FileName}, _CKInt, CKDB}, Delete) ->
                                            [self(), FileName, Reason])
             end;
         _ -> ok
-    end,
-    ?CKETS:delete(CKDB).
+    end.
 
 %% @doc Returns the name of the DB, i.e. the path to its file, which can be
 %%      used with open/1.
-get_name_({{_DB, FileName}, _CKInt, _CKDB}) ->
+get_name_({{_DB, FileName}, _Subscr}) ->
     FileName.
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2_({{DB, _FileName}, _CKInt, _CKDB}, Key) ->
+get_entry2_({{DB, _FileName}, _Subscr}, Key) ->
     case toke_drv:get(DB, erlang:term_to_binary(Key, [{minor_version, 1}])) of
         not_found -> {false, db_entry:new(Key)};
         Entry     -> {true, erlang:binary_to_term(Entry)}
     end.
 
 %% @doc Inserts a complete entry into the DB.
-set_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
+set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
         _    -> 
             Key = db_entry:get_key(Entry),
-            case intervals:in(Key, CKInt) of
-                false -> ok;
-                _     -> ?CKETS:insert(CKDB, {Key})
-            end,
             ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
                                  erlang:term_to_binary(Entry, [{minor_version, 1}])),
+            call_subscribers(State, {write, db_entry:get_key(Entry)}),
             State
     end.
 
@@ -136,22 +134,19 @@ update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry_(State = {{DB, _FileName}, CKInt, CKDB}, Entry) ->
+delete_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
     Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
     toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
+    call_subscribers(State, {delete, Key}),
     State.
 
 %% @doc Returns the number of stored keys.
-get_load_({{DB, _FileName}, _CKInt, _CKDB}) ->
+get_load_({{DB, _FileName}, _Subscr}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
 
 %% @doc Returns the number of stored keys in the given interval.
-get_load_(State = {{DB, _FileName}, _CKInt, _CKDB}, Interval) ->
+get_load_(State = {{DB, _FileName}, _Subscr}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
     if
@@ -168,14 +163,7 @@ get_load_(State = {{DB, _FileName}, _CKInt, _CKDB}, Interval) ->
     end.
 
 %% @doc Adds all db_entry objects in the Data list.
-add_data_(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
-    % check once for the 'common case'
-    _ = case intervals:is_empty(CKInt) of
-            true -> ok;
-            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
-                       Entry <- Data,
-                       intervals:in(db_entry:get_key(Entry), CKInt)]
-        end,
+add_data_(State = {{DB, _FileName}, _Subscr}, Data) ->
     % -> do not use set_entry (no further checks for changed keys necessary)
     lists:foldl(
       fun(DBEntry, _) ->
@@ -183,13 +171,14 @@ add_data_(State = {{DB, _FileName}, CKInt, CKDB}, Data) ->
                                    erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
                                    erlang:term_to_binary(DBEntry, [{minor_version, 1}]))
       end, null, Data),
+    _ = [call_subscribers(State, {write, db_entry:get_key(Entry)}) || Entry <- Data],
     State.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
-split_data_(State = {{DB, _FileName}, _CKInt, CKDB}, MyNewInterval) ->
+split_data_(State = {{DB, _FileName}, _Subscr}, MyNewInterval) ->
     % first collect all toke keys to remove from my db (can not delete while doing fold!)
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -203,8 +192,9 @@ split_data_(State = {{DB, _FileName}, _CKInt, CKDB}, MyNewInterval) ->
     HisListFilt =
         lists:foldl(
           fun(DBEntry, L) ->
-                  toke_drv:delete(DB, erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}])),
-                  ?CKETS:delete(CKDB, db_entry:get_key(DBEntry)),
+                  Key = db_entry:get_key(DBEntry),
+                  toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
+                  call_subscribers(State, {split, Key}),
                   case db_entry:is_empty(DBEntry) of
                       false -> [DBEntry | L];
                       _     -> L
@@ -214,7 +204,7 @@ split_data_(State = {{DB, _FileName}, _CKInt, CKDB}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries_({{DB, _FileName}, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+get_entries_({{DB, _FileName}, _Subscr}, FilterFun, ValueFun) ->
     F = fun (_Key, DBEntry_, Data) ->
                  DBEntry = erlang:binary_to_term(DBEntry_),
                  case FilterFun(DBEntry) of
@@ -226,7 +216,7 @@ get_entries_({{DB, _FileName}, _CKInt, _CKDB}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries_(State = {{DB, _FileName}, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+delete_entries_(State = {{DB, _FileName}, _Subscr}, FilterFun) when is_function(FilterFun) ->
     % first collect all toke keys to delete (can not delete while doing fold!)
     F = fun(KeyToke, DBEntry_, ToDelete) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -239,10 +229,7 @@ delete_entries_(State = {{DB, _FileName}, CKInt, CKDB}, FilterFun) when is_funct
     % delete all entries with these keys
     _ = [begin
              toke_drv:delete(DB, KeyToke),
-             case intervals:in(Key, CKInt) of
-                 true -> ?CKETS:insert(CKDB, {Key});
-                 _    -> ok
-             end
+             call_subscribers(State, {delete, Key})
          end || {KeyToke, Key} <- KeysToDelete],
     State;
 delete_entries_(State, Interval) ->
@@ -252,7 +239,7 @@ delete_entries_(State, Interval) ->
                     end).
 
 %% @doc Returns all DB entries.
-get_data_({{DB, _FileName}, _CKInt, _CKDB}) ->
+get_data_({{DB, _FileName}, _Subscr}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).
