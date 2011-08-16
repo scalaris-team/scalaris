@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -behaviour(db_beh).
--type db_t() :: {Table::tid() | atom(), RecordChangesInterval::intervals:interval(), ChangedKeysTable::tid() | atom()}.
+-type db_t() :: {Table::tid() | atom(), SubscrTable::tid() | atom()}.
 
 % TODO: move these functions to the behaviour and implement them in the other DBs!
 -export([get_chunk/3, delete_chunk/3, get_split_key/4]).
@@ -41,10 +41,11 @@
 new_() ->
     % ets prefix: DB_ + random name
     RandomName = randoms:getRandomId(),
-    DBname = list_to_atom("db_" ++ RandomName),
-    CKDBname = list_to_atom("db_ck_" ++ RandomName), % changed keys
+    DBName = "db_" ++ RandomName,
+    SubscrName = DBName ++ ":subscribers",
     % better protected? All accesses would have to go to DB-process
-    {ets:new(DBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]), intervals:empty(), ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS])}.
+    {ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
+     ets:new(list_to_atom(SubscrName), [ordered_set, private])}.
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
@@ -53,18 +54,19 @@ open_(_FileName) ->
     new().
 
 %% @doc Closes and deletes the DB.
-close_({DB, _CKInt, CKDB}, _Delete) ->
+close_(State = {DB, Subscr}, _Delete) ->
+    call_subscribers(State, close_db),
     ets:delete(DB),
-    ?CKETS:delete(CKDB).
+    ets:delete(Subscr).
 
 %% @doc Returns the name of the table for open/1.
-get_name_({DB, _CKInt, _CKDB}) ->
+get_name_({DB, _Subscr}) ->
     erlang:atom_to_list(ets:info(DB, name)).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
-get_entry2_({DB, _CKInt, _CKDB}, Key) ->
+get_entry2_({DB, _Subscr}, Key) ->
     case ets:lookup(DB, Key) of
         [Entry] -> {true, Entry};
         []      -> {false, db_entry:new(Key)}
@@ -72,15 +74,11 @@ get_entry2_({DB, _CKInt, _CKDB}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 %%      Note: is the Entry is a null entry, it will be deleted!
-set_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+set_entry_(State = {DB, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
-        _    -> Key = db_entry:get_key(Entry),
-                case intervals:in(Key, CKInt) of
-                    false -> ok;
-                    _     -> ?CKETS:insert(CKDB, {Key})
-                end,
-                ets:insert(DB, Entry),
+        _    -> ets:insert(DB, Entry),
+                call_subscribers(State, {write, db_entry:get_key(Entry)}),
                 State
     end.
 
@@ -90,21 +88,18 @@ update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
 %% @doc Removes all values with the given entry's key from the DB.
-delete_entry_(State = {DB, CKInt, CKDB}, Entry) ->
+delete_entry_(State = {DB, _Subscr}, Entry) ->
     Key = db_entry:get_key(Entry),
-    case intervals:in(Key, CKInt) of
-        false -> ok;
-        _     -> ?CKETS:insert(CKDB, {Key})
-    end,
     ets:delete(DB, Key),
+    call_subscribers(State, {delete, Key}),
     State.
 
 %% @doc Returns the number of stored keys.
-get_load_({DB, _CKInt, _CKDB}) ->
+get_load_({DB, _Subscr}) ->
     ets:info(DB, size).
 
 %% @doc Returns the number of stored keys in the given interval.
-get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
+get_load_(State = {DB, _Subscr}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
     if
@@ -121,27 +116,22 @@ get_load_(State = {DB, _CKInt, _CKDB}, Interval) ->
     end.
 
 %% @doc adds keys
-add_data_(State = {DB, CKInt, CKDB}, Data) ->
-    _ = case intervals:is_empty(CKInt) of
-            true -> ok;
-            _    -> [?CKETS:insert(CKDB, {db_entry:get_key(Entry)}) ||
-                       Entry <- Data,
-                       intervals:in(db_entry:get_key(Entry), CKInt)]
-        end,
+add_data_(State = {DB, _Subscr}, Data) ->
     ets:insert(DB, Data),
+    _ = [call_subscribers(State, {write, db_entry:get_key(Entry)}) || Entry <- Data],
     State.
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
-split_data_(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
+split_data_(State = {DB, _Subscr}, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
                 Key = db_entry:get_key(DBEntry),
                 case intervals:in(Key, MyNewInterval) of
                     true -> HisList;
                     _    -> ets:delete(DB, Key),
-                            ?CKETS:delete(CKDB, Key),
+                            call_subscribers(State, {split, Key}),
                             case db_entry:is_empty(DBEntry) of
                                 false -> [DBEntry | HisList];
                                 _     -> HisList
@@ -153,7 +143,7 @@ split_data_(State = {DB, _CKInt, CKDB}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
-get_entries_({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
+get_entries_({DB, _Subscr}, FilterFun, ValueFun) ->
     F = fun (DBEntry, Data) ->
                  case FilterFun(DBEntry) of
                      true -> [ValueFun(DBEntry) | Data];
@@ -164,16 +154,13 @@ get_entries_({DB, _CKInt, _CKDB}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
-delete_entries_(State = {DB, CKInt, CKDB}, FilterFun) when is_function(FilterFun) ->
+delete_entries_(State = {DB, _Subscr}, FilterFun) when is_function(FilterFun) ->
     F = fun(DBEntry, _) ->
                 case FilterFun(DBEntry) of
                     false -> ok;
                     _     -> Key = db_entry:get_key(DBEntry),
                              ets:delete(DB, Key),
-                             case intervals:in(Key, CKInt) of
-                                 true -> ?CKETS:insert(CKDB, {Key});
-                                 _    -> ok
-                             end,
+                             call_subscribers(State, {delete, Key}),
                              ok
                 end
         end,
@@ -184,7 +171,7 @@ delete_entries_(State, Interval) ->
                     fun(E) -> intervals:in(db_entry:get_key(E), Interval) end).
 
 %% @doc Returns all DB entries.
-get_data_({DB, _CKInt, _CKDB}) ->
+get_data_({DB, _Subscr}) ->
     ets:tab2list(DB).
 
 %% @doc Returns all key-value pairs of the given DB which are in the given
@@ -202,7 +189,7 @@ get_chunk(DB, Interval, ChunkSize) -> get_chunk_(DB, Interval, ChunkSize).
 
 -spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer()) ->
     {intervals:interval(), db_as_list()}.
-get_chunk_({ETSDB, _CKInt, _CKDB} = DB, Interval, ChunkSize) ->
+get_chunk_({ETSDB, _Subscr} = DB, Interval, ChunkSize) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
         0 -> {intervals:empty(), []};
@@ -267,11 +254,11 @@ get_chunk_inner(_DB, Current, _RealStart, _Interval, 0, Chunk) ->
     %ct:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
     {Current, Chunk};
-get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, '$end_of_table', RealStart, Interval, ChunkSize, Chunk) ->
+get_chunk_inner({ETSDB, _Subscr} = DB, '$end_of_table', RealStart, Interval, ChunkSize, Chunk) ->
     %ct:pal("inner: 2: ~p", ['$end_of_table']),
     % reached end of table - start at beginning (may be a wrapping interval)
     get_chunk_inner(DB, ets:first(ETSDB), RealStart, Interval, ChunkSize, Chunk);
-get_chunk_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
+get_chunk_inner({ETSDB, _Subscr} = DB, Current, RealStart, Interval, ChunkSize, Chunk) ->
     %ct:pal("inner: 3: ~p", [Current]),
     case intervals:in(Current, Interval) of
         true ->
@@ -297,7 +284,7 @@ get_split_key(DB, Begin, TargetLoad, backward) ->
         ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
         ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key_({ETSDB, _CKInt, _CKDB} = DB, Begin, TargetLoad,
+get_split_key_({ETSDB, _Subscr} = DB, Begin, TargetLoad,
                ETS_first, ETS_next) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
@@ -343,10 +330,10 @@ get_split_key_inner(_DB, RealStart, RealStart, TargetLoad, SplitKey, _ETS_first,
 get_split_key_inner(_DB, _Current, _RealStart, 0, SplitKey, _ETS_first, _ETS_next) ->
     % we hit the chunk size limit
     {SplitKey, 0};
-get_split_key_inner({ETSDB, _CKInt, _CKDB} = DB, '$end_of_table', RealStart, TargetLoad, SplitKey, ETS_first, ETS_next) ->
+get_split_key_inner({ETSDB, _Subscr} = DB, '$end_of_table', RealStart, TargetLoad, SplitKey, ETS_first, ETS_next) ->
     % reached end of table - start at beginning (may be a wrapping interval)
     get_split_key_inner(DB, ETS_first(ETSDB), RealStart, TargetLoad, SplitKey, ETS_first, ETS_next);
-get_split_key_inner({ETSDB, _CKInt, _CKDB} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
+get_split_key_inner({ETSDB, _Subscr} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
     Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
 

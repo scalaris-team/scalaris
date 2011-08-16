@@ -123,20 +123,102 @@ check_db(DB) ->
         _  -> {false, Invalid}
     end.
 
-%% @doc Adds the new interval to the interval to record changes for. Entries
-%%      which have (potentially) changed can then be gathered by get_changes/1.
-record_changes_({DB, CKInt, CKDB}, NewInterval) ->
-    {DB, intervals:union(CKInt, NewInterval), CKDB}.
+%% subscriptions
 
-%% @doc Stops recording changes and removes all entries from the table of
-%%      changed keys.
-stop_record_changes_({DB, _CKInt, CKDB}) ->
-    ?CKETS:delete_all_objects(CKDB),
-    {DB, intervals:empty(), CKDB}.
+%% doc Adds a subscription for the given interval under Tag (overwrites an
+%%     existing subscription with that tag).
+-spec set_subscription_(State::db_t(), Tag::any(), I::intervals:interval(), ChangesFun::subscr_changes_fun_t(), RemSubscrFun::subscr_remove_fun_t()) -> db_t().
+set_subscription_(State, Tag, I, ChangesFun, RemSubscrFun) ->
+    set_subscription_(State, {Tag, I, ChangesFun, RemSubscrFun}).
 
-%% @doc Stops recording changes in the given interval and removes all such
-%%      entries from the table of changed keys.
-stop_record_changes_({DB, CKInt, CKDB}, Interval) ->
+%% doc Adds a subscription for the given interval under Tag (overwrites an
+%%     existing subscription with that tag).
+-spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
+set_subscription_(State = {_DB, Subscr}, SubscrTuple = {_Tag, _I, _ChangesFun, _RemSubscrFun}) ->
+    ets:insert(Subscr, SubscrTuple),
+    State.
+
+%% doc Gets a subscription stored under Tag (empty list if there is none).
+-spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
+get_subscription_({_DB, Subscr}, Tag) ->
+    ets:lookup(Subscr, Tag).
+
+%% doc Removes a subscription stored under Tag (if there is one).
+-spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
+remove_subscription_(State = {_DB, Subscr}, Tag) ->
+    case ets:lookup(Subscr, Tag) of
+        [] -> ok;
+        [{Tag, _I, _ChangesFun, RemSubscrFun}] -> RemSubscrFun()
+    end,
+    ets:delete(Subscr, Tag),
+    State.
+
+%% @doc Go through all subscriptions and perform the given operation if
+%%      matching.
+-spec call_subscribers(State::db_t(), subscr_element()) -> ok.
+call_subscribers(State = {_DB, Subscr}, Operation) ->
+    call_subscribers_iter(State, Operation, ets:first(Subscr)).
+
+%% @doc Iterates over all susbcribers and calls their subscribed functions.
+-spec call_subscribers_iter(State::db_t(), subscr_element(),
+        CurrentKey::subscr_t() | '$end_of_table') -> ok.
+call_subscribers_iter(_State, _Operation, '$end_of_table') ->
+    ok;
+call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
+    % assume the key exists (it should since we are iterating over the table!)
+    [{_Tag, I, ChangesFun, RemSubscrFun}] = ets:lookup(Subscr, CurrentKey),
+    case Op of
+        close_db ->
+            RemSubscrFun();
+        {Operation, Key} ->
+            case intervals:in(Key, I) of
+                false -> ok;
+                _     -> ChangesFun(State, Operation, Key)
+            end
+    end,
+    call_subscribers_iter(State, Op, ets:next(Subscr, CurrentKey)).
+
+%% subscriptions for changed keys
+
+%% @doc Check that the table storing changed keys exists and creates it if
+%%      necessary.
+-spec subscr_delta_check_table(State::db_t()) -> tid() | atom().
+subscr_delta_check_table(State) ->
+    case erlang:get('$delta_tab') of
+        undefined ->
+            CKDBname = list_to_atom(get_name_(State) ++ "_ck"), % changed keys
+            CKDB = ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
+            erlang:put('$delta_tab', CKDB);
+        CKDB -> ok
+    end,
+    CKDB.
+
+%% @doc Cleans up, i.e. deletes, the table with changed keys (called on
+%%      subscription removal).
+-spec subscr_delta_close_table() -> ok | true.
+subscr_delta_close_table() ->
+    case erlang:erase('$delta_tab') of
+        undefined -> ok;
+        CKDB -> ?CKETS:delete(CKDB)
+    end.
+
+%% @doc Inserts/removes the key into the table of changed keys depending on the
+%%      operation (called whenever the DB is changed).
+-spec subscr_delta(State::db_t(), Operation::subscr_action_t(), Key::?RT:key()) -> ok.
+subscr_delta(State, Operation, Key) ->
+    CKDB = subscr_delta_check_table(State),
+    case Operation of
+        write    -> ?CKETS:insert(CKDB, {Key});
+        delete   -> ?CKETS:insert(CKDB, {Key});
+        split    -> ?CKETS:delete(CKDB, Key)
+    end,
+    ok.
+
+%% @doc Removes any changed key in interval I (called when some (sub-)interval
+%%      is unsubscribed).
+-spec subscr_delta_remove(State::db_t(), I::intervals:interval()) -> ok.
+subscr_delta_remove(State, Interval) ->
+    CKDB = subscr_delta_check_table(State),
     F = fun (DBEntry, _) ->
                  Key = db_entry:get_key(DBEntry),
                  case intervals:in(Key, Interval) of
@@ -145,18 +227,55 @@ stop_record_changes_({DB, CKInt, CKDB}, Interval) ->
                  end
         end,
     ?CKETS:foldl(F, true, CKDB),
-    {DB, intervals:minus(CKInt, Interval), CKDB}.
+    ok.
+
+%% @doc Adds the new interval to the interval to record changes for. Entries
+%%      which have (potentially) changed can then be gathered by get_changes/1.
+record_changes_(State, NewInterval) ->
+    RecChanges = get_subscription_(State, record_changes),
+    NewSubscr =
+        case RecChanges of
+            [] -> {record_changes, NewInterval,
+                   fun subscr_delta/3, fun subscr_delta_close_table/0};
+            [{Tag, I, ChangesFun, RemSubscrFun}] ->
+                {Tag, intervals:union(I, NewInterval), ChangesFun, RemSubscrFun}
+        end,
+    set_subscription_(State, NewSubscr).
+
+%% @doc Stops recording changes and removes all entries from the table of
+%%      changed keys.
+stop_record_changes_(State) ->
+    remove_subscription_(State, record_changes).
+
+%% @doc Stops recording changes in the given interval and removes all such
+%%      entries from the table of changed keys.
+stop_record_changes_(State, Interval) ->
+    RecChanges = get_subscription_(State, record_changes),
+    case RecChanges of
+        [] -> State;
+        [{Tag, I, ChangesFun, RemSubscrFun}] ->
+            subscr_delta_remove(State, Interval),
+            NewI = intervals:minus(I, Interval),
+            case intervals:is_empty(NewI) of
+                true -> remove_subscription_(State, Tag);
+                _ ->
+                    set_subscription_(State, Tag, intervals:minus(I, Interval),
+                                      ChangesFun, RemSubscrFun)
+            end
+    end.
 
 %% @doc Gets all db_entry objects which have (potentially) been changed or
 %%      deleted (might return objects that have not changed but have been
 %%      touched by one of the DB setters).
-get_changes_({_DB, _CKInt, CKDB} = State) ->
+get_changes_(State) ->
+    CKDB = subscr_delta_check_table(State),
     get_changes_helper(State, ?CKETS:tab2list(CKDB), intervals:all(), [], []).
 
 %% @doc Gets all db_entry objects in the given interval which have
 %%      (potentially) been changed or deleted (might return objects that have
 %%      not changed but have been touched by one of the DB setters).
-get_changes_({_DB, _CKInt, CKDB} = State, Interval) ->
+get_changes_(State, Interval) ->
+    CKDB = subscr_delta_check_table(State),
     get_changes_helper(State, ?CKETS:tab2list(CKDB), Interval, [], []).
 
 %% @doc Helper for get_changes/2 that adds the entry of a changed key either to
