@@ -335,7 +335,9 @@ tm_crash(_) ->
 
     Res = api_tx:req_list([{read, "a"}, {commit}]),
 
-    ?equals_pattern(Res, {_,[_,{ok}]}),
+    ct:pal("Res: ~p~n", [Res]),
+    %% may fail or succeed, so no equals check possible.
+    %%?equals_pattern(Res, {_,[_,{ok}]}),
 
     _ = [ erlang:exit(Pid, kill) || Pid <- Pids ],
 
