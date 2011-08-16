@@ -183,7 +183,7 @@ init(Me, Pred, Succ) ->
     % create the ets table storing the subscriptions
     TableName = pid_groups:my_groupname() ++ ":rm_tman",
     SubscrTable = ets:new(list_to_atom(TableName ++ ":subscribers"),
-                          [ordered_set, protected]),
+                          [ordered_set, private]),
     dn_cache:subscribe(),
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
