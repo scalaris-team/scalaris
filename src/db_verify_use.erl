@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc Database based on db_gb_trees that verifies the correct use of the DB
+%% @doc Database based on db_ets that verifies the correct use of the DB
 %%      interface.
 %% @end
 %% @version $Id$
@@ -25,7 +25,7 @@
 
 -behaviour(db_beh).
 
--define(BASE_DB, db_gb_trees).
+-define(BASE_DB, db_ets).
 
 -type db_t()::{?BASE_DB:db(), Counter::non_neg_integer()}.
 

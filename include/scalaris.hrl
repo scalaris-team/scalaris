@@ -45,7 +45,6 @@
 
 %% userdevguide-begin scalaris:db
 %%Standard database backend
-%-define(DB, db_gb_trees).
 %-define(DB, db_toke).
 %-define(DB, db_verify_use). % for testing only!
 -define(DB, db_ets).
