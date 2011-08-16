@@ -37,10 +37,6 @@
 
 -include("db_common.hrl").
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% public functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% @doc Initializes a new database.
 new_() ->
     % ets prefix: DB_ + random name
@@ -61,30 +57,18 @@ close_({DB, _CKInt, CKDB}, _Delete) ->
     ets:delete(DB),
     ?CKETS:delete(CKDB).
 
-%% @doc Returns an empty string.
-%%      Note: should return the name of the DB for open/1 which is not
-%%      supported by ets though).
-get_name_(_State) ->
-    "".
+%% @doc Returns the name of the table for open/1.
+get_name_({DB, _CKInt, _CKDB}) ->
+    erlang:atom_to_list(ets:info(DB, name)).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 get_entry2_({DB, _CKInt, _CKDB}, Key) ->
-%%    Start = erlang:now(),
-    Result = case ets:lookup(DB, Key) of
-                 [Entry] -> {true, Entry};
-                 []      -> {false, db_entry:new(Key)}
-             end,
-%%     Stop = erlang:now(),
-%%     Span = timer:now_diff(Stop, Start),
-%%     case ets:lookup(profiling, db_read_lookup) of
-%%         [] ->
-%%             ets:insert(profiling, {db_read_lookup, Span});
-%%         [{_, Sum}] ->
-%%             ets:insert(profiling, {db_read_lookup, Sum + Span})
-%%     end,
-    Result.
+    case ets:lookup(DB, Key) of
+        [Entry] -> {true, Entry};
+        []      -> {false, db_entry:new(Key)}
+    end.
 
 %% @doc Inserts a complete entry into the DB.
 %%      Note: is the Entry is a null entry, it will be deleted!
