@@ -42,10 +42,18 @@
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
-      {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, util:global_uid()}, Key::?RT:key()} |
-      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
-      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()}).
+      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
+      % subscriptions:
+      {db_set_subscription, Tag::any(), I::intervals:interval(), ChangesFun::?DB:subscr_changes_fun_t(), RemSubscrFun::?DB:subscr_remove_fun_t()} |
+      {db_set_subscription, SubscrTuple::?DB:subscr_t()} |
+      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
+      {db_remove_subscription, Tag::any()} |
+      % direct DB manipulation:
+      {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
+      {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
+      {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, util:global_uid()}, HashedKey::?RT:key()} |
+      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
@@ -283,6 +291,24 @@ on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
                 end,                    
     comm:send(Source_PID, ResultMsg),
     NewState;
+
+on({db_set_subscription, Tag, I, ChangesFun, RemSubscrFun}, State) ->
+    DB2 = ?DB:set_subscription(dht_node_state:get(State, db),
+                               Tag, I, ChangesFun, RemSubscrFun),
+    dht_node_state:set_db(State, DB2);
+
+on({db_set_subscription, SubscrTuple}, State) ->
+    DB2 = ?DB:set_subscription(dht_node_state:get(State, db), SubscrTuple),
+    dht_node_state:set_db(State, DB2);
+
+on({db_get_subscription, Tag, SourcePid}, State) ->
+    Subscr = ?DB:get_subscription(dht_node_state:get(State, db), Tag),
+    comm:send_local(SourcePid, {db_get_subscription_response, Tag, Subscr}),
+    State;
+
+on({db_remove_subscription, Tag}, State) ->
+    DB2 = ?DB:remove_subscription(dht_node_state:get(State, db), Tag),
+    dht_node_state:set_db(State, DB2);
 
 %% for unit testing only: allow direct DB manipulation
 on({get_key_entry, Source_PID, HashedKey}, State) ->
