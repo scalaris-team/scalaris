@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
@@ -394,7 +395,12 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
         newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
         
         executor.shutdown();
-        while (!executor.isTerminated()) {
+        boolean shutdown = false;
+        while (!shutdown) {
+            try {
+                shutdown = executor.awaitTermination(1, TimeUnit.MINUTES);
+            } catch (InterruptedException e) {
+            }
         }
         executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
     }
