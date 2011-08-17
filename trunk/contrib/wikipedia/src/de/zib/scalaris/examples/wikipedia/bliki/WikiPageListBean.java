@@ -45,7 +45,11 @@ public class WikiPageListBean extends WikiPageBeanBase {
         /**
          * Form for pages with a given prefix.
          */
-        PagePrefixForm
+        PagePrefixForm,
+        /**
+         * Form for pages with a given substring (for searching).
+         */
+        PageSearchForm
     }
     private List<String> pages = new LinkedList<String>();
 
@@ -60,6 +64,7 @@ public class WikiPageListBean extends WikiPageBeanBase {
     
     private String target = "";
     private String prefix = "";
+    private String search = "";
     private int namespaceId = 0;
 
     /**
@@ -186,5 +191,19 @@ public class WikiPageListBean extends WikiPageBeanBase {
      */
     public void setNamespaceId(int namespaceId) {
         this.namespaceId = namespaceId;
+    }
+
+    /**
+     * @return the search
+     */
+    public String getSearch() {
+        return search;
+    }
+
+    /**
+     * @param search the search to set
+     */
+    public void setSearch(String search) {
+        this.search = search;
     }
 }

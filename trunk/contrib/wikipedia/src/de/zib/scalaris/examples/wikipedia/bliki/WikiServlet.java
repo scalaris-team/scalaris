@@ -340,6 +340,31 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 value.setNamespaceId(nsId);
             }
             handleViewSpecialPageList(request, response, result, value, connection);
+        } else if (req_title.startsWith("Special:Search")) {
+            String req_search = request.getParameter("search");
+            if (req_search == null) {
+                req_search = ""; // shows all pages
+                int slashIndex = req_title.indexOf('/');
+                if (slashIndex != (-1)) {
+                    req_search = req_title.substring(slashIndex + 1);
+                }
+            }
+            // use default namespace (id 0) for invalid values
+            int nsId = parseInt(request.getParameter("namespace"), 0);
+            WikiPageListBean value = new WikiPageListBean();
+            value.setPageHeading("Search");
+            value.setTitle("Special:Search&search=" + req_search);
+            value.setFormTitle("Search results");
+            value.setFormType(FormType.PageSearchForm);
+            value.setSearch(req_search);
+            PageListResult result;
+            if (nsId == 0) {
+                result = ScalarisDataHandler.getArticleList(connection);
+            } else {
+                result = ScalarisDataHandler.getPageList(connection);
+                value.setNamespaceId(nsId);
+            }
+            handleViewSpecialPageList(request, response, result, value, connection);
         } else if (req_title.startsWith("Special:WhatLinksHere")) {
             String req_target = request.getParameter("target");
             if (req_target == null) {
@@ -718,7 +743,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             String fullFrom = nsPrefix + value.getFromPage();
             String to = value.getToPage();
             String fullTo = nsPrefix + value.getToPage();
-            if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty()) {
+            String search = value.getSearch().toLowerCase();
+            if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty() || !search.isEmpty()) {
                 // only show pages with this prefix:
                 for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
                     String cur = it.next();
@@ -728,6 +754,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     } else if (!from.isEmpty() && cur.compareToIgnoreCase(fullFrom) <= 0) {
                         it.remove();
                     } else if (!to.isEmpty() && cur.compareToIgnoreCase(fullTo) > 0) {
+                        it.remove();
+                    } else if (!search.isEmpty() && !cur.toLowerCase().contains(search)) {
                         it.remove();
                     }
                 }

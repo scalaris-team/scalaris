@@ -82,9 +82,7 @@ ${ pageBean.page }
                                 <td class='mw-label'><label for="nsto">Display pages ending at:</label> </td>
                                 <td class='mw-input'><input name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
                               </tr>
-                      <%
-                          } else if (pageBean.getFormType() == WikiPageListBean.FormType.TargetPageForm) {
-                      %>
+                      <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.TargetPageForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="target">Page:</label> </td>
                                 <td class='mw-input'><input name="target" size="30" value="${ pageBean.target }" id="nstarget" />  </td>
@@ -93,6 +91,11 @@ ${ pageBean.page }
                               <tr>
                                 <td class='mw-label'><label for="prefix">Display pages with prefix:</label> </td>
                                 <td class='mw-input'><input name="prefix" size="30" value="${ pageBean.prefix }" id="nsprefix" />  </td>
+                              </tr>
+                      <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.PageSearchForm) { %>
+                              <tr>
+                                <td class='mw-label'><label for="search">Display pages containing:</label> </td>
+                                <td class='mw-input'><input name="search" size="30" value="${ pageBean.search }" id="nsprefix" />  </td>
                               </tr>
                       <% } %>
                               <tr>
@@ -227,11 +230,11 @@ ${ pageBean.page }
 <!-- 2 -->
 <div id="p-search">
     <h5><label for="searchInput">Search</label></h5>
-    <form action="search" id="searchform">
+    <form action="wiki?" id="searchform">
         <input name="title" value="Special:Search" type="hidden" />
         <div id="simpleSearch">
-                        <input disabled="disabled" autocomplete="off" placeholder="Search" tabindex="1" id="searchInput" name="search" title="Search Wikipedia [f]" accesskey="f" type="text" />
-                        <button disabled="disabled" id="searchButton" type="submit" name="button" title="Search the pages for this text"><img src="skins/search-ltr.png" alt="Search" /></button>
+                        <input autocomplete="off" placeholder="Search" tabindex="1" id="searchInput" name="search" title="Search Wikipedia [f]" accesskey="f" type="text" />
+                        <button id="searchButton" type="submit" name="button" title="Search the pages for this text"><img src="skins/search-ltr.png" alt="Search" /></button>
         </div>
     </form>
 </div>
