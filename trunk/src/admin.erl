@@ -19,7 +19,8 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([add_node/1, add_node_at_id/1, add_nodes/1, del_nodes/1, del_nodes/2,
+-export([add_node/1, add_node_at_id/1, add_nodes/1,
+         del_node/2, del_nodes/1, del_nodes/2,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
          check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
@@ -36,74 +37,57 @@
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
--spec add_node_at_id(?RT:key()) ->
-        ok | {error, already_present | {already_started, pid() | undefined} | term()}.
+-spec add_node_at_id(?RT:key()) -> ok | {error, term()}.
 add_node_at_id(Id) ->
     add_node([{{dht_node, id}, Id}, {skip_psv_lb}]).
 
--spec add_node([tuple()]) ->
-        ok | {error, already_present | {already_started, pid() | undefined} | term()}.
+-spec add_node([tuple()]) -> ok | {error, term()}.
 add_node(Options) ->
     DhtNodeId = randoms:getRandomId(),
     Desc = util:sup_supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [[{my_sup_dht_node_id, DhtNodeId} | Options]]),
     case supervisor:start_child(main_sup, Desc) of
-        {ok, _Child}        -> ok;
-        {ok, _Child, _Info} -> ok;
-        {error, _Error} = X -> X
+        {ok, _Child}                  -> ok;
+        {ok, _Child, _Info}           -> ok;
+        {error, already_present}      -> add_node(Options); % try again, different Id
+        {error, {already_started, _}} -> add_node(Options); % try again, different Id
+        {error, _Error} = X           -> X
     end.
 
--spec add_nodes(non_neg_integer()) ->
-        nothing_to_do | [ok | {error, already_present |
-                         {already_started, pid() | undefined} | term()},...].
-add_nodes(0) -> nothing_to_do;
+-spec add_nodes(non_neg_integer()) -> [ok | {error, term()}].
+add_nodes(0) -> [];
 add_nodes(Count) ->
     [add_node([]) || _X <- lists:seq(1, Count)].
 %% userdevguide-end admin:add_nodes
 
-%% @doc Deletes nodes started with add_nodes();
-%%      detects them by their random names (which is a list).
-%%      Beware: Other processes in main_sup must not be started with
-%%      a list as their name!
+%% @doc Deletes Scalaris nodes from the current VM.
 %%      Provided for convenience and backwards-compatibility - kills the node,
-%%      i.e. _no_ graceful leave !
--spec del_nodes(Count::integer())
-        -> nothing_to_do | [ok | {error, running | not_found | simple_one_for_one},...].
+%%      i.e. _no_ graceful leave!
+-spec del_nodes(Count::integer()) -> [ok | {error, not_found}].
 del_nodes(Count) -> del_nodes(Count, false).
 
-%% @doc Deletes nodes started with add_nodes();
-%%      detects them by their random names (which is a list).
-%%      Beware: Other processes in main_sup must not be started with
-%%      a list as their name!
--spec del_nodes(Count::integer(), Graceful::boolean())
-        -> nothing_to_do | [ok | {error, running | not_found | simple_one_for_one},...].
-del_nodes(0, _Graceful) -> nothing_to_do;
+%% @doc Deletes Scalaris nodes from the current VM.
+-spec del_nodes(Count::non_neg_integer(), Graceful::boolean())
+        -> [ok | {error, not_found}].
 del_nodes(Count, Graceful) ->
-    [del_single_node(supervisor:which_children(main_sup), Graceful)
-    || _X <- lists:seq(1, Count)].
+    Children = lists:sublist(supervisor:which_children(main_sup), Count),
+    [del_node(Spec, Graceful) || Spec <- Children].
 
-%% @doc Delete a single node if its Id, i.e. name, is a list.
--spec del_single_node([{Id::term() | undefined, Child::pid() | undefined,
-                        Type::worker | supervisor, Modules::[module()] | dynamic}],
-                      Graceful::boolean())
-        -> ok | {error, running | not_found | simple_one_for_one}.
-del_single_node([], _Graceful) ->
-    ok;
-del_single_node([{Id, Pid, _Type, _} | T], Graceful) ->
-    case is_list(Id) of
+%% @doc Delete a single node.
+-spec del_node({Id::term() | undefined, Child::pid() | undefined,
+                Type::worker | supervisor, Modules::[module()] | dynamic},
+               Graceful::boolean()) -> ok | {error, not_found}.
+del_node({Id, Pid, _Type, _}, Graceful) ->
+    case Graceful of
         true ->
-            case Graceful of
-                true ->
-                    Group = pid_groups:group_of(Pid),
-                    DhtNode = pid_groups:pid_of(Group, dht_node),
-                    comm:send_local(DhtNode, {leave});
-                false ->
-                    util:supervisor_terminate_childs(Pid),
-                    _ = supervisor:terminate_child(main_sup, Id),
-                    supervisor:delete_child(main_sup, Id)
-            end;
-        _ -> del_single_node(T, Graceful)
+            Group = pid_groups:group_of(Pid),
+            DhtNode = pid_groups:pid_of(Group, dht_node),
+            comm:send_local(DhtNode, {leave});
+        false ->
+            util:supervisor_terminate_childs(Pid),
+            _ = supervisor:terminate_child(main_sup, Id),
+            supervisor:delete_child(main_sup, Id)
     end.
 
 %% @doc Contact mgmt server and check that each node's successor is correct.
