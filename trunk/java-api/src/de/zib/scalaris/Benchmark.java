@@ -17,6 +17,7 @@ package de.zib.scalaris;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +32,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
  * Also provides some default benchmarks.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.0
+ * @version 3.6
  * @since 2.0
  */
 public class Benchmark {
@@ -59,6 +60,11 @@ public class Benchmark {
     protected static final int transactionsPerTestRun = 10;
 
     /**
+     * Number of parallel tests per test run, i.e. number of parallel clients.
+     */
+    protected static int parallelRuns;
+
+    /**
      * Default minimal benchmark.
      *
      * Tests some strategies for writing key/value pairs to scalaris:
@@ -84,6 +90,13 @@ public class Benchmark {
      *            the benchmarks to run
      */
     public static void minibench(final int testruns, final Set<Integer> benchmarks) {
+        ConnectionFactory cf = ConnectionFactory.getInstance();
+        List<PeerNode> nodes = cf.getNodes();
+        parallelRuns = nodes.size();
+        // set a connection policy that goes through the available nodes in a round-robin fashion:
+        cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
+        System.out.println("Number of available nodes: " + nodes.size());
+        System.out.println("-> Using " + parallelRuns + " parallel instances per test run...");
         long[][] results = getResultArray(3, 2);
         String[] columns;
         String[] rows;
@@ -211,7 +224,7 @@ public class Benchmark {
                 TimeUnit.SECONDS.sleep(1);
             }
         } catch (final Exception e) {
-            // e.printStackTrace();
+             // e.printStackTrace();
         }
 
         columns = new String[] {
@@ -300,6 +313,129 @@ public class Benchmark {
 
         for (int i = 0; i < columns.length; i++) {
             System.out.println("(" + (i + 1) + ") " + columns[i]);
+        }
+    }
+
+    /**
+     * Abstract base class of a test run that is to be run in a thread.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @since 3.6
+     *
+     * @param <T> type of the value to write
+     */
+    private abstract static class BenchRunnable<T> extends Thread {
+        /**
+         * Tells the thread to stop.
+         */
+        public boolean stop = false;
+
+        /**
+         * The time at the start of a single benchmark.
+         */
+        protected long timeAtStart = 0;
+        /**
+         * The speed of the benchmark in operations/s.
+         */
+        public long speed = -1;
+
+        /**
+         * The key to operate on.
+         */
+        protected final String key;
+        /**
+         * The value to use.
+         */
+        protected final T value;
+
+        /**
+         * Creates a new runnable.
+         *
+         * @param key
+         *            the key to operate on
+         * @param value
+         *            the value to use
+         */
+        public BenchRunnable(String key, T value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        /**
+         * Call this method when a benchmark is started.
+         *
+         * Sets the time the benchmark was started.
+         */
+        final protected void testBegin() {
+            timeAtStart = System.currentTimeMillis();
+        }
+
+        /**
+         * Call this method when a benchmark is finished.
+         *
+         * Calculates the time the benchmark took and the number of transactions
+         * performed during this time.
+         */
+        final protected long testEnd(final int testRuns) {
+            final long timeTaken = System.currentTimeMillis() - timeAtStart;
+            final long speed = (testRuns * 1000) / timeTaken;
+            return speed;
+        }
+
+        /**
+         * Will be called before the benchmark starts.
+         *
+         * @throws Exception
+         */
+        protected void pre_init() throws Exception {
+        }
+
+        /**
+         * Will be called at the start of the benchmark.
+         *
+         * @throws Exception
+         */
+        protected void init() throws Exception {
+        }
+
+        /**
+         * Will be called before the end of the benchmark.
+         *
+         * @throws Exception
+         */
+        protected void cleanup() throws Exception {
+        }
+
+        /**
+         * The operation to execute during the benchmark.
+         *
+         * @param key
+         *            the key to operate on
+         * @param value
+         *            the value to use
+         * @param j
+         *            transaction number
+         *
+         * @throws Exception
+         */
+        abstract protected void operation(String key, T value, int j) throws Exception;
+
+        @Override
+        public void run() {
+            for (int retry = 0; retry < 3 && !stop; ++retry) {
+                try {
+                    pre_init();
+                    testBegin();
+                    init();
+                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+                        operation(key, value, j);
+                    }
+                    cleanup();
+                    this.speed = testEnd(transactionsPerTestRun);
+                    break;
+                } catch (final Exception e) {
+                }
+            }
         }
     }
 
@@ -402,6 +538,49 @@ public class Benchmark {
     }
 
     /**
+     * Integrates the workers' results into the result array.
+     *
+     * @param <T>
+     *            type of the value
+     * @param results
+     *            results array with operations/s
+     * @param i
+     *            current number of the test run
+     * @param worker
+     *            array of worker threads
+     * @param failed
+     *            number of previously failed threads
+     *
+     * @return (new) number of failed threads
+     */
+    private static <T> int integrateResults(final long[] results, int i,
+            BenchRunnable<T>[] worker, int failed) {
+        for (BenchRunnable<T> benchThread : worker) {
+            if (failed >= 3) {
+                benchThread.stop = true;
+                try {
+                    benchThread.join();
+                } catch (InterruptedException e) {
+                }
+            } else {
+                long speed;
+                try {
+                    benchThread.join();
+                    speed = benchThread.speed;
+                } catch (InterruptedException e) {
+                    speed = -1;
+                }
+                if (speed < 0) {
+                    ++failed;
+                } else {
+                    results[i] += speed;
+                }
+            }
+        }
+        return failed;
+    }
+
+    /**
      * Calculates the average number of transactions per second from the results
      * of executing 10 transactions per test run. Will remove the top and bottom
      * {@link #percentToRemove} percent of the sorted results array.
@@ -444,26 +623,27 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         final TransactionSingleOp transaction = new TransactionSingleOp();
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                         transaction.closeConnection();
                     }
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -492,28 +672,37 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    final Connection connection = ConnectionFactory.getInstance()
-                    .createConnection();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    Connection connection;
+                    @Override
+                    protected void init() throws Exception {
+                        connection = ConnectionFactory.getInstance().createConnection();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        connection.close();
+                    }
+
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         final TransactionSingleOp transaction = new TransactionSingleOp(connection);
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                     }
-                    connection.close();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -541,26 +730,36 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    final TransactionSingleOp transaction = new TransactionSingleOp();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    TransactionSingleOp transaction;
+                    @Override
+                    protected void init() throws Exception {
+                        transaction = new TransactionSingleOp();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        transaction.closeConnection();
+                    }
+
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                     }
-                    transaction.closeConnection();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -588,27 +787,28 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         final Transaction transaction = new Transaction();
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                         transaction.commit();
                         transaction.closeConnection();
                     }
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -636,29 +836,38 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    final Connection connection = ConnectionFactory.getInstance()
-                    .createConnection();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    Connection connection;
+                    @Override
+                    protected void init() throws Exception {
+                        connection = ConnectionFactory.getInstance().createConnection();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        connection.close();
+                    }
+
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         final Transaction transaction = new Transaction(connection);
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                         transaction.commit();
                     }
-                    connection.close();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -686,27 +895,37 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    testBegin();
-                    final Transaction transaction = new Transaction();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
+                    Transaction transaction;
+                    @Override
+                    protected void init() throws Exception {
+                        transaction = new Transaction();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        transaction.closeConnection();
+                    }
+
+                    @Override
+                    protected void operation(String key, T value, int j) throws Exception {
                         if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + i + j), (OtpErlangObject) value);
+                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
                         } else {
-                            transaction.write(key + i + j, value);
+                            transaction.write(key + '_' + j, value);
                         }
                         transaction.commit();
                     }
-                    transaction.closeConnection();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -730,29 +949,32 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    final String key_i = key + i;
-                    final Transaction tx_init = new Transaction();
-                    tx_init.write(key_i, 0);
-                    tx_init.commit();
-                    tx_init.closeConnection();
-                    testBegin();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
+                    @Override
+                    protected void pre_init() throws Exception {
+                        final Transaction tx_init = new Transaction();
+                        tx_init.write(key, 0);
+                        tx_init.commit();
+                        tx_init.closeConnection();
+                    }
+                    @Override
+                    protected void operation(String key, Object value, int j) throws Exception {
                         final Transaction transaction = new Transaction();
-                        final int value_old = transaction.read(key_i).intValue();
-                        transaction.write(key_i, value_old + 1);
+                        final int value_old = transaction.read(key).intValue();
+                        transaction.write(key, value_old + 1);
                         transaction.commit();
                         transaction.closeConnection();
                     }
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -777,31 +999,43 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    final String key_i = key + i;
-                    final Transaction tx_init = new Transaction();
-                    tx_init.write(key_i, 0);
-                    tx_init.commit();
-                    tx_init.closeConnection();
-                    testBegin();
-                    final Connection connection = ConnectionFactory.getInstance()
-                    .createConnection();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+            @SuppressWarnings("unchecked")
+            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
+                    Connection connection;
+                    @Override
+                    protected void pre_init() throws Exception {
+                        final Transaction tx_init = new Transaction();
+                        tx_init.write(key, 0);
+                        tx_init.commit();
+                        tx_init.closeConnection();
+                    }
+
+                    @Override
+                    protected void init() throws Exception {
+                        connection = ConnectionFactory.getInstance().createConnection();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        connection.close();
+                    }
+
+                    @Override
+                    protected void operation(String key, Object value, int j) throws Exception {
                         final Transaction transaction = new Transaction(connection);
-                        final int value_old = transaction.read(key_i).intValue();
-                        transaction.write(key_i, value_old + 1);
+                        final int value_old = transaction.read(key).intValue();
+                        transaction.write(key, value_old + 1);
                         transaction.commit();
                     }
-                    connection.close();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 
@@ -825,29 +1059,42 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            for (int retry = 0; retry < 3; ++retry) {
-                try {
-                    final String key_i = key + i;
-                    final Transaction tx_init = new Transaction();
-                    tx_init.write(key_i, 0);
-                    tx_init.commit();
-                    tx_init.closeConnection();
-                    testBegin();
-                    final Transaction transaction = new Transaction();
-                    for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        final int value_old = transaction.read(key_i).intValue();
-                        transaction.write(key_i, value_old + 1);
+            @SuppressWarnings("unchecked")
+            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
+            for (int thread = 0; thread < parallelRuns; ++thread) {
+                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
+                    Transaction transaction;
+                    @Override
+                    protected void pre_init() throws Exception {
+                        final Transaction tx_init = new Transaction();
+                        tx_init.write(key, 0);
+                        tx_init.commit();
+                        tx_init.closeConnection();
+                    }
+
+                    @Override
+                    protected void init() throws Exception {
+                        transaction = new Transaction();
+                    }
+
+                    @Override
+                    protected void cleanup() throws Exception {
+                        transaction.closeConnection();
+                    }
+
+                    @Override
+                    protected void operation(String key, Object value, int j) throws Exception {
+                        final int value_old = transaction.read(key).intValue();
+                        transaction.write(key, value_old + 1);
                         transaction.commit();
                     }
-                    transaction.closeConnection();
-                    results[i] = testEnd(transactionsPerTestRun);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
-                    if (retry == 2) {
-                        return -1;
-                    }
-                }
+                };
+                worker[thread].start();
+            }
+            int failed = 0;
+            failed = integrateResults(results, i, worker, failed);
+            if (failed >= 3) {
+                return -1;
             }
         }
 

@@ -166,7 +166,7 @@ java-bench: compile java
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "jbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
-	SCALARIS_JAPI_NODE="jbench_boot@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
+	SCALARIS_JAPI_NODE="jbench_boot@localhost jbench_node1@localhost jbench_node2@localhost jbench_node3@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "jbench_boot" stop ; \
 	./bin/scalarisctl -n "jbench_node1" stop ; \
 	./bin/scalarisctl -n "jbench_node2" stop ; \
