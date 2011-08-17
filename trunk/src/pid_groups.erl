@@ -179,8 +179,12 @@ group_and_name_of(Pid) ->
         []                -> failed
     end.
 
--spec group_of(pid()) -> groupname().
-group_of(Pid) -> element(1, group_and_name_of(Pid)).
+-spec group_of(pid()) -> groupname() | failed.
+group_of(Pid) ->
+    case group_and_name_of(Pid) of
+        failed -> failed;
+        {GrpName, _PidName} -> GrpName
+    end.
 
 %% @doc find a process group with a given process name inside
 -spec group_with(pidname()) -> groupname() | failed.
