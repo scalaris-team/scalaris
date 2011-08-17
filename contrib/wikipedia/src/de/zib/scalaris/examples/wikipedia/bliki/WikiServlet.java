@@ -57,6 +57,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
@@ -93,10 +94,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      */
     public static final String version = "0.3.0+svn";
 
-    private Connection connection = null; 
     private SiteInfo siteinfo = null;
     private MyNamespace namespace = null;
-    private Random random = null;
     
     private boolean initialized = false;
 
@@ -131,9 +130,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     }
 
     /**
-     * Servlet initialisation: creates the connection to the erlang node.
-     * 
-     * @see #setupChordSharpConnection(HttpServletRequest)
+     * Servlet initialisation: creates the connection to the erlang node and
+     * imports site information.
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -155,47 +153,52 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         
         if (properties != null) {
             cFactory = new ConnectionFactory(properties);
-            cFactory.setClientNameAppendUUID(true);
         } else {
             cFactory = new ConnectionFactory();
             cFactory.setClientName("wiki_renderer");
-            cFactory.setClientNameAppendUUID(true);
         }
-        
-        setupChordSharpConnection(null);
-        random = new Random();
-    }
+        cFactory.setClientNameAppendUUID(true);
+        cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
-        /**
-     * Sets up the connection to the Scalaris erlang node once on the server.
+        loadSiteInfo();
+        loadPlugins();
+    }
+    
+    /**
+     * Loads the siteinfo object from Scalaris.
      * 
-     * @param config
-     *            the servlet's configuration
+     * @return <tt>true</tt> on success,
+     *         <tt>false</tt> if not found or no connection available
      */
-    @SuppressWarnings("unchecked")
-    private boolean setupChordSharpConnection(HttpServletRequest request) {
+    private synchronized boolean loadSiteInfo()  {
         TransactionSingleOp scalaris_single;
         try {
-            connection = cFactory.createConnection();
-            scalaris_single = new TransactionSingleOp(connection);
-        } catch (Exception e) {
-            if (request != null) {
-                addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
-            } else {
-                System.out.println(e);
-                e.printStackTrace();
+            scalaris_single = new TransactionSingleOp(cFactory.createConnection());
+            try {
+                siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
+                // TODO: fix siteinfo's base url
+                namespace = new MyNamespace(siteinfo);
+                initialized = true;
+            } catch (Exception e) {
+                // no warning here - this probably is an empty wiki
+                return false;
             }
-            return false;
-        }
-        try {
-            siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
-            // TODO: fix siteinfo's base url
-            namespace = new MyNamespace(siteinfo);
-            initialized = true;
         } catch (Exception e) {
-            // no warning here - this probably is an empty wiki
+            System.out.println(e);
+            e.printStackTrace();
             return false;
         }
+        return true;
+    }
+    
+    /**
+     * Load all plugins from the plugin directory
+     * <tt>&lt;ServletContextDir&gt;/WEB-INF/plugins</tt>.
+     * 
+     * @return <tt>true</tt> on success, <tt>false</tt> otherwise
+     */
+    @SuppressWarnings("unchecked")
+    private synchronized boolean loadPlugins() {
         final String pluginDir = getServletContext().getRealPath("/WEB-INF/plugins");
         try {
             PluginClassLoader pcl = new PluginClassLoader(pluginDir, new Class[] {WikiPlugin.class});
@@ -216,8 +219,29 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         } catch (IOException e) {
             System.err.println("failed to load plugins");
             e.printStackTrace();
+            return false;
         }
         return true;
+    }
+
+    /**
+     * Sets up the connection to the Scalaris erlang node once on the server.
+     * 
+     * @param config
+     *            the servlet's configuration
+     */
+    private Connection getScalarisConnection(HttpServletRequest request) {
+        try {
+            return cFactory.createConnection();
+        } catch (Exception e) {
+            if (request != null) {
+                addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
+            } else {
+                System.out.println(e);
+                e.printStackTrace();
+            }
+            return null;
+        }
     }
 
     @Override
@@ -233,9 +257,14 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     @Override
     protected void doGet(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
-        if (!initialized && !setupChordSharpConnection(request) || !currentImport.isEmpty()) {
-            showImportPage(request, response);
-            return;
+        Connection connection = getScalarisConnection(request);
+        if (connection == null) {
+            showEmptyPage(request, response); // should forward to another page
+            return; // return just in case
+        }
+        if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
+            showImportPage(request, response, connection); // should forward to another page
+            return; // return just in case
         }
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
@@ -251,12 +280,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         if (req_title == null) {
             req_title = MAIN_PAGE;
         }
-
         
         String req_action = request.getParameter("action");
 
         if (req_title.equals("Special:Random")) {
-            handleViewRandomPage(request, response);
+            handleViewRandomPage(request, response, connection);
         } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
             String req_from = request.getParameter("from");
             if (req_from == null) {
@@ -286,7 +314,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 result = ScalarisDataHandler.getPageList(connection);
                 value.setNamespaceId(nsId);
             }
-            handleViewSpecialPageList(request, response, result, value);
+            handleViewSpecialPageList(request, response, result, value, connection);
         } else if (req_title.startsWith("Special:PrefixIndex")) {
             String req_prefix = request.getParameter("prefix");
             if (req_prefix == null) {
@@ -311,7 +339,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 result = ScalarisDataHandler.getPageList(connection);
                 value.setNamespaceId(nsId);
             }
-            handleViewSpecialPageList(request, response, result, value);
+            handleViewSpecialPageList(request, response, result, value, connection);
         } else if (req_title.startsWith("Special:WhatLinksHere")) {
             String req_target = request.getParameter("target");
             if (req_target == null) {
@@ -329,22 +357,22 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             value.setFormType(FormType.TargetPageForm);
             value.setTarget(req_target);
             PageListResult result = ScalarisDataHandler.getPagesLinkingTo(connection, req_target);
-            handleViewSpecialPageList(request, response, result, value);
+            handleViewSpecialPageList(request, response, result, value, connection);
         } else if (req_title.equals("Special:SpecialPages")) {
-            handleViewSpecialPages(request, response);
+            handleViewSpecialPages(request, response, connection);
         } else if (req_title.equals("Special:Statistics")) {
-            handleViewSpecialStatistics(request, response);
+            handleViewSpecialStatistics(request, response, connection);
         } else if (req_title.equals("Special:Version")) {
-            handleViewSpecialVersion(request, response);
+            handleViewSpecialVersion(request, response, connection);
         } else if (req_action == null || req_action.equals("view")) {
-            handleViewPage(request, response, req_title);
+            handleViewPage(request, response, req_title, connection);
         } else if (req_action.equals("history")) {
-            handleViewPageHistory(request, response, req_title);
+            handleViewPageHistory(request, response, req_title, connection);
         } else if (req_action.equals("edit")) {
-            handleEditPage(request, response, req_title);
+            handleEditPage(request, response, req_title, connection);
         } else {
             // default: show page
-            handleViewPage(request, response, req_title);
+            handleViewPage(request, response, req_title, connection);
         }
 
         // if the request has not been forwarded, print a general error
@@ -363,8 +391,14 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     @Override
     protected void doPost(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
-        if (!initialized && !setupChordSharpConnection(request) || !currentImport.isEmpty()) {
-            showImportPage(request, response);
+        Connection connection = getScalarisConnection(request);
+        if (connection == null) {
+            showEmptyPage(request, response); // should forward to another page
+            return; // return just in case
+        }
+        if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
+            showImportPage(request, response, connection); // should forward to another page
+            return; // return just in case
         }
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
@@ -376,7 +410,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 //            System.out.println(element);
 //            System.out.println(request.getParameter(element));
 //        }
-        handleEditPageSubmitted(request, response, request.getParameter("title"));
+        handleEditPageSubmitted(request, response, request.getParameter("title"), connection);
         
         // if the request has not been forwarded, print a general error
         response.setContentType("text/html");
@@ -397,8 +431,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      *            if the forward fails
      */
     private void handleViewRandomPage(HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
-        RandomTitleResult result = ScalarisDataHandler.getRandomArticle(connection, random);
+            HttpServletResponse response, Connection connection) throws IOException {
+        RandomTitleResult result = ScalarisDataHandler.getRandomArticle(connection, new Random());
         if (result.success) {
             response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(result.title, "UTF-8")));
         } else {
@@ -420,7 +454,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws ServletException 
      */
     private void handleViewPage(HttpServletRequest request,
-            HttpServletResponse response, String title) throws ServletException, IOException {
+            HttpServletResponse response, String title, Connection connection)
+            throws ServletException, IOException {
         // get renderer
         int render = WikiServlet.getParam_renderer(request);
         // get revision id to load:
@@ -428,7 +463,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 
         RevisionResult result = ScalarisDataHandler.getRevision(connection, title, req_oldid);
         if (result.page_not_existing) {
-            handleViewPageNotExisting(request, response, title);
+            handleViewPageNotExisting(request, response, title, connection);
             return;
         } else if (result.rev_not_existing) {
             result = ScalarisDataHandler.getRevision(connection, title);
@@ -436,7 +471,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         }
         
         if (result.success) {
-            WikiPageBean value = renderRevision(title, result.revision, render, request);
+            WikiPageBean value = renderRevision(title, result.revision, render, request, connection);
             
             if (!result.page.checkEditAllowed("")) {
                 value.setEditRestricted(true);
@@ -485,14 +520,15 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * 
      * @return a bean with the rendered content for the jsp
      */
-    private WikiPageBean renderRevision(String title, Revision revision, int renderer, HttpServletRequest request) {
+    private WikiPageBean renderRevision(String title, Revision revision,
+            int renderer, HttpServletRequest request, Connection connection) {
         String notice = WikiServlet.getParam_notice(request);
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
         WikiPageBean value = new WikiPageBean();
         value.setNotice(notice);
-        MyWikiModel wikiModel = getWikiModel();
+        MyWikiModel wikiModel = getWikiModel(connection);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
             wikiModel.setLinkBaseFullURL(fullUrl);
@@ -571,7 +607,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws ServletException 
      */
     private void handleViewPageNotExisting(HttpServletRequest request,
-            HttpServletResponse response, String title) throws ServletException, IOException {
+            HttpServletResponse response, String title, Connection connection)
+            throws ServletException, IOException {
         // get renderer
         int render = WikiServlet.getParam_renderer(request);
         String notExistingTitle = "MediaWiki:Noarticletext";
@@ -580,7 +617,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         
         WikiPageBean value;
         if (result.success) {
-            value = renderRevision(title, result.revision, render, request);
+            value = renderRevision(title, result.revision, render, request, connection);
         } else {
 //            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
             value = new WikiPageBean();
@@ -616,10 +653,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws ServletException 
      */
     private void handleViewPageHistory(HttpServletRequest request,
-            HttpServletResponse response, String title) throws ServletException, IOException {
+            HttpServletResponse response, String title, Connection connection)
+            throws ServletException, IOException {
         PageHistoryResult result = ScalarisDataHandler.getPageHistory(connection, title);
         if (result.not_existing) {
-            handleViewPageNotExisting(request, response, title);
+            handleViewPageNotExisting(request, response, title, connection);
             return;
         }
         
@@ -666,7 +704,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      */
     private void handleViewSpecialPageList(HttpServletRequest request,
             HttpServletResponse response, PageListResult result,
-            WikiPageListBean value)
+            WikiPageListBean value, Connection connection)
             throws ServletException, IOException {
         if (result.success) {
             value.setNotice(WikiServlet.getParam_notice(request));
@@ -711,7 +749,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     }
 
     private void handleViewSpecialPages(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+            HttpServletResponse response, Connection connection)
+            throws ServletException, IOException {
         WikiPageListBean value = new WikiPageListBean();
         value.setPageHeading("Special pages");
         value.setTitle("Special:SpecialPages");
@@ -775,12 +814,13 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
         PageListResult result = new PageListResult(new LinkedList<String>());
-        handleViewSpecialPageList(request, response, result, value);
+        handleViewSpecialPageList(request, response, result, value, connection);
     }
 
     private void handleViewSpecialStatistics(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
-        MyWikiModel wikiModel = getWikiModel();
+            HttpServletResponse response, Connection connection)
+            throws ServletException, IOException {
+        MyWikiModel wikiModel = getWikiModel(connection);
         WikiPageListBean value = new WikiPageListBean();
         value.setPageHeading("Statistics");
         value.setTitle("Special:Statistics");
@@ -834,11 +874,12 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
         PageListResult result = new PageListResult(new LinkedList<String>());
-        handleViewSpecialPageList(request, response, result, value);
+        handleViewSpecialPageList(request, response, result, value, connection);
     }
 
     private void handleViewSpecialVersion(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+            HttpServletResponse response, Connection connection)
+            throws ServletException, IOException {
         WikiPageListBean value = new WikiPageListBean();
         value.setPageHeading("Version");
         value.setTitle("Special:Version");
@@ -888,7 +929,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
         PageListResult result = new PageListResult(new LinkedList<String>());
-        handleViewSpecialPageList(request, response, result, value);
+        handleViewSpecialPageList(request, response, result, value, connection);
     }
     
     /**
@@ -922,8 +963,9 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws IOException 
      * @throws ServletException 
      */
-    private void showImportPage(HttpServletRequest request,
-            HttpServletResponse response) throws ServletException, IOException {
+    private synchronized void showImportPage(HttpServletRequest request,
+            HttpServletResponse response, Connection connection)
+            throws ServletException, IOException {
         WikiPageBean value = new WikiPageBean();
         value.setTitle("Import Wiki dump");
         value.setNotAvailable(true);
@@ -932,7 +974,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         StringBuilder content = new StringBuilder();
         String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
         
-        if (currentImport.isEmpty() || importHandler == null) {
+        if (currentImport.isEmpty() && importHandler == null) {
             List<String> availableDumps = new LinkedList<String>();
             File dumpsDir = new File(dumpsPath);
             if (dumpsDir.isDirectory()) {
@@ -1053,7 +1095,10 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     e.printStackTrace(ps);
                 }
             }
-            WikiServlet.this.currentImport = "";
+            synchronized (WikiServlet.this) {
+                WikiServlet.this.currentImport = "";
+                WikiServlet.this.importHandler = null;
+            }
         }
     }
 
@@ -1071,7 +1116,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws ServletException 
      */
     private void handleEditPage(HttpServletRequest request,
-            HttpServletResponse response, String title) throws ServletException, IOException {
+            HttpServletResponse response, String title, Connection connection)
+            throws ServletException, IOException {
         // get revision id to load:
         int req_oldid = WikiServlet.getParam_oldid(request);
 
@@ -1128,7 +1174,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @throws ServletException 
      */
     private void handleEditPageSubmitted(HttpServletRequest request,
-            HttpServletResponse response, String title) throws UnsupportedEncodingException, IOException, ServletException {
+            HttpServletResponse response, String title, Connection connection)
+            throws UnsupportedEncodingException, IOException, ServletException {
         String content = request.getParameter("wpTextbox1");
         String summary = request.getParameter("wpSummary");
         int oldVersion = parseInt(request.getParameter("oldVersion"), -1);
@@ -1166,7 +1213,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         // set the textarea's contents:
         value.setPage(StringEscapeUtils.escapeHtml(content));
 
-        MyWikiModel wikiModel = getWikiModel();
+        MyWikiModel wikiModel = getWikiModel(connection);
         wikiModel.setPageName(title);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
@@ -1187,7 +1234,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         dispatcher.forward(request, response);
     }
     
-    private MyWikiModel getWikiModel() {
+    private MyWikiModel getWikiModel(Connection connection) {
         return new MyWikiModel(WikiServlet.imageBaseURL,
                 WikiServlet.linkBaseURL, connection, namespace);
     }
@@ -1324,7 +1371,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getImagebaseurl()
      */
     @Override
-    public void registerEventHandler(WikiEventHandler handler) {
+    public synchronized void registerEventHandler(WikiEventHandler handler) {
         eventHandlers.add(handler);
     }
 }
