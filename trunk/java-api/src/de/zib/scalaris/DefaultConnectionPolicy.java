@@ -308,11 +308,12 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
     }
 
     /**
-     * Returns a random node from the list of good nodes
+     * Returns a random node from the list of good nodes.
+     * Assumes {@link #goodNodes} to have at least one element.
      *
      * @return a random good node
      */
-    private final synchronized PeerNode getRandomGoodNode() {
+    protected synchronized PeerNode getGoodNode() {
         if (goodNodes.size() == 1) {
             return goodNodes.get(0);
         } else {
@@ -362,7 +363,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
                 throw new UnsupportedOperationException(
                         "Can not choose a node from an empty list.");
             } else if (goodNodes.size() > 0) {
-                return getRandomGoodNode();
+                return getGoodNode();
             } else {
                 return badNodes.first();
             }
