@@ -71,7 +71,7 @@ del_nodes(Count) -> del_nodes(Count, false).
 -spec del_nodes(Count::non_neg_integer(), Graceful::boolean())
         -> [ok | {error, not_found}].
 del_nodes(Count, Graceful) ->
-    Children = lists:sublist(supervisor:which_children(main_sup), Count),
+    Children = util:random_subset(Count, supervisor:which_children(main_sup)),
     [del_node(Spec, Graceful) || Spec <- Children].
 
 %% @doc Delete a single node.
