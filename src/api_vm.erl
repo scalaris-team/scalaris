@@ -94,8 +94,10 @@ kill_vm() ->
     erlang:halt().
 
 %% @doc Gets some information about the VM and Scalaris.
--spec get_info() -> [{scalaris_version | erlang_version, string()} | {mem_total, non_neg_integer()}].
+-spec get_info() -> [{scalaris_version | erlang_version, string()} |
+                     {mem_total, non_neg_integer()} | {uptime, Ms::non_neg_integer()}].
 get_info() ->
     [{scalaris_version, ?SCALARIS_VERSION},
      {erlang_version, erlang:system_info(otp_release)},
-     {mem_total, erlang:memory(total)}].
+     {mem_total, erlang:memory(total)},
+     {uptime, erlang:element(1, erlang:statistics(wall_clock))}].
