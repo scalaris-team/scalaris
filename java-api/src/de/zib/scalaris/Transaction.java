@@ -99,12 +99,12 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class Transaction {
     /**
-     * erlang transaction log
+     * Erlang transaction log.
      */
     private OtpErlangObject transLog = null;
 
     /**
-     * connection to a scalaris node
+     * Connection to a Scalaris node.
      */
     private final Connection connection;
 
