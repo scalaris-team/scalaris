@@ -105,7 +105,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class TransactionSingleOp {
     /**
-     * Connection to a TransactionSingleOp node.
+     * Connection to a Scalaris node.
      */
     private final Connection connection;
 
