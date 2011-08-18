@@ -89,8 +89,10 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
     case Graceful of
         true ->
             Group = pid_groups:group_of(Pid),
-            DhtNode = pid_groups:pid_of(Group, dht_node),
-            comm:send_local(DhtNode, {leave});
+            case pid_groups:pid_of(Group, dht_node) of
+                failed  -> {error, not_found};
+                DhtNode -> comm:send_local(DhtNode, {leave})
+            end;
         false ->
             util:supervisor_terminate_childs(Pid),
             _ = supervisor:terminate_child(main_sup, Id),
