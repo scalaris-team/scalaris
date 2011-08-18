@@ -98,7 +98,11 @@ req_list(TLog, PlainReqList) ->
                                            element(1, A) =< element(1, B)
                                    end, TmpResultList ++ CommitResults)),
     %% return the NewTLog and a result list
-    {NewTLog, ResultList}.
+    %% if a commit was done, cleanup the TLog, its of no value anymore.
+    case Commit of
+        [] -> {NewTLog, ResultList};
+        _  -> {tx_tlog:empty(), ResultList}
+    end.
 
 %% implementation
 -spec my_split_ops(tx_tlog:tlog(), [{pos_integer(), request()}])
