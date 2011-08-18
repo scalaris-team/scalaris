@@ -238,6 +238,74 @@ public class Connection {
     }
 
     /**
+     * Sends the given RPC and returns immediately.
+     *
+     * @param mod
+     *            the module of the function to call
+     * @param fun
+     *            the function to call
+     * @param args
+     *            the function's arguments
+     *
+     * @throws ConnectionException
+     *             if the connection is not active, a communication error
+     *             occurs, an exit signal is received from a process on the
+     *             peer node or the remote node sends a message containing an
+     *             invalid cookie
+     */
+    public void sendRPC(final String mod, final String fun, final OtpErlangList args)
+            throws ConnectionException {
+        try {
+            boolean success = false;
+            while(!success) {
+                try {
+                    connection.sendRPC(mod, fun, args);
+                    success = true;
+                    return;
+                } catch (final IOException e) {
+                    connectionPolicy.nodeFailed(remote);
+                    // first re-try (connection was the first contact)
+                    remote = connectionPolicy.selectNode(1, remote, e);
+                    // reconnect (and then re-try the operation) if no exception was thrown:
+                    reconnect();
+                }
+            }
+            // this should not happen as there is only one way out of the while
+            // without throwing an exception
+            throw new InternalError();
+        } catch (final OtpAuthException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        } catch (final IOException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
+        }
+    }
+
+    /**
+     * Sends the given RPC and returns immediately.
+     *
+     * Provided for convenience.
+     *
+     * @param mod
+     *            the module of the function to call
+     * @param fun
+     *            the function to call
+     * @param args
+     *            the function's arguments
+     *
+     * @throws ConnectionException
+     *             if the connection is not active, a communication error
+     *             occurs, an exit signal is received from a process on the
+     *             peer node or the remote node sends a message containing an
+     *             invalid cookie
+     */
+    public void sendRPC(final String mod, final String fun, final OtpErlangObject[] args)
+            throws ConnectionException {
+        sendRPC(mod, fun, new OtpErlangList(args));
+    }
+
+    /**
      * Closes the connection to the remote node.
      */
     public void close() {
