@@ -44,7 +44,7 @@ get_nodes() ->
     pid_groups:groups_with(dht_node).
 
 %% @doc Adds Number Scalaris nodes to this VM.
--spec add_nodes(pos_integer()) -> [ok | {error, term()},...].
+-spec add_nodes(pos_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
 add_nodes(Number) ->
     admin:add_nodes(Number).
 

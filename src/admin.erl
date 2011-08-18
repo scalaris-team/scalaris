@@ -41,24 +41,24 @@
 add_node_at_id(Id) ->
     add_node([{{dht_node, id}, Id}, {skip_psv_lb}]).
 
--spec add_node([tuple()]) -> ok | {error, term()}.
+-spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
     DhtNodeId = randoms:getRandomId(),
     Desc = util:sup_supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [[{my_sup_dht_node_id, DhtNodeId} | Options]]),
     case supervisor:start_child(main_sup, Desc) of
-        {ok, _Child}                  -> ok;
-        {ok, _Child, _Info}           -> ok;
+        {ok, _Child, Group}           -> Group;
         {error, already_present}      -> add_node(Options); % try again, different Id
         {error, {already_started, _}} -> add_node(Options); % try again, different Id
         {error, _Error} = X           -> X
     end.
 
--spec add_nodes(non_neg_integer()) -> [ok | {error, term()}].
+-spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
 add_nodes(0) -> [];
 add_nodes(Count) ->
-    [add_node([]) || _X <- lists:seq(1, Count)].
+    Results = [add_node([]) || _X <- lists:seq(1, Count)],
+    lists:partition(fun(E) -> not is_tuple(E) end, Results).
 %% userdevguide-end admin:add_nodes
 
 %% @doc Deletes Scalaris nodes from the current VM.
