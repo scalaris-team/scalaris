@@ -484,7 +484,7 @@ process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}}, {send_fa
         failed ->
             comm:send_local_after(100, self(), {lookup_aux, Key, Hops + 1, Msg}),
             ok;
-        {ok, Pid} ->
+        {ok, {_, Pid}} ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:self_with_cookie({send_failed, [Target | FailedPids]}),
             comm:send_with_shepherd(Pid, {lookup_aux, Key, Hops + 1, Msg}, Self)
