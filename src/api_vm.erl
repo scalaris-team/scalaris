@@ -21,7 +21,7 @@
 -vsn('$Id$ ').
 
 -export([get_version/0, get_info/0,
-         add_nodes/1, number_of_nodes/0, get_nodes/0,
+         number_of_nodes/0, get_nodes/0, add_nodes/1,
          shutdown_node/1, shutdown_nodes/1,
          kill_node/1, kill_nodes/1,
          shutdown_vm/0, kill_vm/0]).
@@ -32,6 +32,15 @@
 -spec get_version() -> string().
 get_version() ->
     ?SCALARIS_VERSION.
+
+%% @doc Gets some information about the VM and Scalaris.
+-spec get_info() -> [{scalaris_version | erlang_version, string()} |
+                     {mem_total, non_neg_integer()} | {uptime, Ms::non_neg_integer()}].
+get_info() ->
+    [{scalaris_version, ?SCALARIS_VERSION},
+     {erlang_version, erlang:system_info(otp_release)},
+     {mem_total, erlang:memory(total)},
+     {uptime, erlang:element(1, erlang:statistics(wall_clock))}].
 
 %% @doc Gets the number of Scalaris nodes inside this VM.
 -spec number_of_nodes() -> non_neg_integer().
@@ -85,12 +94,10 @@ kill_nodes(Names) ->
 del_nodes(0, _Graceful) -> {[], []};
 del_nodes(1, Graceful) ->
     % delete one after another for a better chance of success during concurrent executions
-    AllSpecs = [{Spec, pid_groups:group_of(Pid)}
-               || {_Id, Pid, _Type, _} = Spec <- supervisor:which_children(main_sup),
-                  is_pid(Pid)],
-    case util:random_subset(1, AllSpecs) of
+    case util:random_subset(1, admin:get_dht_node_specs()) of
         [] -> {[], []};
-        [{Spec, Name} | _] ->
+        [{_Id, Pid, _Type, _} = Spec | _] ->
+            Name = pid_groups:group_of(Pid),
             case admin:del_node(Spec, Graceful) of
                 ok -> {[Name], []};
                 {error, not_found} -> del_nodes(1, Graceful)
@@ -103,8 +110,7 @@ del_nodes(Number, Graceful) when is_integer(Number) ->
 del_nodes(Names, Graceful) ->
     Results =
         [begin
-             Specs = [Spec || {_Id, Pid, _Type, _} = Spec <- supervisor:which_children(main_sup),
-                              is_pid(Pid),
+             Specs = [Spec || {_Id, Pid, _Type, _} = Spec <- admin:get_dht_node_specs(),
                               pid_groups:group_of(Pid) =:= Name],
              case Specs of
                  [Spec] -> case admin:del_node(Spec, Graceful) of
@@ -129,12 +135,3 @@ shutdown_vm() ->
 -spec kill_vm() -> no_return().
 kill_vm() ->
     erlang:halt().
-
-%% @doc Gets some information about the VM and Scalaris.
--spec get_info() -> [{scalaris_version | erlang_version, string()} |
-                     {mem_total, non_neg_integer()} | {uptime, Ms::non_neg_integer()}].
-get_info() ->
-    [{scalaris_version, ?SCALARIS_VERSION},
-     {erlang_version, erlang:system_info(otp_release)},
-     {mem_total, erlang:memory(total)},
-     {uptime, erlang:element(1, erlang:statistics(wall_clock))}].

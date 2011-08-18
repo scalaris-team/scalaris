@@ -98,9 +98,10 @@ my_process_list(ServiceGroup, Options) ->
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}]
                      end,
+    DhtNodeId = randoms:getRandomId(),
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
-    DHTNode = util:sup_supervisor_desc(dht_node, sup_dht_node, start_link,
-                                       [[{my_sup_dht_node_id, dht_node}
+    DHTNode = util:sup_supervisor_desc(DhtNodeId, sup_dht_node, start_link,
+                                       [[{my_sup_dht_node_id, DhtNodeId}
                                          | DHTNodeOptions]]),
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),

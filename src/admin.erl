@@ -21,6 +21,7 @@
 
 -export([add_node/1, add_node_at_id/1, add_nodes/1,
          del_node/2, del_nodes/1, del_nodes/2,
+         get_dht_node_specs/0,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
          check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
@@ -61,6 +62,12 @@ add_nodes(Count) ->
     lists:partition(fun(E) -> not is_tuple(E) end, Results).
 %% userdevguide-end admin:add_nodes
 
+-spec get_dht_node_specs() -> [supervisor:child_spec()].
+get_dht_node_specs() ->
+    % note: only sup_dht_node children have strings as identifiers!
+    [Spec || {Id, Pid, _Type, _} = Spec <- supervisor:which_children(main_sup),
+             is_pid(Pid), is_list(Id)].
+
 %% @doc Deletes Scalaris nodes from the current VM.
 %%      Provided for convenience and backwards-compatibility - kills the node,
 %%      i.e. _no_ graceful leave!
@@ -71,7 +78,7 @@ del_nodes(Count) -> del_nodes(Count, false).
 -spec del_nodes(Count::non_neg_integer(), Graceful::boolean())
         -> [ok | {error, not_found}].
 del_nodes(Count, Graceful) ->
-    Children = util:random_subset(Count, supervisor:which_children(main_sup)),
+    Children = util:random_subset(Count, get_dht_node_specs()),
     [del_node(Spec, Graceful) || Spec <- Children].
 
 %% @doc Delete a single node.
