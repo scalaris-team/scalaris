@@ -29,24 +29,27 @@
 
 -export([start_link/1, start_link/0, init/1]).
 
--spec start_link([tuple()]) -> {ok, Pid::pid()} | ignore |
-                             {error, Error::{already_started, Pid::pid()} |
-                                             shutdown | term()}.
+-spec start_link([tuple()])
+        -> {ok, Pid::pid(), pid_groups:groupname()} | ignore |
+               {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
-    supervisor:start_link(?MODULE, Options).
+    DHTNodeGroup = pid_groups:new("dht_node_"),
+    case supervisor:start_link(?MODULE, {DHTNodeGroup, Options}) of
+        {ok, Pid} -> {ok, Pid, DHTNodeGroup};
+        X         -> X
+    end.
 
--spec start_link() -> {ok, Pid::pid()} | ignore |
-                          {error, Error::{already_started, Pid::pid()} |
-                           shutdown | term()}.
+-spec start_link()
+        -> {ok, Pid::pid(), pid_groups:groupname()} | ignore |
+               {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
-    supervisor:start_link(?MODULE, []).
+    start_link([]).
 
 %% userdevguide-begin sup_dht_node:init
--spec init([tuple()]) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
-                                PeriodInSeconds::pos_integer()},
-                               [ProcessDescr::any()]}}.
-init(Options) ->
-    DHTNodeGroup = pid_groups:new("dht_node_"),
+-spec init({pid_groups:groupname(), [tuple()]})
+        -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()},
+                 [ProcessDescr::any()]}}.
+init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     mgmt_server:connect(),
     
