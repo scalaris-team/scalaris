@@ -27,12 +27,24 @@
 
 -export([run_threads/2]).
 
+-record(state,
+        {load_pid :: pid() | ok
+         }).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % the server code
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec on(comm:message(), ok) -> ok.
+-spec on(comm:message(), #state{}) -> #state{}.
+on({load_start, Gap}, State) ->
+    Pid = spawn(fun() ->
+                        bench_load:start(Gap)
+                end),
+    State#state{load_pid=Pid};
+on({load_stop}, #state{load_pid=Pid} = State) ->
+    Pid ! {load_stop},
+    State#state{load_pid=ok};
 on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
     Bench = case Op of
                 increment_with_histo ->
@@ -52,11 +64,11 @@ on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
                       Time, MeanTime, Variance, MinTime, MaxTime, Aborts}),
     State.
 
--spec init([]) -> ok.
+-spec init([]) -> #state{}.
 init([]) ->
     % load bench module
     _X = bench:module_info(),
-    ok.
+    #state{load_pid=ok}.
 
 %% @doc spawns a bench_server
 -spec start_link() -> {ok, pid()}.

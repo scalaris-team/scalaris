@@ -20,7 +20,8 @@
 -vsn('$Id: bench.erl 1814 2011-06-21 15:01:58Z schuett $').
 
 %% public interface
--export([increment/2, increment_with_histo/2, increment/3, quorum_read/2, read_read/2]).
+-export([increment/2, increment_with_histo/2, increment/3, quorum_read/2,
+         read_read/2, load_start/1, load_stop/0]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -58,9 +59,28 @@ quorum_read(ThreadsPerVM, Iterations) ->
 %% @doc run an read benchmark on all nodes
 -spec read_read(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> ok.
 read_read(ThreadsPerVM, Iterations) ->
-    Msg = {bench, read_read, ThreadsPerVM, Iterations, comm:this()},
+    Msg = {bench, read_read, ThreadsPerVM, Iterations, comm:this(), undefined},
     manage_run(ThreadsPerVM, Iterations, [verbose], Msg).
 
+-spec load_start(Gap::pos_integer()) -> ok.
+load_start(Gap) ->
+    ServerList = util:get_proc_in_vms(bench_server),
+    Msg = {load_start, Gap},
+    _ = [comm:send(Server, Msg) || Server <- ServerList],
+    ok.
+
+-spec load_stop() -> ok.
+load_stop() ->
+    ServerList = util:get_proc_in_vms(bench_server),
+    Msg = {load_stop},
+    _ = [comm:send(Server, Msg) || Server <- ServerList],
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% common functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc spread run over the available VMs and collect results
 %% (executed in clients context)
 -spec manage_run(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
