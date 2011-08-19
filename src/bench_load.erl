@@ -23,14 +23,16 @@
 
 -include("scalaris.hrl").
 
--spec start(Gap::pos_integer) -> any().
+-spec start(Gap::pos_integer()) -> ok.
 start(Gap) ->
     loop(Gap, []).
 
+-spec loop(Gap::pos_integer(), [pid()]) -> ok.
 loop(Gap, Pids) ->
     receive
         {load_stop} ->
-            _ = [erlang:exit(Pid, kill) || Pid <- Pids]
+            _ = [erlang:exit(Pid, kill) || Pid <- Pids],
+            ok
     after Gap ->
             Pid = spawn_new(),
             loop(Gap, [Pid | Pids])
