@@ -1238,10 +1238,11 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
         true ->
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
             SupDhtNode = pid_groups:get_my(sup_dht_node),
-            util:supervisor_terminate_childs(SupDhtNode),
-            ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
-            ok = supervisor:delete_child(main_sup, SupDhtNodeId),
-            kill;
+            comm:send_local(pid_groups:find_a(service_per_vm),
+                            {delete_node, SupDhtNode, SupDhtNodeId}),
+            % note: we will be killed soon but need to be removed from the supervisor first
+            % -> do not kill this process
+            State;
         _    ->
             State1 = dht_node_state:set_slide(State, PredOrSucc, null),
             % continue with the next planned operation:

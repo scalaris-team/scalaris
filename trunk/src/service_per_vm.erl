@@ -29,7 +29,8 @@
 -type(state() :: ok).
 
 % accepted messages the module
--type(message() :: {get_dht_nodes, Pid::comm:mypid()}).
+-type(message() :: {get_dht_nodes, Pid::comm:mypid()} |
+                   {delete_node, SupPid::pid(), SupId::nonempty_string()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
@@ -77,6 +78,11 @@ on({get_dht_nodes, Pid}, ok) ->
             ok
     end,
     ok;
+
+on({delete_node, SupPid, SupId}, ok) ->
+    util:supervisor_terminate_childs(SupPid),
+    _ = supervisor:terminate_child(main_sup, SupId),
+    ok = supervisor:delete_child(main_sup, SupId);
 
 % message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
 on({hi}, ok) ->
