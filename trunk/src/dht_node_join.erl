@@ -62,7 +62,7 @@
     {join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
     {join, join_response, not_responsible, CandId::lb_op:id()} |
     {join, known_hosts_timeout, JoinUUId::pos_integer()} |
-    {join, lookup_timeout, Conn::connection(), JoinUUId::pos_integer()} |
+    {join, lookup_timeout, Conn::connection(), JoinId::?RT:key(), JoinUUId::pos_integer()} |
     {join, get_number_of_samples_timeout, Conn::connection(), JoinUUId::pos_integer()} |
     {join, join_request_timeout, Timeouts::non_neg_integer(), CandId::lb_op:id(), JoinUUId::pos_integer()} |
     {join, timeout, JoinUUId::pos_integer()} |
@@ -224,7 +224,7 @@ process_join_state({join, get_number_of_samples, _Samples, Conn} = _Msg,
 %% userdevguide-end dht_node_join:join_other_p2b
 
 % 3. lookup all positions
-process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
+process_join_state({join, lookup_timeout, Conn, Id, JoinUUId} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase3 andalso
            element(2, JoinState) =:= JoinUUId ->
@@ -232,12 +232,12 @@ process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
     % do not know whether the contact node is dead or the lookup takes too long
     % -> simple solution: try with an other contact node, remove the current one
     JoinState1 = remove_connection(Conn, JoinState),
-    NewJoinState = lookup(JoinState1),
+    NewJoinState = lookup(JoinState1, [Id]),
     ?TRACE_JOIN_STATE(NewJoinState),
     {join, NewJoinState, QueuedMessages};
 
 % only remove the failed connection in other phases:
-process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
+process_join_state({join, lookup_timeout, Conn, _Id, JoinUUId} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(2, JoinState) =:= JoinUUId ->
     ?TRACE_JOIN1(_Msg, JoinState),
@@ -246,7 +246,7 @@ process_join_state({join, lookup_timeout, Conn, JoinUUId} = _Msg,
     {join, NewJoinState, QueuedMessages};
 
 % ignore unrelated lookup_timeout messages:
-process_join_state({join, lookup_timeout, _Conn, _JoinId} = _Msg,
+process_join_state({join, lookup_timeout, _Conn, _Id, _JoinId} = _Msg,
                    {join, _JoinState, _QueuedMessages} = State) ->
     ?TRACE_JOIN1(_Msg, _JoinState),
     State;
@@ -566,11 +566,7 @@ process_join_msg({join, join_response_timeout, NewPred, MoveFullId, CandId} = _M
     % almost the same as dht_node_move:safe_operation/5 but we tolerate wrong pred:
     case dht_node_state:get_slide_op(State, MoveFullId) of
         {pred, SlideOp} ->
-            ResponseReceived =
-                lists:member(slide_op:get_phase(SlideOp),
-                             [wait_for_req_data, wait_for_pred_update_join]),
             case (slide_op:get_timeouts(SlideOp) < get_join_response_timeouts()) of
-                _ when ResponseReceived -> State;
                 true ->
                     NewSlideOp = slide_op:inc_timeouts(SlideOp),
                     send_join_response(State, NewSlideOp, NewPred, CandId);
@@ -600,7 +596,7 @@ process_join_msg({join, join_response, _Succ, _Pred, _MoveFullId, _CandId} = _Ms
     State;
 process_join_msg({join, join_response, not_responsible, _CandId} = _Msg, State) ->
     State;
-process_join_msg({join, lookup_timeout, _Conn, _JoinId} = _Msg, State) ->
+process_join_msg({join, lookup_timeout, _Conn, _Id, _JoinId} = _Msg, State) ->
     State;
 process_join_msg({join, known_hosts_timeout, _JoinId} = _Msg, State) ->
     State;
@@ -701,16 +697,16 @@ lookup_new_ids2(TotalCount, JoinState) ->
 -spec create_join_ids(Count::pos_integer(), OldIds::[?RT:key()]) -> {AllKeys::[?RT:key(),...], OnlyNewKeys::[?RT:key(),...]}.
 create_join_ids(Count, OldIds) ->
     OldIdsSet = gb_sets:from_list(OldIds),
-    NewIdsSet = create_join_ids_helper(Count, OldIdsSet),
+    NewIdsSet = create_join_ids_helper(Count + gb_sets:size(OldIdsSet), OldIdsSet),
     OnlyNewIdsSet = gb_sets:subtract(NewIdsSet, OldIdsSet),
     {gb_sets:to_list(NewIdsSet), gb_sets:to_list(OnlyNewIdsSet)}.
 
 %% @doc Helper for create_join_ids/2 that creates the new unique IDs.
--spec create_join_ids_helper(Count::pos_integer(), gb_set()) -> gb_set().
-create_join_ids_helper(Count, Ids) ->
+-spec create_join_ids_helper(TotalCount::pos_integer(), gb_set()) -> gb_set().
+create_join_ids_helper(TotalCount, Ids) ->
     case gb_sets:size(Ids) of
-        Count -> Ids;
-        _     -> create_join_ids_helper(Count, gb_sets:add(?RT:get_random_node_id(), Ids))
+        TotalCount -> Ids;
+        _          -> create_join_ids_helper(TotalCount, gb_sets:add(?RT:get_random_node_id(), Ids))
     end.
 
 %% @doc Tries to do a lookup for all join IDs in JoinState by contacting the
@@ -775,7 +771,7 @@ lookup(JoinState, JoinIds = [_|_]) ->
                      comm:send(Node, Msg),
                      msg_delay:send_local(
                        get_lookup_timeout() div 1000, self(),
-                       {join, lookup_timeout, NewConn, get_join_uuid(JoinState2)}),
+                       {join, lookup_timeout, NewConn, Id, get_join_uuid(JoinState2)}),
                      NewConn                     
                  end
                  || Id <- JoinIds],
