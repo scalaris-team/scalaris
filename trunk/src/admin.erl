@@ -38,7 +38,7 @@
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
--spec add_node_at_id(?RT:key()) -> ok | {error, term()}.
+-spec add_node_at_id(?RT:key()) -> pid_groups:groupname() | {error, term()}.
 add_node_at_id(Id) ->
     add_node([{{dht_node, id}, Id}, {skip_psv_lb}]).
 
@@ -62,7 +62,9 @@ add_nodes(Count) ->
     lists:partition(fun(E) -> not is_tuple(E) end, Results).
 %% userdevguide-end admin:add_nodes
 
--spec get_dht_node_specs() -> [supervisor:child_spec()].
+-spec get_dht_node_specs()
+        -> [{Id::term() | undefined, Child::pid() | undefined,
+             Type::worker | supervisor, Modules::[module()] | dynamic}].
 get_dht_node_specs() ->
     % note: only sup_dht_node children have strings as identifiers!
     [Spec || {Id, Pid, _Type, _} = Spec <- supervisor:which_children(main_sup),
