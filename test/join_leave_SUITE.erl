@@ -71,7 +71,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 join_parameters_list() ->
-    [{join_response_timeout, 100},
+    [{join_response_timeout, 300},
      {join_response_timeouts, 3},
      {join_request_timeout, 100},
      {join_request_timeouts, 3},

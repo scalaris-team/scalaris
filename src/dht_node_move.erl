@@ -1521,7 +1521,8 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
     % re-start a leaving slide on the leaving node if it hasn't left the ring yet:
     case slide_op:is_leave(Type, 'send') andalso
              not slide_op:is_jump(Type) of
-        true -> make_slide_leave(State);
+        true -> comm:send_local(self(), {leave}),
+                State;
         _    -> State
     end.
 
