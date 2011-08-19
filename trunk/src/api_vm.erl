@@ -45,12 +45,14 @@ get_info() ->
 %% @doc Gets the number of Scalaris nodes inside this VM.
 -spec number_of_nodes() -> non_neg_integer().
 number_of_nodes() ->
-    length(pid_groups:find_all(dht_node)).
+    length(get_nodes()).
 
 %% @doc Gets the names of all Scalaris nodes inside this VM.
 -spec get_nodes() -> [pid_groups:groupname()].
 get_nodes() ->
-    pid_groups:groups_with(dht_node).
+    DhtModule = config:read(dht_node),
+    [pid_groups:group_of(Pid) || Pid <- pid_groups:find_all(dht_node),
+                                 DhtModule:is_alive_fully_joined(gen_component:get_state(Pid))].
 
 %% @doc Adds Number Scalaris nodes to this VM.
 -spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
