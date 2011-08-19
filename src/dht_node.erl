@@ -25,7 +25,7 @@
 
 -export([start_link/2, on/2, on_join/2, init/1]).
 
--export([is_first/1, is_alive/1, is_alive_no_join/1]).
+-export([is_first/1, is_alive/1, is_alive_no_slide/1, is_alive_fully_joined/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -505,7 +505,9 @@ on({zombie, Node}, State) ->
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
--spec init(Options::[tuple()]) -> dht_node_state:state().
+-spec init(Options::[tuple()])
+        -> dht_node_state:state() |
+           {'$gen_component', [{on_handler, Handler::on_join}], State::dht_node_join:join_state()}.
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
@@ -534,19 +536,24 @@ start_link(DHTNodeGroup, Options) ->
 is_first(Options) ->
     lists:member({first}, Options) andalso admin_first:is_first_vm().
 
--spec is_alive(Pid::pid()) -> boolean().
-is_alive(Pid) ->
-    State = gen_component:get_state(Pid),
+-spec is_alive(State::dht_node_join:join_state() | dht_node_state:state() | term()) -> boolean().
+is_alive(State) ->
     erlang:is_tuple(State) andalso element(1, State) =:= state.
 
--spec is_alive_no_join(Pid::pid()) -> boolean().
-is_alive_no_join(Pid) ->
-    State = gen_component:get_state(Pid),
+-spec is_alive_no_slide(State::dht_node_join:join_state() | dht_node_state:state() | term()) -> boolean().
+is_alive_no_slide(State) ->
     try
-        SlidePred = dht_node_state:get(State, slide_pred),
+        SlidePred = dht_node_state:get(State, slide_pred), % note: this also tests dht_node_state:state()
         SlideSucc = dht_node_state:get(State, slide_succ),
-        (SlidePred =:= null orelse not slide_op:is_join(SlidePred)) andalso
-            (SlideSucc =:= null orelse not slide_op:is_join(SlideSucc))
+        SlidePred =:= null andalso SlideSucc =:= null
+    catch _:_ -> false
+    end.
+
+-spec is_alive_fully_joined(State::dht_node_join:join_state() | dht_node_state:state() | term()) -> boolean().
+is_alive_fully_joined(State) ->
+    try
+        SlidePred = dht_node_state:get(State, slide_pred), % note: this also tests dht_node_state:state()
+        (SlidePred =:= null orelse not slide_op:is_join(SlidePred, 'rcv'))
     catch _:_ -> false
     end.
 

@@ -282,7 +282,7 @@ check_ring_size(Size) ->
               BootSize =:= Size andalso
                   Size =:= erlang:length(
                 [P || P <- pid_groups:find_all(DhtModule),
-                      DhtModule:is_alive(P)])
+                      DhtModule:is_alive(gen_component:get_state(P))])
       end, 500),
     Size.
 
@@ -296,7 +296,7 @@ check_ring_size_fully_joined(Size) ->
               erlang:whereis(config) =/= undefined andalso
                   Size =:= erlang:length(
                 [P || P <- pid_groups:find_all(DhtModule),
-                      DhtModule:is_alive_no_join(P)])
+                      DhtModule:is_alive_no_slide(gen_component:get_state(P))])
       end, 100).
 
 -spec start_process(StartFun::fun(() -> any())) -> pid().
