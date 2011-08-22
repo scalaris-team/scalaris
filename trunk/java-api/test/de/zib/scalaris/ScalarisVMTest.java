@@ -654,6 +654,66 @@ public class ScalarisVMTest {
     }
 
     /**
+     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)} with
+     * a closed connection.
+     *
+     * @throws ConnectionException
+     * @throws InterruptedException
+     */
+    @Test(expected=ConnectionException.class)
+    public final void testGetOtherVMs_NotConnected() throws ConnectionException, InterruptedException {
+        ScalarisVM conn = new ScalarisVM();
+        conn.closeConnection();
+        conn.getOtherVMs(1);
+    }
+
+    /**
+     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     *
+     * @throws ConnectionException
+     * @throws InterruptedException
+     */
+    @Test
+    public final void testGetOtherVMs1() throws ConnectionException, InterruptedException {
+        testGetOtherVMsX(1);
+    }
+
+    /**
+     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     *
+     * @throws ConnectionException
+     * @throws InterruptedException
+     */
+    @Test
+    public final void testGetOtherVMs2() throws ConnectionException, InterruptedException {
+        testGetOtherVMsX(2);
+    }
+
+    /**
+     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     *
+     * @throws ConnectionException
+     * @throws InterruptedException
+     */
+    @Test
+    public final void testGetOtherVMs3() throws ConnectionException, InterruptedException {
+        testGetOtherVMsX(3);
+    }
+
+    private final void testGetOtherVMsX(int max) throws ConnectionException, InterruptedException {
+        ScalarisVM conn = new ScalarisVM();
+        List<String> result = conn.getOtherVMs(max);
+        assertTrue("list too long:" + result.toString(), result.size() <= max);
+        ConnectionFactory cf = new ConnectionFactory();
+        for (String node : result) {
+            cf.setNode(node);
+            ScalarisVM conn2 = new ScalarisVM(cf.createConnection());
+            conn2.getInfo();
+        }
+        conn.closeConnection();
+    }
+
+    /**
      * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownVM()} with a
      * closed connection.
      *

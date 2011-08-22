@@ -41,9 +41,11 @@ all() ->
 suite() -> [ {timetrap, {seconds, 20}} ].
 
 init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
+    Config2 = unittest_helper:init_per_suite(Config),
+    unittest_helper:start_minimal_procs(Config2, [], true).
 
 end_per_suite(Config) ->
+    unittest_helper:stop_minimal_procs(Config),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
@@ -2647,23 +2649,23 @@ tester_largest_smaller_than2(_Config) ->
 largest_smaller_than2(_Config) ->
     % some tests that previously failed:
     prop_largest_smaller_than2(
-      {node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 1,0},
-      [{node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 3,5},
-       {node, {{{39,220,200,75},3,{two,'ct@csr-pc40'}}, c,101.41898888632392},4,0},
-       {node, {{10,87,88,118},1,{three,'ct@csr-pc40'}}, 5,4}],
+      {node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 1,0, 'nonode@nohost', 8000},
+      [{node, {{{197,151,185,165},1,{one,'ct@csr-pc40'}}, c,{}}, 3,5, 'nonode@nohost', 8000},
+       {node, {{{39,220,200,75},3,{two,'ct@csr-pc40'}}, c,101.41898888632392},4,0, 'nonode@nohost', 8000},
+       {node, {{10,87,88,118},1,{three,'ct@csr-pc40'}}, 5,4, 'nonode@nohost', 8000}],
       1, 1, 5),
     
     prop_largest_smaller_than2(
       {node,
        {{6165,1898,39314,61608,61439,21180,27136,38528}, 4, {two,'ct@csr-pc40'}},
-       0,4},
+       0,4, 'nonode@nohost', 8000},
       [{node,
         {{{38651,60988,24625,21004,23234,64811,37455,60050}, 5, {one,'ct@csr-pc40'}}, c,101.41898888632392},
-        4,1},
+        4,1, 'nonode@nohost', 8000},
        {node,
         {{{12076,15918,45197,41953,9328,37838,58170,26800}, 4,one}, c,42},
-        5,0},
-       {node, {{{25,8,53,113}, 5, {four,'ct@csr-pc40'}}, c, {3}}, 2,4}],
+        5,0, 'nonode@nohost', 8000},
+       {node, {{{25,8,53,113}, 5, {four,'ct@csr-pc40'}}, c, {3}}, 2,4, 'nonode@nohost', 8000}],
       1, 1, 5).
 
 -spec prop_largest_smaller_than3(BaseNode::node:node_type(), AddNodes::[node:node_type()], PredsLength::pos_integer(), SuccsLength::pos_integer(), Id::?RT:key()) -> true.
@@ -2711,17 +2713,17 @@ tester_largest_smaller_than3(_Config) ->
 largest_smaller_than3(_Config) ->
     % some tests that previously failed:
     prop_largest_smaller_than3_fixed_types(
-      {node, proc1, 5, 5},
-      [{node, proc2, 0, 2}, {node, proc3, 3, 2}],
-      1, 3, 5, {node, proc2, 0, 2}),
+      {node, proc1, 5, 5, 'nonode@nohost', 8000},
+      [{node, proc2, 0, 2, 'nonode@nohost', 8000}, {node, proc3, 3, 2, 'nonode@nohost', 8000}],
+      1, 3, 5, {node, proc2, 0, 2, 'nonode@nohost', 8000}),
     
     prop_largest_smaller_than3_fixed_types(
-        {node, proc1, 2, 1},
-        [{node, proc2, 5, 0}, {node, proc3, 4, 4}],
-        2, 5, 3, {node, proc4, 5, 0}),
+        {node, proc1, 2, 1, 'nonode@nohost', 8000},
+        [{node, proc2, 5, 0, 'nonode@nohost', 8000}, {node, proc3, 4, 4, 'nonode@nohost', 8000}],
+        2, 5, 3, {node, proc4, 5, 0, 'nonode@nohost', 8000}),
     
     prop_largest_smaller_than3_fixed_types(
-      {node, proc1, 2, 1},
-      [{node, proc2, 5, 0}, {node, proc3, 3, 1}],
-      1, 1, 2, {node, proc3, 3, 1})
+      {node, proc1, 2, 1, 'nonode@nohost', 8000},
+      [{node, proc2, 5, 0, 'nonode@nohost', 8000}, {node, proc3, 3, 1, 'nonode@nohost', 8000}],
+      1, 1, 2, {node, proc3, 3, 1, 'nonode@nohost', 8000})
 .
