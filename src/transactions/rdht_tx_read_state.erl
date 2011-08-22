@@ -122,10 +122,19 @@ update_decided(State, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:update_decided state maj ~p ~p~n", [State, Maj]),
     OK = get_numok(State) >= MajOk,
     Abort = get_numfailed(State) >= MajDeny,
-    case {OK, Abort} of
-        {true, false} -> set_decided(State, value);
-        {false, true} -> set_decided(State, not_found);
-        _ -> State
+    {_, Vers} = get_result(State),
+    case Vers =/= -1 of
+        true ->
+            case {OK, Abort} of
+                {true, false} -> set_decided(State, value);
+                {false, true} -> set_decided(State, not_found);
+                _ -> State
+            end;
+        false ->
+            case get_numreplied(State) of
+                4 -> set_decided(State, not_found); % all replied with -1
+                _ -> State
+            end
     end.
 
 -spec is_newly_decided(read_state()) -> boolean().
