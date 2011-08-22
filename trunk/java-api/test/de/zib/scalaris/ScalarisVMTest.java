@@ -132,6 +132,12 @@ public class ScalarisVMTest {
         final ScalarisVM conn = new ScalarisVM();
         final Map<String, Object> info = conn.getInfo();
         assertTrue(!info.isEmpty());
+        assertEquals(String.class, info.get("scalaris_version").getClass());
+        assertEquals(String.class, info.get("erlang_version").getClass());
+        assertEquals(Integer.class, info.get("mem_total").getClass());
+        assertEquals(Integer.class, info.get("uptime").getClass());
+        assertTrue("mem_total >= 0", (Integer) info.get("mem_total") >= 0);
+        assertTrue("uptime >= 0", (Integer) info.get("uptime") >= 0);
     }
 
     /**
