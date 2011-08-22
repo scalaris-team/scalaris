@@ -24,6 +24,7 @@
          number_of_nodes/0, get_nodes/0, add_nodes/1,
          shutdown_node/1, shutdown_nodes/1,
          kill_node/1, kill_nodes/1,
+         get_other_vms/1,
          shutdown_vm/0, kill_vm/0]).
 
 -include("scalaris.hrl").
@@ -124,6 +125,28 @@ del_nodes(Names, Graceful) ->
          end || Name <- Names],
     {[Name || Name <- Results, not is_tuple(Name)],
      [Name || {not_found, Name} <- Results]}.
+
+%% @doc Gets connection info for a random subset of known nodes by the cyclon
+%%      processes of the dht_node processes in this VM.
+-spec get_other_vms(MaxVMs::pos_integer()) -> [{ErlNode::node(), Ip::inet:ip_address(), Port::non_neg_integer(), YawsPort::non_neg_integer()}].
+get_other_vms(MaxVMs) ->
+    DhtModule = config:read(dht_node),
+    RandomConns =
+        lists:append(
+          [begin
+               GlobalPid = comm:make_global(Pid),
+               comm:send_to_group_member(GlobalPid, cyclon,
+                                         {get_subset_rand, MaxVMs, self()}),
+               receive
+                   {cy_cache, Cache} ->
+                       [{node:erlNode(Node),
+                         comm:get_ip(node:pidX(Node)),
+                         comm:get_port(node:pidX(Node)),
+                         node:yawsPort(Node)} || Node <- Cache]
+               end
+           end || Pid <- pid_groups:find_all(dht_node),
+                  DhtModule:is_alive_fully_joined(gen_component:get_state(Pid))]),
+    util:random_subset(MaxVMs, lists:usort(RandomConns)).
 
 %% @doc Graceful shutdown of this VM.
 -spec shutdown_vm() -> no_return().

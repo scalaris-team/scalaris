@@ -15,9 +15,11 @@
  */
 package de.zib.scalaris;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangInt;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
@@ -418,6 +420,43 @@ public class ScalarisVM {
             final List<String> successful = new ErlangValue(received.elementAt(0)).stringListValue();
             final List<String> not_found = new ErlangValue(received.elementAt(1)).stringListValue();
             return new DeleteNodesResult(successful, not_found);
+        } catch (final ClassCastException e) {
+            throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Retrieves additional nodes from the Scalaris VM of the current
+     * connection for use by {@link ConnectionFactory#addNode(String)}.
+     *
+     * @param max
+     *            maximum number of nodes to return
+     *
+     * @return a list of nodes (may be empty!)
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public List<String> getOtherVMs(int max)
+            throws ConnectionException, UnknownException {
+        final OtpErlangObject received_raw = connection.doRPC("api_vm", "get_other_vms",
+                    new OtpErlangObject[] { ErlangValue.convertToErlang(max) });
+        try {
+            final OtpErlangList list = ErlangValue.otpObjectToOtpList(received_raw);
+            final ArrayList<String> result = new ArrayList<String>(list.arity());
+            for (int i = 0; i < list.arity(); ++i) {
+                OtpErlangTuple connTuple = ((OtpErlangTuple) list.elementAt(i));
+                if (connTuple.arity() != 4) {
+                    throw new UnknownException(received_raw);
+                }
+                OtpErlangAtom name_otp = (OtpErlangAtom) connTuple.elementAt(i);
+                result.add(name_otp.atomValue());
+            }
+            return result;
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);
         }
