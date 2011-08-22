@@ -89,9 +89,17 @@ public class ScalarisVM {
     }
 
     /**
-     * Gets the number of nodes in the Scalaris VM of the current connection.
+     * Gets some information about the VM and Scalaris.
      *
-     * @return number of nodes
+     * Available keys in the returned map are:
+     * <ul>
+     *  <li><tt>scalaris_version</tt> - contains a {@link String}</li>
+     *  <li><tt>erlang_version</tt> - contains a {@link String}</li>
+     *  <li><tt>mem_total</tt> - contains an {@link Integer}</li>
+     *  <li><tt>uptime</tt> - contains an {@link Integer}</li>
+     * </ul>
+     *
+     * @return VM information
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
