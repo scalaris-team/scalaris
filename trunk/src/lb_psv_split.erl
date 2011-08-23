@@ -85,12 +85,12 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                     MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
                     case SplitKey of
                         MyNodeId ->
-                            log:log(warn, "[ Node ~w ] join requested for my ID, "
-                                        "sending no_op...", [self()]),
+                            log:log(warn, "[ Node ~w ] join requested for my ID (~.0p), "
+                                        "sending no_op...", [self(), MyNodeId]),
                             lb_op:no_op();
                         MyPredId ->
-                            log:log(warn, "[ Node ~w ] join requested for my pred's ID, "
-                                        "sending no_op...", [self()]),
+                            log:log(warn, "[ Node ~w ] join requested for my pred's ID (~.0p), "
+                                        "sending no_op...", [self(), MyPredId]),
                             lb_op:no_op();
                         _ ->
 %%                             ct:pal("MK: ~.0p, SK: ~.0p~n", [MyNodeId, SplitKey]),
