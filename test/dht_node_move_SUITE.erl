@@ -102,17 +102,8 @@ end_per_testcase(_TestCase, _Config) ->
 set_move_config_parameters() ->
     config:write(move_use_incremental_slides, false),
     config:write(move_symmetric_incremental_slides, false),
-    config:write(move_notify_other_timeout, 100),
-    config:write(move_send_data_timeout, 100),
-    config:write(move_send_delta_timeout, 100),
-    config:write(move_rcv_data_timeout, 100),
-    config:write(move_rcv_delta_timeout, 100),
-
-    config:write(move_notify_other_retries, 2),
-    config:write(move_send_data_retries, 5),
-    config:write(move_send_delta_retries, 5),
-    config:write(move_rcv_data_retries, 5),
-    config:write(move_rcv_delta_retries, 5).
+    config:write(move_wait_for_reply_timeout, 1000),
+    config:write(move_send_msg_retries, 2).
 
 %% @doc Sets tighter timeouts for slides
 -spec set_move_config_parameters_incremental_symm() -> ok.
@@ -232,47 +223,92 @@ symm4_slide_pred_rcv_load_incremental(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%
 
+reply_with_send_error(Msg, State) ->
+    % just in case, if there are two slides, then send two send errors
+    SlidePred = dht_node_state:get(State, slide_pred),
+    SlideSucc = dht_node_state:get(State, slide_succ),
+    % note: only send a message once -> use lists:usort/1 to filter out duplicates
+    FailMsgs =
+        [begin
+             case Slide of
+                 null ->
+                     case element(2, Msg) of
+                         slide ->
+                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                         slide_get_mte ->
+                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                         slide_w_mte ->
+                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                         _ ->
+                             {null, ok}
+                     end;
+                 _    ->
+                     Target = node:pidX(slide_op:get_node(Slide)),
+                     FailMsgCookie =
+                         case element(2, Msg) of
+                             delta_ack ->
+                                 {move, timeouts, 0};
+                             slide ->
+                                 {move, element(4, Msg)};
+                             slide_get_mte ->
+                                 {move, element(4, Msg)};
+                             slide_w_mte ->
+                                 {move, element(4, Msg)};
+                             _ ->
+                                 {move, slide_op:get_id(Slide)}
+                         end,
+                     {Target, FailMsgCookie}
+             end
+         end || Slide <- lists:usort([SlidePred, SlideSucc])],
+    _ = [begin
+             case {Target, FailMsgCookie} of
+                 {null, ok} -> ok;
+                 _ -> comm:send(Target, {{send_error, comm:this(), Msg}, FailMsgCookie})
+             end
+         end|| {Target, FailMsgCookie} <- lists:usort(FailMsgs)],
+    State.
+
 % keep in sync with dht_node_move and the timeout config parameters set in set_move_config_parameters/0
 -type move_message() ::
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()}})
-    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
-    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_w_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op()} |
-    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
-    {{move, my_mte, '_', '_'}, [], 1..2, drop_msg} |
+    {{move, my_mte, '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
-    {{move, change_op, '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, change_op, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
-    {{move, change_id, '_'}, [], 1..2, drop_msg} |
+    {{move, change_id, '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
-    {{move, change_id, '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{move, change_id, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
-    {{move, slide_abort, '_', '_', '_'}, [], 1, drop_msg} |
+    {{move, slide_abort, '_', '_', '_'}, [], 1, reply_with_send_error} |
 % note: do not loose local messages:
 %{move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
 %{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
 %{move, req_data, MoveFullId::slide_op:id()} |
-    {{move, req_data, '_'}, [], 1..2, drop_msg} |
+    {{move, req_data, '_'}, [], 1..2, reply_with_send_error} |
 %{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id()} |
-    {{move, data, '_', '_'}, [], 1..5, drop_msg} |
+    {{move, data, '_', '_'}, [], 1..5, reply_with_send_error} |
 %{move, data_ack, MoveFullId::slide_op:id()} |
-    {{move, data_ack, '_'}, [], 1..5, drop_msg} |
+    {{move, data_ack, '_'}, [], 1..5, reply_with_send_error} |
 %{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
-    {{move, delta, '_', '_', '_'}, [], 1..5, drop_msg} |
+    {{move, delta, '_', '_', '_'}, [], 1..5, reply_with_send_error} |
 %{move, delta_ack, MoveFullId::slide_op:id()} |
 % note: this would result in the slide op being aborted with send_delta_timeout
 %       since only send_delta_timeout will handle this but at this point, the
 %       other node will not have this slide op anymore
-%    {{move, delta_ack, '_'}, [], 1..2, drop_msg} |
+%    {{move, delta_ack, '_'}, [], 1..2, reply_with_send_error} |
 %{move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
-    {{move, delta_ack, '_', continue, '_'}, [], 1..2, drop_msg} |
+    {{move, delta_ack, '_', continue, '_'}, [], 1..2, reply_with_send_error} |
 %{move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, drop_msg}.
-% note: do not loose local messages:
+    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error}.
+% note: do not lose local messages:
 %{move, rm_db_range, MoveFullId::slide_op:id()} |
 % note: there's no timeout for this message
 %{move, done, MoveFullId::slide_op:id()} |
@@ -280,10 +316,18 @@ symm4_slide_pred_rcv_load_incremental(Config) ->
 %% @doc Makes IgnoredMessages unique, i.e. only one msg per msg type.
 -spec fix_tester_ignored_msg_list(IgnoredMessages::[move_message(),...]) -> [move_message(),...].
 fix_tester_ignored_msg_list(IgnoredMessages) ->
-    lists:usort(fun(E1, E2) ->
-                        erlang:element(2, erlang:element(1, E1)) =<
-                            erlang:element(2, erlang:element(1, E2))
-                end, IgnoredMessages).
+    IMsg2 = lists:usort(fun(E1, E2) ->
+                                erlang:element(2, erlang:element(1, E1)) =<
+                                    erlang:element(2, erlang:element(1, E2))
+                        end, IgnoredMessages),
+    [begin
+         NewAction =
+             case Action of
+                 reply_with_send_error -> fun reply_with_send_error/2;
+                 X -> X
+             end,
+         {Msg, Conds, Count, NewAction}
+     end || {Msg, Conds, Count, Action} <- IMsg2].
 
 -spec send_ignore_msg_list_to(NthNode::1..4, PredOrSuccOrNode::pred | succ | node, IgnoredMessages::[move_message(),...]) -> ok.
 send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
