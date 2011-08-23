@@ -44,6 +44,7 @@
          rm_notify_new_pred/4, rm_send_node_change/4,
          make_slide/5,
          make_slide_leave/1, make_jump/4,
+         crashed_node/3,
          check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -63,12 +64,7 @@
     {wrong_interval, MyRange::intervals:interval(), MovingDataInterval::intervals:interval()} |
     % node received data but previous data still exists (should never occur - error in the protocoll!)
     existing_data |
-    notify_other_timeout | % tried to notify my successor/predecessor of a move
-    notify_other_continue_timeout | % tried to notify my successor/predecessor of a continued move
-    send_data_timeout | % sent data to succ/pred but no reply yet
-    rcv_data_timeout | % sent req_data to succ/pred but no reply yet
-    rcv_delta_timeout | % sent data_ack to succ/pred but no reply yet
-    send_delta_timeout | % sent delta data to succ/pred but no reply yet
+    target_down | % target node reported down by fd
     scheduled_leave | % tried to continue a slide but a leave was already scheduled
     next_op_mismatch |
     {protocol_error, string()}.
@@ -98,13 +94,7 @@
     {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
     {move, rm_db_range, MoveFullId::slide_op:id()} |
     {move, done, MoveFullId::slide_op:id()} |
-    % timeout messages:
-    {move, notify_other_timeout, MoveFullId::slide_op:id()} | % tried to notify my successor/predecessor of a move
-    {move, notify_other_continue_timeout, MoveFullId::slide_op:id(), NextOpId::slide_op:id()} | % tried to notify my successor/predecessor of a continued move
-    {move, send_data_timeout, MoveFullId::slide_op:id()} | % sent data to succ/pred but no reply yet
-    {move, rcv_data_timeout, MoveFullId::slide_op:id()} | % sent req_data to succ/pred but no reply yet
-    {move, rcv_delta_timeout, MoveFullId::slide_op:id()} | % sent data_ack to succ/pred but no reply yet
-    {move, send_delta_timeout, MoveFullId::slide_op:id(), ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()]} % sent delta data to succ/pred but no reply yet
+    {move, timeout, MoveFullId::slide_op:id()} % sent a message to the succ/pred but no reply yet
 .
 
 %% @doc Processes move messages for the dht_node and implements the node move
@@ -117,44 +107,6 @@ process_move_msg({move, start_slide, PredOrSucc, TargetId, Tag, SourcePid} = _Ms
 process_move_msg({move, start_jump, TargetId, Tag, SourcePid} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     make_jump(State, TargetId, Tag, SourcePid);
-
-process_move_msg({move, notify_other_timeout, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, _PredOrSucc, State) ->
-                MaxRetries = get_notify_other_retries(),
-                case (slide_op:get_timeouts(SlideOp) < MaxRetries) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        notify_other(NewSlideOp, State);
-                    _ ->
-                        % if the message was received by succ, it will itself run
-                        % into a timeout since we do not reply to it anymore
-                        % -> do not send abort message
-                        abort_slide(State, SlideOp, notify_other_timeout, false)
-                end
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId,
-                   [wait_for_other_mte, wait_for_change_op, wait_for_change_id,
-                    wait_for_req_data, wait_for_data], both, notify_other_timeout);
-
-process_move_msg({move, notify_other_continue_timeout, OldMoveFullId, NextOpId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, _PredOrSucc, State) ->
-                MaxRetries = get_notify_other_retries(),
-                case (slide_op:get_timeouts(SlideOp) < MaxRetries) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        notify_other_in_delta_ack(OldMoveFullId, NewSlideOp, State);
-                    _ ->
-                        % if the message was received by succ, it will itself run
-                        % into a timeout since we do not reply to it anymore
-                        % -> do not send abort message
-                        abort_slide(State, SlideOp, notify_other_continue_timeout, false)
-                end
-        end,
-    safe_operation(WorkerFun, MyState, NextOpId, [wait_for_change_id, wait_for_change_op], both, notify_other_continue_timeout);
 
 % notification from predecessor/successor that it wants to slide with our node
 process_move_msg({move, slide, OtherType, MoveFullId, OtherNode,
@@ -200,7 +152,7 @@ process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
                                   {move, result, slide_op:get_tag(SlideOp1), ok}),
                 dht_node_state:set_slide(State, PredOrSucc, null)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other_mte], both, my_mte);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other_mte], both, done);
 
 process_move_msg({move, my_mte, MoveFullId, OtherMTE} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
@@ -224,6 +176,8 @@ process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState
         fun(SlideOp, pred, State) ->
                 SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
                 % simply re-create the slide (TargetId or NextOp have changed)
+                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
+                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
                 State1 = dht_node_state:set_slide(State, pred, null), % just in case
                 Command = {ok, slide_op:get_type(SlideOp1)},
                 exec_setup_slide_not_found(
@@ -288,8 +242,8 @@ process_move_msg({move, node_update, {move, MoveFullId} = RMSubscrTag} = _Msg, M
                         State1 = dht_node_state:add_db_range(
                                    State, slide_op:get_interval(SlideOp),
                                    MoveFullId),
-                        send_data(State1, succ, SlideOp);
-                    'rcv'  -> request_data(State, succ, SlideOp)
+                        send_data(State1, SlideOp);
+                    'rcv'  -> request_data(State, SlideOp)
                 end
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_node_update], succ, node_update);
@@ -306,7 +260,7 @@ process_move_msg({move, node_leave} = _Msg, State) ->
             State1 = dht_node_state:add_db_range(
                        State, slide_op:get_interval(SlideOp),
                        slide_op:get_id(SlideOp)),
-            send_data(State1, succ, SlideOp);
+            send_data(State1, SlideOp);
         _ ->
             % we should not receive node update messages unless we are waiting for them
             % (node id updates should only be triggered by this module anyway)
@@ -337,75 +291,31 @@ process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, M
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_join, wait_for_pred_update_data_ack], pred, rm_new_pred);
 
-% timeout waiting for data
-process_move_msg({move, rcv_data_timeout, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
+% request for data from a neighbor
+process_move_msg({move, req_data, MoveFullId} = Msg, MyState) ->
+    ?TRACE1(Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) < get_rcv_data_retries()) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        case PredOrSucc of
-                            succ ->
-                                request_data(State, succ, NewSlideOp);
-                            pred ->
-                                notify_other(NewSlideOp, State)
-                        end;
+        fun(SlideOp, _PredOrSucc, State) ->
+                case lists:member(slide_op:get_phase(SlideOp), [wait_for_pred_update_join, wait_for_pred_update_data_ack]) of
+                    true -> % send message again - we are waiting for an updated pred in the rm state
+                        comm:send_local_after(10, self(), Msg),
+                        State;
                     _ ->
-                        abort_slide(State, SlideOp, rcv_data_timeout, true)
+                        SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                        send_data(State, SlideOp1)
                 end
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data], both, rcv_data_timeout);
-
-% request for data from a neighbor
-process_move_msg({move, req_data, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                send_data(State, PredOrSucc, SlideOp1)
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data], pred, req_data);
-
-% request for data from a neighbor
-process_move_msg({move, send_data_timeout, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) < get_send_data_retries()) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        send_data(State, PredOrSucc, NewSlideOp);
-                    _ ->
-                        abort_slide(State, SlideOp, send_data_timeout, true)
-                end
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data_ack], both, send_data_timeout);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data, wait_for_pred_update_join, wait_for_pred_update_data_ack], pred, req_data);
 
 % data from a neighbor
 process_move_msg({move, data, MovingData, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, _PredOrSucc, State) ->
                 SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                accept_data(State, PredOrSucc, SlideOp1, MovingData)
+                accept_data(State, SlideOp1, MovingData)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data, wait_for_other_mte, wait_for_change_op], both, data);
-
-% request for data from a neighbor
-process_move_msg({move, rcv_delta_timeout, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) < get_rcv_delta_retries()) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        send_data_ack(State, PredOrSucc, NewSlideOp);
-                    _ ->
-                        abort_slide(State, SlideOp, rcv_delta_timeout, true)
-                end
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta], both, rcv_delta_timeout);
 
 % acknowledgement from neighbor that its node received data for the slide op with the given id
 process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
@@ -418,26 +328,10 @@ process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
                 case PredOrSucc =:= pred andalso
                          slide_op:get_sendORreceive(SlideOp1) =:= send of
                     true -> try_send_delta_to_pred(State, SlideOp1);
-                    _    -> send_delta(State, PredOrSucc, SlideOp1)
+                    _    -> send_delta(State, SlideOp1)
                 end
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data_ack], both, data_ack);
-
-% request for data from a neighbor
-process_move_msg({move, send_delta_timeout, MoveFullId, ChangedData, DeletedKeys} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                case (slide_op:get_timeouts(SlideOp) < get_send_delta_retries()) of
-                    true ->
-                        NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                        send_delta2(State, PredOrSucc, NewSlideOp, ChangedData, DeletedKeys);
-                    _ ->
-                        % abort slide but no need to tell the other node here
-                        abort_slide(State, SlideOp, send_delta_timeout, false)
-                end
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, send_delta_timeout);
 
 % delta from neighbor
 process_move_msg({move, delta, ChangedData, DeletedKeys, MoveFullId} = _Msg, MyState) ->
@@ -492,15 +386,86 @@ process_move_msg({move, delta_ack, MoveFullId} = _Msg, MyState) ->
 % see accept_delta/5
 process_move_msg({move, rm_db_range, MoveFullId} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    dht_node_state:rm_db_range(State, MoveFullId).
+    dht_node_state:rm_db_range(State, MoveFullId);
+
+process_move_msg({{send_error, Target, Message}, {move, timeouts, Timeouts}} = _Msg, MyState) ->
+    ?TRACE1(_Msg, MyState),
+    NewTimeouts = Timeouts + 1,
+    MaxRetries = get_send_msg_retries(),
+    % TODO: keep references to target nodes? (could stop sending messages if fd reports down, otherwise send indefinitely)
+    case NewTimeouts =< MaxRetries of
+        true -> send_no_slide(Target, Message, NewTimeouts);
+        _    -> log:log(warn,
+                        "[ dht_node_move ~.0p ] giving up to send ~.0p to ~p (~p unsuccessful retries)",
+                        [comm:this(), Message, Target, NewTimeouts])
+    end,
+    MyState;
+
+process_move_msg({{send_error, Target, Message}, {move, MoveFullId}} = _Msg, MyState) ->
+    ?TRACE1(_Msg, MyState),
+    WorkerFun =
+        fun(SlideOp, PredOrSucc, State) ->
+                NewSlideOp = slide_op:inc_timeouts(SlideOp),
+                MaxRetries = get_send_msg_retries(),
+                case slide_op:get_timeouts(SlideOp) of
+                    T when T =< MaxRetries -> ok;
+                    T    ->
+                        log:log(warn,
+                                "[ dht_node_move ~.0p ] slide with ~p: ~p unsuccessful retries to send message ~.0p",
+                                [comm:this(), PredOrSucc, T, Message])
+                end,
+                send(Target, Message, MoveFullId),
+                dht_node_state:set_slide(State, PredOrSucc, NewSlideOp)
+        end,
+    safe_operation(WorkerFun, MyState, MoveFullId, all, both, send_error);
+
+% no reply from the target node within get_wait_for_reply_timeout() ms
+process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
+    ?TRACE1(_Msg, MyState),
+    WorkerFun =
+        fun(SlideOp, PredOrSucc, State) ->
+                log:log(warn,
+                        "[ dht_node_move ~.0p ] slide with ~p: no reply received within ~pms",
+                        [comm:this(), PredOrSucc, get_wait_for_reply_timeout()]),
+                SlideOp1 = slide_op:set_timer(
+                             SlideOp, get_wait_for_reply_timeout(),
+                             {move, timeout, slide_op:get_id(SlideOp)}),
+                dht_node_state:set_slide(State, PredOrSucc, SlideOp1)
+        end,
+    safe_operation(WorkerFun, MyState, MoveFullId, all, both, timeout).
 
 % misc.
 
-%% @doc Notifies the successor or predecessor about a (new) slide operation and
-%%      sets a timeout timer. Assumes that the information in the slide
-%%      operation is still correct (check with safe_operation/6!). No timer
-%%      should have been set on NewSlideOp. Will also set the appropriate
-%%      slide_phase and update the slide op in the dht_node.
+-spec send(Pid::comm:mypid(), Message::move_message(), MoveFullId::slide_op:id()) -> ok.
+send(Pid, Message, MoveFullId) ->
+    Shepherd = comm:this_with_cookie({move, MoveFullId}),
+    ?TRACE_SEND(Pid, Message),
+    comm:send_with_shepherd(Pid, Message, Shepherd).
+
+-spec send_no_slide(Pid::comm:mypid(), Message::move_message(), Timeouts::non_neg_integer()) -> ok.
+send_no_slide(Pid, Message, Timeouts) ->
+    Shepherd = comm:this_with_cookie({move, timeouts, Timeouts}),
+    ?TRACE_SEND(Pid, Message),
+    comm:send_with_shepherd(Pid, Message, Shepherd).
+
+-spec send2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(), Message::move_message()) -> dht_node_state:state().
+send2(State, SlideOp, Message) ->
+    MoveFullId = slide_op:get_id(SlideOp),
+    Target = node:pidX(slide_op:get_node(SlideOp)),
+    PredOrSucc = slide_op:get_predORsucc(SlideOp),
+    % reset previous timeouts (just in case - could have been done earlier):
+    SlideOp1 = slide_op:reset_timer(SlideOp),
+    SlideOp2 = slide_op:set_timer(
+                 SlideOp1, get_wait_for_reply_timeout(),
+                 {move, timeout, slide_op:get_id(SlideOp1)}),
+    send(Target, Message, MoveFullId),
+    dht_node_state:set_slide(State, PredOrSucc, SlideOp2).
+
+%% @doc Notifies the successor or predecessor about a (new) slide operation.
+%%      Assumes that the information in the slide operation is still correct
+%%      (check with safe_operation/6!).
+%%      Will also set the appropriate slide_phase and update the slide op in
+%%      the dht_node.
 -spec notify_other(SlideOp::slide_op:slide_op(), State::dht_node_state:state())
         -> dht_node_state:state().
 notify_other(SlideOp, State) ->
@@ -508,70 +473,59 @@ notify_other(SlideOp, State) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
     SlOpNode = slide_op:get_node(SlideOp),
     Phase = slide_op:get_phase(SlideOp),
-    SlideOp2 = if Phase =:= wait_for_data andalso PredOrSucc =:= pred ->
-                      slide_op:set_timer(
-                        SlideOp, get_rcv_data_timeout(),
-                        {move, rcv_data_timeout, slide_op:get_id(SlideOp)});
-                  true ->
-                      slide_op:set_timer(
-                        SlideOp, get_notify_other_timeout(),
-                        {move, notify_other_timeout, slide_op:get_id(SlideOp)})
-               end,
-    SetupAtOther = slide_op:is_setup_at_other(SlideOp2),
-    SendOrReceive = slide_op:get_sendORreceive(SlideOp2),
+    SetupAtOther = slide_op:is_setup_at_other(SlideOp),
+    SendOrReceive = slide_op:get_sendORreceive(SlideOp),
     UseIncrSlides = use_incremental_slides(),
     Msg =
         if SetupAtOther ->
                if SendOrReceive =:= 'rcv' andalso PredOrSucc =:= succ andalso
                       Phase =:= wait_for_change_id ->
-                      {move, my_mte, slide_op:get_id(SlideOp2), get_max_transport_entries()};
+                      {move, my_mte, slide_op:get_id(SlideOp), get_max_transport_entries()};
                   SendOrReceive =:= 'rcv' andalso PredOrSucc =:= pred andalso
                       Phase =:= wait_for_change_op ->
-                      {move, my_mte, slide_op:get_id(SlideOp2), get_max_transport_entries()};
+                      {move, my_mte, slide_op:get_id(SlideOp), get_max_transport_entries()};
                   SendOrReceive =:= 'send' andalso PredOrSucc =:= succ ->
-                      {move, change_op, slide_op:get_id(SlideOp2),
-                       slide_op:get_target_id(SlideOp2),
-                       slide_op:get_next_op(SlideOp2)};
+                      {move, change_op, slide_op:get_id(SlideOp),
+                       slide_op:get_target_id(SlideOp),
+                       slide_op:get_next_op(SlideOp)};
                   PredOrSucc =:= pred ->
-                      case slide_op:is_incremental(SlideOp2) of
+                      case slide_op:is_incremental(SlideOp) of
                           true ->
-                              {move, change_id, slide_op:get_id(SlideOp2),
-                               slide_op:get_target_id(SlideOp2),
-                               slide_op:get_next_op(SlideOp2)};
+                              {move, change_id, slide_op:get_id(SlideOp),
+                               slide_op:get_target_id(SlideOp),
+                               slide_op:get_next_op(SlideOp)};
                           _ ->
-                              {move, change_id, slide_op:get_id(SlideOp2)}
+                              {move, change_id, slide_op:get_id(SlideOp)}
                       end
                end;
            true ->
                if Phase =:= wait_for_other_mte ->
-                      {move, slide_get_mte, Type, slide_op:get_id(SlideOp2),
+                      {move, slide_get_mte, Type, slide_op:get_id(SlideOp),
                        dht_node_state:get(State, node), SlOpNode,
-                       slide_op:get_target_id(SlideOp2),
-                       slide_op:get_tag(SlideOp2)};
+                       slide_op:get_target_id(SlideOp),
+                       slide_op:get_tag(SlideOp)};
                   true ->
-                      case slide_op:is_incremental(SlideOp2) of
+                      case slide_op:is_incremental(SlideOp) of
                           true ->
-                              {move, slide, Type, slide_op:get_id(SlideOp2),
+                              {move, slide, Type, slide_op:get_id(SlideOp),
                                dht_node_state:get(State, node), SlOpNode,
-                               slide_op:get_target_id(SlideOp2),
-                               slide_op:get_tag(SlideOp2),
-                               slide_op:get_next_op(SlideOp2)};
+                               slide_op:get_target_id(SlideOp),
+                               slide_op:get_tag(SlideOp),
+                               slide_op:get_next_op(SlideOp)};
                           _ when UseIncrSlides andalso SendOrReceive =:= 'rcv' ->
-                              {move, slide_w_mte, Type, slide_op:get_id(SlideOp2),
+                              {move, slide_w_mte, Type, slide_op:get_id(SlideOp),
                                dht_node_state:get(State, node), SlOpNode,
-                               slide_op:get_target_id(SlideOp2),
-                               slide_op:get_tag(SlideOp2), get_max_transport_entries()};
+                               slide_op:get_target_id(SlideOp),
+                               slide_op:get_tag(SlideOp), get_max_transport_entries()};
                           _ ->
-                              {move, slide, Type, slide_op:get_id(SlideOp2),
+                              {move, slide, Type, slide_op:get_id(SlideOp),
                                dht_node_state:get(State, node), SlOpNode,
-                               slide_op:get_target_id(SlideOp2),
-                               slide_op:get_tag(SlideOp2)}
+                               slide_op:get_target_id(SlideOp),
+                               slide_op:get_tag(SlideOp)}
                       end
                end
         end,
-    ?TRACE_SEND(node:pidX(SlOpNode), Msg),
-    comm:send(node:pidX(SlOpNode), Msg),
-    dht_node_state:set_slide(State, PredOrSucc, SlideOp2).
+    send2(State, SlideOp, Msg).
 
 %% @doc Sets up a new slide operation with the node's successor or predecessor
 %%      after a request for a slide has been received.
@@ -588,7 +542,8 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
     case get_slide_op(State, MoveFullId) of
         {ok, _PredOrSucc, _SlideOp} ->
             % there could already be slide operation and a second message was
-            % send after a timeout hit on the other node -> ignore this message
+            % send after an unsuccessful send-message on the other node
+            % -> ignore this message
             State;
         not_found ->
             Neihb_Command = check_setup_slide_not_found(
@@ -692,6 +647,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
                         OrigType, Reason, MsgTag =/= nomsg);
         {ok, {jump, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             % TODO: activate incremental jump:
 %%             IncTargetKey = find_incremental_target_id(Neighbors, dht_node_state:get(State, db), TargetId, NewType, OtherMTE),
 %%             SlideOp = slide_op:new_sending_slide_jump(MoveFullId, IncTargetKey, TargetId, Tag, Neighbors),
@@ -703,6 +659,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                 _ -> change_my_id(State, SlideOp)
             end;
         {ok, {leave, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             % TODO: activate incremental leave:
 %%             IncTargetKey = find_incremental_target_id(Neighbors, dht_node_state:get(State, db), TargetId, NewType, OtherMTE),
 %%             SlideOp = slide_op:new_sending_slide_leave(MoveFullId, IncTargetKey, leave, Neighbors),
@@ -714,6 +671,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                 _ -> change_my_id(State, SlideOp)
             end;
         {ok, {leave, 'rcv'} = NewType} -> % similar to {ok, {slide, pred, 'rcv'}}
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             % TODO: activate incremental leave:
             % slide with leaving pred, receive data
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
@@ -724,9 +682,8 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                        State, slide_op:get_interval(SlideOp2),
                        node:pidX(slide_op:get_node(SlideOp2))),
             notify_other(SlideOp2, State1);
-        % send data to pred:
         {ok, {slide, pred, 'send'} = NewType} ->
-            % slide with pred, send data
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             UseIncrSlides = use_incremental_slides(),
             UseSymmIncrSlides = use_symmetric_incremental_slides(),
             case MsgTag of
@@ -781,7 +738,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                     notify_other(SlideOp2, State1)
             end;
         {ok, {slide, succ, 'rcv'} = NewType} ->
-            % slide with succ, receive data
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             case MsgTag of
@@ -795,9 +752,8 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                 _ ->
                     change_my_id(State, SlideOp)
             end;
-        % send data to succ:
         {ok, {slide, succ, 'send'} = NewType} ->
-            % slide with succ, send data
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             UseIncrSlides = use_incremental_slides(),
             UseSymmIncrSlides = use_symmetric_incremental_slides(),
             case MsgTag of
@@ -846,7 +802,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
                     notify_other(SlideOp2, State)
             end;
         {ok, {slide, pred, 'rcv'} = NewType} ->
-            % slide with pred, receive data
+            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             UseIncrSlides = use_incremental_slides(),
@@ -879,8 +835,7 @@ exec_setup_slide_not_found({Neighbors, Command}, State, MoveFullId, TargetNode,
             case MsgTag of
                 nomsg -> ok;
                 _     -> Msg = {move, done, MoveFullId},
-                         ?TRACE_SEND(node:pidX(TargetNode), Msg),
-                         comm:send(node:pidX(TargetNode), Msg)
+                         send_no_slide(node:pidX(TargetNode), Msg, 0)
             end,
             State
     end.
@@ -971,59 +926,40 @@ change_my_id(State, SlideOp) ->
               State1, succ, slide_op:set_phase(SlideOp1, wait_for_node_update))
     end.
 
-%% @doc Requests data from the node of the given slide operation, sets a
-%%      rcv_data_timeout timeout, sets the slide operation's phase to
+%% @doc Requests data from the node of the given slide operation, sets the
+%%      slide operation's phase to
 %%      wait_for_data and sets the slide operation in the dht node's state.
--spec request_data(State::dht_node_state:state(), PredOrSucc::succ, SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-request_data(State, PredOrSucc = succ, SlideOp) ->
-    SlOp1 = slide_op:set_timer(SlideOp, get_rcv_data_timeout(),
-                              {move, rcv_data_timeout, slide_op:get_id(SlideOp)}),
-    NewSlideOp = slide_op:set_phase(SlOp1, wait_for_data),
+-spec request_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+request_data(State, SlideOp) ->
+    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data),
     Msg = {move, req_data, slide_op:get_id(NewSlideOp)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(NewSlideOp)), Msg),
-    comm:send(node:pidX(slide_op:get_node(NewSlideOp)), Msg),
-    dht_node_state:set_slide(State, PredOrSucc, NewSlideOp).
+    send2(State, NewSlideOp, Msg).
 
 %% @doc Gets all data in the slide operation's interval from the DB and sends
 %%      it to the target node. Also sets the DB to record changes in this
-%%      interval, changes the slide operation's phase to wait_for_data_ack and
-%%      sets a send_data_timeout.
--spec send_data(State::dht_node_state:state(), PredOrSucc::pred | succ, SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-send_data(State, PredOrSucc, SlideOp) ->
+%%      interval and changes the slide operation's phase to wait_for_data_ack.
+-spec send_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+send_data(State, SlideOp) ->
     MovingInterval = slide_op:get_interval(SlideOp),
     OldDB = dht_node_state:get(State, db),
     MovingData = ?DB:get_entries(OldDB, MovingInterval),
     NewDB = ?DB:record_changes(OldDB, MovingInterval),
-    SlOp2 = slide_op:set_timer(SlideOp, get_send_data_timeout(),
-                              {move, send_data_timeout, slide_op:get_id(SlideOp)}),
-    Msg = {move, data, MovingData, slide_op:get_id(SlOp2)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(SlOp2)), Msg),
-    comm:send(node:pidX(slide_op:get_node(SlOp2)), Msg),
-    NewSlideOp = slide_op:set_phase(SlOp2, wait_for_data_ack),
+    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data_ack),
     State_NewDB = dht_node_state:set_db(State, NewDB),
-    dht_node_state:set_slide(State_NewDB, PredOrSucc, NewSlideOp).
+    Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp)},
+    send2(State_NewDB, NewSlideOp, Msg).
 
 %% @doc Accepts data received during the given (existing!) slide operation and
 %%      writes it to the DB. Then calls send_data_ack/3.
 %% @see send_data_ack/3
--spec accept_data(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                  SlideOp::slide_op:slide_op(), Data::?DB:db_as_list()) -> dht_node_state:state().
-accept_data(State, PredOrSucc, SlideOp, Data) ->
+-spec accept_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                  Data::?DB:db_as_list()) -> dht_node_state:state().
+accept_data(State, SlideOp, Data) ->
     NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
     State1 = dht_node_state:set_db(State, NewDB),
-    send_data_ack(State1, PredOrSucc, SlideOp).
-
-%% @doc Sets a data_ack message for the given slide operation, sets its phase
-%%      to wait_for_delta and sets a rcv_delta_timeout timeout.
--spec send_data_ack(State::dht_node_state:state(), PredOrSucc::pred | succ, SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-send_data_ack(State, PredOrSucc, SlideOp) ->
-    SlOp1 = slide_op:set_timer(SlideOp, get_rcv_delta_timeout(),
-                              {move, rcv_delta_timeout, slide_op:get_id(SlideOp)}),
-    NewSlideOp = slide_op:set_phase(SlOp1, wait_for_delta),
+    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_delta),
     Msg = {move, data_ack, slide_op:get_id(NewSlideOp)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(NewSlideOp)), Msg),
-    comm:send(node:pidX(slide_op:get_node(NewSlideOp)), Msg),
-    dht_node_state:set_slide(State, PredOrSucc, NewSlideOp).
+    send2(State1, NewSlideOp, Msg).
 
 %% @doc Tries to send the delta to the predecessor. If a slide is sending
 %%      data to its predecessor, we need to take care that the delta is not
@@ -1035,7 +971,7 @@ try_send_delta_to_pred(State, SlideOp) ->
     Pred = dht_node_state:get(State, pred),
     case node:id(Pred) of
         ExpPredId ->
-            send_delta(State, pred, SlideOp);
+            send_delta(State, SlideOp);
         _ ->
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_data_ack),
             RMSubscrTag = {move, slide_op:get_id(SlideOp)},
@@ -1056,8 +992,8 @@ try_send_delta_to_pred(State, SlideOp) ->
 %%      changes in this interval and delete any such entries. Changes the slide
 %%      operation's phase to wait_for_delta_ack and calls send_delta2/5.
 %% @see send_delta2/5
--spec send_delta(State::dht_node_state:state(), PredOrSucc::pred | succ, SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-send_delta(State, PredOrSucc, SlideOp) ->
+-spec send_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+send_delta(State, SlideOp) ->
     SlideOpInterval = slide_op:get_interval(SlideOp),
     % send delta (values of keys that have changed during the move)
     OldDB = dht_node_state:get(State, db),
@@ -1067,19 +1003,8 @@ send_delta(State, PredOrSucc, SlideOp) ->
     State1 = dht_node_state:set_db(State, NewDB),
     State2 = dht_node_state:rm_db_range(State1, slide_op:get_id(SlideOp)),
     SlOp1 = slide_op:set_phase(SlideOp, wait_for_delta_ack),
-    send_delta2(State2, PredOrSucc, SlOp1, ChangedData, DeletedKeys).
-
-%% @doc Sets a delta message with the given data and sets a send_delta_timeout
-%%      timeout.
--spec send_delta2(State::dht_node_state:state(), PredOrSucc::pred | succ, SlideOp::slide_op:slide_op(), ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()]) -> dht_node_state:state().
-send_delta2(State, PredOrSucc, SlideOp, ChangedData, DeletedKeys) ->
-    SlOp1 = slide_op:set_timer(SlideOp, get_send_delta_timeout(),
-                              {move, send_delta_timeout, slide_op:get_id(SlideOp),
-                               ChangedData, DeletedKeys}),
     Msg = {move, delta, ChangedData, DeletedKeys, slide_op:get_id(SlOp1)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(SlOp1)), Msg),
-    comm:send(node:pidX(slide_op:get_node(SlOp1)), Msg),
-    dht_node_state:set_slide(State, PredOrSucc, SlOp1).
+    send2(State2, SlOp1, Msg).
 
 %% @doc Accepts delta received during the given (existing!) slide operation and
 %%      writes it to the DB. Then removes the dht_node's message forward for 
@@ -1160,9 +1085,11 @@ accept_delta(State, PredOrSucc, SlideOp, ChangedData, DeletedKeys) ->
 -spec accept_delta2(State::dht_node_state:state(), PredOrSucc::pred | succ,
                     SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 accept_delta2(State, PredOrSucc, SlideOp) ->
-    Msg = {move, delta_ack, slide_op:get_id(SlideOp)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(SlideOp)), Msg),
-    comm:send(node:pidX(slide_op:get_node(SlideOp)), Msg),
+    Pid = node:pidX(slide_op:get_node(SlideOp)),
+    MoveFullId = slide_op:get_id(SlideOp),
+    fd:unsubscribe([Pid], {move, MoveFullId}),
+    Msg = {move, delta_ack, MoveFullId},
+    send_no_slide(Pid, Msg, 0),
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
     rm_loop:notify_slide_finished(PredOrSucc),
@@ -1217,20 +1144,14 @@ continue_slide_delta(State, PredOrSucc, SlideOp) ->
         NextSlideOp::slide_op:slide_op(), State::dht_node_state:state())
             -> dht_node_state:state().
 notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
-    NextSlideOp2 = slide_op:set_timer(
-                 NextSlideOp, get_notify_other_timeout(),
-                 {move, notify_other_continue_timeout, OldMoveFullId,
-                  slide_op:get_id(NextSlideOp)}),
     Msg = {move, delta_ack, OldMoveFullId, continue,
-           slide_op:get_id(NextSlideOp2)},
-    ?TRACE_SEND(node:pidX(slide_op:get_node(NextSlideOp2)), Msg),
-    comm:send(node:pidX(slide_op:get_node(NextSlideOp2)), Msg),
-    PredOrSucc = slide_op:get_predORsucc(NextSlideOp2),
-    dht_node_state:set_slide(State, PredOrSucc, NextSlideOp2).
+           slide_op:get_id(NextSlideOp)},
+    send2(State, NextSlideOp, Msg).
 
 -spec finish_delta_ack(State::dht_node_state:state(), PredOrSucc::pred | succ,
                        SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 finish_delta_ack(State, PredOrSucc, SlideOp) ->
+    fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
     rm_loop:notify_slide_finished(PredOrSucc),
@@ -1298,6 +1219,7 @@ finish_delta_ack_continue(State, PredOrSucc, SlideOp, NewSlideId) ->
 finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
                       MyNode, TargetNode, TargetId, Tag, MaxTransportEntries,
                       SourcePid) ->
+    fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
     case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
         true ->
             % TODO: allow if continue op is leave, too!
@@ -1349,16 +1271,19 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
     WorkerFun::fun((SlideOp::slide_op:slide_op(), PredOrSucc::pred | succ,
                     State::dht_node_state:state()) -> dht_node_state:state()),
     State::dht_node_state:state(), MoveFullId::slide_op:id(),
-    WorkPhases::[slide_op:phase(),...], PredOrSuccExp::pred | succ | both,
+    WorkPhases::[slide_op:phase(),...] | all, PredOrSuccExp::pred | succ | both,
     MoveMsgTag::atom()) -> dht_node_state:state().
 safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgTag) ->
     case get_slide_op(State, MoveFullId) of
         {ok, PredOrSucc, SlideOp} ->
             case PredOrSuccExp =:= both orelse PredOrSucc =:= PredOrSuccExp of
                 true ->
-                    case lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
+                    case WorkPhases =:= all orelse lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                         true -> WorkerFun(SlideOp, PredOrSucc, State);
-                        _    -> State
+                        _    ->
+                            log:log(info, "[ dht_node_move ~.0p ] unexpected message ~.0p received in phase ~.0p",
+                                    [comm:this(), MoveMsgTag, slide_op:get_phase(SlideOp)]),
+                            State
                     end;
                 _ ->
                     % abort slide but do not notify the other node
@@ -1374,13 +1299,13 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
             case util:is_my_old_uid(MoveFullId) of
                 true -> ok;
                 remote ->
-                    log:log(info,"[ dht_node_move ~.0p ] ~.0p received with no "
+                    log:log(info, "[ dht_node_move ~.0p ] ~.0p received with no "
                            "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
                             [comm:this(), MoveMsgTag, MoveFullId,
                              dht_node_state:get(State, slide_pred),
                              dht_node_state:get(State, slide_succ)]);
                 _ ->
-                    log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no "
+                    log:log(warn, "[ dht_node_move ~.0p ] ~.0p received with no "
                            "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
                             [comm:this(), MoveMsgTag, MoveFullId,
                              dht_node_state:get(State, slide_pred),
@@ -1395,7 +1320,7 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                      dht_node_state:get(State, slide_succ)]),
             State;
         {wrong_neighbor, PredOrSucc, SlideOp} -> % wrong pred or succ
-            case lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
+            case WorkPhases =:= all orelse lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                 true ->
                     log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s "
                            "changed during move (ID: ~.0p, node(slide): ~.0p, new_~s: ~.0p)~n",
@@ -1506,6 +1431,8 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
                   NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, NotifyNode) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
+    NodePid = node:pidX(Node),
+    fd:unsubscribe([NodePid], {move, SlideOpId}),
     % abort slide on the (other) node:
     case NotifyNode of
         true ->
@@ -1514,8 +1441,7 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
                                   succ -> pred
                               end,
             Msg = {move, slide_abort, PredOrSuccOther, SlideOpId, Reason},
-            ?TRACE_SEND(node:pidX(Node), Msg),
-            comm:send(node:pidX(Node), Msg);
+            send_no_slide(NodePid, Msg, 0);
         _ -> ok
     end,
     notify_source_pid(SourcePid, {move, result, Tag, Reason}),
@@ -1526,6 +1452,16 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
                 State;
         _    -> State
     end.
+
+% failure detector reported dead node
+-spec crashed_node(State::dht_node_state:state(), DeadPid::comm:mypid(), Cookie::{move, MoveFullId::slide_op:id()}) -> dht_node_state:state().
+crashed_node(MyState, _DeadPid, {move, MoveFullId} = _Cookie) ->
+    ?TRACE1({crash, _DeadPid, _Cookie}, MyState),
+    WorkerFun =
+        fun(SlideOp, _PredOrSucc, State) ->
+                abort_slide(State, SlideOp, target_down, false)
+        end,
+    safe_operation(WorkerFun, MyState, MoveFullId, all, both, crashed_node).
 
 %% @doc Creates a slide with the node's successor or predecessor. TargetId will
 %%      become the ID between the two nodes, i.e. either the current node or
@@ -1610,35 +1546,11 @@ check_config() ->
     config:is_integer(move_max_transport_entries) and
     config:is_greater_than(move_max_transport_entries, 0) and
 
-    config:is_integer(move_notify_other_timeout) and
-    config:is_greater_than(move_notify_other_timeout, 0) and
+    config:is_integer(move_wait_for_reply_timeout) and
+    config:is_greater_than(move_wait_for_reply_timeout, 0) and
 
-    config:is_integer(move_notify_other_retries) and
-    config:is_greater_than(move_notify_other_retries, 0) and
-
-    config:is_integer(move_send_data_timeout) and
-    config:is_greater_than(move_send_data_timeout, 0) and
-
-    config:is_integer(move_send_data_retries) and
-    config:is_greater_than(move_send_data_retries, 0) and
-
-    config:is_integer(move_send_delta_timeout) and
-    config:is_greater_than(move_send_delta_timeout, 0) and
-
-    config:is_integer(move_send_delta_retries) and
-    config:is_greater_than(move_send_delta_retries, 0) and
-
-    config:is_integer(move_rcv_data_timeout) and
-    config:is_greater_than(move_rcv_data_timeout, 0) and
-
-    config:is_integer(move_rcv_data_retries) and
-    config:is_greater_than(move_rcv_data_retries, 0) and
-
-    config:is_integer(move_rcv_delta_timeout) and
-    config:is_greater_than(move_rcv_delta_timeout, 0) and
-
-    config:is_integer(move_rcv_delta_retries) and
-    config:is_greater_than(move_rcv_delta_retries, 0) and
+    config:is_integer(move_send_msg_retries) and
+    config:is_greater_than(move_send_msg_retries, 0) and
 
     config:is_bool(move_use_incremental_slides) and
     config:is_bool(move_symmetric_incremental_slides).
@@ -1649,65 +1561,17 @@ check_config() ->
 get_max_transport_entries() ->
     config:read(move_max_transport_entries).
 
-%% @doc Gets the max number of ms to wait for the other node's reply when
-%%      initiating a move (set in the config files).
--spec get_notify_other_timeout() -> pos_integer().
-get_notify_other_timeout() ->
-    config:read(move_notify_other_timeout).
+%% @doc Gets the max number of ms to wait for the other node's reply until
+%%      logging a warning (set in the config files).
+-spec get_wait_for_reply_timeout() -> pos_integer().
+get_wait_for_reply_timeout() ->
+    config:read(move_wait_for_reply_timeout).
 
-%% @doc Gets the max number of retries to notify the other node when
-%%      initiating a move (set in the config files).
--spec get_notify_other_retries() -> pos_integer().
-get_notify_other_retries() ->
-    config:read(move_notify_other_retries).
-
-%% @doc Gets the max number of ms to wait for the succ/pred's reply after
-%%      sending data to it (set in the config files).
--spec get_send_data_timeout() -> pos_integer().
-get_send_data_timeout() ->
-    config:read(move_send_data_timeout).
-
-%% @doc Gets the max number of retries to send data to the succ/pred
-%%      (set in the config files).
--spec get_send_data_retries() -> pos_integer().
-get_send_data_retries() ->
-    config:read(move_send_data_retries).
-
-%% @doc Gets the max number of ms to wait for the succ/pred's reply after
-%%      sending delta data to it (set in the config files).
--spec get_send_delta_timeout() -> pos_integer().
-get_send_delta_timeout() ->
-    config:read(move_send_delta_timeout).
-
-%% @doc Gets the max number of retries to send delta to the succ/pred
-%%      (set in the config files).
--spec get_send_delta_retries() -> pos_integer().
-get_send_delta_retries() ->
-    config:read(move_send_delta_retries).
-
-%% @doc Gets the max number of ms to wait for the succ/pred's reply after
-%%      requesting data from it (set in the config files).
--spec get_rcv_data_timeout() -> pos_integer().
-get_rcv_data_timeout() ->
-    config:read(move_rcv_data_timeout).
-
-%% @doc Gets the max number of retries to send a data request to the succ/pred
-%%      (set in the config files).
--spec get_rcv_data_retries() -> pos_integer().
-get_rcv_data_retries() ->
-    config:read(move_rcv_data_retries).
-
-%% @doc Gets the max number of ms to wait for the succ/pred's reply after
-%%      sending data_ack to it (set in the config files).
--spec get_rcv_delta_timeout() -> pos_integer().
-get_rcv_delta_timeout() ->
-    config:read(move_rcv_delta_timeout).
-
-%% @doc Gets the max number of retries to send a data_ack to the succ/pred
-%%      (set in the config files).
--spec get_rcv_delta_retries() -> pos_integer().
-get_rcv_delta_retries() ->
-    config:read(move_rcv_delta_retries).
+%% @doc Gets the max number of retries to send a message to the other node
+%%      until logging a warning (set in the config files).
+-spec get_send_msg_retries() -> pos_integer().
+get_send_msg_retries() ->
+    config:read(move_send_msg_retries).
 
 %% @doc Checks whether incremental slides are to be used
 %%      (set in the config files).

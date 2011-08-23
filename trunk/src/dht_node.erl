@@ -87,7 +87,7 @@ on(Msg, State) when element(1, Msg) =:= join ->
     dht_node_join:process_join_msg(Msg, State);
 % message with cookie for dht_node_join?
 on({Msg, Cookie} = FullMsg, State) when
-  is_tuple(Msg) andalso is_atom(element(1, Msg)) andalso
+  is_tuple(Msg) andalso
       (element(1, Msg) =:= join orelse
            Cookie =:= join orelse
            (is_tuple(Cookie) andalso element(1, Cookie) =:= join)) ->
@@ -97,6 +97,13 @@ on({Msg, Cookie} = FullMsg, State) when
 % Move messages (see dht_node_move.erl)
 on(Msg, State) when element(1, Msg) =:= move ->
     dht_node_move:process_move_msg(Msg, State);
+% message with cookie for dht_node_move?
+on({Msg, Cookie} = FullMsg, State) when
+  is_tuple(Msg) andalso
+      (element(1, Msg) =:= move orelse
+           Cookie =:= move orelse
+           (is_tuple(Cookie) andalso element(1, Cookie) =:= move)) ->
+    dht_node_move:process_move_msg(FullMsg, State);
 
 % RM messages (see rm_loop.erl)
 on(Msg, State) when element(1, Msg) =:= rm ->
@@ -489,10 +496,12 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
     State;
 
 % failure detector, dead node cache
+on({crash, DeadPid, Cookie}, State) when is_tuple(Cookie) andalso element(1, Cookie) =:= move->
+    dht_node_move:crashed_node(State, DeadPid, Cookie);
 on({crash, DeadPid}, State) ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:crashed_node(RMState, DeadPid),
-    % TODO: call other modules, e.g. join, move
+    % TODO: integrate crash handler for join
     dht_node_state:set_rm(State, RMState1);
 
 % dead-node-cache reported dead node to be alive again
