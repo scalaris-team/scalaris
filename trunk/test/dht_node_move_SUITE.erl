@@ -25,7 +25,7 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() ->
+test_cases() ->
     [
      symm4_slide_succ_rcv_load, symm4_slide_succ_send_load,
      symm4_slide_pred_send_load, symm4_slide_pred_rcv_load,
@@ -63,6 +63,12 @@ all() ->
      tester_symm4_slide_pred_rcv_load_timeouts_node_incremental
     ].
 
+all() -> unittest_helper:create_ct_all(test_cases()).
+
+groups() ->
+%%     unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
+    unittest_helper:create_ct_groups(test_cases(), []).
+
 suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
@@ -71,6 +77,10 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
     % stop ring from previous test case (it may have run into a timeout)

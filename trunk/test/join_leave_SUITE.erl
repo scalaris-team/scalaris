@@ -26,7 +26,7 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() ->
+test_cases() ->
     [
      tester_join_at,
      add_9, rm_5, add_9_rm_5,
@@ -38,6 +38,12 @@ all() ->
      tester_join_at_timeouts
     ].
 
+all() -> unittest_helper:create_ct_all(test_cases()).
+
+groups() ->
+%%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
+    unittest_helper:create_ct_groups(test_cases(), []).
+
 suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
@@ -46,6 +52,10 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
