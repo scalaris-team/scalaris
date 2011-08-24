@@ -20,7 +20,7 @@
 -vsn('$Id$').
 
 -export([add_node/1, add_node_at_id/1, add_nodes/1,
-         del_node/2, del_nodes/1, del_nodes/2,
+         del_node/2, del_nodes/1, del_nodes/2, del_nodes_by_name/2,
          get_dht_node_specs/0,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
@@ -78,10 +78,51 @@ del_nodes(Count) -> del_nodes(Count, false).
 
 %% @doc Deletes Scalaris nodes from the current VM.
 -spec del_nodes(Count::non_neg_integer(), Graceful::boolean())
-        -> [ok | {error, not_found}].
+        -> Successful::[pid_groups:groupname()].
 del_nodes(Count, Graceful) ->
-    Children = util:random_subset(Count, get_dht_node_specs()),
-    [del_node(Spec, Graceful) || Spec <- Children].
+    del_nodes(Count, Graceful, []).
+
+-spec del_nodes(Count::non_neg_integer(), Graceful::boolean(), Prev::Acc)
+        -> Acc when is_subtype(Acc, Successful::[pid_groups:groupname()]).
+del_nodes(X, _Graceful, Prev) when X =< 0 ->
+    Prev;
+del_nodes(Count, Graceful, Prev) ->
+    % note: specs selected now may not be available anymore when trying to
+    % delete them during concurrent executions
+    case util:random_subset(Count, get_dht_node_specs()) of
+        [] -> Prev;
+        [_|_] = Specs ->
+            Successful =
+                lists:foldr(fun(Spec = {_Id, Pid, _Type, _}, Successful) ->
+                                    Name = pid_groups:group_of(Pid),
+                                    case del_node(Spec, Graceful) of
+                                        ok -> [Name | Successful];
+                                        {error, not_found} -> Successful
+                                    end
+                            end, [], Specs),
+            Missing = Count - length(Successful),
+            del_nodes(Missing, Graceful, Successful)
+    end.
+
+-spec del_nodes_by_name(Names::[pid_groups:groupname()], Graceful::boolean())
+        -> {Successful::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
+del_nodes_by_name(Names, Graceful) ->
+    % note: specs selected now may not be available anymore when trying to
+    % delete them during concurrent executions
+    Specs = [Spec || {_Id, Pid, _Type, _} = Spec <- get_dht_node_specs(),
+                     lists:member(pid_groups:group_of(Pid), Names)],
+    case Specs of
+        [] -> {[], []};
+        [_|_] ->
+            lists:foldr(
+              fun(Spec = {_Id, Pid, _Type, _}, {Ok, NotFound}) ->
+                      Name = pid_groups:group_of(Pid),
+                      case del_node(Spec, Graceful) of
+                          ok -> {[Name | Ok], NotFound};
+                          {error, not_found} -> {Ok, [Name | NotFound]}
+                      end
+              end, {[], []}, Specs)
+    end.
 
 %% @doc Delete a single node.
 -spec del_node({Id::term() | undefined, Child::pid() | undefined,

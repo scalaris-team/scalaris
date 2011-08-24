@@ -94,37 +94,10 @@ kill_nodes(Names) ->
         -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]};
                (non_neg_integer(), Graceful::boolean())
         -> {Ok::[pid_groups:groupname()], NotFound::[]}.
-del_nodes(0, _Graceful) -> {[], []};
-del_nodes(1, Graceful) ->
-    % delete one after another for a better chance of success during concurrent executions
-    case util:random_subset(1, admin:get_dht_node_specs()) of
-        [] -> {[], []};
-        [{_Id, Pid, _Type, _} = Spec | _] ->
-            Name = pid_groups:group_of(Pid),
-            case admin:del_node(Spec, Graceful) of
-                ok -> {[Name], []};
-                {error, not_found} -> del_nodes(1, Graceful)
-            end
-    end;
-del_nodes(Number, Graceful) when is_integer(Number) ->
-    {RestOk, []} = del_nodes(Number - 1, Graceful),
-    {MyOk, []} = del_nodes(1, Graceful),
-    {lists:append(MyOk, RestOk), []};
+del_nodes(Count, Graceful) when is_integer(Count) ->
+    {admin:del_nodes(Count, Graceful), []};
 del_nodes(Names, Graceful) ->
-    Results =
-        [begin
-             Specs = [Spec || {_Id, Pid, _Type, _} = Spec <- admin:get_dht_node_specs(),
-                              pid_groups:group_of(Pid) =:= Name],
-             case Specs of
-                 [Spec] -> case admin:del_node(Spec, Graceful) of
-                               ok -> Name;
-                               {error, not_found} -> {not_found, Name}
-                           end;
-                 _      -> {not_found, Name}
-             end
-         end || Name <- Names],
-    {[Name || Name <- Results, not is_tuple(Name)],
-     [Name || {not_found, Name} <- Results]}.
+    admin:del_nodes_by_name(Names, Graceful).
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.
