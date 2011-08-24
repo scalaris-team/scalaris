@@ -287,14 +287,14 @@ public class ScalarisVM {
 
     /**
      * Plain old data object for results of
-     * {@link ScalarisVM#shutdownNodes(int)}, {@link ScalarisVM#shutdownNodes(List)},
+     * {@link ScalarisVM#shutdownNodes(int)}, {@link ScalarisVM#shutdownNodesByName(List)},
      * {@link ScalarisVM#killNodes(int)} and {@link ScalarisVM#killNodes(List)}.
      *
      * @author Nico Kruber, kruber@zib.de
      * @version 3.6
      * @since 3.6
      */
-    public static class DeleteNodesResult {
+    public static class DeleteNodesByNameResult {
         /**
          * Names of successfully deleted nodes.
          */
@@ -304,7 +304,7 @@ public class ScalarisVM {
          */
         public final List<String> notFound;
 
-        protected DeleteNodesResult(List<String> successful, List<String> notFound) {
+        protected DeleteNodesByNameResult(List<String> successful, List<String> notFound) {
             this.successful = successful;
             this.notFound = notFound;
         }
@@ -326,7 +326,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesResult shutdownNodes(final int number)
+    public List<String> shutdownNodes(final int number)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes",
                     new OtpErlangObject[] { new OtpErlangInt(number) });
@@ -349,11 +349,11 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesResult shutdownNodes(final List<String> names)
+    public DeleteNodesByNameResult shutdownNodesByName(final List<String> names)
             throws ConnectionException, UnknownException {
-        final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes",
+        final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes_by_name",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
-        return makeDeleteResult(received_raw);
+        return makeDeleteByNameResult(received_raw);
     }
 
     /**
@@ -372,7 +372,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesResult killNodes(final int number)
+    public List<String> killNodes(final int number)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes",
                     new OtpErlangObject[] { new OtpErlangInt(number) });
@@ -394,11 +394,11 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public DeleteNodesResult killNodes(final List<String> names)
+    public DeleteNodesByNameResult killNodes(final List<String> names)
             throws ConnectionException, UnknownException {
-        final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes",
+        final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes_by_name",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
-        return makeDeleteResult(received_raw);
+        return makeDeleteByNameResult(received_raw);
     }
 
     /**
@@ -413,13 +413,34 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if an error occurs during transformation
      */
-    private final DeleteNodesResult makeDeleteResult(
+    private final List<String> makeDeleteResult(
+            final OtpErlangObject received_raw) throws UnknownException {
+        try {
+            return new ErlangValue(received_raw).stringListValue();
+        } catch (final ClassCastException e) {
+            throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Transforms the given result from a "delete nodes by name"-operation into
+     * a {@link DeleteNodesByNameResult}.
+     *
+     * @param received_raw
+     *            raw erlang result
+     *
+     * @return {@link DeleteResult} object
+     *
+     * @throws UnknownException
+     *             if an error occurs during transformation
+     */
+    private final DeleteNodesByNameResult makeDeleteByNameResult(
             final OtpErlangObject received_raw) throws UnknownException {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             final List<String> successful = new ErlangValue(received.elementAt(0)).stringListValue();
             final List<String> not_found = new ErlangValue(received.elementAt(1)).stringListValue();
-            return new DeleteNodesResult(successful, not_found);
+            return new DeleteNodesByNameResult(successful, not_found);
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);
         }

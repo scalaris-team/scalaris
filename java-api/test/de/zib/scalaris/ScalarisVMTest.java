@@ -25,7 +25,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import de.zib.scalaris.ScalarisVM.AddNodesResult;
-import de.zib.scalaris.ScalarisVM.DeleteNodesResult;
+import de.zib.scalaris.ScalarisVM.DeleteNodesByNameResult;
 
 /**
  * Test class for {@link ScalarisVM}.
@@ -34,7 +34,7 @@ import de.zib.scalaris.ScalarisVM.DeleteNodesResult;
  * @version 3.6
  * @since 3.6
  */
-@Ignore
+//@Ignore
 public class ScalarisVMTest {
     private static final int MAX_WAIT_FOR_VM_SIZE = 30000;
 
@@ -489,7 +489,7 @@ public class ScalarisVMTest {
             conn.addNodes(nodesToRemove);
             waitForVMSize(conn, size + nodesToRemove);
         }
-        DeleteNodesResult result = null;
+        List<String> result = null;
         switch (action) {
             case SHUTDOWN:
                 result = conn.shutdownNodes(nodesToRemove);
@@ -498,18 +498,17 @@ public class ScalarisVMTest {
                 result = conn.killNodes(nodesToRemove);
                 break;
         }
-        assertEquals(nodesToRemove, result.successful.size());
-        assertEquals(0, result.notFound.size());
+        assertEquals(nodesToRemove, result.size());
         waitForVMSize(conn, size);
         final List<String> nodes = conn.getNodes();
-        for (final String name : result.successful) {
+        for (final String name : result) {
             assertTrue(nodes.toString() + " should not contain " + name, !nodes.contains(name));
         }
     }
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(java.util.List)} with a
+     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)} with a
      * closed connection.
      *
      * @throws ConnectionException
@@ -520,7 +519,7 @@ public class ScalarisVMTest {
         final ScalarisVM conn = new ScalarisVM();
         int size = conn.getNumberOfNodes();
         conn.closeConnection();
-        conn.shutdownNodes(Arrays.asList("test"));
+        conn.shutdownNodesByName(Arrays.asList("test"));
         // should not get here...but if, then wait for the correct ring size
         // note: there should not be a node named "test"
         waitForVMSize(conn, size);
@@ -528,7 +527,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(java.util.List)}.
+     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -540,7 +539,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(java.util.List)}.
+     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -552,7 +551,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(java.util.List)}.
+     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -619,7 +618,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(java.util.List)} and
+     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)} and
      * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)}.
      *
      * @throws ConnectionException
@@ -634,10 +633,10 @@ public class ScalarisVMTest {
         }
         List<String> nodes = conn.getNodes();
         final List<String> removedNodes = nodes.subList(nodes.size() - nodesToRemove, nodes.size());
-        DeleteNodesResult result = null;
+        DeleteNodesByNameResult result = null;
         switch (action) {
             case SHUTDOWN:
-                result = conn.shutdownNodes(removedNodes);
+                result = conn.shutdownNodesByName(removedNodes);
                 break;
             case KILL:
                 result = conn.killNodes(removedNodes);

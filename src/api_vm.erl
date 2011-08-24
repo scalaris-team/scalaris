@@ -22,8 +22,8 @@
 
 -export([get_version/0, get_info/0,
          number_of_nodes/0, get_nodes/0, add_nodes/1,
-         shutdown_node/1, shutdown_nodes/1,
-         kill_node/1, kill_nodes/1,
+         shutdown_node/1, shutdown_nodes/1, shutdown_nodes_by_name/1,
+         kill_node/1, kill_nodes/1, kill_nodes_by_name/1,
          get_other_vms/1,
          shutdown_vm/0, kill_vm/0]).
 
@@ -63,41 +63,32 @@ add_nodes(Number) -> admin:add_nodes(Number).
 %% @doc Sends a graceful leave request to a given node.
 -spec shutdown_node(pid_groups:groupname()) -> ok | not_found.
 shutdown_node(Name) ->
-    case element(1, shutdown_nodes([Name])) of
+    case element(1, shutdown_nodes_by_name([Name])) of
         [] -> not_found;
         _  -> ok
     end.
 %% @doc Sends a graceful leave request to multiple nodes.
--spec shutdown_nodes
-        ([pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]};
-        (non_neg_integer())        -> {Ok::[pid_groups:groupname()], NotFound::[]}.
-shutdown_nodes(Names) ->
-    del_nodes(Names, true).
+-spec shutdown_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
+shutdown_nodes(Count) ->
+    admin:del_nodes(Count, true).
+-spec shutdown_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
+shutdown_nodes_by_name(Names) ->
+    admin:del_nodes_by_name(Names, true).
 
 %% @doc Kills a given node.
 -spec kill_node(pid_groups:groupname()) -> ok | not_found.
 kill_node(Name) ->
-    case element(1, kill_nodes([Name])) of
+    case element(1, kill_nodes_by_name([Name])) of
         [] -> not_found;
         _  -> ok
     end.
 %% @doc Kills multiple nodes.
--spec kill_nodes
-        ([pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]};
-        (non_neg_integer())        -> {Ok::[pid_groups:groupname()], NotFound::[]}.
-kill_nodes(Names) ->
-    del_nodes(Names, false).
-
-%% @doc Gets supervisor specs for all nodes with the given names and kills them
-%%      (internal function).
--spec del_nodes([pid_groups:groupname()], Graceful::boolean())
-        -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]};
-               (non_neg_integer(), Graceful::boolean())
-        -> {Ok::[pid_groups:groupname()], NotFound::[]}.
-del_nodes(Count, Graceful) when is_integer(Count) ->
-    {admin:del_nodes(Count, Graceful), []};
-del_nodes(Names, Graceful) ->
-    admin:del_nodes_by_name(Names, Graceful).
+-spec kill_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
+kill_nodes(Count) ->
+    admin:del_nodes(Count, false).
+-spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
+kill_nodes_by_name(Names) ->
+    admin:del_nodes_by_name(Names, false).
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.
@@ -124,7 +115,7 @@ get_other_vms(MaxVMs) ->
 %% @doc Graceful shutdown of this VM.
 -spec shutdown_vm() -> no_return().
 shutdown_vm() ->
-    _ = shutdown_nodes(get_nodes()),
+    _ = shutdown_nodes(number_of_nodes()),
     % TODO: need to wait for the actual leave to finish
     timer:sleep(5000),
     erlang:halt().
