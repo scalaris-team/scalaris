@@ -527,7 +527,12 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             RTMs = tx_state:get_rtms(TxState),
             Role = state_get_role(State),
             ValidAccs = [ X || {X} <- rtms_get_accpids(RTMs)],
-            {_, _, ThisRTMsNumber, _} = lists:keyfind({comm:this()}, 2, RTMs),
+            This = comm:this(),
+            case comm:is_valid(This) of
+                false ->
+                    log:log(warn, "Cannot discover my comm:this().~n");
+                true ->
+                    {_, _, ThisRTMsNumber, _} = lists:keyfind({This}, 2, RTMs),
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
@@ -558,6 +563,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                           ok
                   end
               end || ItemId <- TxItemIDs ]
+            end
         end,
     State;
 
@@ -849,9 +855,11 @@ count_messages_per_type() ->
 
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
 rtms_of_same_dht_node(InRTMs) ->
-    Groups = lists:usort([catch(pid_groups:group_of(
-                                  comm:make_local(element(1,get_rtmpid(X)))))
+    GetGroups = lists:usort([pid_groups:group_of(
+                            comm:make_local(element(1,get_rtmpid(X))))
                           || X <- InRTMs, unknown =/= get_rtmpid(X)]),
+    %% group_of may return failed, don't include these
+    Groups = [ X || X <- GetGroups, X =/= failed ],
     case length(Groups) of
         4 -> false;
         _ ->
