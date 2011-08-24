@@ -11,25 +11,20 @@ update-rc.d -f hadoop-0.20-tasktracker remove
 update-rc.d -f hue remove
 update-rc.d -f dnsmasq remove
 
-#ln -s /etc/init.d/hadoop /etc/rc2.d/S99hadoop
-
-apt-get remove --purge -y dhcp3-client dhcp3-common
+apt-get remove --purge -y dhcp3-client dhcp3-common isc-dhcp-client isc-dhcp-common
 
 echo "LC_ALL=C" > /etc/default/locale
 echo "Europe/Berlin" > /etc/timezone
 
-#cat << EOT >> /etc/hadoop/conf/hadoop-env.sh 
-#export HADOOP_OPTS="-Djava.net.preferIPv4Stack=true -Djava.security.egd=file:/dev/./urandom"
-#EOT
-
-rm -f /etc/hadoop/conf/masters /etc/hadoop/conf/slaves
+HADOOP_ETC="/etc/alternatives/hadoop-etc"
+cp -a /root/conf.cluster $HADOOP_ETC/
+update-alternatives --install $HADOOP_ETC/conf hadoop-0.20-conf $HADOOP_ETC/conf.cluster 99
 
 cat << EOT > /etc/dnsmasq.conf
 expand-hosts
 domain=localcloud
 local=/localcloud/
 EOT
-
 
 HADOOP_CONFIG="/etc/hadoop-0.20/conf.cluster"
 test -d $HADOOP_CONFIG || (echo "Error: $HADOOP_CONFIG not found"; exit 1)
@@ -50,3 +45,8 @@ done
 groupmod -g 1001 xtreemfs
 usermod -u 1001 xtreemfs
 chown -R xtreemfs /var/lib/xtreemfs
+
+echo << EOT > /root/.bashrc
+export JAVA_HOME=/usr/lib/jvm/java-6-sun/jre
+export PATH=$PATH:/root/pig/bin
+EOT

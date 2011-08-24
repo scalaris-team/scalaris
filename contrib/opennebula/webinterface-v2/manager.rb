@@ -32,7 +32,11 @@ end
 puts instance.id
 
 get '/' do
-  erb :index
+  if TYPE == "hadoop"
+    erb :hadoop_index
+  else
+    erb :scalaris_index
+  end
 end
 
 post '/add' do
@@ -50,6 +54,20 @@ end
 post '/list' do
   @list = helper.list(instance)
   erb :list
+end
+
+get '/jsonrpc' do
+  redirect "/"
+end
+
+if TYPE == "hadoop"
+  post '/analyze_logs' do
+    system("perl /root/analyze_logs.pl")
+    erb :hadoop_waitresults
+  end
+  get '/analyze_logs' do
+    erb :hadoop_waitresults
+  end
 end
 
 get '/jsonrpc' do

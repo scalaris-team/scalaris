@@ -12,8 +12,11 @@ binary.iso: Makefile config.sh cust
 clean:
 	sudo lh clean
 
+shiny: clean
+	sudo rm -rf auto config cache .stage
+
 config: config.sh
-	sh config.sh
+	./config.sh
 
 build:
 	sudo lh build

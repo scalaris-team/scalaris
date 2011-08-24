@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 lh config \
   --distribution stable --memtest none --binary-indices false \
@@ -18,22 +18,26 @@ cp cust/cloudera.list config/chroot_sources/cloudera.binary
 cp cust/cloudera.gpg  config/chroot_sources/cloudera.chroot.gpg
 cp cust/cloudera.gpg  config/chroot_sources/cloudera.binary.gpg
 
-test -f config/chroot_local-packages/xtreemfs-client_1.3.0b1_amd64.deb ||
+# xtreemfs client
+test -f config/chroot_local-packages/xtreemfs-client_1.3.0rc1_amd64.deb ||
   wget --directory-prefix=config/chroot_local-packages \
-  http://download.opensuse.org/repositories/home:/xtreemfs:/unstable/Debian_6.0/amd64/xtreemfs-client_1.3.0b1_amd64.deb
+  http://download.opensuse.org/repositories/home:/xtreemfs:/unstable/Debian_6.0/amd64/xtreemfs-client_1.3.0rc1_amd64.deb
 
 # we accept the terms of licence
 LICENCE_FILE="config/chroot_local-preseed/sun-licence"
 echo "sun-java6-bin shared/accepted-sun-dlj-v1-1 select true" >  $LICENCE_FILE
 echo "sun-java6-jre shared/accepted-sun-dlj-v1-1 select true" >> $LICENCE_FILE
 
-mkdir -p config/chroot_local-includes/etc/hadoop-0.20/conf.cluster
-cp cust/conf.cluster/* config/chroot_local-includes/etc/hadoop-0.20/conf.cluster
+mkdir -p config/chroot_local-includes/root/conf.cluster
+cp cust/conf.cluster/* config/chroot_local-includes/root/conf.cluster
 
 install -D -m 755 cust/vmcontext config/chroot_local-includes/etc/init.d/vmcontext
 install -D -m 755 cust/start-hadoop.sh config/chroot_local-includes/etc/init.d/hadoop 
 install -D -m 755 cust/dnsupdate-client.pl config/chroot_local-includes/usr/bin/dnsupdate-client.pl
 install -D -m 755 cust/dnsupdate-server.pl config/chroot_local-includes/usr/bin/dnsupdate-server.pl
+install -D -m 644 cust/analyze_logs.pig config/chroot_local-includes/root/analyze_logs.pig
+install -D -m 755 cust/analyze_logs.pl config/chroot_local-includes/root/analyze_logs.pl
+install -D -m 644 cust/bydate.gnuplot config/chroot_local-includes/root/bydate.gnuplot
 
 mkdir -p config/chroot_local-includes/var/lib
 rm -rf config/chroot_local-includes/var/lib/sc-manager
@@ -46,3 +50,14 @@ cp cust/post-install.sh config/chroot_local-hooks/00-post-install.sh
 #test -f /usr/share/live-helper/hooks/stripped && \
 #  cp /usr/share/live-helper/hooks/stripped config/chroot_local-hooks/01-stripped
 
+# get and compile pig(gybank)
+if [ ! -d cust/pig ]; then
+  mkdir -p config/chroot_local-includes/root
+  svn checkout http://svn.apache.org/repos/asf/pig/trunk/ cust/pig
+else
+  svn update cust/pig
+fi
+
+cp -u cust/ContrailLogLoader.java cust/pig/contrib/piggybank/java/src/main/java/org/apache/pig/piggybank/storage/apachelog/
+pushd cust/pig && ant && cd contrib/piggybank/java && ant && popd
+cp -u cust/pig/contrib/piggybank/java/piggybank.jar config/chroot_local-includes/root

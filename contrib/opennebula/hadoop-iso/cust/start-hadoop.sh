@@ -52,6 +52,7 @@ sed -i "s/@NR_REDTASKS@/$NR_TASKS/" $HADOOP_DIR/mapred-site.xml
 
 # HDFS stuff
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
+  sudo -u hdfs hadoop namenode -format
   /etc/init.d/hadoop-0.20-namenode start
   /etc/init.d/hadoop-0.20-secondarynamenode start
 fi
@@ -70,6 +71,7 @@ fi
 
 # MapReduce stuff
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
+  sudo -u hdfs hadoop fs -chmod 777 /
   /etc/init.d/hadoop-0.20-jobtracker start
   /etc/init.d/hue start
 fi
