@@ -438,13 +438,13 @@ process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
 
 -spec send(Pid::comm:mypid(), Message::move_message(), MoveFullId::slide_op:id()) -> ok.
 send(Pid, Message, MoveFullId) ->
-    Shepherd = comm:this_with_cookie({move, MoveFullId}),
+    Shepherd = comm:self_with_cookie({move, MoveFullId}),
     ?TRACE_SEND(Pid, Message),
     comm:send_with_shepherd(Pid, Message, Shepherd).
 
 -spec send_no_slide(Pid::comm:mypid(), Message::move_message(), Timeouts::non_neg_integer()) -> ok.
 send_no_slide(Pid, Message, Timeouts) ->
-    Shepherd = comm:this_with_cookie({move, timeouts, Timeouts}),
+    Shepherd = comm:self_with_cookie({move, timeouts, Timeouts}),
     ?TRACE_SEND(Pid, Message),
     comm:send_with_shepherd(Pid, Message, Shepherd).
 
