@@ -36,12 +36,19 @@ get_version() ->
 
 %% @doc Gets some information about the VM and Scalaris.
 -spec get_info() -> [{scalaris_version | erlang_version, string()} |
-                     {mem_total, non_neg_integer()} | {uptime, Ms::non_neg_integer()}].
+                     {mem_total, non_neg_integer()} | {uptime, Ms::non_neg_integer()} |
+                     {erlang_node, node()} | {ip, inet:ip_address()} |
+                     {port, non_neg_integer()} | {yaws_port, non_neg_integer()}].
 get_info() ->
     [{scalaris_version, ?SCALARIS_VERSION},
      {erlang_version, erlang:system_info(otp_release)},
      {mem_total, erlang:memory(total)},
-     {uptime, erlang:element(1, erlang:statistics(wall_clock))}].
+     {uptime, erlang:element(1, erlang:statistics(wall_clock))},
+     {erlang_node, node()},
+     {ip, comm:get_ip(comm:this())},
+     {port, comm:get_port(comm:this())},
+     {yaws_port, config:read(yaws_port)}
+    ].
 
 %% @doc Gets the number of Scalaris nodes inside this VM.
 -spec number_of_nodes() -> non_neg_integer().

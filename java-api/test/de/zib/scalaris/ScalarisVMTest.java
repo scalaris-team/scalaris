@@ -19,13 +19,13 @@ import static org.junit.Assert.*;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.Ignore;
 import org.junit.Test;
 
 import de.zib.scalaris.ScalarisVM.AddNodesResult;
 import de.zib.scalaris.ScalarisVM.DeleteNodesByNameResult;
+import de.zib.scalaris.ScalarisVM.GetInfoResult;
 
 /**
  * Test class for {@link ScalarisVM}.
@@ -34,7 +34,7 @@ import de.zib.scalaris.ScalarisVM.DeleteNodesByNameResult;
  * @version 3.6
  * @since 3.6
  */
-//@Ignore
+@Ignore
 public class ScalarisVMTest {
     private static final int MAX_WAIT_FOR_VM_SIZE = 30000;
 
@@ -130,14 +130,15 @@ public class ScalarisVMTest {
     @Test
     public final void testGetInfo1() throws ConnectionException {
         final ScalarisVM conn = new ScalarisVM();
-        final Map<String, Object> info = conn.getInfo();
-        assertTrue(!info.isEmpty());
-        assertEquals(String.class, info.get("scalaris_version").getClass());
-        assertEquals(String.class, info.get("erlang_version").getClass());
-        assertEquals(Integer.class, info.get("mem_total").getClass());
-        assertEquals(Integer.class, info.get("uptime").getClass());
-        assertTrue("mem_total >= 0", (Integer) info.get("mem_total") >= 0);
-        assertTrue("uptime >= 0", (Integer) info.get("uptime") >= 0);
+        final GetInfoResult info = conn.getInfo();
+        System.out.println(info.scalarisVersion);
+        assertTrue("scalaris_version (" + info.scalarisVersion + ") != \"\"", !info.scalarisVersion.isEmpty());
+        assertTrue("erlang_version (" + info.erlangVersion + ") != \"\"", !info.erlangVersion.isEmpty());
+        assertTrue("mem_total (" + info.memTotal + ") >= 0", info.memTotal >= 0);
+        assertTrue("uptime (" + info.uptime + ") >= 0", info.uptime >= 0);
+        assertTrue("erlang_node (" + info.erlangNode + ") != \"\"", !info.erlangNode.isEmpty());
+        assertTrue("0 <= port (" + info.port + ") <= 65535", info.port >= 0 && info.port <= 65535);
+        assertTrue("0 <= yaws_port (" + info.yawsPort + ") <= 65535", info.yawsPort >= 0 && info.yawsPort <= 65535);
     }
 
     /**
