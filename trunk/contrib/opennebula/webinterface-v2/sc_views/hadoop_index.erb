@@ -1,7 +1,7 @@
 <html>
 <head>
 <link rel="stylesheet" text="text/css" href="/contrail.css">
-<title>Scalaris</title>
+<title><%= TYPE.capitalize %></title>
 <style type="text/css">
 table { width:100%; margin-top:20%; margin-left:20%; border-spacing:50px}
 td { vertical-align:top; overflow:hidden; }
@@ -22,6 +22,21 @@ td { vertical-align:top; overflow:hidden; }
       <input name="_method" type="hidden" value="post" />
     </div>
     List Nodes
+    <input id="submit" name="commit" type="submit" value="Go" />
+  </form>
+
+<ul>
+  <li><a href="http://<%= env["SERVER_NAME"] %>:50030">JobTracker</a></li>
+  <li><a href="http://<%= env["SERVER_NAME"] %>:50070">NameNode</a></li>
+  <li><a href="http://<%= env["SERVER_NAME"] %>:8088">Hue</a></li>
+  <li><a href="http://<%= env["HTTP_HOST"] %>/hadoop_result.html">Analyzed logs</a></li>
+</ul>
+
+  <form action="/analyze_logs" method="post">
+    <div style="margin:0;padding:0;display:inline">
+      <input name="_method" type="hidden" value="post" />
+    </div>
+    Analyze Logs
     <input id="submit" name="commit" type="submit" value="Go" />
   </form>
 

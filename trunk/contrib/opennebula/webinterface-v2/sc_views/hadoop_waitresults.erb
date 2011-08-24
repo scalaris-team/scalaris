@@ -1,0 +1,43 @@
+<html>
+<head>
+<meta http-equiv="refresh" content="5;">
+<link rel="stylesheet" text="text/css" href="/contrail.css">
+<title>pig output</title>
+<style type="text/css">
+table { width:100%; margin-top:20%; margin-left:20%; border-spacing:50px}
+td { vertical-align:top; overflow:hidden; }
+</style>
+<script type="text/javascript">
+<!--
+
+function scroll_bottom() 
+{
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+-->
+</script>
+</head>
+<body onload="scroll_bottom();">
+Waiting for results...<br>
+<div style="font-size:10pt">
+<% if File.exist?("/tmp/hadoop-output") %>
+<% result = File.new("/tmp/hadoop-output", "r") %>
+<% while (line = result.gets) %>
+<% if line.match("Success!") %>
+<% show_link=true %>
+<% end %>
+<%= line.chomp! %><br>
+<% end %>
+<% result.close %>
+</textarea>
+<% else %>
+Hadoop has not started yet
+<% end %>
+</div>
+<% if show_link == true %>
+<p><a href="/hadoop_result.html">To the results</a></p>
+<% end %>
+</body>
+</html>
+

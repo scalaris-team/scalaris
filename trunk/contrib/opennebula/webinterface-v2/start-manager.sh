@@ -16,6 +16,7 @@ if [ -z  "$VMID" ]; then
   exit 1
 fi
 
+mkdir -p /var/lib/sc-manager/public
 cd /var/lib/sc-manager
 # the sleep command is used to find error messages
 screen -d -m /bin/bash -c "VMID=$VMID /var/lib/sc-manager/manager.rb; sleep 365d"
