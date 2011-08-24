@@ -37,6 +37,8 @@
          get_all_children/1,
          get_processes/0, kill_new_processes/1, kill_new_processes/2,
          init_per_suite/1, end_per_suite/1,
+         create_ct_all/1, create_ct_groups/2,
+         init_per_group/2, end_per_group/2,
          get_ring_data/0, print_ring_data/0,
          macro_equals/4, macro_equals/5,
          expect_no_message_timeout/1,
@@ -44,6 +46,7 @@
          start_minimal_procs/3, stop_minimal_procs/1]).
 
 -include("scalaris.hrl").
+-include_lib("common_test/include/ct.hrl").
 
 %% @doc Sets the current working directory to "../bin" if it does not end with
 %%      "/bin" yet. Assumes that the current working directory is a sub-dir of
@@ -478,6 +481,39 @@ end_per_suite(Config) ->
     kill_new_processes(OldProcesses),
     error_logger:tty(true),
     Config.
+
+-type ct_group_props() ::
+    [parallel | sequence | shuffle | {shuffle, {integer(), integer(), integer()}} |
+     {repeat | repeat_until_all_ok | repeat_until_all_fail | repeat_until_any_ok | repeat_until_any_fail, integer() | forever}].
+
+-spec create_ct_all(TestCases::[atom()]) -> [{group, atom()}].
+create_ct_all(TestCases) ->
+    [{group, TestCase} || TestCase <- TestCases].
+
+-spec create_ct_groups(TestCases::[atom()], SpecialOptions::[{atom(), ct_group_props()}])
+        -> [{atom(), ct_group_props(), [atom()]}].
+create_ct_groups(TestCases, SpecialOptions) ->
+    [begin
+         Options =
+             case lists:keyfind(TestCase, 1, SpecialOptions) of
+                 false -> [sequence, {repeat, 1}];
+                 {_, X} -> X
+             end,
+         {TestCase, Options, [TestCase]}
+     end || TestCase <- TestCases].
+
+-spec init_per_group(atom(), [tuple()]) -> [tuple()].
+init_per_group(_Group, Config) -> Config.
+
+-spec end_per_group(atom(), [tuple()]) -> {return_group_result, ok | failed}.
+end_per_group(_Group, Config) ->
+    Status = ?config(tc_group_result, Config),
+    case proplists:get_value(failed, Status) of
+        [] ->                                   % no failed cases 
+            {return_group_result, ok};
+        _Failed ->                              % one or more failed
+            {return_group_result, failed}
+    end.
 
 -spec get_ring_data() -> [{pid(), 
                            {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, 

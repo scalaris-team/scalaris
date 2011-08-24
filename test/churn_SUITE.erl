@@ -26,15 +26,34 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() ->
-    [transactions_1_failure_4_nodes_read,
+test_cases() ->
+    [
+     transactions_1_failure_4_nodes_read,
      transactions_2_failures_4_nodes_read,
      transactions_3_failures_4_nodes_read,
      transactions_1_failure_4_nodes_networksplit_write,
      transactions_2_failures_4_nodes_networksplit_write,
-     transactions_3_failures_4_nodes_networksplit_write].
+     transactions_3_failures_4_nodes_networksplit_write
+    ].
+
+all() -> unittest_helper:create_ct_all(test_cases()).
+
+groups() ->
+%%     unittest_helper:create_ct_groups(test_cases(), [{transactions_1_failure_4_nodes_read, [sequence, {repeat_until_any_fail, forever}]}]).
+    unittest_helper:create_ct_groups(test_cases(), []).
 
 suite() -> [ {timetrap, {seconds, 30}} ].
+
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
@@ -57,13 +76,6 @@ init_per_testcase(TestCase, Config) ->
 
 end_per_testcase(_TestCase, _Config) ->
     unittest_helper:stop_ring(),
-    ok.
-
-init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
-
-end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 transactions_1_failure_4_nodes_read(_) ->
