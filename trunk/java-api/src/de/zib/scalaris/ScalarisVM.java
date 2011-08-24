@@ -15,7 +15,10 @@
  */
 package de.zib.scalaris;
 
+import java.net.Inet4Address;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -91,15 +94,73 @@ public class ScalarisVM {
     }
 
     /**
-     * Gets some information about the VM and Scalaris.
+     * Plain old data object for results of {@link ScalarisVM#getInfo()}.
      *
-     * Available keys in the returned map are:
-     * <ul>
-     *  <li><tt>scalaris_version</tt> - contains a {@link String}</li>
-     *  <li><tt>erlang_version</tt> - contains a {@link String}</li>
-     *  <li><tt>mem_total</tt> - contains an {@link Integer}</li>
-     *  <li><tt>uptime</tt> - contains an {@link Integer}</li>
-     * </ul>
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.6
+     * @since 3.6
+     */
+    public static class GetInfoResult {
+        /**
+         * Scalaris version string.
+         */
+        public final String scalarisVersion;
+        /**
+         * Scalaris version string.
+         */
+        public final String erlangVersion;
+        /**
+         * Scalaris version string.
+         */
+        public final int memTotal;
+        /**
+         * Scalaris version string.
+         */
+        public final int uptime;
+        /**
+         * Scalaris version string.
+         */
+        public final String erlangNode;
+        /**
+         * Scalaris version string.
+         */
+        public final Inet4Address ip;
+        /**
+         * Scalaris version string.
+         */
+        public final int port;
+        /**
+         * Scalaris version string.
+         */
+        public final int yawsPort;
+
+        /**
+         * @param scalarisVersion
+         * @param erlangVersion
+         * @param memTotal
+         * @param uptime
+         * @param erlangNode
+         * @param ip
+         * @param port
+         * @param yawsPort
+         */
+        public GetInfoResult(String scalarisVersion, String erlangVersion,
+                int memTotal, int uptime, String erlangNode, Inet4Address ip,
+                int port, int yawsPort) {
+            super();
+            this.scalarisVersion = scalarisVersion;
+            this.erlangVersion = erlangVersion;
+            this.memTotal = memTotal;
+            this.uptime = uptime;
+            this.erlangNode = erlangNode;
+            this.ip = ip;
+            this.port = port;
+            this.yawsPort = yawsPort;
+        }
+    }
+
+    /**
+     * Gets some information about the VM and Scalaris.
      *
      * @return VM information
      *
@@ -110,15 +171,39 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public Map<String, Object> getInfo()
+    public GetInfoResult getInfo()
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "get_info",
                     new OtpErlangObject[] {});
         try {
-            // note: the type ist a K/V list which is the same as in JSON object
-            final ErlangValueJSONToMap json_converter = new ErlangValueJSONToMap();
-            return json_converter.toJava((OtpErlangList) received_raw);
+            OtpErlangList received = (OtpErlangList) received_raw;
+            final Map<String, OtpErlangObject> result = new LinkedHashMap<String, OtpErlangObject>(
+                    received.arity());
+            for (final OtpErlangObject iter : received) {
+                final OtpErlangTuple iter_tpl = (OtpErlangTuple) iter;
+                if (iter_tpl.arity() == 2) {
+                    final String key = ((OtpErlangAtom) (iter_tpl.elementAt(0))).atomValue();
+                    result.put(key, iter_tpl.elementAt(1));
+                } else {
+                    throw new UnknownException(received_raw);
+                }
+            }
+            String scalarisVersion = new ErlangValue(result.get("scalaris_version")).stringValue();
+            String erlangVersion = new ErlangValue(result.get("erlang_version")).stringValue();
+            int memTotal = new ErlangValue(result.get("mem_total")).intValue();
+            int uptime = new ErlangValue(result.get("uptime")).intValue();
+            String erlangNode = new ErlangValue(result.get("erlang_node")).stringValue();
+            OtpErlangTuple erlIP = (OtpErlangTuple) result.get("ip");
+            Inet4Address ip = (Inet4Address) Inet4Address.getByName(
+                    erlIP.elementAt(0) + "." + erlIP.elementAt(1) + "." + erlIP.elementAt(2) + "." + erlIP.elementAt(3));
+            int port = new ErlangValue(result.get("port")).intValue();
+            int yawsPort = new ErlangValue(result.get("yaws_port")).intValue();
+            return new GetInfoResult(scalarisVersion, erlangVersion, memTotal, uptime, erlangNode, ip, port, yawsPort);
         } catch (final ClassCastException e) {
+            throw new UnknownException(e, received_raw);
+        } catch (final NullPointerException e) {
+            throw new UnknownException(e, received_raw);
+        } catch (final UnknownHostException e) {
             throw new UnknownException(e, received_raw);
         }
     }
