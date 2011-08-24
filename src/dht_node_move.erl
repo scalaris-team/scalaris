@@ -71,7 +71,7 @@
 
 -type result_message() :: {move, result, Tag::any(), Reason::abort_reason() | ok}.
 
--type move_message() ::
+-type move_message1() ::
     {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
@@ -96,6 +96,18 @@
     {move, done, MoveFullId::slide_op:id()} |
     {move, timeout, MoveFullId::slide_op:id()} % sent a message to the succ/pred but no reply yet
 .
+
+-ifdef(forward_or_recursive_types_are_not_allowed).
+-type move_message() ::
+    move_message1() |
+    {{send_error, Target::comm:mypid(), Message::comm:message()}, {move, timeouts, Timeouts::non_neg_integer()}} |
+    {{send_error, Target::comm:mypid(), Message::comm:message()}, {move, MoveFullId::slide_op:id()}}.
+-else.
+-type move_message() ::
+    move_message1() |
+    {{send_error, Target::comm:mypid(), Message::move_message1()}, {move, timeouts, Timeouts::non_neg_integer()}} |
+    {{send_error, Target::comm:mypid(), Message::move_message1()}, {move, MoveFullId::slide_op:id()}}.
+-endif.
 
 %% @doc Processes move messages for the dht_node and implements the node move
 %%      protocol.
