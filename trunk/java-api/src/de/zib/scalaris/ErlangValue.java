@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangBoolean;
 import com.ericsson.otp.erlang.OtpErlangDouble;
@@ -259,6 +260,8 @@ public class ErlangValue {
             } catch (final OtpErlangException e) {
                 throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString: " + e.getMessage());
             }
+        } else if (value instanceof OtpErlangAtom) {
+            return ((OtpErlangAtom) value).atomValue();
         } else {
             return ((OtpErlangString) value).stringValue();
         }
