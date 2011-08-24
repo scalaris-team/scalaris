@@ -46,7 +46,11 @@
          start_minimal_procs/3, stop_minimal_procs/1]).
 
 -include("scalaris.hrl").
--include_lib("common_test/include/ct.hrl").
+% we should include ct.hrl but erlang versions < R13B04 do not compile that way
+% -> include contents of ct.hrl manually:
+%-include_lib("common_test/include/ct.hrl").
+-include_lib("test_server/include/test_server.hrl").
+-compile({parse_transform,ct_line}).
 
 %% @doc Sets the current working directory to "../bin" if it does not end with
 %%      "/bin" yet. Assumes that the current working directory is a sub-dir of
