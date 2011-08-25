@@ -41,7 +41,9 @@
 
 %% @doc generates a failure detector for the calling process on the given pid.
 -spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
-subscribe(GlobalPids) -> subscribe(GlobalPids, '$fd_nil').
+subscribe([]) -> ok;
+subscribe(GlobalPids) ->
+    subscribe(GlobalPids, {self(), '$fd_nil'}).
 
 %% @doc generates a failure detector for the calling process and cookie on the
 %%      given pid.
@@ -58,7 +60,9 @@ subscribe(GlobalPid, Cookie) -> subscribe([GlobalPid], Cookie).
 
 %% @doc deletes the failure detector for the given pid.
 -spec unsubscribe(comm:mypid() | [comm:mypid()]) -> ok.
-unsubscribe(GlobalPids)-> unsubscribe(GlobalPids, '$fd_nil').
+unsubscribe([])-> ok;
+unsubscribe(GlobalPids)->
+    unsubscribe(GlobalPids, {self(), '$fd_nil'}).
 
 %% @doc deletes the failure detector for the given pid and cookie.
 -spec unsubscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
