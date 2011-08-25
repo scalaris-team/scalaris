@@ -156,17 +156,17 @@ check_ring() ->
         -> first | {error, Reason::string()} | ?RT:key().
 check_ring_foldl({ok, NodeDetails}, first) ->
     node:id(node_details:get(NodeDetails, succ));
+check_ring_foldl(_, {error, Message}) ->
+    {error, Message};
 check_ring_foldl({ok, NodeDetails}, PredsSucc) ->
     MyId = node:id(node_details:get(NodeDetails, node)),
     if
         MyId =:= PredsSucc ->
             node:id(node_details:get(NodeDetails, succ));
         true ->
-            {error, lists:flatten(io_lib:format("~p didn't match ~p", [MyId, PredsSucc]))}
+            {error, lists:flatten(io_lib:format("MyID ~p didn't match preds succc ~p", [MyId, PredsSucc]))}
     end;
 check_ring_foldl({failed, _}, Previous) ->
-    Previous;
-check_ring_foldl(_, Previous = {error, _Message}) ->
     Previous.
 
 %% @doc Contact mgmt server and check that each node's successor and
@@ -190,11 +190,18 @@ check_ring_deep() ->
 check_ring_deep_foldl({ok, NodeDetails}, {ok, Nodes}) ->
     PredList = node_details:get(NodeDetails, predlist),
     SuccList = node_details:get(NodeDetails, succlist),
-    CheckIsKnownNode = fun (Node) -> lists:member(Node, Nodes) end,
-    case lists:all(CheckIsKnownNode, PredList) andalso
-          lists:all(CheckIsKnownNode, SuccList) of
-        true -> {ok, Nodes};
-        _    -> {error, node_details:get(NodeDetails, node), PredList, SuccList}
+    CheckIsKnownNode = fun (Node) -> not lists:member(Node, Nodes) end,
+    case {lists:filter(CheckIsKnownNode, PredList),
+          lists:filter(CheckIsKnownNode, SuccList)} of
+        {[],[]} -> {ok, Nodes};
+        {UnknownPreds, UnknownSuccs} ->
+            {error,
+             'in_node:', node_details:get(NodeDetails, node),
+             'predList:', PredList,
+             'succList:', SuccList,
+             'nodes:', Nodes,
+             'UnknownPreds:', UnknownPreds,
+             'UnknownSuccs:', UnknownSuccs}
     end;
 check_ring_deep_foldl({failed, _}, Previous) ->
     Previous;
