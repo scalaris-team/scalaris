@@ -118,8 +118,8 @@ get_port({_IP, Port, _Pid}) -> Port.
 report_send_error(Shepherd, Target, Message) ->
     case Shepherd of
         unknown ->
-            log:log(warn, "~.0p Connection failed, drop message ~.0p",
-                    [pid_groups:my_pidname(), Message]),
+            log:log(warn, "~p (name: ~.0p) Connection to ~.0p failed, drop message ~.0p",
+                    [self(), pid_groups:my_pidname(), Target, Message]),
             ok;
         ShepherdPid ->
             comm:send_local(ShepherdPid, {send_error, Target, Message})
