@@ -568,6 +568,8 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
     State;
 
 %% failure detector events
+on({crash, Pid, _Cookie}, State) ->
+    on({crash, Pid}, State);
 on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     RTMs = state_get_RTMs(State),
@@ -700,6 +702,12 @@ on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     comm:send_local(DHTNode, {lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
     State;
 
+on_init({tx_tm_rtm_tid_isdone, _TxId} = Msg, State) ->
+    comm:send_local(self(), Msg),
+    State;
+
+on_init({crash, Pid, _Cookie}, State) ->
+    on_init({crash, Pid}, State);
 on_init({crash, _Pid} = Msg, State) ->
     %% only in tx_tm
     on(Msg, State).
@@ -951,8 +959,9 @@ state_dec_opentxnum(State) -> setelement(7, State, element(7, State) - 1).
 state_subscribe(State, Pid) ->
     Subs = state_get_subs(State),
     NewSubs = case lists:keyfind(Pid, 1, Subs) of
-                  false -> fd:subscribe(Pid),
-                           [{Pid, 1} | Subs];
+                  false -> 
+                      fd:subscribe(Pid, {self(), state_get_role(State)}),
+                      [{Pid, 1} | Subs];
                   Tuple ->
                       NewVal = setelement(2, Tuple, element(2, Tuple) + 1),
                       lists:keyreplace(Pid, 1, Subs, NewVal)
@@ -968,7 +977,7 @@ state_unsubscribe(State, Pid) ->
                       case element(2, Tuple) of
                           1 ->
                               %% delay the actual unsubscribe for better perf.?
-                              fd:unsubscribe(element(1, Tuple)),
+                              fd:unsubscribe(element(1, Tuple), {self(), state_get_role(State)}),
                               lists:keydelete(Pid, 1, Subs);
                           Num ->
                               NewVal = setelement(2, Tuple, Num - 1),
