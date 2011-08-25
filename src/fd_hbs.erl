@@ -84,9 +84,12 @@ on({add_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
 on({del_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
     ?TRACE("fd_hbs del_subscriber ~.0p~n", [_Msg]),
     %% unregister subscriber locally
-    S1 = state_del_entry(State, {Subscriber, WatchedPid, Cookie}),
+    {Changed, S1} = state_del_entry(State, {Subscriber, WatchedPid, Cookie}),
     %% delete watched pid remotely, if no longer needed
-    _S2 = state_del_watched_pid(S1, WatchedPid);
+    case Changed of
+        deleted -> _S2 = state_del_watched_pid(S1, WatchedPid);
+        unchanged -> S1
+    end;
 
 on({add_watching_of, WatchedPid} = _Msg, State) ->
     ?TRACE("fd_hbs add_watching_of ~.0p~n", [_Msg]),
@@ -164,7 +167,7 @@ on({crashed, WatchedPid}, State) ->
         _ -> ok
     end,
     _ = [ case Cookie of
-              '$fd_nil' ->
+              {_, '$fd_nil'} ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X)]),
                   comm:send_local(X, {crash, WatchedPid});
@@ -179,7 +182,10 @@ on({crashed, WatchedPid}, State) ->
     S1 = state_set_rem_pids(State, NewRemPids),
     %% delete subscription entries with this pid
     lists:foldl(fun({Sub, Cook}, StAgg) ->
-                        state_del_entry(StAgg, {Sub, WatchedPid, Cook}) end,
+                        {_, Res} =
+                            state_del_entry(StAgg, {Sub, WatchedPid, Cook}),
+                        Res
+                end,
                 S1, Subscriptions);
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
@@ -189,7 +195,7 @@ on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
               {crashed, comm:make_global(WatchedPid)}),
     %% delete WatchedPid and MonRef locally (MonRef is already
     %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, WatchedPid).
+    _S1 = state_del_monitor(State, comm:make_global(WatchedPid)).
 
 %% @doc Checks existence and validity of config parameters for this module.
 -spec check_config() -> boolean().
@@ -267,7 +273,7 @@ state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     end,
     State.
 
--spec state_del_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> state().
+-spec state_del_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> {deleted | unchanged, state()}.
 state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
@@ -276,20 +282,35 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     Entry = pdb:get({Subscriber, WatchedPid}, Table),
     case Entry of
         undefined ->
-            log:log(warn, "got unsubscribe for not registered subscription ~.0p~n", [{unsubscribe, Subscriber, WatchedPid, Cookie}]),
-            State;
+            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~p, Watching group and name ~p~n",
+                    [{unsubscribe, Subscriber, WatchedPid, Cookie},
+                     pid_groups:group_and_name_of(Subscriber),
+                    pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
+            {unchanged, State};
         Entry ->
             %% delete cookie
-            EntryWithoutCookie =
-                setelement(2, Entry, lists:delete(Cookie, element(2, Entry))),
-            NewEntry =
-                setelement(3, EntryWithoutCookie,
-                           element(3, EntryWithoutCookie) - 1),
+            Cookies = element(2, Entry),
+            Changed =
+                case lists:member(Cookie, Cookies) of
+                    true ->
+                        EntryWithoutCookie =
+                            setelement(2, Entry, lists:delete(Cookie, element(2, Entry))),
+                        NewEntry =
+                            setelement(3, EntryWithoutCookie,
+                                       element(3, EntryWithoutCookie) - 1),
+                        deleted;
+                false ->
+                    log:log(warn,
+                            "got unsubscribe with non existing cookie ~p~n",
+                            [Cookie]),
+                        NewEntry = Entry,
+                        unchanged
+            end,
             case element(3, NewEntry) of
-                0 -> pdb:delete(Entry, Table);
+                0 -> pdb:delete(element(1, Entry), Table);
                 _ -> pdb:set(NewEntry, Table)
             end,
-            State
+            {Changed, State}
     end.
 
 -spec state_get_subscriptions(state(), comm:mypid()) -> [{pid(), any()}].
@@ -353,7 +374,7 @@ state_add_monitor(State, WatchedPid) ->
     state_set_monitors(
       State, [{WatchedPid, MonRef} | state_get_monitors(State)]).
 
--spec state_del_monitor(state(), pid()) -> state().
+-spec state_del_monitor(state(), comm:mypid()) -> state().
 state_del_monitor(State, WatchedPid) ->
     Monitors = state_get_monitors(State),
     case lists:keyfind(WatchedPid, 1, Monitors) of
