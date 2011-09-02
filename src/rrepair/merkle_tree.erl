@@ -35,8 +35,8 @@
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
@@ -51,9 +51,9 @@
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
-         bucket_size    = 64                :: pos_integer(),   %max items in a leaf
+         bucket_size    = 24                :: pos_integer(),   %max items in a leaf
          leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation
+         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation - 
          gen_hash_on    = value             :: value | key      %node hash will be generated on value or an key         
          }).
 -type mt_config() :: #mt_config{}.
@@ -213,9 +213,10 @@ gen_hash({_, Count, nil, I, List}, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Size
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec size(merkle_tree()) -> non_neg_integer().
+-spec size(merkle_tree() | mt_node()) -> non_neg_integer().
 size({_, Root}) ->
-    node_size(Root).
+    node_size(Root);
+size(Node) -> node_size(Node).
 
 -spec node_size(mt_node()) -> non_neg_integer().
 node_size({_, _, _, _, []}) ->
