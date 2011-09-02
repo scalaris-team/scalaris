@@ -123,7 +123,12 @@ module JSONRPC
       :method => function,
       :params => params,
       :id => 0}.to_json
-    res = Net::HTTP.start(url.host, url.port){|http|http.request(req)}
-    JSON.parse(res.body)
+    begin
+      res = Net::HTTP.start(url.host, url.port){|http|http.request(req)}
+      JSON.parse(res.body)
+    rescue
+      puts "#{url}: #{$!}"
+      nil
+    end
   end
 end
