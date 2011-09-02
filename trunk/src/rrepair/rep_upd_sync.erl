@@ -27,6 +27,7 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_sync/2, check_config/0]).
+-export([print_sync_stats/1]).
 
 %exports for testing
 -export([encodeBlob/2, decodeBlob/1, 
@@ -82,9 +83,11 @@
          diffCount          = 0 :: non_neg_integer(),
          updatedCount       = 0 :: non_neg_integer(),
          notUpdatedCount    = 0 :: non_neg_integer(),
+         tree_size          = 0 :: non_neg_integer(),
          tree_compareLeft   = 0 :: non_neg_integer(),
          tree_nodesCompared = 0 :: non_neg_integer(),
          tree_leafsSynced   = 0 :: non_neg_integer(),
+         tree_compareSkipped= 0 :: non_neg_integer(),
          errorCount         = 0 :: non_neg_integer(),
          buildTime          = 0 :: non_neg_integer(),
          syncTime           = 0 :: non_neg_integer()
@@ -116,7 +119,7 @@
     {get_chunk_response, rep_upd:db_chunk()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
-    {check_node_response, ok | not_found} |
+    {check_node_response, intervals:interval(), ok | not_found} |
     {check_node_response, fail, intervals:interval(), [merkle_tree:mt_node_key()] | is_leaf} |
     {start_sync, rep_upd:sync_method(), sync_stage()} |
     {start_sync, rep_upd:sync_method(), sync_stage(), sync_struct()} |
@@ -151,18 +154,21 @@ on({get_state_response, MyInterval}, State =
                             sync_master = false,
                             sync_struct = {MasterOwnerPid, SrcInterval},                        
                             dhtNodePid = DhtNodePid }) ->
-    fd:subscribe(MasterOwnerPid),    
+    fd:subscribe(MasterOwnerPid),
     MyIMapped = mapInterval(MyInterval, 1),
     SrcIMapped = mapInterval(SrcInterval, 1),
     Intersection = intervals:intersection(MyIMapped, SrcIMapped),
-    ?TRACE("REQ SHARED I FROM~nMyI=[~p] -~nMyIMapped=[~p]~nSrcI=[~p]~nSrcIMapped=~p~nIntersec=~p", 
-           [MyInterval, MyIMapped, SrcInterval, SrcIMapped, Intersection]),
+    %?TRACE("REQ SHARED I FROM~nMyI=[~p] -~nMyIMapped=[~p]~nSrcI=[~p]~nSrcIMapped=~p~nIntersec=~p", 
+    %       [MyInterval, MyIMapped, SrcInterval, SrcIMapped, Intersection]),
     case intervals:is_empty(Intersection) of
         true ->
+            ?TRACE("SYNC CLIENT - INTERSECTION EMPTY", []),
             comm:send_local(self(), {shutdown, intersection_empty});
         false ->
+            %comm:send_local(DhtNodePid, 
+            %                {get_chunk, self(), Intersection, get_max_items()}) %only one merkle sync if active
             comm:send_local(DhtNodePid, 
-                            {get_chunk, self(), Intersection, get_max_items()})
+                            {get_chunk, self(), mapInterval_to_range(Intersection, MyInterval, 2), get_max_items()})
     end,
     State#rep_upd_sync_state{ sync_stage = build_struct,
                               sync_struct = {MasterOwnerPid, Intersection} };
@@ -174,6 +180,7 @@ on({get_state_response, MyInterval}, State =
     MappedIntersec = mapInterval(Interval, get_interval_quadrant(MyInterval)),
     case intervals:is_subset(MappedIntersec, MyInterval) of
         false ->
+            ?TRACE("SYNC MASTER - INTERSEC NOT IN MY I", []),
             comm:send_local(self(), {shutdown, negotiate_interval_master}),
             comm:send(ClientPid, {shutdown, no_interval_intersection});
         true ->
@@ -199,30 +206,8 @@ on({get_state_response, NodeDBInterval}, State =
     end,
     State;
 
-on({get_state_response, NodeDBInterval}, State = 
-       #rep_upd_sync_state{ sync_stage = resolution,
-                            sync_struct = {simple_detail_sync, _, DiffList},
-                            dhtNodePid = DhtNodePid
-                          }) ->
-    %simple detail sync case
-    MyPid = comm:this(),
-    erlang:spawn(lists, 
-                 foreach, 
-                 [fun({MinKey, Val, Vers}) ->
-                          PosKeys = ?RT:get_replica_keys(MinKey),
-                          UpdKeys = lists:filter(fun(X) -> 
-                                                         intervals:in(X, NodeDBInterval)
-                                                 end, PosKeys),
-                          lists:foreach(fun(Key) ->
-                                                comm:send_local(DhtNodePid, 
-                                                                {update_key_entry, MyPid, Key, Val, Vers})
-                                        end, UpdKeys)
-                  end, 
-                  DiffList]),
-    %kill is done by update_key_entry_ack
-    State;
-
 on({get_chunk_response, {_, []}}, State) ->
+    comm:send_local(self(), {shutdown, req_chunk_is_empty}),
     State;
 
 on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
@@ -232,10 +217,8 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
                             dhtNodePid = DhtNodePid,
                             sync_master = SyncMaster,
                             sync_stats = SyncStats }) ->
-    ?TRACE("Get_Chunk Res - Build Bloom", []),
     case intervals:is_empty(RestI) of
         false ->
-            %{ok, Pid} = start_sync(true, Round + 0.1),
             {ok, Pid} = fork_sync(State, Round + 0.1),
             comm:send_local(DhtNodePid, {get_chunk, Pid, RestI, get_max_items()});
         _ -> ok
@@ -276,17 +259,16 @@ on({get_chunk_response, {RestI, DBList}}, State =
                             dhtNodePid = DhtNodePid,
                             sync_round = Round,
                             sync_stats = Stats }) ->
-    %build or extend tree
     {BuildTime, TreeSync} = 
         case is_record(SyncStruct, merkle_sync_struct) of
-            true ->
+            true -> %extend tree
                 {BTime, NewTree} = util:tc(
                                      fun() -> add_to_tree(DBList, 
                                                           SyncStruct#merkle_sync_struct.tree) 
                                      end),
                 {Stats#rep_upd_sync_stats.buildTime + BTime, 
                  SyncStruct#merkle_sync_struct{ tree = NewTree } };
-            false ->
+            false -> %build new tree
                 {DestOwnerPid, Interval} = SyncStruct,
                 util:tc(
                   fun() -> build_sync_struct(merkleTree, 
@@ -302,12 +284,14 @@ on({get_chunk_response, {RestI, DBList}}, State =
             comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items()}),
             State#rep_upd_sync_state{sync_struct = TreeSync, 
                                      sync_stats = Stats#rep_upd_sync_stats{ buildTime = BuildTime } };        
-        true ->
+        true ->            
             FinalTree = merkle_tree:gen_hashes(TreeSync#merkle_sync_struct.tree),
             FinalTreeSync = TreeSync#merkle_sync_struct{ tree = FinalTree },
+            %?TRACE("BUILD TREE NodeCount=~p~n~p", [merkle_tree:size(FinalTree), FinalTree]),
             ToCompare = 
                 case IsMaster of
                     true ->
+                        ?TRACE("MASTER SENDS ROOT CHECK", []),
                         comm:send(SrcPid, {check_node, 
                                            comm:this(), 
                                            merkle_tree:get_interval(FinalTree), 
@@ -326,8 +310,10 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                       sync_struct = FinalTreeSync, 
                                       sync_stats = 
                                           Stats#rep_upd_sync_stats{ tree_compareLeft = ToCompare,
+                                                                    tree_size = merkle_tree:size(FinalTree),
                                                                     buildTime = BuildTime
-                                                                  } }
+                                                                  } 
+                                    }
     end;
 
 on({get_chunk_response, {RestI, DBList}}, State = 
@@ -366,6 +352,58 @@ on({get_chunk_response, {RestI, DBList}}, State =
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
 
+on({start_sync, SyncMethod, SyncStage}, State) ->
+    comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    State#rep_upd_sync_state{ sync_method = SyncMethod, 
+                              sync_stage = SyncStage };    
+on({start_sync, SyncMethod, SyncStage, SyncStruct}, State =
+       #rep_upd_sync_state{ sync_master = Master }) ->
+    comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    State#rep_upd_sync_state{ sync_stage = SyncStage, 
+                              sync_struct = SyncStruct,
+                              sync_method = SyncMethod,
+                              sync_master = Master orelse SyncStage =:= res_shared_interval };
+
+on({crash, Pid}, State) ->
+    comm:send_local(self(), {shutdown, {fail, crash_of_sync_node, Pid}}),
+    State;
+
+on({shutdown, {simple_detail_sync_ok, _}}, _) ->
+    kill;    
+on({shutdown, Reason}, State = #rep_upd_sync_state{ sync_round = Round,
+                                                    sync_stats = Stats,
+                                                    sync_master = Master,
+                                                    sync_stage = Stage }) ->
+    ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
+    Stage =/= req_shared_interval andalso
+        comm:send_local(State#rep_upd_sync_state.ownerLocalPid, 
+                        {sync_progress_report, self(), Round, Master, Stats}),
+    kill;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% detail sync messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({get_state_response, NodeDBInterval}, State = 
+       #rep_upd_sync_state{ sync_stage = resolution,
+                            sync_struct = {simple_detail_sync, _, DiffList},
+                            dhtNodePid = DhtNodePid,
+                            sync_stats = Stats
+                          }) ->
+    MyPid = comm:this(),
+    lists:foreach(fun({MinKey, Val, Vers}) ->
+                          PosKeys = ?RT:get_replica_keys(MinKey),
+                          UpdKeys = lists:filter(fun(X) -> 
+                                                         intervals:in(X, NodeDBInterval)
+                                                 end, PosKeys),
+                          lists:foreach(fun(Key) ->
+                                                comm:send_local(DhtNodePid, 
+                                                                {update_key_entry, MyPid, Key, Val, Vers})
+                                        end, UpdKeys)                  end,
+                  DiffList),
+    %kill is done by update_key_entry_ack
+    State#rep_upd_sync_state{ sync_stats = Stats#rep_upd_sync_stats{ diffCount = length(DiffList) } };
+
+
 on({update_key_entry_ack, Entry, Exists, Done}, State =
        #rep_upd_sync_state{ sync_struct = {simple_detail_sync, Sender, _},
                             ownerRemotePid = Owner,
@@ -388,36 +426,17 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                                   db_entry:get_version(Entry)} | Feedback]};
                    false -> State#rep_upd_sync_state{ sync_stats = NewStats }
                end,
+    %?TRACE("DETAIL SYNC OK=~p Failed=~p Diff=~p", [OkCount, FailedCount, DiffCount]),
     _ = case DiffCount - 1 =:= OkCount + FailedCount of
             true ->
+                %?TRACE("DETAIL SYNC FINISHED", []),
                 get_do_feedback() andalso
                     comm:send(Sender, {request_sync, Round, resolution, bloom, {simple_detail_sync, Owner, NewState#rep_upd_sync_state.feedback}}),
-                comm:send_local(self(), {shutdown, {ok, NewState#rep_upd_sync_state.sync_stats}});
+                comm:send_local(self(), {shutdown, {simple_detail_sync_ok, NewState#rep_upd_sync_state.sync_stats}});
             _ ->
                 ok
         end,
     NewState;
-
-on({start_sync, SyncMethod, SyncStage}, State) ->
-    comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rep_upd_sync_state{ sync_method = SyncMethod, 
-                              sync_stage = SyncStage };    
-on({start_sync, SyncMethod, SyncStage, SyncStruct}, State =
-       #rep_upd_sync_state{ sync_master = Master }) ->
-    comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rep_upd_sync_state{ sync_stage = SyncStage, 
-                              sync_struct = SyncStruct,
-                              sync_method = SyncMethod,
-                              sync_master = Master orelse SyncStage =:= res_shared_interval };
-
-on({crash, Pid}, State) ->
-    comm:send_local(self(), {shutdown, {fail, crash_of_sync_node, Pid}}),
-    State;
-
-on({shutdown, Reason}, State = #rep_upd_sync_state{ sync_round = Round }) ->
-    comm:send_local(State#rep_upd_sync_state.ownerLocalPid, 
-                    {sync_progress_report, self(), shutdown, io_lib:format("[R~p] ~p", [Round, Reason])}),
-    kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
@@ -428,14 +447,14 @@ on({check_node, SrcPid, Interval, Hash}, State =
     Node = merkle_tree:lookup(Interval, Tree),
     case Node of
         not_found ->
-            comm:send(SrcPid, 
-                      {check_node_response, not_found});
+            comm:send(SrcPid, {check_node_response, Interval, not_found});
         _ ->
             IsLeaf = merkle_tree:is_leaf(Node),
+            ?TRACE("COMPARE RECV{I=[~p] Hash=[~p]} with MY {I=[~p] Hash=[~p]}", 
+                   [Interval, Hash, merkle_tree:get_interval(Node), merkle_tree:get_hash(Node)]),
             case merkle_tree:get_hash(Node) =:= Hash of
                 true ->
-                    comm:send(SrcPid, 
-                              {check_node_response, ok});
+                    comm:send(SrcPid, {check_node_response, Interval, ok});
                 false when IsLeaf -> 
                     comm:send(SrcPid, 
                               {check_node_response, fail, Interval, is_leaf});
@@ -450,28 +469,36 @@ on({check_node, SrcPid, Interval, Hash}, State =
     end,
     State#rep_upd_sync_state{ sync_pid = SrcPid };
 
-on({check_node_response, Result}, State = 
+on({check_node_response, I, Result}, State = 
        #rep_upd_sync_state{
                            sync_pid = SyncDest, 
                            sync_stats = 
                                 #rep_upd_sync_stats{ tree_compareLeft = CLeft,
+                                                     tree_nodesCompared = Compared,
+                                                     tree_compareSkipped = Skipped,
                                                      errorCount = Errors
-                                                   } = Stats 
+                                                   } = Stats,
+                            sync_struct = #merkle_sync_struct{ tree = Tree }                           
                           }) ->
+    Node = merkle_tree:lookup(I, Tree),
     NewErrorCount = Errors + case Result of
                                  ok -> 0;
                                  not_found -> 1
                              end,
     NewStats = Stats#rep_upd_sync_stats{ tree_compareLeft = CLeft - 1, 
-                                         errorCount = NewErrorCount },
+                                         errorCount = NewErrorCount,
+                                         tree_compareSkipped = Skipped + merkle_tree:size(Node),
+                                         tree_nodesCompared = Compared + 1 },
     if NewStats#rep_upd_sync_stats.tree_compareLeft =< 1 ->
            comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
-           comm:send_local(self(), {shutdown, sync_finished})
-    end,                                                        
+           comm:send_local(self(), {shutdown, sync_finished});
+       true -> ok
+    end,
     State#rep_upd_sync_state{ sync_stats = NewStats };
 
 on({check_node_response, fail, I, is_leaf}, State = 
-       #rep_upd_sync_state{ sync_stats = 
+       #rep_upd_sync_state{ sync_pid = SyncDest,
+                            sync_stats = 
                                 #rep_upd_sync_stats{
                                                     errorCount = Errors,
                                                     tree_compareLeft = ToCompare,
@@ -492,24 +519,39 @@ on({check_node_response, fail, I, is_leaf}, State =
                                reconcileLeaf(Node, {SrcNode, Round, OwnerPid}),
                                Stats#rep_upd_sync_stats{ tree_leafsSynced = LeafCount + 1 };
                            false ->
-                               reconcileNode(Node, {SrcNode, Round, OwnerPid})
-                                %TODO stats updaten
+                               ?TRACE("CLIENT LEAF IS AN INNER NODE OF MASTER", []),
+                               Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
+                               Stats#rep_upd_sync_stats{ tree_leafsSynced = LeafCount + Leafs }
                        end
                end,
+    if NewStats#rep_upd_sync_stats.tree_compareLeft =< 1 ->
+           comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
+           comm:send_local(self(), {shutdown, sync_finished});
+       true -> ok
+    end,    
     State#rep_upd_sync_state{ sync_stats = NewStats#rep_upd_sync_stats{ tree_compareLeft = ToCompare - 1} };
 
 on({check_node_response, fail, I, ChildHashs}, State = 
-       #rep_upd_sync_state{ sync_stats = #rep_upd_sync_stats{
-                                                             tree_compareLeft = ToCompare,
-                                                             tree_nodesCompared = Compared
-                                                             } = Stats, 
+       #rep_upd_sync_state{ sync_stats = 
+                                #rep_upd_sync_stats{
+                                                    tree_compareLeft = ToCompare,
+                                                    tree_nodesCompared = Compared,
+                                                    tree_compareSkipped = Skipped
+                                                   } = Stats, 
                             sync_pid = SrcPid,
                             sync_struct = #merkle_sync_struct{ tree = Tree } }) ->
     Node = merkle_tree:lookup(I, Tree),
     NewStats = case Node of 
                    not_found -> Stats;
                    _ -> MyChilds = merkle_tree:get_childs(Node),
-                        NotMatched = compareNodes(MyChilds, ChildHashs, []),
+                        {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
+                        MatchedSubNodes = 
+                            lists:foldl(fun(MNode, Acc) -> 
+                                                Acc + case merkle_tree:is_leaf(MNode) of
+                                                          true -> 0;
+                                                          false -> merkle_tree:size(MNode)
+                                                      end
+                                        end, 0, Matched),
                         lists:foreach(
                           fun(X) -> 
                                   comm:send(SrcPid, 
@@ -520,7 +562,8 @@ on({check_node_response, fail, I, ChildHashs}, State =
                           end, 
                           NotMatched),
                         Stats#rep_upd_sync_stats{ tree_compareLeft = ToCompare + length(NotMatched) - 1,
-                                                  tree_nodesCompared = Compared + 1 }                
+                                                  tree_nodesCompared = Compared + length(Matched) + 1,
+                                                  tree_compareSkipped = Skipped + MatchedSubNodes }                
                end,
     State#rep_upd_sync_state{ sync_stats = NewStats }.
     
@@ -576,23 +619,31 @@ fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec compareNodes([merkle_tree:mt_node()], [merkle_tree:mt_node_key()], [merkle_tree:mt_node()]) -> [merkle_tree:mt_node()].
+-spec compareNodes([merkle_tree:mt_node()], 
+                   [merkle_tree:mt_node_key()], 
+                   {Matched::[merkle_tree:mt_node()], NotMatched::[merkle_tree:mt_node()]}) -> 
+          {Matched::[merkle_tree:mt_node()], NotMatched::[merkle_tree:mt_node()]}.
 compareNodes([], [], Acc) -> Acc;
-compareNodes([N | Nodes], [H | NodeHashs], Acc) ->
+compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
     Hash = merkle_tree:get_hash(N),
     case Hash =:= H of
-        true -> compareNodes(Nodes, NodeHashs, Acc);
-        false -> compareNodes(Nodes, NodeHashs, [N|Acc])
+        true -> compareNodes(Nodes, NodeHashs, {[N|Matched], NotMatched});
+        false -> compareNodes(Nodes, NodeHashs, {Matched, [N|NotMatched]})
     end.
 
-% @doc Starts simple sync for a given node
--spec reconcileNode(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> ok.
+% @doc Starts simple sync for a given node, returns number of leaf sync requests.
+-spec reconcileNode(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> non_neg_integer().
 reconcileNode(Node, Conf) ->
-    _ = case merkle_tree:is_leaf(Node) of
-            true -> reconcileLeaf(Node, Conf);
-            false -> [ reconcileNode(X, Conf) || X <- merkle_tree:get_childs(Node)]
-        end,
-    ok.
+    Count = case merkle_tree:is_leaf(Node) of
+                true -> reconcileLeaf(Node, Conf), 1;
+                %false -> [ reconcileNode(X, Conf) || X <- merkle_tree:get_childs(Node)]
+                false -> lists:foldl(fun(X, Acc) -> 
+                                             Acc + reconcileNode(X, Conf) 
+                                     end, 
+                                     0, 
+                                     merkle_tree:get_childs(Node))
+            end,
+    Count.
 -spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> ok.
 reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
     ToSync = lists:map(fun({Key, Value}) -> 
@@ -607,6 +658,16 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec print_sync_stats(rep_upd_sync_stats()) -> [any()].
+print_sync_stats(Stats) ->
+    FieldNames = record_info(fields, rep_upd_sync_stats),
+    Res = util:for_to_ex(1, length(FieldNames), 
+                         fun(I) ->
+                                 {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
+                         end),
+    [erlang:element(1, Stats), lists:flatten(lists:reverse(Res))].
+
 % @ doc filter, partition and map items of a list in one run
 -spec filterPartitionMap(fun((A) -> boolean()), fun((A) -> boolean()), fun((A) -> any()), [A]) -> {Satisfying::[any()], NonSatisfying::[any()]}.
 filterPartitionMap(Filter, Pred, Map, List) ->
@@ -696,6 +757,18 @@ mapInterval(I, Q) ->
                   add_quadrants_to_key(RKey, QDiff, RepFactor), 
                   RBr).
 
+% @doc Tries to map SrcI into a destination Interval (DestRange)
+-spec mapInterval_to_range(intervals:interval(), intervals:interval(), pos_integer()) -> intervals:interval() | error.
+mapInterval_to_range(I, I, _) ->
+    I;
+mapInterval_to_range(SrcI, DestRange, Q) ->
+    {_, LKey, _, _} = intervals:get_bounds(SrcI),
+    RepFactor = length(?RT:get_replica_keys(LKey)),
+    case Q > RepFactor of
+        true -> error;
+        false -> mapInterval_to_range(mapInterval(SrcI, Q), DestRange, Q + 1)
+    end.
+
 -spec concatKeyVer(db_entry:entry()) -> binary().
 concatKeyVer(DBEntry) ->
     encodeBlob(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
@@ -746,6 +819,7 @@ check_config() ->
     case config:read(rep_update_activate) of
         true ->
             config:is_bool(rep_update_sync_feedback) andalso
+                
             config:is_float(rep_update_fpr) andalso
             config:is_greater_than(rep_update_fpr, 0) andalso
             config:is_less_than(rep_update_fpr, 1) andalso

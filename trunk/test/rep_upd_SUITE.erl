@@ -55,6 +55,7 @@ all() ->
      bloomSync_times,
      bloomSync_parts,
      bloomSync_min_nodes,
+     merkleSync_noOutdated,
      merkleSync_simple,
      merkleSync_parts,
      merkleSync_min_nodes
@@ -88,7 +89,7 @@ get_bloom_RepUpd_config() ->
      {rep_update_trigger, trigger_periodic},
      {rep_update_sync_method, bloom}, %bloom, merkleTree, art
      {rep_update_fpr, 0.1},
-     {rep_update_max_items, 1000},
+     {rep_update_max_items, 10000},
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
 
@@ -146,15 +147,15 @@ mapInterval(_) ->
 
 % @doc Bloom Synchronization should update at least one Item.
 bloomSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, get_bloom_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, get_bloom_RepUpd_config()),
     ?assert(Start < End),
     ok.
 
 % @doc Check rep upd with only one node
 bloomSync_min_nodes(Config) ->
     BConf = get_bloom_RepUpd_config(),    
-    [Start1, End1] = start_sync(Config, 1, 1, 1, 0.2, BConf),
-    [Start2, End2] = start_sync(Config, 1, 1000, 1, 0.2, BConf),
+    [Start1, End1] = start_sync(Config, 1, 1, 100, 1, 0.2, BConf),
+    [Start2, End2] = start_sync(Config, 1, 1000, 100, 1, 0.2, BConf),
     ?assert(Start1 =:= End1),
     ?assert(Start2 =:= End2),
     ok.
@@ -162,15 +163,15 @@ bloomSync_min_nodes(Config) ->
 bloomSync_parts(Config) ->
     OldConf = get_bloom_RepUpd_config(),
     BConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 400}),
-    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, BConf),
+    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, BConf),
     ?assert(Start < End),
     ok.    
 
 % @doc Better Fpr should result in a higher synchronization degree.
 bloomSync_FprCompare_check(Config) ->
     BConf = get_bloom_RepUpd_config(),    
-    R1 = start_sync(Config, 4, 1000, 2, 0.2, BConf),
-    R2 = start_sync(Config, 4, 1000, 2, 0.1, BConf),
+    R1 = start_sync(Config, 4, 1000, 100, 2, 0.2, BConf),
+    R2 = start_sync(Config, 4, 1000, 100, 2, 0.1, BConf),
     ?assert(lists:last(R1) < lists:last(R2)),
     ok.
 
@@ -187,7 +188,7 @@ bloomSync_times(Config) ->
     %Build Ring
     {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_bloom_RepUpd_config()]),
     config:write(rep_update_fpr, Fpr),
-    {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount]),
+    {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount, 100]),
     %measure initial sync degree
     {DBStatusTime, DBStatus} = util:tc(?MODULE, getDBStatus, []),
     {GetVersionCountTime, VersCount} = util:tc(?MODULE, getVersionCount, [DBStatus]),
@@ -213,21 +214,26 @@ bloomSync_times(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree Tests
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+merkleSync_noOutdated(Config) ->
+    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_merkle_tree_RepUpd_config()),
+    ?assert(Start =:= End),
+    ok.    
+
 merkleSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, get_merkle_tree_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 1, 1, 0.1, get_merkle_tree_RepUpd_config()),
     ?assert(Start < End),
     ok.
 
 merkleSync_min_nodes(Config) ->
     MConf = get_merkle_tree_RepUpd_config(),
-    [Start, End] = start_sync(Config, 1, 1, 1, 0.2, MConf),
+    [Start, End] = start_sync(Config, 1, 1, 100, 1, 0.2, MConf),
     ?assert(Start =:= End),
     ok.
 
 merkleSync_parts(Config) ->
     OldConf = get_merkle_tree_RepUpd_config(),
     MConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
-    [Start, End] = start_sync(Config, 4, 1000, 1, 0.1, MConf),
+    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, MConf),
     ?assert(Start < End),
     ok.
 
@@ -240,15 +246,15 @@ merkleSync_parts(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_sync([tuple()], pos_integer(), pos_integer(), pos_integer(), float(), [tuple()]) -> [float()].
-start_sync(Config, NodeCount, DataCount, Rounds, Fpr, RepUpdConfig) ->
+-spec start_sync([tuple()], pos_integer(), pos_integer(), 0..100, pos_integer(), float(), [tuple()]) -> [float()].
+start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     DestVersCount = NodeCount * 2 * DataCount,
     ItemCount = NodeCount * DataCount,
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RepUpdConfig),
     config:write(rep_update_fpr, Fpr),
-    fill_symmetric_ring(DataCount, NodeCount),
+    fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
     %measure initial sync degree
     InitialOutdated = DestVersCount - getVersionCount(getDBStatus()),
     %run sync rounds
@@ -287,7 +293,8 @@ build_symmetric_ring(NodeCount, Config, RepUpdConfig) ->
     timer:sleep(500),
     ok.
 
-fill_symmetric_ring(DataCount, NodeCount) ->
+-spec fill_symmetric_ring(non_neg_integer(), pos_integer(), 0..100) -> ok.
+fill_symmetric_ring(DataCount, NodeCount, OutdatedProbability) ->
     NodeIds = lists:sort(get_symmetric_keys(NodeCount)),
     util:for_to(1, 
                 NodeCount div 4,
@@ -306,11 +313,15 @@ fill_symmetric_ring(DataCount, NodeCount) ->
                                                    receive {set_key_entry_reply, _} -> ok end
                                            end, 
                                            RepKeys),
-                             %random replica is outdated
-                             OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
-                             api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
-                             receive {set_key_entry_reply, _} -> ok end,
-                             ok
+                             %random replica is outdated                             
+                             case OutdatedProbability >= randoms:rand_uniform(1, 100) of
+                                 true ->
+                                     OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
+                                     api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
+                                     receive {set_key_entry_reply, _} -> ok end,
+                                     ok;
+                                 _ -> ok
+                             end
                          end || I <- intervals:split(intervals:new('[', From, To, ']'), DataCount)]
                 end),
     ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),

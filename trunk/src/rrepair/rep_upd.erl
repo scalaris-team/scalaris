@@ -30,8 +30,8 @@
 -export_type([db_chunk/0, sync_method/0]).
 -endif.
 
-%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -48,7 +48,8 @@
 -record(rep_upd_state,
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
-         sync_round     = 0.0                                       :: float()
+         sync_round     = 0.0                                       :: float(),
+         running_jobs   = 0                                         :: non_neg_integer()
          }).
 -type state() :: #rep_upd_state{}.
 
@@ -64,7 +65,8 @@
 
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
-on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round }) ->
+on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
+                                            running_jobs = RunningJobs }) ->
     {ok, Pid} = rep_upd_sync:start_sync(true, Round),
     case get_sync_method() of
         bloom -> comm:send_local(Pid, {start_sync, get_sync_method(), build_struct});
@@ -72,17 +74,19 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round }) ->
         _ -> ok
     end,
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
-    ?TRACE("Trigger NEXT", []),
-    State#rep_upd_state{ trigger_state = NewTriggerState, sync_round = Round + 1 };
+    %?TRACE("Trigger NEXT", []),
+    State#rep_upd_state{ trigger_state = NewTriggerState, 
+                         sync_round = Round + 1,
+                         running_jobs = RunningJobs + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_sync, Round, SyncStage, SyncMethod, SyncStruct}, State) ->
-    ?TRACE("SYNC REQ recv", []),
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
     {ok, Pid} = rep_upd_sync:start_sync(false, Round),
     comm:send_local(Pid, {start_sync, SyncMethod, SyncStage, SyncStruct}),
-    State;
+    RunningJobs = State#rep_upd_state.running_jobs,
+    State#rep_upd_state{ running_jobs = RunningJobs + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
@@ -100,11 +104,15 @@ on({web_debug_info, Requestor}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Monitor Reporting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({sync_progress_report, _Sender, _Key, Value}, State) ->
-    monitor:proc_set_value(?MODULE, "Progress",
-                           fun(Old) -> rrd:add_now(Value, Old) end),
-    ?TRACE("SYNC FINISHED - Key=~p REASON=[~p]", [_Key, Value]),
-    State.
+on({sync_progress_report, Sender, Round, SyncMaster, SyncStats}, 
+    State = #rep_upd_state{ running_jobs = Jobs}) ->
+    %monitor:proc_set_value(?MODULE, "Progress",
+    %                       fun(Old) -> rrd:add_now(Value, Old) end),
+    SyncMaster andalso
+        ?TRACE("SYNC FINISHED - Round=~p - Sender=~p - Master=~p~nStats=~p", 
+               [Round, Sender, SyncMaster, rep_upd_sync:print_sync_stats(SyncStats)]),
+    %?TRACE("Running Jobs = [~p]", [State#rep_upd_state.running_jobs - 1]),
+    State#rep_upd_state{ running_jobs = Jobs - 1 }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
