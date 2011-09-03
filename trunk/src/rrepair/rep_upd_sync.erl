@@ -41,6 +41,10 @@
 -define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE(X,Y), ok).
 
+%DETAIL DEBUG MESSAGES
+%-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE2(X,Y), ok).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,8 +93,8 @@
          tree_leafsSynced   = 0 :: non_neg_integer(),
          tree_compareSkipped= 0 :: non_neg_integer(),
          errorCount         = 0 :: non_neg_integer(),
-         buildTime          = 0 :: non_neg_integer(),
-         syncTime           = 0 :: non_neg_integer()
+         buildTime          = 0 :: non_neg_integer(),   %in us
+         syncTime           = 0 :: integer()            %in us
          }).
 -type rep_upd_sync_stats() :: #rep_upd_sync_stats{}.
 
@@ -105,7 +109,8 @@
          sync_pid           = undefined                                     :: comm:mypid() | undefined,%sync dest process
          sync_master        = ?required(rep_upd_sync_state, sync_master)    :: boolean(),               %true if process is sync leader
          sync_round         = 0                                             :: float(),
-         sync_stats         = #rep_upd_sync_stats{}                         :: rep_upd_sync_stats(),    
+         sync_stats         = #rep_upd_sync_stats{}                         :: rep_upd_sync_stats(),
+         sync_start_time    = {0, 0, 0}                                     :: {non_neg_integer(), non_neg_integer(), non_neg_integer()},
          feedback           = []                                            :: [keyValVers()]
          }).
 -type state() :: #rep_upd_sync_state{}.
@@ -119,8 +124,7 @@
     {get_chunk_response, rep_upd:db_chunk()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
-    {check_node_response, intervals:interval(), ok | not_found} |
-    {check_node_response, fail, intervals:interval(), [merkle_tree:mt_node_key()] | is_leaf} |
+    {check_node_response, ok | not_found | fail_is_leaf | fail_node, intervals:interval(), [merkle_tree:mt_node_key()]} |
     {start_sync, rep_upd:sync_method(), sync_stage()} |
     {start_sync, rep_upd:sync_method(), sync_stage(), sync_struct()} |
     {shutdown, exit_reason()} |
@@ -158,8 +162,8 @@ on({get_state_response, MyInterval}, State =
     MyIMapped = mapInterval(MyInterval, 1),
     SrcIMapped = mapInterval(SrcInterval, 1),
     Intersection = intervals:intersection(MyIMapped, SrcIMapped),
-    %?TRACE("REQ SHARED I FROM~nMyI=[~p] -~nMyIMapped=[~p]~nSrcI=[~p]~nSrcIMapped=~p~nIntersec=~p", 
-    %       [MyInterval, MyIMapped, SrcInterval, SrcIMapped, Intersection]),
+    ?TRACE2("REQ SHARED I FROM~nMyI=[~p] -~nMyIMapped=[~p]~nSrcI=[~p]~nSrcIMapped=~p~nIntersec=~p", 
+           [MyInterval, MyIMapped, SrcInterval, SrcIMapped, Intersection]),
     case intervals:is_empty(Intersection) of
         true ->
             ?TRACE("SYNC CLIENT - INTERSECTION EMPTY", []),
@@ -226,7 +230,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
     %Get Interval of DBList
     %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)
     ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
-    %?TRACE("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
+    ?TRACE2("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
     {BuildTime, SyncStruct} = util:tc(fun() -> 
                                               build_sync_struct(
                                                 bloom, 
@@ -325,7 +329,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                               versBF = VersBF},
                             dhtNodePid = DhtNodePid,
                             sync_round = Round }) ->
-    ?TRACE("GetChunk Res - Recon Bloom Round=~p", [Round]),
+    ?TRACE2("GetChunk Res - Recon Bloom Round=~p", [Round]),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
@@ -373,11 +377,13 @@ on({shutdown, {simple_detail_sync_ok, _}}, _) ->
 on({shutdown, Reason}, State = #rep_upd_sync_state{ sync_round = Round,
                                                     sync_stats = Stats,
                                                     sync_master = Master,
-                                                    sync_stage = Stage }) ->
+                                                    sync_stage = Stage,
+                                                    sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
+    NewStatS = Stats#rep_upd_sync_stats{ syncTime = timer:now_diff(erlang:now(), SyncStartTime) },
     Stage =/= req_shared_interval andalso
         comm:send_local(State#rep_upd_sync_state.ownerLocalPid, 
-                        {sync_progress_report, self(), Round, Master, Stats}),
+                        {sync_progress_report, self(), Round, Master, NewStatS}),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -418,7 +424,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     NewStats = case Done of 
                    true  -> Stats#rep_upd_sync_stats{ updatedCount = OkCount +1 };
                    false -> Stats#rep_upd_sync_stats{ notUpdatedCount = FailedCount + 1 } 
-               end,    
+               end,
     NewState = case not Done andalso Exists andalso get_do_feedback() of
                    true -> State#rep_upd_sync_state{ sync_stats = NewStats,
                                                      feedback = [{db_entry:get_key(Entry),
@@ -426,7 +432,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                                   db_entry:get_version(Entry)} | Feedback]};
                    false -> State#rep_upd_sync_state{ sync_stats = NewStats }
                end,
-    %?TRACE("DETAIL SYNC OK=~p Failed=~p Diff=~p", [OkCount, FailedCount, DiffCount]),
+    ?TRACE2("DETAIL SYNC OK=~p Failed=~p Diff=~p", [OkCount, FailedCount, DiffCount]),
     _ = case DiffCount - 1 =:= OkCount + FailedCount of
             true ->
                 %?TRACE("DETAIL SYNC FINISHED", []),
@@ -447,125 +453,78 @@ on({check_node, SrcPid, Interval, Hash}, State =
     Node = merkle_tree:lookup(Interval, Tree),
     case Node of
         not_found ->
-            comm:send(SrcPid, {check_node_response, Interval, not_found});
+            comm:send(SrcPid, {check_node_response, not_found, Interval, []});
         _ ->
             IsLeaf = merkle_tree:is_leaf(Node),
-            ?TRACE("COMPARE RECV{I=[~p] Hash=[~p]} with MY {I=[~p] Hash=[~p]}", 
+            ?TRACE2("COMPARE RECV{I=[~p] Hash=[~p]} with MY {I=[~p] Hash=[~p]}", 
                    [Interval, Hash, merkle_tree:get_interval(Node), merkle_tree:get_hash(Node)]),
             case merkle_tree:get_hash(Node) =:= Hash of
                 true ->
-                    comm:send(SrcPid, {check_node_response, Interval, ok});
+                    comm:send(SrcPid, {check_node_response, ok, Interval, []});
                 false when IsLeaf -> 
                     comm:send(SrcPid, 
-                              {check_node_response, fail, Interval, is_leaf});
+                              {check_node_response, fail_is_leaf, Interval, []});
                 false when not IsLeaf ->
                     ChildHashs = lists:map(fun(N) ->
                                                    merkle_tree:get_hash(N)
                                            end, 
                                            merkle_tree:get_childs(Node)),
                     comm:send(SrcPid, 
-                              {check_node_response, fail, Interval, ChildHashs})
+                              {check_node_response, fail_node, Interval, ChildHashs})
             end
     end,
     State#rep_upd_sync_state{ sync_pid = SrcPid };
 
-on({check_node_response, I, Result}, State = 
-       #rep_upd_sync_state{
-                           sync_pid = SyncDest, 
-                           sync_stats = 
-                                #rep_upd_sync_stats{ tree_compareLeft = CLeft,
-                                                     tree_nodesCompared = Compared,
-                                                     tree_compareSkipped = Skipped,
-                                                     errorCount = Errors
-                                                   } = Stats,
-                            sync_struct = #merkle_sync_struct{ tree = Tree }                           
-                          }) ->
+on({check_node_response, Result, I, ChildHashs}, State = 
+       #rep_upd_sync_state{ sync_pid = SyncDest,
+                            sync_stats = 
+                                #rep_upd_sync_stats{ errorCount = Errors,
+                                                     tree_leafsSynced = LeafCount,
+                                                     tree_compareSkipped = Skipped
+                                                    } = Stats, 
+                            ownerRemotePid = OwnerPid,
+                            sync_struct = 
+                                #merkle_sync_struct{ dest_repUpd_pid = SrcNode,
+                                                     tree = Tree },
+                            sync_round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
-    NewErrorCount = Errors + case Result of
-                                 ok -> 0;
-                                 not_found -> 1
-                             end,
-    NewStats = Stats#rep_upd_sync_stats{ tree_compareLeft = CLeft - 1, 
-                                         errorCount = NewErrorCount,
-                                         tree_compareSkipped = Skipped + merkle_tree:size(Node),
-                                         tree_nodesCompared = Compared + 1 },
-    if NewStats#rep_upd_sync_stats.tree_compareLeft =< 1 ->
+    NewStats = Stats#rep_upd_sync_stats{ 
+                    tree_compareLeft = Stats#rep_upd_sync_stats.tree_compareLeft - 1,
+                    tree_nodesCompared = Stats#rep_upd_sync_stats.tree_nodesCompared + 1 },
+    FinalStats = 
+        case Result of
+            not_found -> NewStats#rep_upd_sync_stats{ errorCount = Errors + 1 };
+            ok -> NewStats#rep_upd_sync_stats{ tree_compareSkipped = Skipped + merkle_tree:size(Node) };
+            fail_is_leaf ->                        
+                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
+                NewStats#rep_upd_sync_stats{ tree_leafsSynced = LeafCount + Leafs };               
+            fail_node -> 
+                MyChilds = merkle_tree:get_childs(Node),
+                {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
+                SkippedSubNodes = lists:foldl(fun(MNode, Acc) -> 
+                                                      Acc + case merkle_tree:is_leaf(MNode) of
+                                                                true -> 0;
+                                                                false -> merkle_tree:size(MNode)
+                                                            end
+                                              end, 0, Matched),
+                lists:foreach(fun(X) -> 
+                                      comm:send(SyncDest, 
+                                                {check_node,
+                                                 comm:this(), 
+                                                 merkle_tree:get_interval(X), 
+                                                 merkle_tree:get_hash(X)}) 
+                              end, NotMatched),
+                NewStats#rep_upd_sync_stats{ 
+                    tree_compareLeft = NewStats#rep_upd_sync_stats.tree_compareLeft + length(NotMatched),
+                    tree_nodesCompared = NewStats#rep_upd_sync_stats.tree_nodesCompared + length(Matched),
+                    tree_compareSkipped = Skipped + SkippedSubNodes }        
+        end,
+    if FinalStats#rep_upd_sync_stats.tree_compareLeft =< 1 ->
            comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
     end,
-    State#rep_upd_sync_state{ sync_stats = NewStats };
-
-on({check_node_response, fail, I, is_leaf}, State = 
-       #rep_upd_sync_state{ sync_pid = SyncDest,
-                            sync_stats = 
-                                #rep_upd_sync_stats{
-                                                    errorCount = Errors,
-                                                    tree_compareLeft = ToCompare,
-                                                    tree_leafsSynced = LeafCount
-                                                    } = Stats, 
-                            ownerRemotePid = OwnerPid,
-                            sync_struct = #merkle_sync_struct{ dest_repUpd_pid = SrcNode,
-                                                               tree = Tree },
-                            sync_round = Round }) ->
-    Node = merkle_tree:lookup(I, Tree),
-    NewStats = case Node of
-                   not_found -> 
-                       Stats#rep_upd_sync_stats{ errorCount = Errors + 1 };
-                   _ -> 
-                       IsLeaf = merkle_tree:is_leaf(Node),
-                       case IsLeaf of
-                           true ->
-                               reconcileLeaf(Node, {SrcNode, Round, OwnerPid}),
-                               Stats#rep_upd_sync_stats{ tree_leafsSynced = LeafCount + 1 };
-                           false ->
-                               ?TRACE("CLIENT LEAF IS AN INNER NODE OF MASTER", []),
-                               Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
-                               Stats#rep_upd_sync_stats{ tree_leafsSynced = LeafCount + Leafs }
-                       end
-               end,
-    if NewStats#rep_upd_sync_stats.tree_compareLeft =< 1 ->
-           comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
-           comm:send_local(self(), {shutdown, sync_finished});
-       true -> ok
-    end,    
-    State#rep_upd_sync_state{ sync_stats = NewStats#rep_upd_sync_stats{ tree_compareLeft = ToCompare - 1} };
-
-on({check_node_response, fail, I, ChildHashs}, State = 
-       #rep_upd_sync_state{ sync_stats = 
-                                #rep_upd_sync_stats{
-                                                    tree_compareLeft = ToCompare,
-                                                    tree_nodesCompared = Compared,
-                                                    tree_compareSkipped = Skipped
-                                                   } = Stats, 
-                            sync_pid = SrcPid,
-                            sync_struct = #merkle_sync_struct{ tree = Tree } }) ->
-    Node = merkle_tree:lookup(I, Tree),
-    NewStats = case Node of 
-                   not_found -> Stats;
-                   _ -> MyChilds = merkle_tree:get_childs(Node),
-                        {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
-                        MatchedSubNodes = 
-                            lists:foldl(fun(MNode, Acc) -> 
-                                                Acc + case merkle_tree:is_leaf(MNode) of
-                                                          true -> 0;
-                                                          false -> merkle_tree:size(MNode)
-                                                      end
-                                        end, 0, Matched),
-                        lists:foreach(
-                          fun(X) -> 
-                                  comm:send(SrcPid, 
-                                            {check_node,
-                                             comm:this(), 
-                                             merkle_tree:get_interval(X), 
-                                             merkle_tree:get_hash(X)}) 
-                          end, 
-                          NotMatched),
-                        Stats#rep_upd_sync_stats{ tree_compareLeft = ToCompare + length(NotMatched) - 1,
-                                                  tree_nodesCompared = Compared + length(Matched) + 1,
-                                                  tree_compareSkipped = Skipped + MatchedSubNodes }                
-               end,
-    State#rep_upd_sync_state{ sync_stats = NewStats }.
+    State#rep_upd_sync_state{ sync_stats = FinalStats }.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% build sync struct
@@ -635,8 +594,7 @@ compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
 -spec reconcileNode(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> non_neg_integer().
 reconcileNode(Node, Conf) ->
     Count = case merkle_tree:is_leaf(Node) of
-                true -> reconcileLeaf(Node, Conf), 1;
-                %false -> [ reconcileNode(X, Conf) || X <- merkle_tree:get_childs(Node)]
+                true -> reconcileLeaf(Node, Conf);
                 false -> lists:foldl(fun(X, Acc) -> 
                                              Acc + reconcileNode(X, Conf) 
                                      end, 
@@ -644,7 +602,7 @@ reconcileNode(Node, Conf) ->
                                      merkle_tree:get_childs(Node))
             end,
     Count.
--spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> ok.
+-spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> 1.
 reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
     ToSync = lists:map(fun({Key, Value}) -> 
                                {Ver, Val} = decodeBlob(Value),
@@ -653,7 +611,7 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
                        merkle_tree:get_bucket(Node)),
     comm:send(DestPid, 
               {request_sync, Round, resolution, merkleTree, {simple_detail_sync, OwnerPid, ToSync}}),
-    ok.
+    1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
@@ -790,9 +748,9 @@ decodeBlob(Blob) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc init module
--spec init({comm:erl_local_pid(), sync_struct()}) -> state().
+-spec init(state()) -> state().
 init(State) ->
-    State.
+    State#rep_upd_sync_state{ sync_start_time = erlang:now() }.
 
 -spec start_sync(boolean(), float()) -> {ok, pid()}.
 start_sync(SyncMaster, Round) ->

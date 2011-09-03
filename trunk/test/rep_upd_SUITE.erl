@@ -220,13 +220,13 @@ merkleSync_noOutdated(Config) ->
     ok.    
 
 merkleSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 1, 1, 0.1, get_merkle_tree_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.1, get_merkle_tree_RepUpd_config()),
     ?assert(Start < End),
     ok.
 
 merkleSync_min_nodes(Config) ->
     MConf = get_merkle_tree_RepUpd_config(),
-    [Start, End] = start_sync(Config, 1, 1, 100, 1, 0.2, MConf),
+    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, MConf),
     ?assert(Start =:= End),
     ok.
 
