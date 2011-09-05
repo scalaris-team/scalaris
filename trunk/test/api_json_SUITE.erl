@@ -33,21 +33,21 @@ end_per_suite(Config) ->
     ok.
 
 get_node_info(_Config) ->
-     {struct, [{status, "ok"}, {value, Value}]} = api_json:handler(get_node_info, []),
+     {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_node_info, []),
     ?assert(erlang:is_list(Value)),
     ok.
 
 get_node_performance(_Config) ->
-     {struct, [{status, "ok"}, {value, Value}]} = api_json:handler(get_node_performance, []),
+     {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_node_performance, []),
     ?assert(erlang:is_list(Value)),
     ok.
 
 get_service_info(_Config) ->
-     {struct, [{status, "ok"}, {value, Value}]} = api_json:handler(get_service_info, []),
+     {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_service_info, []),
     ?assert(erlang:is_list(Value)),
     ok.
 
 get_service_performance(_Config) ->
-     {struct, [{status, "ok"}, {value, Value}]} = api_json:handler(get_service_performance, []),
+     {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_service_performance, []),
     ?assert(erlang:is_list(Value)),
     ok.
