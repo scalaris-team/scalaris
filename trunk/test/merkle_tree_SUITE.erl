@@ -29,7 +29,7 @@
 -include("unittest.hrl").
 
 all() -> [
-          insert1,
+          insert_bucketing,
           treeHash,
           branchTest
          ].
@@ -46,10 +46,12 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-insert1(_) ->    
-    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),[{1, 63}]),
+insert_bucketing(_) ->    
+    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
+    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
+                       [{1, DefBucketSize - 1}]),
     ?equals(merkle_tree:size(Tree1), 1),
-    Tree2 = add_to_tree(950, 1000, Tree1),
+    Tree2 = add_to_tree(1000 - DefBucketSize + 1, 1000, Tree1),
     ?equals(merkle_tree:size(Tree2), 3),
     ok.
 

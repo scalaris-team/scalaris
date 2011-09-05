@@ -29,7 +29,8 @@
          lookup/2, 
          set_root_interval/2, size/1, gen_hashes/1,
          is_empty/1, is_leaf/1, get_bucket/1,
-         get_hash/1, get_interval/1, get_childs/1]).
+         get_hash/1, get_interval/1, get_childs/1,
+         get_bucket_size/1, get_branch_factor/1]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
@@ -67,6 +68,17 @@
 
 %-opaque merkle_tree() :: {mt_config(), Root::mt_node()}.
 -type merkle_tree() :: {mt_config(), Root::mt_node()}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Tree properties
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec get_bucket_size(merkle_tree()) -> pos_integer().
+get_bucket_size({Config, _}) ->
+    Config#mt_config.bucket_size.
+
+-spec get_branch_factor(merkle_tree()) -> pos_integer().
+get_branch_factor({Config, _}) -> 
+    Config#mt_config.branch_factor.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Empty
