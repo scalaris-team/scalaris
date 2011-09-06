@@ -76,7 +76,11 @@ module JSONRPC
 
   def self.get_node_info(params, helper, instance)
     vmid = params[0]
-    {:result => helper.get_node_info(instance, vmid)}
+    if(vmid == ENV["VMID"])
+      {:result => helper.get_node_info(instance, vmid)}
+    else
+      self.redirect_call_to_vm(vmid, "get_node_info", params, helper)
+    end
   end
 
   def self.get_node_performance(params, helper, instance)
@@ -130,5 +134,11 @@ module JSONRPC
       puts "#{url}: #{$!}"
       nil
     end
+  end
+
+  def self.redirect_call_to_vm(vmid, function, params, helper)
+    ip = helper.get_ip(vmid)
+    url = "http://" << ip << ":4567/jsonrpc"
+    self.json_call(URI.parse(url), function, params)
   end
 end

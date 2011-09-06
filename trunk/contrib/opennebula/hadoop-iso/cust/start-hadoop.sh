@@ -20,10 +20,10 @@ fi
 source /root/context.sh
 
 echo "nameserver $HADOOP_MASTER" > /etc/resolv.conf
+/var/lib/sc-manager/start-manager.sh
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   /etc/init.d/dnsmasq start
   /usr/bin/dnsupdate-server.pl &
-  /var/lib/sc-manager/start-manager.sh
 else
   RETVAL=1
   while [ "$RETVAL" -ne "0" ]; do

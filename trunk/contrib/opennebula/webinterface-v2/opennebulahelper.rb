@@ -49,6 +49,17 @@ class OpenNebulaHelper
     {:peers => ids}
   end
 
+  def get_ip(one_id)
+    client = Client.new(CREDENTIALS, ENDPOINT)
+    pool = VirtualMachinePool.new(client, -1)
+    pool.info
+    vm = pool.find {|i| i.id.to_i == one_id.to_i}
+    if vm == nil
+      raise "unknown machine identifier"
+    end
+    Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
+  end
+
   private
 
   def create_vm(description)
@@ -63,17 +74,6 @@ class OpenNebulaHelper
     vm = pool.find {|i| i.id == id.to_i}
     puts vm.class
     vm.finalize
-  end
-
-  def get_ip(one_id)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
-    vm = pool.find {|i| i.id.to_i == one_id.to_i}
-    if vm == nil
-      raise "unknown machine identifier"
-    end
-    Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
   end
 
   def get_vms(instance)

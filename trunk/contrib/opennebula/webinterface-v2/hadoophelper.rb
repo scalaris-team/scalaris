@@ -21,6 +21,26 @@ class HadoopHelper < OpenNebulaHelper
 
   def get_node_info(instance, vmid)
     info = {}
+    found = {}
+    File.readlines("/tmp/mrmetrics.log").reverse_each do |line|
+      if line.start_with?("mapred.tasktracker") || line.start_with?("mapred.shuffleOutput")
+        category = line.split(':')[0]
+        if ! found.key?(category)
+          found[category] = true
+          line.split(' ').each do |field|
+            if field.match("=") 
+              data = field.split('=')
+              key = category, ".", data[0]
+              value = data[1].sub(/,/, '')
+              info[key] = value
+            end
+          end
+          if found.size() == 2
+            break
+          end
+        end
+      end
+    end
     info
   end
 
@@ -30,8 +50,25 @@ class HadoopHelper < OpenNebulaHelper
   end
 
   def get_service_info(instance)
-    info = {}
-    info
+    myip = get_ip(ENV['VMID'])
+    if myip == ENV['HADOOP_MASTER']
+      info = {}
+      File.readlines("/tmp/mrmetrics.log").reverse_each do |line|
+        if line.start_with?("mapred.jobtracker") 
+          line.split(' ').each do |field|
+            if field.match("=") 
+              data = field.split('=')
+              info[data[0]] = data[1].sub(/,/, '') 
+            end
+          end
+          break
+        end
+      end
+      info
+    else
+      url = "http://" << ENV['HADOOP_MASTER'] << ":4567/jsonrpc"
+      JSONRPC.json_call(URI.parse(url), "get_service_info", [])
+    end
   end
 
   def get_service_performance(instance)
