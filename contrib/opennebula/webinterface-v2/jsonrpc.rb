@@ -85,8 +85,12 @@ module JSONRPC
 
   def self.get_node_performance(params, helper, instance)
     vmid = params[0]
-    {:result => helper.get_node_performance(instance, vmid)}
-  end
+    if(vmid == ENV["VMID"])
+      {:result => helper.get_node_performance(instance, vmid)}
+    else
+      self.redirect_call_to_vm(vmid, "get_node_performance", params, helper)
+    end
+ end
 
   def self.get_service_info(params, helper, instance)
     {:result => helper.get_service_info(instance)}
