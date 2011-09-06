@@ -777,7 +777,7 @@ fork_sync(Sync_Conf, Round) ->
 check_config() ->
     case config:read(rep_update_activate) of
         true ->
-            config:is_bool(rep_update_sync_feedback) andalso                
+            config:cfg_is_bool(rep_update_sync_feedback) andalso                
             config:cfg_is_float(rep_update_fpr) andalso
             config:cfg_is_greater_than(rep_update_fpr, 0) andalso
             config:cfg_is_less_than(rep_update_fpr, 1) andalso
