@@ -1138,9 +1138,11 @@ continue_slide_delta(State, PredOrSucc, SlideOp) ->
                     Neighbors = dht_node_state:get(State, neighbors),
                     % continued slide with pred/succ, receive data
                     % -> reserve slide_op with pred/succ
+                    NewMoveFullId = util:get_global_uid(),
+                    fd:subscribe([node:pidX(TargetNode)], {move, NewMoveFullId}),
                     NextSlideOp =
                         slide_op:new_slide(
-                          util:get_global_uid(), NewType, NewTargetId, Tag,
+                          NewMoveFullId, NewType, NewTargetId, Tag,
                           SourcePid, OtherMTE, {none}, Neighbors),
                     NextSlideOp1 =
                         case slide_op:get_predORsucc(NextSlideOp) of
