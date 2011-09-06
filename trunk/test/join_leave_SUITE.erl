@@ -38,11 +38,13 @@ test_cases() ->
      tester_join_at_timeouts
     ].
 
-all() -> unittest_helper:create_ct_all(test_cases()).
+all() ->
+%%     unittest_helper:create_ct_all(test_cases()).
+    test_cases().
 
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
-    unittest_helper:create_ct_groups(test_cases(), []).
+    [].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 

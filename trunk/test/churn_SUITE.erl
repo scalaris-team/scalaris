@@ -36,11 +36,13 @@ test_cases() ->
      transactions_3_failures_4_nodes_networksplit_write
     ].
 
-all() -> unittest_helper:create_ct_all(test_cases()).
+all() ->
+%%     unittest_helper:create_ct_all(test_cases()).
+    test_cases().
 
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{transactions_1_failure_4_nodes_read, [sequence, {repeat_until_any_fail, forever}]}]).
-    unittest_helper:create_ct_groups(test_cases(), []).
+    [].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 

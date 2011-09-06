@@ -63,11 +63,13 @@ test_cases() ->
      tester_symm4_slide_pred_rcv_load_timeouts_node_incremental
     ].
 
-all() -> unittest_helper:create_ct_all(test_cases()).
+all() ->
+%%     unittest_helper:create_ct_all(test_cases()).
+    test_cases().
 
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
-    unittest_helper:create_ct_groups(test_cases(), []).
+    [].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
