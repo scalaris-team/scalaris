@@ -123,8 +123,7 @@ get_other_vms(MaxVMs) ->
 -spec shutdown_vm() -> no_return().
 shutdown_vm() ->
     _ = shutdown_nodes(number_of_nodes()),
-    % TODO: need to wait for the actual leave to finish
-    timer:sleep(5000),
+    util:wait_for(fun() -> number_of_nodes() =:= 0 end),
     erlang:halt().
 
 %% @doc Kills this VM.
