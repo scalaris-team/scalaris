@@ -46,11 +46,6 @@
          start_minimal_procs/3, stop_minimal_procs/1]).
 
 -include("scalaris.hrl").
-% we should include ct.hrl but erlang versions < R13B04 do not compile that way
-% -> include contents of ct.hrl manually:
-%-include_lib("common_test/include/ct.hrl").
--include_lib("test_server/include/test_server.hrl").
--compile({parse_transform,ct_line}).
 
 %% @doc Sets the current working directory to "../bin" if it does not end with
 %%      "/bin" yet. Assumes that the current working directory is a sub-dir of
@@ -490,9 +485,13 @@ end_per_suite(Config) ->
     [parallel | sequence | shuffle | {shuffle, {integer(), integer(), integer()}} |
      {repeat | repeat_until_all_ok | repeat_until_all_fail | repeat_until_any_ok | repeat_until_any_fail, integer() | forever}].
 
+-spec testcase_to_groupname(TestCase::atom()) -> atom().
+testcase_to_groupname(TestCase) ->
+    erlang:list_to_atom(erlang:atom_to_list(TestCase) ++ "_grp").
+
 -spec create_ct_all(TestCases::[atom()]) -> [{group, atom()}].
 create_ct_all(TestCases) ->
-    [{group, TestCase} || TestCase <- TestCases].
+    [{group, testcase_to_groupname(TestCase)} || TestCase <- TestCases].
 
 -spec create_ct_groups(TestCases::[atom()], SpecialOptions::[{atom(), ct_group_props()}])
         -> [{atom(), ct_group_props(), [atom()]}].
@@ -503,7 +502,7 @@ create_ct_groups(TestCases, SpecialOptions) ->
                  false -> [sequence, {repeat, 1}];
                  {_, X} -> X
              end,
-         {TestCase, Options, [TestCase]}
+         {testcase_to_groupname(TestCase), Options, [TestCase]}
      end || TestCase <- TestCases].
 
 -spec init_per_group(atom(), [tuple()]) -> [tuple()].
@@ -511,7 +510,7 @@ init_per_group(_Group, Config) -> Config.
 
 -spec end_per_group(atom(), [tuple()]) -> {return_group_result, ok | failed}.
 end_per_group(_Group, Config) ->
-    Status = ?config(tc_group_result, Config),
+    Status = test_server:lookup_config(tc_group_result, Config),
     case proplists:get_value(failed, Status) of
         [] ->                                   % no failed cases 
             {return_group_result, ok};
