@@ -109,9 +109,8 @@ on({sync_progress_report, Sender, Round, SyncMaster, SyncStats},
     %monitor:proc_set_value(?MODULE, "Progress",
     %                       fun(Old) -> rrd:add_now(Value, Old) end),
     SyncMaster andalso
-        ?TRACE("SYNC FINISHED - Round=~p - Sender=~p - Master=~p~nStats=~p", 
-               [Round, Sender, SyncMaster, rep_upd_sync:print_sync_stats(SyncStats)]),
-    %?TRACE("Running Jobs = [~p]", [State#rep_upd_state.running_jobs - 1]),
+        ?TRACE("SYNC FINISHED - Round=~p - OpenProcesses=~p - Sender=~p - Master=~p~nStats=~p", 
+               [Round, Jobs - 1, Sender, SyncMaster, rep_upd_sync:print_sync_stats(SyncStats)]),
     State#rep_upd_state{ running_jobs = Jobs - 1 }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -26,11 +26,12 @@
 -include("scalaris.hrl").
 
 -export([new/1, new/3, insert/3, empty/0,
-         lookup/2, 
-         set_root_interval/2, size/1, gen_hashes/1,
+         lookup/2, size/1, size_detail/1,
+         set_root_interval/2, gen_hashes/1,
          is_empty/1, is_leaf/1, get_bucket/1,
          get_hash/1, get_interval/1, get_childs/1,
-         get_bucket_size/1, get_branch_factor/1]).
+         get_bucket_size/1, get_branch_factor/1,
+         store_to_DOT/1]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
@@ -48,6 +49,7 @@
 -type mt_bucket()       :: orddict:orddict() | nil.
 -type hash_fun()        :: fun((binary()) -> mt_node_key()).
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
+-type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 
 -record(mt_config,
         {
@@ -60,7 +62,7 @@
 -type mt_config() :: #mt_config{}.
 
 -type mt_node() :: { Hash        :: mt_node_key(),       %hash of childs/containing items 
-                     Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes bucket size
+                     Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes number of items in the bucket
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
@@ -225,6 +227,7 @@ gen_hash({_, Count, nil, I, List}, Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Size
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc Returns the total number of nodes in a tree or node (inner nodes and leafs)
 -spec size(merkle_tree() | mt_node()) -> non_neg_integer().
 size({_, Root}) ->
     node_size(Root);
@@ -235,6 +238,60 @@ node_size({_, _, _, _, []}) ->
     1;
 node_size({_, C, _, _, _}) ->
     C.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Tree size detail
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc Returns a tuple with number of inner nodes and leaf nodes.
+-spec size_detail(merkle_tree()) -> mt_size().
+size_detail({_, Root}) ->
+    size_detail_node(Root, {0, 0}).
+
+-spec size_detail_node(mt_node(), mt_size()) -> mt_size().
+size_detail_node({_, _, _, _, []}, {Inner, Leafs}) ->
+    {Inner, Leafs + 1};
+size_detail_node({_, _, _, _, Childs}, {Inner, Leafs}) ->
+    lists:foldl(fun(Node, {I, L}) -> size_detail_node(Node, {I, L}) end, 
+                {Inner + 1, Leafs}, Childs).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Store to DOT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
+-spec store_to_DOT(merkle_tree()) -> ok | io_error.
+store_to_DOT({Conf, Root}) ->
+    case file:open("../merkle_tree-graph.dot", [write]) of
+        {ok, Fileid} ->
+            io:fwrite(Fileid, "digraph merkle_tree { ~n", []),
+            io:fwrite(Fileid, "    style=filled;~n", []),
+            store_node_to_DOT(Root, Fileid, 1, 2, Conf),
+            io:fwrite(Fileid, "} ~n", []),
+            file:close(Fileid),
+            ok;
+        {_, _} ->
+            io_error
+    end.
+
+-spec store_node_to_DOT(mt_node(), pid(), pos_integer(), pos_integer(), mt_config()) -> pos_integer().
+store_node_to_DOT({_, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
+    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s ; ~p/~p\", shape=box]~n", 
+              [MyId, erlang:atom_to_list(LBr), LKey, RKey, erlang:atom_to_list(RBr), C, BuckSize]),
+    NextFreeId;
+store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
+    io:fwrite(Fileid, "    ~p -> { ~p", [MyId, NextFreeId]),
+    NNFreeId = lists:foldl(fun(_, Acc) -> 
+                                    io:fwrite(Fileid, ";~p", [Acc]),
+                                    Acc + 1
+                           end, NextFreeId + 1, RChilds),
+    io:fwrite(Fileid, " }~n", []),
+    {_, NNNFreeId} = lists:foldl(fun(Node, {NodeId, NextFree}) -> 
+                                         {NodeId + 1 , store_node_to_DOT(Node, Fileid, NodeId, NextFree, TConf)}
+                                 end, {NextFreeId, NNFreeId}, Childs),
+    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]", 
+              [MyId, erlang:atom_to_list(LBr), LKey, RKey, erlang:atom_to_list(RBr)]),
+    NNNFreeId.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
