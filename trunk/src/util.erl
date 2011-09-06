@@ -280,9 +280,20 @@ get_stacktrace() ->
 -spec dump_extract_from_list
         ([{Item::atom(), Info::term()}], ItemInfo::memory | message_queue_len | stack_size | heap_size) -> non_neg_integer();
         ([{Item::atom(), Info::term()}], ItemInfo::messages) -> [tuple()];
-        ([{Item::atom(), Info::term()}], ItemInfo::current_function) -> Fun::mfa().
+        ([{Item::atom(), Info::term()}], ItemInfo::current_function) -> Fun::mfa();
+        ([{Item::atom(), Info::term()}], ItemInfo::dictionary) -> [{Key::term(), Value::term()}].
 dump_extract_from_list(List, Key) ->
     element(2, lists:keyfind(Key, 1, List)).
+
+%% @doc Extracts a given ItemInfo from an ItemList or returns 'undefined' if
+%%      there is no such item.
+-spec dump_extract_from_list_may_not_exist
+        ([{Item::term(), Info}], ItemInfo::term()) -> Info | undefined.
+dump_extract_from_list_may_not_exist(List, Key) ->
+    case lists:keyfind(Key, 1, List) of
+        false -> undefined;
+        X     -> element(2, X)
+    end.
 
 %% @doc Returns a list of all currently executed functions and the number of
 %%      instances for each of them.
@@ -299,32 +310,38 @@ dump() ->
 %% @doc Returns information about all processes' memory usage.
 -spec dump2() -> [{PID::pid(), Mem::non_neg_integer(), Fun::mfa()}].
 dump2() ->
-    Info = 
-        [{Pid,
-          dump_extract_from_list(Data, memory),
-          dump_extract_from_list(Data, current_function)}
-        || Pid <- processes(),
-           Data <- [process_info(Pid, [memory, current_function])],
-           Data =/= undefined],
-    lists:reverse(lists:keysort(2, Info)).
+    dumpX([memory, current_function, dictionary],
+          fun(K, Value) ->
+                  case K of
+                      dictionary -> dump_extract_from_list_may_not_exist(Value, test_server_loc);
+                      _          -> Value
+                  end
+          end).
 
 %% @doc Returns various data about all processes.
 -spec dump3() -> [{PID::pid(), Mem::non_neg_integer(), MsgQLength::non_neg_integer(),
                    StackSize::non_neg_integer(), HeapSize::non_neg_integer(),
                    Messages::[atom()], Fun::mfa()}].
 dump3() ->
+    dumpX([memory, message_queue_len, stack_size, heap_size, messages, current_function],
+          fun(K, Value) ->
+                  case K of
+                      messages -> [element(1, V) || V <- Value];
+                      _        -> Value
+                  end
+          end).
+
+%% @doc Returns various data about all processes.
+-spec dumpX([ItemInfo::atom(),...], ValueFun::fun((atom(), term()) -> term())) -> [tuple(),...].
+dumpX(Keys, ValueFun) ->
     Info = 
-        [{Pid,
-          dump_extract_from_list(Data, memory),
-          dump_extract_from_list(Data, message_queue_len),
-          dump_extract_from_list(Data, stack_size),
-          dump_extract_from_list(Data, heap_size),
-          [element(1, Y) || Y <- dump_extract_from_list(Data, messages)],
-          dump_extract_from_list(Data, current_function)}
-        || Pid <- processes(),
-           Data <- [process_info(Pid, [memory, message_queue_len, stack_size,
-                                       heap_size, messages, current_function])],
-           Data =/= undefined],
+        [begin
+             Values =
+                 [ValueFun(Key, dump_extract_from_list(Data, Key)) || Key <- Keys],
+             erlang:list_to_tuple([Pid, Values])
+         end || Pid <- processes(),
+                Data <- [process_info(Pid, Keys)],
+                Data =/= undefined],
     lists:reverse(lists:keysort(2, Info)).
 
 %% @doc minus(M,N) : { x | x in M and x notin N}

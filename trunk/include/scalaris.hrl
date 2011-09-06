@@ -86,4 +86,9 @@
 -define(REP_BLOOM, bloom). % bloom filter implemenation selection 
 -define(REP_HFS, hfs_lhsp_md5). %HashFunctionSet selection for usage by bloom filter
 
+% for debugging:
+% allows the retrieval of the current function and line number a process is in
+% (process dictionary, key test_server_loc)
+% -compile({parse_transform, ct_line}).
+
 -include("types.hrl").
