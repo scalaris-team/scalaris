@@ -83,8 +83,8 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 join_parameters_list() ->
-    [{join_response_timeout, 300},
-     {join_response_timeouts, 3},
+    [{move_wait_for_reply_timeout, 300},
+     {move_send_msg_retries, 3},
      {join_request_timeout, 100},
      {join_request_timeouts, 3},
      {join_lookup_timeout, 300},
@@ -207,7 +207,6 @@ tester_join_at(Config) ->
 %{join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
 %{join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
     {{join, join_request, '_', '_'}, [], 1..2, drop_msg}.
-%{join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
 %{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
 %      lb_psv_gossip:custom_message(),
 % {join, LbPsv::module(), LbPsvState::term()}}

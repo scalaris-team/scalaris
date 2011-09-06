@@ -70,7 +70,6 @@
     {join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module(), Conn::connection()} |
     {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
     {join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
-    {join, join_response_timeout, NewPred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
     {Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() | 
           lb_psv_gossip:custom_message(),
      {join, LbPsv::module(), LbPsvState::term()}}
@@ -534,6 +533,7 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
                 % TODO: implement step-wise join
                 MoveFullId = util:get_global_uid(),
                 Neighbors = dht_node_state:get(State, neighbors),
+                fd:subscribe([node:pidX(NewPred)], {move, MoveFullId}),
                 SlideOp = slide_op:new_sending_slide_join(
                             MoveFullId, NewPred, join, Neighbors),
                 SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_join),
@@ -546,7 +546,14 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
                 State1 = dht_node_state:add_db_range(
                            State, slide_op:get_interval(SlideOp1),
                            slide_op:get_id(SlideOp1)),
-                send_join_response(State1, SlideOp1, NewPred, CandId)
+                MoveFullId = slide_op:get_id(SlideOp1),
+                MyOldPred = dht_node_state:get(State1, pred),
+                MyNode = dht_node_state:get(State1, node),
+                % no need to tell the ring maintenance -> the other node will trigger an update
+                % also this is better in case the other node dies during the join
+                %%     rm_loop:notify_new_pred(comm:this(), NewPred),
+                Msg = {join, join_response, MyNode, MyOldPred, MoveFullId, CandId},
+                dht_node_move:send2(State1, SlideOp1, Msg)
             catch throw:not_responsible ->
                       ?TRACE_SEND(node:pidX(NewPred),
                                   {join, join_response, not_responsible, CandId}),
@@ -560,29 +567,6 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
             State
     end;
 %% userdevguide-end dht_node_join:join_request1
-
-process_join_msg({join, join_response_timeout, NewPred, MoveFullId, CandId} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    % almost the same as dht_node_move:safe_operation/5 but we tolerate wrong pred:
-    case dht_node_state:get_slide_op(State, MoveFullId) of
-        {pred, SlideOp} ->
-            case (slide_op:get_timeouts(SlideOp) < get_join_response_timeouts()) of
-                true ->
-                    NewSlideOp = slide_op:inc_timeouts(SlideOp),
-                    send_join_response(State, NewSlideOp, NewPred, CandId);
-                _ ->
-                    % abort the slide operation set up for the join:
-                    % (similar to dht_node_move:abort_slide/*)
-                    log:log(warn, "abort_join(op: ~p, reason: timeout)~n",
-                            [SlideOp]),
-                    _ = slide_op:reset_timer(SlideOp), % reset previous timeouts
-                    RMSubscrTag = {move, slide_op:get_id(SlideOp)},
-                    rm_loop:unsubscribe(self(), RMSubscrTag),
-                    State1 = dht_node_state:rm_db_range(State, MoveFullId),
-                    dht_node_state:set_slide(State1, pred, null)
-            end;
-        not_found -> State
-    end;
 
 % only messages with the first element being "join" are processed here
 % -> see dht_node.erl
@@ -888,30 +872,6 @@ try_next_candidate(JoinState) ->
         end,
     contact_best_candidate(JoinState1).
 
-%% @doc Sends a join response message to the new predecessor and sets the given
-%%      slide operation in the dht_node state (adding a timeout to it as well).
-%% userdevguide-begin dht_node_join:join_request2
--spec send_join_response(State::dht_node_state:state(),
-                         NewSlideOp::slide_op:slide_op(),
-                         NewPred::node:node_type(), CandId::lb_op:id())
-        -> dht_node_state:state().
-send_join_response(State, SlideOp, NewPred, CandId) ->
-    MoveFullId = slide_op:get_id(SlideOp),
-    NewSlideOp =
-        slide_op:set_timer(SlideOp, get_join_response_timeout(),
-                           {join, join_response_timeout, NewPred, MoveFullId, CandId}),
-    MyOldPred = dht_node_state:get(State, pred),
-    MyNode = dht_node_state:get(State, node),
-    ?TRACE_SEND(node:pidX(NewPred),
-                {join, join_response, MyNode, MyOldPred, MoveFullId, CandId}),
-    comm:send(node:pidX(NewPred),
-              {join, join_response, MyNode, MyOldPred, MoveFullId, CandId}),
-    % no need to tell the ring maintenance -> the other node will trigger an update
-    % also this is better in case the other node dies during the join
-%%     rm_loop:notify_new_pred(comm:this(), NewPred),
-    dht_node_state:set_slide(State, pred, NewSlideOp).
-%% userdevguide-end dht_node_join:join_request2
-
 %% userdevguide-begin dht_node_join:finish_join
 %% @doc Finishes the join and sends all queued messages.
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
@@ -941,6 +901,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
             State::dht_node_state:state()}.
 finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
     State = finish_join(Me, Pred, Succ, DB, QueuedMessages),
+    fd:subscribe([node:pidX(Succ)], {move, MoveId}),
     SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, node:id(Me), join),
     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
     State1 = dht_node_state:set_slide(State, succ, SlideOp1),
@@ -1049,12 +1010,6 @@ remove_connection(Conn, {Phase, JoinUUId, Options, CurIdVersion, Connections, Jo
 %%      exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(join_response_timeout) and
-    config:cfg_is_greater_than_equal(join_response_timeout, 1000) and
-
-    config:cfg_is_integer(join_response_timeouts) and
-    config:cfg_is_greater_than_equal(join_response_timeouts, 1) and
-
     config:cfg_is_integer(join_request_timeout) and
     config:cfg_is_greater_than_equal(join_request_timeout, 1000) and
 
@@ -1074,18 +1029,6 @@ check_config() ->
     config:cfg_is_greater_than_equal(join_get_number_of_samples_timeout, 1000) and
 
     config:cfg_is_module(join_lb_psv).
-
-%% @doc Gets the max number of ms to wait for a joining node's reply after
-%%      it send a join request (set in the config files).
--spec get_join_response_timeout() -> pos_integer().
-get_join_response_timeout() ->
-    config:read(join_response_timeout).
-
-%% @doc Gets the max number of join_response_timeouts before the slide is
-%%      aborted (set in the config files).
--spec get_join_response_timeouts() -> pos_integer().
-get_join_response_timeouts() ->
-    config:read(join_response_timeouts).
 
 %% @doc Gets the max number of ms to wait for a scalaris node to reply on a
 %%      join request (set in the config files).

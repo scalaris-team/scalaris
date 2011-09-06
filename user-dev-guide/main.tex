@@ -2275,14 +2275,10 @@ The \code{join_request} message will be received by the existing node which
 will set up a slide operation with the new node. If it is not responsible for
 the key (anymore), it will deny the request and reply with a
 \code{\{join, join_response, not_responsible, Node\}} message.
-
-\codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
-
 If it is responsible for the ID and is not participating in a slide with its
 current predecessor, it will set up a slide with the joining node:
 
-\erlfunindex{dht\_node\_join}{send\_join\_response}
-\codesnippet{dht_node_join.erl}{dht_node_join:join_request2}{../src/dht_node_join.erl}
+\codesnippet{dht_node_join.erl}{dht_node_join:join_request1}{../src/dht_node_join.erl}
 
 \subsubsection{Phase 4}
 
