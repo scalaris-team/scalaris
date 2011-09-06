@@ -31,7 +31,9 @@
 all() -> [
           insert_bucketing,
           treeHash,
-          branchTest
+          branchTest,          
+          %storeToDot,
+          sizeTest
          ].
 
 suite() ->
@@ -79,6 +81,24 @@ branchTest(_) ->
     ?equals(merkle_tree:size(Tree2), 4),
     ?equals(merkle_tree:size(Tree3), 11),
     ok.
+
+sizeTest(_) ->
+    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
+    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
+                       [{1, DefBucketSize - 1}]),
+    Tree2 = add_to_tree(1000 - 2 * DefBucketSize, 1000, Tree1),
+    {Inner, Leafs} = merkle_tree:size_detail(Tree2),
+    Size = merkle_tree:size(Tree2),
+    ct:pal("Size=~p ; InnerCount=~p ; Leafs=~p", [Size, Inner, Leafs]),
+    ?equals(Size, Inner + Leafs).
+
+storeToDot(_) ->
+    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
+    Tree = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
+                       [{1, 3*DefBucketSize - 1}, {1000 - 4*DefBucketSize + 1, 1000}]),
+    {Inner, Leafs} = merkle_tree:size_detail(Tree),
+    ct:pal("Tree Size - Inner=~p ; Leafs=~p", [Inner, Leafs]),
+    merkle_tree:store_to_DOT(Tree).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper

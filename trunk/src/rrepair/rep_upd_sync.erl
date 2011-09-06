@@ -84,17 +84,17 @@
 
 -record(rep_upd_sync_stats,
         {
-         diffCount          = 0 :: non_neg_integer(),
-         updatedCount       = 0 :: non_neg_integer(),
-         notUpdatedCount    = 0 :: non_neg_integer(),
-         tree_size          = 0 :: non_neg_integer(),
-         tree_compareLeft   = 0 :: non_neg_integer(),
-         tree_nodesCompared = 0 :: non_neg_integer(),
-         tree_leafsSynced   = 0 :: non_neg_integer(),
-         tree_compareSkipped= 0 :: non_neg_integer(),
-         errorCount         = 0 :: non_neg_integer(),
-         buildTime          = 0 :: non_neg_integer(),   %in us
-         syncTime           = 0 :: integer()            %in us
+         diffCount          = 0      :: non_neg_integer(),
+         updatedCount       = 0      :: non_neg_integer(),
+         notUpdatedCount    = 0      :: non_neg_integer(),
+         tree_size          = {0, 0} :: merkle_tree:mt_size(),
+         tree_compareLeft   = 0      :: non_neg_integer(),
+         tree_nodesCompared = 0      :: non_neg_integer(),
+         tree_leafsSynced   = 0      :: non_neg_integer(),
+         tree_compareSkipped= 0      :: non_neg_integer(),
+         errorCount         = 0      :: non_neg_integer(),
+         buildTime          = 0      :: non_neg_integer(),   %in us
+         syncTime           = 0      :: integer()            %in us
          }).
 -type rep_upd_sync_stats() :: #rep_upd_sync_stats{}.
 
@@ -314,9 +314,9 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                       sync_struct = FinalTreeSync, 
                                       sync_stats = 
                                           Stats#rep_upd_sync_stats{ tree_compareLeft = ToCompare,
-                                                                    tree_size = merkle_tree:size(FinalTree),
+                                                                    tree_size = merkle_tree:size_detail(FinalTree),
                                                                     buildTime = BuildTime
-                                                                  } 
+                                                                  }
                                     }
     end;
 
@@ -530,7 +530,8 @@ on({check_node_response, Result, I, ChildHashs}, State =
 %% build sync struct
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_sync_struct(rep_upd:sync_method(), rep_upd:db_chunk(), Args::build_args()) -> bloom_sync_struct() | merkle_sync_struct().
+-spec build_sync_struct(rep_upd:sync_method(), rep_upd:db_chunk(), Args::build_args()) -> 
+          bloom_sync_struct() | merkle_sync_struct().
 build_sync_struct(bloom, {I, DBItems}, {Fpr, SrcNodePid}) ->
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
@@ -546,16 +547,6 @@ build_sync_struct(bloom, {I, DBItems}, {Fpr, SrcNodePid}) ->
 build_sync_struct(merkleTree, {I, DBItems}, {DestRepUpdPid}) ->
     #merkle_sync_struct{ dest_repUpd_pid = DestRepUpdPid, 
                          tree = add_to_tree(DBItems, merkle_tree:new(I))}.
-
--spec add_to_tree(?DB:db_as_list(), merkle_tree:merkle_tree()) -> merkle_tree:merkle_tree().
-add_to_tree(DBItems, MTree) ->
-    TreeI = merkle_tree:get_interval(MTree),
-    lists:foldl(fun({Key, Val, _, _, Ver}, Tree) ->
-                        MinKey = minKeyInInterval(Key, TreeI),
-                        merkle_tree:insert(MinKey, encodeBlob(Ver, Val), Tree)
-                end, 
-                MTree, 
-                DBItems).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BloomFilter specific
@@ -578,6 +569,16 @@ fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec add_to_tree(?DB:db_as_list(), merkle_tree:merkle_tree()) -> merkle_tree:merkle_tree().
+add_to_tree(DBItems, MTree) ->
+    TreeI = merkle_tree:get_interval(MTree),
+    lists:foldl(fun({Key, Val, _, _, Ver}, Tree) ->
+                        MinKey = minKeyInInterval(Key, TreeI),
+                        merkle_tree:insert(MinKey, encodeBlob(Ver, Val), Tree)
+                end, 
+                MTree, 
+                DBItems).
+
 -spec compareNodes([merkle_tree:mt_node()], 
                    [merkle_tree:mt_node_key()], 
                    {Matched::[merkle_tree:mt_node()], NotMatched::[merkle_tree:mt_node()]}) -> 
@@ -776,8 +777,7 @@ fork_sync(Sync_Conf, Round) ->
 check_config() ->
     case config:read(rep_update_activate) of
         true ->
-            config:cfg_is_bool(rep_update_sync_feedback) andalso
-                
+            config:is_bool(rep_update_sync_feedback) andalso                
             config:cfg_is_float(rep_update_fpr) andalso
             config:cfg_is_greater_than(rep_update_fpr, 0) andalso
             config:cfg_is_less_than(rep_update_fpr, 1) andalso
