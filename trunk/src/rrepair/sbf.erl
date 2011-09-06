@@ -48,7 +48,7 @@
 %% 
 %% % @doc creates a new sbf
 %% new_(N, FPR, Hfs) ->
-%%     CellSize = case config:is_integer(sbf_cell_size) of
+%%     CellSize = case config:cfg_is_integer(sbf_cell_size) of
 %%                    true -> config:read(sbf_cell_size);
 %%                    _ -> 8
 %%                end,

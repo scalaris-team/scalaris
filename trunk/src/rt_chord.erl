@@ -203,15 +203,15 @@ next_index({I, J}) ->
 %% @doc Checks whether config parameters of the rt_chord process exist and are
 %%      valid.
 check_config() ->
-    config:is_integer(chord_base) and
-        config:is_greater_than_equal(chord_base, 2) and
-        config:is_integer(rt_size_use_neighbors) and
-        config:is_greater_than_equal(rt_size_use_neighbors, 0) and
-        config:is_in(key_creator, [random, random_with_bit_mask]) and
+    config:cfg_is_integer(chord_base) and
+        config:cfg_is_greater_than_equal(chord_base, 2) and
+        config:cfg_is_integer(rt_size_use_neighbors) and
+        config:cfg_is_greater_than_equal(rt_size_use_neighbors, 0) and
+        config:cfg_is_in(key_creator, [random, random_with_bit_mask]) and
         case config:read(key_creator) of
             random -> true;
             random_with_bit_mask ->
-                config:is_tuple(key_creator_bitmask, 2,
+                config:cfg_is_tuple(key_creator_bitmask, 2,
                                 fun({Mask1, Mask2}) ->
                                         erlang:is_integer(Mask1) andalso
                                             erlang:is_integer(Mask2) end,

@@ -152,10 +152,10 @@ add_additional_nodes() ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_string(log_path) and
-    config:is_string(log_file_name_errorlogger) and
-    config:test_and_error(log_path, fun(X) -> X =/= config:read(log_file_name_errorlogger) end,
+    config:cfg_is_string(log_path) and
+    config:cfg_is_string(log_file_name_errorlogger) and
+    config:cfg_test_and_error(log_path, fun(X) -> X =/= config:read(log_file_name_errorlogger) end,
                           "is not different from log_file_name_errorlogger") and
-    config:is_integer(nodes_per_vm) and
-    config:is_port(yaws_port) and
-    config:is_string(docroot).
+    config:cfg_is_integer(nodes_per_vm) and
+    config:cfg_is_port(yaws_port) and
+    config:cfg_is_string(docroot).

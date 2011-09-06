@@ -1555,17 +1555,17 @@ rm_notify_new_pred(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(move_max_transport_entries) and
-    config:is_greater_than(move_max_transport_entries, 0) and
+    config:cfg_is_integer(move_max_transport_entries) and
+    config:cfg_is_greater_than(move_max_transport_entries, 0) and
 
-    config:is_integer(move_wait_for_reply_timeout) and
-    config:is_greater_than(move_wait_for_reply_timeout, 0) and
+    config:cfg_is_integer(move_wait_for_reply_timeout) and
+    config:cfg_is_greater_than(move_wait_for_reply_timeout, 0) and
 
-    config:is_integer(move_send_msg_retries) and
-    config:is_greater_than(move_send_msg_retries, 0) and
+    config:cfg_is_integer(move_send_msg_retries) and
+    config:cfg_is_greater_than(move_send_msg_retries, 0) and
 
-    config:is_bool(move_use_incremental_slides) and
-    config:is_bool(move_symmetric_incremental_slides).
+    config:cfg_is_bool(move_use_incremental_slides) and
+    config:cfg_is_bool(move_symmetric_incremental_slides).
     
 %% @doc Gets the max number of DB entries per data move operation (set in the
 %%      config files).

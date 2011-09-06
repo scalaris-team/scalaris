@@ -191,8 +191,8 @@ process_join_msg({gossip_get_values_best_response, BestValues},
 %% @doc Checks whether config parameters of the passive load balancing
 %%      algorithm exist and are valid.
 check_config() ->
-    config:is_integer(lb_psv_gossip_min_samples) and
-    config:is_greater_than_equal(lb_psv_gossip_min_samples, 1).
+    config:cfg_is_integer(lb_psv_gossip_min_samples) and
+    config:cfg_is_greater_than_equal(lb_psv_gossip_min_samples, 1).
 
 %% @doc Gets the minnimum number of nodes to sample (set in the config files).
 -spec conf_get_min_number_of_samples() -> pos_integer().

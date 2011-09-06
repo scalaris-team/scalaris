@@ -94,17 +94,17 @@ set_log_level(Level) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_in(log_level, [warn, info, error, fatal, debug, none]) and
-    config:is_in(log_level_file, [warn, info, error, fatal, debug, none]) and
+    config:cfg_is_in(log_level, [warn, info, error, fatal, debug, none]) and
+    config:cfg_is_in(log_level_file, [warn, info, error, fatal, debug, none]) and
     
-    config:is_string(log_path) and
-    config:is_string(log_file_name_log4erl) and
+    config:cfg_is_string(log_path) and
+    config:cfg_is_string(log_file_name_log4erl) and
     
-    config:is_integer(log_file_size) and
-    config:is_greater_than(log_file_size, 0) and
+    config:cfg_is_integer(log_file_size) and
+    config:cfg_is_greater_than(log_file_size, 0) and
     
-    config:is_integer(log_file_rotations) and
-    config:is_greater_than(log_file_rotations, 0) and
+    config:cfg_is_integer(log_file_rotations) and
+    config:cfg_is_greater_than(log_file_rotations, 0) and
 
-    config:is_string(log_format) and
-    config:is_string(log_format_file).
+    config:cfg_is_string(log_format) and
+    config:cfg_is_string(log_format_file).

@@ -265,13 +265,13 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_module(vivaldi_trigger) and
+    config:cfg_is_module(vivaldi_trigger) and
 
-    config:is_integer(vivaldi_interval) and
-    config:is_greater_than(vivaldi_interval, 0) and
+    config:cfg_is_integer(vivaldi_interval) and
+    config:cfg_is_greater_than(vivaldi_interval, 0) and
 
-    config:is_integer(vivaldi_dimensions) and
-    config:is_greater_than_equal(vivaldi_dimensions, 2).
+    config:cfg_is_integer(vivaldi_dimensions) and
+    config:cfg_is_greater_than_equal(vivaldi_dimensions, 2).
 
 %% @doc Gets the vivaldi interval set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().

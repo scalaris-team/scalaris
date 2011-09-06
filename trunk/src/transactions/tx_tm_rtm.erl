@@ -990,17 +990,17 @@ state_unsubscribe(State, Pid) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(quorum_factor) and
-    config:is_greater_than(quorum_factor, 0) and
-    config:is_integer(replication_factor) and
-    config:is_greater_than(replication_factor, 0) and
+    config:cfg_is_integer(quorum_factor) and
+    config:cfg_is_greater_than(quorum_factor, 0) and
+    config:cfg_is_integer(replication_factor) and
+    config:cfg_is_greater_than(replication_factor, 0) and
 
-    config:is_integer(tx_timeout) and
-    config:is_greater_than(tx_timeout, 0) and
-    config:is_integer(tx_rtm_update_interval) and
-    config:is_greater_than(tx_rtm_update_interval, 0) and
+    config:cfg_is_integer(tx_timeout) and
+    config:cfg_is_greater_than(tx_timeout, 0) and
+    config:cfg_is_integer(tx_rtm_update_interval) and
+    config:cfg_is_greater_than(tx_rtm_update_interval, 0) and
 
-    config:is_greater_than_equal(tx_timeout, 1000 div 3)
-%%     config:is_greater_than_equal(tx_timeout, 1000 div 2)
+    config:cfg_is_greater_than_equal(tx_timeout, 1000 div 3)
+%%     config:cfg_is_greater_than_equal(tx_timeout, 1000 div 2)
     .
 

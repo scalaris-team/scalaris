@@ -296,6 +296,6 @@ receive_answer() ->
 %% @doc Checks whether used config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(tx_timeout) and
-    config:is_greater_than_equal(tx_timeout, 1000).
+    config:cfg_is_integer(tx_timeout) and
+    config:cfg_is_greater_than_equal(tx_timeout, 1000).
 

@@ -151,11 +151,11 @@ dump(Succ) -> [{"0", lists:flatten(io_lib:format("~p", [Succ]))}].
 %% @doc Checks whether config parameters of the rt_simple process exist and are
 %%      valid.
 check_config() ->
-    config:is_in(key_creator, [random, random_with_bit_mask]) and
+    config:cfg_is_in(key_creator, [random, random_with_bit_mask]) and
         case config:read(key_creator) of
             random -> true;
             random_with_bit_mask ->
-                config:is_tuple(key_creator_bitmask, 2,
+                config:cfg_is_tuple(key_creator_bitmask, 2,
                                 fun({Mask1, Mask2}) ->
                                         erlang:is_integer(Mask1) andalso
                                             erlang:is_integer(Mask2) end,

@@ -239,5 +239,5 @@ get_base_interval() ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(pointer_base_stabilization_interval) and
-        config:is_greater_than_equal(pointer_base_stabilization_interval, 1000).
+    config:cfg_is_integer(pointer_base_stabilization_interval) and
+        config:cfg_is_greater_than_equal(pointer_base_stabilization_interval, 1000).
