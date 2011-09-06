@@ -78,12 +78,12 @@ init(ChildSpecs) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_string(docroot) and
-    config:is_string(log_path) and
-    config:is_port(yaws_port) and
+    config:cfg_is_string(docroot) and
+    config:cfg_is_string(log_path) and
+    config:cfg_is_port(yaws_port) and
 
     case config:read(yaws_max_post_data) of
         nolimit -> true;
-        _ -> config:is_integer(yaws_max_post_data) and
-             config:is_greater_than(yaws_max_post_data, 0)
+        _ -> config:cfg_is_integer(yaws_max_post_data) and
+             config:cfg_is_greater_than(yaws_max_post_data, 0)
     end.

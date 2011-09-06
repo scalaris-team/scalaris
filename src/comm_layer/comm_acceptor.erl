@@ -102,4 +102,4 @@ first_ip() ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_port(port).
+    config:cfg_is_port(port).

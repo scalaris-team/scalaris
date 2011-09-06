@@ -100,11 +100,11 @@ calc_latency(Latencies) ->
 %%      and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(vivaldi_count_measurements) and
-    config:is_greater_than(vivaldi_count_measurements, 0) and
+    config:cfg_is_integer(vivaldi_count_measurements) and
+    config:cfg_is_greater_than(vivaldi_count_measurements, 0) and
     
-    config:is_integer(vivaldi_measurements_delay) and
-    config:is_greater_than_equal(vivaldi_measurements_delay, 0) and
+    config:cfg_is_integer(vivaldi_measurements_delay) and
+    config:cfg_is_greater_than_equal(vivaldi_measurements_delay, 0) and
     
-    config:is_integer(vivaldi_latency_timeout) and
-    config:is_greater_than(vivaldi_latency_timeout, 0).
+    config:cfg_is_integer(vivaldi_latency_timeout) and
+    config:cfg_is_greater_than(vivaldi_latency_timeout, 0).

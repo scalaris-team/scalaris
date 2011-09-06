@@ -224,28 +224,28 @@ get_web_debug_info(_State) -> [].
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_module(ringmaintenance_trigger) and
+    config:cfg_is_module(ringmaintenance_trigger) and
 
-    config:is_integer(stabilization_interval_base) and
-    config:is_greater_than(stabilization_interval_base, 0) and
+    config:cfg_is_integer(stabilization_interval_base) and
+    config:cfg_is_greater_than(stabilization_interval_base, 0) and
 
-    config:is_integer(stabilization_interval_min) and
-    config:is_greater_than(stabilization_interval_min, 0) and
-    config:is_greater_than_equal(stabilization_interval_base, stabilization_interval_min) and
+    config:cfg_is_integer(stabilization_interval_min) and
+    config:cfg_is_greater_than(stabilization_interval_min, 0) and
+    config:cfg_is_greater_than_equal(stabilization_interval_base, stabilization_interval_min) and
 
-    config:is_integer(stabilization_interval_max) and
-    config:is_greater_than(stabilization_interval_max, 0) and
-    config:is_greater_than_equal(stabilization_interval_max, stabilization_interval_min) and
-    config:is_greater_than_equal(stabilization_interval_max, stabilization_interval_base) and
+    config:cfg_is_integer(stabilization_interval_max) and
+    config:cfg_is_greater_than(stabilization_interval_max, 0) and
+    config:cfg_is_greater_than_equal(stabilization_interval_max, stabilization_interval_min) and
+    config:cfg_is_greater_than_equal(stabilization_interval_max, stabilization_interval_base) and
 
-    config:is_integer(cyclon_cache_size) and
-    config:is_greater_than(cyclon_cache_size, 2) and
+    config:cfg_is_integer(cyclon_cache_size) and
+    config:cfg_is_greater_than(cyclon_cache_size, 2) and
 
-    config:is_integer(succ_list_length) and
-    config:is_greater_than_equal(succ_list_length, 1) and
+    config:cfg_is_integer(succ_list_length) and
+    config:cfg_is_greater_than_equal(succ_list_length, 1) and
 
-    config:is_integer(pred_list_length) and
-    config:is_greater_than_equal(pred_list_length, 1).
+    config:cfg_is_integer(pred_list_length) and
+    config:cfg_is_greater_than_equal(pred_list_length, 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Internal Functions

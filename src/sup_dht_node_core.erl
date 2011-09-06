@@ -64,4 +64,4 @@ init({DHTNodeGroup, Options}) ->
 %%      exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_module(dht_node).
+    config:cfg_is_module(dht_node).

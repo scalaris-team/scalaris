@@ -157,7 +157,7 @@ decide(PaxosID, State) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(learner_noinit_timeout) and
-    config:is_greater_than_equal(learner_noinit_timeout, 1000) and
-    config:is_greater_than(learner_noinit_timeout, tx_timeout).
+    config:cfg_is_integer(learner_noinit_timeout) and
+    config:cfg_is_greater_than_equal(learner_noinit_timeout, 1000) and
+    config:cfg_is_greater_than(learner_noinit_timeout, tx_timeout).
 

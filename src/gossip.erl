@@ -734,25 +734,25 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_module(gossip_trigger) and
+    config:cfg_is_module(gossip_trigger) and
     
-    config:is_integer(gossip_interval) and
-    config:is_greater_than(gossip_interval, 0) and
+    config:cfg_is_integer(gossip_interval) and
+    config:cfg_is_greater_than(gossip_interval, 0) and
     
-    config:is_integer(gossip_min_triggers_per_round) and
-    config:is_greater_than_equal(gossip_min_triggers_per_round, 0) and
+    config:cfg_is_integer(gossip_min_triggers_per_round) and
+    config:cfg_is_greater_than_equal(gossip_min_triggers_per_round, 0) and
     
-    config:is_integer(gossip_max_triggers_per_round) and
-    config:is_greater_than_equal(gossip_max_triggers_per_round, 1) and
+    config:cfg_is_integer(gossip_max_triggers_per_round) and
+    config:cfg_is_greater_than_equal(gossip_max_triggers_per_round, 1) and
     
-    config:is_float(gossip_converge_avg_epsilon) and
-    config:is_in_range(gossip_converge_avg_epsilon, 0.0, 100.0) and
+    config:cfg_is_float(gossip_converge_avg_epsilon) and
+    config:cfg_is_in_range(gossip_converge_avg_epsilon, 0.0, 100.0) and
     
-    config:is_integer(gossip_converge_avg_count) and
-    config:is_greater_than(gossip_converge_avg_count, 0) and
+    config:cfg_is_integer(gossip_converge_avg_count) and
+    config:cfg_is_greater_than(gossip_converge_avg_count, 0) and
     
-    config:is_integer(gossip_converge_avg_count_start_new_round) and
-    config:is_greater_than(gossip_converge_avg_count_start_new_round, 0).
+    config:cfg_is_integer(gossip_converge_avg_count_start_new_round) and
+    config:cfg_is_greater_than(gossip_converge_avg_count_start_new_round, 0).
     
 %% @doc Gets the gossip interval set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().

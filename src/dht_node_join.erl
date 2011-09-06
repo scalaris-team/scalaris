@@ -1049,31 +1049,31 @@ remove_connection(Conn, {Phase, JoinUUId, Options, CurIdVersion, Connections, Jo
 %%      exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(join_response_timeout) and
-    config:is_greater_than_equal(join_response_timeout, 1000) and
+    config:cfg_is_integer(join_response_timeout) and
+    config:cfg_is_greater_than_equal(join_response_timeout, 1000) and
 
-    config:is_integer(join_response_timeouts) and
-    config:is_greater_than_equal(join_response_timeouts, 1) and
+    config:cfg_is_integer(join_response_timeouts) and
+    config:cfg_is_greater_than_equal(join_response_timeouts, 1) and
 
-    config:is_integer(join_request_timeout) and
-    config:is_greater_than_equal(join_request_timeout, 1000) and
+    config:cfg_is_integer(join_request_timeout) and
+    config:cfg_is_greater_than_equal(join_request_timeout, 1000) and
 
-    config:is_integer(join_request_timeouts) and
-    config:is_greater_than_equal(join_request_timeouts, 1) and
+    config:cfg_is_integer(join_request_timeouts) and
+    config:cfg_is_greater_than_equal(join_request_timeouts, 1) and
 
-    config:is_integer(join_lookup_timeout) and
-    config:is_greater_than_equal(join_lookup_timeout, 1000) and
+    config:cfg_is_integer(join_lookup_timeout) and
+    config:cfg_is_greater_than_equal(join_lookup_timeout, 1000) and
 
-    config:is_integer(join_known_hosts_timeout) and
-    config:is_greater_than_equal(join_known_hosts_timeout, 1000) and
+    config:cfg_is_integer(join_known_hosts_timeout) and
+    config:cfg_is_greater_than_equal(join_known_hosts_timeout, 1000) and
 
-    config:is_integer(join_timeout) and
-    config:is_greater_than_equal(join_timeout, 1000) and
+    config:cfg_is_integer(join_timeout) and
+    config:cfg_is_greater_than_equal(join_timeout, 1000) and
 
-    config:is_integer(join_get_number_of_samples_timeout) and
-    config:is_greater_than_equal(join_get_number_of_samples_timeout, 1000) and
+    config:cfg_is_integer(join_get_number_of_samples_timeout) and
+    config:cfg_is_greater_than_equal(join_get_number_of_samples_timeout, 1000) and
 
-    config:is_module(join_lb_psv).
+    config:cfg_is_module(join_lb_psv).
 
 %% @doc Gets the max number of ms to wait for a joining node's reply after
 %%      it send a join request (set in the config files).

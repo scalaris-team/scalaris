@@ -318,8 +318,8 @@ process_rrds(DBs) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(monitor_perf_interval) and
-    config:is_greater_than(monitor_perf_interval, 0).
+    config:cfg_is_integer(monitor_perf_interval) and
+    config:cfg_is_greater_than(monitor_perf_interval, 0).
 
 -spec get_bench_interval() -> pos_integer().
 get_bench_interval() ->

@@ -345,17 +345,17 @@ rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_module(cyclon_trigger) and
+    config:cfg_is_module(cyclon_trigger) and
     
-    config:is_integer(cyclon_interval) and
-    config:is_greater_than(cyclon_interval, 0) and
+    config:cfg_is_integer(cyclon_interval) and
+    config:cfg_is_greater_than(cyclon_interval, 0) and
     
-    config:is_integer(cyclon_cache_size) and
-    config:is_greater_than(cyclon_cache_size, 2) and
+    config:cfg_is_integer(cyclon_cache_size) and
+    config:cfg_is_greater_than(cyclon_cache_size, 2) and
     
-    config:is_integer(cyclon_shuffle_length) and
-    config:is_greater_than_equal(cyclon_shuffle_length, 1) and
-    config:is_less_than_equal(cyclon_shuffle_length, config:read(cyclon_cache_size)).
+    config:cfg_is_integer(cyclon_shuffle_length) and
+    config:cfg_is_greater_than_equal(cyclon_shuffle_length, 1) and
+    config:cfg_is_less_than_equal(cyclon_shuffle_length, config:read(cyclon_cache_size)).
 
 %% @doc Gets the cyclon interval set in scalaris.cfg.
 -spec get_shuffle_interval() -> pos_integer().

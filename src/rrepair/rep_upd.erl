@@ -145,10 +145,10 @@ init(Trigger) ->
 check_config() ->
     case config:read(rep_update_activate) of
         true ->
-            config:is_module(rep_update_trigger) andalso
-            config:is_atom(rep_update_sync_method) andalso	
-            config:is_integer(rep_update_interval) andalso
-            config:is_greater_than(rep_update_interval, 0);
+            config:cfg_is_module(rep_update_trigger) andalso
+            config:cfg_is_atom(rep_update_sync_method) andalso	
+            config:cfg_is_integer(rep_update_interval) andalso
+            config:cfg_is_greater_than(rep_update_interval, 0);
         _ -> true
     end.
 

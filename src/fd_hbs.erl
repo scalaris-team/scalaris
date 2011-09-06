@@ -200,8 +200,8 @@ on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
 %% @doc Checks existence and validity of config parameters for this module.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(failure_detector_interval) and
-    config:is_greater_than(failure_detector_interval, 0).
+    config:cfg_is_integer(failure_detector_interval) and
+    config:cfg_is_greater_than(failure_detector_interval, 0).
 
 %% @doc Reports the crash to local subscribers.
 %% @private

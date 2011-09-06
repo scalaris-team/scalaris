@@ -213,7 +213,7 @@ inform_learner(Learner, PaxosID, StateForID) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(acceptor_noinit_timeout) and
-    config:is_greater_than_equal(acceptor_noinit_timeout, 1000) and
-    config:is_greater_than_equal(tx_timeout, 1000/4) and
-    config:is_greater_than(acceptor_noinit_timeout, tx_timeout).
+    config:cfg_is_integer(acceptor_noinit_timeout) and
+    config:cfg_is_greater_than_equal(acceptor_noinit_timeout, 1000) and
+    config:cfg_is_greater_than_equal(tx_timeout, 1000/4) and
+    config:cfg_is_greater_than(acceptor_noinit_timeout, tx_timeout).

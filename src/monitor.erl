@@ -292,8 +292,8 @@ init(null) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(monitor_timeslots_to_keep) and
-    config:is_greater_than(monitor_timeslots_to_keep, 0).
+    config:cfg_is_integer(monitor_timeslots_to_keep) and
+    config:cfg_is_greater_than(monitor_timeslots_to_keep, 0).
 
 -spec get_timeslots_to_keep() -> pos_integer().
 get_timeslots_to_keep() ->

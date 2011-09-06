@@ -369,8 +369,8 @@ us2timestamp(Time) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:is_integer(rrd_timing_hist_size) and
-    config:is_greater_than_equal(rrd_timing_hist_size, 0).
+    config:cfg_is_integer(rrd_timing_hist_size) and
+    config:cfg_is_greater_than_equal(rrd_timing_hist_size, 0).
 
 -spec get_timing_hist_size() -> non_neg_integer().
 get_timing_hist_size() ->
