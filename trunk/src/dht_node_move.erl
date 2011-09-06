@@ -47,6 +47,7 @@
          make_slide/5,
          make_slide_leave/1, make_jump/4,
          crashed_node/3,
+         send/3, send_no_slide/3, send2/3, % for dht_node_join
          check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -448,19 +449,29 @@ process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
 
 % misc.
 
--spec send(Pid::comm:mypid(), Message::move_message(), MoveFullId::slide_op:id()) -> ok.
+%% @doc Sends a move message using the dht_node as the shepherd to handle
+%%      broken connections.
+-spec send(Pid::comm:mypid(), Message::comm:message(), MoveFullId::slide_op:id()) -> ok.
 send(Pid, Message, MoveFullId) ->
     Shepherd = comm:self_with_cookie({move, MoveFullId}),
     ?TRACE_SEND(Pid, Message),
     comm:send_with_shepherd(Pid, Message, Shepherd).
 
--spec send_no_slide(Pid::comm:mypid(), Message::move_message(), Timeouts::non_neg_integer()) -> ok.
+%% @doc Sends a move message using the dht_node as the shepherd to handle
+%%      broken connections. This does not require a slide_op being set up.
+%%      The error message handler can count the number of timeouts using the
+%%      provided cookie.
+-spec send_no_slide(Pid::comm:mypid(), Message::comm:message(), Timeouts::non_neg_integer()) -> ok.
 send_no_slide(Pid, Message, Timeouts) ->
     Shepherd = comm:self_with_cookie({move, timeouts, Timeouts}),
     ?TRACE_SEND(Pid, Message),
     comm:send_with_shepherd(Pid, Message, Shepherd).
 
--spec send2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(), Message::move_message()) -> dht_node_state:state().
+%% @doc Sends a move message using the dht_node as the shepherd to handle
+%%      broken connections. The target node is determined from the SlideOp.
+%%      A timeout counter in the SlideOp is reset and the dht_node_state is
+%%      updated with the (new) slide operation.
+-spec send2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(), Message::comm:message()) -> dht_node_state:state().
 send2(State, SlideOp, Message) ->
     MoveFullId = slide_op:get_id(SlideOp),
     Target = node:pidX(slide_op:get_node(SlideOp)),
@@ -1362,9 +1373,15 @@ get_slide_op(State, MoveFullId) ->
         {PredOrSucc, SlideOp} ->
             Node = dht_node_state:get(State, PredOrSucc),
             NodeSlOp = slide_op:get_node(SlideOp),
-            % allow only changed pred during a leave if the new pred is not between the leaving node and the current node!
+            % - allow changed pred during a leave if the new pred is not between
+            %   the leaving node and the current node!
+            % - allow outdated pred during wait_for_pred_update_join if the new
+            %   pred is in the current range
             case node:same_process(Node, NodeSlOp) orelse
-                     (slide_op:is_leave(SlideOp) andalso PredOrSucc =:= pred andalso
+                     (PredOrSucc =:= pred andalso
+                          (slide_op:is_leave(SlideOp) orelse
+                               (slide_op:is_join(SlideOp) andalso
+                                    slide_op:get_phase(SlideOp) =:= wait_for_pred_update_join)) andalso
                           intervals:in(node:id(NodeSlOp), dht_node_state:get(State, my_range))) of
                 true -> {ok,             PredOrSucc, SlideOp};
                 _    -> {wrong_neighbor, PredOrSucc, SlideOp}
@@ -1424,12 +1441,14 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
     % set a 'null' slide_op if there was an old one with the given ID
     Type = slide_op:get_type(SlideOp1),
     PredOrSucc = slide_op:get_predORsucc(Type),
+    Node = slide_op:get_node(SlideOp1),
+    Id = slide_op:get_id(SlideOp1),
+    fd:unsubscribe([node:pidX(Node)], {move, Id}),
     State3 = dht_node_state:set_slide(State2, PredOrSucc, null),
     NewDB = ?DB:stop_record_changes(dht_node_state:get(State3, db),
                                     slide_op:get_interval(SlideOp)),
     State4 = dht_node_state:set_db(State3, NewDB),
-    abort_slide(State4, slide_op:get_node(SlideOp1), slide_op:get_id(SlideOp1),
-                slide_op:get_phase(SlideOp1),
+    abort_slide(State4, Node, Id, slide_op:get_phase(SlideOp1),
                 slide_op:get_source_pid(SlideOp1), slide_op:get_tag(SlideOp1),
                 Type, Reason, NotifyNode).
 
@@ -1444,7 +1463,6 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
 abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, NotifyNode) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
     NodePid = node:pidX(Node),
-    fd:unsubscribe([NodePid], {move, SlideOpId}),
     % abort slide on the (other) node:
     case NotifyNode of
         true ->
