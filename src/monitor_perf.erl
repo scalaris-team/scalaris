@@ -75,7 +75,10 @@ run_bench() ->
 -spec on(message(), state()) -> state().
 on({bench} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    msg_delay:send_local(get_bench_interval(), self(), {bench}),
+    case get_bench_interval() of
+        0 -> ok;
+        I -> msg_delay:send_local(I, self(), {bench})
+    end,
     run_bench(),
     State;
 
@@ -220,9 +223,12 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    FirstDelay = randoms:rand_uniform(1, get_bench_interval() + 1),
-    msg_delay:send_local(FirstDelay, self(), {bench}),
-    msg_delay:send_local(get_gather_interval(), self(), {propagate}),
+    case get_bench_interval() of
+        0 -> ok;
+        I -> FirstDelay = randoms:rand_uniform(1, I + 1),
+             msg_delay:send_local(FirstDelay, self(), {bench}),
+             msg_delay:send_local(get_gather_interval(), self(), {propagate})
+    end,
     Now = os:timestamp(),
     State = #state{id = util:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
@@ -319,9 +325,9 @@ process_rrds(DBs) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(monitor_perf_interval) and
-    config:cfg_is_greater_than(monitor_perf_interval, 0).
+    config:cfg_is_greater_than_equal(monitor_perf_interval, 0).
 
--spec get_bench_interval() -> pos_integer().
+-spec get_bench_interval() -> non_neg_integer().
 get_bench_interval() ->
     config:read(monitor_perf_interval).
 
