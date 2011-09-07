@@ -33,13 +33,26 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start_link/2, check_config/0]).
+
+-type(rempid() :: %% locally existing subscriptions for remote pids
+        {
+          comm:mypid(),  %% remote pid a local subscriber is subscribed to
+                         %% the other end (fd_hbs) has a monitor
+                         %% established for this
+          non_neg_integer(), %% number of local subscribers for the remote pid
+          util:time(),   %% delay remote demonitoring:
+                         %%   time of ref count reached 0
+                         %%   all other modifications change this to {0,0,0}
+          boolean()      %% delayed demonitoring requested and still open?
+        }).
+
 -type(state() :: {
-       comm:mypid(),   %% remote hbs
-       [{comm:mypid(), pos_integer()}], %% subscribed rem. pids + ref counting
-       util:time(),    %% local time of last pong arrival
-       util:time(),    %% remote is crashed if no pong arrives until this
-       atom(),         %% ets table name
-       %% locally monitored pids for a remote hbs:
+       comm:mypid(), %% remote hbs
+       [rempid()],  %% subscribed rem. pids + ref counting
+       util:time(),  %% local time of last pong arrival
+       util:time(),  %% remote is crashed if no pong arrives until this
+       atom(),       %% ets table name
+       %% locally erlang:monitored() pids for a remote hbs:
        [{comm:mypid(), reference()}]
      }).
 
@@ -67,8 +80,9 @@ init([RemotePid]) ->
         false -> comm:send_local(self(), {periodic_alive_check});
         true -> ok
     end,
-    Now = erlang:now(),
-    state_new(_RemoteHBS = RemoteFDPid, _RemotePids = [{RemotePid, 1}],
+    Now = os:timestamp(),
+    state_new(_RemoteHBS = RemoteFDPid,
+              _RemotePids = [],
               _LastPong = Now,
               _CrashedAfter = util:time_plus_ms(Now, delayfactor() * failureDetectorInterval()),
               TableName).
@@ -89,6 +103,42 @@ on({del_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
     case Changed of
         deleted -> _S2 = state_del_watched_pid(S1, WatchedPid);
         unchanged -> S1
+    end;
+
+on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
+    ?TRACE("fd_hbs check_delayed_del_watching_of ~.0p~n", [_Msg]),
+    %% initiate demonitoring and delete local entry if
+    %% entry time is still unmodified since this message was triggered
+    RemPids = state_get_rem_pids(State),
+    case lists:keyfind(WatchedPid, 1, RemPids) of
+        false -> log:log(error, "req. to delete non watched pid~n"),
+                 State;
+        Entry ->
+            NewRemPids =
+                case rempid_get_last_modified(Entry) of
+                    Time -> %% untouched for whole wait period
+                        RemHBS = state_get_rem_hbs(State),
+                        case comm:make_local(RemHBS) of
+                            fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid});
+                            _ -> comm:send(RemHBS, {del_watching_of, WatchedPid})
+                        end,
+                        lists:delete(WatchedPid, RemPids);
+                    _ ->
+                        NewEntry =
+                            case rempid_refcount(Entry) of
+                                0 -> %% retrigger delayed del watching
+                                    NewTime = os:timestamp(),
+                                    msg_delay:send_local(
+                                      1, self(),
+                                      {check_delayed_del_watching_of,
+                                       WatchedPid, NewTime}),
+                                    rempid_set_last_modified(Entry, NewTime);
+                                _ ->
+                                    rempid_set_pending_demonitor(Entry, false)
+                            end,
+                        lists:keyreplace(WatchedPid, 1, RemPids, NewEntry)
+                end,
+            state_set_rem_pids(State, NewRemPids)
     end;
 
 on({add_watching_of, WatchedPid} = _Msg, State) ->
@@ -121,7 +171,7 @@ on({pong_via_fd, RemHBSSubscriber, RemoteDelay}, State) ->
 
 on({pong, _Subscriber, RemoteDelay}, State) ->
     ?TRACEPONG("Pinger pong for ~p~n", [_Subscriber]),
-    Now = erlang:now(),
+    Now = os:timestamp(),
     LastPong = state_get_last_pong(State),
     CrashedAfter = state_get_crashed_after(State),
     PongDelay = abs(timer:now_diff(Now, LastPong)),
@@ -137,7 +187,7 @@ on({pong, _Subscriber, RemoteDelay}, State) ->
 
 on({periodic_alive_check}, State) ->
     ?TRACEPONG("Pinger periodic_alive_check~n", []),
-    Now = erlang:now(),
+    Now = os:timestamp(),
     CrashedAfter = state_get_crashed_after(State),
     comm:send(state_get_rem_hbs(State),
               {pong, comm:this(),
@@ -214,7 +264,8 @@ report_crash(State) ->
     erlang:unlink(FD),
     _ = try
             lists:foldl(fun(X, S) -> on({crashed, X}, S) end,
-                        State, [RemPid || {RemPid, _} <- state_get_rem_pids(State)])
+                        State, [ rempid_get_rempid(RemPidEntry)
+                                 || RemPidEntry <- state_get_rem_pids(State)])
         catch _:_ -> ignore_exception
         end,
     kill.
@@ -226,20 +277,20 @@ failureDetectorInterval() -> config:read(failure_detector_interval).
 -spec delayfactor() -> pos_integer().
 delayfactor() -> 4.
 
--spec state_new(comm:mypid(), [{comm:mypid(), pos_integer()}],
+-spec state_new(comm:mypid(), [rempid()],
                 util:time(), util:time(), atom()) -> state().
 state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter,Table) ->
     {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
 
--spec state_get_rem_hbs(state()) -> comm:mypid().
+-spec state_get_rem_hbs(state())    -> comm:mypid().
 state_get_rem_hbs(State)            -> element(1, State).
 -spec state_set_rem_hbs(state(), comm:mypid()) -> state().
 state_set_rem_hbs(State, Val)       -> setelement(1, State, Val).
--spec state_get_rem_pids(state()) -> [{comm:mypid(), pos_integer()}].
+-spec state_get_rem_pids(state())   -> [rempid()].
 state_get_rem_pids(State)           -> element(2, State).
--spec state_set_rem_pids(state(), [{comm:mypid(), pos_integer()}]) -> state().
+-spec state_set_rem_pids(state(), [rempid()]) -> state().
 state_set_rem_pids(State, Val)      -> setelement(2, State, Val).
--spec state_get_last_pong(state()) -> util:time().
+-spec state_get_last_pong(state())  -> util:time().
 state_get_last_pong(State)          -> element(3, State).
 -spec state_set_last_pong(state(), util:time()) -> state().
 state_set_last_pong(State, Val)     -> setelement(3, State, Val).
@@ -249,7 +300,7 @@ state_get_crashed_after(State)      -> element(4, State).
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
 -spec state_get_table(state()) -> atom().
 state_get_table(State)              -> element(5, State).
--spec state_get_monitors(state()) -> [{comm:mypid(), reference()}].
+-spec state_get_monitors(state())   -> [{comm:mypid(), reference()}].
 state_get_monitors(State)           -> element(6, State).
 -spec state_set_monitors(state(), [{comm:mypid(), reference()}]) -> state().
 state_set_monitors(State, Val)      -> setelement(6, State, Val).
@@ -282,7 +333,7 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     Entry = pdb:get({Subscriber, WatchedPid}, Table),
     case Entry of
         undefined ->
-            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~p, Watching group and name ~p~n",
+            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~p, Watching group and name ~p.~n",
                     [{unsubscribe, Subscriber, WatchedPid, Cookie},
                      pid_groups:group_and_name_of(Subscriber),
                     pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
@@ -338,9 +389,10 @@ state_add_watched_pid(State, WatchedPid) ->
                 _ -> comm:send(RemHBS, {add_watching_of, WatchedPid})
             end,
             %% add to list
-            state_set_rem_pids(State, [{WatchedPid, 1} | RemPids]);
+            state_set_rem_pids(
+              State, [rempid_inc(rempid_new(WatchedPid)) | RemPids]);
         Entry ->
-            NewEntry = setelement(2, Entry, 1 + element(2, Entry)),
+            NewEntry = rempid_inc(Entry),
             state_set_rem_pids(
               State, lists:keyreplace(WatchedPid, 1, RemPids, NewEntry))
     end.
@@ -353,18 +405,26 @@ state_del_watched_pid(State, WatchedPid) ->
         false -> log:log(error, "req. to delete non watched pid~n"),
                  State;
         Entry ->
-            NewEntry = setelement(2, Entry, element(2, Entry) - 1),
-            NewRemPids =
-                case element(2, NewEntry) of
-                    0 ->
-                        RemHBS = state_get_rem_hbs(State),
-                        case comm:make_local(RemHBS) of
-                            fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid});
-                            _ -> comm:send(RemHBS, {del_watching_of, WatchedPid})
-                        end,
-                        lists:delete(WatchedPid, RemPids);
-                    _ -> lists:keyreplace(WatchedPid, 1, RemPids, NewEntry)
+            TmpEntry = rempid_dec(Entry),
+            NewEntry =
+                case {rempid_refcount(TmpEntry),
+                      rempid_get_pending_demonitor(TmpEntry)} of
+                    {0, false} -> %% dec to 0 and triggger new delayed message
+                        Time = os:timestamp(),
+                        %% delayed demonitoring: remember current time
+                        %% self-inform on pending demonitoring with current
+                        %% time.
+                        %% actually delete if timestamp of the entry is
+                        %% still the same after delay
+                        msg_delay:send_local(
+                          1, self(),
+                          {check_delayed_del_watching_of, WatchedPid, Time}),
+                        rempid_set_last_modified(TmpEntry, Time);
+                    {0, true} -> %% dec to 0 and no new delayed message needed
+                        TmpEntry;
+                    _ -> TmpEntry
                 end,
+            NewRemPids = lists:keyreplace(WatchedPid, 1, RemPids, NewEntry),
             state_set_rem_pids(State, NewRemPids)
     end.
 
@@ -384,3 +444,27 @@ state_del_monitor(State, WatchedPid) ->
             state_set_monitors(State,
                                lists:delete({WatchedPid, MonRef}, Monitors))
     end.
+
+-spec rempid_new(comm:mypid()) -> rempid().
+rempid_new(Pid) ->
+    {Pid, _RefCount = 0, _DecTo0 = {0,0,0}, _PendingDemonitor = false}.
+-spec rempid_get_rempid(rempid()) -> comm:mypid().
+rempid_get_rempid(Entry) -> element(1, Entry).
+-spec rempid_refcount(rempid()) -> non_neg_integer().
+rempid_refcount(Entry) -> element(2, Entry).
+-spec rempid_inc(rempid()) -> rempid().
+rempid_inc(Entry) ->
+    TmpEntry = setelement(2, Entry, element(2, Entry) + 1),
+    rempid_set_last_modified(TmpEntry, {0,0,0}).
+-spec rempid_dec(rempid()) -> rempid().
+rempid_dec(Entry) ->
+    TmpEntry = setelement(2, Entry, element(2, Entry) - 1),
+    rempid_set_last_modified(TmpEntry, {0,0,0}).
+-spec rempid_set_last_modified(rempid(), util:time()) -> rempid().
+rempid_set_last_modified(Entry, Time) -> setelement(3, Entry, Time).
+-spec rempid_get_last_modified(rempid()) -> util:time().
+rempid_get_last_modified(Entry) -> element(3, Entry).
+-spec rempid_get_pending_demonitor(rempid()) -> boolean().
+rempid_get_pending_demonitor(Entry) -> element(4, Entry).
+-spec rempid_set_pending_demonitor(rempid(), boolean()) -> rempid().
+rempid_set_pending_demonitor(Entry, Val) -> setelement(4, Entry, Val).
