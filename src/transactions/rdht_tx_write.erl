@@ -112,8 +112,7 @@ validate(DB, RTLogEntry) ->
 %%%            {NewDB, prepared};
 %%%        false ->
     VersionOK = (RTVers =:= DBVers),
-    Lockable = (false =:= db_entry:get_writelock(DBEntry))
-        andalso (0 =:= db_entry:get_readlock(DBEntry)),
+    Lockable = not db_entry:is_locked(DBEntry),
     case (VersionOK andalso Lockable) of
         true ->
             %% set locks on entry

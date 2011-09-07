@@ -405,7 +405,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     
     % delete DBEntry:
     DB3 =
-        case db_entry:get_writelock(DBEntry) orelse db_entry:get_readlock(DBEntry) > 0 of
+        case db_entry:is_locked(DBEntry) of
             true ->
                 DBA1 = ?db_equals_pattern(?TEST_DB:delete(DB2, Key), locks_set),
                 check_entry(DBA1, Key, DBEntry, {ok, Value, Version}, true, "check_entry_delete_1a"),
@@ -649,7 +649,7 @@ prop_update_entries(Data, ItemsToUpdate) ->
         [db_entry:inc_version(E) || E <- lists:sublist(UniqueData, ItemsToUpdate)],
     ExpUpdatedData =
         [begin
-             case db_entry:get_writelock(E) orelse db_entry:get_readlock(E) =/= 0 of
+             case db_entry:is_locked(E) of
                  true -> E;
                  _    ->
                      EUpd = [X || X <- UniqueUpdateData,
@@ -1446,8 +1446,7 @@ check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
         {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> true.
 check_key_in_deleted_no_locks(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
     case intervals:in(Key, ChangesInterval) andalso OldExists andalso
-             (db_entry:get_writelock(OldEntry) =:= false andalso
-                  db_entry:get_readlock(OldEntry) =:= 0) of
+             not db_entry:is_locked(OldEntry) of
         true ->
             {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
             check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note);
