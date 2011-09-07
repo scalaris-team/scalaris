@@ -162,7 +162,7 @@ process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 notify_source_pid(slide_op:get_source_pid(SlideOp1),
                                   {move, result, slide_op:get_tag(SlideOp1), ok}),
                 dht_node_state:set_slide(State, PredOrSucc, null)
@@ -173,7 +173,7 @@ process_move_msg({move, my_mte, MoveFullId, OtherMTE} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % simply re-create the slide (TargetId or NextOp have changed)
                 State1 = dht_node_state:set_slide(State, PredOrSucc, null),
                 Command = {ok, slide_op:get_type(SlideOp1)},
@@ -188,7 +188,7 @@ process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, pred, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % simply re-create the slide (TargetId or NextOp have changed)
                 % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
                 fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
@@ -206,7 +206,7 @@ process_move_msg({move, change_id, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, succ, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 change_my_id(State, SlideOp1)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_change_id], succ, change_id);
@@ -215,7 +215,7 @@ process_move_msg({move, change_id, MoveFullId, TargetId, NextOp} = _Msg, MyState
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, succ, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % simply re-create the slide (TargetId or NextOp might have changed)
                 State1 = dht_node_state:set_slide(State, succ, null),
                 Command = {ok, slide_op:get_type(SlideOp1)},
@@ -314,7 +314,7 @@ process_move_msg({move, req_data, MoveFullId} = Msg, MyState) ->
                         comm:send_local_after(10, self(), Msg),
                         State;
                     _ ->
-                        SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                        SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                         send_data(State, SlideOp1)
                 end
         end,
@@ -325,7 +325,7 @@ process_move_msg({move, data, MovingData, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, _PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 accept_data(State, SlideOp1, MovingData)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data, wait_for_other_mte, wait_for_change_op], both, data);
@@ -335,7 +335,7 @@ process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % if sending data to the predecessor, check if we have already
                 % received the new predecessor info, otherwise wait for it
                 case PredOrSucc =:= pred andalso
@@ -351,7 +351,7 @@ process_move_msg({move, delta, ChangedData, DeletedKeys, MoveFullId} = _Msg, MyS
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 accept_delta(State, PredOrSucc, SlideOp1, ChangedData, DeletedKeys)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta], both, delta);
@@ -362,7 +362,7 @@ process_move_msg({move, delta_ack, MoveFullId, continue, NewSlideId} = _Msg, MyS
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 finish_delta_ack_continue(
                   State, PredOrSucc, SlideOp1, NewSlideId)
         end,
@@ -375,7 +375,7 @@ process_move_msg({move, delta_ack, MoveFullId, OtherNextOpType, NewSlideId, Othe
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 MyNextOpType = slide_op:other_type_to_my_type(OtherNextOpType),
                 finish_delta_ack_next(
                   State, PredOrSucc, SlideOp1, MyNextOpType, NewSlideId,
@@ -390,7 +390,7 @@ process_move_msg({move, delta_ack, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 finish_delta_ack(State, PredOrSucc, SlideOp1)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
@@ -476,13 +476,11 @@ send2(State, SlideOp, Message) ->
     MoveFullId = slide_op:get_id(SlideOp),
     Target = node:pidX(slide_op:get_node(SlideOp)),
     PredOrSucc = slide_op:get_predORsucc(SlideOp),
-    % reset previous timeouts (just in case - could have been done earlier):
-    SlideOp1 = slide_op:reset_timer(SlideOp),
-    SlideOp2 = slide_op:set_timer(
-                 SlideOp1, get_wait_for_reply_timeout(),
-                 {move, timeout, slide_op:get_id(SlideOp1)}),
+    SlideOp1 = slide_op:set_timer(
+                 SlideOp, get_wait_for_reply_timeout(),
+                 {move, timeout, slide_op:get_id(SlideOp)}),
     send(Target, Message, MoveFullId),
-    dht_node_state:set_slide(State, PredOrSucc, SlideOp2).
+    dht_node_state:set_slide(State, PredOrSucc, SlideOp1).
 
 %% @doc Notifies the successor or predecessor about a (new) slide operation.
 %%      Assumes that the information in the slide operation is still correct
@@ -1433,7 +1431,7 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
     % write to log when aborting an already set-up slide:
     log:log(warn, "[ dht_node_move ~.0p ] abort_slide(op: ~.0p, reason: ~.0p)~n",
             [comm:this(), SlideOp, Reason]),
-    SlideOp1 = slide_op:reset_timer(SlideOp), % reset previous timeouts
+    SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
     % potentially set up for joining nodes (slide with pred) or
     % nodes sending data to their predecessor:
     RMSubscrTag = {move, slide_op:get_id(SlideOp1)},

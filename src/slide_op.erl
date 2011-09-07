@@ -30,7 +30,7 @@
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
          get_predORsucc/1,
-         get_timer/1, set_timer/3, reset_timer/1,
+         get_timer/1, set_timer/3, cancel_timer/1,
          get_timeouts/1, inc_timeouts/1, reset_timeouts/1,
          get_phase/1, set_phase/2,
          is_setup_at_other/1, set_setup_at_other/1,
@@ -78,13 +78,12 @@
          interval          = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
          target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
          tag               = ?required(slide_op, tag)       :: any(),
-         source_pid        = null          :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
-         timer             = {null, nomsg} :: {reference(), comm:message()} | {null, nomsg}, % timeout timer
-         timeouts          = 0             :: non_neg_integer(),
-         phase             = null          :: phase(),
-         setup_at_other    = false         :: boolean(),
-         next_op           = {none}        :: next_op(),
-         other_max_entries = unknown       :: unknown | pos_integer()
+         source_pid        = null             :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
+         timer             = {null, nomsg, 0} :: {reference(), comm:message(), non_neg_integer()} | {null, nomsg, non_neg_integer()}, % timeout timer, msg, number of timeouts
+         phase             = null             :: phase(),
+         setup_at_other    = false            :: boolean(),
+         next_op           = {none}           :: next_op(),
+         other_max_entries = unknown          :: unknown | pos_integer()
         }).
 -opaque slide_op() :: #slide_op{}.
 
@@ -357,7 +356,9 @@ is_incremental(_) -> false.
 
 %% @doc Returns the timer of the slide operation or {null, nomsg} if no timer
 %%      is set.
--spec get_timer(SlideOp::slide_op()) -> {reference(), comm:message()} | {null, nomsg}.
+-spec get_timer(SlideOp::slide_op())
+        -> {TRef::reference(), Msg::comm:message(), Timeouts::non_neg_integer()} |
+           {TRef::null, Msg::nomsg, Timeouts::non_neg_integer()}.
 get_timer(#slide_op{timer=Timer}) -> Timer.
 
 %% @doc Sets a timer that will send the given Message in Timeout ms. If Timeout
@@ -366,46 +367,46 @@ get_timer(#slide_op{timer=Timer}) -> Timer.
 -spec set_timer(SlideOp::slide_op(), TimeOut::pos_integer(), Message::comm:message()) -> slide_op();
                (SlideOp::slide_op(), Timer::null, Message::nomsg) -> slide_op().
 set_timer(SlideOp, Timeout, Message) ->
+    cancel_timer2(SlideOp),
     TimerRef = case Timeout =/= null of
-                   %TODO: switch to msg_delay (need to implement timer canceling first - see reset_timer/1)
-%%                    true -> msg_delay:send_local(Timeout / 1000, self(), Message);
                    true -> comm:send_local_after(Timeout, self(), Message);
                    _    -> null
                end,
-    SlideOp#slide_op{timer = {TimerRef, Message}}.
+    SlideOp#slide_op{timer = {TimerRef, Message, 0}}.
 
 %% @doc Resets the timer of the given SlideOp, consumes any of its timeout
 %%      messages and resets the timeout counter.
--spec reset_timer(SlideOp::slide_op()) -> slide_op().
-reset_timer(SlideOp) ->
-    {TimerRef, Msg} = get_timer(SlideOp),
-    SlOp1 = case (TimerRef =/= null) of
-                true ->
-                    _ = erlang:cancel_timer(TimerRef),
-                    % consume potential timeout message
-                    receive Msg -> ok
-                    after 0 -> ok
-                    end,
-                    set_timer(SlideOp, null, nomsg);
-                false when Msg =:= nomsg ->
-                    SlideOp;
-                false ->
-                    set_timer(SlideOp, null, nomsg)
-            end,
-    reset_timeouts(SlOp1).
+-spec cancel_timer(SlideOp::slide_op()) -> slide_op().
+cancel_timer(SlideOp) ->
+    cancel_timer2(SlideOp),
+    SlideOp#slide_op{timer = {null, nomsg, 0}}.
+
+-spec cancel_timer2(SlideOp::slide_op()) -> ok.
+cancel_timer2(SlideOp) ->
+    {TimerRef, Msg, _Timeouts} = get_timer(SlideOp),
+    case (TimerRef =/= null) of
+        true ->
+            _ = erlang:cancel_timer(TimerRef),
+            % consume potential timeout message
+            receive Msg -> ok
+                after 0 -> ok
+            end;
+        _ -> ok
+    end.
 
 %% @doc Returns the number of timeouts received by a timer.
 -spec get_timeouts(SlideOp::slide_op()) -> non_neg_integer().
-get_timeouts(#slide_op{timeouts=Timeouts}) -> Timeouts.
+get_timeouts(#slide_op{timer={_TimerRef, _Msg, Timeouts}}) -> Timeouts.
 
 %% @doc Increases the number of timeouts received by a timer by 1.
 -spec inc_timeouts(SlideOp::slide_op()) -> slide_op().
-inc_timeouts(SlideOp = #slide_op{timeouts=Timeouts}) ->
-    SlideOp#slide_op{timeouts = Timeouts + 1}.
+inc_timeouts(SlideOp = #slide_op{timer={TimerRef, Msg, Timeouts}}) ->
+    SlideOp#slide_op{timer={TimerRef, Msg, Timeouts + 1}}.
 
 %% @doc Resets the number of timeouts to 0.
 -spec reset_timeouts(SlideOp::slide_op()) -> slide_op().
-reset_timeouts(SlideOp) -> SlideOp#slide_op{timeouts = 0}.
+reset_timeouts(SlideOp = #slide_op{timer={TimerRef, Msg, _Timeouts}}) ->
+    SlideOp#slide_op{timer={TimerRef, Msg, 0}}.
 
 %% @doc Returns the current phase of the slide operation.
 -spec get_phase(SlideOp::slide_op()) -> phase().
