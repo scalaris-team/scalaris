@@ -28,7 +28,7 @@
          get_readlock/1, inc_readlock/1, dec_readlock/1,
          get_writelock/1, set_writelock/1, unset_writelock/1,
          get_version/1, inc_version/1, set_version/2,
-         reset_locks/1,
+         reset_locks/1, is_locked/1,
          is_empty/1, is_null/1]).
 
 -ifdef(with_export_type_support).
@@ -112,6 +112,10 @@ set_version(DBEntry, Version) -> setelement(5, DBEntry, Version).
 reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
     set_writelock(TmpEntry, false).
+
+-spec is_locked(DBEntry::entry()) -> boolean().
+is_locked(DBEntry) ->
+    get_readlock(DBEntry) > 0 orelse get_writelock(DBEntry).
 
 %% @doc Returns whether the item is an empty_val item with version -1.
 %%      Note: The number of read or write locks does not matter here!

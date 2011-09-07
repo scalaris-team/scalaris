@@ -60,9 +60,8 @@ delete(DB, Key) ->
         false ->
             {DB, undef};
         _ ->
-            case db_entry:get_writelock(DBEntry) =:= false andalso
-                     db_entry:get_readlock(DBEntry) =:= 0 of
-                true ->
+            case db_entry:is_locked(DBEntry) of
+                false ->
                     {delete_entry_(DB, DBEntry), ok};
                 _ ->
                     {DB, locks_set}
@@ -90,8 +89,7 @@ get_entries_(State, Interval) ->
 update_entries_(OldDB, NewEntries, Pred, UpdateFun) ->
     F = fun(NewEntry, DB) ->
                 {Exists, OldEntry} = get_entry2_(DB, db_entry:get_key(NewEntry)),
-                IsNotLocked = (not db_entry:get_writelock(OldEntry)) andalso
-                                  db_entry:get_readlock(OldEntry) =:= 0,
+                IsNotLocked = not db_entry:is_locked(OldEntry),
                 IsUpdatable = IsNotLocked andalso Pred(OldEntry, NewEntry),
                 case Exists of
                     false when IsUpdatable ->
