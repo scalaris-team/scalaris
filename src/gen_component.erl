@@ -390,10 +390,19 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                                     unknown_event;
                                 _ ->
                                     log:log(error,
-                                            "Error: exception ~p:~p during handling "
-                                                "of ~.0p in module ~p in (~.0p) with ~p "
-                                                "- stacktrace: ~.0p",
-                                            [Level, Reason, Message, Module, State, On,
+                                            "~n** Exception:~n ~.0p:~.0p~n"
+                                            "** Current message:~n ~.0p~n"
+                                            "** Module:~n ~.0p~n"
+                                            "** Source linetrace (enable in scalaris.hrl):~n ~.0p~n"
+                                            "** State:~n ~.0p~n"
+                                            "** Handler:~n ~.0p~n"
+                                            "** Stacktrace:~n ~.0p~n",
+                                            [Level, Reason,
+                                             Message,
+                                             Module,
+                                             erlang:get(test_server_loc),
+                                             State,
+                                             On,
                                              Stacktrace]),
                                     '$exception'
                             end
