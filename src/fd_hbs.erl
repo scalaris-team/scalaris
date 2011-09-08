@@ -72,8 +72,9 @@ init([RemotePid]) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
     TableName = pdb:new(?MODULE, [set, protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
-    comm:send(RemoteFDPid,
-              {subscribe_heartbeats, comm:this(), RemotePid}),
+    comm:send_with_shepherd(
+      RemoteFDPid,
+      {subscribe_heartbeats, comm:this(), RemotePid}, shepherd_new()),
 
     %% no periodic alive check inside same vm (to succeed unittests)
     case comm:is_local(RemotePid) of
@@ -189,15 +190,17 @@ on({periodic_alive_check}, State) ->
     ?TRACEPONG("Pinger periodic_alive_check~n", []),
     Now = os:timestamp(),
     CrashedAfter = state_get_crashed_after(State),
-    comm:send(state_get_rem_hbs(State),
-              {pong, comm:this(),
-               timer:now_diff(
-                 CrashedAfter,
-                 util:time_plus_ms(state_get_last_pong(State),
-                                   failureDetectorInterval()
-                                   %% the following is the reduction rate
-                                   %% when increased earlier
-                                   + failureDetectorInterval() div 3))}),
+    comm:send_with_shepherd(
+      state_get_rem_hbs(State),
+      {pong, comm:this(),
+       timer:now_diff(
+         CrashedAfter,
+         util:time_plus_ms(state_get_last_pong(State),
+                           failureDetectorInterval()
+                           %% the following is the reduction rate
+                           %% when increased earlier
+                           + failureDetectorInterval() div 3))},
+     shepherd_new()),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
                    true -> report_crash(State);
                    false -> State
@@ -206,6 +209,33 @@ on({periodic_alive_check}, State) ->
     comm:send_local_after(failureDetectorInterval(),
                           self(), {periodic_alive_check}),
     NewState;
+
+on({{send_error, Target, Message}, ShepherdCookie}, State) ->
+    NextOp =
+        case N = shepherd_retries(ShepherdCookie) of
+            1 -> {retry};
+            2 -> {delay, _Wait = 1, N + 1};
+            3 -> {retry};
+            4 -> {delay, _Wait = 2, N + 1};
+            5 -> {retry};
+            6 -> {giveup}
+        end,
+    case NextOp of
+        {retry} ->
+            comm:send_with_shepherd(Target, Message,
+                                    shepherd_inc(ShepherdCookie)),
+            State;
+        {delay, Sec, Retries} ->
+            msg_delay:send_local(
+              Sec, self(),
+              {{send_error, Target, Message}, {retries, Retries}}),
+            State;
+        {giveup} ->
+            log:log(warn, "[ FD ] Sending ~.0p failed 3 times. "
+                    "Report target ~.0p as crashed.~n", [Message, Target]),
+            %% report whole node as crashed, when not reachable via tcp:
+            report_crash(State)
+    end;
 
 on({crashed, WatchedPid}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
@@ -385,8 +415,12 @@ state_add_watched_pid(State, WatchedPid) ->
             %% add to remote site
             RemHBS = state_get_rem_hbs(State),
             case comm:make_local(RemHBS) of
-                fd -> comm:send(RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid});
-                _ -> comm:send(RemHBS, {add_watching_of, WatchedPid})
+                fd -> comm:send_with_shepherd(
+                        RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid},
+                        shepherd_new());
+                _ -> comm:send_with_shepherd(
+                       RemHBS, {add_watching_of, WatchedPid},
+                       shepherd_new())
             end,
             %% add to list
             state_set_rem_pids(
@@ -468,3 +502,16 @@ rempid_get_last_modified(Entry) -> element(3, Entry).
 rempid_get_pending_demonitor(Entry) -> element(4, Entry).
 -spec rempid_set_pending_demonitor(rempid(), boolean()) -> rempid().
 rempid_set_pending_demonitor(Entry, Val) -> setelement(4, Entry, Val).
+
+-spec shepherd_new() -> comm:erl_local_pid_with_cookie().
+shepherd_new() ->
+    comm:self_with_cookie({retries, 1}).
+
+-spec shepherd_inc(tuple()) -> comm:erl_local_pid_with_cookie().
+shepherd_inc(ShepherdCookie) ->
+    comm:self_with_cookie(
+      {retries, 1 + shepherd_retries(ShepherdCookie)}).
+
+-spec shepherd_retries(tuple()) -> pos_integer().
+shepherd_retries(ShepherdCookie) ->
+    element(2, ShepherdCookie).

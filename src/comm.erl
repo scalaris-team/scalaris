@@ -57,7 +57,8 @@
 -export([unpack_cookie/2]).
 
 -ifdef(with_export_type_support).
--export_type([message/0, message_tag/0, mypid/0, erl_local_pid/0]).
+-export_type([message/0, message_tag/0, mypid/0,
+              erl_local_pid/0, erl_local_pid_with_cookie/0]).
 % for comm_layer
 -export_type([erl_pid_plain/0]).
 % for tester_scheduler
@@ -133,6 +134,9 @@ send_local_after(Delay, Pid, Message) ->
 send_to_group_member(DestNode, Processname, Mesg) ->
     send(DestNode, {send_to_group_member, Processname, Mesg}).
 
+%% @doc Sends a message to an arbitrary process. When the sending fails, the
+%%      shepherd process will be informed with a message of the form:
+%%       {send_error, Pid, Message}.
 -spec send_with_shepherd(mypid(), message() | group_message(), erl_local_pid()) -> ok.
 -ifdef(TCP_LAYER).
 send_with_shepherd(Pid, Message, Shepherd) ->
@@ -199,12 +203,16 @@ get(Name, Pid = _Node) ->
 
 %% @doc Encapsulates the current process' pid (as returned by this/0)
 %%      and the given cookie for seamless use of cookies with send/2.
+%%      A message Msg to the pid with cookie Cookie will be deliverd as:
+%%      {Msg, Cookie} to the Pid.
 -spec this_with_cookie(any()) -> mypid().
 this_with_cookie(Cookie) -> {this_(), c, Cookie}.
 
 %% @doc Encapsulates the current process' pid (as returned by self/0) and the
 %%      given cookie for seamless use of cookies with send_local/2 and
 %%      send_local_after/3.
+%%      A message Msg to the pid with cookie Cookie will be deliverd as:
+%%      {Msg, Cookie} to the Pid.
 -spec self_with_cookie(any()) -> erl_local_pid_with_cookie().
 self_with_cookie(Cookie) -> {self(), c, Cookie}.
 
