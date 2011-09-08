@@ -38,7 +38,7 @@ all() ->
      tester_largest_smaller_than2, largest_smaller_than2,
      tester_largest_smaller_than3, largest_smaller_than3].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 40}} ].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
