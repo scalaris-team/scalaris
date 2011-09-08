@@ -15,14 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -74,8 +70,8 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
-import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
+import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiPlugin;
 
 /**
@@ -118,6 +114,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     
     private String currentImport = "";
 
+    private static CircularByteArrayOutputStream importLog = null;
     private WikiDumpHandler importHandler = null;
     
     private List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
@@ -1036,7 +1033,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 try {
                     currentImport = req_import;
                     int maxRevisions = parseInt(request.getParameter("max_revisions"), 2);
-                    PrintStream ps = new PrintStream(new FileOutputStream(dumpsPath + File.separator + req_import + "-import.log"));
+                    importLog = new CircularByteArrayOutputStream(1024 * 1024);
+                    PrintStream ps = new PrintStream(importLog);
                     ps.println("starting import...");
                     importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, maxRevisions, cFactory);
                     importHandler.setUp();
@@ -1072,12 +1070,10 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 content.append("<p>Current log file:</p>\n");
             }
             content.append("<pre>");
-            final String logFileName = dumpsPath + File.separator + currentImport + "-import.log";
-            BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(logFileName), "UTF-8"));
-            String line;
-            while ((line = br.readLine()) != null) {
-                content.append(line);
-                content.append("\n");
+            String log = importLog.toString();
+            int start = log.indexOf("\n");
+            if (start != -1) { 
+                content.append(log.substring(start));
             }
             content.append("</pre>");
             if (!stopImport) {
@@ -1126,6 +1122,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             synchronized (WikiServlet.this) {
                 WikiServlet.this.currentImport = "";
                 WikiServlet.this.importHandler = null;
+            }
+            try {
+                is.getCharacterStream().close();
+            } catch (IOException e) {
+                // don't care
             }
         }
     }
