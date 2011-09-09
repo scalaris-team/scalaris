@@ -35,7 +35,7 @@
          minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
-         zipfoldl/5,
+         zipfoldl/5, safe_split/2,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
@@ -532,6 +532,17 @@ zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->
     zipfoldl(ZipFun, FoldFun, L1R, L2R, FoldFun(ZipFun(L1H, L2H), AccIn));
 zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
     AccIn.
+
+-spec safe_split(non_neg_integer(), [T]) -> {[T], [T]}.
+safe_split(N, List) when is_integer(N), N >= 0, is_list(List) ->
+    safe_split(N, List, []).
+
+safe_split(0, L, R) ->
+    {lists:reverse(R, []), L};
+safe_split(N, [H | T], R) ->
+    safe_split(N - 1, T, [H | R]);
+safe_split(_N, [], R) ->
+    {lists:reverse(R, []), []}.
 
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that both lists share and a list of elements unique to L2.

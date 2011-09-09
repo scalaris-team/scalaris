@@ -22,6 +22,9 @@
 %% @end
 %% @version $Id$
 
+% needed by delete_entry_:
+-spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
+
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
 close_(State) ->
@@ -68,6 +71,11 @@ delete(DB, Key) ->
             end
     end.
 
+%% @doc Removes all values with the given entry's key from the DB.
+delete_entry_(State, Entry) ->
+    Key = db_entry:get_key(Entry),
+    delete_entry_at_key_(State, Key).
+
 %% @doc Gets (non-empty) db_entry objects in the given range.
 get_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
@@ -82,6 +90,17 @@ get_entries_(State, Interval) ->
                           end,
                           fun(DBEntry) -> DBEntry end)
     end.
+
+%% @doc Returns all key-value pairs of the given DB which are in the given
+%%      interval but at most ChunkSize elements.
+%%      Assumes the ets-table is an ordered_set,
+%%      may return data from "both ends" of the DB-range if the interval is
+%%      ""wrapping around", i.e. its begin is larger than its end.
+%%      Returns the chunk and the remaining interval for which the DB may still
+%%      have data (a subset of I).
+%%      Precond: Interval is a subset of the range of the dht_node and continuous!
+get_chunk_(DB, Interval, ChunkSize) ->
+    get_chunk_(DB, Interval, fun(_) -> true end, fun(E) -> E end, ChunkSize).
 
 %% @doc Updates all (existing or non-existing) non-locked entries from
 %%      NewEntries for which Pred(OldEntry, NewEntry) returns true with

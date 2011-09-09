@@ -161,6 +161,13 @@ split_data_({DB, Counter} = _DB_, MyNewInterval) ->
     {MyNewDB, HisList} = ?BASE_DB:split_data(DB, MyNewInterval),
     {{MyNewDB, update_counter(Counter)}, HisList}.
 
+%% @doc Returns the key that would remove not more than TargetLoad entries
+%%      from the DB when starting at the key directly after Begin.
+get_split_key_({DB, Counter} = _DB_, Begin, TargetLoad, Direction) ->
+    ?TRACE4(get_load, _DB_, Begin, TargetLoad, Direction),
+    verify_counter(Counter),
+    ?BASE_DB:get_split_key(DB, Begin, TargetLoad, Direction).
+
 %% @doc Gets (non-empty) db_entry objects in the given range.
 get_entries_({DB, Counter} = _DB_, Interval) ->
     ?TRACE2(get_entries, _DB_, Interval),
@@ -173,6 +180,20 @@ get_entries_({DB, Counter} = _DB_, FilterFun, ValueFun) ->
     ?TRACE3(get_entries, _DB_, FilterFun, ValueFun),
     verify_counter(Counter),
     ?BASE_DB:get_entries(DB, FilterFun, ValueFun).
+
+%% @doc Returns all key-value pairs of the given DB which are in the given
+%%      interval but at most ChunkSize elements.
+get_chunk_({DB, Counter} = _DB_, Interval, ChunkSize) ->
+    ?TRACE3(get_chunk, _DB_, Interval, ChunkSize),
+    verify_counter(Counter),
+    ?BASE_DB:get_chunk(DB, Interval, ChunkSize).
+
+%% @doc Returns all key-value pairs of the given DB which are in the given
+%%      interval but at most ChunkSize elements.
+get_chunk_({DB, Counter} = _DB_, Interval, FilterFun, ValueFun, ChunkSize) ->
+    ?TRACE5(get_chunk, _DB_, Interval, FilterFun, ValueFun, ChunkSize),
+    verify_counter(Counter),
+    ?BASE_DB:get_chunk(DB, Interval, FilterFun, ValueFun, ChunkSize).
 
 %% @doc Returns all DB entries.
 get_data_({DB, Counter} = _DB_) ->
@@ -267,6 +288,12 @@ delete_entries_({DB, Counter} = _DB_, RangeOrFilterFun) ->
     ?TRACE2(get_entries, _DB_, RangeOrFilterFun),
     verify_counter(Counter),
     {?BASE_DB:delete_entries(DB, RangeOrFilterFun), update_counter(Counter)}.
+
+delete_chunk_({DB, Counter} = _DB_, Interval, ChunkSize) ->
+    ?TRACE3(delete_chunk, _DB_, Interval, ChunkSize),
+    verify_counter(Counter),
+    {RestInterval, NewDB} = ?BASE_DB:delete_chunk(DB, Interval, ChunkSize),
+    {RestInterval, {NewDB, update_counter(Counter)}}.
 
 check_db({DB, Counter} = _DB_) ->
     ?TRACE1(check_db, _DB_),
