@@ -104,11 +104,6 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                     throw:'no key in range' ->
                                         %%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
                                         %%                                             "splitting address range instead", [self()]),
-                                        lb_common:split_my_range(DhtNodeState, SelectedKey);
-                                    'EXIT':{undef, _} ->
-                                        % splitting load did not work because ?DB:get_chunk is not
-                                        % yet available in all DB implementations
-                                        % -> split address range
                                         lb_common:split_my_range(DhtNodeState, SelectedKey)
                                 end;
                             _ -> % split address range (fall-back):

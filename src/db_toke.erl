@@ -133,10 +133,12 @@ set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
 update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
-%% @doc Removes all values with the given entry's key from the DB.
-delete_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
-    Key = db_entry:get_key(Entry),
-    toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
+%% @doc Removes all values with the given key from the DB.
+delete_entry_at_key_(State, Key) ->
+    delete_entry_at_key_(State, Key, erlang:term_to_binary(Key, [{minor_version, 1}])).
+
+delete_entry_at_key_(State = {{DB, _FileName}, _Subscr}, Key, Key_) ->
+    toke_drv:delete(DB, Key_),
     call_subscribers(State, {delete, Key}),
     State.
 
@@ -214,6 +216,46 @@ get_entries_({{DB, _FileName}, _Subscr}, FilterFun, ValueFun) ->
         end,
     toke_drv:fold(F, [], DB).
 
+%% @doc Returns all ValueFun(DBEntry) objects of the given DB which are in the
+%%      given interval and satisfy FilterFun but at most ChunkSize elements.
+%%      See get_chunk/3 for more details.
+get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
+    AddDataFun = fun(_Key_, _Key, DBEntry_, Data) ->
+                         DBEntry = erlang:binary_to_term(DBEntry_),
+                         case FilterFun(DBEntry) of
+                             true -> [ValueFun(DBEntry) | Data];
+                             _    -> Data
+                         end
+                 end,
+    get_chunk_helper(State, Interval, AddDataFun, fun db_entry:get_key/1, ChunkSize).
+
+get_chunk_helper({{DB, _FileName}, _Subscr}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
+    F = fun (Key_, DBEntry_, Data) ->
+                 Key = erlang:binary_to_term(Key_),
+                 case intervals:in(Key, Interval) of
+                     true -> AddDataFun(Key_, Key, DBEntry_, Data);
+                     _    -> Data
+                 end
+        end,
+    Data = toke_drv:fold(F, [], DB),
+    {BeginBr, Begin, End, EndBr} = intervals:get_bounds(Interval),
+    % try to find the first existing key in the interval, starting at Begin:
+    MInfToBegin = intervals:minus(intervals:all(),
+                                  intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
+    {SecondPart, FirstPart} =
+        lists:partition(fun(E) ->
+                                intervals:in(GetKeyFromDataFun(E), MInfToBegin)
+                        end, Data),
+    SortedData = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
+    case ChunkSize of
+        all -> {intervals:empty(), SortedData};
+        _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
+               case Rest of
+                   []      -> {intervals:empty(), Chunk};
+                   [H | _] -> {intervals:new('(', GetKeyFromDataFun(H), End, EndBr), Chunk}
+               end
+    end.
+
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
 delete_entries_(State = {{DB, _FileName}, _Subscr}, FilterFun) when is_function(FilterFun) ->
@@ -233,13 +275,54 @@ delete_entries_(State = {{DB, _FileName}, _Subscr}, FilterFun) when is_function(
          end || {KeyToke, Key} <- KeysToDelete],
     State;
 delete_entries_(State, Interval) ->
-    delete_entries_(State,
-                    fun(E) ->
-                            intervals:in(db_entry:get_key(E), Interval)
-                    end).
+    {Elements, RestInterval} = intervals:get_elements(Interval),
+    case intervals:is_empty(RestInterval) of
+        true ->
+            lists:foldl(fun(Key, State1) -> delete_entry_at_key_(State1, Key) end, State, Elements);
+        _ ->
+            delete_entries_(State,
+                            fun(E) ->
+                                    intervals:in(db_entry:get_key(E), Interval)
+                            end)
+    end.
+
+delete_chunk_(DB, Interval, ChunkSize) ->
+    AddDataFun = fun(Key_, Key, _DBEntry_, Data) -> [{Key, Key_} | Data] end,
+    {Next, Chunk} = get_chunk_helper(DB, Interval, AddDataFun, fun({K, _K_}) -> K end, ChunkSize),
+    DB2 = lists:foldl(fun({Key, Key_}, DB1) -> delete_entry_at_key_(DB1, Key, Key_) end, DB, Chunk),
+    {Next, DB2}.
 
 %% @doc Returns all DB entries.
 get_data_({{DB, _FileName}, _Subscr}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).
+
+%% @doc Returns the key that would remove not more than TargetLoad entries
+%%      from the DB when starting at the key directly after Begin.
+%%      Precond: a load larger than 0
+%%      Note: similar to get_chunk/2.
+get_split_key_(DB, Begin, TargetLoad, Direction) ->
+    % assert ChunkSize > 0, see ChunkSize type
+    case get_load_(DB) of
+        0 -> throw('empty_db');
+        _ ->
+            % first need to get all keys, then sort them and filter out the split key
+            F = fun (Key_, _DBEntry_, Data) -> [erlang:binary_to_term(Key_) | Data] end,
+            Keys = toke_drv:fold(F, [], DB),
+            % try to find the first existing key in the interval, starting at Begin (exclusive):
+            MInfToBegin = intervals:minus(intervals:all(),
+                                          intervals:new('(', Begin, ?PLUS_INFINITY, ')')),
+            {SecondPart, FirstPart} =
+                lists:partition(fun(E) -> intervals:in(E, MInfToBegin) end, Keys),
+            SortedKeys = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
+            
+            case Direction of
+                forward  ->
+                    {Chunk, _Rest} = util:safe_split(TargetLoad, SortedKeys),
+                    {lists:last(Chunk), erlang:length(Chunk)};
+                backward ->
+                    {Chunk, _Rest} = util:safe_split(TargetLoad, lists:reverse(SortedKeys)),
+                    {hd(Chunk), erlang:length(Chunk)}
+            end
+    end.
