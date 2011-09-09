@@ -34,9 +34,10 @@
     {add_zombie_candidate, node:node_type() | comm:mypid()} |
     {subscribe, comm:erl_local_pid()} |
     {unsubscribe, comm:erl_local_pid()} |
+    {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type(state() :: {fix_queue:fix_queue(), gb_set(), trigger:state()}).
+-type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set(), trigger:state()}).
 
 % prevent warnings in the log by mis-using comm:send_with_shepherd/3
 %-define(SEND(Pid, Msg), comm:send(Pid, Msg)).
@@ -83,7 +84,7 @@ init(Trigger) ->
 % @doc the Token takes care, that there is only one timermessage for stabilize 
 
 -spec on(message(), state()) -> state().
-on({trigger}, {Queue, Subscriber, TriggerState}) ->
+on({trigger}, {Queue, Subscribers, TriggerState}) ->
     _ = fix_queue:map(fun(X) ->
                               Pid = case node:is_valid(X) of
                                         true -> node:pidX(X);
@@ -92,57 +93,60 @@ on({trigger}, {Queue, Subscriber, TriggerState}) ->
                               ?SEND(Pid, {ping, comm:this_with_cookie(X)})
                       end, Queue),
     NewTriggerState = trigger:next(TriggerState),
-    {Queue, Subscriber, NewTriggerState};
+    {fix_queue:new(config:read(zombieDetectorSize)), Subscribers, NewTriggerState};
 
-on({{pong}, Zombie}, {Queue, Subscriber, TriggerState}) ->
+on({{pong}, Zombie}, {Queue, Subscribers, TriggerState}) ->
     log:log(warn,"[ dn_cache ~p ] found zombie ~.0p", [comm:this(), Zombie]),
-    NewQueue =
-        case node:is_valid(Zombie) of % comm:mypid() or node:node_type()?
-            true ->
-                gb_sets:fold(fun(X, _) ->
-                                     comm:send_local(X, {zombie, Zombie})
-                             end, ok, Subscriber),
-                fix_queue:remove(Zombie, Queue, fun node:same_process/2);
-            _ ->
-                gb_sets:fold(fun(X, _) ->
-                                     comm:send_local(X, {zombie_pid, Zombie})
-                             end, ok, Subscriber),
-                fix_queue:remove(Zombie, Queue, fun erlang:'=:='/2)
-    end,
-    {NewQueue, Subscriber, TriggerState};
+    report_zombie(Subscribers, Zombie),
+    {Queue, Subscribers, TriggerState};
 
-on({add_zombie_candidate, Node}, {Queue, Subscriber, TriggerState}) ->
-    case node:is_valid(Node) of
-        true ->
-            {fix_queue:add_unique_head(Node, Queue, fun node:same_process/2, fun node:newer/2),
-             Subscriber, TriggerState};
-        _ ->
-            {fix_queue:add_unique_head(Node, Queue, fun erlang:'=:='/2, fun(_Old, New) -> New end),
-             Subscriber, TriggerState}
-    end;
+on({add_zombie_candidate, Node}, {Queue, Subscribers, TriggerState}) ->
+    {add_to_queue(Queue, Node), Subscribers, TriggerState};
 
-on({subscribe, Node}, {Queue, Subscriber, TriggerState}) ->
-    {Queue, gb_sets:insert(Node, Subscriber), TriggerState};
+on({subscribe, Node}, {Queue, Subscribers, TriggerState}) ->
+    {Queue, gb_sets:insert(Node, Subscribers), TriggerState};
 
-on({unsubscribe, Node}, {Queue, Subscriber, TriggerState}) ->
-    {Queue, gb_sets:del_element(Node, Subscriber), TriggerState};
+on({unsubscribe, Node}, {Queue, Subscribers, TriggerState}) ->
+    {Queue, gb_sets:del_element(Node, Subscribers), TriggerState};
 
-on({send_error, _Target, {ping, _}}, State) ->
-    % ignore (we expect failed messages and only hope for availability)
-    State;
+on({send_error, _Target, {ping, ThisWithCookie}}, {Queue, Subscribers, TriggerState}) ->
+    {_This, {{null}, Node}} = comm:unpack_cookie(ThisWithCookie, {null}),
+    {add_to_queue(Queue, Node), Subscribers, TriggerState};
 
-on({web_debug_info, Requestor}, {Queue, Subscriber, _TriggerState} = State) ->
+on({web_debug_info, Requestor}, {Queue, Subscribers, _TriggerState} = State) ->
     KeyValueList =
         lists:flatten(
           [{"max_length", fix_queue:max_length(Queue)},
            {"queue length", fix_queue:length(Queue)},
            {"queue (node):", ""},
            [{"", lists:flatten(io_lib:format("~p", [Node]))} || Node <- queue:to_list(fix_queue:queue(Queue))],
-           {"subscribers", gb_sets:size(Subscriber)},
+           {"subscribers", gb_sets:size(Subscribers)},
            {"subscribers (pid):", ""},
-           [{"", pid_groups:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscriber)]]),
+           [{"", pid_groups:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscribers)]]),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
+
+-spec add_to_queue(Queue::fix_queue:fix_queue(), Node::node:node_type() | comm:mypid())
+        -> fix_queue:fix_queue().
+add_to_queue(Queue, Node) ->
+    case node:is_valid(Node) of
+        true -> fix_queue:add_unique_head(Node, Queue, fun node:same_process/2,
+                                          fun node:newer/2);
+        _    -> fix_queue:add_unique_head(Node, Queue, fun erlang:'=:='/2,
+                                          fun(_Old, New) -> New end)
+    end.
+
+-spec report_zombie(Subscribers::gb_set(), Zombie::node:node_type() | comm:mypid()) -> ok.
+report_zombie(Subscribers, Zombie) ->
+    case node:is_valid(Zombie) of % comm:mypid() or node:node_type()?
+        true -> gb_sets:fold(fun(X, _) ->
+                                     comm:send_local(X, {zombie, Zombie})
+                             end, ok, Subscribers);
+        _    -> gb_sets:fold(fun(X, _) ->
+                                     comm:send_local(X, {zombie_pid, Zombie})
+                             end, ok, Subscribers)
+    end,
+    ok.
 
 %% @doc Gets the pid of the dn_cache process in the same group as the calling
 %%      process. 
