@@ -57,7 +57,7 @@ all() ->
      bloomSync_min_nodes,
      merkleSync_noOutdated,
      merkleSync_simple,
-     merkleSync_parts,
+     %merkleSync_parts,
      merkleSync_min_nodes
      ].
 
@@ -78,6 +78,7 @@ get_rrepair_config_parameter() ->
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
      {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_resolve_method, simple},
      {rep_update_fpr, 0.1},
      {rep_update_max_items, 1000},
      {rep_update_sync_feedback, true},
@@ -88,6 +89,7 @@ get_bloom_RepUpd_config() ->
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
      {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_resolve_method, simple},
      {rep_update_fpr, 0.1},
      {rep_update_max_items, 10000},
      {rep_update_sync_feedback, true},
@@ -98,6 +100,7 @@ get_merkle_tree_RepUpd_config() ->
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
      {rep_update_sync_method, merkleTree}, %bloom, merkleTree, art
+     {rep_update_resolve_method, simple},
      {rep_update_fpr, 0.1},
      {rep_update_max_items, 100000},
      {rep_update_sync_feedback, true},
@@ -220,7 +223,7 @@ merkleSync_noOutdated(Config) ->
     ok.    
 
 merkleSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.1, get_merkle_tree_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_merkle_tree_RepUpd_config()),
     ?assert(Start < End),
     ok.
 
@@ -233,7 +236,7 @@ merkleSync_min_nodes(Config) ->
 merkleSync_parts(Config) ->
     OldConf = get_merkle_tree_RepUpd_config(),
     MConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
-    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, MConf),
+    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.2, MConf),
     ?assert(Start < End),
     ok.
 
@@ -263,7 +266,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
                                                Rounds, 
                                                fun(_I) ->
                                                        startSyncRound(NodeKeys),
-                                                       timer:sleep(300),
+                                                       timer:sleep(500),
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],

@@ -13,9 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica update synchronization protocol
-%%         2 phases: I) reconciliation - find differences 
-%%                  II) resolution - resolve differences
+%% @doc    replica reconcilication protocol
 %% @end
 %% @version $Id$
 
@@ -26,8 +24,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start_sync/2, check_config/0]).
--export([print_sync_stats/1]).
+-export([init/1, on/2, start/1, check_config/0]).
+-export([print_recon_stats/1]).
 
 %exports for testing
 -export([encodeBlob/2, decodeBlob/1, 
@@ -35,8 +33,9 @@
          get_key_quadrant/1, get_interval_quadrant/1]).
 
 -ifdef(with_export_type_support).
--export_type([sync_struct/0, sync_stage/0]).
+-export_type([sync_struct/0, sync_stage/0, keyValVers/0]).
 -endif.
+
 
 -define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE(X,Y), ok).
@@ -51,9 +50,9 @@
 
 -type keyValVers() :: {?RT:key(), ?DB:value(), ?DB:version()}.
 
--type sync_stage()  :: req_shared_interval | res_shared_interval | build_struct | reconciliation | resolution.
+-type sync_stage()  :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
 
--type exit_reason() :: empty_interval | {ok, ItemsUpdated::non_neg_integer()}.
+-type exit_reason() :: empty_interval | {ok, atom()}.
 
 -record(bloom_sync_struct, 
         {
@@ -66,12 +65,10 @@
 
 -record(merkle_sync_struct,
         {
-         dest_repUpd_pid = ?required(merkle_sync_struct, dest_repUpd_pid) :: comm:mypid(),
+         dest_ru_pid = ?required(merkle_sync_struct, dest_ru_pid) :: comm:mypid(),
          tree            = merkle_tree:empty()                            :: merkle_tree:merkle_tree()
          }).
 -type merkle_sync_struct() :: #merkle_sync_struct{}.
-
--type simple_detail_sync() :: {simple_detail_sync, SrcNode::comm:mypid(), [keyValVers()]}.
 
 -type internal_buffer_struct() :: intervals:interval() |  
                                   {comm:mypid(), comm:mypid(), intervals:interval()} |
@@ -79,14 +76,10 @@
 
 -type sync_struct() :: bloom_sync_struct() |
                        merkle_sync_struct() |
-                       simple_detail_sync() |
                        internal_buffer_struct().
 
 -record(rep_upd_sync_stats,
         {
-         diffCount          = 0      :: non_neg_integer(),
-         updatedCount       = 0      :: non_neg_integer(),
-         notUpdatedCount    = 0      :: non_neg_integer(),
          tree_size          = {0, 0} :: merkle_tree:mt_size(),
          tree_compareLeft   = 0      :: non_neg_integer(),
          tree_nodesCompared = 0      :: non_neg_integer(),
@@ -102,16 +95,15 @@
         {
          ownerLocalPid      = ?required(rep_upd_sync_state, ownerLocalPid)  :: comm:erl_local_pid(),
          ownerRemotePid     = ?required(rep_upd_sync_state, ownerRemotePid) :: comm:mypid(),
-         dhtNodePid         = ?required(rep_upd_sync_state, ownerDhtPid)    :: comm:erl_local_pid(),
+         dhtNodePid         = ?required(rep_upd_sync_state, dhtNodePid)     :: comm:erl_local_pid(),
          sync_method        = undefined                                     :: rep_upd:sync_method(),   %determines the build sync struct
          sync_struct        = {}                                            :: sync_struct() | {},
          sync_stage         = reconciliation                                :: sync_stage(),
          sync_pid           = undefined                                     :: comm:mypid() | undefined,%sync dest process
-         sync_master        = ?required(rep_upd_sync_state, sync_master)    :: boolean(),               %true if process is sync leader
+         sync_master        = false                                         :: boolean(),               %true if process is sync leader
          sync_round         = 0                                             :: float(),
          sync_stats         = #rep_upd_sync_stats{}                         :: rep_upd_sync_stats(),
-         sync_start_time    = {0, 0, 0}                                     :: {non_neg_integer(), non_neg_integer(), non_neg_integer()},
-         feedback           = []                                            :: [keyValVers()]
+         sync_start_time    = {0, 0, 0}                                     :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
          }).
 -type state() :: #rep_upd_sync_state{}.
 
@@ -122,11 +114,9 @@
 -type message() ::
     {get_state_response, intervals:interval()} |
     {get_chunk_response, rep_upd:db_chunk()} |
-    {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
     {check_node_response, ok | not_found | fail_is_leaf | fail_node, intervals:interval(), [merkle_tree:mt_node_key()]} |
-    {start_sync, rep_upd:sync_method(), sync_stage()} |
-    {start_sync, rep_upd:sync_method(), sync_stage(), sync_struct()} |
+    {start_sync, rep_upd:sync_method(), sync_stage(), sync_struct(), Master::boolean()} |
     {shutdown, exit_reason()} |
     {crash, DeadPid::comm:mypid()}.
 
@@ -149,7 +139,7 @@ on({get_state_response, MyInterval}, State =
     comm:send_local(DhtNodePid, 
                     {lookup_aux, select_sync_node(MyInterval), 0, 
                      {send_to_group_member, rep_upd,
-                      {request_sync, Round, req_shared_interval, merkleTree, {OwnerPid, MyInterval}}}}),
+                      {request_recon, Round, false, req_shared_interval, merkleTree, {OwnerPid, MyInterval}}}}),
     comm:send_local(self(), {shutdown, negotiate_interval_master}),
     State;
 
@@ -244,7 +234,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
             comm:send_local(DhtNodePid, 
                             {lookup_aux, DestKey, 0, 
                              {send_to_group_member, rep_upd, 
-                              {request_sync, Round, reconciliation, bloom, SyncStruct}}}),
+                              {request_recon, Round, false, reconciliation, bloom, SyncStruct}}}),
             comm:send_local(self(), {shutdown, {ok, build_struct}});
         _ -> ok
     end,
@@ -302,11 +292,9 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                            merkle_tree:get_hash(FinalTree)}),
                         1;
                     false -> 
-                        comm:send(FinalTreeSync#merkle_sync_struct.dest_repUpd_pid, 
-                                  {request_sync, 
-                                   Round, 
-                                   res_shared_interval, 
-                                   merkleTree, 
+                        comm:send(FinalTreeSync#merkle_sync_struct.dest_ru_pid, 
+                                  {request_recon, Round, true, 
+                                   res_shared_interval, merkleTree, 
                                    {OwnerPid, comm:this(), merkle_tree:get_interval(FinalTree)}}),
                         0
                 end,
@@ -328,6 +316,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                               keyBF = KeyBF,
                                                               versBF = VersBF},
                             dhtNodePid = DhtNodePid,
+                            sync_master = Master,
                             sync_round = Round }) ->
     ?TRACE2("GetChunk Res - Recon Bloom Round=~p", [Round]),
     %if rest interval is non empty start another sync    
@@ -349,19 +338,16 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                      db_entry:get_version(C) }
                            end,
                            DBList),
-    %TODO possibility of DETAIL SYNC IMPL - NOW SEND COMPLETE obsolete Entries (key-val-vers)
+    %TODO: Possibility to resolve missing replicas
     length(Obsolete) > 0 andalso
-        comm:send(SrcNode, {request_sync, Round, resolution, bloom, {simple_detail_sync, OwnerPid, Obsolete}}),
+        comm:send(SrcNode, {request_resolve, Round, simple, {simple_detail_sync, Obsolete},
+                                {Master andalso get_do_feedback(), OwnerPid}, 
+                                {false, OwnerPid}}),
     SyncFinished andalso
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
-
-on({start_sync, SyncMethod, SyncStage}, State) ->
-    comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rep_upd_sync_state{ sync_method = SyncMethod, 
-                              sync_stage = SyncStage };    
-on({start_sync, SyncMethod, SyncStage, SyncStruct}, State =
-       #rep_upd_sync_state{ sync_master = Master }) ->
+    
+on({start_sync, SyncMethod, SyncStage, SyncStruct, Master}, State) ->
     comm:send_local(State#rep_upd_sync_state.dhtNodePid, {get_state, comm:this(), my_range}),
     State#rep_upd_sync_state{ sync_stage = SyncStage, 
                               sync_struct = SyncStruct,
@@ -380,69 +366,11 @@ on({shutdown, Reason}, State = #rep_upd_sync_state{ sync_round = Round,
                                                     sync_stage = Stage,
                                                     sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
-    NewStatS = Stats#rep_upd_sync_stats{ syncTime = timer:now_diff(erlang:now(), SyncStartTime) },
+    NewStats = Stats#rep_upd_sync_stats{ syncTime = timer:now_diff(erlang:now(), SyncStartTime) },
     Stage =/= req_shared_interval andalso
         comm:send_local(State#rep_upd_sync_state.ownerLocalPid, 
-                        {sync_progress_report, self(), Round, Master, NewStatS}),
+                        {recon_progress_report, self(), Round, Master, NewStats}),
     kill;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% detail sync messages
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_state_response, NodeDBInterval}, State = 
-       #rep_upd_sync_state{ sync_stage = resolution,
-                            sync_struct = {simple_detail_sync, _, DiffList},
-                            dhtNodePid = DhtNodePid,
-                            sync_stats = Stats
-                          }) ->
-    MyPid = comm:this(),
-    lists:foreach(fun({MinKey, Val, Vers}) ->
-                          PosKeys = ?RT:get_replica_keys(MinKey),
-                          UpdKeys = lists:filter(fun(X) -> 
-                                                         intervals:in(X, NodeDBInterval)
-                                                 end, PosKeys),
-                          lists:foreach(fun(Key) ->
-                                                comm:send_local(DhtNodePid, 
-                                                                {update_key_entry, MyPid, Key, Val, Vers})
-                                        end, UpdKeys)                  end,
-                  DiffList),
-    %kill is done by update_key_entry_ack
-    State#rep_upd_sync_state{ sync_stats = Stats#rep_upd_sync_stats{ diffCount = length(DiffList) } };
-
-
-on({update_key_entry_ack, Entry, Exists, Done}, State =
-       #rep_upd_sync_state{ sync_struct = {simple_detail_sync, Sender, _},
-                            ownerRemotePid = Owner,
-                            sync_stats = 
-                                #rep_upd_sync_stats{ diffCount = DiffCount,
-                                                     updatedCount = OkCount, 
-                                                     notUpdatedCount = FailedCount                                                         
-                                                   } = Stats,
-                            feedback = Feedback,                            
-                            sync_round = Round
-                          }) ->
-    NewStats = case Done of 
-                   true  -> Stats#rep_upd_sync_stats{ updatedCount = OkCount +1 };
-                   false -> Stats#rep_upd_sync_stats{ notUpdatedCount = FailedCount + 1 } 
-               end,
-    NewState = case not Done andalso Exists andalso get_do_feedback() of
-                   true -> State#rep_upd_sync_state{ sync_stats = NewStats,
-                                                     feedback = [{db_entry:get_key(Entry),
-                                                                  db_entry:get_value(Entry),
-                                                                  db_entry:get_version(Entry)} | Feedback]};
-                   false -> State#rep_upd_sync_state{ sync_stats = NewStats }
-               end,
-    ?TRACE2("DETAIL SYNC OK=~p Failed=~p Diff=~p", [OkCount, FailedCount, DiffCount]),
-    _ = case DiffCount - 1 =:= OkCount + FailedCount of
-            true ->
-                %?TRACE("DETAIL SYNC FINISHED", []),
-                get_do_feedback() andalso
-                    comm:send(Sender, {request_sync, Round, resolution, bloom, {simple_detail_sync, Owner, NewState#rep_upd_sync_state.feedback}}),
-                comm:send_local(self(), {shutdown, {simple_detail_sync_ok, NewState#rep_upd_sync_state.sync_stats}});
-            _ ->
-                ok
-        end,
-    NewState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
@@ -462,15 +390,13 @@ on({check_node, SrcPid, Interval, Hash}, State =
                 true ->
                     comm:send(SrcPid, {check_node_response, ok, Interval, []});
                 false when IsLeaf -> 
-                    comm:send(SrcPid, 
-                              {check_node_response, fail_is_leaf, Interval, []});
+                    comm:send(SrcPid, {check_node_response, fail_is_leaf, Interval, []});
                 false when not IsLeaf ->
                     ChildHashs = lists:map(fun(N) ->
                                                    merkle_tree:get_hash(N)
                                            end, 
                                            merkle_tree:get_childs(Node)),
-                    comm:send(SrcPid, 
-                              {check_node_response, fail_node, Interval, ChildHashs})
+                    comm:send(SrcPid, {check_node_response, fail_node, Interval, ChildHashs})
             end
     end,
     State#rep_upd_sync_state{ sync_pid = SrcPid };
@@ -484,7 +410,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                                     } = Stats, 
                             ownerRemotePid = OwnerPid,
                             sync_struct = 
-                                #merkle_sync_struct{ dest_repUpd_pid = SrcNode,
+                                #merkle_sync_struct{ dest_ru_pid = SrcNode,
                                                      tree = Tree },
                             sync_round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
@@ -526,46 +452,6 @@ on({check_node_response, Result, I, ChildHashs}, State =
     end,
     State#rep_upd_sync_state{ sync_stats = FinalStats }.
     
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% build sync struct
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec build_sync_struct(rep_upd:sync_method(), rep_upd:db_chunk(), Args::build_args()) -> 
-          bloom_sync_struct() | merkle_sync_struct().
-build_sync_struct(bloom, {I, DBItems}, {Fpr, SrcNodePid}) ->
-    ElementNum = length(DBItems),
-    HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    Hfs = ?REP_HFS:new(HFCount),
-    BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
-    BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
-    {KeyBF, VerBF} = fill_bloom(DBItems, BF1, BF2),
-    #bloom_sync_struct{ interval = I,
-                        srcNode = SrcNodePid,
-                        keyBF = KeyBF,
-                        versBF = VerBF
-                      };
-build_sync_struct(merkleTree, {I, DBItems}, {DestRepUpdPid}) ->
-    #merkle_sync_struct{ dest_repUpd_pid = DestRepUpdPid, 
-                         tree = add_to_tree(DBItems, merkle_tree:new(I))}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% BloomFilter specific
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Create two bloom filter of a given database chunk.
-%%      One over all keys and one over all keys concatenated with their version.
--spec fill_bloom(?DB:db_as_list(), KeyBF::?REP_BLOOM:bloomFilter(), VerBF::?REP_BLOOM:bloomFilter()) -> 
-          {?REP_BLOOM:bloomFilter(), ?REP_BLOOM:bloomFilter()}.
-
-fill_bloom([], KeyBF, VerBF) ->
-    {KeyBF, VerBF};
-fill_bloom([{_, _, _, _, -1} | T], KeyBF, VerBF) ->
-    fill_bloom(T, KeyBF, VerBF);
-fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
-    AddKey = minKey(Key),
-    NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-    NewVerBF = ?REP_BLOOM:add(VerBF, encodeBlob(AddKey, Ver)),
-    fill_bloom(T, NewKeyBF, NewVerBF).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -611,15 +497,56 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
                        end, 
                        merkle_tree:get_bucket(Node)),
     comm:send(DestPid, 
-              {request_sync, Round, resolution, merkleTree, {simple_detail_sync, OwnerPid, ToSync}}),
+              {request_resolve, Round, simple, {simple_detail_sync, ToSync},
+               {true, OwnerPid}, {false, OwnerPid}}),
     1.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% build sync struct
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec build_sync_struct(rep_upd:sync_method(), rep_upd:db_chunk(), Args::build_args()) -> 
+          bloom_sync_struct() | merkle_sync_struct().
+build_sync_struct(bloom, {I, DBItems}, {Fpr, SrcNodePid}) ->
+    ElementNum = length(DBItems),
+    HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
+    Hfs = ?REP_HFS:new(HFCount),
+    BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
+    BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
+    {KeyBF, VerBF} = fill_bloom(DBItems, BF1, BF2),
+    #bloom_sync_struct{ interval = I,
+                        srcNode = SrcNodePid,
+                        keyBF = KeyBF,
+                        versBF = VerBF
+                      };
+build_sync_struct(merkleTree, {I, DBItems}, {DestRepUpdPid}) ->
+    #merkle_sync_struct{ dest_ru_pid = DestRepUpdPid, 
+                         tree = add_to_tree(DBItems, merkle_tree:new(I))}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BloomFilter specific
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Create two bloom filter of a given database chunk.
+%%      One over all keys and one over all keys concatenated with their version.
+-spec fill_bloom(?DB:db_as_list(), KeyBF::?REP_BLOOM:bloomFilter(), VerBF::?REP_BLOOM:bloomFilter()) -> 
+          {?REP_BLOOM:bloomFilter(), ?REP_BLOOM:bloomFilter()}.
+
+fill_bloom([], KeyBF, VerBF) ->
+    {KeyBF, VerBF};
+fill_bloom([{_, _, _, _, -1} | T], KeyBF, VerBF) ->
+    fill_bloom(T, KeyBF, VerBF);
+fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
+    AddKey = minKey(Key),
+    NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
+    NewVerBF = ?REP_BLOOM:add(VerBF, encodeBlob(AddKey, Ver)),
+    fill_bloom(T, NewKeyBF, NewVerBF).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec print_sync_stats(rep_upd_sync_stats()) -> [any()].
-print_sync_stats(Stats) ->
+-spec print_recon_stats(rep_upd_sync_stats()) -> [any()].
+print_recon_stats(Stats) ->
     FieldNames = record_info(fields, rep_upd_sync_stats),
     Res = util:for_to_ex(1, length(FieldNames), 
                          fun(I) ->
@@ -753,12 +680,11 @@ decodeBlob(Blob) ->
 init(State) ->
     State#rep_upd_sync_state{ sync_start_time = erlang:now() }.
 
--spec start_sync(boolean(), float()) -> {ok, pid()}.
-start_sync(SyncMaster, Round) ->
+-spec start(float()) -> {ok, pid()}.
+start(Round) ->
     State = #rep_upd_sync_state{ ownerLocalPid = self(), 
                                  ownerRemotePid = comm:this(), 
-                                 dhtNodePid = pid_groups:get_my(dht_node), 
-                                 sync_master = SyncMaster,
+                                 dhtNodePid = pid_groups:get_my(dht_node),
                                  sync_round = Round },
     gen_component:start(?MODULE, State, []).
 

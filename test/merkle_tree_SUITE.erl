@@ -32,7 +32,7 @@ all() -> [
           insert_bucketing,
           treeHash,
           branchTest,          
-          %storeToDot,
+          storeToDot,
           sizeTest
          ].
 
