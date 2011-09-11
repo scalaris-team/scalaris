@@ -34,7 +34,7 @@
          store_to_DOT/1]).
 
 -ifdef(with_export_type_support).
--export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0]).
+-export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
 -endif.
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -266,7 +266,7 @@ store_to_DOT({Conf, Root}) ->
             io:fwrite(Fileid, "    style=filled;~n", []),
             store_node_to_DOT(Root, Fileid, 1, 2, Conf),
             io:fwrite(Fileid, "} ~n", []),
-            file:close(Fileid),
+            _ = file:close(Fileid),
             ok;
         {_, _} ->
             io_error

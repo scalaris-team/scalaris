@@ -13,7 +13,10 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica update protocol 
+%% @doc    replica update module 
+%%         Replica sets will be synchronized in two steps.
+%%          I) reconciliation - find set differences  (rep_upd_recon.erl)
+%%         II) resolution - resolve found differences (rep_upd_resolve.erl)
 %% @end
 %% @version $Id$
 
@@ -49,13 +52,18 @@
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
          sync_round     = 0.0                                       :: float(),
-         running_jobs   = 0                                         :: non_neg_integer()
+         open_recon     = 0                                         :: non_neg_integer(),
+         open_resolve   = 0                                         :: non_neg_integer()
          }).
 -type state() :: #rep_upd_state{}.
 
 -type message() ::
     {?TRIGGER_NAME} |
-    {request_sync, Round::float(), rep_upd_sync:sync_stage(), sync_method(), rep_upd_sync:sync_struct()} |
+    {request_recon, Round::float(), SyncMaster::boolean(), rep_upd_sync:sync_stage(), 
+        sync_method(), rep_upd_sync:sync_struct()} |
+    {request_resolve, Round::float(), rep_upd_resolve:ru_resolve_method(), 
+        rep_upd_resolve:ru_resolve_struct(), 
+        rep_upd_resolve:ru_resolve_answer(), rep_upd_resolve:ru_resolve_answer()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {sync_progress_report, Sender::comm:erl_local_pid(), Key::term(), Value::term()}.
 
@@ -66,52 +74,68 @@
 %% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
-                                            running_jobs = RunningJobs }) ->
-    {ok, Pid} = rep_upd_sync:start_sync(true, Round),
+                                            open_recon = OpenRecon }) ->
+    {ok, Pid} = rep_upd_sync:start(Round),
     case get_sync_method() of
-        bloom -> comm:send_local(Pid, {start_sync, get_sync_method(), build_struct});
-        merkleTree -> comm:send_local(Pid, {start_sync, get_sync_method(), req_shared_interval});
+        bloom -> comm:send_local(Pid, {start_sync, get_sync_method(), build_struct, {}, true});
+        merkleTree -> comm:send_local(Pid, {start_sync, get_sync_method(), req_shared_interval, {}, true});
         _ -> ok
     end,
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
     %?TRACE("Trigger NEXT", []),
     State#rep_upd_state{ trigger_state = NewTriggerState, 
                          sync_round = Round + 1,
-                         running_jobs = RunningJobs + 1 };
+                         open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_sync, Round, SyncStage, SyncMethod, SyncStruct}, State) ->
+on({request_recon, Round, SyncMaster, SyncStage, SyncMethod, SyncStruct}, 
+   State = #rep_upd_state{ open_recon = OpenRecon }) ->
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
-    {ok, Pid} = rep_upd_sync:start_sync(false, Round),
-    comm:send_local(Pid, {start_sync, SyncMethod, SyncStage, SyncStruct}),
-    RunningJobs = State#rep_upd_state.running_jobs,
-    State#rep_upd_state{ running_jobs = RunningJobs + 1 };
+    {ok, Pid} = rep_upd_sync:start(Round),
+    comm:send_local(Pid, {start_sync, SyncMethod, SyncStage, SyncStruct, SyncMaster}),
+    State#rep_upd_state{ open_recon = OpenRecon + 1 };
+
+on({request_resolve, Round, RMethod, RStruct, Feedback, SendStats}, 
+   State = #rep_upd_state{ open_resolve = OpenResolve }) ->
+    _ = rep_upd_resolve:start(Round, RMethod, RStruct, Feedback, SendStats),
+    State#rep_upd_state{ open_resolve = OpenResolve + 1 };
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Monitor Reporting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
+    %monitor:proc_set_value(?MODULE, "Progress",
+    %                       fun(Old) -> rrd:add_now(Value, Old) end),
+    Master andalso
+        ?TRACE("SYNC FINISHED - Round=~p - Sender=~p - Master=~p~nStats=~p", 
+               [Round, Sender, Master, rep_upd_sync:print_recon_stats(Stats)]),
+    State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
+
+on({resolve_progress_report, Sender, Round, Stats}, State) ->
+    %monitor:proc_set_value(?MODULE, "Progress",
+    %                       fun(Old) -> rrd:add_now(Value, Old) end),
+    ?TRACE("SYNC FINISHED - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
+           [Round, Sender, rep_upd_resolve:print_resolve_stats(Stats),
+            State#rep_upd_state.open_recon, State#rep_upd_state.open_resolve]),    
+    State#rep_upd_state{ open_resolve = State#rep_upd_state.open_resolve - 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({web_debug_info, Requestor}, State) ->
-    #rep_upd_state{ sync_round = Round } = State,
+    #rep_upd_state{ sync_round = Round, 
+                    open_recon = OpenRecon, 
+                    open_resolve = OpenResol } = State,
     KeyValueList =
         [{"Sync Method:", get_sync_method()},
          {"Bloom Module:", ?REP_BLOOM},
-         {"Sync Round:", Round}
+         {"Sync Round:", Round},
+         {"Open Recon Jobs:", OpenRecon},
+         {"Open Resolve Jobs:", OpenResol}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-    State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Monitor Reporting
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({sync_progress_report, Sender, Round, SyncMaster, SyncStats}, 
-    State = #rep_upd_state{ running_jobs = Jobs}) ->
-    %monitor:proc_set_value(?MODULE, "Progress",
-    %                       fun(Old) -> rrd:add_now(Value, Old) end),
-    SyncMaster andalso
-        ?TRACE("SYNC FINISHED - Round=~p - OpenProcesses=~p - Sender=~p - Master=~p~nStats=~p", 
-               [Round, Jobs - 1, Sender, SyncMaster, rep_upd_sync:print_sync_stats(SyncStats)]),
-    State#rep_upd_state{ running_jobs = Jobs - 1 }.
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
@@ -145,11 +169,16 @@ check_config() ->
     case config:read(rep_update_activate) of
         true ->
             config:cfg_is_module(rep_update_trigger) andalso
-            config:cfg_is_atom(rep_update_sync_method) andalso	
+            config:cfg_is_atom(rep_update_sync_method) andalso
+            config:cfg_is_atom(rep_update_resolve_method) andalso
             config:cfg_is_integer(rep_update_interval) andalso
             config:cfg_is_greater_than(rep_update_interval, 0);
         _ -> true
     end.
+
+-spec get_resolve_method() -> rep_upd_resolve:ru_resolve_method().
+get_resolve_method() ->
+    config:read(rep_update_resolve_method).
 
 -spec get_sync_method() -> sync_method().
 get_sync_method() -> 
