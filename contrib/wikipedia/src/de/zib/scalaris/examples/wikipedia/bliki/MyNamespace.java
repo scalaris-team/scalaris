@@ -95,7 +95,13 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
                     {Messages.WIKI_API_HELPTALK1, getNsPref(Namespace.HELP_TALK_NAMESPACE_KEY)},
                     {Messages.WIKI_API_CATEGORY1, getNsPref(Namespace.CATEGORY_NAMESPACE_KEY)},
                     {Messages.WIKI_API_CATEGORYTALK1, getNsPref(Namespace.CATEGORY_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_TAGS_TOC_CONTENT, "Contents"} // TODO: internationalise!
+                    {Messages.WIKI_TAGS_TOC_CONTENT, "Contents"}, // TODO: internationalise!
+                    // Aliases as defined by
+                    // https://secure.wikimedia.org/wikipedia/en/wiki/Wikipedia:Namespace#Aliases
+                    {Messages.WIKI_API_META2, "WP"}, // also: "Project" but we can only add one here
+                    {Messages.WIKI_API_METATALK2, "WT"}, // also: "Project talk" but we can only add one here
+                    {Messages.WIKI_API_IMAGE2, "Image"},
+                    {Messages.WIKI_API_IMAGETALK2, "Image talk"},
             };
         }
 
