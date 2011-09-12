@@ -229,32 +229,60 @@ get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
                  end,
     get_chunk_helper(State, Interval, AddDataFun, fun db_entry:get_key/1, ChunkSize).
 
+-spec get_chunk_helper(DB::db_t(), Interval::intervals:interval(),
+                       AddDataFun::fun((Key_::binary(), Key::?RT:key(), db_entry:entry(), [T]) -> [T]),
+                       GetKeyFromDataFun::fun((T) -> ?RT:key()), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), [T]}.
 get_chunk_helper({{DB, _FileName}, _Subscr}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
-    F = fun (Key_, DBEntry_, Data) ->
-                 Key = erlang:binary_to_term(Key_),
-                 case intervals:in(Key, Interval) of
-                     true -> AddDataFun(Key_, Key, DBEntry_, Data);
-                     _    -> Data
-                 end
-        end,
-    Data = toke_drv:fold(F, [], DB),
     {BeginBr, Begin, End, EndBr} = intervals:get_bounds(Interval),
     % try to find the first existing key in the interval, starting at Begin:
     MInfToBegin = intervals:minus(intervals:all(),
                                   intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
-    {SecondPart, FirstPart} =
-        lists:partition(fun(E) ->
-                                intervals:in(GetKeyFromDataFun(E), MInfToBegin)
-                        end, Data),
-    SortedData = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
+    F = fun (Key_, DBEntry_, {N, Data} = Acc) ->
+                 Key = erlang:binary_to_term(Key_),
+                 case intervals:in(Key, Interval) of
+                     true when ChunkSize =:= all ->
+                         AddDataFun(Key_, Key, DBEntry_, Data);
+                     true ->
+                         Data1 = AddDataFun(Key_, Key, DBEntry_, Data),
+                         % filter out every (2 * ChunkSize) elements
+                         case N rem 2 * ChunkSize of
+                             0 ->
+                                 {0, get_chunk_helper_filter(Data1, MInfToBegin, GetKeyFromDataFun, ChunkSize)};
+                             _ ->
+                                 {N + 1, Data1}
+                         end;
+                     _    -> Acc
+                 end
+        end,
+    {_, Data} = toke_drv:fold(F, {0, []}, DB),
+    SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
     case ChunkSize of
         all -> {intervals:empty(), SortedData};
         _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
                case Rest of
                    []      -> {intervals:empty(), Chunk};
-                   [H | _] -> {intervals:new('(', GetKeyFromDataFun(H), End, EndBr), Chunk}
+                   [H | _] -> {intervals:new('[', GetKeyFromDataFun(H), End, EndBr), Chunk}
                end
     end.
+
+-spec get_chunk_helper_sort(Data::[T], MInfToBegin::intervals:interval(),
+                            GetKeyFromDataFun::fun((T) -> ?RT:key())) -> SortedData::[T].
+get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun) ->
+    {SecondPart, FirstPart} =
+        lists:partition(fun(E) ->
+                                intervals:in(GetKeyFromDataFun(E), MInfToBegin)
+                        end, Data),
+    lists:append(lists:usort(FirstPart), lists:usort(SecondPart)).
+
+-spec get_chunk_helper_filter(Data::[T], MInfToBegin::intervals:interval(),
+                              GetKeyFromDataFun::fun((T) -> ?RT:key()),
+                              ChunkSize::pos_integer()) -> SortedData::[T].
+get_chunk_helper_filter(Data, MInfToBegin, GetKeyFromDataFun, ChunkSize) ->
+    SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
+    % note: leave one extra to be able to find the next available key
+    {Chunk, _Rest} = util:safe_split(ChunkSize + 1, SortedData),
+    Chunk.
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.

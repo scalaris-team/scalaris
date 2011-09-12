@@ -533,7 +533,9 @@ zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->
 zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
     AccIn.
 
--spec safe_split(non_neg_integer(), [T]) -> {[T], [T]}.
+%% @doc Splits off N elements from List. If List is not large enough, the whole
+%%      list is returned.
+-spec safe_split(non_neg_integer(), [T]) -> {FirstN::[T], Rest::[T]}.
 safe_split(N, List) when is_integer(N), N >= 0, is_list(List) ->
     safe_split(N, List, []).
 
