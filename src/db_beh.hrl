@@ -25,7 +25,7 @@
 -opaque db() :: db_t(). % define db_t in the DB-implementation!
 
 -type subscr_op_t() :: {write, db_entry:entry()} | {delete | split, ?RT:key()}.
--type subscr_changes_fun_t() :: fun((DB::db(), Operation::subscr_op_t()) -> any()).
+-type subscr_changes_fun_t() :: fun((DB::db(), Operation::subscr_op_t()) -> db()).
 -type subscr_remove_fun_t() :: fun(() -> any()).
 -type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
 

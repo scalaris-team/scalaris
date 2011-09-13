@@ -89,7 +89,7 @@ new_db(FileName, TokeOptions) ->
 
 %% @doc Deletes all contents of the given DB.
 close_(State = {{DB, FileName}, _Subscr}, Delete) ->
-    call_subscribers(State, close_db),
+    _ = call_subscribers(State, close_db),
     toke_drv:close(DB),
     toke_drv:delete(DB),
     toke_drv:stop(DB),
@@ -125,8 +125,7 @@ set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
             Key = db_entry:get_key(Entry),
             ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
                                  erlang:term_to_binary(Entry, [{minor_version, 1}])),
-            call_subscribers(State, {write, Entry}),
-            State
+            call_subscribers(State, {write, Entry})
     end.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -139,8 +138,7 @@ delete_entry_at_key_(State, Key) ->
 
 delete_entry_at_key_(State = {{DB, _FileName}, _Subscr}, Key, Key_) ->
     toke_drv:delete(DB, Key_),
-    call_subscribers(State, {delete, Key}),
-    State.
+    call_subscribers(State, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
 get_load_({{DB, _FileName}, _Subscr}) ->
@@ -167,13 +165,13 @@ get_load_(State = {{DB, _FileName}, _Subscr}, Interval) ->
 %% @doc Adds all db_entry objects in the Data list.
 add_data_(State = {{DB, _FileName}, _Subscr}, Data) ->
     % -> do not use set_entry (no further checks for changed keys necessary)
-    lists:foldl(
-      fun(DBEntry, _) ->
+    _ = lists:foldl(
+          fun(DBEntry, _) ->
               ok = toke_drv:insert(DB,
                                    erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
-                                   erlang:term_to_binary(DBEntry, [{minor_version, 1}]))
-      end, null, Data),
-    _ = [call_subscribers(State, {write, Entry}) || Entry <- Data],
+                                   erlang:term_to_binary(DBEntry, [{minor_version, 1}])),
+              call_subscribers(State, {write, DBEntry})
+          end, ok, Data),
     State.
 
 %% @doc Splits the database into a database (first element) which contains all
@@ -196,7 +194,7 @@ split_data_(State = {{DB, _FileName}, _Subscr}, MyNewInterval) ->
           fun(DBEntry, L) ->
                   Key = db_entry:get_key(DBEntry),
                   toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
-                  call_subscribers(State, {split, Key}),
+                  _ = call_subscribers(State, {split, Key}),
                   case db_entry:is_empty(DBEntry) of
                       false -> [DBEntry | L];
                       _     -> L
@@ -297,10 +295,10 @@ delete_entries_(State = {{DB, _FileName}, _Subscr}, FilterFun) when is_function(
         end,
     KeysToDelete = toke_drv:fold(F, [], DB),
     % delete all entries with these keys
-    _ = [begin
-             toke_drv:delete(DB, KeyToke),
-             call_subscribers(State, {delete, Key})
-         end || {KeyToke, Key} <- KeysToDelete],
+    _ = lists:foldl(fun({KeyToke, Key}, _) ->
+                        toke_drv:delete(DB, KeyToke),
+                        call_subscribers(State, {delete, Key})
+                    end, ok, KeysToDelete),
     State;
 delete_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
