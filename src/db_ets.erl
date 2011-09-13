@@ -75,7 +75,7 @@ set_entry_(State = {DB, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
         _    -> ets:insert(DB, Entry),
-                call_subscribers(State, {write, db_entry:get_key(Entry)}),
+                call_subscribers(State, {write, Entry}),
                 State
     end.
 
@@ -114,7 +114,7 @@ get_load_(State = {DB, _Subscr}, Interval) ->
 %% @doc adds keys
 add_data_(State = {DB, _Subscr}, Data) ->
     ets:insert(DB, Data),
-    _ = [call_subscribers(State, {write, db_entry:get_key(Entry)}) || Entry <- Data],
+    _ = [call_subscribers(State, {write, Entry}) || Entry <- Data],
     State.
 
 %% @doc Splits the database into a database (first element) which contains all

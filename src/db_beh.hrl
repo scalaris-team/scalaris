@@ -24,15 +24,14 @@
 -type db_name() :: string().
 -opaque db() :: db_t(). % define db_t in the DB-implementation!
 
--type subscr_action_t() :: write | delete | split.
--type subscr_element() :: close_db | {Operation::subscr_action_t(), Key::?RT:key()}.
--type subscr_changes_fun_t() :: fun((DB::db_t(), Operation::subscr_action_t(), Key::?RT:key()) -> any()).
+-type subscr_op_t() :: {write, db_entry:entry()} | {delete | split, ?RT:key()}.
+-type subscr_changes_fun_t() :: fun((DB::db(), Operation::subscr_op_t()) -> any()).
 -type subscr_remove_fun_t() :: fun(() -> any()).
 -type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
 
 -ifdef(with_export_type_support).
 -export_type([db/0, value/0, version/0, kvv_list/0, db_as_list/0,
-              subscr_action_t/0, subscr_changes_fun_t/0, subscr_remove_fun_t/0,
+              subscr_op_t/0, subscr_changes_fun_t/0, subscr_remove_fun_t/0,
               subscr_t/0]).
 -endif.
 
