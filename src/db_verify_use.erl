@@ -203,13 +203,6 @@ get_data_({DB, Counter} = _DB_) ->
 
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
-set_subscription_({DB, Counter} = _DB_, Tag, I, ChangesFun, RemSubscrFun) ->
-    ?TRACE5(set_subscription, _DB_, Tag, I, ChangesFun, RemSubscrFun),
-    verify_counter(Counter),
-    {?BASE_DB:set_subscription(DB, Tag, I, ChangesFun, RemSubscrFun), update_counter(Counter)}.
-
-%% doc Adds a subscription for the given interval under Tag (overwrites an
-%%     existing subscription with that tag).
 set_subscription_({DB, Counter} = _DB_, SubscrTuple) ->
     ?TRACE2(set_subscription, _DB_, SubscrTuple),
     verify_counter(Counter),

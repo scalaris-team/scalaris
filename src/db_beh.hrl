@@ -45,8 +45,7 @@
 -export([delete_entries/2]).
 -export([get_load/1, get_load/2, split_data/2, get_data/1, add_data/2]).
 -export([check_db/1]).
--export([set_subscription/5, set_subscription/2,
-         get_subscription/2, remove_subscription/2]).
+-export([set_subscription/2, get_subscription/2, remove_subscription/2]).
 -export([record_changes/2, stop_record_changes/1, stop_record_changes/2,
          get_changes/1, get_changes/2]).
 
@@ -154,10 +153,6 @@ get_data(DB) -> get_data_(DB).
 add_data(DB, Data) -> add_data_(DB, Data).
 
 % subscriptions:
--spec set_subscription(DB::db(), Tag::any(), I::intervals:interval(), ChangesFun::subscr_changes_fun_t(), RemSubscrFun::subscr_remove_fun_t()) -> db().
-set_subscription(DB, Tag, I, ChangesFun, RemSubscrFun) ->
-    set_subscription_(DB, Tag, I, ChangesFun, RemSubscrFun).
-
 -spec set_subscription(DB::db(), subscr_t()) -> db().
 set_subscription(DB, SubscrTuple) ->
     set_subscription_(DB, SubscrTuple).
@@ -230,6 +225,10 @@ get_changes(DB, Interval) -> get_changes_(DB, Interval).
         -> {?RT:key(), TakenLoad::pos_integer()}.
 -spec get_data_(DB::db_t()) -> db_as_list().
 -spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
+
+-spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
+-spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
+-spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
 
 -spec record_changes_(OldDB::db_t(), intervals:interval()) -> NewDB::db_t().
 -spec stop_record_changes_(OldDB::db_t()) -> NewDB::db_t().
