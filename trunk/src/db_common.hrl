@@ -172,12 +172,12 @@ remove_subscription_(State = {_DB, Subscr}, Tag) ->
 
 %% @doc Go through all subscriptions and perform the given operation if
 %%      matching.
--spec call_subscribers(State::db_t(), subscr_element()) -> ok.
+-spec call_subscribers(State::db_t(), Operation::close_db | subscr_op_t()) -> ok.
 call_subscribers(State = {_DB, Subscr}, Operation) ->
     call_subscribers_iter(State, Operation, ets:first(Subscr)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
--spec call_subscribers_iter(State::db_t(), subscr_element(),
+-spec call_subscribers_iter(State::db_t(), Operation::close_db | subscr_op_t(),
         CurrentKey::subscr_t() | '$end_of_table') -> ok.
 call_subscribers_iter(_State, _Operation, '$end_of_table') ->
     ok;
@@ -187,10 +187,15 @@ call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
     case Op of
         close_db ->
             RemSubscrFun();
-        {Operation, Key} ->
+        Operation ->
+            case Operation of
+                {write, Entry} -> Key = db_entry:get_key(Entry), ok;
+                {delete, Key}  -> ok;
+                {split, Key}  -> ok
+            end,
             case intervals:in(Key, I) of
                 false -> ok;
-                _     -> ChangesFun(State, Operation, Key)
+                _     -> ChangesFun(State, Operation)
             end
     end,
     call_subscribers_iter(State, Op, ets:next(Subscr, CurrentKey)).
@@ -221,13 +226,13 @@ subscr_delta_close_table() ->
 
 %% @doc Inserts/removes the key into the table of changed keys depending on the
 %%      operation (called whenever the DB is changed).
--spec subscr_delta(State::db_t(), Operation::subscr_action_t(), Key::?RT:key()) -> ok.
-subscr_delta(State, Operation, Key) ->
+-spec subscr_delta(State::db_t(), Operation::subscr_op_t()) -> ok.
+subscr_delta(State, Operation) ->
     CKDB = subscr_delta_check_table(State),
     case Operation of
-        write    -> ?CKETS:insert(CKDB, {Key});
-        delete   -> ?CKETS:insert(CKDB, {Key});
-        split    -> ?CKETS:delete(CKDB, Key)
+        {write, Entry} -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)});
+        {delete, Key}  -> ?CKETS:insert(CKDB, {Key});
+        {split, Key}   -> ?CKETS:delete(CKDB, Key)
     end,
     ok.
 
@@ -253,7 +258,7 @@ record_changes_(State, NewInterval) ->
     NewSubscr =
         case RecChanges of
             [] -> {record_changes, NewInterval,
-                   fun subscr_delta/3, fun subscr_delta_close_table/0};
+                   fun subscr_delta/2, fun subscr_delta_close_table/0};
             [{Tag, I, ChangesFun, RemSubscrFun}] ->
                 {Tag, intervals:union(I, NewInterval), ChangesFun, RemSubscrFun}
         end,

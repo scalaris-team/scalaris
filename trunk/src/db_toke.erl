@@ -125,7 +125,7 @@ set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
             Key = db_entry:get_key(Entry),
             ok = toke_drv:insert(DB, erlang:term_to_binary(Key, [{minor_version, 1}]),
                                  erlang:term_to_binary(Entry, [{minor_version, 1}])),
-            call_subscribers(State, {write, db_entry:get_key(Entry)}),
+            call_subscribers(State, {write, Entry}),
             State
     end.
 
@@ -173,7 +173,7 @@ add_data_(State = {{DB, _FileName}, _Subscr}, Data) ->
                                    erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
                                    erlang:term_to_binary(DBEntry, [{minor_version, 1}]))
       end, null, Data),
-    _ = [call_subscribers(State, {write, db_entry:get_key(Entry)}) || Entry <- Data],
+    _ = [call_subscribers(State, {write, Entry}) || Entry <- Data],
     State.
 
 %% @doc Splits the database into a database (first element) which contains all
