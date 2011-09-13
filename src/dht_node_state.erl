@@ -38,8 +38,6 @@
          % node moves:
          get_slide_op/2,
          set_slide/3,
-         add_msg_fwd/3,
-         rm_msg_fwd/2,
          add_db_range/3,
          rm_db_range/2,
          % bulk owner:
@@ -60,10 +58,9 @@
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
                 proposer   = ?required(state, proposer)  :: pid(),
                 % slide with pred (must not overlap with 'slide with succ'!):
-                slide_pred = null :: slide_op:slide_op() | null,
+                slide_pred              = null :: slide_op:slide_op() | null,
                 % slide with succ (must not overlap with 'slide with pred'!):
-                slide_succ = null :: slide_op:slide_op() | null,
-                msg_fwd    = []   :: [{intervals:interval(), comm:mypid()}],
+                slide_succ              = null :: slide_op:slide_op() | null,
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 bulkowner_reply_timer   = null :: null | reference(),
@@ -137,7 +134,7 @@ new(RT, RMState, DB) ->
          (state(), rm_state) -> rm_loop:state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
-           slide_pred=SlidePred, slide_succ=SlideSucc, msg_fwd=MsgFwd,
+           slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange}, Key) ->
     case Key of
         rt         -> RT;
@@ -169,7 +166,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load       -> ?DB:get_load(DB);
         slide_pred -> SlidePred;
         slide_succ -> SlideSucc;
-        msg_fwd    -> MsgFwd;
+        msg_fwd    -> lists:append([slide_op:get_msg_fwd(SlidePred),
+                                    slide_op:get_msg_fwd(SlideSucc)]);
         rm_state   -> RMState
     end.
 
@@ -242,26 +240,6 @@ set_rm(State, RMState) -> State#state{rm_state = RMState}.
 -spec set_slide(state(), pred | succ, slide_op:slide_op() | null) -> state().
 set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};
 set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
-
-%% @doc Adds a (temporary) message forward to the given process.
-%%      Beware: intervals of different forwards must not overlap (which is not
-%%      checked)!
--spec add_msg_fwd(State::state(), Interval::intervals:interval(),
-                  ForwardTo::comm:mypid()) -> state().
-add_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval, Pid) ->
-    case OldMsgFwd of
-        []      -> ok;
-        [_]     -> ok;
-        [_,_|_] -> log:log(fatal, "[ Node ~w] adding a third message forward - there should only be two!~"
-                                  "(OldFwds: ~w, NewFwd: ~w)~nstacktrace: ~w~n",
-                           [comm:this(), OldMsgFwd, {Interval, Pid},
-                            util:get_stacktrace()])
-    end,
-    State#state{msg_fwd = [{Interval, Pid} | OldMsgFwd]}.
-
--spec rm_msg_fwd(State::state(), Interval::intervals:interval()) -> state().
-rm_msg_fwd(State = #state{msg_fwd=OldMsgFwd}, Interval) ->
-    State#state{msg_fwd = [X || X = {I, _} <- OldMsgFwd, I =/= Interval]}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().

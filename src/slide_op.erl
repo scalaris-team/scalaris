@@ -35,7 +35,8 @@
          get_phase/1, set_phase/2,
          is_setup_at_other/1, set_setup_at_other/1,
          get_next_op/1, set_next_op/2,
-         get_other_max_entries/1, set_other_max_entries/2]).
+         get_other_max_entries/1, set_other_max_entries/2,
+         get_msg_fwd/1, set_msg_fwd/2]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -78,12 +79,15 @@
          interval          = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
          target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
          tag               = ?required(slide_op, tag)       :: any(),
-         source_pid        = null             :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
-         timer             = {null, nomsg, 0} :: {reference(), comm:message(), non_neg_integer()} | {null, nomsg, non_neg_integer()}, % timeout timer, msg, number of timeouts
-         phase             = null             :: phase(),
-         setup_at_other    = false            :: boolean(),
-         next_op           = {none}           :: next_op(),
-         other_max_entries = unknown          :: unknown | pos_integer()
+         source_pid        = null              :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
+         timer             = {null, nomsg, 0}  :: {reference(), comm:message(), non_neg_integer()} | {null, nomsg, non_neg_integer()}, % timeout timer, msg, number of timeouts
+         phase             = null              :: phase(),
+         setup_at_other    = false             :: boolean(),
+         % note: use a format which does not require conversion when read
+         % -> the pid is already contained in node, but this should be faster
+         msg_fwd           = []                :: [{intervals:interval(), comm:mypid()}],
+         next_op           = {none}            :: next_op(),
+         other_max_entries = unknown           :: unknown | pos_integer()
         }).
 -opaque slide_op() :: #slide_op{}.
 
@@ -437,3 +441,15 @@ get_other_max_entries(#slide_op{other_max_entries=OtherMTE}) -> OtherMTE.
 
 -spec set_other_max_entries(SlideOp::slide_op(), OtherMTE::pos_integer()) -> slide_op().
 set_other_max_entries(SlideOp, OtherMTE) -> SlideOp#slide_op{other_max_entries = OtherMTE}.
+
+-spec get_msg_fwd(SlideOp::slide_op() | null) -> [{intervals:interval(), comm:mypid()}].
+get_msg_fwd(null) -> [];
+get_msg_fwd(#slide_op{msg_fwd=MsgFwd}) -> MsgFwd.
+
+-spec set_msg_fwd(SlideOp::slide_op(), Interval::intervals:interval()) -> slide_op().
+set_msg_fwd(SlideOp, Interval) ->
+    NewFwd = case intervals:is_empty(Interval) of
+                 true -> [];
+                 _    -> [{Interval, node:pidX(get_node(SlideOp))}]
+             end,
+    SlideOp#slide_op{msg_fwd = NewFwd}.
