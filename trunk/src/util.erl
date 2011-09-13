@@ -42,7 +42,8 @@
          is_unittest/0, make_filename/1,
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
-         for_to/3, for_to_ex/3]).
+         for_to/3, for_to_ex/3,
+         collect_while/1]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -842,6 +843,19 @@ parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
                 {parallel_result, R} -> R
              end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
+
+-spec collect_while(GatherFun::fun((non_neg_integer()) -> {boolean(), T} | boolean())) -> [T].
+collect_while(GatherFun) ->
+    collect_while(GatherFun, 0).
+
+-spec collect_while(GatherFun::fun((non_neg_integer()) -> {boolean(), T} | boolean()), non_neg_integer()) -> [T].
+collect_while(GatherFun, Count) ->
+    case GatherFun(Count) of
+        {true, Data}  -> [Data | GatherFun(Count + 1)];
+        {false, Data} -> [Data];
+        true          -> GatherFun(Count + 1);
+        false         -> []
+    end.
 
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
