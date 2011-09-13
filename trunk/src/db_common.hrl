@@ -163,33 +163,35 @@ remove_subscription_(State = {_DB, Subscr}, Tag) ->
 
 %% @doc Go through all subscriptions and perform the given operation if
 %%      matching.
--spec call_subscribers(State::db_t(), Operation::close_db | subscr_op_t()) -> ok.
+-spec call_subscribers(State::db_t(), Operation::close_db | subscr_op_t()) -> db_t().
 call_subscribers(State = {_DB, Subscr}, Operation) ->
     call_subscribers_iter(State, Operation, ets:first(Subscr)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
 -spec call_subscribers_iter(State::db_t(), Operation::close_db | subscr_op_t(),
-        CurrentKey::subscr_t() | '$end_of_table') -> ok.
-call_subscribers_iter(_State, _Operation, '$end_of_table') ->
-    ok;
+        CurrentKey::subscr_t() | '$end_of_table') -> db_t().
+call_subscribers_iter(State, _Operation, '$end_of_table') ->
+    State;
 call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
     % assume the key exists (it should since we are iterating over the table!)
     [{_Tag, I, ChangesFun, RemSubscrFun}] = ets:lookup(Subscr, CurrentKey),
-    case Op of
-        close_db ->
-            RemSubscrFun();
-        Operation ->
-            case Operation of
-                {write, Entry} -> Key = db_entry:get_key(Entry), ok;
-                {delete, Key}  -> ok;
-                {split, Key}  -> ok
-            end,
-            case intervals:in(Key, I) of
-                false -> ok;
-                _     -> ChangesFun(State, Operation)
-            end
-    end,
-    call_subscribers_iter(State, Op, ets:next(Subscr, CurrentKey)).
+    NewState =
+        case Op of
+            close_db ->
+                RemSubscrFun(),
+                State;
+            Operation ->
+                case Operation of
+                    {write, Entry} -> Key = db_entry:get_key(Entry), ok;
+                    {delete, Key}  -> ok;
+                    {split, Key}  -> ok
+                end,
+                case intervals:in(Key, I) of
+                    false -> State;
+                    _     -> ChangesFun(State, Operation)
+                end
+        end,
+    call_subscribers_iter(NewState, Op, ets:next(Subscr, CurrentKey)).
 
 %% subscriptions for changed keys
 
@@ -217,7 +219,7 @@ subscr_delta_close_table() ->
 
 %% @doc Inserts/removes the key into the table of changed keys depending on the
 %%      operation (called whenever the DB is changed).
--spec subscr_delta(State::db_t(), Operation::subscr_op_t()) -> ok.
+-spec subscr_delta(State::db_t(), Operation::subscr_op_t()) -> db_t().
 subscr_delta(State, Operation) ->
     CKDB = subscr_delta_check_table(State),
     case Operation of
@@ -225,7 +227,7 @@ subscr_delta(State, Operation) ->
         {delete, Key}  -> ?CKETS:insert(CKDB, {Key});
         {split, Key}   -> ?CKETS:delete(CKDB, Key)
     end,
-    ok.
+    State.
 
 %% @doc Removes any changed key in interval I (called when some (sub-)interval
 %%      is unsubscribed).

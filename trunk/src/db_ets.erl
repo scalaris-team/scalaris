@@ -52,7 +52,7 @@ open_(_FileName) ->
 
 %% @doc Closes and deletes the DB.
 close_(State = {DB, Subscr}, _Delete) ->
-    call_subscribers(State, close_db),
+    _ = call_subscribers(State, close_db),
     ets:delete(DB),
     ets:delete(Subscr).
 
@@ -75,8 +75,7 @@ set_entry_(State = {DB, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
         _    -> ets:insert(DB, Entry),
-                call_subscribers(State, {write, Entry}),
-                State
+                call_subscribers(State, {write, Entry})
     end.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -87,8 +86,7 @@ update_entry_(State, Entry) ->
 %% @doc Removes all values with the given key from the DB.
 delete_entry_at_key_(State = {DB, _Subscr}, Key) ->
     ets:delete(DB, Key),
-    call_subscribers(State, {delete, Key}),
-    State.
+    call_subscribers(State, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
 get_load_({DB, _Subscr}) ->
@@ -114,7 +112,9 @@ get_load_(State = {DB, _Subscr}, Interval) ->
 %% @doc adds keys
 add_data_(State = {DB, _Subscr}, Data) ->
     ets:insert(DB, Data),
-    _ = [call_subscribers(State, {write, Entry}) || Entry <- Data],
+    _ = lists:foldl(fun(Entry, _) ->
+                        call_subscribers(State, {write, Entry})
+                    end, ok, Data),
     State.
 
 %% @doc Splits the database into a database (first element) which contains all
@@ -127,7 +127,7 @@ split_data_(State = {DB, _Subscr}, MyNewInterval) ->
                 case intervals:in(Key, MyNewInterval) of
                     true -> HisList;
                     _    -> ets:delete(DB, Key),
-                            call_subscribers(State, {split, Key}),
+                            _ = call_subscribers(State, {split, Key}),
                             case db_entry:is_empty(DBEntry) of
                                 false -> [DBEntry | HisList];
                                 _     -> HisList
@@ -156,7 +156,7 @@ delete_entries_(State = {DB, _Subscr}, FilterFun) when is_function(FilterFun) ->
                     false -> ok;
                     _     -> Key = db_entry:get_key(DBEntry),
                              ets:delete(DB, Key),
-                             call_subscribers(State, {delete, Key}),
+                             _ = call_subscribers(State, {delete, Key}),
                              ok
                 end
         end,
