@@ -156,7 +156,7 @@ get_subscription_({_DB, Subscr}, Tag) ->
 remove_subscription_(State = {_DB, Subscr}, Tag) ->
     case ets:lookup(Subscr, Tag) of
         [] -> ok;
-        [{Tag, _I, _ChangesFun, RemSubscrFun}] -> RemSubscrFun()
+        [{Tag, _I, _ChangesFun, RemSubscrFun}] -> RemSubscrFun(Tag)
     end,
     ets:delete(Subscr, Tag),
     State.
@@ -174,11 +174,11 @@ call_subscribers_iter(State, _Operation, '$end_of_table') ->
     State;
 call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
     % assume the key exists (it should since we are iterating over the table!)
-    [{_Tag, I, ChangesFun, RemSubscrFun}] = ets:lookup(Subscr, CurrentKey),
+    [{Tag, I, ChangesFun, RemSubscrFun}] = ets:lookup(Subscr, CurrentKey),
     NewState =
         case Op of
             close_db ->
-                RemSubscrFun(),
+                RemSubscrFun(Tag),
                 State;
             Operation ->
                 case Operation of
@@ -188,7 +188,7 @@ call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
                 end,
                 case intervals:in(Key, I) of
                     false -> State;
-                    _     -> ChangesFun(State, Operation)
+                    _     -> ChangesFun(State, Tag, Operation)
                 end
         end,
     call_subscribers_iter(NewState, Op, ets:next(Subscr, CurrentKey)).
@@ -210,8 +210,8 @@ subscr_delta_check_table(State) ->
 
 %% @doc Cleans up, i.e. deletes, the table with changed keys (called on
 %%      subscription removal).
--spec subscr_delta_close_table() -> ok | true.
-subscr_delta_close_table() ->
+-spec subscr_delta_close_table(Tag::any()) -> ok | true.
+subscr_delta_close_table(_Tag) ->
     case erlang:erase('$delta_tab') of
         undefined -> ok;
         CKDB -> ?CKETS:delete(CKDB)
@@ -219,8 +219,8 @@ subscr_delta_close_table() ->
 
 %% @doc Inserts/removes the key into the table of changed keys depending on the
 %%      operation (called whenever the DB is changed).
--spec subscr_delta(State::db_t(), Operation::subscr_op_t()) -> db_t().
-subscr_delta(State, Operation) ->
+-spec subscr_delta(State::db_t(), Tag::any(), Operation::subscr_op_t()) -> db_t().
+subscr_delta(State, _Tag, Operation) ->
     CKDB = subscr_delta_check_table(State),
     case Operation of
         {write, Entry} -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)});
@@ -251,7 +251,7 @@ record_changes_(State, NewInterval) ->
     NewSubscr =
         case RecChanges of
             [] -> {record_changes, NewInterval,
-                   fun subscr_delta/2, fun subscr_delta_close_table/0};
+                   fun subscr_delta/3, fun subscr_delta_close_table/1};
             [{Tag, I, ChangesFun, RemSubscrFun}] ->
                 {Tag, intervals:union(I, NewInterval), ChangesFun, RemSubscrFun}
         end,
