@@ -71,7 +71,7 @@ req_list(TLog, ReqList) ->
       ?MODULE, "req_list",
       fun(Old) ->
               Old2 = case Old of
-                         % 10s monitoring interval, only keep newest
+                         % 10s monitoring interval, only keep newest in the client process
                          undefined -> rrd:create(10 * 1000000, 1, {timing, ms});
                          _ -> Old
                      end,
