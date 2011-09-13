@@ -144,24 +144,15 @@ check_db(DB) ->
 
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
--spec set_subscription_(State::db_t(), Tag::any(), I::intervals:interval(), ChangesFun::subscr_changes_fun_t(), RemSubscrFun::subscr_remove_fun_t()) -> db_t().
-set_subscription_(State, Tag, I, ChangesFun, RemSubscrFun) ->
-    set_subscription_(State, {Tag, I, ChangesFun, RemSubscrFun}).
-
-%% doc Adds a subscription for the given interval under Tag (overwrites an
-%%     existing subscription with that tag).
--spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
-set_subscription_(State = {_DB, Subscr}, SubscrTuple = {_Tag, _I, _ChangesFun, _RemSubscrFun}) ->
+set_subscription_(State = {_DB, Subscr}, SubscrTuple) ->
     ets:insert(Subscr, SubscrTuple),
     State.
 
 %% doc Gets a subscription stored under Tag (empty list if there is none).
--spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
 get_subscription_({_DB, Subscr}, Tag) ->
     ets:lookup(Subscr, Tag).
 
 %% doc Removes a subscription stored under Tag (if there is one).
--spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
 remove_subscription_(State = {_DB, Subscr}, Tag) ->
     case ets:lookup(Subscr, Tag) of
         [] -> ok;
@@ -281,8 +272,8 @@ stop_record_changes_(State, Interval) ->
             case intervals:is_empty(NewI) of
                 true -> remove_subscription_(State, Tag);
                 _ ->
-                    set_subscription_(State, Tag, intervals:minus(I, Interval),
-                                      ChangesFun, RemSubscrFun)
+                    set_subscription_(State, {Tag, intervals:minus(I, Interval),
+                                              ChangesFun, RemSubscrFun})
             end
     end.
 

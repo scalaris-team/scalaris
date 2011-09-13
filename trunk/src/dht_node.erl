@@ -44,8 +44,7 @@
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
       {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
-      % subscriptions:
-      {db_set_subscription, Tag::any(), I::intervals:interval(), ChangesFun::?DB:subscr_changes_fun_t(), RemSubscrFun::?DB:subscr_remove_fun_t()} |
+      % DB subscriptions:
       {db_set_subscription, SubscrTuple::?DB:subscr_t()} |
       {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
       {db_remove_subscription, Tag::any()} |
@@ -298,11 +297,6 @@ on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
                 end,                    
     comm:send(Source_PID, ResultMsg),
     NewState;
-
-on({db_set_subscription, Tag, I, ChangesFun, RemSubscrFun}, State) ->
-    DB2 = ?DB:set_subscription(dht_node_state:get(State, db),
-                               Tag, I, ChangesFun, RemSubscrFun),
-    dht_node_state:set_db(State, DB2);
 
 on({db_set_subscription, SubscrTuple}, State) ->
     DB2 = ?DB:set_subscription(dht_node_state:get(State, db), SubscrTuple),
