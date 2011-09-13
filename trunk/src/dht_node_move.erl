@@ -560,7 +560,7 @@ notify_other(SlideOp, State) ->
         -> dht_node_state:state().
 setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
             MaxTransportEntries, SourcePid, MsgTag, NextOp) ->
-    case get_slide_op(State, MoveFullId) of
+    case get_slide(State, MoveFullId) of
         {ok, _PredOrSucc, _SlideOp} ->
             % there could already be slide operation and a second message was
             % send after an unsuccessful send-message on the other node
@@ -1292,7 +1292,7 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
     WorkPhases::[slide_op:phase(),...] | all, PredOrSuccExp::pred | succ | both,
     MoveMsgTag::atom()) -> dht_node_state:state().
 safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgTag) ->
-    case get_slide_op(State, MoveFullId) of
+    case get_slide(State, MoveFullId) of
         {ok, PredOrSucc, SlideOp} ->
             case PredOrSuccExp =:= both orelse PredOrSucc =:= PredOrSuccExp of
                 true ->
@@ -1358,12 +1358,12 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
 %%      predecessor info is wrong (slide with pred) and {fail, wrong_succ} if
 %%      the successor info is wrong (slide with succ). If not found,
 %%      {fail, not_found} is returned.
--spec get_slide_op(State::dht_node_state:state(), MoveFullId::slide_op:id()) ->
+-spec get_slide(State::dht_node_state:state(), MoveFullId::slide_op:id()) ->
         {Result::ok, Type::pred | succ, SlideOp::slide_op:slide_op()} |
         {Result::wrong_neighbor, Type::pred | succ, SlideOp::slide_op:slide_op()} |
         not_found.
-get_slide_op(State, MoveFullId) ->
-    case dht_node_state:get_slide_op(State, MoveFullId) of
+get_slide(State, MoveFullId) ->
+    case dht_node_state:get_slide(State, MoveFullId) of
         not_found -> not_found;
         {PredOrSucc, SlideOp} ->
             Node = dht_node_state:get(State, PredOrSucc),

@@ -36,10 +36,8 @@
          % transactions:
          set_tx_tp_db/2,
          % node moves:
-         get_slide_op/2,
-         set_slide/3,
-         add_db_range/3,
-         rm_db_range/2,
+         get_slide/2, set_slide/3,
+         add_db_range/3, rm_db_range/2,
          % bulk owner:
          add_bulkowner_reply_msg/5,
          take_bulkowner_reply_msgs/1,
@@ -211,10 +209,10 @@ is_db_responsible(Key, State = #state{db_range=DBRange}) ->
 %%      predecessor info is wrong (slide with pred) and {fail, wrong_succ} if
 %%      the successor info is wrong (slide with succ). If not found,
 %%      {fail, not_found} is returned.
--spec get_slide_op(State::state(), MoveFullId::slide_op:id()) ->
+-spec get_slide(State::state(), MoveFullId::slide_op:id()) ->
         {Type::pred | succ, SlideOp::slide_op:slide_op()} |
         not_found.
-get_slide_op(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
+get_slide(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
     IsSlidePred = SlidePred =/= null andalso
                       slide_op:get_id(SlidePred) =:= MoveFullId,
     IsSlideSucc = SlideSucc =/= null andalso
