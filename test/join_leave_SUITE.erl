@@ -277,4 +277,4 @@ stop_time(F, Tag) ->
 check_size(Size) ->
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
-    unittest_helper:check_ring_size(Size).
+    unittest_helper:check_ring_size_fully_joined(4).
