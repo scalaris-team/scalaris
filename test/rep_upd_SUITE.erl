@@ -57,7 +57,7 @@ all() ->
      bloomSync_min_nodes,
      merkleSync_noOutdated,
      merkleSync_simple,
-     %merkleSync_parts,
+     merkleSync_parts,
      merkleSync_min_nodes
      ].
 
@@ -77,9 +77,9 @@ get_rrepair_config_parameter() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_recon_method, bloom}, %bloom, merkleTree, art
      {rep_update_resolve_method, simple},
-     {rep_update_fpr, 0.1},
+     {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 1000},
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
@@ -88,9 +88,9 @@ get_bloom_RepUpd_config() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_sync_method, bloom}, %bloom, merkleTree, art
+     {rep_update_recon_method, bloom}, %bloom, merkleTree, art
      {rep_update_resolve_method, simple},
-     {rep_update_fpr, 0.1},
+     {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 10000},
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
@@ -99,9 +99,9 @@ get_merkle_tree_RepUpd_config() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_sync_method, merkleTree}, %bloom, merkleTree, art
+     {rep_update_recon_method, merkleTree}, %bloom, merkleTree, art
      {rep_update_resolve_method, simple},
-     {rep_update_fpr, 0.1},
+     {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 100000},
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, true}].
@@ -256,7 +256,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
     ItemCount = NodeCount * DataCount,
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RepUpdConfig),
-    config:write(rep_update_fpr, Fpr),
+    config:write(rep_update_recon_fpr, Fpr),
     fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
     %measure initial sync degree
     InitialOutdated = DestVersCount - getVersionCount(getDBStatus()),
