@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  scalaris-svn-java >= 1834
+BuildRequires:  scalaris-svn-java >= 2131
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -72,7 +72,7 @@ Conflicts:  scalaris-examples-wiki-tomcat5
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
-Requires:   scalaris-svn-java >= 1834
+Requires:   scalaris-svn-java >= 2131
 BuildArch:  noarch
 
 %description -n scalaris-svn-examples-wiki-tomcat5
@@ -86,7 +86,7 @@ Conflicts:  scalaris-examples-wiki-tomcat6
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6
-Requires:   scalaris-svn-java >= 1834
+Requires:   scalaris-svn-java >= 2131
 BuildArch:  noarch
 
 %description -n scalaris-svn-examples-wiki-tomcat6
