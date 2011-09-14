@@ -108,7 +108,24 @@ change_id_and_check(OldId, NewId) ->
                 true ->
                     ?equals(node:id(NewNode), NewId),
                     ?equals(node:id_version(NewNode), node:id_version(OldNode) + 1),
-                    check_subscr_node_update(OldNode, NewNode);
+                    check_subscr_node_update(OldNode, NewNode),
+                    % now wait for all rm processes of the other nodes to know about the new id (at least in pred/succ):
+                    util:wait_for(
+                      fun() ->
+                              Nodes =
+                                  lists:flatten(
+                                    [begin
+                                         comm:send(comm:make_global(N),
+                                                   {get_node_details, comm:this(), [node, pred, succ]}),
+                                         receive
+                                             {get_node_details_response, ND} ->
+                                                 [node_details:get(ND, node),
+                                                  node_details:get(ND, pred),
+                                                  node_details:get(ND, succ)]
+                                         end
+                                     end || N <- pid_groups:find_all(dht_node)]),
+                              not lists:any(fun(N) -> N =:= OldNode end, Nodes)
+                      end);
                 _ ->
                     ?equals(NewNode, OldNode),
                     ?expect_no_message()
