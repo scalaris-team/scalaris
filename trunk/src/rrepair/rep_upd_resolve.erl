@@ -41,7 +41,7 @@
 
 -type ru_resolve_method() :: simple.
 
--type ru_resolve_struct() :: {simple_detail_sync, [rep_upd_sync:keyValVers()]}.
+-type ru_resolve_struct() :: {simple_detail_sync, [rep_upd_recon:keyValVers()]}.
 
 -type ru_resolve_answer() :: {true | false, Dest::comm:mypid()}.
 
@@ -64,7 +64,7 @@
          resolve_struct = ?required(ru_resolve_state, resolve_struct)   :: ru_resolve_struct(),
          stats          = #ru_resolve_stats{}                           :: ru_resolve_stats(),
          feedback       = ?required(ru_resolve_state, feedback)         :: ru_resolve_answer(), %if active sends data ids to given Dest which are outdated at Dest
-         feedbackItems  = []                                            :: [rep_upd_sync:keyValVers()],
+         feedbackItems  = []                                            :: [rep_upd_recon:keyValVers()],
          send_stats     = ?required(ru_resolve_state, send_stats)       :: ru_resolve_answer()  %if active sends resolve results (stats) to given dest
          }).
 -type state() :: #ru_resolve_state{}.

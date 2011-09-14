@@ -30,7 +30,7 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -ifdef(with_export_type_support).
--export_type([db_chunk/0, sync_method/0]).
+-export_type([db_chunk/0]).
 -endif.
 
 -define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -46,7 +46,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
--type sync_method() :: bloom | merkleTree | art | undefined.
 
 -record(rep_upd_state,
         {
@@ -59,8 +58,8 @@
 
 -type message() ::
     {?TRIGGER_NAME} |
-    {request_recon, Round::float(), SyncMaster::boolean(), rep_upd_sync:sync_stage(), 
-        sync_method(), rep_upd_sync:sync_struct()} |
+    {request_recon, Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
+        rep_upd_recon:recon_method(), rep_upd_recon:recon_struct()} |
     {request_resolve, Round::float(), rep_upd_resolve:ru_resolve_method(), 
         rep_upd_resolve:ru_resolve_struct(), 
         rep_upd_resolve:ru_resolve_answer(), rep_upd_resolve:ru_resolve_answer()} |
@@ -75,10 +74,10 @@
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
                                             open_recon = OpenRecon }) ->
-    {ok, Pid} = rep_upd_sync:start(Round),
-    case get_sync_method() of
-        bloom -> comm:send_local(Pid, {start_sync, get_sync_method(), build_struct, {}, true});
-        merkleTree -> comm:send_local(Pid, {start_sync, get_sync_method(), req_shared_interval, {}, true});
+    {ok, Pid} = rep_upd_recon:start(Round),
+    case get_recon_method() of
+        bloom -> comm:send_local(Pid, {start_recon, get_recon_method(), build_struct, {}, true});
+        merkleTree -> comm:send_local(Pid, {start_recon, get_recon_method(), req_shared_interval, {}, true});
         _ -> ok
     end,
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
@@ -88,12 +87,12 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
                          open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_recon, Round, SyncMaster, SyncStage, SyncMethod, SyncStruct}, 
+on({request_recon, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
    State = #rep_upd_state{ open_recon = OpenRecon }) ->
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
-    {ok, Pid} = rep_upd_sync:start(Round),
-    comm:send_local(Pid, {start_sync, SyncMethod, SyncStage, SyncStruct, SyncMaster}),
+    {ok, Pid} = rep_upd_recon:start(Round),
+    comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
     State#rep_upd_state{ open_recon = OpenRecon + 1 };
 
 on({request_resolve, Round, RMethod, RStruct, Feedback, SendStats}, 
@@ -109,7 +108,7 @@ on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
     %                       fun(Old) -> rrd:add_now(Value, Old) end),
     Master andalso
         ?TRACE("SYNC FINISHED - Round=~p - Sender=~p - Master=~p~nStats=~p", 
-               [Round, Sender, Master, rep_upd_sync:print_recon_stats(Stats)]),
+               [Round, Sender, Master, rep_upd_recon:print_recon_stats(Stats)]),
     State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
 
 on({resolve_progress_report, Sender, Round, Stats}, State) ->
@@ -128,7 +127,8 @@ on({web_debug_info, Requestor}, State) ->
                     open_recon = OpenRecon, 
                     open_resolve = OpenResol } = State,
     KeyValueList =
-        [{"Sync Method:", get_sync_method()},
+        [{"Recon Method:", get_recon_method()},
+         {"Resolve Method:", get_resolve_method()},
          {"Bloom Module:", ?REP_BLOOM},
          {"Sync Round:", Round},
          {"Open Recon Jobs:", OpenRecon},
@@ -169,7 +169,7 @@ check_config() ->
     case config:read(rep_update_activate) of
         true ->
             config:cfg_is_module(rep_update_trigger) andalso
-            config:cfg_is_atom(rep_update_sync_method) andalso
+            config:cfg_is_atom(rep_update_recon_method) andalso
             config:cfg_is_atom(rep_update_resolve_method) andalso
             config:cfg_is_integer(rep_update_interval) andalso
             config:cfg_is_greater_than(rep_update_interval, 0);
@@ -180,9 +180,9 @@ check_config() ->
 get_resolve_method() ->
     config:read(rep_update_resolve_method).
 
--spec get_sync_method() -> sync_method().
-get_sync_method() -> 
-	config:read(rep_update_sync_method).
+-spec get_recon_method() -> rep_upd_recon:recon_method().
+get_recon_method() -> 
+	config:read(rep_update_recon_method).
 
 -spec get_update_trigger() -> Trigger::module().
 get_update_trigger() -> 
