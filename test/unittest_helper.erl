@@ -160,9 +160,10 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     % need to call IdsFun again (may require config process or others
     % -> can not call it before starting the scalaris process)
     Ids = IdsFun(),
-    check_ring_size(length(Ids)),
+    Size = length(Ids),
+    check_ring_size(Size),
     wait_for_stable_ring(),
-    Size = check_ring_size(length(Ids)),
+    check_ring_size(Size),
     ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
     ?TRACE_RING_DATA(),
     Pid.
@@ -267,29 +268,20 @@ wait_for_stable_ring_deep() ->
                      R =:= ok
              end, 500).
 
--spec check_ring_size(non_neg_integer(), CheckFun::fun((DhtNodeState::term()) -> boolean())) -> non_neg_integer().
+-spec check_ring_size(non_neg_integer(), CheckFun::fun((DhtNodeState::term()) -> boolean())) -> ok.
 check_ring_size(Size, CheckFun) ->
     DhtModule = config:read(dht_node),
     util:wait_for(
       fun() ->
               % note: we use a single VM in unit tests, therefore no
-              % mgmt_server is needed - if one exists though, then check
-              % the correct size
-              BootSize =
-                  try
-                      mgmt_server:number_of_nodes(),
-                      receive {get_list_length_response, L} -> L end
-                  catch _:_ -> Size
-                  end,
+              % mgmt_server is needed
               erlang:whereis(config) =/= undefined andalso
-                  BootSize =:= Size andalso
                   Size =:= erlang:length(
                 [P || P <- pid_groups:find_all(DhtModule),
                       CheckFun(gen_component:get_state(P))])
-      end, 500),
-    Size.
+      end, 500).
 
--spec check_ring_size(Size::non_neg_integer()) -> non_neg_integer().
+-spec check_ring_size(Size::non_neg_integer()) -> ok.
 check_ring_size(Size) ->
     check_ring_size(Size, fun(State) ->
                                   DhtModule = config:read(dht_node),
