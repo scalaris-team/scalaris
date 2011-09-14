@@ -125,8 +125,8 @@ get_symmetric_keys_test(Config) ->
 
 blobCoding(_) ->
     KeyOrg = 180000001,
-    Coded = rep_upd_sync:encodeBlob(KeyOrg, 4),
-    {Key, Ver} = rep_upd_sync:decodeBlob(Coded),
+    Coded = rep_upd_recon:encodeBlob(KeyOrg, 4),
+    {Key, Ver} = rep_upd_recon:decodeBlob(Coded),
     ct:pal("Coded=[~p] ; decoded key=[~p] val=[~p]", [Coded, Key, Ver]),
     ?equals(Key, KeyOrg),
     ?equals(Ver, 4),
@@ -137,9 +137,9 @@ mapInterval(_) ->
     I = intervals:new('[', K, ?MINUS_INFINITY ,']'),
     ct:pal("I1=~p", [I]),
     lists:foreach(fun(X) -> 
-                          MappedI = rep_upd_sync:mapInterval(I, X),
+                          MappedI = rep_upd_recon:mapInterval(I, X),
                           ?equals(intervals:is_empty(intervals:intersection(I, MappedI)),true),
-                          ?equals(rep_upd_sync:get_interval_quadrant(MappedI), X)
+                          ?equals(rep_upd_recon:get_interval_quadrant(MappedI), X)
                   end, 
                   [1,2,3]),
     ok.
