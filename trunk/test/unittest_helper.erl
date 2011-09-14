@@ -267,8 +267,8 @@ wait_for_stable_ring_deep() ->
                      R =:= ok
              end, 500).
 
--spec check_ring_size(non_neg_integer()) -> non_neg_integer().
-check_ring_size(Size) ->
+-spec check_ring_size(non_neg_integer(), CheckFun::fun((DhtNodeState::term()) -> boolean())) -> non_neg_integer().
+check_ring_size(Size, CheckFun) ->
     DhtModule = config:read(dht_node),
     util:wait_for(
       fun() ->
@@ -281,25 +281,29 @@ check_ring_size(Size) ->
                       receive {get_list_length_response, L} -> L end
                   catch _:_ -> Size
                   end,
-              BootSize =:= Size andalso
+              erlang:whereis(config) =/= undefined andalso
+                  BootSize =:= Size andalso
                   Size =:= erlang:length(
                 [P || P <- pid_groups:find_all(DhtModule),
-                      DhtModule:is_alive(gen_component:get_state(P))])
+                      CheckFun(gen_component:get_state(P))])
       end, 500),
     Size.
+
+-spec check_ring_size(Size::non_neg_integer()) -> non_neg_integer().
+check_ring_size(Size) ->
+    check_ring_size(Size, fun(State) ->
+                                  DhtModule = config:read(dht_node),
+                                  DhtModule:is_alive(State)
+                          end).
 
 %% @doc Checks whether Size nodes have fully joined the ring (including
 %%      finished join-related slides).
 -spec check_ring_size_fully_joined(Size::non_neg_integer()) -> ok.
 check_ring_size_fully_joined(Size) ->
-    DhtModule = config:read(dht_node),
-    util:wait_for(
-      fun() ->
-              erlang:whereis(config) =/= undefined andalso
-                  Size =:= erlang:length(
-                [P || P <- pid_groups:find_all(DhtModule),
-                      DhtModule:is_alive_no_slide(gen_component:get_state(P))])
-      end, 100).
+    check_ring_size(Size, fun(State) ->
+                                  DhtModule = config:read(dht_node),
+                                  DhtModule:is_alive_no_slide(State)
+                          end).
 
 -spec start_process(StartFun::fun(() -> any())) -> pid().
 start_process(StartFun) ->
