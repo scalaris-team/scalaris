@@ -274,8 +274,16 @@ check_ring_size(Size, CheckFun) ->
     util:wait_for(
       fun() ->
               % note: we use a single VM in unit tests, therefore no
-              % mgmt_server is needed
+              % mgmt_server is needed - if one exists though, then check
+              % the correct size
+              BootSize =
+                  try
+                      mgmt_server:number_of_nodes(),
+                      receive {get_list_length_response, L} -> L end
+                  catch _:_ -> Size
+                  end,
               erlang:whereis(config) =/= undefined andalso
+                  BootSize =:= Size andalso
                   Size =:= erlang:length(
                 [P || P <- pid_groups:find_all(DhtModule),
                       CheckFun(gen_component:get_state(P))])
