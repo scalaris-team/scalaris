@@ -27,6 +27,7 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -425,13 +426,6 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
         
-        // for debugging, show all parameters:
-//        Enumeration test = request.getParameterNames();
-//        while (test.hasMoreElements()) {
-//            String element = (String) test.nextElement();
-//            System.out.println(element);
-//            System.out.println(request.getParameter(element));
-//        }
         handleEditPageSubmitted(request, response, request.getParameter("title"), connection);
         
         // if the request has not been forwarded, print a general error
@@ -594,6 +588,19 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             value.setPage(mainText);
             value.setCategories(wikiModel.getCategories().keySet());
         } else if (renderer == 0) {
+            // for debugging, show all parameters:
+            StringBuilder sb = new StringBuilder();
+            for (Enumeration<?> req_pars = request.getParameterNames(); req_pars.hasMoreElements();) {
+                String element = (String) req_pars.nextElement();
+                sb.append(element + " = ");
+                sb.append(request.getParameter(element) + "\n");
+            }
+            sb.append("\n\n");
+            for (Enumeration<?> headers = request.getHeaderNames(); headers.hasMoreElements();) {
+                String element = (String) headers.nextElement();
+                sb.append(element + " = ");
+                sb.append(request.getHeader(element) + "\n");
+            }
             value.setPage("<p>WikiText:<pre>"
                     + StringEscapeUtils.escapeHtml(revision.getText()) + "</pre></p>" +
                     "<p>Version:<pre>"
@@ -601,7 +608,9 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     "<p>Last change:<pre>"
                     + StringEscapeUtils.escapeHtml(revision.getTimestamp()) + "</pre></p>" +
                     "<p>Categories:<pre>"
-                    + StringEscapeUtils.escapeHtml(revision.parseCategories(wikiModel).toString()) + "</pre></p>");
+                    + StringEscapeUtils.escapeHtml(revision.parseCategories(wikiModel).toString()) + "</pre></p>" +
+                    "<p>Request Parameters:<pre>"
+                    + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
         }
 
         value.setTitle(title);
