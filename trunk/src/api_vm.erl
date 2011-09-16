@@ -60,12 +60,33 @@ number_of_nodes() ->
 get_nodes() ->
     DhtModule = config:read(dht_node),
     [pid_groups:group_of(Pid) || Pid <- pid_groups:find_all(dht_node),
-                                 DhtModule:is_alive_fully_joined(gen_component:get_state(Pid))].
+                                 DhtModule:is_alive(gen_component:get_state(Pid))].
 
 %% @doc Adds Number Scalaris nodes to this VM.
 -spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
 add_nodes(0) -> {[], []};
-add_nodes(Number) -> admin:add_nodes(Number).
+add_nodes(Number) ->
+    Result = {Ok, _Failed} = admin:add_nodes(Number),
+    % at least wait for the successful nodes to have joined, i.e. left the join phases
+    util:wait_for(
+      fun() ->
+              DhtModule = config:read(dht_node),
+              NotReady = [Name || Name <- Ok,
+                                  not DhtModule:is_alive(
+                                    gen_component:get_state(
+                                      pid_groups:pid_of(Name, dht_node)))],
+              [] =:= NotReady
+      end),
+    Result.
+
+%% @doc Wait for the given nodes to disappear.
+-spec wait_for_nodes_to_disappear(Names::[pid_groups:groupname()]) -> ok.
+wait_for_nodes_to_disappear(Names) ->
+    util:wait_for(
+      fun() ->
+              [] =:= [Name || Name <- Names,
+                              pid_groups:pid_of(Name, dht_node) =/= failed]
+      end).
 
 %% @doc Sends a graceful leave request to a given node.
 -spec shutdown_node(pid_groups:groupname()) -> ok | not_found.
@@ -77,10 +98,14 @@ shutdown_node(Name) ->
 %% @doc Sends a graceful leave request to multiple nodes.
 -spec shutdown_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
 shutdown_nodes(Count) ->
-    admin:del_nodes(Count, true).
+    Ok = admin:del_nodes(Count, true),
+    wait_for_nodes_to_disappear(Ok),
+    Ok.
 -spec shutdown_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
 shutdown_nodes_by_name(Names) ->
-    admin:del_nodes_by_name(Names, true).
+    Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, true),
+    wait_for_nodes_to_disappear(Ok),
+    Result.
 
 %% @doc Kills a given node.
 -spec kill_node(pid_groups:groupname()) -> ok | not_found.
@@ -92,10 +117,14 @@ kill_node(Name) ->
 %% @doc Kills multiple nodes.
 -spec kill_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
 kill_nodes(Count) ->
-    admin:del_nodes(Count, false).
+    Ok = admin:del_nodes(Count, false),
+    wait_for_nodes_to_disappear(Ok),
+    Ok.
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
 kill_nodes_by_name(Names) ->
-    admin:del_nodes_by_name(Names, false).
+    Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, false),
+    wait_for_nodes_to_disappear(Ok),
+    Result.
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.
