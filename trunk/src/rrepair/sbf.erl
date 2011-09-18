@@ -40,7 +40,7 @@
 %%                 addedItems    = 0                             :: integer()      %number of inserted items
 %%                }).
 %% 
-%% -type bloomFilter_t() :: #sbf{}.
+%% -type bloom_filter_t() :: #sbf{}.
 %% 
 %% -include("bloom_beh.hrl").
 %% 
@@ -137,7 +137,7 @@
 %%            addedItems = NumItems
 %%           } = Bloom,
 %%     HCount = apply(element(1, Hfs), hfs_size, [Hfs]), 
-%%     io:format("BloomFilter: bloom~n"
+%%     io:format("bloom_filter: bloom~n"
 %%               "Size~16b Bit~n"
 %%               "Size~16.2f kb~n---~n"
 %%               "Bits Per Item~16.2f~n"

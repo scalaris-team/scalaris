@@ -33,7 +33,8 @@ all() -> [
           treeHash,
           branchTest,          
           storeToDot,
-          sizeTest
+          sizeTest,
+          tester_iter
          ].
 
 suite() ->
@@ -90,7 +91,26 @@ sizeTest(_) ->
     {Inner, Leafs} = merkle_tree:size_detail(Tree2),
     Size = merkle_tree:size(Tree2),
     ct:pal("Size=~p ; InnerCount=~p ; Leafs=~p", [Size, Inner, Leafs]),
-    ?equals(Size, Inner + Leafs).
+    ?equals(Size, Inner + Leafs),
+    ok.
+
+-spec prop_iter(intervals:key(), intervals:key(), 1..1000000) -> true.
+prop_iter(X, Y, Items) ->
+    I = intervals:new('[', X, Y, ']'),
+    ToInsert = if 
+                   erlang:abs(Y - X) < Items -> erlang:abs(Y - X) - 10;
+                   true -> Items
+               end,
+    {_, LKey, _RKey, _} = intervals:get_bounds(I),
+    Tree = build_tree(I, [{LKey + 1, LKey + ToInsert}]),
+    {Inner, Leafs} = merkle_tree:size_detail(Tree),
+    Count = count_iter(merkle_tree:iterator(Tree), 0),
+    ?equals(Count, Inner + Leafs),
+    true.
+
+tester_iter(_Config) ->
+    prop_iter(0, 100001, randoms:rand_uniform(1, 10000)).
+    %tester:test(?MODULE, prop_iter, 3, 2).
 
 storeToDot(_) ->
     DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
@@ -98,11 +118,21 @@ storeToDot(_) ->
                        [{1, 3*DefBucketSize - 1}, {1000 - 4*DefBucketSize + 1, 1000}]),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ct:pal("Tree Size - Inner=~p ; Leafs=~p", [Inner, Leafs]),
-    merkle_tree:store_to_DOT(Tree).
+    merkle_tree:store_to_DOT(Tree),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+count_iter(none, Count) ->
+    Count;
+count_iter(Iter, Count) ->
+    Next = merkle_tree:next(Iter),
+    case Next of
+        none -> Count;
+        {_, Iter2} -> count_iter(Iter2, Count + 1)
+    end.
+
 -spec build_tree(intervals:interval(), [{Min::pos_integer(), Max::pos_integer()}]) 
         -> merkle_tree:merkle_tree().
 build_tree(Interval, KeyIntervalList) ->
@@ -115,8 +145,9 @@ build_tree(Interval, Config, KeyIntervalList) ->
                         case size(Config) of                            
                             2 ->
                                 {Branch, Bucket} = Config,
-                                merkle_tree:new(Interval, Branch, Bucket);
-                            _ -> merkle_tree:new(Interval)                        
+                                merkle_tree:new(Interval, 
+                                                [{branch_factor, Branch}, {bucket_size, Bucket}]);
+                            _ -> merkle_tree:new(Interval)
                         end,
                         KeyIntervalList),
     merkle_tree:gen_hashes(Tree1).

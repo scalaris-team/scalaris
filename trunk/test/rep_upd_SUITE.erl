@@ -77,7 +77,7 @@ get_rrepair_config_parameter() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, bloom}, %bloom, merkleTree, art
+     {rep_update_recon_method, bloom}, %bloom, merkle_tree, art
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 1000},
@@ -88,7 +88,7 @@ get_bloom_RepUpd_config() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, bloom}, %bloom, merkleTree, art
+     {rep_update_recon_method, bloom}, %bloom, merkle_tree, art
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 10000},
@@ -99,7 +99,7 @@ get_merkle_tree_RepUpd_config() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, merkleTree}, %bloom, merkleTree, art
+     {rep_update_recon_method, merkle_tree}, %bloom, merkle_tree, art
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 100000},
