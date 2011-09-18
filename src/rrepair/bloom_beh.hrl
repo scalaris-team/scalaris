@@ -17,7 +17,7 @@
 %% @end
 %% @version $Id$
 
--export([new/3, add/2, addRange/2, is_element/2]).
+-export([new/2, new/3, add/2, addRange/2, is_element/2]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/2,
@@ -26,35 +26,41 @@
          calc_FPR/3]).
 
 %% types
-%-opaque bloomFilter() :: bloomFilter_t().
--type bloomFilter() :: bloomFilter_t(). %make opaque causes lots of dialyzer warnings
+%-opaque bloom_filter() :: bloom_filter_t().
+-type bloom_filter() :: bloom_filter_t(). %make opaque causes lots of dialyzer warnings
 -type key() :: any().
 
 -ifdef(with_export_type_support).
--export_type([bloomFilter/0]).
+-export_type([bloom_filter/0]).
 -endif.
 
 %% Functions
 
--spec new(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter().
+-spec new(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter().
 new(MaxElements, FPR, Hfs) -> new_(MaxElements, FPR, Hfs).
 
--spec add(bloomFilter(), key()) -> bloomFilter().
+% @doc Creates new bloom filter with default hash function set
+-spec new(integer(), float()) -> bloom_filter().
+new(MaxElements, FPR) ->
+    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxElements, FPR)),
+    new(MaxElements, FPR, Hfs).
+
+-spec add(bloom_filter(), key()) -> bloom_filter().
 add(Bloom, Item) -> addRange_(Bloom, [Item]).
 
--spec addRange(bloomFilter(), [key()]) -> bloomFilter().
+-spec addRange(bloom_filter(), [key()]) -> bloom_filter().
 addRange(Bloom, Items) -> addRange_(Bloom, Items).
 
--spec is_element(bloomFilter(), key()) -> boolean().
+-spec is_element(bloom_filter(), key()) -> boolean().
 is_element(Bloom, Item) -> is_element_(Bloom, Item).
 
--spec equals(bloomFilter(), bloomFilter()) -> boolean().
+-spec equals(bloom_filter(), bloom_filter()) -> boolean().
 equals(Bloom1, Bloom2) -> equals_(Bloom1, Bloom2).
 
--spec print(bloomFilter()) -> ok.
+-spec print(bloom_filter()) -> ok.
 print(Bloom) -> print_(Bloom). 
 
--spec join(bloomFilter(), bloomFilter()) -> bloomFilter().
+-spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
 join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,7 +90,7 @@ calc_HF_numEx(N, FPR) ->
 calc_least_size(N, FPR) -> 
     trunc(N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2)). 
 
-% @doc  Calculates FPR for an M-bit large BloomFilter with K Hashfuntions 
+% @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
 %       and a maximum of N elements.
 %       FPR = (1-e^(-kn/m))^k
 %       M = number of BF-Bits
@@ -94,9 +100,9 @@ calc_FPR(M, N, K) ->
 
 
 %% private function specs - TO IMPLEMENT if behaviour is used
--spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloomFilter_t().
--spec addRange_(bloomFilter_t(), [key()]) -> bloomFilter_t().
--spec is_element_(bloomFilter_t(), key()) -> boolean().
--spec equals_(bloomFilter(), bloomFilter()) -> boolean().
--spec join_(bloomFilter(), bloomFilter()) -> bloomFilter().
--spec print_(bloomFilter_t()) -> ok.
+-spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter_t().
+-spec addRange_(bloom_filter_t(), [key()]) -> bloom_filter_t().
+-spec is_element_(bloom_filter_t(), key()) -> boolean().
+-spec equals_(bloom_filter(), bloom_filter()) -> boolean().
+-spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
+-spec print_(bloom_filter_t()) -> ok.

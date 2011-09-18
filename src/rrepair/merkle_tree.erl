@@ -25,9 +25,9 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/3, insert/3, empty/0,
+-export([new/1, new/2, insert/3, empty/0,
          lookup/2, size/1, size_detail/1,
-         set_root_interval/2, gen_hashes/1,
+         gen_hashes/1, iterator/1, next/1,
          is_empty/1, is_leaf/1, get_bucket/1,
          get_hash/1, get_interval/1, get_childs/1,
          get_bucket_size/1, get_branch_factor/1,
@@ -35,6 +35,7 @@
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
+-export_type([mt_iter/0]).
 -endif.
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -47,10 +48,11 @@
 -type mt_node_key()     :: binary() | nil.
 -type mt_interval()     :: intervals:interval(). 
 -type mt_bucket()       :: orddict:orddict() | nil.
+-type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 -type hash_fun()        :: fun((binary()) -> mt_node_key()).
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
--type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 
+% INFO: on changes extend build_config function
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
@@ -67,56 +69,53 @@
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
                     }.
+-type mt_iter() :: [mt_node()].
 
-%-opaque merkle_tree() :: {mt_config(), Root::mt_node()}.
--type merkle_tree() :: {mt_config(), Root::mt_node()}.
+-type merkle_tree() :: {merkle_tree, mt_config(), Root::mt_node()}.
+%-type merkle_tree() :: {mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Tree properties
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec get_bucket_size(merkle_tree()) -> pos_integer().
-get_bucket_size({Config, _}) ->
+get_bucket_size({merkle_tree, Config, _}) ->
     Config#mt_config.bucket_size.
 
 -spec get_branch_factor(merkle_tree()) -> pos_integer().
-get_branch_factor({Config, _}) -> 
+get_branch_factor({merkle_tree, Config, _}) -> 
     Config#mt_config.branch_factor.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Empty
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc Insert on an empty tree fail. First operation on an empty tree should be set_interval.
 %      Returns an empty merkle tree ready for work.
-% @end
 -spec empty() -> merkle_tree().
 empty() ->
-    {#mt_config{}, {nil, 0, nil, intervals:empty(), []}}.
+    {merkle_tree, #mt_config{}, {nil, 0, nil, intervals:empty(), []}}.
 
 -spec is_empty(merkle_tree()) -> boolean().
-is_empty({_, {nil, 0, nil, I, []}}) -> intervals:is_empty(I);
+is_empty({merkle_tree, _, {nil, 0, nil, I, []}}) -> intervals:is_empty(I);
 is_empty(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% New
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec new(mt_interval()) -> merkle_tree().
 new(Interval) ->
-    {#mt_config{}, {nil, 0, orddict:new(), Interval, []}}.
+    {merkle_tree, #mt_config{}, {nil, 0, orddict:new(), Interval, []}}.
 
--spec new(mt_interval(), mt_config()) -> merkle_tree().
-new(Interval, Conf) ->
-    {Conf, {nil, 0, orddict:new(), Interval, []}}.
-
--spec new(mt_interval(), Branch_factor::pos_integer(), Bucket_size::pos_integer()) -> merkle_tree().
-new(Interval, BranchFactor, BucketSize) ->
-    {#mt_config{ branch_factor = BranchFactor, bucket_size = BucketSize }, 
-     {nil, 0, orddict:new(), Interval, []}}.
+% @doc ConfParams = list of tuples defined by {config field name, value}
+%       e.g. [{branch_factor, 32}, {bucket_size, 16}]
+-spec new(mt_interval(), [{atom(), term()}]) -> merkle_tree().
+new(Interval, ConfParams) ->
+    {merkle_tree, build_config(ConfParams), {nil, 0, orddict:new(), Interval, []}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Lookup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec lookup(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
-lookup(I, {_, Root}) ->
+
+-spec lookup(Interval, TreeObj) -> Node | not_found when
+      Interval :: mt_interval(),
+      TreeObj  :: merkle_tree() | mt_node(),
+      Node     :: mt_node().
+
+lookup(I, {merkle_tree, _, Root}) ->
     lookup(I, Root);
 lookup(I, {_, _, _, I, _} = Node) ->
     Node;
@@ -124,65 +123,76 @@ lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
         true when length(ChildList) =:= 0 -> Node;
         true -> 
-            IChilds = lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
+            IChilds = 
+                lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
             case length(IChilds) of
                 0 -> not_found;
                 1 -> [IChild] = IChilds, 
                      lookup(I, IChild);
-                _ -> erlang:throw('tree interval not correct splitted')
+                _ -> error_logger:error_msg("tree interval not correct splitted")
             end;
         false -> not_found
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Getter for mt_node / merkle_tree (root)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
-get_hash({_, Node}) -> get_hash(Node);
+get_hash({merkle_tree, _, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec get_interval(merkle_tree() | mt_node()) -> intervals:interval().
-get_interval({_, Node}) -> get_interval(Node);
+get_interval({merkle_tree, _, Node}) -> get_interval(Node);
 get_interval({_, _, _, I, _}) -> I.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec get_childs(merkle_tree() | mt_node()) -> [mt_node()].
-get_childs({_, Node}) -> get_childs(Node);
+get_childs({merkle_tree, _, Node}) -> get_childs(Node);
 get_childs({_, _, _, _, Childs}) -> Childs.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec is_leaf(merkle_tree() | mt_node()) -> boolean().
-is_leaf({_, Node}) -> is_leaf(Node);
+is_leaf({merkle_tree, _, Node}) -> is_leaf(Node);
 is_leaf({_, _, _, _, []}) -> true;
 is_leaf(_) -> false.
 
--spec get_bucket(merkle_tree | mt_node()) -> [{Key::term(), Value::term()}].
-get_bucket({_, Root}) -> get_bucket(Root);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_bucket(merkle_tree() | mt_node()) -> [{Key::term(), Value::term()}].
+get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
 get_bucket({_, C, Bucket, _, []}) when C > 0 -> orddict:to_list(Bucket);
 get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% set_root_interval
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec set_root_interval(mt_interval(), merkle_tree()) -> merkle_tree().
-set_root_interval(I, {Conf, _}) ->
-    new(I, Conf).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Insert
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec insert(Key::term(), Val::term(), merkle_tree()) -> merkle_tree().
-insert(Key, Val, {Config, Root}) ->
-    Changed = insert_to_node(Key, Val, Root, Config),
-    {Config, Changed}.
+insert(Key, Val, {merkle_tree, Config, Root} = Tree) ->
+    case intervals:in(Key, get_interval(Root)) of
+        true ->
+            Changed = insert_to_node(Key, Val, Root, Config),
+            {merkle_tree, Config, Changed};
+        false -> Tree
+    end.
 
+-spec insert_to_node(Key, Val, Node, Config) -> NewNode when
+      Key     :: term(),
+      Val     :: term(),
+      Node    :: mt_node(),
+      Config  :: mt_config(),
+      NewNode :: mt_node().
 
--spec insert_to_node(Key::term(), Val::term(), mt_node(), mt_config()) -> mt_node().
-
-insert_to_node(Key, Val, {Hash, Count, Bucket, Interval, []}, Config) 
+insert_to_node(Key, Val, {Hash, Count, Bucket, Interval, []} = Node, Config) 
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
-    {Hash, Count + 1, orddict:store(Key, Val, Bucket), Interval, []};
+    case orddict:is_key(Key, Bucket) of
+        true -> Node;
+        false -> {Hash, Count + 1, orddict:store(Key, Val, Bucket), Interval, []}
+    end;
 
 insert_to_node(Key, Val, {_, Count, Bucket, Interval, []}, Config) 
-  when Count =:= Config#mt_config.bucket_size ->
+  when Count =:= Config#mt_config.bucket_size ->    
     ChildI = intervals:split(Interval, Config#mt_config.branch_factor),
     NewLeafs = lists:map(fun(I) -> 
                               NewBucket = orddict:filter(fun(K, _) -> intervals:in(K, I) end, Bucket),
@@ -190,20 +200,24 @@ insert_to_node(Key, Val, {_, Count, Bucket, Interval, []}, Config)
                          end, ChildI),
     insert_to_node(Key, Val, {nil, 1 + Config#mt_config.branch_factor, nil, Interval, NewLeafs}, Config);
 
-insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs}, Config) ->
+insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs} = Node, Config) ->
     {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
-    length(_Dest) =:= 0 andalso ?TRACE("THIS SHOULD NOT HAPPEN! Key=~p ; NodeI=~p", [Key, Interval]),
-    Dest = hd(_Dest),
-    OldSize = node_size(Dest),
-    NewDest = insert_to_node(Key, Val, Dest, Config),
-    {Hash, Count + (node_size(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}.
+    case length(_Dest) =:= 0 of
+        true ->
+            error_logger:error_msg("InsertFailed: No free slots in Merkle_Tree!"),
+            Node;
+        false ->
+            Dest = hd(_Dest),
+            OldSize = node_size(Dest),
+            NewDest = insert_to_node(Key, Val, Dest, Config),
+            {Hash, Count + (node_size(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Generate Signatures/Hashes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec gen_hashes(merkle_tree()) -> merkle_tree().
-gen_hashes({Config, Root}) ->
-    {Config, gen_hash(Root, Config)}.
+gen_hashes({merkle_tree, Config, Root}) ->
+    {merkle_tree, Config, gen_hash(Root, Config)}.
 
 gen_hash({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp }) ->
     LeafHf = Config#mt_config.leaf_hf,
@@ -225,11 +239,10 @@ gen_hash({_, Count, nil, I, List}, Config) ->
     {Hash, Count, nil, I, NewChilds}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Size
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc Returns the total number of nodes in a tree or node (inner nodes and leafs)
 -spec size(merkle_tree() | mt_node()) -> non_neg_integer().
-size({_, Root}) ->
+size({merkle_tree, _, Root}) ->
     node_size(Root);
 size(Node) -> node_size(Node).
 
@@ -240,11 +253,10 @@ node_size({_, C, _, _, _}) ->
     C.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Tree size detail
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc Returns a tuple with number of inner nodes and leaf nodes.
 -spec size_detail(merkle_tree()) -> mt_size().
-size_detail({_, Root}) ->
+size_detail({merkle_tree, _, Root}) ->
     size_detail_node(Root, {0, 0}).
 
 -spec size_detail_node(mt_node(), mt_size()) -> mt_size().
@@ -255,11 +267,37 @@ size_detail_node({_, _, _, _, Childs}, {Inner, Leafs}) ->
                 {Inner + 1, Leafs}, Childs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Store to DOT
+
+% @doc Returns an iterator to visit all tree nodes with next
+%      Iterates over all tree nodes from left to right in a deep first manner.
+-spec iterator(Tree) -> Iter when
+      Tree :: merkle_tree(),
+      Iter :: mt_iter().
+iterator({merkle_tree, _, Root}) -> [Root].
+
+-spec iterator_node(Node, Iter1) -> Iter2 when
+      Node  :: mt_node(),
+      Iter1 :: mt_iter(),
+      Iter2 :: mt_iter().
+iterator_node({_, _, _, _, []}, Iter1) ->
+    Iter1;
+iterator_node({_, _, _, _, Childs}, Iter1) ->
+    lists:flatten([Childs | Iter1]).
+
+-spec next(Iter1) -> none | {Node, Iter2} when
+      Iter1 :: mt_iter(),
+      Node  :: mt_node(),
+      Iter2 :: mt_iter().
+next([Node | Rest]) ->
+        {Node, iterator_node(Node, Rest)};
+next([]) -> 
+    none.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
 -spec store_to_DOT(merkle_tree()) -> ok | io_error.
-store_to_DOT({Conf, Root}) ->
+store_to_DOT({merkle_tree, Conf, Root}) ->
     case file:open("../merkle_tree-graph.dot", [write]) of
         {ok, Fileid} ->
             io:fwrite(Fileid, "digraph merkle_tree { ~n", []),
@@ -293,9 +331,38 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
               [MyId, erlang:atom_to_list(LBr), LKey, RKey, erlang:atom_to_list(RBr)]),
     NNNFreeId.
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
+
+-spec build_config([{atom(), term()}]) -> mt_config().
+build_config(ParamList) ->
+    Init = #mt_config{},
+    Branch = get_conf_value(lists:keyfind(branch_factor, 1, ParamList),
+                            Init#mt_config.branch_factor),    
+    Bucket = get_conf_value(lists:keyfind(bucket_size, 1, ParamList),
+                            Init#mt_config.bucket_size),
+    LeafHF = get_conf_value(lists:keyfind(leaf_hf, 1, ParamList),
+                            Init#mt_config.leaf_hf),
+    InnerHF = get_conf_value(lists:keyfind(inner_hf, 1, ParamList),
+                             Init#mt_config.inner_hf),
+    GenHashOn = get_conf_value(lists:keyfind(gen_hash_on, 1, ParamList),
+                               Init#mt_config.gen_hash_on),        
+    #mt_config{ branch_factor = Branch,
+                bucket_size = Bucket,
+                leaf_hf = LeafHF,
+                inner_hf = InnerHF,
+                gen_hash_on = GenHashOn }.
+
+-spec get_conf_value(KeyVal, Default) -> Result when
+      KeyVal  :: {atom(), term()} | false,
+      Default :: term(),
+      Result  :: term().
+get_conf_value(false, Default) -> Default;
+get_conf_value({_, Value}, _) -> Value.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 get_XOR_fun() ->
     (fun([H|T]) -> lists:foldl(fun(X, Acc) -> binary_xor(X, Acc) end, H, T) end).
 

@@ -37,7 +37,7 @@
                 hfs           = ?required(bloom, hfs)         :: ?REP_HFS:hfs(),%HashFunctionSet
                 addedItems    = 0                             :: integer()      %number of inserted items
                }).
--type bloomFilter_t() :: #bloom{}.
+-type bloom_filter_t() :: #bloom{}.
 
 -include("bloom_beh.hrl").
 
@@ -127,7 +127,7 @@ print_(Bloom) ->
           } = Bloom,
     HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
     FullSize = byte_size(term_to_binary(Bloom)),
-    io:format("BloomFilter: bloom~n"
+    io:format("bloom_filter: bloom~n"
               "Filter_Size: ~b Bit (~10.4f kb) (~5.2f Bit/Item)~n"
               "StructSize: ~10.4f kb~n"
               "HashFunNum~b~n"

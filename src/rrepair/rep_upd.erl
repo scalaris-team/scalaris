@@ -58,7 +58,7 @@
 
 -type message() ::
     {?TRIGGER_NAME} |
-    {request_recon, Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
+    {request_recon, SenderRUPid::comm:mypid(), Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
         rep_upd_recon:recon_method(), rep_upd_recon:recon_struct()} |
     {request_resolve, Round::float(), rep_upd_resolve:ru_resolve_method(), 
         rep_upd_resolve:ru_resolve_struct(), 
@@ -74,12 +74,13 @@
 -spec on(message(), state()) -> state().
 on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
                                             open_recon = OpenRecon }) ->
-    {ok, Pid} = rep_upd_recon:start(Round),
-    case get_recon_method() of
-        bloom -> comm:send_local(Pid, {start_recon, get_recon_method(), build_struct, {}, true});
-        merkleTree -> comm:send_local(Pid, {start_recon, get_recon_method(), req_shared_interval, {}, true});
-        _ -> ok
-    end,
+    {ok, Pid} = rep_upd_recon:start(Round, undefined),
+    RStage = case get_recon_method() of
+                 bloom -> build_struct;
+                 merkle_tree -> req_shared_interval;        
+                 art -> req_shared_interval
+             end,
+    comm:send_local(Pid, {start_recon, get_recon_method(), RStage, {}, true}),
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
     %?TRACE("Trigger NEXT", []),
     State#rep_upd_state{ trigger_state = NewTriggerState, 
@@ -87,11 +88,11 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
                          open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_recon, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
+on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
    State = #rep_upd_state{ open_recon = OpenRecon }) ->
     monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
                            fun(Old) -> rrd:add_now(1, Old) end),
-    {ok, Pid} = rep_upd_recon:start(Round),
+    {ok, Pid} = rep_upd_recon:start(Round, Sender),
     comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
     State#rep_upd_state{ open_recon = OpenRecon + 1 };
 
