@@ -64,7 +64,10 @@
         rep_upd_resolve:ru_resolve_struct(), 
         rep_upd_resolve:ru_resolve_answer(), rep_upd_resolve:ru_resolve_answer()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
-    {sync_progress_report, Sender::comm:erl_local_pid(), Key::term(), Value::term()}.
+    {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
+        Master::boolean(), Stats::rep_upd_recon:ru_recon_stats()} |
+    {resolve_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
+        Stats::rep_upd_resolve:ru_resolve_stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling

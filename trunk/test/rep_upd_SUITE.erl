@@ -266,7 +266,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
                                                Rounds, 
                                                fun(_I) ->
                                                        startSyncRound(NodeKeys),
-                                                       timer:sleep(500),
+                                                       timer:sleep(5000),
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],

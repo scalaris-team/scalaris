@@ -30,10 +30,11 @@
 
 -ifdef(with_export_type_support).
 -export_type([ru_resolve_struct/0, ru_resolve_method/0, ru_resolve_answer/0]).
+-export_type([ru_resolve_stats/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -167,8 +168,16 @@ init(State) ->
     comm:send_local(State#ru_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     State.
 
--spec start(float(), ru_resolve_method(), ru_resolve_struct(), 
-            ru_resolve_answer(), ru_resolve_answer()) -> {ok, pid()}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec start(Round, Method, Struct, Feedback, SendStats) -> {ok, MyPid} when
+      is_subtype(Round,     float()),
+      is_subtype(Method,    ru_resolve_method()),
+      is_subtype(Struct,    ru_resolve_struct()),
+      is_subtype(Feedback,  ru_resolve_answer()),
+      is_subtype(SendStats, ru_resolve_answer()),
+      is_subtype(MyPid,     pid()).
+
 start(Round, RMethod, RStruct, Feedback, SendStats) ->
     State = #ru_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
