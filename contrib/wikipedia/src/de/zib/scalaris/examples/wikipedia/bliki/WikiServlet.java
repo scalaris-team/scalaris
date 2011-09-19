@@ -1033,7 +1033,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 }
                 content.append("  </select>\n");
                 content.append(" </p>\n");
-                content.append(" Maximum number of revisions per page: <input name=\"max_revisions\" size=\"2\" value=\"2\" /></br>\n");
+                content.append(" <p>Maximum number of revisions per page: <input name=\"max_revisions\" size=\"2\" value=\"2\" /></br><span style=\"font-size:80%\">(<tt>-1</tt> to import everything)</span></p>\n");
+                content.append(" <p>No entra newer than: <input name=\"max_time\" size=\"20\" value=\"\" /></br><span style=\"font-size:80%\">(ISO8601 format, e.g. <tt>2004-01-07T08:09:29Z</tt> - leave empty to import everything)</span></p>\n");
                 content.append(" <input type=\"submit\" value=\"Import\" />\n");
                 content.append("</form>\n");
                 content.append("<p>Note: You will be re-directed to the main page when the import finishes.</p>");
@@ -1042,10 +1043,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 try {
                     currentImport = req_import;
                     int maxRevisions = parseInt(request.getParameter("max_revisions"), 2);
+                    Calendar maxTime = parseDate(request.getParameter("max_time"), null);
                     importLog = new CircularByteArrayOutputStream(1024 * 1024);
                     PrintStream ps = new PrintStream(importLog);
                     ps.println("starting import...");
-                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, maxRevisions, cFactory);
+                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, maxRevisions, maxTime, cFactory);
                     importHandler.setUp();
                     importHandler.setMsgOut(ps);
                     InputSource is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(dumpsPath + File.separator + req_import);
@@ -1353,6 +1355,17 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+    
+    private final static Calendar parseDate(String value, Calendar def) {
+        if (value == null) {
+            return def;
+        }
+        try {
+            return Revision.stringToCalendar(value);
+        } catch (IllegalArgumentException e) {
             return def;
         }
     }

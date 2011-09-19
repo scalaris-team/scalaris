@@ -82,7 +82,7 @@
   <target name="build" depends="init">
     <echo message="Download Wiktionary dump:                'ant download'"/>
     <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
-    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
     <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
     <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
       <src path="src"/>
@@ -119,6 +119,10 @@
     <input addproperty="max_revisions" defaultvalue="2" message="Maximum number of revisions per page starting with the most recent one (-1 for all revisions)"/>
   </target>
 
+  <target name="import.get.max_time" unless="max_time">
+    <input addproperty="max_time" defaultvalue="" message="Maximum date of revisions to import in ISO8601 format, e.g. 2004-01-07T08:09:29Z, (empty for all revisions)"/>
+  </target>
+
   <target name="download">
     <get usetimestamp="true" dest="simplewiktionary-latest-pages-meta-history.xml.bz2" src="http://dumps.wikimedia.org/simplewiktionary/latest/simplewiktionary-latest-pages-meta-history.xml.bz2"/>
   </target>
@@ -132,14 +136,16 @@
 
   <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
 
-  <target name="import" depends="build,import.get.data,import.get.max_revisions,scalaris.properties">
+  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,scalaris.properties">
     <fail unless="data">You must specify the data property when you run 'ant import'.</fail>
-    <fail unless="max_revisions">You must specify the data property when you run 'ant import'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property when you run 'ant import'.</fail>
+    <fail unless="max_time">You must specify the max_time property when you run 'ant import'.</fail>
     <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
       <sysproperty key="scalaris.node" value="${scalaris.node}" />
       <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
       <arg value="${data}"/>
       <arg value="${max_revisions}"/>
+      <arg value="${max_time}"/>
       <classpath>
         <pathelement location="simplewiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>

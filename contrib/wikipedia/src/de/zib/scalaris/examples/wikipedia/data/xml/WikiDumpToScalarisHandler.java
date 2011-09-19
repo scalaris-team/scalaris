@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -75,12 +76,17 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param maxTime
+     *            maximum time a revision should have (newer revisions are
+     *            omitted) - <tt>null/tt> imports all revisions
+     *            (useful to create dumps of a wiki at a specific point in time)
      * 
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions) throws RuntimeException {
-        super(blacklist, maxRevisions);
+    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions,
+            Calendar maxTime) throws RuntimeException {
+        super(blacklist, maxRevisions, maxTime);
         init(blacklist, maxRevisions, ConnectionFactory.getInstance());
     }
 
@@ -94,14 +100,20 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param maxTime
+     *            maximum time a revision should have (newer revisions are
+     *            omitted) - <tt>null/tt> imports all revisions
+     *            (useful to create dumps of a wiki at a specific point in time)
      * @param cFactory
      *            the connection factory to use for creating new connections
      * 
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions, ConnectionFactory cFactory) throws RuntimeException {
-        super(blacklist, maxRevisions);
+    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions,
+            Calendar maxTime, ConnectionFactory cFactory)
+            throws RuntimeException {
+        super(blacklist, maxRevisions, maxTime);
         init(blacklist, maxRevisions, cFactory);
     }
 
