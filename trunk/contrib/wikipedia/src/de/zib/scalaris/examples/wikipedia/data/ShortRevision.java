@@ -15,6 +15,9 @@
  */
 package de.zib.scalaris.examples.wikipedia.data;
 
+import java.util.LinkedList;
+import java.util.List;
+
 /**
  * Represents a revision of a page.
  * 
@@ -163,5 +166,22 @@ public class ShortRevision {
      */
     public void setSize(int size) {
         this.size = size;
+    }
+    
+    /**
+     * Converts a list of {@link Revision} objects into a list of
+     * {@link ShortRevision} objects.
+     * 
+     * @param revisions
+     *            the revision list to convert
+     * 
+     * @return a short revision list
+     */
+    public static List<ShortRevision> fromRevisions(final List<Revision> revisions) {
+        List<ShortRevision> result = new LinkedList<ShortRevision>();
+        for (Revision rev : revisions) {
+            result.add(new ShortRevision(rev));
+        }
+        return result;
     }
 }

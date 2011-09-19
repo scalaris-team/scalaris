@@ -25,7 +25,6 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
-import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 
 /**
  * Represents a page including its revisions for use by an XML reader.
@@ -67,7 +66,6 @@ public class XmlPage extends DefaultHandler {
     protected XmlRevision currentRevision = null;
     
     protected Page final_page = null;
-    protected List<ShortRevision> revisions_short = new LinkedList<ShortRevision>();
     
     /**
      * Maximum number of revisions per page (starting with the most recent) -
@@ -243,7 +241,6 @@ public class XmlPage extends DefaultHandler {
                 if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
                     revisions.remove(revisions.firstKey());
                 }
-                revisions_short.add(new ShortRevision(currentRevision.getRevision()));
                 currentRevision = null;
             } else {
                 currentRevision.endElement(uri, localName, qName);
@@ -278,14 +275,5 @@ public class XmlPage extends DefaultHandler {
      */
     public List<Revision> getRevisions() {
         return new LinkedList<Revision>(revisions.values());
-    }
-
-    /**
-     * Gets a list of {@link ShortRevision} objects.
-     * 
-     * @return a list containing compact revision info
-     */
-    public List<ShortRevision> getRevisions_short() {
-        return revisions_short;
     }
 }
