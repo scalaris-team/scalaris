@@ -39,7 +39,7 @@ all() -> [
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 30}}
     ].
 
 init_per_suite(Config) ->
@@ -94,7 +94,7 @@ sizeTest(_) ->
     ?equals(Size, Inner + Leafs),
     ok.
 
--spec prop_iter(intervals:key(), intervals:key(), 1..1000000) -> true.
+-spec prop_iter(intervals:key(), intervals:key(), 1..10000) -> true.
 prop_iter(X, Y, Items) ->
     I = intervals:new('[', X, Y, ']'),
     ToInsert = if 
@@ -102,15 +102,18 @@ prop_iter(X, Y, Items) ->
                    true -> Items
                end,
     {_, LKey, _RKey, _} = intervals:get_bounds(I),
-    Tree = build_tree(I, [{LKey + 1, LKey + ToInsert}]),
+    {BuildT, Tree} = util:tc(fun() -> add_to_tree(LKey + 1, LKey + ToInsert, merkle_tree:new(I)) end),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    Count = count_iter(merkle_tree:iterator(Tree), 0),
+    {IterateT, Count} = util:tc(fun() -> count_iter(merkle_tree:iterator(Tree), 0) end),
+    ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n"
+           "Tree: BuildingTime=~p s ; IterationTime=~p s", 
+           [X, Y, Items, BuildT / (1000*1000), IterateT / (1000*1000)]),
     ?equals(Count, Inner + Leafs),
     true.
 
 tester_iter(_Config) ->
-    prop_iter(0, 100001, randoms:rand_uniform(1, 10000)).
-    %tester:test(?MODULE, prop_iter, 3, 2).
+    %prop_iter(0, 10000001, 10000).
+    tester:test(?MODULE, prop_iter, 3, 1).
 
 storeToDot(_) ->
     DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
@@ -140,7 +143,7 @@ build_tree(Interval, KeyIntervalList) ->
 
 build_tree(Interval, Config, KeyIntervalList) ->
     Tree1 = lists:foldl(fun({From, To}, Tree) -> 
-                                add_to_tree(From, To, Tree) 
+                                add_to_tree(From, To, Tree)
                         end,
                         case size(Config) of                            
                             2 ->
@@ -150,7 +153,7 @@ build_tree(Interval, Config, KeyIntervalList) ->
                             _ -> merkle_tree:new(Interval)
                         end,
                         KeyIntervalList),
-    merkle_tree:gen_hashes(Tree1).
+    merkle_tree:gen_hash(Tree1).
 
 add_to_tree(To, To, Tree) ->
     Tree;

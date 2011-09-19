@@ -58,10 +58,6 @@ new() -> {art, #art_config{}, intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
 new(Tree) ->
-    build(Tree).
-
--spec build(merkle_tree:merkle_tree()) -> art().
-build(Tree) ->
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
     InnerBF = ?REP_BLOOM:new(InnerCount, 0.01),
     LeafBF = ?REP_BLOOM:new(LeafCount, 0.1),

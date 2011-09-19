@@ -27,8 +27,9 @@
 
 -export([new/1, new/2, insert/3, empty/0,
          lookup/2, size/1, size_detail/1,
-         gen_hashes/1, iterator/1, next/1,
+         gen_hash/1, iterator/1, next/1,
          is_empty/1, is_leaf/1, get_bucket/1,
+         is_merkle_tree/1,
          get_hash/1, get_interval/1, get_childs/1,
          get_bucket_size/1, get_branch_factor/1,
          store_to_DOT/1]).
@@ -69,10 +70,9 @@
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
                     }.
--type mt_iter() :: [mt_node()].
 
+-type mt_iter() :: [mt_node()].
 -type merkle_tree() :: {merkle_tree, mt_config(), Root::mt_node()}.
-%-type merkle_tree() :: {mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -160,6 +160,14 @@ is_leaf(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc Returns true if given term is a merkle tree otherwise false.
+-spec is_merkle_tree(term()) -> boolean().
+is_merkle_tree(Tree) when erlang:is_tuple(Tree) ->
+    erlang:element(1, Tree) =:= merkle_tree;
+is_merkle_tree(_) -> false.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec get_bucket(merkle_tree() | mt_node()) -> [{Key::term(), Value::term()}].
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
 get_bucket({_, C, Bucket, _, []}) when C > 0 -> orddict:to_list(Bucket);
@@ -182,7 +190,6 @@ insert(Key, Val, {merkle_tree, Config, Root} = Tree) ->
       is_subtype(Node,    mt_node()),
       is_subtype(Config,  mt_config()),
       is_subtype(NewNode, mt_node()).
-
 insert_to_node(Key, Val, {Hash, Count, Bucket, Interval, []} = Node, Config) 
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
     case orddict:is_key(Key, Bucket) of
@@ -214,11 +221,15 @@ insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs} = Node, Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec gen_hashes(merkle_tree()) -> merkle_tree().
-gen_hashes({merkle_tree, Config, Root}) ->
-    {merkle_tree, Config, gen_hash(Root, Config)}.
+-spec gen_hash(merkle_tree()) -> merkle_tree().
+gen_hash({merkle_tree, Config, Root}) ->
+    {merkle_tree, Config, gen_hash_node(Root, Config)}.
 
-gen_hash({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp }) ->
+-spec gen_hash_node(Node, Config) -> Node2 when
+      is_subtype(Node,   mt_node()),
+      is_subtype(Config, mt_config()),
+      is_subtype(Node2,  mt_node()).
+gen_hash_node({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp }) ->
     LeafHf = Config#mt_config.leaf_hf,
     Hash = case Count > 0 of
                true ->
@@ -231,8 +242,8 @@ gen_hash({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp 
                _ -> LeafHf(term_to_binary(0))
            end,
     {Hash, Count, Bucket, I, []};
-gen_hash({_, Count, nil, I, List}, Config) ->    
-    NewChilds = lists:map(fun(X) -> gen_hash(X, Config) end, List),
+gen_hash_node({_, Count, nil, I, List}, Config) ->    
+    NewChilds = lists:map(fun(X) -> gen_hash_node(X, Config) end, List),
     InnerHf = Config#mt_config.inner_hf,
     Hash = InnerHf(lists:map(fun({H, _, _, _, _}) -> H end, NewChilds)),
     {Hash, Count, nil, I, NewChilds}.
@@ -336,29 +347,16 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
 
 -spec build_config([{atom(), term()}]) -> mt_config().
 build_config(ParamList) ->
-    Init = #mt_config{},
-    Branch = get_conf_value(lists:keyfind(branch_factor, 1, ParamList),
-                            Init#mt_config.branch_factor),    
-    Bucket = get_conf_value(lists:keyfind(bucket_size, 1, ParamList),
-                            Init#mt_config.bucket_size),
-    LeafHF = get_conf_value(lists:keyfind(leaf_hf, 1, ParamList),
-                            Init#mt_config.leaf_hf),
-    InnerHF = get_conf_value(lists:keyfind(inner_hf, 1, ParamList),
-                             Init#mt_config.inner_hf),
-    GenHashOn = get_conf_value(lists:keyfind(gen_hash_on, 1, ParamList),
-                               Init#mt_config.gen_hash_on),        
-    #mt_config{ branch_factor = Branch,
-                bucket_size = Bucket,
-                leaf_hf = LeafHF,
-                inner_hf = InnerHF,
-                gen_hash_on = GenHashOn }.
-
--spec get_conf_value(KeyVal, Default) -> Result when
-      is_subtype(KeyVal,  {atom(), term()} | false),
-      is_subtype(Default, term()),
-      is_subtype(Result,  term()).
-get_conf_value(false, Default) -> Default;
-get_conf_value({_, Value}, _) -> Value.
+    lists:foldl(fun({Key, Val}, Conf) ->
+                        case Key of
+                            branch_factor -> Conf#mt_config{ branch_factor = Val };
+                            bucket_size -> Conf#mt_config{ bucket_size = Val };
+                            leaf_hf -> Conf#mt_config{ leaf_hf = Val };
+                            inner_hf -> Conf#mt_config{ inner_hf = Val };
+                            gen_hash_on -> Conf#mt_config{ gen_hash_on = Val }
+                        end
+                end, 
+                #mt_config{}, ParamList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
