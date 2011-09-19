@@ -287,7 +287,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
 //      String title = page.getTitle().replaceFirst("^Category:", "Kategorie:");
 
         List<Revision> revisions = page_xml.getRevisions();
-        List<ShortRevision> revisions_short = page_xml.getRevisions_short();
+        List<ShortRevision> revisions_short = ShortRevision.fromRevisions(revisions);
         Collections.sort(revisions, Collections.reverseOrder(new byRevId()));
         Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
         
