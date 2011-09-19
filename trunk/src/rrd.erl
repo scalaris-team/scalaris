@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    RRD clone.
+%%% @doc    Round-Robin-Database (RRD) clone.
 %%% @end
 %% @version $Id$
 -module(rrd).
