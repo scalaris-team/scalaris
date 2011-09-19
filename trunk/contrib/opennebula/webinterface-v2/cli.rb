@@ -19,7 +19,7 @@ require 'net/http'
 require 'optparse'
 require 'pp'
 
-$url = 'http://localhost:4568/jsonrpc'
+$url = 'http://localhost:4567/jsonrpc'
 
 def json_call(url, function, params)
   req = Net::HTTP::Post.new(url.path)
