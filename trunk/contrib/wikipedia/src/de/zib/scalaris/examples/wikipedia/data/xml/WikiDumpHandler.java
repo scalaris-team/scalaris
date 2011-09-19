@@ -19,6 +19,7 @@ import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 
 import java.io.PrintStream;
+import java.util.Calendar;
 import java.util.Set;
 
 import org.xml.sax.Attributes;
@@ -44,8 +45,18 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     private Set<String> blacklist = null;
     
     protected WikiModel wikiModel;
+
+    /**
+     * Maximum number of revisions per page (starting with the most recent) -
+     * <tt>-1/tt> imports all revisions.
+     */
+    private int maxRevisions = -1;
     
-    private int maxRevisions = -1; // all revisions by default
+    /**
+     * Maximum time a revision should have (newer revisions are omitted) -
+     * <tt>null/tt> imports all revisions.
+     */
+    protected Calendar maxTime = null;
     
     /**
      * The time at the start of an import operation.
@@ -74,10 +85,15 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param maxTime
+     *            maximum time a revision should have (newer revisions are
+     *            omitted) - <tt>null/tt> imports all revisions
+     *            (useful to create dumps of a wiki at a specific point in time)
      */
-    public WikiDumpHandler(Set<String> blacklist, int maxRevisions) {
+    public WikiDumpHandler(Set<String> blacklist, int maxRevisions, Calendar maxTime) {
         this.blacklist = blacklist;
         this.maxRevisions = maxRevisions;
+        this.maxTime = maxTime;
     }
 
     /**
@@ -120,7 +136,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
             currentSiteInfo.startSiteInfo(uri, localName, qName, attributes);
         } else if (localName.equals("page")) {
             inPage = true;
-            currentPage = new XmlPage(maxRevisions);
+            currentPage = new XmlPage(maxRevisions, maxTime);
             currentPage.startPage(uri, localName, qName, attributes);
         } else if (inSiteInfo) {
             currentSiteInfo.startElement(uri, localName, qName, attributes);
@@ -186,7 +202,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
             if (localName.equals("page")) {
                 inPage = false;
                 currentPage.endPage(uri, localName, qName);
-                if (!blacklist.contains(currentPage.getPage().getTitle())) {
+                if (currentPage.getPage() != null &&
+                        !blacklist.contains(currentPage.getPage().getTitle())) {
                     export(currentPage);
                 }
                 currentPage = null;

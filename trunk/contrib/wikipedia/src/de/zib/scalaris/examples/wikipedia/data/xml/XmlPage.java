@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.util.Calendar;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -66,12 +67,18 @@ public class XmlPage extends DefaultHandler {
     protected XmlRevision currentRevision = null;
     
     protected Page final_page = null;
-    
+
     /**
      * Maximum number of revisions per page (starting with the most recent) -
      * <tt>-1/tt> imports all revisions.
      */
     protected int maxRevisions;
+    
+    /**
+     * Maximum time a revision should have (newer revisions are omitted) -
+     * <tt>null/tt> imports all revisions.
+     */
+    protected Calendar maxTime;
 
     /**
      * Creates a new page with an empty title, id and no revision.
@@ -79,10 +86,14 @@ public class XmlPage extends DefaultHandler {
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
+     * @param maxTime
+     *            maximum time a revision should have (newer revisions are
+     *            omitted) - <tt>null/tt> imports all revisions
      */
-    public XmlPage(int maxRevisions) {
+    public XmlPage(int maxRevisions, Calendar maxTime) {
         super();
         this.maxRevisions = maxRevisions;
+        this.maxTime = maxTime;
     }
 
     /**
@@ -192,6 +203,10 @@ public class XmlPage extends DefaultHandler {
      *            qualified names are not available.
      */
     public void endPage(String uri, String localName, String qName) {
+        if (revisions.isEmpty()) {
+            final_page = null;
+            return;
+        }
         /* 
          * parse page restrictions - examples:
          * <restrictions>edit=sysop:move=sysop</restrictions>
@@ -237,9 +252,13 @@ public class XmlPage extends DefaultHandler {
             if (localName.equals("revision")) {
                 inRevision = false;
                 currentRevision.endRevision(uri, localName, qName);
-                revisions.put(currentRevision.getRevision().getId(), currentRevision.getRevision());
-                if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
-                    revisions.remove(revisions.firstKey());
+                Revision curRev = currentRevision.getRevision();
+                if (maxTime == null ||
+                        !Revision.stringToCalendar(curRev.getTimestamp()).after(maxTime)) {
+                    revisions.put(curRev.getId(), curRev);
+                    if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
+                        revisions.remove(revisions.firstKey());
+                    }
                 }
                 currentRevision = null;
             } else {

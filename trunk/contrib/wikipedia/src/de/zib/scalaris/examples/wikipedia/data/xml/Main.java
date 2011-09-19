@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
@@ -30,6 +31,8 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
+
+import de.zib.scalaris.examples.wikipedia.data.Revision;
 
 /**
  * Provides abilities to read an xml wiki dump file and write Wiki pages to
@@ -64,8 +67,19 @@ public class Main {
                     System.exit(-1);
                 }
             }
+            
+            // a timestamp in ISO8601 format
+            Calendar maxTime = null;
+            if (args.length > 2 && !args[2].isEmpty()) {
+                try {
+                    maxTime = Revision.stringToCalendar(args[2]);
+                } catch (IllegalArgumentException e) {
+                    System.err.println("no date in ISO8601: " + args[2]);
+                    System.exit(-1);
+                }
+            }
 
-            WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions);
+            WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions, maxTime);
             handler.setUp();
             Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
             reader.setContentHandler(handler);

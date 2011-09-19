@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
@@ -42,9 +43,13 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param maxTime
+     *            maximum time a revision should have (newer revisions are
+     *            omitted) - <tt>null/tt> imports all revisions
+     *            (useful to create dumps of a wiki at a specific point in time)
      */
-    public WikiDumpToStdoutHandler(Set<String> blacklist, int maxRevisions) {
-        super(blacklist, maxRevisions);
+    public WikiDumpToStdoutHandler(Set<String> blacklist, int maxRevisions, Calendar maxTime) {
+        super(blacklist, maxRevisions, maxTime);
     }
 
     /**
