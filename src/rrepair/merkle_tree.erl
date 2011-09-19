@@ -111,10 +111,9 @@ new(Interval, ConfParams) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec lookup(Interval, TreeObj) -> Node | not_found when
-      Interval :: mt_interval(),
-      TreeObj  :: merkle_tree() | mt_node(),
-      Node     :: mt_node().
-
+      is_subtype(Interval, mt_interval()),
+      is_subtype(TreeObj,  merkle_tree() | mt_node()),
+      is_subtype(Node,     mt_node()).
 lookup(I, {merkle_tree, _, Root}) ->
     lookup(I, Root);
 lookup(I, {_, _, _, I, _} = Node) ->
@@ -178,11 +177,11 @@ insert(Key, Val, {merkle_tree, Config, Root} = Tree) ->
     end.
 
 -spec insert_to_node(Key, Val, Node, Config) -> NewNode when
-      Key     :: term(),
-      Val     :: term(),
-      Node    :: mt_node(),
-      Config  :: mt_config(),
-      NewNode :: mt_node().
+      is_subtype(Key,     term()),
+      is_subtype(Val,     term()),
+      is_subtype(Node,    mt_node()),
+      is_subtype(Config,  mt_config()),
+      is_subtype(NewNode, mt_node()).
 
 insert_to_node(Key, Val, {Hash, Count, Bucket, Interval, []} = Node, Config) 
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
@@ -271,23 +270,23 @@ size_detail_node({_, _, _, _, Childs}, {Inner, Leafs}) ->
 % @doc Returns an iterator to visit all tree nodes with next
 %      Iterates over all tree nodes from left to right in a deep first manner.
 -spec iterator(Tree) -> Iter when
-      Tree :: merkle_tree(),
-      Iter :: mt_iter().
+      is_subtype(Tree, merkle_tree()),
+      is_subtype(Iter, mt_iter()).
 iterator({merkle_tree, _, Root}) -> [Root].
 
 -spec iterator_node(Node, Iter1) -> Iter2 when
-      Node  :: mt_node(),
-      Iter1 :: mt_iter(),
-      Iter2 :: mt_iter().
+      is_subtype(Node,  mt_node()),
+      is_subtype(Iter1, mt_iter()),
+      is_subtype(Iter2, mt_iter()).
 iterator_node({_, _, _, _, []}, Iter1) ->
     Iter1;
 iterator_node({_, _, _, _, Childs}, Iter1) ->
     lists:flatten([Childs | Iter1]).
 
 -spec next(Iter1) -> none | {Node, Iter2} when
-      Iter1 :: mt_iter(),
-      Node  :: mt_node(),
-      Iter2 :: mt_iter().
+      is_subtype(Iter1, mt_iter()),
+      is_subtype(Node,  mt_node()),
+      is_subtype(Iter2, mt_iter()).
 next([Node | Rest]) ->
         {Node, iterator_node(Node, Rest)};
 next([]) -> 
@@ -355,9 +354,9 @@ build_config(ParamList) ->
                 gen_hash_on = GenHashOn }.
 
 -spec get_conf_value(KeyVal, Default) -> Result when
-      KeyVal  :: {atom(), term()} | false,
-      Default :: term(),
-      Result  :: term().
+      is_subtype(KeyVal,  {atom(), term()} | false),
+      is_subtype(Default, term()),
+      is_subtype(Result,  term()).
 get_conf_value(false, Default) -> Default;
 get_conf_value({_, Value}, _) -> Value.
 

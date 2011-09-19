@@ -79,12 +79,11 @@ get_merkle_tree(I) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec fill_bloom(Iterator, InnerBloom1, LeafBloom1) -> {InnerBloom2, LeafBloom2} when
-      Iterator    :: merkle_tree:mt_iter(),
-      InnerBloom1 :: ?REP_BLOOM:bloom_filter(),
-      LeafBloom1  :: ?REP_BLOOM:bloom_filter(),
-      InnerBloom2 :: ?REP_BLOOM:bloom_filter(),
-      LeafBloom2  :: ?REP_BLOOM:bloom_filter().
-
+      is_subtype(Iterator,    merkle_tree:mt_iter()),
+      is_subtype(InnerBloom1, ?REP_BLOOM:bloom_filter()),
+      is_subtype(LeafBloom1,  ?REP_BLOOM:bloom_filter()),
+      is_subtype(InnerBloom2, ?REP_BLOOM:bloom_filter()),
+      is_subtype(LeafBloom2,  ?REP_BLOOM:bloom_filter()).
 fill_bloom(Iter, IBF, LBF) ->
     Next = merkle_tree:next(Iter),
     case Next of

@@ -510,10 +510,10 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(Method, DB_Chunk, Args) -> Recon_Struct when
-      Method       :: recon_method(),
-      DB_Chunk     :: rep_upd:db_chunk(),
-      Args         :: build_args(),
-      Recon_Struct :: bloom_recon_struct() | merkle_tree:merkle_tree() | art:art().
+      is_subtype(Method,       recon_method()),
+      is_subtype(DB_Chunk,     rep_upd:db_chunk()),
+      is_subtype(Args,         build_args()),
+      is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
 build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
@@ -690,10 +690,9 @@ init(State) ->
     State#ru_recon_state{ sync_start_time = erlang:now() }.
 
 -spec start(Round, Sender_RU_Pid) -> {ok, MyPid} when
-      Round         :: float(),
-      Sender_RU_Pid :: comm:mypid() | undefined,
-      MyPid         :: pid().
-
+      is_subtype(Round,         float()),
+      is_subtype(Sender_RU_Pid, comm:mypid() | undefined),
+      is_subtype(MyPid,         pid()).
 start(Round, SenderRUPid) ->
     State = #ru_recon_state{ ownerLocalPid = self(), 
                              ownerRemotePid = comm:this(), 
