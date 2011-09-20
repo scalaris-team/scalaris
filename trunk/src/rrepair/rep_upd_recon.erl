@@ -27,7 +27,7 @@
 -export([init/1, on/2, start/2, check_config/0]).
 -export([print_recon_stats/1]).
 
-%exports for testing
+%export for testing
 -export([encodeBlob/2, decodeBlob/1, 
          mapInterval/2, map_key_to_quadrant/2, 
          get_key_quadrant/1, get_interval_quadrant/1]).
@@ -265,7 +265,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
             State#ru_recon_state{ recon_struct = MerkleTree, 
                                   recon_stats = Stats#ru_recon_stats{ build_time = BuildTime } };        
         true ->
-            %?TRACE("BUILD TREE NodeCount=~p~n~p", [merkle_tree:size(FinalTree), FinalTree]),
             ToCompare = 
                 case IsMaster of
                     true ->
@@ -516,8 +515,6 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% build sync struct
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(Method, DB_Chunk, Args) -> Recon_Struct when
       is_subtype(Method,       recon_method()),
@@ -528,14 +525,15 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
 build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    Hfs = ?REP_HFS:new(HFCount),
-    BF1 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),
-    BF2 = ?REP_BLOOM:new(ElementNum, Fpr, Hfs),    
-    {KeyBF, VerBF} = fill_bloom(DBItems, BF1, BF2),
+    Hfs = ?REP_HFS:new(HFCount),    
+    {KeyBF, VerBF} = fill_bloom(DBItems, 
+                                ?REP_BLOOM:new(ElementNum, Fpr, Hfs), 
+                                ?REP_BLOOM:new(ElementNum, Fpr, Hfs)),
     #bloom_recon_struct{ interval = I,
                          keyBF = KeyBF,
                          versBF = VerBF
                        };
+
 build_recon_struct(merkle_tree, {I, DBItems}, _) ->
     Tree = add_to_tree(DBItems, merkle_tree:new(I)),
     merkle_tree:gen_hash(Tree);
@@ -709,6 +707,7 @@ init(State) ->
       is_subtype(Round,         float()),
       is_subtype(Sender_RU_Pid, comm:mypid() | undefined),
       is_subtype(MyPid,         pid()).
+
 start(Round, SenderRUPid) ->
     State = #ru_recon_state{ ownerLocalPid = self(), 
                              ownerRemotePid = comm:this(), 

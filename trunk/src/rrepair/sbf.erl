@@ -66,7 +66,7 @@
 %%           }.
 %% 
 %% % @doc adds a range of items
-%% addRange_(Sbf, Items) ->
+%% add_list_(Sbf, Items) ->
 %%     #sbf{
 %%            cellCount = CellCount, 
 %%            hfs = Hfs, 
