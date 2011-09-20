@@ -17,7 +17,7 @@
 %% @end
 %% @version $Id$
 
--export([new/2, new/3, add/2, addRange/2, is_element/2]).
+-export([new/2, new/3, add/2, add_list/2, is_element/2]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/2,
@@ -28,7 +28,7 @@
 %% types
 %-opaque bloom_filter() :: bloom_filter_t().
 -type bloom_filter() :: bloom_filter_t(). %make opaque causes lots of dialyzer warnings
--type key() :: any().
+-type key() :: binary() | integer() | float() | boolean() | atom() | tuple().
 
 -ifdef(with_export_type_support).
 -export_type([bloom_filter/0]).
@@ -46,10 +46,10 @@ new(MaxElements, FPR) ->
     new(MaxElements, FPR, Hfs).
 
 -spec add(bloom_filter(), key()) -> bloom_filter().
-add(Bloom, Item) -> addRange_(Bloom, [Item]).
+add(Bloom, Item) -> add_list_(Bloom, [Item]).
 
--spec addRange(bloom_filter(), [key()]) -> bloom_filter().
-addRange(Bloom, Items) -> addRange_(Bloom, Items).
+-spec add_list(bloom_filter(), [key()]) -> bloom_filter().
+add_list(Bloom, Items) -> add_list_(Bloom, Items).
 
 -spec is_element(bloom_filter(), key()) -> boolean().
 is_element(Bloom, Item) -> is_element_(Bloom, Item).
@@ -57,7 +57,7 @@ is_element(Bloom, Item) -> is_element_(Bloom, Item).
 -spec equals(bloom_filter(), bloom_filter()) -> boolean().
 equals(Bloom1, Bloom2) -> equals_(Bloom1, Bloom2).
 
--spec print(bloom_filter()) -> ok.
+-spec print(bloom_filter()) -> [any()].
 print(Bloom) -> print_(Bloom). 
 
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
@@ -75,14 +75,18 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 
 % @doc  Calculates optimal number of hash functions - 
 %       prefers smaller values (truncates decimals)
--spec calc_HF_num(integer(), integer()) -> integer().
-calc_HF_num(M,N) -> 
-    trunc(ln(2) * (M / N)).
+-spec calc_HF_num(integer(), integer()) -> pos_integer().
+calc_HF_num(M, N) ->
+    Result = ln(2) * (M / N),
+    if 
+        Result < 1 -> 1;
+        true -> trunc(Result)
+    end.
 
 -spec calc_HF_numEx(integer(), float()) -> integer().
 calc_HF_numEx(N, FPR) ->
     M = calc_least_size(N, FPR),
-    calc_HF_num(M,N).
+    calc_HF_num(M, N).
 
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate up to MaxElements.
@@ -96,12 +100,12 @@ calc_least_size(N, FPR) ->
 %       M = number of BF-Bits
 -spec calc_FPR(integer(), integer(), integer()) -> float().
 calc_FPR(M, N, K) -> 
-    math:pow(1 - math:pow(math:exp(1), -K*N / M), K).
+    math:pow(1 - math:pow(math:exp(1), (-K*N) / M), K).
 
 
 %% private function specs - TO IMPLEMENT if behaviour is used
 -spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter_t().
--spec addRange_(bloom_filter_t(), [key()]) -> bloom_filter_t().
+-spec add_list_(bloom_filter_t(), [key()]) -> bloom_filter_t().
 -spec is_element_(bloom_filter_t(), key()) -> boolean().
 -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
 -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().

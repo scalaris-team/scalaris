@@ -56,7 +56,7 @@ new_(N, FPR, Hfs) ->
           }.
 
 % @doc adds a range of items to bloom filter
-addRange_(Bloom, Items) ->
+add_list_(Bloom, Items) ->
     #bloom{
            size = BFSize, 
            hfs = Hfs, 
@@ -65,9 +65,8 @@ addRange_(Bloom, Items) ->
           } = Bloom,
     Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]), %TODO: USE FLATTEN???
     Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
-    NewFilter = set_Bits(Filter, Positions),
     Bloom#bloom{
-                filter = NewFilter, 
+                filter = set_Bits(Filter, Positions),
                 addedItems = FilledCount + length(Items)
                }.
 
@@ -126,23 +125,13 @@ print_(Bloom) ->
            addedItems = NumItems
           } = Bloom,
     HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
-    FullSize = byte_size(term_to_binary(Bloom)),
-    io:format("bloom_filter: bloom~n"
-              "Filter_Size: ~b Bit (~10.4f kb) (~5.2f Bit/Item)~n"
-              "StructSize: ~10.4f kb~n"
-              "HashFunNum~b~n"
-              "Planed - MaxItems=~b (DestFPR=~8.6f)~n"
-              "Actual - ItemNum=~b (Fpr=~8.6f)~n", 
-              [Size,
-               (Size div 8) / 1024,
-               Size / MaxItems,
-               FullSize / 1024,
-               HCount,
-               MaxItems,
-               TargetFPR,
-               NumItems,
-               calc_FPR(Size, NumItems, HCount)]),
-    ok.
+    [{"Filter_Size=", Size, "bit"},
+     {"Struct_Size=", byte_size(term_to_binary(Bloom))},
+     {"HashFunNum=", HCount},
+     {"MaxItems=", MaxItems},
+     {"DestFPR=", TargetFPR},
+     {"ItemsInserted=", NumItems},
+     {"ActFPR=", calc_FPR(Size, NumItems, HCount)}].
 
 %% bit operations
 

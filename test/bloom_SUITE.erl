@@ -32,72 +32,101 @@
 -define(HFS, hfs_lhsp_md5).
 
 -define(Fpr_Test_NumTests, 30).
--define(Fpr_Test_DestFPR, 0.001).
--define(Fpr_Test_ElementNum, 1000).
 
 all() -> [
-		  add,
-		  addRange,
-          join,
-          equals,
-          fpr_test_parallel,
+		  tester_add,
+		  tester_add_list,
+          tester_join,
+          tester_equals,
+          tester_fpr,
           %fprof,
           time_measurement
 		 ].
 
-add(_) -> 
-	BF = newBloom(10, 0.1),
-	B1 = ?BLOOM:add(BF, "10"),
-	B2 = ?BLOOM:add(B1, 10),
-	B3 = ?BLOOM:add(B2, 10.3),
-    ?equals(?BLOOM:is_element(B3, "10"), true),
-    ?equals(?BLOOM:is_element(B3, "100"), false),
-    ?equals(?BLOOM:is_element(B3, 10.3), true).
+suite() ->
+    [
+     {timetrap, {seconds, 10}}
+    ].
 
-addRange(_) ->	
-	BF = newBloom(10, 0.1),
-	Elements = lists:seq(1,10,1),
-	BF1 = ?BLOOM:addRange(BF, Elements),
-	Results = [ ?BLOOM:is_element(BF1, Item) || Item <- Elements],
-	ct:pal("Elements: ~p~nResults: ~p~n", [Elements, Results]),
-	?equals(lists:member(false, Results), false),
-    ?equals(?BLOOM:is_element(BF1, "Not"), false),
-    ?equals(?BLOOM:is_element(BF1, 2), true).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-join(_) ->
-    BF1 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
-    BF2 = for_to_ex(11, 20, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
-    BF3 = ?BLOOM:join(BF1, BF2),
-    NumFound = for_to_ex(1, 20, 
-                         fun(I) -> case ?BLOOM:is_element(BF3, I) of
-                                       true -> 1;
-                                       false -> 0
-                                   end
-                         end,
-                         fun(X,Y) -> X+Y end, 0),
-    ct:pal("join NumFound=~B~n", [NumFound]),
-    ?assert(NumFound > 10 andalso NumFound =< 20),
-    ok.
+-spec prop_add(?BLOOM:key(), ?BLOOM:key()) -> true.
+prop_add(X, Y) ->
+    B1 = newBloom(10, 0.1),
+    B2 = ?BLOOM:add(B1, X),
+    ?assert(?BLOOM:is_element(B2, X)),
+    B3 = ?BLOOM:add(B2, Y),
+    ?assert(?BLOOM:is_element(B3, X) andalso 
+                ?BLOOM:is_element(B3,Y)),
+    true.
 
-equals(_) ->
-    BF1 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),
-    BF2 = for_to_ex(1, 10, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(30, 0.1)),    
-    ?equals(?BLOOM:equals(BF1, BF2), true),
-    ok.
+tester_add(_) ->
+    tester:test(?MODULE, prop_add, 2, 100).
 
-%% @doc ?Fpr_Test_NumTests-fold parallel run of measure_fp
-fpr_test_parallel(_) ->
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_add_list([?BLOOM:key(),...]) -> true.
+prop_add_list(Items) ->
+    B1 = newBloom(erlang:length(Items), 0.1),
+    B2 = ?BLOOM:add_list(B1, Items),
+    lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B2, X)) end, Items),
+    true.
+
+tester_add_list(_) ->
+    tester:test(?MODULE, prop_add_list, 1, 100).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_join([?BLOOM:key(),...], [?BLOOM:key(),...]) -> true.                                        
+prop_join(List1, List2) ->
+    BSize = erlang:length(List1) + erlang:length(List2),
+    B1 = ?BLOOM:add_list(newBloom(BSize, 0.1), List1),
+    B2 = ?BLOOM:add_list(newBloom(BSize, 0.1), List2),
+    B3 = ?BLOOM:join(B1, B2),
+    lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B1, X) andalso
+                                        ?BLOOM:is_element(B3, X)) end, List1),
+    lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B2, X) andalso
+                                        ?BLOOM:is_element(B3, X)) end, List2),
+    true.
+
+tester_join(_) ->
+    tester:test(?MODULE, prop_join, 2, 100).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_equals([?BLOOM:key(),...]) -> true.
+prop_equals(List) ->
+    B1 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
+    B2 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
+    ?assert(?BLOOM:equals(B1, B2)),
+    true.
+
+tester_equals(_) ->
+    tester:test(?MODULE, prop_equals, 1, 100).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_fpr(100..10000) -> true.
+prop_fpr(ElementCount) ->
+    DestFpr = randoms:rand_uniform(1, 500) / 1000,
+    %DestFpr = 0.01,
     FalsePositives = util:p_repeatAndAccumulate(
                        fun measure_fp/2, 
-                       [?Fpr_Test_DestFPR, ?Fpr_Test_ElementNum], 
+                       [DestFpr, ElementCount], 
                        ?Fpr_Test_NumTests, 
                        fun(X, Y) -> X + Y end, 
                        0),
     AvgFpr = FalsePositives / ?Fpr_Test_NumTests,
-    ?BLOOM:print(newBloom(?Fpr_Test_ElementNum, ?Fpr_Test_DestFPR)),
-    ct:pal("~nDestFpr: ~f~nMeasured Fpr: ~f~n", [?Fpr_Test_DestFPR, AvgFpr]),
-    ?assert(?Fpr_Test_DestFPR >= AvgFpr orelse ?Fpr_Test_DestFPR*1.3 >= AvgFpr),
-    ok.   
+    ct:pal("FalsePositives=~p - NumberOfTests=~p - Elements=~p~n"
+           "DestFpr: ~f~nMeasured Fpr: ~f~n
+            BloomFilter=~p~n", 
+           [FalsePositives, ?Fpr_Test_NumTests, ElementCount, DestFpr, AvgFpr,
+            ?BLOOM:print(?BLOOM:new(ElementCount, DestFpr))]),
+    %?assert(DestFpr >= AvgFpr orelse DestFpr * 1.3 >= AvgFpr), 
+    true.
+
+tester_fpr(_) ->
+    tester:test(?MODULE, prop_fpr, 1, 1).
 
 %% @doc measures false positives by adding 1..MaxElements into a new BF
 %%      and checking number of found items which are not in the BF
@@ -117,6 +146,41 @@ measure_fp(DestFpr, MaxElements) ->
                          0),
 	NumFound / NumNotIn.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+time_measurement(_) ->
+    %parameter
+    ExecTimes = 100, 
+    BFSize = 1000, % req: mod 2 = 0
+    
+    %measure Build times
+    {BTMin, BTMax, BTMed, BTAvg} = 
+        measure_util:time_avg(fun() -> for_to_ex(1, round(BFSize / 2), 
+                                                 fun(I) -> I end, 
+                                                 fun(I, B) -> ?BLOOM:add(B, I) end, 
+                                                 newBloom(BFSize, 0.1)) 
+                              end,
+                              [], ExecTimes, false),
+    %measure join time
+    BF1 = for_to_ex(1, 
+                    round(BFSize / 2), 
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
+    BF2 = for_to_ex(round(BFSize / 2) + 1, 
+                    BFSize, 
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
+    {JTMin, JTMax, JTMed, JTAvg} = 
+        measure_util:time_avg(fun() -> ?BLOOM:join(BF1, BF2) end, [], ExecTimes, false),
+    
+    %print results
+    ct:pal("EXECUTION TIMES in microseconds~n"
+           "PARAMETER - ExecTimes=[~w] - BFSize=[~w]~n"
+           "BuildTimes - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]~n"
+           "JoinTimes  - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]",
+           [ExecTimes, BFSize, BTMin, BTMax, BTMed, BTAvg, JTMin, JTMax, JTMed, JTAvg]),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 fprof(_) ->
     fprof:trace(start, "bloom_fprof.trace"),
     BF = newBloom(100, 0.1),
@@ -126,30 +190,7 @@ fprof(_) ->
     fprof:analyse([{dest, "bloom_fprof.analysis"}, {cols, 120}]),    
     ok.
 
-time_measurement(_) ->
-    %parameter
-    ExecTimes = 100, 
-    BFSize = 1000, % req: mod 2 = 0
-    
-    %measure Build times
-    {BTMin, BTMax, BTMed, BTAvg} = measure_util:time_avg(fun() -> for_to_ex(1, round(BFSize / 2), fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)) end,
-                                       [], ExecTimes, false),
-    %measure join time
-    BF1 = for_to_ex(1, 
-                    round(BFSize / 2), 
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
-    BF2 = for_to_ex(round(BFSize / 2) + 1, 
-                    BFSize, 
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
-    {JTMin, JTMax, JTMed, JTAvg} = measure_util:time_avg(fun() -> ?BLOOM:join(BF1, BF2) end, [], ExecTimes, false),
-    
-    %print results
-    ct:pal("EXECUTION TIMES in microseconds~n"
-           "PARAMETER - ExecTimes=[~w] - BFSize=[~w]~n"
-           "BuildTimes - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]~n"
-           "JoinTimes  - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]",
-           [ExecTimes, BFSize, BTMin, BTMax, BTMed, BTAvg, JTMin, JTMax, JTMed, JTAvg]),
-    ok.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 newBloom(ElementNum, Fpr) ->
 	HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),
