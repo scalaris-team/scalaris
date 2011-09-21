@@ -28,7 +28,7 @@
 %% types
 %-opaque bloom_filter() :: bloom_filter_t().
 -type bloom_filter() :: bloom_filter_t(). %make opaque causes lots of dialyzer warnings
--type key() :: binary() | integer() | float() | boolean() | atom() | tuple().
+-type key() :: binary() | integer() | float() | boolean() | atom() | tuple() | ?RT:key().
 
 -ifdef(with_export_type_support).
 -export_type([bloom_filter/0]).
@@ -57,7 +57,7 @@ is_element(Bloom, Item) -> is_element_(Bloom, Item).
 -spec equals(bloom_filter(), bloom_filter()) -> boolean().
 equals(Bloom1, Bloom2) -> equals_(Bloom1, Bloom2).
 
--spec print(bloom_filter()) -> [any()].
+-spec print(bloom_filter()) -> [{atom(), any()}].
 print(Bloom) -> print_(Bloom). 
 
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
