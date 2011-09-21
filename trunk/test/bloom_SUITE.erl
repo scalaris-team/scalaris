@@ -142,7 +142,7 @@ measure_fp(DestFpr, MaxElements) ->
                                        false -> 0
                                    end
                          end,
-                         fun(X,Y) -> X+Y end,
+                         fun(X, Y) -> X + Y end,
                          0),
 	NumFound / NumNotIn.
 

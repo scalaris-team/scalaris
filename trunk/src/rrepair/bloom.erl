@@ -125,13 +125,13 @@ print_(Bloom) ->
            addedItems = NumItems
           } = Bloom,
     HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
-    [{"Filter_Size=", Size, "bit"},
-     {"Struct_Size=", byte_size(term_to_binary(Bloom))},
-     {"HashFunNum=", HCount},
-     {"MaxItems=", MaxItems},
-     {"DestFPR=", TargetFPR},
-     {"ItemsInserted=", NumItems},
-     {"ActFPR=", calc_FPR(Size, NumItems, HCount)}].
+    [{filter_size, Size, bit},
+     {struct_size, byte_size(term_to_binary(Bloom))},
+     {hash_fun_num, HCount},
+     {max_items, MaxItems},
+     {dest_fpr, TargetFPR},
+     {items_inserted, NumItems},
+     {act_fpr, calc_FPR(Size, NumItems, HCount)}].
 
 %% bit operations
 
