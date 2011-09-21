@@ -58,11 +58,13 @@
 
 -type message() ::
     {?TRIGGER_NAME} |
+    {get_state, Sender::comm:mypid(), Key::atom()} |
     {request_recon, SenderRUPid::comm:mypid(), Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
         rep_upd_recon:recon_method(), rep_upd_recon:recon_struct()} |
     {request_resolve, Round::float(), rep_upd_resolve:ru_resolve_method(), 
         rep_upd_resolve:ru_resolve_struct(), 
         rep_upd_resolve:ru_resolve_answer(), rep_upd_resolve:ru_resolve_answer()} |
+    {recon_forked} | 
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
         Master::boolean(), Stats::rep_upd_recon:ru_recon_stats()} |
@@ -73,8 +75,22 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Message handler when trigger triggers (INITIATE SYNC BY TRIGGER)
 -spec on(message(), state()) -> state().
+
+on({get_state, Sender, Key}, State = 
+       #rep_upd_state{ open_recon = Recon,
+                       open_resolve = Resolve,
+                       sync_round = Round }) ->
+    ?TRACE("GET STATE - Recon=~p  - Resolve=~p", [Recon, Resolve]),
+    Value = case Key of
+                open_recon -> Recon;
+                open_resolve -> Resolve;
+                sync_round -> Round;
+                open_sync -> Recon + Resolve
+            end,
+    comm:send(Sender, {get_state_response, Value}),
+    State;
+
 on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
                                             open_recon = OpenRecon }) ->
     {ok, Pid} = rep_upd_recon:start(Round, undefined),
@@ -93,8 +109,6 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
    State = #rep_upd_state{ open_recon = OpenRecon }) ->
-    monitor:proc_set_value(?MODULE, "Recv-Sync-Req-Count",
-                           fun(Old) -> rrd:add_now(1, Old) end),
     {ok, Pid} = rep_upd_recon:start(Round, Sender),
     comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
     State#rep_upd_state{ open_recon = OpenRecon + 1 };
@@ -105,20 +119,18 @@ on({request_resolve, Round, RMethod, RStruct, Feedback, SendStats},
     State#rep_upd_state{ open_resolve = OpenResolve + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Monitor Reporting
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
+    State#rep_upd_state{ open_recon = Recon + 1 };
+
 on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
-    %monitor:proc_set_value(?MODULE, "Progress",
-    %                       fun(Old) -> rrd:add_now(Value, Old) end),
     Master andalso
-        ?TRACE("SYNC FINISHED - Round=~p - Sender=~p - Master=~p~nStats=~p", 
+        ?TRACE("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p", 
                [Round, Sender, Master, rep_upd_recon:print_recon_stats(Stats)]),
     State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
 
 on({resolve_progress_report, Sender, Round, Stats}, State) ->
-    %monitor:proc_set_value(?MODULE, "Progress",
-    %                       fun(Old) -> rrd:add_now(Value, Old) end),
-    ?TRACE("SYNC FINISHED - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
+    ?TRACE("RESOLVE OK - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
            [Round, Sender, rep_upd_resolve:print_resolve_stats(Stats),
             State#rep_upd_state.open_recon, State#rep_upd_state.open_resolve]),    
     State#rep_upd_state{ open_resolve = State#rep_upd_state.open_resolve - 1 };

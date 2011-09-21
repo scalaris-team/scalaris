@@ -42,8 +42,8 @@
 %-define(TRACE(X,Y), ok).
 
 %DETAIL DEBUG MESSAGES
-%-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE2(X,Y), ok).
+-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE2(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -215,7 +215,8 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
                         recon_stats = Stats }) ->
     case intervals:is_empty(RestI) of
         false ->
-            {ok, Pid} = fork_sync(State, Round + 0.1),
+            ?TRACE2("FORK RECON", []),
+            {ok, Pid} = fork_recon(State, Round + 0.1),
             comm:send_local(DhtNodePid, {get_chunk, Pid, RestI, get_max_items(bloom)});
         _ -> ok
     end,
@@ -227,6 +228,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
         util:tc(fun() -> build_recon_struct(bloom, {ChunkI, DBList}, {get_fpr()}) end),
     case SyncMaster of
         true ->
+            ?TRACE("SEND BLOOM - time=~p", [now()]),
             DestKey = select_sync_node(ChunkI),
             comm:send_local(DhtNodePid, 
                             {lookup_aux, DestKey, 0, 
@@ -369,21 +371,19 @@ on({start_recon, ReconMethod, ReconStage, ReconStruct, Master}, State) ->
                           sync_master = Master orelse ReconStage =:= res_shared_interval };
 
 on({crash, Pid}, State) ->
-    comm:send_local(self(), {shutdown, {fail, crash_of_sync_node, Pid}}),
+    comm:send_local(self(), {shutdown, {fail, crash_of_recon_node, Pid}}),
     State;
 
-on({shutdown, {simple_detail_sync_ok, _}}, _) ->
-    kill;    
-on({shutdown, Reason}, State = #ru_recon_state{ sync_round = Round,
+on({shutdown, Reason}, State = #ru_recon_state{ ownerLocalPid = Owner, 
+                                                sync_round = Round,
                                                 recon_stats = Stats,
                                                 sync_master = Master,
                                                 recon_stage = Stage,
                                                 sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
     NewStats = Stats#ru_recon_stats{ recon_time = timer:now_diff(erlang:now(), SyncStartTime) },
-    Stage =/= req_shared_interval andalso
-        comm:send_local(State#ru_recon_state.ownerLocalPid, 
-                        {recon_progress_report, self(), Round, Master, NewStats}),
+    comm:send_local(Owner, 
+                    {recon_progress_report, self(), Round, Master, NewStats}),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -716,9 +716,10 @@ start(Round, SenderRUPid) ->
                              sync_round = Round },
     gen_component:start(?MODULE, State, []).
 
--spec fork_sync(state(), float()) -> {ok, pid()}.
-fork_sync(Conf, Round) ->
+-spec fork_recon(state(), float()) -> {ok, pid()}.
+fork_recon(Conf, Round) ->
     State = Conf#ru_recon_state{ sync_round = Round },
+    comm:send_local(Conf#ru_recon_state.ownerLocalPid, {recon_forked}),
     gen_component:start(?MODULE, State, []).
 
 

@@ -111,7 +111,6 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                    } = Stats,
                           feedback = {DoFeedback, FeedbackPid},
                           feedbackItems = FBItems,
-                          send_stats = {DoSendResult, ResultDest},
                           sync_round = Round
                         }) ->
     NewStats = case Done of 
@@ -126,23 +125,23 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                end,
     _ = case Diff - 1 =:= Ok + Failed of
             true ->
-                ?TRACE("DETAIL SYNC FINISHED Ok/Failed/Todo = ~p/~p/~p", 
-                       [NewStats#ru_resolve_stats.updatedCount, 
-                        NewStats#ru_resolve_stats.notUpdatedCount, 
-                        Diff]),
                 DoFeedback andalso
                         comm:send(FeedbackPid, {request_resolve, Round, simple, 
                                                     {simple_detail_sync, NewFBItems},
                                                     {false, self()}, {false, self()}}),
-                DoSendResult andalso
-                    comm:send(ResultDest, {resolve_progress_report, self(), Round, NewStats}),
-                comm:send_local(self(), {shutdown, {simple_resolve_ok, NewStats}});
+                comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
             _ ->
                 ok
         end,
     State#ru_resolve_state{ stats = NewStats, feedbackItems = NewFBItems };
 
-on({shutdown, _}, _) ->
+on({shutdown, _}, State =
+         #ru_resolve_state{ 
+                         ownerLocalPid = Owner,
+                         sync_round = Round,
+                         stats = Stats }) ->
+    %DoSendResult TODO
+    comm:send_local(Owner, {resolve_progress_report, self(), Round, Stats}),    
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

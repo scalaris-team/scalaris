@@ -266,7 +266,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
                                                Rounds, 
                                                fun(_I) ->
                                                        startSyncRound(NodeKeys),
-                                                       timer:sleep(5000),
+                                                       waitForSyncRoundEnd(NodeKeys),
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],
@@ -338,6 +338,22 @@ startSyncRound(NodeKeys) ->
                           api_dht_raw:unreliable_lookup(X, {send_to_group_member, rep_upd, {rep_update_trigger}})
                   end, 
                   NodeKeys),
+    ok.
+
+waitForSyncRoundEnd(NodeKeys) ->
+    lists:foreach(
+      fun(Node) -> 
+              util:wait_for(
+                fun() -> 
+                        api_dht_raw:unreliable_lookup(Node, 
+                                                      {send_to_group_member, rep_upd, 
+                                                       {get_state, comm:this(), open_sync}}),
+                        receive
+                            {get_state_response, Val} -> Val =:= 0
+                        end
+                end)
+      end, 
+      NodeKeys),
     ok.
 
 % @doc returns replica update specific node db information

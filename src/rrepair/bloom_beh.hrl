@@ -92,7 +92,7 @@ calc_HF_numEx(N, FPR) ->
 %       with a bounded false-positive rate up to MaxElements.
 -spec calc_least_size(integer(), float()) -> integer().
 calc_least_size(N, FPR) -> 
-    trunc(N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2)). 
+    erlang:round((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
 % @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
 %       and a maximum of N elements.
