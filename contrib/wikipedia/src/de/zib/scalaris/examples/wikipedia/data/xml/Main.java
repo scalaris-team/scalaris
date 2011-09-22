@@ -203,6 +203,7 @@ public class Main {
         }
 
         Set<String> pages = new HashSet<String>(categories);
+        pages.add("Main Page");
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         while (recursionLvl >= 1) {
             // need to get all subcategories recursively, as they must be included as well 
