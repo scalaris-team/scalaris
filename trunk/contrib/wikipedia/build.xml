@@ -123,6 +123,14 @@
     <input addproperty="max_time" defaultvalue="" message="Maximum date of revisions to import in ISO8601 format, e.g. 2004-01-07T08:09:29Z, (empty for all revisions)"/>
   </target>
 
+  <target name="import.get.recursion_lvl" unless="recursion_lvl">
+    <input addproperty="recursion_lvl" defaultvalue="1" message="Recursively import pages this deep"/>
+  </target>
+
+  <target name="import.get.categories" unless="categories">
+    <input addproperty="categories" defaultvalue="" message="Import pages in these categories"/>
+  </target>
+
   <target name="download">
     <get usetimestamp="true" dest="simplewiktionary-latest-pages-meta-history.xml.bz2" src="http://dumps.wikimedia.org/simplewiktionary/latest/simplewiktionary-latest-pages-meta-history.xml.bz2"/>
   </target>
@@ -144,8 +152,29 @@
       <sysproperty key="scalaris.node" value="${scalaris.node}" />
       <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
       <arg value="${data}"/>
+      <arg value="import"/>
       <arg value="${max_revisions}"/>
       <arg value="${max_time}"/>
+      <classpath>
+        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.categories">
+    <fail unless="data">You must specify the data property when you run 'ant filter'.</fail>
+    <fail unless="max_time">You must specify the max_time property when you run 'ant filter'.</fail>
+    <fail unless="categories">You must specify the categories property when you run 'ant filter'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="filter"/>
+      <arg value="${recursion_lvl}"/>
+      <arg value="${max_time}"/>
+      <arg value="${categories}"/>
       <classpath>
         <pathelement location="simplewiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>

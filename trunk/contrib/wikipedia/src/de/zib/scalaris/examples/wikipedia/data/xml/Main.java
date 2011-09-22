@@ -18,11 +18,16 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
@@ -55,36 +60,15 @@ public class Main {
      */
     public static void main(String[] args) {
         try {
-            XMLReader reader = XMLReaderFactory.createXMLReader();
-
             String filename = args[0];
-            int maxRevisions = -1;
-            if (args.length > 1) {
-                try {
-                    maxRevisions = Integer.parseInt(args[1]);
-                } catch (NumberFormatException e) {
-                    System.err.println("no number: " + args[1]);
-                    System.exit(-1);
-                }
-            }
             
-            // a timestamp in ISO8601 format
-            Calendar maxTime = null;
-            if (args.length > 2 && !args[2].isEmpty()) {
-                try {
-                    maxTime = Revision.stringToCalendar(args[2]);
-                } catch (IllegalArgumentException e) {
-                    System.err.println("no date in ISO8601: " + args[2]);
-                    System.exit(-1);
+            if (args.length > 1) {
+                if (args[1].equals("filter")) {
+                    doFilter(filename, Arrays.copyOfRange(args, 2, args.length));
+                } else if (args[1].equals("import")) {
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
             }
-
-            WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions, maxTime);
-            handler.setUp();
-            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
-            reader.setContentHandler(handler);
-            reader.parse(getFileReader(filename));
-            handler.tearDown();
         } catch (SAXException e) {
             System.err.println(e.getMessage());
         } catch (FileNotFoundException e) {
@@ -92,6 +76,137 @@ public class Main {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Imports all pages in the Wikipedia XML dump from the given file to Scalaris.
+     * 
+     * @param args
+     * @param reader
+     * @param filename
+     * @throws RuntimeException
+     * @throws IOException
+     * @throws SAXException
+     * @throws FileNotFoundException
+     */
+    private static void doImport(String filename, String[] args) throws RuntimeException, IOException,
+            SAXException, FileNotFoundException {
+        XMLReader reader = XMLReaderFactory.createXMLReader();
+        
+        int maxRevisions = -1;
+        if (args.length >= 1) {
+            try {
+                maxRevisions = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.err.println("no number: " + args[0]);
+                System.exit(-1);
+            }
+        }
+        
+        // a timestamp in ISO8601 format
+        Calendar maxTime = null;
+        if (args.length >= 2 && !args[1].isEmpty()) {
+            try {
+                maxTime = Revision.stringToCalendar(args[1]);
+            } catch (IllegalArgumentException e) {
+                System.err.println("no date in ISO8601: " + args[1]);
+                System.exit(-1);
+            }
+        }
+
+        WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions, maxTime);
+        handler.setUp();
+        Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
+        reader.setContentHandler(handler);
+        reader.parse(getFileReader(filename));
+        handler.tearDown();
+    }
+
+
+    /**
+     * Filters all pages in the Wikipedia XML dump from the given file and
+     * creates a list of page names belonging to certain categories.
+     * 
+     * @param args
+     * @param reader
+     * @param filename
+     * @throws RuntimeException
+     * @throws IOException
+     * @throws SAXException
+     * @throws FileNotFoundException
+     */
+    private static void doFilter(String filename, String[] args) throws RuntimeException, IOException,
+            SAXException, FileNotFoundException {
+        XMLReader reader = XMLReaderFactory.createXMLReader();
+        
+        int recursionLvl = 1;
+        if (args.length >= 1) {
+            try {
+                recursionLvl = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.err.println("no number: " + args[0]);
+                System.exit(-1);
+            }
+        }
+        
+        // a timestamp in ISO8601 format
+        Calendar maxTime = null;
+        if (args.length >= 2 && !args[1].isEmpty()) {
+            try {
+                maxTime = Revision.stringToCalendar(args[1]);
+            } catch (IllegalArgumentException e) {
+                System.err.println("no date in ISO8601: " + args[1]);
+                System.exit(-1);
+            }
+        }
+        
+        Set<String> categories = null;
+        if (args.length >= 3) {
+            LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
+            System.out.println("building category tree...");
+            
+            // need to get all subcategories recursively, as they must be included as well 
+            WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
+            handler.setUp();
+            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
+            reader.setContentHandler(handler);
+            reader.parse(getFileReader(filename));
+            handler.tearDown();
+            
+            Map<String, Set<String>> categoryTree = handler.getCategories();
+            categories = new HashSet<String>();
+            while (!rootCategories.isEmpty()) {
+                String curCat = rootCategories.removeFirst();
+                Set<String> subcats = categoryTree.get(curCat);
+                if (subcats != null) {
+                    categories.addAll(subcats);
+                    rootCategories.addAll(subcats);
+                }
+            }
+        }
+
+        Set<String> pages = new HashSet<String>(categories);
+        System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
+        while (recursionLvl >= 1) {
+            // need to get all subcategories recursively, as they must be included as well 
+            WikiDumpGetPagesInCategoriesHandler handler = new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categories, pages);
+            handler.setUp();
+            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
+            reader.setContentHandler(handler);
+            reader.parse(getFileReader(filename));
+            handler.tearDown();
+            pages.addAll(handler.getPages());
+            pages.addAll(handler.getLinksOnPages());
+            
+            --recursionLvl;
+        }
+        
+        FileWriter outFile = new FileWriter(filename + "-filtered_pagelist.txt");
+        PrintWriter out = new PrintWriter(outFile);
+        for (String page : pages) {
+            out.println(page);
+        }
+        out.close();
     }
     
     /**
