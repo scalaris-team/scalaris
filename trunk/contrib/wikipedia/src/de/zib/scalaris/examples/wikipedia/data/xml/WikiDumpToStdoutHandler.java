@@ -39,6 +39,8 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param whitelist
+     *            only import these pages
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -48,8 +50,8 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
      *            omitted) - <tt>null/tt> imports all revisions
      *            (useful to create dumps of a wiki at a specific point in time)
      */
-    public WikiDumpToStdoutHandler(Set<String> blacklist, int maxRevisions, Calendar maxTime) {
-        super(blacklist, maxRevisions, maxTime);
+    public WikiDumpToStdoutHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar maxTime) {
+        super(blacklist, whitelist, maxRevisions, maxTime);
     }
 
     /**
@@ -71,14 +73,14 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
     }
 
     /**
-     * dumps the given page (including all revisions) to the standard output in
+     * Dumps the given page (including all revisions) to the standard output in
      * the following text format:
      * <code>
      * {title, id, revisions, props}
      * </code>
      * 
-     * @param revision
-     *            the page to export
+     * @param page_xml
+     *            the page object extracted from XML
      */
     @Override
     protected void export(XmlPage page_xml) {

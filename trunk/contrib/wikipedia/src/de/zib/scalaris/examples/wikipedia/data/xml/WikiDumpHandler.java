@@ -41,8 +41,9 @@ public abstract class WikiDumpHandler extends DefaultHandler {
 
     private XmlSiteInfo currentSiteInfo = null;
     private XmlPage currentPage = null;
-    
+
     private Set<String> blacklist = null;
+    private Set<String> whitelist = null;
     
     protected WikiModel wikiModel;
 
@@ -81,6 +82,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param whitelist
+     *            only import these pages
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -90,8 +93,9 @@ public abstract class WikiDumpHandler extends DefaultHandler {
      *            omitted) - <tt>null/tt> imports all revisions
      *            (useful to create dumps of a wiki at a specific point in time)
      */
-    public WikiDumpHandler(Set<String> blacklist, int maxRevisions, Calendar maxTime) {
+    public WikiDumpHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar maxTime) {
         this.blacklist = blacklist;
+        this.whitelist = whitelist;
         this.maxRevisions = maxRevisions;
         this.maxTime = maxTime;
     }
@@ -203,7 +207,8 @@ public abstract class WikiDumpHandler extends DefaultHandler {
                 inPage = false;
                 currentPage.endPage(uri, localName, qName);
                 if (currentPage.getPage() != null &&
-                        !blacklist.contains(currentPage.getPage().getTitle())) {
+                        !blacklist.contains(currentPage.getPage().getTitle()) &&
+                        (whitelist == null || whitelist.contains(currentPage.getPage().getTitle()))) {
                     export(currentPage);
                 }
                 currentPage = null;
