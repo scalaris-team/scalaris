@@ -10,6 +10,9 @@ update-rc.d -f hadoop-0.20-jobtracker remove
 update-rc.d -f hadoop-0.20-tasktracker remove
 update-rc.d -f hue remove
 update-rc.d -f dnsmasq remove
+update-rc.d -f gmetad remove
+update-rc.d -f ganglia-monitor remove
+update-rc.d -f apache2 remove
 
 apt-get remove --purge -y dhcp3-client dhcp3-common isc-dhcp-client isc-dhcp-common
 
@@ -46,7 +49,7 @@ groupmod -g 1001 xtreemfs
 usermod -u 1001 xtreemfs
 chown -R xtreemfs /var/lib/xtreemfs
 
-echo << EOT > /root/.bashrc
+cat << EOT > /root/.bashrc
 export JAVA_HOME=/usr/lib/jvm/java-6-sun/jre
 export PATH=$PATH:/root/pig/bin
 EOT
