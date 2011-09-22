@@ -203,10 +203,6 @@ public class XmlPage extends DefaultHandler {
      *            qualified names are not available.
      */
     public void endPage(String uri, String localName, String qName) {
-        if (revisions.isEmpty()) {
-            final_page = null;
-            return;
-        }
         /* 
          * parse page restrictions - examples:
          * <restrictions>edit=sysop:move=sysop</restrictions>
@@ -227,7 +223,10 @@ public class XmlPage extends DefaultHandler {
             }
         }
         // get current revision (the largest one):
-        Revision curRev = revisions.lastEntry().getValue();
+        Revision curRev = null;
+        if (!revisions.isEmpty()) {
+            curRev = revisions.lastEntry().getValue();
+        }
         final_page = new Page(title,
                 Integer.parseInt(id), redirect, restrictions_map, curRev);
     }
