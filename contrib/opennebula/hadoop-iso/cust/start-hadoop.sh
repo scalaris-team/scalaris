@@ -73,9 +73,19 @@ fi
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   sudo -u hdfs hadoop fs -chmod 777 /
   /etc/init.d/hadoop-0.20-jobtracker start
-  /etc/init.d/hue start
+#  /etc/init.d/hue start
 fi
 /etc/init.d/hadoop-0.20-tasktracker start
 
+
+# Ganglia stuff
+sed -i "s/@HADOOP_MASTER@/$HADOOP_MASTER/g" /etc/ganglia/gmond.conf
+ln -s /etc/ganglia-webfrontend/apache.conf /etc/apache2/mods-enabled/ganglia.conf
+
+/etc/init.d/ganglia-monitor start
+if [ "x$HADOOP_FIRST" == "xtrue" ]; then
+  /etc/init.d/gmetad start
+  /etc/init.d/apache2 start
+fi
 
 exit 0

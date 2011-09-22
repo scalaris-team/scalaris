@@ -37,3 +37,6 @@ libxml2
 libxml2-dev 
 libxslt1-dev
 gnuplot
+ganglia-monitor
+gmetad
+ganglia-webfrontend

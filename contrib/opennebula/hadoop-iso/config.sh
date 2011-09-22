@@ -38,6 +38,7 @@ install -D -m 755 cust/dnsupdate-server.pl config/chroot_local-includes/usr/bin/
 install -D -m 644 cust/analyze_logs.pig config/chroot_local-includes/root/analyze_logs.pig
 install -D -m 755 cust/analyze_logs.pl config/chroot_local-includes/root/analyze_logs.pl
 install -D -m 644 cust/bydate.gnuplot config/chroot_local-includes/root/bydate.gnuplot
+install -D -m 644 cust/gmond.conf config/chroot_local-includes/etc/ganglia/gmond.conf
 
 mkdir -p config/chroot_local-includes/var/lib
 rm -rf config/chroot_local-includes/var/lib/sc-manager
