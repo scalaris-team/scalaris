@@ -296,64 +296,67 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     @Override
     protected void export(XmlPage page_xml) {
         Page page = page_xml.getPage();
-//      String title = page.getTitle().replaceFirst("^Category:", "Kategorie:");
-
-        List<Revision> revisions = page_xml.getRevisions();
-        List<ShortRevision> revisions_short = ShortRevision.fromRevisions(revisions);
-        Collections.sort(revisions, Collections.reverseOrder(new byRevId()));
-        Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
-        
-        if (!revisions.isEmpty() && wikiModel != null) {
-            wikiModel.render(null, revisions.get(0).getText());
-            for (String cat_raw: wikiModel.getCategories().keySet()) {
-                String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
-                List<String> catPages = newCategories.get(category);
-                if (catPages == null) {
-                    catPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
-                }
-                catPages.add(page.getTitle());
-                newCategories.put(category, catPages);
-            }
-            for (String tpl_raw: wikiModel.getTemplates()) {
-                String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
-                List<String> templatePages = newTemplates.get(template);
-                if (templatePages == null) {
-                    templatePages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
-                }
-                templatePages.add(page.getTitle());
-                newTemplates.put(template, templatePages);
-            }
-            for (String link: wikiModel.getLinks()) {
-                List<String> backLinks = newBackLinks.get(link);
-                if (backLinks == null) {
-                    backLinks = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
-                }
-                backLinks.add(page.getTitle());
-                newBackLinks.put(link, backLinks);
-            }
-        }
-
-        // do not make the translog too full -> write revisions beforehand,
-        // ignore the (rest of the) page if a failure occured
-        TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-        for (Revision rev : revisions) {
-            String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId());
-            requests.addWrite(key, rev);
-        }
-        requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle()), revisions_short);
-        requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle()), page);
-        Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
-        executor.execute(worker);
-        newPages.add(page.getTitle());
         ++pageCount;
-        // simple article filter: only pages in main namespace:
-        if (MyWikiModel.getNamespace(page.getTitle()).isEmpty()) {
-            newArticles.add(page.getTitle());
+        
+        if (page.getCurRev() != null) {
+            List<Revision> revisions = page_xml.getRevisions();
+            List<ShortRevision> revisions_short = ShortRevision.fromRevisions(revisions);
+            Collections.sort(revisions, Collections.reverseOrder(new byRevId()));
+            Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
+
+            if (!revisions.isEmpty() && wikiModel != null) {
+                wikiModel.render(null, revisions.get(0).getText());
+                for (String cat_raw: wikiModel.getCategories().keySet()) {
+                    String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
+                    List<String> catPages = newCategories.get(category);
+                    if (catPages == null) {
+                        catPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
+                    }
+                    catPages.add(page.getTitle());
+                    newCategories.put(category, catPages);
+                }
+                for (String tpl_raw: wikiModel.getTemplates()) {
+                    String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
+                    List<String> templatePages = newTemplates.get(template);
+                    if (templatePages == null) {
+                        templatePages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
+                    }
+                    templatePages.add(page.getTitle());
+                    newTemplates.put(template, templatePages);
+                }
+                for (String link: wikiModel.getLinks()) {
+                    List<String> backLinks = newBackLinks.get(link);
+                    if (backLinks == null) {
+                        backLinks = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
+                    }
+                    backLinks.add(page.getTitle());
+                    newBackLinks.put(link, backLinks);
+                }
+            }
+
+            // do not make the translog too full -> write revisions beforehand,
+            // ignore the (rest of the) page if a failure occured
+            TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
+            for (Revision rev : revisions) {
+                String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId());
+                requests.addWrite(key, rev);
+            }
+            requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle()), revisions_short);
+            requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle()), page);
+            Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
+            executor.execute(worker);
+            newPages.add(page.getTitle());
+            // simple article filter: only pages in main namespace:
+            if (MyWikiModel.getNamespace(page.getTitle()).isEmpty()) {
+                newArticles.add(page.getTitle());
+            }
+            // only export page list every UPDATE_PAGELIST_EVERY pages:
+            if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
+                updatePageLists();
+            }
         }
-        // only export page list every UPDATE_PAGELIST_EVERY pages:
-        if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
-            updatePageLists();
-            msgOut.println("imported pages: " + pageCount);
+        if ((pageCount % UPDATE_PAGELIST_EVERY) == 0) {
+            msgOut.println("processed pages: " + pageCount);
         }
     }
 

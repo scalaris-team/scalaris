@@ -83,29 +83,32 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
     @Override
     protected void export(XmlPage page_xml) {
         Page page = page_xml.getPage();
-        String title = page.getTitle().replaceFirst("^Category:", "Kategorie:");
+        
+        if (page.getCurRev() != null) {
+            String title = page.getTitle().replaceFirst("^Category:", "Kategorie:");
 
-        try {
-            System.out.print("{page, \"");
-            System.out.print(escape(title));
-            System.out.print("\", \"");
-            System.out.print(page.getId());
-            System.out.println("\", [");
+            try {
+                System.out.print("{page, \"");
+                System.out.print(escape(title));
+                System.out.print("\", \"");
+                System.out.print(page.getId());
+                System.out.println("\", [");
 
-            for (Iterator<Revision> iterator = page_xml.getRevisions().iterator(); iterator
-                    .hasNext();) {
-                Revision revision = iterator.next();
-                export(revision);
-                if (iterator.hasNext())
-                    System.out.println(",");
+                for (Iterator<Revision> iterator = page_xml.getRevisions().iterator(); iterator
+                        .hasNext();) {
+                    Revision revision = iterator.next();
+                    export(revision);
+                    if (iterator.hasNext())
+                        System.out.println(",");
+                }
+                ++pageCount;
+                msgOut.println(" " + page_xml.getRevisions().size() + " " + title);
+
+                System.out.println("], []}.");
+            } catch (Exception e) {
+                msgOut.println(title);
+                System.exit(0);
             }
-            ++pageCount;
-            msgOut.println(" " + page_xml.getRevisions().size() + " " + title);
-
-            System.out.println("], []}.");
-        } catch (Exception e) {
-            msgOut.println(title);
-            System.exit(0);
         }
     }
     
