@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import info.bliki.htmlcleaner.TagNode;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 
@@ -47,6 +48,8 @@ public class MyWikiModel extends WikiModel {
         configuration.addTemplateFunction("localurl", MyLocalurl.CONST);
         // do not use interwiki links (some may be internal - bliki however favours interwiki links)
         configuration.getInterwikiMap().clear();
+        // allow style attributes:
+        TagNode.addAllowedAttribute("style");
     }
     
     /**
