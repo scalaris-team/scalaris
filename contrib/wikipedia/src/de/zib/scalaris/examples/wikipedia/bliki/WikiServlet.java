@@ -15,6 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import info.bliki.api.Connector;
+import info.bliki.api.Page;
+import info.bliki.api.User;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -107,9 +111,10 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     /**
      * URL for image links
      */
-    public static final String imageBaseURL = "images/image.png";
-    
+    public static final String imageBaseURL = WikiServlet.wikiBaseURL + "?get_image=${image}";
+
     private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*\\.xml(\\.gz|\\.bz2)?$");
+    private static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
     
     private ConnectionFactory cFactory;
     
@@ -255,6 +260,12 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     @Override
     protected void doGet(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
+        String image = request.getParameter("get_image");
+        if (image != null) {
+            showImage(request, response, image);
+            return;
+        }
+        
         Connection connection = getScalarisConnection(request);
         if (connection == null) {
             showEmptyPage(request, response); // should forward to another page
@@ -1272,6 +1283,46 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         RequestDispatcher dispatcher = request
                 .getRequestDispatcher("pageEdit.jsp");
         dispatcher.forward(request, response);
+    }
+    
+    /**
+     * Shows a preview of the edit operation submitted or saves the page with
+     * the given <tt>title</tt> depending on what button the user clicked.
+     * 
+     * @param request
+     *            the request of the current operation
+     * @param response
+     *            the response of the current operation
+     * @param title
+     *            the title of the article to show
+     * 
+     * @throws IOException 
+     * @throws UnsupportedEncodingException 
+     * @throws ServletException 
+     */
+    private void showImage(HttpServletRequest request,
+            HttpServletResponse response, String image)
+            throws UnsupportedEncodingException, IOException, ServletException {
+        // we need to fix the image title first, e.g. a prefix with the desired size may exist
+        image = MATCH_WIKI_IMAGE_PX.matcher(image).replaceFirst("");
+        // add namespace - use English namespace for files (see below)
+        image = new String("File:" + image);
+        User user = new User("", "", "http://en.wikipedia.org/w/api.php");
+        Connector connector = new Connector();
+        user = connector.login(user);
+
+        // set image width thumb size to 200px
+        List<Page> pages = user.queryImageinfo(new String[] { image }, 200);
+        if (pages.size() == 1) {
+            Page imagePage = pages.get(0);
+//            System.out.println("IMG-THUMB-URL: " + imagePage.getImageThumbUrl());
+//            System.out.println("IMG-URL: " + imagePage.getImageUrl());
+
+            response.sendRedirect(imagePage.getImageThumbUrl());
+            return;
+        } else {
+            response.sendRedirect(response.encodeRedirectURL("images/image.png"));
+        }
     }
     
     private MyWikiModel getWikiModel(Connection connection) {
