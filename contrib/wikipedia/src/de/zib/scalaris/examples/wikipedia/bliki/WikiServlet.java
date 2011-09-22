@@ -1047,7 +1047,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     importLog = new CircularByteArrayOutputStream(1024 * 1024);
                     PrintStream ps = new PrintStream(importLog);
                     ps.println("starting import...");
-                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, maxRevisions, maxTime, cFactory);
+                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, null, maxRevisions, maxTime, cFactory);
                     importHandler.setUp();
                     importHandler.setMsgOut(ps);
                     InputSource is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(dumpsPath + File.separator + req_import);

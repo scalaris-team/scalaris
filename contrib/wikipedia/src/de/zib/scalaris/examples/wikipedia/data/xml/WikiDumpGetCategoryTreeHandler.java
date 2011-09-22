@@ -50,7 +50,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      */
     public WikiDumpGetCategoryTreeHandler(Set<String> blacklist,
             Calendar maxTime) throws RuntimeException {
-        super(blacklist, 1, maxTime);
+        super(blacklist, null, 1, maxTime);
     }
     
     private void updateSubCats(String category, String newSubCat) {

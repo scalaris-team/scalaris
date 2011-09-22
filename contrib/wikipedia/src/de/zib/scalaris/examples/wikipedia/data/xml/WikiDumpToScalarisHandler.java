@@ -72,6 +72,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param whitelist
+     *            only import these pages
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -84,9 +86,9 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions,
+    public WikiDumpToScalarisHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions,
             Calendar maxTime) throws RuntimeException {
-        super(blacklist, maxRevisions, maxTime);
+        super(blacklist, whitelist, maxRevisions, maxTime);
         init(blacklist, maxRevisions, ConnectionFactory.getInstance());
     }
 
@@ -96,6 +98,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param whitelist
+     *            only import these pages
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -110,10 +114,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, int maxRevisions,
+    public WikiDumpToScalarisHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions,
             Calendar maxTime, ConnectionFactory cFactory)
             throws RuntimeException {
-        super(blacklist, maxRevisions, maxTime);
+        super(blacklist, whitelist, maxRevisions, maxTime);
         init(blacklist, maxRevisions, cFactory);
     }
 
@@ -283,15 +287,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpHandler {
     }
     
     /**
-     * dumps the given page (including all revisions) to the standard output in
-     * the following text format:
-     * <code>
-     * {title, id, revisions, props}
-     * </code>
-     * @param String 
+     * Exports the given page (including all revisions) to Scalaris
      * 
-     * @param revision
-     *            the page to export
+     * @param page_xml
+     *            the page object extracted from XML
      */
     @Override
     protected void export(XmlPage page_xml) {

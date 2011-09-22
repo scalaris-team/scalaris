@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -113,8 +114,24 @@ public class Main {
                 System.exit(-1);
             }
         }
+        
+        Set<String> whitelist = null;
+        if (args.length >= 3 && !args[2].isEmpty()) {
+            FileReader inFile = new FileReader(args[2]);
+            BufferedReader br = new BufferedReader(inFile);
+            whitelist = new HashSet<String>();
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.isEmpty()) {
+                    whitelist.add(line);
+                }
+            }
+            if (whitelist.isEmpty()) {
+                whitelist = null;
+            }
+        }
 
-        WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, maxRevisions, maxTime);
+        WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
         handler.setUp();
         Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
         reader.setContentHandler(handler);

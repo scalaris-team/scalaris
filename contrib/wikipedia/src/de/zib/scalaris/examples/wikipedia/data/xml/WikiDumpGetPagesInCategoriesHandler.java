@@ -55,7 +55,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      */
     public WikiDumpGetPagesInCategoriesHandler(Set<String> blacklist,
             Calendar maxTime, Set<String> categories, Set<String> whitelist) throws RuntimeException {
-        super(blacklist, 1, maxTime);
+        super(blacklist, null, 1, maxTime);
         this.categories = categories;
         this.whitelist = whitelist;
     }
