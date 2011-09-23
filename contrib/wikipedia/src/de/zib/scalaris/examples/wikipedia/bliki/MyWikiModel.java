@@ -101,6 +101,11 @@ public class MyWikiModel extends WikiModel {
                 // retrieve template from Scalaris:
                 // note: templates are already cached, no need to cache them here
                 if (connection != null) {
+                    // (ugly) fix for template parameter replacement if no parameters given,
+                    // e.g. "{{noun}}" in the simple English Wiktionary
+                    if (templateParameters.isEmpty()) {
+                        templateParameters.put("", null);
+                    }
                     String pageName = getTemplateNamespace() + ":" + articleName;
                     RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
                     if (getRevResult.success) {
