@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
+import info.bliki.wiki.filter.Util;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 
@@ -72,7 +73,7 @@ public class MyWikiModel extends WikiModel {
         this.connection = connection;
         this.fExternalWikiBaseFullURL = linkBaseURL;
     }
-
+    
     /* (non-Javadoc)
      * @see info.bliki.wiki.model.AbstractWikiModel#getRawWikiContent(java.lang.String, java.lang.String, java.util.Map)
      */
@@ -103,7 +104,9 @@ public class MyWikiModel extends WikiModel {
                     String pageName = getTemplateNamespace() + ":" + articleName;
                     RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
                     if (getRevResult.success) {
-                        return getRevResult.revision.getText();
+                        String text = getRevResult.revision.getText();
+                        text = removeNoIncludeContents(text);
+                        return text;
                     } else {
 //                        System.err.println(getRevResult.message);
 //                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
@@ -125,6 +128,46 @@ public class MyWikiModel extends WikiModel {
 //        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
 //            templateParameters + ")");
         return null;
+    }
+    
+    /**
+     * Fixes noinclude tags inside includeonly/onlyinclude not being filtered
+     * out by the template parsing.
+     * 
+     * @param text
+     *            the template's text
+     * 
+     * @return the text without anything within noinclude tags
+     */
+    private final String removeNoIncludeContents(String text) {
+        // do not alter if showing the template page: 
+        if (getRecursionLevel() == 0) {
+            return text;
+        }
+        
+        StringBuilder sb = new StringBuilder(text.length());
+        int curPos = 0;
+        while(true) {
+            // starting tag:
+            String startString = "<", endString = "noinclude>";
+            int index = Util.indexOfIgnoreCase(text, startString, endString, curPos);
+            if (index != (-1)) {
+                sb.append(text.substring(curPos, index));
+                curPos = index;
+            } else {
+                sb.append(text.substring(curPos));
+                return sb.toString();
+            }
+
+            // ending tag:
+            startString = "</"; endString = "noinclude>";
+            index = Util.indexOfIgnoreCase(text, startString, endString, curPos);
+            if (index != (-1)) {
+                curPos = index + startString.length() + endString.length();
+            } else {
+                return sb.toString();
+            }
+        }
     }
     
     /**
