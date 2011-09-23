@@ -1318,11 +1318,12 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 //            System.out.println("IMG-THUMB-URL: " + imagePage.getImageThumbUrl());
 //            System.out.println("IMG-URL: " + imagePage.getImageUrl());
 
-            response.sendRedirect(imagePage.getImageThumbUrl());
-            return;
-        } else {
-            response.sendRedirect(response.encodeRedirectURL("images/image.png"));
+            if (imagePage.getImageThumbUrl() != null && !imagePage.getImageThumbUrl().isEmpty()) {
+                response.sendRedirect(imagePage.getImageThumbUrl());
+                return;
+            }
         }
+        response.sendRedirect(response.encodeRedirectURL("images/image.png"));
     }
     
     private MyWikiModel getWikiModel(Connection connection) {
