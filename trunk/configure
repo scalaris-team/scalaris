@@ -567,6 +567,7 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
+ENABLEONEINSTALL
 PYTHON3SITELIBDIR
 ENABLEPYTHON3INSTALL
 PYTHONSITELIBDIR
@@ -3442,7 +3443,7 @@ fi
 #
 ###########################################################
 
-ENABLEONE=
+ENABLEONEINSTALL=
 ONEPREFIX=
 # Check whether --enable-opennebula was given.
 if test "${enable_opennebula+set}" = set; then :
@@ -3451,9 +3452,11 @@ fi
 
 # Check whether --enable-opennebula was given.
 if test "${enable_opennebula+set}" = set; then :
-  enableval=$enable_opennebula; ENABLEONE=yes
+  enableval=$enable_opennebula; ENABLEONEINSTALL="install-one"
                ONEPREFIX=$enableval
 fi
+
+
 
 ###########################################################
 #
