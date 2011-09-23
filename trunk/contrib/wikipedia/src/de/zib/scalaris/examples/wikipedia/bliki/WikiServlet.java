@@ -41,6 +41,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.servlet.RequestDispatcher;
@@ -115,6 +116,12 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 
     private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*\\.xml(\\.gz|\\.bz2)?$");
     private static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
+    /*
+     * http://simple.wiktionary.org/wiki/Main_Page
+     * http://bar.wikipedia.org/wiki/Hauptseitn
+     * https://secure.wikimedia.org/wikipedia/en/wiki/Main_Page
+     */
+    private static final Pattern MATCH_WIKI_SITE_BASE = Pattern.compile("^(http[s]?://.+)(/wiki/.*)$");
     
     private ConnectionFactory cFactory;
     
@@ -1307,7 +1314,13 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         image = MATCH_WIKI_IMAGE_PX.matcher(image).replaceFirst("");
         // add namespace - use English namespace for files (see below)
         image = new String("File:" + image);
-        User user = new User("", "", "http://en.wikipedia.org/w/api.php");
+        String fullBaseUrl = siteinfo.getBase();
+        String baseUrl = "http://en.wikipedia.org";
+        Matcher matcher = MATCH_WIKI_SITE_BASE.matcher(fullBaseUrl);
+        if (matcher.matches()) {
+            baseUrl = matcher.group(1);
+        }
+        User user = new User("", "", baseUrl + "/w/api.php");
         Connector connector = new Connector();
         user = connector.login(user);
 
