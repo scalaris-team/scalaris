@@ -41,9 +41,6 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
-/etc/tomcat6/Catalina/localhost/scalaris-wiki.xml 
-
-
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
 	mkdir -p $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps
 	cp -r simplewiki $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps/scalaris-wiki
