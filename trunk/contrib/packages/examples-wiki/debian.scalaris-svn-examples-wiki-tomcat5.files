@@ -1,1 +1,2 @@
 /usr/share/tomcat5/webapps/scalaris-wiki/*
+/etc/tomcat5/Catalina/localhost/scalaris-wiki.xml
