@@ -45,14 +45,12 @@ install: build
 	mkdir -p $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps
 	cp -r simplewiki $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
-	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat5/webapps/scalaris-wiki\" />" > 
-$(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost//etc/tomcat5/Catalina/localhost/scalaris-wiki.xml
+	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat5/webapps/scalaris-wiki\" />" >  $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost//etc/tomcat5/Catalina/localhost/scalaris-wiki.xml
 
 	mkdir -p $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps
 	cp -r simplewiki $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost/
-	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat6/webapps/scalaris-wiki\" />" > 
-$(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost//etc/tomcat6/Catalina/localhost/scalaris-wiki.xml
+	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat6/webapps/scalaris-wiki\" />" >  $(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost//etc/tomcat6/Catalina/localhost/scalaris-wiki.xml
 
 # Build architecture-independent files here.
 binary-indep: build install
