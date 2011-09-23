@@ -107,7 +107,12 @@ public class MyWikiModel extends WikiModel {
                     } else {
 //                        System.err.println(getRevResult.message);
 //                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
-                        return null;
+                        /*
+                         * the template was not found and will never be - assume
+                         * an empty content instead of letting the model try
+                         * again (which is what it does if null is returned)
+                         */
+                        return "";
                     }
                 }
             }
@@ -298,5 +303,17 @@ public class MyWikiModel extends WikiModel {
                     title.substring(colonIndex + 1) };
         }
         return new String[] {namespace, title, ""};
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.AbstractWikiModel#appendRedirectLink(java.lang.String)
+     */
+    @Override
+    public boolean appendRedirectLink(String redirectLink) {
+        // do not add redirection if we are parsing a template:
+        if (getRecursionLevel() == 0) {
+            return super.appendRedirectLink(redirectLink);
+        }
+        return true;
     }
 }
