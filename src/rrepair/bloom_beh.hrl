@@ -31,7 +31,7 @@
 -type key() :: binary() | integer() | float() | boolean() | atom() | tuple() | ?RT:key().
 
 -ifdef(with_export_type_support).
--export_type([bloom_filter/0]).
+-export_type([bloom_filter/0, key/0]).
 -endif.
 
 %% Functions
