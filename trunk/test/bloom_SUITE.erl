@@ -48,6 +48,10 @@ suite() ->
      {timetrap, {seconds, 10}}
     ].
 
+init_per_suite(Config) ->
+    _ = crypto:start(),
+    Config.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_add(?BLOOM:key(), ?BLOOM:key()) -> true.
