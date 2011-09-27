@@ -24,8 +24,10 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
@@ -40,17 +42,56 @@ public class MyWikiModel extends WikiModel {
     protected Connection connection;
     protected Map<String, String> magicWordCache = new HashMap<String, String>();
     private String fExternalWikiBaseFullURL;
+
+    /**
+     * Interwiki links pointing to other wikis in the web
+     */
+    private static final String[] INTERLANGUAGE_STRINGS = { "en", "de", "fr",
+            "it", "pl", "es", "ja", "ru", "nl", "pt", "sv", "zh", "ca", "uk",
+            "no", "fi", "hu", "cs", "ro", "tr", "ko", "vi", "da", "ar", "eo",
+            "sr", "id", "lt", "vo", "sk", "he", "fa", "bg", "sl", "eu", "war",
+            "lmo", "et", "hr", "new", "te", "nn", "th", "gl", "el", "ceb",
+            "simple", "ms", "ht", "bs", "bpy", "lb", "ka", "is", "sq", "la",
+            "br", "hi", "az", "bn", "mk", "mr", "sh", "tl", "cy", "io", "pms",
+            "lv", "ta", "su", "oc", "jv", "nap", "nds", "scn", "be", "ast",
+            "ku", "wa", "af", "be-x-old", "an", "ksh", "szl", "fy", "frr",
+            "yue", "ur", "ia", "ga", "yi", "sw", "als", "hy", "am", "roa-rup",
+            "map-bms", "bh", "co", "cv", "dv", "nds-nl", "fo", "fur", "glk",
+            "gu", "ilo", "kn", "pam", "csb", "kk", "km", "lij", "li", "ml",
+            "gv", "mi", "mt", "nah", "ne", "nrm", "se", "nov", "qu", "os",
+            "pi", "pag", "ps", "pdc", "rm", "bat-smg", "sa", "gd", "sco", "sc",
+            "si", "tg", "roa-tara", "tt", "to", "tk", "hsb", "uz", "vec",
+            "fiu-vro", "wuu", "vls", "yo", "diq", "zh-min-nan", "zh-classical",
+            "frp", "lad", "bar", "bcl", "kw", "mn", "haw", "ang", "ln", "ie",
+            "wo", "tpi", "ty", "crh", "jbo", "ay", "zea", "eml", "ky", "ig",
+            "or", "mg", "cbk-zam", "kg", "arc", "rmy", "gn", "mo (closed)",
+            "so", "kab", "ks", "stq", "ce", "udm", "mzn", "pap", "cu", "sah",
+            "tet", "sd", "lo", "ba", "pnb", "iu", "na", "got", "bo", "dsb",
+            "chr", "cdo", "hak", "om", "my", "sm", "ee", "pcd", "ug", "as",
+            "ti", "av", "bm", "zu", "pnt", "nv", "cr", "pih", "ss", "ve", "bi",
+            "rw", "ch", "arz", "xh", "kl", "ik", "bug", "dz", "ts", "tn", "kv",
+            "tum", "xal", "st", "tw", "bxr", "ak", "ab", "ny", "fj", "lbe",
+            "ki", "za", "ff", "lg", "sn", "ha", "sg", "ii", "cho", "rn", "mh",
+            "chy", "ng", "kj", "ho", "mus", "kr", "hz", "mwl", "pa" };
     
-    private static final Configuration configuration = new Configuration();
+    protected static final Set<String> INTERLANGUAGE_KEYS;
     
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
-        configuration.addTemplateFunction("fullurl", MyFullurl.CONST);
-        configuration.addTemplateFunction("localurl", MyLocalurl.CONST);
-        // do not use interwiki links (some may be internal - bliki however favours interwiki links)
-        configuration.getInterwikiMap().clear();
+        Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("fullurl", MyFullurl.CONST);
+        Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("localurl", MyLocalurl.CONST);
+        
+        // add missing hsb interlanguage link:
+        Configuration.DEFAULT_CONFIGURATION.addInterwikiLink("hsb", "http://hsb.wiktionary.org/wiki/?${title}");
+        
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
+        
+        // create set of keys for interlanguage wiki links
+        INTERLANGUAGE_KEYS = new HashSet<String>(INTERLANGUAGE_STRINGS.length);
+        for (String lang : INTERLANGUAGE_STRINGS) {
+            INTERLANGUAGE_KEYS.add(lang);
+        }
     }
     
     /**
@@ -69,7 +110,7 @@ public class MyWikiModel extends WikiModel {
      *            namespace of the wiki
      */
     public MyWikiModel(String imageBaseURL, String linkBaseURL, Connection connection, MyNamespace namespace) {
-        super(configuration, null, namespace, imageBaseURL, linkBaseURL);
+        super(new MyConfiguration(namespace), null, namespace, imageBaseURL, linkBaseURL);
         this.connection = connection;
         this.fExternalWikiBaseFullURL = linkBaseURL;
     }
@@ -363,5 +404,26 @@ public class MyWikiModel extends WikiModel {
             return super.appendRedirectLink(redirectLink);
         }
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.AbstractWikiModel#appendInterWikiLink(java.lang.String, java.lang.String, java.lang.String)
+     */
+    @Override
+    public void appendInterWikiLink(String namespace, String title, String linkText) {
+        if (INTERLANGUAGE_KEYS.contains(namespace)) {
+            // also check if this is an inter wiki link to an external wiki in another language
+            // -> only ignore inter language links to the same wiki
+            String namespace2 = getNamespace(title);
+            if (!namespace2.isEmpty() && isInterWiki(namespace2)) {
+                // bliki is not able to parse language-specific interwiki links
+                // -> use default language
+                super.appendInterWikiLink(namespace2, title, linkText);
+            } else {
+                // ignore interlanguage keys
+            }
+        } else {
+            super.appendInterWikiLink(namespace, title, linkText);
+        }
     }
 }
