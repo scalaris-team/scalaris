@@ -562,7 +562,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         // need special handling the wiki renderer is used)
         WikiPageBean value = new WikiPageBean();
         value.setNotice(notice);
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyScalarisWikiModel wikiModel = getWikiModel(connection);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
             wikiModel.setLinkBaseFullURL(fullUrl);
@@ -872,7 +872,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     private void handleViewSpecialStatistics(HttpServletRequest request,
             HttpServletResponse response, Connection connection)
             throws ServletException, IOException {
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyScalarisWikiModel wikiModel = getWikiModel(connection);
         WikiPageListBean value = new WikiPageListBean();
         value.setPageHeading("Statistics");
         value.setTitle("Special:Statistics");
@@ -1271,7 +1271,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         // set the textarea's contents:
         value.setPage(StringEscapeUtils.escapeHtml(content));
 
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyScalarisWikiModel wikiModel = getWikiModel(connection);
         wikiModel.setPageName(title);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
@@ -1339,8 +1339,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         response.sendRedirect(response.encodeRedirectURL("images/image.png"));
     }
     
-    private MyWikiModel getWikiModel(Connection connection) {
-        return new MyWikiModel(WikiServlet.imageBaseURL,
+    private MyScalarisWikiModel getWikiModel(Connection connection) {
+        return new MyScalarisWikiModel(WikiServlet.imageBaseURL,
                 WikiServlet.linkBaseURL, connection, namespace);
     }
 

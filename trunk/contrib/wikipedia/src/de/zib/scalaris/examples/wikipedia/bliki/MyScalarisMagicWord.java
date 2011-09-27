@@ -28,7 +28,7 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class MyMagicWord extends MagicWord {
+public class MyScalarisMagicWord extends MagicWord {
     // statistics
     private static final String MAGIC_CURRENT_VERSION = "CURRENTVERSION";
 
@@ -188,7 +188,7 @@ public class MyMagicWord extends MagicWord {
      * 
      * @see <a href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
      */
-    public static String processMagicWord(String name, String parameter, MyWikiModel model) {
+    public static String processMagicWord(String name, String parameter, MyScalarisWikiModel model) {
         if (!MY_MAGIC_WORDS.contains(name)) {
             return MagicWord.processMagicWord(name, parameter, model);
         }
@@ -369,7 +369,7 @@ public class MyMagicWord extends MagicWord {
         return name;
     }
     
-    private static String getPageName(String parameter, MyWikiModel model) {
+    private static String getPageName(String parameter, MyScalarisWikiModel model) {
         // parse page name to operate on:
         String pagename = parameter;
         if (pagename.isEmpty()) {
