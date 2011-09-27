@@ -209,6 +209,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      */
     @Override
     public void tearDown() {
+        super.tearDown();
         updatePageLists();
         importEnd();
     }
@@ -270,7 +271,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    private static class MyScalarisSingleRunnable implements Runnable {
+    static class MyScalarisSingleRunnable implements Runnable {
         private TransactionSingleOp.RequestList requests;
         private ArrayBlockingQueue<TransactionSingleOp> scalaris_single;
         private String note;
