@@ -15,9 +15,6 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
-import info.bliki.wiki.model.Configuration;
-import info.bliki.wiki.model.WikiModel;
-
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -596,8 +593,7 @@ public class ScalarisDataHandler {
 
         // write:
         // get previous categories and templates:
-        final WikiModel wikiModel = new WikiModel(
-                Configuration.DEFAULT_CONFIGURATION, null, new MyNamespace(siteinfo), "", "");
+        final MyWikiModel wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
         Set<String> oldCats = new HashSet<String>();
         Set<String> oldTpls = new HashSet<String>();
         Set<String> oldLnks = new HashSet<String>();

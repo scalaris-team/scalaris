@@ -15,9 +15,6 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
-import info.bliki.wiki.model.Configuration;
-import info.bliki.wiki.model.WikiModel;
-
 import java.io.PrintStream;
 import java.util.Calendar;
 import java.util.Set;
@@ -27,6 +24,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
 /**
@@ -45,7 +43,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     private Set<String> blacklist = null;
     private Set<String> whitelist = null;
     
-    protected WikiModel wikiModel;
+    protected MyWikiModel wikiModel;
 
     /**
      * Maximum number of revisions per page (starting with the most recent) -
@@ -221,8 +219,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     }
     
     private void setUpWikiModel(SiteInfo siteinfo) {
-        wikiModel = new WikiModel(
-                Configuration.DEFAULT_CONFIGURATION, null, new MyNamespace(siteinfo), "", "");
+        wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
     }
 
     /**
