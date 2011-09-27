@@ -15,12 +15,19 @@
  */
 package de.zib.scalaris.examples.wikipedia.data;
 
+import java.io.Serializable;
+
 /**
  * Contributor known as a registered user or as an IP address.
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class Contributor {
+public class Contributor implements Serializable {
+    /**
+     * Version for serialisation.
+     */
+    private static final long serialVersionUID = 1L;
+    
     /**
      * IP address or custom name of a contributor, e.g. "127.0.0.1" or
      * "Incubator import".

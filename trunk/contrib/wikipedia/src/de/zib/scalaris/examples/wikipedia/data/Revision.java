@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia.data;
 
 import info.bliki.wiki.model.WikiModel;
 
+import java.io.Serializable;
 import java.util.Calendar;
 import java.util.Collection;
 
@@ -25,7 +26,12 @@ import java.util.Collection;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class Revision {
+public class Revision implements Serializable {
+    /**
+     * Version for serialisation.
+     */
+    private static final long serialVersionUID = 1L;
+    
     /**
      * the revision's ID
      */

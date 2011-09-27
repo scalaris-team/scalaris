@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,7 +24,12 @@ import java.util.Map;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class SiteInfo {
+public class SiteInfo implements Serializable {
+    /**
+     * Version for serialisation.
+     */
+    private static final long serialVersionUID = 1L;
+    
     protected String base;
     protected String sitename;
     protected String generator;
