@@ -326,45 +326,6 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
 <!-- /TOOLBOX -->
 
 <!-- LANGUAGES -->
-        <% if (!pageBean.isNotAvailable()) { %>
-<div class="portal expanded" id="p-lang">
-    <h5 tabindex="3">In other languages</h5>
-    <div style="display: block;" class="body">
-        <ul>
-<% /*
-                    <li class="interwiki-cs"><a href="http://cs.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Česky</a></li>
-                    <li class="interwiki-de"><a href="http://de.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Deutsch</a></li>
-                    <li class="interwiki-et"><a href="http://et.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Eesti</a></li>
-                    <li class="interwiki-el"><a href="http://el.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Ελληνικά</a></li>
-                    <li class="interwiki-en"><a href="http://en.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">English</a></li>
-                    <li class="interwiki-es"><a href="http://es.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Español</a></li>
-                    <li class="interwiki-fa"><a href="http://fa.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">فارسی</a></li>
-                    <li class="interwiki-fr"><a href="http://fr.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Français</a></li>
-                    <li class="interwiki-ko"><a href="http://ko.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">한국어</a></li>
-                    <li class="interwiki-io"><a href="http://io.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Ido</a></li>
-                    <li class="interwiki-it"><a href="http://it.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Italiano</a></li>
-                    <li class="interwiki-kn"><a href="http://kn.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">ಕನ್ನಡ</a></li>
-                    <li class="interwiki-sw"><a href="http://sw.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Kiswahili</a></li>
-                    <li class="interwiki-ku"><a href="http://ku.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Kurdî</a></li>
-                    <li class="interwiki-hu"><a href="http://hu.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Magyar</a></li>
-                    <li class="interwiki-ml"><a href="http://ml.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">മലയാളം</a></li>
-                    <li class="interwiki-pl"><a href="http://pl.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Polski</a></li>
-                    <li class="interwiki-pt"><a href="http://pt.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Português</a></li>
-                    <li class="interwiki-ro"><a href="http://ro.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Română</a></li>
-                    <li class="interwiki-ru"><a href="http://ru.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Русский</a></li>
-                    <li class="interwiki-sl"><a href="http://sl.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Slovenščina</a></li>
-                    <li class="interwiki-fi"><a href="http://fi.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Suomi</a></li>
-                    <li class="interwiki-sv"><a href="http://sv.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Svenska</a></li>
-                    <li class="interwiki-ta"><a href="http://ta.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">தமிழ்</a></li>
-                    <li class="interwiki-tr"><a href="http://tr.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Türkçe</a></li>
-                    <li class="interwiki-vi"><a href="http://vi.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">Tiếng Việt</a></li>
-                    <li class="interwiki-zh"><a href="http://zh.wiktionary.org/wiki/${ pageBean.title }" title="${ pageBean.title }">中文</a></li>
-*/ %>
-                </ul>
-    </div>
-</div>
-        <% } %>
-
 <!-- /LANGUAGES -->
 <!-- RENDERER -->
 <div class="portal expanded" id="p-renderer">
