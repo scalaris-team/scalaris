@@ -411,11 +411,15 @@ public class MyWikiModel extends WikiModel {
      */
     @Override
     public void appendInterWikiLink(String namespace, String title, String linkText) {
+        appendInterWikiLink(namespace, title, linkText, true);
+    }
+    
+    public void appendInterWikiLink(String namespace, String title, String linkText, boolean ignoreInterLang) {
         if (INTERLANGUAGE_KEYS.contains(namespace)) {
             // also check if this is an inter wiki link to an external wiki in another language
             // -> only ignore inter language links to the same wiki
             String namespace2 = getNamespace(title);
-            if (!namespace2.isEmpty() && isInterWiki(namespace2)) {
+            if (!ignoreInterLang || (!namespace2.isEmpty() && isInterWiki(namespace2))) {
                 // bliki is not able to parse language-specific interwiki links
                 // -> use default language
                 super.appendInterWikiLink(namespace2, title, linkText);
@@ -424,6 +428,38 @@ public class MyWikiModel extends WikiModel {
             }
         } else {
             super.appendInterWikiLink(namespace, title, linkText);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.WikiModel#addLink(java.lang.String)
+     */
+    @Override
+    public void addLink(String topicName) {
+        /*
+         * to not add links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
+         * the internal links
+         */
+        String namespace = getNamespace(topicName);
+        if (namespace.isEmpty() || !isInterWiki(namespace)) {
+            super.addLink(topicName);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.WikiModel#appendInternalLink(java.lang.String, java.lang.String, java.lang.String, java.lang.String, boolean)
+     */
+    @Override
+    public void appendInternalLink(String topic, String hashSection, String topicDescription, String cssClass, boolean parseRecursive) {
+        /*
+         * convert links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
+         * external links if the link is an interwiki link
+         */
+        String[] nsTitle = splitNsTitle(topic);
+        if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
+            appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, false);
+        } else {
+            super.appendInternalLink(topic, hashSection, topicDescription, cssClass, parseRecursive);
         }
     }
 }
