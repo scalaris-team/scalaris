@@ -25,6 +25,7 @@ import java.net.URLEncoder;
 import java.text.NumberFormat;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -66,7 +67,13 @@ public class MyWikiModel extends WikiModel {
             "rw", "ch", "arz", "xh", "kl", "ik", "bug", "dz", "ts", "tn", "kv",
             "tum", "xal", "st", "tw", "bxr", "ak", "ab", "ny", "fj", "lbe",
             "ki", "za", "ff", "lg", "sn", "ha", "sg", "ii", "cho", "rn", "mh",
-            "chy", "ng", "kj", "ho", "mus", "kr", "hz", "mwl", "pa" };
+            "chy", "ng", "kj", "ho", "mus", "kr", "hz", "mwl", "pa", "ace",
+            "bat-smg", "bjn", "cbk-zam", "cdo", "ceb", "crh", "dsb", "eml",
+            "ext", "fiu-vro", "frp", "frr", "gag", "gan", "hak", "kaa", "kab",
+            "kbd", "koi", "krc", "ksh", "lad", "lbe", "lmo", "map-bms", "mdf",
+            "mrj", "mwl", "nap", "nds-nl", "nrm", "pcd", "pfl", "pih", "pnb", "rmy",
+            "roa-tara", "rue", "sah", "sco", "stq", "szl", "udm",
+            "war", "wuu", "xmf", "zea", "zh-classical", "zh-yue" };
     
     protected static final Set<String> INTERLANGUAGE_KEYS;
 
@@ -75,16 +82,19 @@ public class MyWikiModel extends WikiModel {
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("fullurl", MyFullurl.CONST);
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("localurl", MyLocalurl.CONST);
         
-        // add missing hsb interlanguage link:
-        Configuration.DEFAULT_CONFIGURATION.addInterwikiLink("hsb", "http://hsb.wiktionary.org/wiki/?${title}");
-        
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
         
         // create set of keys for interlanguage wiki links
+        // also add missing hsb interlanguage link:
+        Map<String, String> interWikiMap = Configuration.DEFAULT_CONFIGURATION.getInterwikiMap();
         INTERLANGUAGE_KEYS = new HashSet<String>(INTERLANGUAGE_STRINGS.length);
         for (String lang : INTERLANGUAGE_STRINGS) {
             INTERLANGUAGE_KEYS.add(lang);
+            // if there is no interwiki link for it, create one and guess the URL:
+            if (!interWikiMap.containsKey(lang)) {
+                Configuration.DEFAULT_CONFIGURATION.addInterwikiLink(lang, "http://" + lang + ".wiktionary.org/wiki/?${title}");
+            }
         }
     }
     
@@ -321,7 +331,7 @@ public class MyWikiModel extends WikiModel {
         appendInterWikiLink(namespace, title, linkText, true);
     }
     
-    public void appendInterWikiLink(String namespace, String title, String linkText, boolean ignoreInterLang) {
+    protected void appendInterWikiLink(String namespace, String title, String linkText, boolean ignoreInterLang) {
         if (INTERLANGUAGE_KEYS.contains(namespace)) {
             // also check if this is an inter wiki link to an external wiki in another language
             // -> only ignore inter language links to the same wiki
