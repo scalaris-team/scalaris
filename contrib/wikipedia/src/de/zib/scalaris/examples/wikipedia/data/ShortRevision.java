@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data;
 
+import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -23,7 +24,12 @@ import java.util.List;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class ShortRevision {
+public class ShortRevision implements Serializable {
+    /**
+     * Version for serialisation.
+     */
+    private static final long serialVersionUID = 1L;
+    
     /**
      * the revision's ID
      */
