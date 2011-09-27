@@ -130,6 +130,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      */
     @Override
     public void tearDown() {
+        super.tearDown();
         importEnd();
     }
 

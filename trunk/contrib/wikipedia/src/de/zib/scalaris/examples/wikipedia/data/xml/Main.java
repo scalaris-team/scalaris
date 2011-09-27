@@ -130,15 +130,26 @@ public class Main {
                 whitelist = null;
             }
         }
+        
+        // add a pre-process step first?
+        boolean preprocess = true;
+        if (args.length >= 4 && !args[3].isEmpty()) {
+            preprocess = Boolean.parseBoolean(args[3]);
+        }
 
-        WikiDumpHandler handler = new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
+        WikiDumpHandler handler;
+        if (preprocess) {
+//            handler = new WikiDumpPrepareScalarisFilesHandler(blacklist, whitelist, maxRevisions, maxTime, filename + "-tmp");
+            handler = new WikiDumpPreparedToScalarisWithSQLiteHandler(blacklist, whitelist, maxRevisions, maxTime, filename + "-tmp");
+        } else {
+            handler = new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
+        }
         handler.setUp();
         Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
         reader.setContentHandler(handler);
         reader.parse(getFileReader(filename));
         handler.tearDown();
     }
-
 
     /**
      * Filters all pages in the Wikipedia XML dump from the given file and
