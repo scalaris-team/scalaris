@@ -39,6 +39,8 @@ datarootdir = @datarootdir@
 BINDIR = $(DESTDIR)@bindir@
 # /etc/scalaris/
 ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
+# /etc/init.d/
+INITDIR = $(DESTDIR)@sysconfdir@/init.d
 # /lib/scalaris/
 SCALARISDIR = $(DESTDIR)@libdir@/scalaris
 # /lib/scalaris/ebin
@@ -609,6 +611,11 @@ install-python3: python3
 	install -m 755 -p python3-api/scalaris_client.py $(BINDIR)/scalaris-python3
 
 install-one:
+	install -d $(INITDIR)
+	install -m 744 -t $(INITDIR) contrib/opennebula/scalaris-iso/scalaris-contrail
+	install -m 744 -t $(INITDIR) contrib/opennebula/scalaris-iso/vmcontext
+	install -d $(ETCDIR)
+	install -m 744 -t $(ETCDIR) contrib/opennebula/scalaris-iso/init-contrail.sh
 	install -d $(SCALARISDIR)/contrib/opennebula
 	install -d $(SCALARISDIR)/contrib/opennebula/fe_views
 	install -d $(SCALARISDIR)/contrib/opennebula/public
