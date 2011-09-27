@@ -80,7 +80,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
                 if (connection != null) {
                     // (ugly) fix for template parameter replacement if no parameters given,
                     // e.g. "{{noun}}" in the simple English Wiktionary
-                    if (templateParameters.isEmpty()) {
+                    if (templateParameters != null && templateParameters.isEmpty()) {
                         templateParameters.put("", null);
                     }
                     String pageName = getTemplateNamespace() + ":" + articleName;
