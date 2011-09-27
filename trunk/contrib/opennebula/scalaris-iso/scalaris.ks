@@ -9,7 +9,7 @@ firstboot --disable
 bootloader --timeout=1 --append="3"
 
 repo --name=fedora-15 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-15&arch=$basearch
-repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/
+repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/
 
 %packages
 @core
@@ -28,7 +28,10 @@ ruby-scalaris-svn
 screen
 
 # for manager interface
+scalaris-svn-one-manager
+scalaris-svn-one-client
 ruby
+rubygem-oca
 rubygem-sequel
 rubygem-sqlite3
 rubygem-json
@@ -52,7 +55,7 @@ anaconda
 
 cp scalaris-contrail.init.d $INSTALL_ROOT/etc/init.d/scalaris-contrail
 cp vmcontext $INSTALL_ROOT/etc/init.d/vmcontext
-cp init-contrail-scalaris.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
+cp init-contrail.sh $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 chmod ugo+x $INSTALL_ROOT/etc/init.d/vmcontext
 chmod ugo+x $INSTALL_ROOT/etc/scalaris/init-contrail.sh
 
