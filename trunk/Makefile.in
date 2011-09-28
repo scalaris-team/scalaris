@@ -626,6 +626,10 @@ install-one:
 	           contrib/opennebula/webinterface-v2/*.erb
 	install -m 744 -t $(SCALARISDIR)/contrib/opennebula \
 	           contrib/opennebula/webinterface-v2/cli.rb
+	install -m 744 -t $(SCALARISDIR)/contrib/opennebula \
+	           contrib/opennebula/webinterface-v2/frontend.rb
+	install -m 744 -t $(SCALARISDIR)/contrib/opennebula \
+	           contrib/opennebula/webinterface-v2/manager.rb
 	install -m 644 -t $(SCALARISDIR)/contrib/opennebula \
 	           contrib/opennebula/webinterface-v2/*.sh
 	install -m 644 -t $(SCALARISDIR)/contrib/opennebula/fe_views \

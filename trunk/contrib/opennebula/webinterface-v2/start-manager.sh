@@ -16,8 +16,10 @@ if [ -z  "$VMID" ]; then
   exit 1
 fi
 
-mkdir -p /var/lib/sc-manager/public
-cd /var/lib/sc-manager
+WEBDIR=/usr/lib/scalaris/contrib/opennebula
+
+mkdir -p $WEBDIR/public
+cd $WEBDIR
 # the sleep command is used to find error messages
-screen -d -m /bin/bash -c "VMID=$VMID HADOOP_MASTER=$HADOOP_MASTER /var/lib/sc-manager/manager.rb; sleep 365d"
+screen -d -m /bin/bash -c "VMID=$VMID HADOOP_MASTER=$HADOOP_MASTER $WEB/manager.rb; sleep 365d"
 cd -
