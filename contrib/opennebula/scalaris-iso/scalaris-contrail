@@ -6,6 +6,15 @@
 #
 # description:  starting and stopping scalaris for contrail
 #
+### BEGIN INIT INFO
+# Provides:          scalaris-contrail
+# Required-Start:    vmcontext
+# Required-Stop:     vmcontext
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start scalaris for contrail
+# Description:       Start scalaris for contrail
+### END INIT INFO
 
 # source function library
 . /etc/rc.d/init.d/functions

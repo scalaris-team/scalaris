@@ -18,6 +18,15 @@
 # See the License for the specific language governing permissions and        #
 # limitations under the License.                                             #
 #--------------------------------------------------------------------------- #
+### BEGIN INIT INFO
+# Provides:          vmcontext
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: vmcontext for opennebula
+# Description:       sets the IP address for opennebula
+### END INIT INFO
 
 # source function library
 . /etc/rc.d/init.d/functions
