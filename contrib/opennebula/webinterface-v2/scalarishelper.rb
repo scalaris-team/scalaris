@@ -26,13 +26,15 @@ class ScalarisHelper < OpenNebulaHelper
   def get_node_info(instance, vmid)
     info = {}
     info[:rpm_version] = get_scalaris_version()
+    info[:vmid] = ENV['VMID']
     info.merge!(get_scalaris_info("get_node_info"))
     info
   end
 
   def get_node_performance(instance, vmid)
     perf = {}
-    info.merge!(get_scalaris_info("get_node_performance"))
+    perf[:vmid] = ENV['VMID']
+    perf.merge!(get_scalaris_info("get_node_performance"))
     perf
   end
 
@@ -45,15 +47,15 @@ class ScalarisHelper < OpenNebulaHelper
 
   def get_service_performance(instance)
     perf = {}
-    info.merge!(get_scalaris_info("get_service_performance"))
+    perf.merge!(get_scalaris_info("get_service_performance"))
     perf
   end
 
   private
 
   def get_scalaris_info(call)
-    url = "http://localhost:8000/jsonrpc.yaws"
-    JSONRPC.json_call(url, "get_node_info", [])["result"]["value"]
+    url = URI.parse("http://localhost:8000/jsonrpc.yaws")
+    JSONRPC.json_call(url, call, [])["result"]["value"]
   end
 
   def get_scalaris_version()
