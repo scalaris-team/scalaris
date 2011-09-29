@@ -113,7 +113,7 @@
   </target>
 
   <target name="import.get.data" unless="data">
-    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2)"/>
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2, *.db)"/>
   </target>
 
   <target name="import.get.whitelist" unless="whitelist">
@@ -136,8 +136,8 @@
     <input addproperty="categories" defaultvalue="" message="Import pages in these categories"/>
   </target>
 
-  <target name="import.get.preprocess" unless="preprocess">
-    <input addproperty="preprocess" defaultvalue="true" message="Pre-process the XML dump into K/V pairs first and then write to Scalaris? (will be faster but takes some space on the local filesystem)"/>
+  <target name="import.get.prepare_db" unless="prepare_db" depends="import.get.data">
+    <input addproperty="prepare_db" defaultvalue="${data}-1.db" message="Write pre-processed K/V pairs to this database (will be created or overwritten)"/>
   </target>
 
   <target name="download">
@@ -153,11 +153,11 @@
 
   <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
 
-  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,import.get.whitelist,import.get.preprocess,scalaris.properties">
-    <fail unless="data">You must specify the data property when you run 'ant import'.</fail>
-    <fail unless="max_revisions">You must specify the max_revisions property when you run 'ant import'.</fail>
-    <fail unless="max_time">You must specify the max_time property when you run 'ant import'.</fail>
-    <fail unless="whitelist">You must specify the whitelist property when you run 'ant import'.</fail>
+  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,import.get.whitelist,scalaris.properties">
+    <fail unless="data">You must specify the data property for 'ant import'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant import'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant import'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant import'.</fail>
     <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
       <sysproperty key="scalaris.node" value="${scalaris.node}" />
       <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
@@ -166,7 +166,27 @@
       <arg value="${max_revisions}"/>
       <arg value="${max_time}"/>
       <arg value="${whitelist}"/>
-      <arg value="${preprocess}"/>
+      <classpath>
+        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <target name="prepare" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+    <fail unless="data">You must specify the data property for 'ant prepare'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant prepare'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant prepare'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant prepare'.</fail>
+    <fail unless="prepare_db">You must specify the prepare_db property for 'ant prepare'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <arg value="${data}"/>
+      <arg value="prepare"/>
+      <arg value="${max_revisions}"/>
+      <arg value="${max_time}"/>
+      <arg value="${whitelist}"/>
+      <arg value="${prepare_db}"/>
       <classpath>
         <pathelement location="simplewiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
@@ -176,9 +196,9 @@
   </target>
 
   <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.categories">
-    <fail unless="data">You must specify the data property when you run 'ant filter'.</fail>
-    <fail unless="max_time">You must specify the max_time property when you run 'ant filter'.</fail>
-    <fail unless="categories">You must specify the categories property when you run 'ant filter'.</fail>
+    <fail unless="data">You must specify the data property for 'ant filter'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant filter'.</fail>
+    <fail unless="categories">You must specify the categories property for 'ant filter'.</fail>
     <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
       <sysproperty key="scalaris.node" value="${scalaris.node}" />
       <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />

@@ -19,11 +19,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.PrintStream;
 import java.util.Calendar;
 import java.util.Set;
 
@@ -31,15 +29,13 @@ import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
-import de.zib.scalaris.ConnectionFactory;
-
 /**
- * Provides abilities to read an xml wiki dump file and write its contents to
- * Scalaris by pre-processing key/value pairs into a local SQLite db.
+ * Provides abilities to read an xml wiki dump file and prepare its contents
+ * for Scalaris by creating key/value pairs in a local SQLite db.
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPreparedToScalarisHandler {
+public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForScalarisHandler {
     SQLiteConnection db;
     SQLiteStatement stRead;
     SQLiteStatement stWrite;
@@ -60,47 +56,16 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
      *            (useful to create dumps of a wiki at a specific point in time)
-     * @param dirname
-     *            the name of the directory to write temporary files to
+     * @param dbFileName
+     *            the name of the database file to write to
      * 
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpPreparedToScalarisWithSQLiteHandler(Set<String> blacklist,
+    public WikiDumpPrepareSQLiteForScalarisHandler(Set<String> blacklist,
             Set<String> whitelist, int maxRevisions, Calendar maxTime,
-            String dirname) throws RuntimeException {
-        super(blacklist, whitelist, maxRevisions, maxTime, dirname);
-        init();
-    }
-
-    /**
-     * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
-     * blacklist to Scalaris but with an additional pre-process phase.
-     * 
-     * @param blacklist
-     *            a number of page titles to ignore
-     * @param whitelist
-     *            only import these pages
-     * @param maxRevisions
-     *            maximum number of revisions per page (starting with the most
-     *            recent) - <tt>-1/tt> imports all revisions
-     *            (useful to speed up the import / reduce the DB size)
-     * @param maxTime
-     *            maximum time a revision should have (newer revisions are
-     *            omitted) - <tt>null/tt> imports all revisions
-     *            (useful to create dumps of a wiki at a specific point in time)
-     * @param dirname
-     *            the name of the directory to write temporary files to
-     * @param cFactory
-     *            the connection factory to use for creating new connections
-     * 
-     * @throws RuntimeException
-     *             if the connection to Scalaris fails
-     */
-    public WikiDumpPreparedToScalarisWithSQLiteHandler(Set<String> blacklist,
-            Set<String> whitelist, int maxRevisions, Calendar maxTime,
-            String dirname, ConnectionFactory cFactory) throws RuntimeException {
-        super(blacklist, whitelist, maxRevisions, maxTime, dirname, cFactory);
+            String dbFileName) throws RuntimeException {
+        super(blacklist, whitelist, maxRevisions, maxTime, dbFileName);
         init();
     }
 
@@ -111,19 +76,41 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
      */
     private void init() throws RuntimeException {
         try {
-            db = new SQLiteConnection(new File(this.dirname + File.separatorChar + "database"));
-            db.open(true);
-            // create table
+            db = openDB(this.dbFileName);
             db.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
-            db.exec("PRAGMA cache_size = 200000;");
-            db.exec("PRAGMA synchronous = OFF;");
-            
-            // create statements for read/write
-            stRead = db.prepare("SELECT scalaris_key, scalaris_value FROM objects WHERE scalaris_key == ?");
-            stWrite = db.prepare("REPLACE INTO objects (scalaris_key, scalaris_value) VALUES (?, ?);");
+            stRead = createReadStmt(db);
+            stWrite = createWriteStmt(db);
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @return
+     * @throws SQLiteException 
+     */
+    static SQLiteConnection openDB(String fileName) throws SQLiteException {
+        SQLiteConnection db = new SQLiteConnection(new File(fileName));
+        db.open(true);
+        db.exec("PRAGMA cache_size = 200000;");
+        db.exec("PRAGMA synchronous = OFF;");
+        return db;
+    }
+
+    /**
+     * @return
+     * @throws SQLiteException
+     */
+    static SQLiteStatement createReadStmt(SQLiteConnection db) throws SQLiteException {
+        return db.prepare("SELECT scalaris_key, scalaris_value FROM objects WHERE scalaris_key == ?");
+    }
+
+    /**
+     * @return
+     * @throws SQLiteException
+     */
+    static SQLiteStatement createWriteStmt(SQLiteConnection db) throws SQLiteException {
+        return db.prepare("REPLACE INTO objects (scalaris_key, scalaris_value) VALUES (?, ?);");
     }
 
     /**
@@ -136,8 +123,34 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
     @Override
     protected <T> void writeObject(String key, T value)
             throws RuntimeException {
+        writeObject(stWrite, key, value);
+    }
+
+    /**
+     * @param <T>
+     * @param siteinfo
+     * @param key
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    @Override
+    protected <T> T readObject(String key)
+            throws RuntimeException, FileNotFoundException {
+        return readObject(stRead, key);
+    }
+
+    /**
+     * @param <T>
+     * @param siteinfo
+     * @param key
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    static <T> void writeObject(SQLiteStatement stWrite, String key, T value)
+            throws RuntimeException {
         try {
-            // note: uncompressed data performs better with SQLite than compressed data (smaller DB size)
+            // note: uncompressed data performs better with SQLite than
+            // compressed data (smaller DB size)
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(bos);
             oos.writeObject(value);
@@ -164,8 +177,7 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
      * @throws IOException
      * @throws FileNotFoundException
      */
-    @Override
-    protected <T> T readObject(String key)
+    static <T> T readObject(SQLiteStatement stRead, String key)
             throws RuntimeException, FileNotFoundException {
         try {
             try {
@@ -173,7 +185,8 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
                 if (stRead.step()) {
                     // there should only be one result
                     byte[] value = stRead.columnBlob(1);
-                    ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(value));
+                    ObjectInputStream ois = new ObjectInputStream(
+                            new ByteArrayInputStream(value));
                     @SuppressWarnings("unchecked")
                     T result = (T) ois.readObject();
                     ois.close();
@@ -207,40 +220,5 @@ public class WikiDumpPreparedToScalarisWithSQLiteHandler extends WikiDumpPrepare
         stRead.dispose();
         stWrite.dispose();
         db.dispose();
-    }
-    
-    @Override
-    protected void updatePageLists() {
-        super.updatePageLists();
-        try {
-            SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects ORDER BY scalaris_key ASC");
-            PrintStream ps = new PrintStream(new FileOutputStream(dirname
-                    + File.separatorChar + "keys.txt"));
-            while (st.step()) {
-                String key = st.columnString(0);
-                ps.println(key);
-            }
-            ps.flush();
-            ps.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (SQLiteException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    protected void writeToScalaris() {
-        try {
-            SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects");
-            while (st.step()) {
-                String key = st.columnString(0);
-                writeToScalaris(key, readObject(key));
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (SQLiteException e) {
-            e.printStackTrace();
-        }
     }
 }

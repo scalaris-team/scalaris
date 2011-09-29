@@ -33,7 +33,7 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public abstract class WikiDumpHandler extends DefaultHandler {
+public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump {
     private boolean inSiteInfo = false;
     private boolean inPage = false;
 
@@ -264,30 +264,27 @@ public abstract class WikiDumpHandler extends DefaultHandler {
         timeAtEnd = System.currentTimeMillis();
     }
 
-    /**
-     * Gets the time the import started.
-     * 
-     * @return the time the import started (in milliseconds)
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#getTimeAtStart()
      */
+    @Override
     public long getTimeAtStart() {
         return timeAtStart;
     }
 
-    /**
-     * Gets the time the import finished.
-     * 
-     * @return the time the import finished (in milliseconds)
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#getTimeAtEnd()
      */
+    @Override
     public long getTimeAtEnd() {
         return timeAtEnd;
     }
 
-    /**
-     * Gets the number of imported pages.
-     * 
-     * @return the number of pages imported into Scalaris
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#getPageCount()
      */
-    public int getPageCount() {
+    @Override
+    public int getImportCount() {
         return pageCount;
     }
 
@@ -309,13 +306,10 @@ public abstract class WikiDumpHandler extends DefaultHandler {
         }
     }
 
-    /**
-     * Sets the output writer to write status messages to (defaults to
-     * System.out).
-     * 
-     * @param msgOut
-     *            the msgOut to set
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#setMsgOut(java.io.PrintStream)
      */
+    @Override
     public void setMsgOut(PrintStream msgOut) {
         this.msgOut = msgOut;
     }
@@ -323,6 +317,7 @@ public abstract class WikiDumpHandler extends DefaultHandler {
     /**
      * Tells the parser to stop at the next starting element.
      */
+    @Override
     public void stopParsing() {
         this.stop = true;
     }
