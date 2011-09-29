@@ -39,6 +39,7 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.examples.wikipedia.data.Revision;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler.ReportAtShutDown;
 
 /**
  * Provides abilities to read an xml wiki dump file and write Wiki pages to
@@ -67,7 +68,9 @@ public class Main {
                 if (args[1].equals("filter")) {
                     doFilter(filename, Arrays.copyOfRange(args, 2, args.length));
                 } else if (args[1].equals("import")) {
-                    doImport(filename, Arrays.copyOfRange(args, 2, args.length));
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), false);
+                } else if (args[1].equals("prepare")) {
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), true);
                 }
             }
         } catch (SAXException e) {
@@ -82,17 +85,17 @@ public class Main {
     /**
      * Imports all pages in the Wikipedia XML dump from the given file to Scalaris.
      * 
-     * @param args
-     * @param reader
      * @param filename
+     * @param args
+     * @param prepare
+     * 
      * @throws RuntimeException
      * @throws IOException
      * @throws SAXException
      * @throws FileNotFoundException
      */
-    private static void doImport(String filename, String[] args) throws RuntimeException, IOException,
+    private static void doImport(String filename, String[] args, boolean prepare) throws RuntimeException, IOException,
             SAXException, FileNotFoundException {
-        XMLReader reader = XMLReaderFactory.createXMLReader();
         
         int maxRevisions = -1;
         if (args.length >= 1) {
@@ -130,34 +133,61 @@ public class Main {
                 whitelist = null;
             }
         }
-        
-        // add a pre-process step first?
-        boolean preprocess = true;
-        if (args.length >= 4 && !args[3].isEmpty()) {
-            preprocess = Boolean.parseBoolean(args[3]);
-        }
 
-        WikiDumpHandler handler;
-        if (preprocess) {
-//            handler = new WikiDumpPrepareScalarisFilesHandler(blacklist, whitelist, maxRevisions, maxTime, filename + "-tmp");
-            handler = new WikiDumpPreparedToScalarisWithSQLiteHandler(blacklist, whitelist, maxRevisions, maxTime, filename + "-tmp");
+        if (prepare) {
+            // only prepare the import to Scalaris, i.e. pre-process K/V pairs?
+            String dbFileName = "";
+            if (args.length >= 4 && !args[3].isEmpty()) {
+                dbFileName = args[3];
+            } else {
+                System.err.println("need a DB file name for prepare; arguments given: " + Arrays.toString(args));
+                System.exit(-1);
+            }
+            WikiDumpHandler handler =
+                    new WikiDumpPrepareSQLiteForScalarisHandler(blacklist, whitelist, maxRevisions, maxTime, dbFileName);
+            InputSource file = getFileReader(filename);
+            runXmlHandler(handler, file);
         } else {
-            handler = new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
+            if (filename.endsWith(".db")) {
+                WikiDumpPreparedSQLiteToScalaris handler =
+                        new WikiDumpPreparedSQLiteToScalaris(filename);
+                handler.writeToScalaris();
+                handler.new ReportAtShutDown().run();
+            } else {
+                WikiDumpHandler handler =
+                        new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
+                InputSource file = getFileReader(filename);
+                runXmlHandler(handler, file);
+            }
         }
+    }
+
+    /**
+     * @param handler
+     * @param file
+     * @throws SAXException
+     * @throws IOException
+     */
+    static void runXmlHandler(WikiDumpHandler handler, InputSource file)
+            throws SAXException, IOException {
+        XMLReader reader = XMLReaderFactory.createXMLReader();
         handler.setUp();
-        Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
+        ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
         reader.setContentHandler(handler);
-        reader.parse(getFileReader(filename));
+        reader.parse(file);
         handler.tearDown();
+        shutdownHook.run();
+        Runtime.getRuntime().removeShutdownHook(shutdownHook);
     }
 
     /**
      * Filters all pages in the Wikipedia XML dump from the given file and
      * creates a list of page names belonging to certain categories.
      * 
-     * @param args
-     * @param reader
      * @param filename
+     * @param args
+     * 
      * @throws RuntimeException
      * @throws IOException
      * @throws SAXException
@@ -165,8 +195,6 @@ public class Main {
      */
     private static void doFilter(String filename, String[] args) throws RuntimeException, IOException,
             SAXException, FileNotFoundException {
-        XMLReader reader = XMLReaderFactory.createXMLReader();
-        
         int recursionLvl = 1;
         if (args.length >= 1) {
             try {
@@ -190,22 +218,18 @@ public class Main {
         
         Set<String> categories = null;
         Map<String, Set<String>> categoryTree = null;
+        InputSource file = getFileReader(filename);
         if (args.length >= 3) {
             LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
             System.out.println("building category tree...");
             
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
-            handler.setUp();
-            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
-            reader.setContentHandler(handler);
-            reader.parse(getFileReader(filename));
-            handler.tearDown();
-            
+            runXmlHandler(handler, file);
             categoryTree = handler.getCategories();
             categories = WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, rootCategories);
         } else {
-            System.err.println("need a list of categories to do filtering on; arguments given: " + args.toString());
+            System.err.println("need a list of categories to do filtering on; arguments given: " + Arrays.toString(args));
             System.exit(-1);
         }
 
@@ -216,11 +240,7 @@ public class Main {
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetPagesInCategoriesHandler handler =
                     new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, categories, pages);
-            handler.setUp();
-            Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
-            reader.setContentHandler(handler);
-            reader.parse(getFileReader(filename));
-            handler.tearDown();
+            runXmlHandler(handler, file);
             pages.addAll(handler.getPages());
             pages.addAll(handler.getLinksOnPages());
             
