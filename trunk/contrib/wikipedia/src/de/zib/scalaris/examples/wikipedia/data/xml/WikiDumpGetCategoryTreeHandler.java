@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -115,6 +116,30 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * @return the categories
      */
     public Map<String, Set<String>> getCategories() {
+        return categories;
+    }
+    
+    /**
+     * Gets all sub categories that belong to any of the given root categories
+     * (recursively).
+     * 
+     * @param categoryTree
+     *            the tree of categories as returned by {@link #getCategories()}
+     * @param rootCats
+     *            a list of root categories
+     * 
+     * @return a set of all sub categories; also includes the rootCats
+     */
+    public static Set<String> getAllSubCats(Map<String, Set<String>> categoryTree, List<String> rootCats) {
+        HashSet<String> categories = new HashSet<String>(rootCats);
+        while (!rootCats.isEmpty()) {
+            String curCat = rootCats.remove(0);
+            Set<String> subcats = categoryTree.get(curCat);
+            if (subcats != null) {
+                categories.addAll(subcats);
+                rootCats.addAll(subcats);
+            }
+        }
         return categories;
     }
 }

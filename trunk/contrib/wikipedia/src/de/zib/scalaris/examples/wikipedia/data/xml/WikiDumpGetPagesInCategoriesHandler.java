@@ -15,8 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -33,6 +35,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     Set<String> linksOnPages = new HashSet<String>();
     Set<String> whitelist;
     Set<String> categories;
+    Map<String, Set<String>> categoryTree;
 
     /**
      * Sets up a SAX XmlHandler exporting all page titles in the given
@@ -44,8 +47,10 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
      *            (useful to create dumps of a wiki at a specific point in time)
+     * @param categoryTree
+     *            information about the categories and their dependencies
      * @param categories
-     *            include all pages in there categories
+     *            include all pages in these categories
      * @param whitelist
      *            a number of pages to include (parses these pages for more
      *            links)
@@ -54,10 +59,12 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      *             if the connection to Scalaris fails
      */
     public WikiDumpGetPagesInCategoriesHandler(Set<String> blacklist,
-            Calendar maxTime, Set<String> categories, Set<String> whitelist) throws RuntimeException {
+            Calendar maxTime, Map<String, Set<String>> categoryTree,
+            Set<String> categories, Set<String> whitelist) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
         this.categories = categories;
         this.whitelist = whitelist;
+        this.categoryTree = categoryTree;
     }
 
     /**
@@ -84,8 +91,9 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             wikiModel.render(null, page.getCurRev().getText());
             
             boolean pageInAllowedCat = false;
-            Set<String> pageCategories = new HashSet<String>();
-            for (String cat_raw: wikiModel.getCategories().keySet()) {
+            Set<String> pageCategories_raw = wikiModel.getCategories().keySet();
+            ArrayList<String> pageCategories = new ArrayList<String>(pageCategories_raw.size());
+            for (String cat_raw: pageCategories_raw) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
                 pageCategories.add(category);
                 if (categories.contains(category)) {
@@ -95,8 +103,9 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             }
 
             boolean pageInAllowedTpl = false;
-            Set<String> pageTemplates= new HashSet<String>();
-            for (String tpl_raw: wikiModel.getTemplates()) {
+            Set<String> pageTemplates_raw = wikiModel.getTemplates();
+            ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
+            for (String tpl_raw: pageTemplates_raw) {
                 String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
                 pageTemplates.add(template);
                 if (categories.contains(template)) {
@@ -107,8 +116,8 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             
             if (whitelist.contains(page.getTitle()) || pageInAllowedCat || pageInAllowedTpl) {
                 pages.add(page.getTitle());
-                pages.addAll(pageCategories);
-                pages.addAll(pageTemplates);
+                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, pageCategories));
+                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, pageTemplates));
                 String redirLink = wikiModel.getRedirectLink();
                 if (redirLink != null) {
                     pages.add(redirLink);
