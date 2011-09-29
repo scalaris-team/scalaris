@@ -24,6 +24,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Calendar;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
@@ -94,6 +96,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         db.open(true);
         db.exec("PRAGMA cache_size = 200000;");
         db.exec("PRAGMA synchronous = OFF;");
+        db.exec("PRAGMA journal_mode = OFF;");
+        db.exec("PRAGMA locking_mode = EXCLUSIVE;");
         return db;
     }
 
@@ -149,10 +153,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     static <T> void writeObject(SQLiteStatement stWrite, String key, T value)
             throws RuntimeException {
         try {
-            // note: uncompressed data performs better with SQLite than
-            // compressed data (smaller DB size)
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(bos);
+            ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
             oos.writeObject(value);
             oos.flush();
             oos.close();
@@ -186,7 +188,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
                     // there should only be one result
                     byte[] value = stRead.columnBlob(1);
                     ObjectInputStream ois = new ObjectInputStream(
-                            new ByteArrayInputStream(value));
+                            new GZIPInputStream(new ByteArrayInputStream(value)));
                     @SuppressWarnings("unchecked")
                     T result = (T) ois.readObject();
                     ois.close();
