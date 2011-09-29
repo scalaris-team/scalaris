@@ -189,6 +189,7 @@ public class Main {
         }
         
         Set<String> categories = null;
+        Map<String, Set<String>> categoryTree = null;
         if (args.length >= 3) {
             LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
             System.out.println("building category tree...");
@@ -201,16 +202,11 @@ public class Main {
             reader.parse(getFileReader(filename));
             handler.tearDown();
             
-            Map<String, Set<String>> categoryTree = handler.getCategories();
-            categories = new HashSet<String>();
-            while (!rootCategories.isEmpty()) {
-                String curCat = rootCategories.removeFirst();
-                Set<String> subcats = categoryTree.get(curCat);
-                if (subcats != null) {
-                    categories.addAll(subcats);
-                    rootCategories.addAll(subcats);
-                }
-            }
+            categoryTree = handler.getCategories();
+            categories = WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, rootCategories);
+        } else {
+            System.err.println("need a list of categories to do filtering on; arguments given: " + args.toString());
+            System.exit(-1);
         }
 
         Set<String> pages = new HashSet<String>(categories);
@@ -218,7 +214,8 @@ public class Main {
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         while (recursionLvl >= 1) {
             // need to get all subcategories recursively, as they must be included as well 
-            WikiDumpGetPagesInCategoriesHandler handler = new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categories, pages);
+            WikiDumpGetPagesInCategoriesHandler handler =
+                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, categories, pages);
             handler.setUp();
             Runtime.getRuntime().addShutdownHook(handler.new ReportAtShutDown());
             reader.setContentHandler(handler);
