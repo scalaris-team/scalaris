@@ -38,7 +38,7 @@ import de.zib.scalaris.TransactionSingleOp;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
-    private static final int MAX_SCALARIS_CONNECTIONS = 4;
+    private static final int MAX_SCALARIS_CONNECTIONS = Runtime.getRuntime().availableProcessors() * 2;
     private static final int PRINT_SCALARIS_KV_PAIRS_EVERY = 5000;
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
