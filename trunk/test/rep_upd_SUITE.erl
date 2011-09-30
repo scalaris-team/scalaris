@@ -67,9 +67,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
+    _ = crypto:start(),
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
+    crypto:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
