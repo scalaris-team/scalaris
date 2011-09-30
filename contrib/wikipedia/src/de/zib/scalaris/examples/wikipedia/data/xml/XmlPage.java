@@ -64,6 +64,9 @@ public class XmlPage extends DefaultHandler {
     protected boolean inPage_restrictions;
     protected boolean inRevision;
     
+    protected CheckSkipRevisions checkSkipRevisions = null;
+    protected boolean skipRevisions;
+    
     protected XmlRevision currentRevision = new XmlRevision();
     
     protected Page final_page;
@@ -111,6 +114,7 @@ public class XmlPage extends DefaultHandler {
         inPage_id = false;
         inPage_restrictions = false;
         inRevision = false;
+        skipRevisions = false;
         currentRevision.reset();
         final_page = null;
     }
@@ -169,7 +173,9 @@ public class XmlPage extends DefaultHandler {
         // System.out.println(localName);
         
         if (inRevision) {
-            currentRevision.startElement(uri, localName, qName, attributes);
+            if (!skipRevisions) {
+                currentRevision.startElement(uri, localName, qName, attributes);
+            }
         } else {
             currentString.setLength(0);
             /*
@@ -182,8 +188,14 @@ public class XmlPage extends DefaultHandler {
                 redirect = true;
             } else if (localName.equals("revision")) {
                 inRevision = true;
-                currentRevision.reset();
-                currentRevision.startRevision(uri, localName, qName, attributes);
+                // check whether all revisions of this page should be skipped
+                if (checkSkipRevisions != null && checkSkipRevisions.skipRevisions(title)) {
+                    skipRevisions = true;
+                }
+                if (!skipRevisions) {
+                    currentRevision.reset();
+                    currentRevision.startRevision(uri, localName, qName, attributes);
+                }
             } else {
                 System.err.println("unknown page tag: " + localName);
             }
@@ -209,11 +221,12 @@ public class XmlPage extends DefaultHandler {
         // System.out.println(new String(ch, start, length));
 
         if (inRevision) {
-            currentRevision.characters(ch, start, length);
+            if (!skipRevisions) {
+                currentRevision.characters(ch, start, length);
+            }
         } else {
             currentString.append(ch, start, length);
         }
-
     }
 
     /**
@@ -278,17 +291,21 @@ public class XmlPage extends DefaultHandler {
         if (inRevision) {
             if (localName.equals("revision")) {
                 inRevision = false;
-                currentRevision.endRevision(uri, localName, qName);
-                Revision curRev = currentRevision.getRevision();
-                if (maxTime == null ||
-                        !Revision.stringToCalendar(curRev.getTimestamp()).after(maxTime)) {
-                    revisions.put(curRev.getId(), curRev);
-                    if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
-                        revisions.remove(revisions.firstKey());
+                if (!skipRevisions) {
+                    currentRevision.endRevision(uri, localName, qName);
+                    Revision curRev = currentRevision.getRevision();
+                    if (maxTime == null ||
+                            !Revision.stringToCalendar(curRev.getTimestamp()).after(maxTime)) {
+                        revisions.put(curRev.getId(), curRev);
+                        if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
+                            revisions.remove(revisions.firstKey());
+                        }
                     }
                 }
             } else {
-                currentRevision.endElement(uri, localName, qName);
+                if (!skipRevisions) {
+                    currentRevision.endElement(uri, localName, qName);
+                }
             }
         } else {
             if (localName.equals("title")) {
@@ -320,5 +337,31 @@ public class XmlPage extends DefaultHandler {
      */
     public List<Revision> getRevisions() {
         return new LinkedList<Revision>(revisions.values());
+    }
+
+    /**
+     * @param checkSkipRevisions the checkSkipRevisions to set
+     */
+    public void setCheckSkipRevisions(CheckSkipRevisions checkSkipRevisions) {
+        this.checkSkipRevisions = checkSkipRevisions;
+    }
+    
+    /**
+     * Functor to check whether to skip parsing revisions based on a page's
+     * title.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static interface CheckSkipRevisions {
+        /**
+         * Checks whether to skip parsing all revisions of a page.
+         * 
+         * @param pageTitle
+         *            the title of the page
+         * 
+         * @return <tt>true</tt> if revisions should not be parsed,
+         *         <tt>false</tt> otherwise
+         */
+        public abstract boolean skipRevisions(String pageTitle);
     }
 }
