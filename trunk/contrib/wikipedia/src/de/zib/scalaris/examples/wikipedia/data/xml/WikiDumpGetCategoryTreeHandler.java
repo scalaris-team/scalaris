@@ -24,6 +24,7 @@ import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
+import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 
 /**
  * Provides abilities to read an xml wiki dump file and create a category (and
@@ -52,6 +53,17 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     public WikiDumpGetCategoryTreeHandler(Set<String> blacklist,
             Calendar maxTime) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
+        setPageCheckSkipRevisions(new CheckSkipRevisions() {
+            @Override
+            public boolean skipRevisions(String pageTitle) {
+                return !isTemplateOrCategory(pageTitle);
+            }
+        });
+    }
+    
+    private boolean isTemplateOrCategory(String pageTitle) {
+        return wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(pageTitle)) ||
+               wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(pageTitle));
     }
     
     private void updateSubCats(String category, String newSubCat) {
@@ -84,8 +96,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         Page page = page_xml.getPage();
 
         if (page.getCurRev() != null && wikiModel != null &&
-                (wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(page.getTitle())) ||
-                 wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(page.getTitle())))) {
+                isTemplateOrCategory(page.getTitle())) {
             wikiModel.render(null, page.getCurRev().getText());
             for (String cat_raw: wikiModel.getCategories().keySet()) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;

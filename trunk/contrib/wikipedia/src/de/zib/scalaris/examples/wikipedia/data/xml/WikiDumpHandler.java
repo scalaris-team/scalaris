@@ -28,6 +28,7 @@ import org.xml.sax.helpers.DefaultHandler;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 
 /**
  * Provides abilities to read an xml wiki dump file and write its contents to
@@ -305,6 +306,13 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     @Override
     public void setMsgOut(PrintStream msgOut) {
         this.msgOut = msgOut;
+    }
+
+    /**
+     * @param checkSkipRevisions the checkSkipRevisions to set
+     */
+    protected void setPageCheckSkipRevisions(CheckSkipRevisions checkSkipRevisions) {
+        this.currentPage.setCheckSkipRevisions(checkSkipRevisions);
     }
 
     /**
