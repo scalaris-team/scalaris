@@ -33,40 +33,40 @@ import de.zib.scalaris.examples.wikipedia.data.Revision;
  * @author Nico Kruber, kruber@zib.de
  */
 public class XmlPage extends DefaultHandler {
-    protected StringBuffer currentString = new StringBuffer();
+    protected StringBuilder currentString = new StringBuilder();
     /**
      * The page's title.
      */
-    protected String title = "";
+    protected String title;
 
     /**
      * The page's ID.
      */
-    protected String id = "";
+    protected String id;
 
     /**
      * The page's restrictions, e.g. for moving/editing the page.
      */
-    protected String restrictions = "";
+    protected String restrictions;
     
     /**
      * Whether the page's newest revision redirects or not.
      */
-    boolean redirect = false;
+    protected boolean redirect;
     
     /**
      * All revisions of the page.
      */
     protected TreeMap<Integer, Revision> revisions = new TreeMap<Integer, Revision>();
     
-    protected boolean inPage_title = false;
-    protected boolean inPage_id = false;
-    protected boolean inPage_restrictions = false;
-    protected boolean inRevision = false;
+    protected boolean inPage_title;
+    protected boolean inPage_id;
+    protected boolean inPage_restrictions;
+    protected boolean inRevision;
     
-    protected XmlRevision currentRevision = null;
+    protected XmlRevision currentRevision = new XmlRevision();
     
-    protected Page final_page = null;
+    protected Page final_page;
 
     /**
      * Maximum number of revisions per page (starting with the most recent) -
@@ -94,6 +94,34 @@ public class XmlPage extends DefaultHandler {
         super();
         this.maxRevisions = maxRevisions;
         this.maxTime = maxTime;
+        init();
+    }
+    
+    /**
+     * (Re-) Initialises all instance variables.
+     */
+    private void init() {
+        currentString.setLength(0);
+        title = "";
+        id = "";
+        restrictions = "";
+        redirect = false;
+        revisions.clear();
+        inPage_title = false;
+        inPage_id = false;
+        inPage_restrictions = false;
+        inRevision = false;
+        currentRevision.reset();
+        final_page = null;
+    }
+    
+    /**
+     * Resets all instance variables. Afterwards, the object has the same state
+     * as a newly created one with the given {@link #maxRevisions} and
+     * {@link #maxTime}.
+     */
+    public void reset() {
+        init();
     }
 
     /**
@@ -154,7 +182,7 @@ public class XmlPage extends DefaultHandler {
                 redirect = true;
             } else if (localName.equals("revision")) {
                 inRevision = true;
-                currentRevision = new XmlRevision();
+                currentRevision.reset();
                 currentRevision.startRevision(uri, localName, qName, attributes);
             } else {
                 System.err.println("unknown page tag: " + localName);
@@ -259,7 +287,6 @@ public class XmlPage extends DefaultHandler {
                         revisions.remove(revisions.firstKey());
                     }
                 }
-                currentRevision = null;
             } else {
                 currentRevision.endElement(uri, localName, qName);
             }

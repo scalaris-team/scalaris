@@ -29,7 +29,7 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public class XmlSiteInfo extends DefaultHandler {
-    protected StringBuffer currentString = new StringBuffer();
+    protected StringBuilder currentString = new StringBuilder();
     
     protected String base = "";
     protected String sitename = "";

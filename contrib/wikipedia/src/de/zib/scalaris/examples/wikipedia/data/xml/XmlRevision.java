@@ -26,40 +26,40 @@ import de.zib.scalaris.examples.wikipedia.data.Revision;
  * @author Nico Kruber, kruber@zib.de
  */
 public class XmlRevision extends DefaultHandler {
-    protected StringBuffer currentString = new StringBuffer();
+    protected StringBuilder currentString = new StringBuilder();
     /**
      * the revision's ID
      */
-    protected String id = "";
+    protected String id;
 
     /**
      * the revision's date of creation
      */
-    protected String timestamp = "";
+    protected String timestamp;
     
     /**
      * whether the change is a minor change or not
      */
-    boolean minorChange = false;
+    protected boolean minorChange;
 
     /**
      * the revision's contributor
      */
-    protected XmlContributor currentContributor = null;
+    protected XmlContributor currentContributor = new XmlContributor();
 
     /**
      * the comment of the revision
      */
-    protected String comment = "";
+    protected String comment;
     
     /**
      * the content (text) of the revision
      */
-    protected String text = "";
+    protected String text;
     
-    private boolean inRevision_contributor = false;
+    private boolean inRevision_contributor;
     
-    protected Revision final_revision = null;
+    protected Revision final_revision;
 
     /**
      * Creates a new revision with an empty id, timestamp, contributor,
@@ -67,6 +67,30 @@ public class XmlRevision extends DefaultHandler {
      */
     public XmlRevision() {
         super();
+        init();
+    }
+
+    /**
+     * (Re-) Initialises all instance variables.
+     */
+    private void init() {
+        currentString.setLength(0);
+        id = "";
+        timestamp = "";
+        minorChange = false;
+        currentContributor.reset();
+        comment = "";
+        text = "";
+        inRevision_contributor = false;
+        final_revision = null;
+    }
+    
+    /**
+     * Resets all instance variables. Afterwards, the object has the same state
+     * as a newly created one.
+     */
+    public void reset() {
+        init();
     }
 
     /**
@@ -128,7 +152,7 @@ public class XmlRevision extends DefaultHandler {
                 minorChange = true;
             } else if (localName.equals("contributor")) {
                 inRevision_contributor = true;
-                currentContributor = new XmlContributor();
+                currentContributor.reset();
                 currentContributor.startContributor(uri, localName, qName, attributes);
             } else if (localName.equals("comment")) {
             } else if (localName.equals("text")) {
@@ -214,10 +238,6 @@ public class XmlRevision extends DefaultHandler {
                 // nothing to do
             } else if (localName.equals("contributor")) {
                 inRevision_contributor = false;
-                // note: may be an empty element
-                if (currentContributor == null) {
-                    currentContributor = new XmlContributor("unknown");
-                }
             } else if (localName.equals("comment")) {
                 comment = currentString.toString();
             } else if (localName.equals("text")) {
