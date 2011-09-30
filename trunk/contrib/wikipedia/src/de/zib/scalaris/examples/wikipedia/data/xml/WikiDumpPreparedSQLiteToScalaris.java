@@ -17,6 +17,8 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.text.NumberFormat;
+import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -150,8 +152,10 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 importEnd();
             }
             final long timeTaken = timeAtEnd - timeAtStart;
-            final long speed = (importedKeys * 1000) / timeTaken;
-            msgOut.println("Finished import (" + speed + " values/s)");
+            final double speed = (((double) importedKeys) * 1000) / timeTaken;
+            NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+            nf.setGroupingUsed(true);
+            msgOut.println("Finished import (" + nf.format(speed) + " pages/s)");
         }
     }
 

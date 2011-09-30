@@ -16,7 +16,9 @@
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.PrintStream;
+import java.text.NumberFormat;
 import java.util.Calendar;
+import java.util.Locale;
 import java.util.Set;
 
 import org.xml.sax.Attributes;
@@ -303,8 +305,10 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
                 importEnd();
             }
             final long timeTaken = timeAtEnd - timeAtStart;
-            final long speed = (pageCount * 1000) / timeTaken;
-            msgOut.println("Finished import (" + speed + " pages/s)");
+            final double speed = (((double) pageCount) * 1000) / timeTaken;
+            NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+            nf.setGroupingUsed(true);
+            msgOut.println("Finished import (" + nf.format(speed) + " pages/s)");
         }
     }
 
