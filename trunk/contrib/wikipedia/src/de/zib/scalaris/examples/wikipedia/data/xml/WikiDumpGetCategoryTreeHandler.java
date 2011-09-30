@@ -15,7 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +38,7 @@ import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
     Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
+    Map<String, Set<String>> templates = new HashMap<String, Set<String>>();
 
     /**
      * Sets up a SAX XmlHandler extracting all categories from all pages except
@@ -70,9 +74,19 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         Set<String> subCats = categories.get(category);
         if (subCats == null) {
             subCats = new HashSet<String>();
+            categories.put(category, subCats);
         }
         subCats.add(newSubCat);
-        categories.put(category, subCats);
+    }
+    
+    private void updateTplReqs(String template, Collection<? extends String> requiredTpls) {
+        Set<String> subTpls = templates.get(template);
+        if (subTpls == null) {
+            subTpls = new HashSet<String>(requiredTpls);
+            templates.put(template, subTpls);
+        } else {
+            subTpls.addAll(requiredTpls);
+        }
     }
 
     /**
@@ -102,9 +116,16 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
                 updateSubCats(category, page.getTitle());
             }
-            for (String tpl_raw: wikiModel.getTemplates()) {
+            Set<String> pageTemplates_raw = wikiModel.getTemplates();
+            ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
+            for (String tpl_raw: pageTemplates_raw) {
                 String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
                 updateSubCats(template, page.getTitle());
+                pageTemplates.add(template);
+            }
+            // also need the dependencies of each template:
+            if (wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(page.getTitle()))) {
+                updateTplReqs(page.getTitle(), pageTemplates);
             }
         }
         ++pageCount;
@@ -129,28 +150,57 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     public Map<String, Set<String>> getCategories() {
         return categories;
     }
+
+    /**
+     * @return the categories
+     */
+    public Map<String, Set<String>> getTemplates() {
+        return templates;
+    }
+    
+    /**
+     * Gets all sub categories that belong to a given root category
+     * (recursively).
+     * 
+     * @param tree
+     *            the tree of categories or templates as returned by
+     *            {@link #getCategories()} or {@link #getTemplates()}
+     * @param root
+     *            a root category or template
+     * 
+     * @return a set of all sub categories/templates; also includes the root
+     */
+    public static Set<String> getAllChildren(Map<String, Set<String>> tree, String root) {
+        return getAllChildren(tree, Arrays.asList(root));
+    }
     
     /**
      * Gets all sub categories that belong to any of the given root categories
      * (recursively).
      * 
-     * @param categoryTree
-     *            the tree of categories as returned by {@link #getCategories()}
-     * @param rootCats
-     *            a list of root categories
+     * @param tree
+     *            the tree of categories or templates as returned by
+     *            {@link #getCategories()} or {@link #getTemplates()}
+     * @param roots
+     *            a list of root categories or templates
      * 
      * @return a set of all sub categories; also includes the rootCats
      */
-    public static Set<String> getAllSubCats(Map<String, Set<String>> categoryTree, List<String> rootCats) {
-        HashSet<String> categories = new HashSet<String>(rootCats);
-        while (!rootCats.isEmpty()) {
-            String curCat = rootCats.remove(0);
-            Set<String> subcats = categoryTree.get(curCat);
-            if (subcats != null) {
-                categories.addAll(subcats);
-                rootCats.addAll(subcats);
+    public static Set<String> getAllChildren(Map<String, Set<String>> tree, List<String> roots) {
+        HashSet<String> allChildren = new HashSet<String>(roots);
+        while (!roots.isEmpty()) {
+            String curChild = roots.remove(0);
+            Set<String> subChilds = tree.get(curChild);
+            if (subChilds != null) {
+                // only add new categories to the root categories
+                // (remove already processed ones)
+                // -> prevents endless loops in circles
+                Set<String> newCats = new HashSet<String>(subChilds);
+                newCats.removeAll(allChildren);
+                allChildren.addAll(subChilds);
+                roots.addAll(newCats);
             }
         }
-        return categories;
+        return allChildren;
     }
 }
