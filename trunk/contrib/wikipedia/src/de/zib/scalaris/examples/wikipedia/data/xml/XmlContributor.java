@@ -26,12 +26,12 @@ import de.zib.scalaris.examples.wikipedia.data.Contributor;
  * @author Nico Kruber, kruber@zib.de
  */
 public class XmlContributor extends DefaultHandler {
-    protected StringBuffer currentString = new StringBuffer();
-    protected String user = "";
-    protected String id = "";
-    protected String ip = "";
+    protected StringBuilder currentString = new StringBuilder();
+    protected String user;
+    protected String id;
+    protected String ip;
     
-    Contributor final_contributor = null;
+    protected Contributor final_contributor;
 
     /**
      * Creates a new contributor with a (temporarily) empty username and ID.
@@ -39,17 +39,26 @@ public class XmlContributor extends DefaultHandler {
      */
     public XmlContributor() {
         super();
+        init();
     }
 
     /**
-     * Creates a new contributor with the given ip.
-     * 
-     * @param ip
-     *            an IP address or a custom name
+     * (Re-) Initialises all instance variables.
      */
-    public XmlContributor(String ip) {
-        super();
-        this.ip = ip;
+    private void init() {
+        currentString.setLength(0);
+        user = "";
+        id = "";
+        ip = "";
+        final_contributor = null;
+    }
+    
+    /**
+     * Resets all instance variables. Afterwards, the object has the same state
+     * as a newly created one.
+     */
+    public void reset() {
+        init();
     }
     
     /**
@@ -182,12 +191,18 @@ public class XmlContributor extends DefaultHandler {
 
     /**
      * Converts the {@link XmlContributor} object to a {@link Contributor}
-     * object.
-     * Throws in case of a malformed XML file.
+     * object. If no properties have been set, a {@link Contributor} with the
+     * IP Address "unknown" is returned.
      * 
      * @return the contributor of a revision
      */
     public Contributor getContributor() {
-        return final_contributor;
+        if (final_contributor == null) {
+            Contributor contributor = new Contributor();
+            contributor.setIp("unknown");
+            return contributor;
+        } else {
+            return final_contributor;
+        }
     }
 }

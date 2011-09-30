@@ -122,7 +122,7 @@ public class WikiDumpToStdoutHandler extends WikiDumpHandler {
      * </code>
      */
     protected void export(Revision rev) {
-        StringBuffer categories_str = new StringBuffer(1000);
+        StringBuilder categories_str = new StringBuilder(1000);
         categories_str.append('[');
         if (wikiModel != null) {
             Collection<String> categories = rev.parseCategories(wikiModel);

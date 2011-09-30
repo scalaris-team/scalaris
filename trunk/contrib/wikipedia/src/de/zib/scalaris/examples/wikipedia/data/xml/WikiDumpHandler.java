@@ -40,24 +40,12 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     private boolean inPage = false;
 
     private XmlSiteInfo currentSiteInfo = null;
-    private XmlPage currentPage = null;
+    private XmlPage currentPage;
 
     private Set<String> blacklist = null;
     private Set<String> whitelist = null;
     
     protected MyWikiModel wikiModel;
-
-    /**
-     * Maximum number of revisions per page (starting with the most recent) -
-     * <tt>-1/tt> imports all revisions.
-     */
-    private int maxRevisions = -1;
-    
-    /**
-     * Maximum time a revision should have (newer revisions are omitted) -
-     * <tt>null/tt> imports all revisions.
-     */
-    protected Calendar maxTime = null;
     
     /**
      * The time at the start of an import operation.
@@ -96,8 +84,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     public WikiDumpHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar maxTime) {
         this.blacklist = blacklist;
         this.whitelist = whitelist;
-        this.maxRevisions = maxRevisions;
-        this.maxTime = maxTime;
+        currentPage = new XmlPage(maxRevisions, maxTime);
     }
 
     /**
@@ -140,7 +127,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
             currentSiteInfo.startSiteInfo(uri, localName, qName, attributes);
         } else if (localName.equals("page")) {
             inPage = true;
-            currentPage = new XmlPage(maxRevisions, maxTime);
+            currentPage.reset();
             currentPage.startPage(uri, localName, qName, attributes);
         } else if (inSiteInfo) {
             currentSiteInfo.startElement(uri, localName, qName, attributes);
@@ -211,7 +198,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
                         (whitelist == null || whitelist.contains(currentPage.getPage().getTitle()))) {
                     export(currentPage);
                 }
-                currentPage = null;
+                currentPage.reset();
             } else {
                 currentPage.endElement(uri, localName, qName);
             }
