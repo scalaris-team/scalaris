@@ -223,13 +223,13 @@ public class Main {
         
         Set<String> categories = null;
         Map<String, Set<String>> categoryTree = null;
-        InputSource file = getFileReader(filename);
         if (args.length >= 3) {
             LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
             System.out.println("building category tree...");
             
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
+            InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
             categoryTree = handler.getCategories();
             categories = WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, rootCategories);
@@ -242,6 +242,9 @@ public class Main {
         pages.add("Main Page");
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         while (recursionLvl >= 1) {
+            // note: need to create a new file for each pass because it is being
+            // closed at the end of a pass
+            InputSource file = getFileReader(filename);
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetPagesInCategoriesHandler handler =
                     new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, categories, pages);
