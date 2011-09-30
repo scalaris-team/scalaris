@@ -53,7 +53,7 @@ init_per_suite(Config) ->
     Config.
 
 end_per_suite(_Config) ->
-    %crypto:stop(), ???
+    crypto:stop(),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
