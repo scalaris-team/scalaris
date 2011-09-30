@@ -223,20 +223,31 @@ public class Main {
         
         Set<String> categories = null;
         Map<String, Set<String>> categoryTree = null;
+        Map<String, Set<String>> templateTree = null;
         if (args.length >= 3) {
             LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
-            System.out.println("building category tree...");
+            System.out.println("building category tree for categories " + rootCategories.toString() + " ...");
             
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
             categoryTree = handler.getCategories();
-            categories = WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, rootCategories);
+            templateTree = handler.getTemplates();
+            categories = WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories);
         } else {
             System.err.println("need a list of categories to do filtering on; arguments given: " + Arrays.toString(args));
             System.exit(-1);
         }
+        
+        do {
+            FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
+            PrintWriter out = new PrintWriter(outFile);
+            for (String category : categories) {
+                out.println(category);
+            }
+            out.close();
+        } while(false);
 
         Set<String> pages = new HashSet<String>(categories);
         pages.add("Main Page");
@@ -247,20 +258,22 @@ public class Main {
             InputSource file = getFileReader(filename);
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetPagesInCategoriesHandler handler =
-                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, categories, pages);
+                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, categories, pages);
             runXmlHandler(handler, file);
             pages.addAll(handler.getPages());
             pages.addAll(handler.getLinksOnPages());
             
             --recursionLvl;
         }
-        
-        FileWriter outFile = new FileWriter(filename + "-filtered_pagelist.txt");
-        PrintWriter out = new PrintWriter(outFile);
-        for (String page : pages) {
-            out.println(page);
-        }
-        out.close();
+
+        do {
+            FileWriter outFile = new FileWriter(filename + "-filtered_pagelist.txt");
+            PrintWriter out = new PrintWriter(outFile);
+            for (String page : pages) {
+                out.println(page);
+            }
+            out.close();
+        } while(false);
     }
     
     /**

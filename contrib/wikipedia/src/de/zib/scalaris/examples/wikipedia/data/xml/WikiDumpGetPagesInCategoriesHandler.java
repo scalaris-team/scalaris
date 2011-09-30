@@ -31,11 +31,12 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
  */
 public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
-    Set<String> pages = new HashSet<String>();
-    Set<String> linksOnPages = new HashSet<String>();
-    Set<String> whitelist;
-    Set<String> categories;
-    Map<String, Set<String>> categoryTree;
+    protected Set<String> pages = new HashSet<String>();
+    protected Set<String> linksOnPages = new HashSet<String>();
+    protected final Set<String> whitelist;
+    protected final Set<String> categories;
+    protected Map<String, Set<String>> categoryTree;
+    protected Map<String, Set<String>> templateTree;
 
     /**
      * Sets up a SAX XmlHandler exporting all page titles in the given
@@ -49,6 +50,8 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      *            (useful to create dumps of a wiki at a specific point in time)
      * @param categoryTree
      *            information about the categories and their dependencies
+     * @param templateTree
+     *            information about the templates and their dependencies
      * @param categories
      *            include all pages in these categories
      * @param whitelist
@@ -60,11 +63,13 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      */
     public WikiDumpGetPagesInCategoriesHandler(Set<String> blacklist,
             Calendar maxTime, Map<String, Set<String>> categoryTree,
+            Map<String, Set<String>> templateTree,
             Set<String> categories, Set<String> whitelist) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
         this.categories = categories;
         this.whitelist = whitelist;
         this.categoryTree = categoryTree;
+        this.templateTree = templateTree;
     }
 
     /**
@@ -96,28 +101,34 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             for (String cat_raw: pageCategories_raw) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
                 pageCategories.add(category);
-                if (categories.contains(category)) {
+                if (!pageInAllowedCat && categories.contains(category)) {
+//                    System.out.println("page " + page.getTitle() + " in category " + category);
                     pageInAllowedCat = true;
-                    break;
                 }
             }
-
+            
             boolean pageInAllowedTpl = false;
             Set<String> pageTemplates_raw = wikiModel.getTemplates();
             ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
             for (String tpl_raw: pageTemplates_raw) {
                 String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
                 pageTemplates.add(template);
-                if (categories.contains(template)) {
-                    pageInAllowedTpl = true;
-                    break;
+                if (!pageInAllowedCat && categories.contains(template)) {
+//                    System.out.println("page " + page.getTitle() + " uses template " + template);
+                    pageInAllowedCat = true;
                 }
             }
             
             if (whitelist.contains(page.getTitle()) || pageInAllowedCat || pageInAllowedTpl) {
                 pages.add(page.getTitle());
-                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, pageCategories));
-                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllSubCats(categoryTree, pageTemplates));
+                System.out.println("added: " + page.getTitle());
+                // add only new categories to the pages:
+                // note: no need to include sub-categories
+                // note: parent categories are not included
+                pages.addAll(pageCategories);
+                // add templates and their requirements:
+                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplates));
+                
                 String redirLink = wikiModel.getRedirectLink();
                 if (redirLink != null) {
                     pages.add(redirLink);
