@@ -44,4 +44,14 @@ public interface WikiDump {
      */
     public abstract void stopParsing();
 
+    /**
+     * Method to be called before using the handler.
+     */
+    public abstract void setUp();
+
+    /**
+     * Method to be called after using the handler (to clean up).
+     */
+    public abstract void tearDown();
+
 }

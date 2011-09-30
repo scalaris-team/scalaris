@@ -237,16 +237,18 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      *            the page to export
      */
     protected abstract void export(XmlPage page);
-    
-    /**
-     * Method to be called before using the handler.
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#setUp()
      */
+    @Override
     public void setUp() {
     }
 
-    /**
-     * Method to be called after using the handler (to clean up).
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#tearDown()
      */
+    @Override
     public void tearDown() {
     }
 

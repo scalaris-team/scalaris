@@ -151,8 +151,13 @@ public class Main {
             if (filename.endsWith(".db")) {
                 WikiDumpPreparedSQLiteToScalaris handler =
                         new WikiDumpPreparedSQLiteToScalaris(filename);
+                handler.setUp();
+                WikiDumpPreparedSQLiteToScalaris.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+                Runtime.getRuntime().addShutdownHook(shutdownHook);
                 handler.writeToScalaris();
-                handler.new ReportAtShutDown().run();
+                handler.tearDown();
+                shutdownHook.run();
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
             } else {
                 WikiDumpHandler handler =
                         new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);

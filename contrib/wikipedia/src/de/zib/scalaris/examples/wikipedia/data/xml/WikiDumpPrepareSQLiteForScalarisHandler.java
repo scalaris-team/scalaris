@@ -68,23 +68,6 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
             Set<String> whitelist, int maxRevisions, Calendar maxTime,
             String dbFileName) throws RuntimeException {
         super(blacklist, whitelist, maxRevisions, maxTime, dbFileName);
-        init();
-    }
-
-    /**
-     * Initialises the SQLite db to use during processing.
-     * 
-     * @throws RuntimeException
-     */
-    private void init() throws RuntimeException {
-        try {
-            db = openDB(this.dbFileName);
-            db.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
-            stRead = createReadStmt(db);
-            stWrite = createWriteStmt(db);
-        } catch (SQLiteException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -214,6 +197,23 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     }
 
     /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpPrepareForScalarisHandler#setUp()
+     */
+    @Override
+    public void setUp() {
+        super.setUp();
+        
+        try {
+            db = openDB(this.dbFileName);
+            db.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
+            stRead = createReadStmt(db);
+            stWrite = createWriteStmt(db);
+        } catch (SQLiteException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /* (non-Javadoc)
      * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler#tearDown()
      */
     @Override
@@ -221,6 +221,15 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         super.tearDown();
         stRead.dispose();
         stWrite.dispose();
+        db.dispose();
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
         db.dispose();
     }
 }

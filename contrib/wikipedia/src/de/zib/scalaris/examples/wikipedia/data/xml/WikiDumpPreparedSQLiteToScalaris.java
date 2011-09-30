@@ -64,6 +64,9 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     SQLiteConnection db;
     SQLiteStatement stRead;
     
+    String dbFileName;
+    ConnectionFactory cFactory;
+    
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
      * blacklist to Scalaris but with an additional pre-process phase.
@@ -75,7 +78,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      *             if the connection to Scalaris fails
      */
     public WikiDumpPreparedSQLiteToScalaris(String dbFileName) throws RuntimeException {
-        init(dbFileName, ConnectionFactory.getInstance());
+        this.dbFileName = dbFileName;
+        this.cFactory = ConnectionFactory.getInstance();
     }
 
     /**
@@ -91,43 +95,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      *             if the connection to Scalaris fails
      */
     public WikiDumpPreparedSQLiteToScalaris(String dbFileName, ConnectionFactory cFactory) throws RuntimeException {
-        init(dbFileName, cFactory);
-    }
-
-    /**
-     * Sets up the directory to write files to as well as the Scalaris
-     * connection.
-     * 
-     * @param dbFileName
-     *            the name of the database file to read from
-     * @param cFactory
-     *            the connection factory to use for creating new connections
-     * 
-     * @throws RuntimeException
-     *             if the directory could not be created
-     */
-    public void init(String dbFileName, ConnectionFactory cFactory) throws RuntimeException {
-        try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
-            stRead = WikiDumpPrepareSQLiteForScalarisHandler.createReadStmt(db);
-        } catch (SQLiteException e) {
-            System.err.println("Cannot read database: " + dbFileName);
-            throw new RuntimeException(e);
-        }
-        
-        try {
-            for (int i = 0; i < MAX_SCALARIS_CONNECTIONS; ++i) {
-                Connection connection = cFactory.createConnection(
-                        "wiki_import", true);
-                scalaris_single.put(new TransactionSingleOp(connection));
-            }
-        } catch (ConnectionException e) {
-            System.err.println("Connection to Scalaris failed");
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            System.err.println("Interrupted while setting up multiple connections to Scalaris");
-            throw new RuntimeException(e);
-        }
+        this.dbFileName = dbFileName;
+        this.cFactory = cFactory;
     }
 
     /**
@@ -272,5 +241,44 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         super.finalize();
         stRead.dispose();
         db.dispose();
+    }
+
+    /**
+     * Sets up the directory to write files to as well as the Scalaris
+     * connection.
+     * 
+     * @throws RuntimeException
+     *             if the directory could not be created
+     */
+    @Override
+    public void setUp() {
+        try {
+            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
+            stRead = WikiDumpPrepareSQLiteForScalarisHandler.createReadStmt(db);
+        } catch (SQLiteException e) {
+            System.err.println("Cannot read database: " + dbFileName);
+            throw new RuntimeException(e);
+        }
+
+        try {
+            for (int i = 0; i < MAX_SCALARIS_CONNECTIONS; ++i) {
+                Connection connection = cFactory.createConnection(
+                        "wiki_import", true);
+                scalaris_single.put(new TransactionSingleOp(connection));
+            }
+        } catch (ConnectionException e) {
+            System.err.println("Connection to Scalaris failed");
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            System.err.println("Interrupted while setting up multiple connections to Scalaris");
+            throw new RuntimeException(e);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.data.xml.WikiDump#tearDown()
+     */
+    @Override
+    public void tearDown() {
     }
 }

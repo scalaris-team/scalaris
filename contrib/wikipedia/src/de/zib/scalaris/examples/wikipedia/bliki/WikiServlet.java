@@ -41,6 +41,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -74,7 +75,9 @@ import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDump;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpPreparedSQLiteToScalaris;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
@@ -114,7 +117,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
      */
     public static final String imageBaseURL = WikiServlet.wikiBaseURL + "?get_image=${image}";
 
-    private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*\\.xml(\\.gz|\\.bz2)?$");
+    private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     private static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
     /*
      * http://simple.wiktionary.org/wiki/Main_Page
@@ -128,7 +131,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     private String currentImport = "";
 
     private static CircularByteArrayOutputStream importLog = null;
-    private WikiDumpHandler importHandler = null;
+    private WikiDump importHandler = null;
     
     private List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
 
@@ -1027,15 +1030,15 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
         
         if (currentImport.isEmpty() && importHandler == null) {
-            List<String> availableDumps = new LinkedList<String>();
+            TreeSet<String> availableDumps = new TreeSet<String>();
             File dumpsDir = new File(dumpsPath);
             if (dumpsDir.isDirectory()) {
-                availableDumps = Arrays.asList(dumpsDir.list(new FilenameFilter() {
+                availableDumps.addAll(Arrays.asList(dumpsDir.list(new FilenameFilter() {
                     @Override
                     public boolean accept(File dir, String name) {
                         return MATCH_WIKI_IMPORT_FILE.matcher(name).matches();
                     }
-                }));
+                })));
             }
 
             // get parameters:
@@ -1045,7 +1048,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 
                 content.append("<form method=\"get\" action=\"wiki\">\n");
                 content.append("<p>\n");
-                content.append("  <select name=\"import\" size=\"10\" style=\"width:400px;\">\n");
+                content.append("  <select name=\"import\" size=\"10\" style=\"width:500px;\">\n");
                 for (String dump: availableDumps) {
                     content.append("   <option>" + dump + "</option>\n");
                 }
@@ -1065,13 +1068,16 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     importLog = new CircularByteArrayOutputStream(1024 * 1024);
                     PrintStream ps = new PrintStream(importLog);
                     ps.println("starting import...");
-                    importHandler = new WikiDumpToScalarisHandler(de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist, null, maxRevisions, maxTime, cFactory);
-                    importHandler.setUp();
+                    String fileName = dumpsPath + File.separator + req_import;
+                    if (fileName.endsWith(".db")) {
+                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName);
+                    } else {
+                        importHandler = new WikiDumpToScalarisHandler(
+                                de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
+                                null, maxRevisions, maxTime, cFactory);
+                    }
                     importHandler.setMsgOut(ps);
-                    InputSource is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(dumpsPath + File.separator + req_import);
-                    XMLReader reader = XMLReaderFactory.createXMLReader();
-                    reader.setContentHandler(importHandler);
-                    this.new ImportThread(reader, importHandler, is, ps).start();
+                    this.new ImportThread(importHandler, fileName, ps).start();
                     response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
                     content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
                     content.append("<pre>");
@@ -1121,15 +1127,13 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
     }
     
     class ImportThread extends Thread {
-        private XMLReader reader;
-        private WikiDumpHandler handler;
-        private InputSource is;
+        private WikiDump handler;
+        private String fileName;
         private PrintStream ps;
         
-        public ImportThread(XMLReader reader, WikiDumpHandler handler, InputSource is, PrintStream ps) {
-            this.reader = reader;
+        public ImportThread(WikiDump handler, String fileName, PrintStream ps) {
             this.handler = handler;
-            this.is = is;
+            this.fileName = fileName;
             this.ps = ps;
         }
         /* (non-Javadoc)
@@ -1137,25 +1141,43 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
          */
         @Override
         public void run() {
+            InputSource is = null;
             try {
-                reader.parse(is);
-                handler.tearDown();
-                ps.println("import finished");
+                handler.setUp();
+                if (handler instanceof WikiDumpHandler) {
+                    WikiDumpHandler xmlHandler = (WikiDumpHandler) handler;
+                    XMLReader reader = XMLReaderFactory.createXMLReader();
+                    reader.setContentHandler(xmlHandler);
+                    is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(fileName);
+                    reader.parse(is);
+                    xmlHandler.new ReportAtShutDown().run();
+                    ps.println("import finished");
+                } else if (handler instanceof WikiDumpPreparedSQLiteToScalaris) {
+                    WikiDumpPreparedSQLiteToScalaris sqlHandler =
+                            (WikiDumpPreparedSQLiteToScalaris) handler;
+                    sqlHandler.writeToScalaris();
+                    sqlHandler.new ReportAtShutDown().run();
+                    
+                }
             } catch (Exception e) {
                 if (e instanceof SAXParsingInterruptedException) {
                     // this is ok - we told the parser to stop
                 } else {
                     e.printStackTrace(ps);
                 }
+            } finally {
+                handler.tearDown();
+                if (is != null) {
+                    try {
+                        is.getCharacterStream().close();
+                    } catch (IOException e) {
+                        // don't care
+                    }
+                }
             }
             synchronized (WikiServlet.this) {
                 WikiServlet.this.currentImport = "";
                 WikiServlet.this.importHandler = null;
-            }
-            try {
-                is.getCharacterStream().close();
-            } catch (IOException e) {
-                // don't care
             }
         }
     }
