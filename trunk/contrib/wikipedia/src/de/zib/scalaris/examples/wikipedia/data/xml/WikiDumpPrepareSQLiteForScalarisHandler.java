@@ -114,6 +114,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     }
 
     /**
+     * 
      * @param <T>
      * @param siteinfo
      * @param key
@@ -123,7 +124,9 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     @Override
     protected <T> T readObject(String key)
             throws RuntimeException, FileNotFoundException {
-        return readObject(stRead, key);
+        // Note: need to qualify static function call due to
+        // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+        return WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key);
     }
 
     /**
