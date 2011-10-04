@@ -21,5 +21,5 @@ WEBDIR=/usr/lib/scalaris/contrib/opennebula
 mkdir -p $WEBDIR/public
 cd $WEBDIR
 # the sleep command is used to find error messages
-screen -d -m /bin/bash -c "VMID=$VMID HADOOP_MASTER=$HADOOP_MASTER $WEB/manager.rb; sleep 365d"
+screen -d -m /bin/bash -c "VMID=$VMID HADOOP_MASTER=$HADOOP_MASTER $WEBDIR/manager.rb; sleep 365d"
 cd -
