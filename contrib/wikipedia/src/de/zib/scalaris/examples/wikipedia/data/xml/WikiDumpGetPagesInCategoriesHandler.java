@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.data.Page;
+import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 
 /**
  * Provides abilities to read an xml wiki dump file and extract page titles
@@ -33,8 +34,13 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
     protected Set<String> pages = new HashSet<String>();
     protected Set<String> linksOnPages = new HashSet<String>();
-    protected final Set<String> whitelist;
-    protected final Set<String> categories;
+    /**
+     * A number of pages to include (parses these pages for more links).
+     * Note: this is different from {@link WikiDumpHandler#allowedPages} as it
+     * this still allows pages not in this list to be parsed.
+     */
+    protected final Set<String> allowedPages;
+    protected final Set<String> allowedCats;
     protected Map<String, Set<String>> categoryTree;
     protected Map<String, Set<String>> templateTree;
 
@@ -52,10 +58,10 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      *            information about the categories and their dependencies
      * @param templateTree
      *            information about the templates and their dependencies
-     * @param categories
+     * @param allowedCats
      *            include all pages in these categories
-     * @param whitelist
-     *            a number of pages to include (parses these pages for more
+     * @param allowedPages
+     *            a number of pages to include (also parses these pages for more
      *            links)
      * 
      * @throws RuntimeException
@@ -64,12 +70,22 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     public WikiDumpGetPagesInCategoriesHandler(Set<String> blacklist,
             Calendar maxTime, Map<String, Set<String>> categoryTree,
             Map<String, Set<String>> templateTree,
-            Set<String> categories, Set<String> whitelist) throws RuntimeException {
+            Set<String> allowedCats, Set<String> allowedPages) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
-        this.categories = categories;
-        this.whitelist = whitelist;
+        this.allowedCats = allowedCats;
+        this.allowedPages = allowedPages;
         this.categoryTree = categoryTree;
         this.templateTree = templateTree;
+        // we do not need to parse any other pages if the allowedCats set is empty!
+        if (allowedCats.isEmpty()) {
+            setPageCheckSkipRevisions(new CheckSkipRevisions() {
+                @Override
+                public boolean skipRevisions(String pageTitle) {
+                    return !WikiDumpGetPagesInCategoriesHandler.this.allowedPages
+                            .contains(pageTitle);
+                }
+            });
+        }
     }
 
     /**
@@ -101,7 +117,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             for (String cat_raw: pageCategories_raw) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
                 pageCategories.add(category);
-                if (!pageInAllowedCat && categories.contains(category)) {
+                if (!pageInAllowedCat && allowedCats.contains(category)) {
 //                    System.out.println("page " + page.getTitle() + " in category " + category);
                     pageInAllowedCat = true;
                 }
@@ -113,21 +129,24 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             for (String tpl_raw: pageTemplates_raw) {
                 String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
                 pageTemplates.add(template);
-                if (!pageInAllowedCat && categories.contains(template)) {
+                if (!pageInAllowedTpl && allowedCats.contains(template)) {
 //                    System.out.println("page " + page.getTitle() + " uses template " + template);
-                    pageInAllowedCat = true;
+                    pageInAllowedTpl = true;
                 }
             }
             
-            if (whitelist.contains(page.getTitle()) || pageInAllowedCat || pageInAllowedTpl) {
+            if (allowedPages.contains(page.getTitle()) || pageInAllowedCat || pageInAllowedTpl) {
                 pages.add(page.getTitle());
                 System.out.println("added: " + page.getTitle());
                 // add only new categories to the pages:
                 // note: no need to include sub-categories
                 // note: parent categories are not included
                 pages.addAll(pageCategories);
+//                System.out.println("added cats: " + pageCategories.toString());
                 // add templates and their requirements:
-                pages.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplates));
+                Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplates);
+                pages.addAll(tplChildren);
+//                System.out.println("added tpls: " + tplChildren.toString());
                 
                 String redirLink = wikiModel.getRedirectLink();
                 if (redirLink != null) {

@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
@@ -221,13 +222,17 @@ public class Main {
             }
         }
         
-        Set<String> categories = null;
-        Map<String, Set<String>> categoryTree = null;
-        Map<String, Set<String>> templateTree = null;
+        Set<String> categories = new HashSet<String>();
+        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
+        LinkedList<String> rootCategories = new LinkedList<String>();
         if (args.length >= 3) {
-            LinkedList<String> rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
-            System.out.println("building category tree for categories " + rootCategories.toString() + " ...");
-            
+            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
+            rootCategories.removeAll(Arrays.asList(""));
+        }
+        System.out.println("building category tree for categories " + rootCategories.toString() + " ...");
+
+        do {
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
             InputSource file = getFileReader(filename);
@@ -235,10 +240,7 @@ public class Main {
             categoryTree = handler.getCategories();
             templateTree = handler.getTemplates();
             categories = WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories);
-        } else {
-            System.err.println("need a list of categories to do filtering on; arguments given: " + Arrays.toString(args));
-            System.exit(-1);
-        }
+        } while(false);
         
         do {
             FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
