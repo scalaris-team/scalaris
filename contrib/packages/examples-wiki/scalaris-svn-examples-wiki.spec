@@ -19,6 +19,8 @@ BuildRequires:  scalaris-svn-java >= 2131
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+# the wiki includes some libraries which are normally not allowed in noarch packages:
+%global _binaries_in_noarch_packages_terminate_build 0
 %if 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600
 %define with_tomcat5 0
 %else
