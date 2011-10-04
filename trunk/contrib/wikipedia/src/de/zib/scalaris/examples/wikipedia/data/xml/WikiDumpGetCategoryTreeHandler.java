@@ -57,6 +57,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     public WikiDumpGetCategoryTreeHandler(Set<String> blacklist,
             Calendar maxTime) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
+        // since we do not use a whitelist, we can safely overwrite the skip
+        // revision handler:
+        // (otherwise we should also filter using the whitelist)
         setPageCheckSkipRevisions(new CheckSkipRevisions() {
             @Override
             public boolean skipRevisions(String pageTitle) {

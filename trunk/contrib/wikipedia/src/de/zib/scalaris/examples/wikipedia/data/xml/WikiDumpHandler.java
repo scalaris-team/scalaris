@@ -69,6 +69,10 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
      * blacklist.
      * 
+     * If a whitelist is given, a skip revision handler is set which ignores
+     * pages not in the whitelist. See
+     * {@link #setPageCheckSkipRevisions(CheckSkipRevisions)}.
+     * 
      * @param blacklist
      *            a number of page titles to ignore
      * @param whitelist
@@ -79,13 +83,22 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      *            (useful to speed up the import / reduce the DB size)
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
-     *            omitted) - <tt>null/tt> imports all revisions
-     *            (useful to create dumps of a wiki at a specific point in time)
+     *            omitted) - <tt>null/tt> imports all revisions (useful to
+     *            create dumps of a wiki at a specific point in time)
      */
     public WikiDumpHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar maxTime) {
         this.blacklist = blacklist;
         this.whitelist = whitelist;
         currentPage = new XmlPage(maxRevisions, maxTime);
+        // if a whitelist is given, do not render any other page:
+        if (whitelist != null) {
+            currentPage.setCheckSkipRevisions(new CheckSkipRevisions() {
+                @Override
+                public boolean skipRevisions(String pageTitle) {
+                    return !WikiDumpHandler.this.whitelist.contains(pageTitle);
+                }
+            });
+        }
     }
 
     /**
