@@ -25,6 +25,7 @@ class ScalarisHelper < OpenNebulaHelper
 
   def get_node_info(instance, vmid)
     info = {}
+    info[:ip] = get_ip(ENV['VMID'])
     info[:rpm_version] = get_scalaris_version()
     info[:vmid] = ENV['VMID']
     info.merge!(get_scalaris_info("get_node_info"))
