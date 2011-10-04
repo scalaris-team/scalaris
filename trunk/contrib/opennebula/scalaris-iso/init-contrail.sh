@@ -36,6 +36,6 @@ export HOME=/root
 # the sleep command is used to find error messages
 screen -d -m /bin/bash -c "/usr/bin/scalarisctl -s -n node@$ADDR -p 14195 -y 8000 $SCALARIS_PARAMS start; sleep 365d"
 
-/var/lib/sc-manager/start-manager.sh
+/usr/lib/scalaris/contrib/opennebula/start-manager.sh
 
 /etc/init.d/iptables stop
