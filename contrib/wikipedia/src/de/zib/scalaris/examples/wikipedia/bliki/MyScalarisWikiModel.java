@@ -83,36 +83,31 @@ public class MyScalarisWikiModel extends MyWikiModel {
     }
 
     /**
-     * Retrieves the contents of the given template from Scalaris.
+     * Retrieves the contents of the given page from Scalaris.
      * 
-     * @param name
-     *            the template's name without the namespace
-     * @param parameter
-     *            the parameters of the template
+     * @param namespace
+     *            the namespace of the page
+     * @param articleName
+     *            the page's name without the namespace
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
      * 
-     * @return the template's contents or <tt>null</tt> if no connection exists
+     * @return the page's contents or <tt>null</tt> if no connection exists
      */
     @Override
-    protected String retrieveTemplate(String name, Map<String, String> parameters) {
-        // retrieve template from Scalaris:
-        // note: templates are already cached, no need to cache them here
+    protected String retrievePage(String namespace, String articleName,
+            Map<String, String> templateParameters) {
         if (connection != null) {
-            // (ugly) fix for template parameter replacement if no parameters given,
-            // e.g. "{{noun}}" in the simple English Wiktionary
-            if (parameters != null && parameters.isEmpty()) {
-                parameters.put("", null);
-            }
-            String pageName = getTemplateNamespace() + ":" + name;
+            String pageName = createFullPageName(namespace, articleName);
             RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
             if (getRevResult.success) {
-                String text = getRevResult.revision.getText();
-                text = removeNoIncludeContents(text);
-                return text;
+                return getRevResult.revision.getText();
             } else {
 //                        System.err.println(getRevResult.message);
 //                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
                 /*
-                 * the template was not found and will never be - assume
+                 * the page was not found and will never be - assume
                  * an empty content instead of letting the model try
                  * again (which is what it does if null is returned)
                  */

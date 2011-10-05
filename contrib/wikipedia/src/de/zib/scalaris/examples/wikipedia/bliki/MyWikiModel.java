@@ -134,7 +134,19 @@ public class MyWikiModel extends WikiModel {
             if (processedMagicWord != null) {
                 return processedMagicWord;
             } else {
-                return retrieveTemplate(articleName, templateParameters);
+                // note: templates are already cached, no need to cache them here
+                
+                // (ugly) fix for template parameter replacement if no parameters given,
+                // e.g. "{{noun}}" in the simple English Wiktionary
+                if (templateParameters != null && templateParameters.isEmpty()) {
+                    templateParameters.put("", null);
+                }
+                
+                String text = retrievePage(namespace, articleName, templateParameters);
+                if (text != null && !text.isEmpty()) {
+                    text = removeNoIncludeContents(text);
+                }
+                return text;
             }
         }
         
@@ -142,9 +154,9 @@ public class MyWikiModel extends WikiModel {
             // requesting a page from a redirect?
             return getRedirectContent(getRedirectLink());
         }
-//        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
-//            templateParameters + ")");
-        return null;
+        
+        // e.g. page inclusions of the form "{{:Main Page/Introduction}}"
+        return retrievePage(namespace, articleName, templateParameters);
     }
 
     /**
@@ -230,18 +242,40 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Retrieves the contents of the given template (override in
-     * sub-classes!).
+     * Creates the full pagename including the namespace (if non-empty).
      * 
-     * @param name
-     *            the template's name without the namespace
-     * @param parameter
-     *            the parameters of the template
+     * @param namespace
+     *            the namespace of a page
+     * @param articleName
+     *            the name of a page
+     * 
+     * @return the full name of the page
+     */
+    public static String createFullPageName(String namespace, String articleName) {
+        String pageName;
+        if (namespace.isEmpty()) {
+            pageName = articleName;
+        } else {
+            pageName = namespace + ":" + articleName;
+        }
+        return pageName;
+    }
+    
+    /**
+     * Retrieves the contents of the given page (override in sub-classes!).
+     * 
+     * @param namespace
+     *            the namespace of the page
+     * @param articleName
+     *            the page's name without the namespace
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
      * 
      * @return <tt>null</tt>
      */
-    protected String retrieveTemplate(String name,
-            Map<String, String> parameters) {
+    protected String retrievePage(String namespace, String articleName,
+            Map<String, String> templateParameters) {
         return null;
     }
 
