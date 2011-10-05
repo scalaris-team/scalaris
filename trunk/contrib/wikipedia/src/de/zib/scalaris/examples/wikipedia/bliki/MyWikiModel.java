@@ -75,7 +75,8 @@ public class MyWikiModel extends WikiModel {
             "kbd", "koi", "krc", "ksh", "lad", "lbe", "lmo", "map-bms", "mdf",
             "mrj", "mwl", "nap", "nds-nl", "nrm", "pcd", "pfl", "pih", "pnb", "rmy",
             "roa-tara", "rue", "sah", "sco", "stq", "szl", "udm",
-            "war", "wuu", "xmf", "zea", "zh-classical", "zh-yue" };
+            "war", "wuu", "xmf", "zea", "zh-classical", "zh-yue",
+            "ckb", "hif", "mhr", "myv", "srn"};
     
     protected static final Set<String> INTERLANGUAGE_KEYS;
     
@@ -538,7 +539,7 @@ public class MyWikiModel extends WikiModel {
          */
         String[] nsTitle = splitNsTitle(topic);
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
-            appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, false);
+            appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic));
         } else {
             super.appendInternalLink(topic, hashSection, topicDescription, cssClass, parseRecursive);
         }
