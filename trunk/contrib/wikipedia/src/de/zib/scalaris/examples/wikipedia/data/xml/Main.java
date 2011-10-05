@@ -16,13 +16,17 @@
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -32,6 +36,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.xml.sax.InputSource;
@@ -222,25 +227,18 @@ public class Main {
             }
         }
         
-        Set<String> categories = new HashSet<String>();
-        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
         LinkedList<String> rootCategories = new LinkedList<String>();
         if (args.length >= 3) {
             rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
             rootCategories.removeAll(Arrays.asList(""));
         }
-        System.out.println("building category tree for categories " + rootCategories.toString() + " ...");
+        System.out.println("filtering by categories " + rootCategories.toString() + " ...");
 
-        do {
-            // need to get all subcategories recursively, as they must be included as well 
-            WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
-            InputSource file = getFileReader(filename);
-            runXmlHandler(handler, file);
-            categoryTree = handler.getCategories();
-            templateTree = handler.getTemplates();
-            categories = WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories);
-        } while(false);
+        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
+        getCategoryTemplateTrees(filename, maxTime, categoryTree, templateTree);
+        Set<String> categories = new HashSet<String>();
+        categories.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories));
         
         do {
             FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
@@ -276,6 +274,73 @@ public class Main {
             }
             out.close();
         } while(false);
+    }
+
+    /**
+     * Gets the category and template trees from a file, i.e.
+     * <tt>filename + "-trees.bin"</tt>, or if this does not exist, builds the
+     * trees and stores them to this file.
+     * 
+     * @param filename
+     *            the name of the xml wiki dump file
+     * @param maxTime
+     *            the maximum time of a revision to use for category parsing
+     * @param categoryTree
+     *            the (preferably empty) category tree object
+     * @param templateTree
+     *            the (preferably empty) template tree object
+     * 
+     * @throws RuntimeException
+     * @throws FileNotFoundException
+     * @throws IOException
+     * @throws SAXException
+     */
+    protected static void getCategoryTemplateTrees(String filename,
+            Calendar maxTime,
+            Map<String, Set<String>> categoryTree,
+            Map<String, Set<String>> templateTree) throws RuntimeException,
+            FileNotFoundException, IOException, SAXException {
+        File trees = new File(filename + "-trees.bin.gz");
+        if (trees.exists()) {
+            // read trees from tree file
+            System.out.println("reading category tree from " + trees.getName() + " ...");
+            ObjectInputStream ois = new ObjectInputStream(new GZIPInputStream(
+                    new FileInputStream(trees)));
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Set<String>> catTree =
+                        (Map<String, Set<String>>) ois.readObject();
+                categoryTree.putAll(catTree);
+                @SuppressWarnings("unchecked")
+                Map<String, Set<String>> tplTree =
+                        (Map<String, Set<String>>) ois.readObject();
+                templateTree.putAll(tplTree);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            } finally {
+                ois.close();
+            }
+        } else {
+            // build trees from xml file
+            // need to get all subcategories recursively, as they must be included as well 
+            System.out.println("building category tree from " + filename + " ...");
+            WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime);
+            InputSource file = getFileReader(filename);
+            runXmlHandler(handler, file);
+            categoryTree.putAll(handler.getCategories());
+            templateTree.putAll(handler.getTemplates());
+            
+            // save trees to tree file
+            System.out.println("saving category tree to " + trees.getName() + " ...");
+            ObjectOutputStream oos = new ObjectOutputStream(
+                    new GZIPOutputStream(new FileOutputStream(trees)));
+            try {
+                oos.writeObject(categoryTree);
+                oos.writeObject(templateTree);
+            } finally {
+                oos.close();
+            }
+        }
     }
     
     /**
