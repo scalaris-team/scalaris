@@ -26,6 +26,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
+import de.zib.scalaris.examples.wikipedia.bliki.MyParsingWikiModel;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
@@ -222,7 +223,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     }
     
     private void setUpWikiModel(SiteInfo siteinfo) {
-        wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
+        wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteinfo));
     }
 
     /**
