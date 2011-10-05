@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
+import info.bliki.wiki.filter.MagicWord;
 import info.bliki.wiki.filter.Util;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
@@ -23,6 +24,7 @@ import info.bliki.wiki.model.WikiModel;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
@@ -76,6 +78,11 @@ public class MyWikiModel extends WikiModel {
             "war", "wuu", "xmf", "zea", "zh-classical", "zh-yue" };
     
     protected static final Set<String> INTERLANGUAGE_KEYS;
+    
+    /**
+     * Cache of processed magic words.
+     */
+    protected Map<String, String> magicWordCache = new HashMap<String, String>();
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -99,8 +106,8 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Creates a new wiki model to render wiki text using the given connection
-     * to Scalaris.
+     * Creates a new wiki model to render wiki text fixing some bugs of
+     * {@link WikiModel}.
      * 
      * @param imageBaseURL
      *            base url pointing to images - can contain ${image} for
@@ -114,6 +121,128 @@ public class MyWikiModel extends WikiModel {
     public MyWikiModel(String imageBaseURL, String linkBaseURL, MyNamespace namespace) {
         super(new MyConfiguration(namespace), null, namespace, imageBaseURL, linkBaseURL);
         this.fExternalWikiBaseFullURL = linkBaseURL;
+    }
+    
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.AbstractWikiModel#getRawWikiContent(java.lang.String, java.lang.String, java.util.Map)
+     */
+    @Override
+    public String getRawWikiContent(String namespace, String articleName,
+            Map<String, String> templateParameters) {
+        if (isTemplateNamespace(namespace)) {
+            String processedMagicWord = getMagicWord(articleName);
+            if (processedMagicWord != null) {
+                return processedMagicWord;
+            } else {
+                return retrieveTemplate(articleName, templateParameters);
+            }
+        }
+        
+        if (getRedirectLink() != null) {
+            // requesting a page from a redirect?
+            return getRedirectContent(getRedirectLink());
+        }
+//        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
+//            templateParameters + ")");
+        return null;
+    }
+
+    /**
+     * Checks whether the given template name is a magic word and if this is the
+     * case, processes it and returns its value.
+     * 
+     * Retrieves magic word contents using
+     * {@link #retrieveMagicWord(String, String, String)} and caches the
+     * contents in {@link #magicWordCache}.
+     * 
+     * @param templateName
+     *            the template's name without the namespace, e.g. a magic word
+     *            including its parameters
+     * 
+     * @return the contents of the magic word or <tt>null</tt> if the template
+     *         is no magic word
+     */
+    private String getMagicWord(String templateName) {
+        String magicWord = templateName;
+        String parameter = "";
+        int index = magicWord.indexOf(':');
+        if (index > 0) {
+            parameter = magicWord.substring(index + 1).trim();
+            magicWord = magicWord.substring(0, index);
+        }
+        if (isMagicWord(magicWord)) {
+            // cache values for magic words:
+            if (magicWordCache.containsKey(templateName)) {
+                return magicWordCache.get(templateName);
+            } else {
+                String value = retrieveMagicWord(templateName, magicWord, parameter);
+                magicWordCache.put(templateName, value);
+                return value;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Determines if a template name corresponds to a magic word using
+     * {@link MagicWord#isMagicWord(String)}.
+     * 
+     * @param name
+     *            the template name
+     * 
+     * @return whether the template is a magic word or not
+     */
+    protected boolean isMagicWord(String name) {
+        return MagicWord.isMagicWord(name);
+    }
+    
+    /**
+     * Retrieves the contents of the given magic word using
+     * {@link MagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)}.
+     * 
+     * @param templateName
+     *            the template's name without the namespace, e.g. a magic word
+     *            including its parameters
+     * @param magicWord
+     *            the magic word alone
+     * @param parameter
+     *            the parameters of the magic word
+     * 
+     * @return the contents of the magic word
+     */
+    protected String retrieveMagicWord(String templateName, String magicWord,
+            String parameter) {
+        return MagicWord.processMagicWord(templateName, parameter, this);
+    }
+    
+    /**
+     * Gets the contents of the newest revision of the page redirected to
+     * (override in sub-classes!).
+     * 
+     * @param pageName
+     *            the name of the page redirected to
+     * 
+     * @return a placeholder string for the redirect
+     */
+    public String getRedirectContent(String pageName) {
+        return "&#35;redirect [[" + pageName + "]]";
+    }
+    
+    /**
+     * Retrieves the contents of the given template (override in
+     * sub-classes!).
+     * 
+     * @param name
+     *            the template's name without the namespace
+     * @param parameter
+     *            the parameters of the template
+     * 
+     * @return <tt>null</tt>
+     */
+    protected String retrieveTemplate(String name,
+            Map<String, String> parameters) {
+        return null;
     }
 
     /**

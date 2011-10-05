@@ -15,8 +15,6 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
-
-import java.util.HashMap;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
@@ -30,7 +28,6 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
  */
 public class MyScalarisWikiModel extends MyWikiModel {
     protected Connection connection;
-    protected Map<String, String> magicWordCache = new HashMap<String, String>();
     /**
      * Creates a new wiki model to render wiki text using the given connection
      * to Scalaris.
@@ -50,66 +47,80 @@ public class MyScalarisWikiModel extends MyWikiModel {
         super(imageBaseURL, linkBaseURL, namespace);
         this.connection = connection;
     }
-    
-    /* (non-Javadoc)
-     * @see info.bliki.wiki.model.AbstractWikiModel#getRawWikiContent(java.lang.String, java.lang.String, java.util.Map)
+
+    /**
+     * Determines if a template name corresponds to a magic word using
+     * {@link MyScalarisMagicWord#isMagicWord(String)}.
+     * 
+     * @param name
+     *            the template name
+     * 
+     * @return whether the template is a magic word or not
      */
     @Override
-    public String getRawWikiContent(String namespace, String articleName,
-            Map<String, String> templateParameters) {
-        if (isTemplateNamespace(namespace)) {
-            String magicWord = articleName;
-            String parameter = "";
-            int index = magicWord.indexOf(':');
-            if (index > 0) {
-                parameter = magicWord.substring(index + 1).trim();
-                magicWord = magicWord.substring(0, index);
+    protected boolean isMagicWord(String name) {
+        return MyScalarisMagicWord.isMagicWord(name);
+    }
+
+    /**
+     * Retrieves the contents of the given magic word from Scalaris.
+     * 
+     * @param templateName
+     *            the template's name without the namespace, e.g. a magic word
+     *            including its parameters
+     * @param magicWord
+     *            the magic word alone
+     * @param parameter
+     *            the parameters of the magic word
+     * 
+     * @return the contents of the magic word (see
+     *         {@link MyScalarisMagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)})
+     */
+    @Override
+    protected String retrieveMagicWord(String articleName, String magicWord,
+            String parameter) {
+        return MyScalarisMagicWord.processMagicWord(magicWord, parameter, this);
+    }
+
+    /**
+     * Retrieves the contents of the given template from Scalaris.
+     * 
+     * @param name
+     *            the template's name without the namespace
+     * @param parameter
+     *            the parameters of the template
+     * 
+     * @return the template's contents or <tt>null</tt> if no connection exists
+     */
+    @Override
+    protected String retrieveTemplate(String name, Map<String, String> parameters) {
+        // retrieve template from Scalaris:
+        // note: templates are already cached, no need to cache them here
+        if (connection != null) {
+            // (ugly) fix for template parameter replacement if no parameters given,
+            // e.g. "{{noun}}" in the simple English Wiktionary
+            if (parameters != null && parameters.isEmpty()) {
+                parameters.put("", null);
             }
-            if (MyScalarisMagicWord.isMagicWord(magicWord)) {
-                // cache values for magic words:
-                if (magicWordCache.containsKey(articleName)) {
-                    return magicWordCache.get(articleName);
-                } else {
-                    String value = MyScalarisMagicWord.processMagicWord(magicWord, parameter, this);
-                    magicWordCache.put(articleName, value);
-                    return value;
-                }
+            String pageName = getTemplateNamespace() + ":" + name;
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
+            if (getRevResult.success) {
+                String text = getRevResult.revision.getText();
+                text = removeNoIncludeContents(text);
+                return text;
             } else {
-                // retrieve template from Scalaris:
-                // note: templates are already cached, no need to cache them here
-                if (connection != null) {
-                    // (ugly) fix for template parameter replacement if no parameters given,
-                    // e.g. "{{noun}}" in the simple English Wiktionary
-                    if (templateParameters != null && templateParameters.isEmpty()) {
-                        templateParameters.put("", null);
-                    }
-                    String pageName = getTemplateNamespace() + ":" + articleName;
-                    RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
-                    if (getRevResult.success) {
-                        String text = getRevResult.revision.getText();
-                        text = removeNoIncludeContents(text);
-                        return text;
-                    } else {
 //                        System.err.println(getRevResult.message);
 //                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
-                        /*
-                         * the template was not found and will never be - assume
-                         * an empty content instead of letting the model try
-                         * again (which is what it does if null is returned)
-                         */
-                        return "";
-                    }
-                }
+                /*
+                 * the template was not found and will never be - assume
+                 * an empty content instead of letting the model try
+                 * again (which is what it does if null is returned)
+                 */
+                return "";
             }
+        } else {
+            return null;
         }
-        
-        if (getRedirectLink() != null) {
-            // requesting a page from a redirect?
-            return getRedirectContent(getRedirectLink());
-        }
-//        System.out.println("getRawWikiContent(" + namespace + ", " + articleName + ", " +
-//            templateParameters + ")");
-        return null;
     }
     
     /**
@@ -119,18 +130,21 @@ public class MyScalarisWikiModel extends MyWikiModel {
      *            the name of the page redirected to
      * 
      * @return the contents of the newest revision of that page or a placeholder
-     *         string
+     *         string for the redirect
      */
+    @Override
     public String getRedirectContent(String pageName) {
-        RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
-        if (getRevResult.success) {
-            // make PAGENAME in the redirected content work as expected
-            setPageName(pageName);
-            return getRevResult.revision.getText();
-        } else {
-//            System.err.println(getRevResult.message);
-//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
-            return "&#35;redirect [[" + pageName + "]]";
+        if (connection != null) {
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
+            if (getRevResult.success) {
+                // make PAGENAME in the redirected content work as expected
+                setPageName(pageName);
+                return getRevResult.revision.getText();
+            } else {
+//                System.err.println(getRevResult.message);
+//                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
+            }
         }
+        return "&#35;redirect [[" + pageName + "]]";
     }
 }

@@ -157,9 +157,9 @@ public class MyScalarisMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_SCRIPT_PATH);
         MY_MAGIC_WORDS.add(MAGIC_SERVER_NAME);
     }
-
+    
     public static boolean isMagicWord(String name) {
-        return MagicWord.isMagicWord(name);
+        return MagicWord.isMagicWord(name) || isMyMagicWord(name);
     }
 
     /**
@@ -189,7 +189,7 @@ public class MyScalarisMagicWord extends MagicWord {
      * @see <a href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
      */
     public static String processMagicWord(String name, String parameter, MyScalarisWikiModel model) {
-        if (!MY_MAGIC_WORDS.contains(name)) {
+        if (!isMyMagicWord(name)) {
             return MagicWord.processMagicWord(name, parameter, model);
         }
         
