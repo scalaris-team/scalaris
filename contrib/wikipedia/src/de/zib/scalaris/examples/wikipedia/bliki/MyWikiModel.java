@@ -545,4 +545,18 @@ public class MyWikiModel extends WikiModel {
         }
     }
 
+    /**
+     * Capitalise the first letter of the given string.
+     *
+     * @param value
+     *            the string
+     *
+     * @return a string with the first character being upper case
+     */
+    public static String capFirst(final String value) {
+        if (value.length() > 0) {
+            return value.substring(0, 1).toUpperCase() + value.substring(1);
+        }
+        return "";
+    }
 }

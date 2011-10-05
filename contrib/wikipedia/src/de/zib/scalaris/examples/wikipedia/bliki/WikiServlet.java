@@ -508,7 +508,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         }
         
         if (result.success) {
-            WikiPageBean value = renderRevision(title, result.revision, render, request, connection);
+            WikiPageBean value = renderRevision(result.page.getTitle(), result.revision, render, request, connection);
             
             if (!result.page.checkEditAllowed("")) {
                 value.setEditRestricted(true);
