@@ -265,6 +265,9 @@ public class Main {
             pages.addAll(handler.getLinksOnPages());
             
             --recursionLvl;
+            // note: all further recursion levels only get linked-in pages
+            // (these categories have been completely covered)
+            categories.clear();
         }
 
         do {
