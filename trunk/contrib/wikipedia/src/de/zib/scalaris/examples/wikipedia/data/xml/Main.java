@@ -44,6 +44,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
 
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler.ReportAtShutDown;
 
@@ -132,7 +133,7 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    whitelist.add(line);
+                    whitelist.add(MyWikiModel.capFirst(line));
                 }
             }
             if (whitelist.isEmpty()) {

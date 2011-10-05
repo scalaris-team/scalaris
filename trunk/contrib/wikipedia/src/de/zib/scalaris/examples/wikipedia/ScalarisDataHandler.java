@@ -107,7 +107,7 @@ public class ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getPageKey(String title) {
-        return title + ":page";
+        return MyWikiModel.capFirst(title) + ":page";
     }
     /**
      * Gets the key to store the list of revisions of a page at.
@@ -117,7 +117,7 @@ public class ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getRevListKey(String title) {
-        return title + ":revs";
+        return MyWikiModel.capFirst(title) + ":revs";
     }
     /**
      * Gets the key to store the list of pages belonging to a category at.
@@ -127,7 +127,7 @@ public class ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getCatPageListKey(String title) {
-        return title + ":cpages";
+        return MyWikiModel.capFirst(title) + ":cpages";
     }
     /**
      * Gets the key to store the list of pages using a template at.
@@ -137,7 +137,7 @@ public class ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getTplPageListKey(String title) {
-        return title + ":tpages";
+        return MyWikiModel.capFirst(title) + ":tpages";
     }
     /**
      * Gets the key to store the list of pages linking to the given title.
@@ -147,7 +147,7 @@ public class ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getBackLinksPageListKey(String title) {
-        return title + ":blpages";
+        return MyWikiModel.capFirst(title) + ":blpages";
     }
     /**
      * Gets the key to store the number of page edits.

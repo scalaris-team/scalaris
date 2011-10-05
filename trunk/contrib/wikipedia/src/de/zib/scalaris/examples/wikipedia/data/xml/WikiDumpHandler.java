@@ -77,7 +77,8 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      * @param blacklist
      *            a number of page titles to ignore
      * @param whitelist
-     *            only import these pages
+     *            only import these pages (pages in this list must begin with a
+     *            capital letter!)
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -96,10 +97,26 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
             currentPage.setCheckSkipRevisions(new CheckSkipRevisions() {
                 @Override
                 public boolean skipRevisions(String pageTitle) {
-                    return !WikiDumpHandler.this.whitelist.contains(pageTitle);
+                    return !inWhiteList(pageTitle);
                 }
             });
         }
+    }
+    
+    /**
+     * Checks whether the given page title is in the whitelist.
+     * 
+     * Note: a title's first character may need to be capitalised in order to be
+     * found.
+     * 
+     * @param pageTitle
+     *            the title of a page
+     * 
+     * @return whether the page should be imported or not
+     */
+    private boolean inWhiteList(String pageTitle) {
+        return WikiDumpHandler.this.whitelist.contains(pageTitle)
+                || WikiDumpHandler.this.whitelist.contains(MyWikiModel.capFirst(pageTitle));
     }
 
     /**
@@ -210,7 +227,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
                 currentPage.endPage(uri, localName, qName);
                 if (currentPage.getPage() != null &&
                         !blacklist.contains(currentPage.getPage().getTitle()) &&
-                        (whitelist == null || whitelist.contains(currentPage.getPage().getTitle()))) {
+                        (whitelist == null || inWhiteList(currentPage.getPage().getTitle()))) {
                     export(currentPage);
                 }
                 currentPage.reset();
