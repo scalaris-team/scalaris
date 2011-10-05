@@ -57,6 +57,19 @@ public class MyParsingWikiModel extends MyWikiModel {
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters) {
         if (isTemplateNamespace(namespace)) {
+            int index = articleName.indexOf(':');
+            if (index > 0) {
+                String magicWord = articleName.substring(0, index);
+                String parameter = articleName.substring(index + 1).trim();
+                if (magicWord.equals(MyScalarisMagicWord.MAGIC_PAGES_IN_CATEGORY)
+                        || magicWord.equals(MyScalarisMagicWord.MAGIC_PAGES_IN_CAT)) {
+//                  {{PAGESINCATEGORY:categoryname}}
+//                  {{PAGESINCAT:categoryname}}
+                    // -> add as a link (there is no other property for this)
+                    addLink(createFullPageName(getCategoryNamespace(), parameter));
+                    return "";
+                }
+            }
             if (templateParameters != null) {
                 StringBuilder result = new StringBuilder(8 * templateParameters.size());
                 for (int i = 1; i <= templateParameters.size(); ++i) {

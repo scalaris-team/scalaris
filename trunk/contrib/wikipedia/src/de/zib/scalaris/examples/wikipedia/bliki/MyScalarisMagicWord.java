@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
+import de.zib.scalaris.examples.wikipedia.PageListResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 
 /**
@@ -30,86 +31,132 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
  */
 public class MyScalarisMagicWord extends MagicWord {
     // statistics
-    private static final String MAGIC_CURRENT_VERSION = "CURRENTVERSION";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_CURRENT_VERSION = "CURRENTVERSION";
 
-    private static final String MAGIC_NUMBER_ARTICLES = "NUMBEROFARTICLES";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NUMBER_ARTICLES = "NUMBEROFARTICLES";
 
-    private static final String MAGIC_NUMBER_PAGES = "NUMBEROFPAGES";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NUMBER_PAGES = "NUMBEROFPAGES";
 
-    private static final String MAGIC_NUMBER_FILES = "NUMBEROFFILES";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NUMBER_FILES = "NUMBEROFFILES";
 
-    private static final String MAGIC_NUMBER_USERS = "NUMBEROFUSERS";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGES_IN_CATEGORY = "PAGESINCATEGORY";
 
-    private static final String MAGIC_NUMBER_ADMINS = "NUMBEROFADMINS";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGES_IN_CAT = "PAGESINCAT";
 
-    private static final String MAGIC_PAGES_IN_NS = "PAGESINNS";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NUMBER_USERS = "NUMBEROFUSERS";
 
-    private static final String MAGIC_PAGES_IN_NAMESPACE = "PAGESINNAMESPACE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NUMBER_ADMINS = "NUMBEROFADMINS";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGES_IN_NS = "PAGESINNS";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGES_IN_NAMESPACE = "PAGESINNAMESPACE";
 
     // page values
-    private static final String MAGIC_PAGE_NAME = "PAGENAME";
-    
-    private static final String MAGIC_PAGE_NAME_E = "PAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGE_NAME = "PAGENAME";
 
-    private static final String MAGIC_SUB_PAGE_NAME = "SUBPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGE_NAME_E = "PAGENAMEE";
 
-    private static final String MAGIC_SUB_PAGE_NAME_E = "SUBPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUB_PAGE_NAME = "SUBPAGENAME";
 
-    private static final String MAGIC_BASE_PAGE_NAME = "BASEPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUB_PAGE_NAME_E = "SUBPAGENAMEE";
 
-    private static final String MAGIC_BASE_PAGE_NAME_E = "BASEPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_BASE_PAGE_NAME = "BASEPAGENAME";
 
-    private static final String MAGIC_NAMESPACE = "NAMESPACE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_BASE_PAGE_NAME_E = "BASEPAGENAMEE";
 
-    private static final String MAGIC_NAMESPACE_E = "NAMESPACEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NAMESPACE = "NAMESPACE";
 
-    private static final String MAGIC_FULL_PAGE_NAME = "FULLPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NAMESPACE_E = "NAMESPACEE";
 
-    private static final String MAGIC_FULL_PAGE_NAME_E = "FULLPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_FULL_PAGE_NAME = "FULLPAGENAME";
 
-    private static final String MAGIC_TALK_SPACE = "TALKSPACE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_FULL_PAGE_NAME_E = "FULLPAGENAMEE";
 
-    private static final String MAGIC_TALK_SPACE_E = "TALKSPACEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_TALK_SPACE = "TALKSPACE";
 
-    private static final String MAGIC_SUBJECT_SPACE = "SUBJECTSPACE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_TALK_SPACE_E = "TALKSPACEE";
 
-    private static final String MAGIC_SUBJECT_SPACE_E = "SUBJECTSPACEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUBJECT_SPACE = "SUBJECTSPACE";
 
-    private static final String MAGIC_ARTICLE_SPACE = "ARTICLESPACE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUBJECT_SPACE_E = "SUBJECTSPACEE";
 
-    private static final String MAGIC_ARTICLE_SPACE_E = "ARTICLESPACEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_ARTICLE_SPACE = "ARTICLESPACE";
 
-    private static final String MAGIC_TALK_PAGE_NAME = "TALKPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_ARTICLE_SPACE_E = "ARTICLESPACEE";
 
-    private static final String MAGIC_TALK_PAGE_NAME_E = "TALKPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_TALK_PAGE_NAME = "TALKPAGENAME";
 
-    private static final String MAGIC_SUBJECT_PAGE_NAME = "SUBJECTPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_TALK_PAGE_NAME_E = "TALKPAGENAMEE";
 
-    private static final String MAGIC_SUBJECT_PAGE_NAME_E = "SUBJECTPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUBJECT_PAGE_NAME = "SUBJECTPAGENAME";
 
-    private static final String MAGIC_ARTICLE_PAGE_NAME = "ARTICLEPAGENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SUBJECT_PAGE_NAME_E = "SUBJECTPAGENAMEE";
 
-    private static final String MAGIC_ARTICLE_PAGE_NAME_E = "ARTICLEPAGENAMEE";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_ARTICLE_PAGE_NAME = "ARTICLEPAGENAME";
 
-    private static final String MAGIC_REVISION_ID = "REVISIONID";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_ARTICLE_PAGE_NAME_E = "ARTICLEPAGENAMEE";
 
-    private static final String MAGIC_REVISION_DAY = "REVISIONDAY";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_ID = "REVISIONID";
 
-    private static final String MAGIC_REVISION_DAY2 = "REVISIONDAY2";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_DAY = "REVISIONDAY";
 
-    private static final String MAGIC_REVISION_MONTH = "REVISIONMONTH";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_DAY2 = "REVISIONDAY2";
 
-    private static final String MAGIC_REVISION_YEAR = "REVISIONYEAR";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_MONTH = "REVISIONMONTH";
 
-    private static final String MAGIC_REVISION_TIMESTAMP = "REVISIONTIMESTAMP";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_YEAR = "REVISIONYEAR";
 
-    private static final String MAGIC_SITE_NAME = "SITENAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_REVISION_TIMESTAMP = "REVISIONTIMESTAMP";
 
-    private static final String MAGIC_SERVER = "SERVER";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SITE_NAME = "SITENAME";
 
-    private static final String MAGIC_SCRIPT_PATH = "SCRIPTPATH";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SERVER = "SERVER";
 
-    private static final String MAGIC_SERVER_NAME = "SERVERNAME";
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SCRIPT_PATH = "SCRIPTPATH";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_SERVER_NAME = "SERVERNAME";
 
     private static List<String> MY_MAGIC_WORDS = new ArrayList<String>();
 
@@ -121,6 +168,8 @@ public class MyScalarisMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_ARTICLES);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_PAGES);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_FILES);
+        MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_CATEGORY);
+        MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_CAT);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_USERS);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_ADMINS);
         MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NS);
@@ -280,8 +329,14 @@ public class MyScalarisMagicWord extends MagicWord {
             // we currently do not support users/admins:
             return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFACTIVEUSERS}}
-//            {{PAGESINCATEGORY:categoryname}}
-//            {{PAGESINCAT:categoryname}}
+        } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
+            String category = MyWikiModel.createFullPageName(model.getCategoryNamespace(), parameter.trim());
+            PageListResult catListResult = ScalarisDataHandler.getPagesInCategory(model.connection, category);
+            int number = 0;
+            if (catListResult.success) {
+                number = catListResult.pages.size();
+            }
+            return model.formatStatisticNumber(rawNumber, number);
 //            {{NUMBERINGROUP:groupname}}
 //            {{NUMINGROUP:groupname}}
 //        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE) || name.equals(MAGIC_PAGES_IN_NS)) {
