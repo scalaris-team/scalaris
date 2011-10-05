@@ -54,17 +54,24 @@ public class MyParsingWikiModel extends MyWikiModel {
      * @return the template's contents
      */
     @Override
-    protected String retrieveTemplate(String name,
-            Map<String, String> parameters) {
-        if (parameters != null) {
-            StringBuilder result = new StringBuilder(7 * parameters.size());
-            for (int i = 1; i <= parameters.size(); ++i) {
-                result.append("{{{");
-                result.append(i);
-                result.append("}}}");
+    protected String retrievePage(String namespace, String articleName,
+            Map<String, String> templateParameters) {
+        if (isTemplateNamespace(namespace)) {
+            if (templateParameters != null) {
+                StringBuilder result = new StringBuilder(8 * templateParameters.size());
+                for (int i = 1; i <= templateParameters.size(); ++i) {
+                    result.append("{{{");
+                    result.append(i);
+                    result.append("}}}\n");
+                }
+                return result.toString();
             }
-            return result.toString();
+            return null;
         }
+        // e.g. page inclusions of the form "{{:Main Page/Introduction}}"
+        // -> add as a link (there is no other property for this and templates
+        // which are also included get a "Template:" prepended)
+        addLink(createFullPageName(namespace, articleName));
         return null;
     }
 
