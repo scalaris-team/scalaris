@@ -559,4 +559,16 @@ public class MyWikiModel extends WikiModel {
         }
         return "";
     }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.WikiModel#setUp()
+     */
+    @Override
+    public void setUp() {
+        // WikiModel forgets to reset fRedirectLink
+        super.setUp();
+        fRedirectLink = null;
+    }
+    
+    
 }

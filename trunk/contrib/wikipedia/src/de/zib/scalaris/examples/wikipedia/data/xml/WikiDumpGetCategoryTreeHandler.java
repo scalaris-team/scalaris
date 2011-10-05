@@ -114,6 +114,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
         if (page.getCurRev() != null && wikiModel != null &&
                 isTemplateOrCategory(page.getTitle())) {
+            wikiModel.setUp();
+            wikiModel.setPageName(page.getTitle());
             wikiModel.render(null, page.getCurRev().getText());
             for (String cat_raw: wikiModel.getCategories().keySet()) {
                 String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
@@ -130,6 +132,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             if (wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(page.getTitle()))) {
                 updateTplReqs(page.getTitle(), pageTemplates);
             }
+            wikiModel.tearDown();
         }
         ++pageCount;
         // only export page list every UPDATE_PAGELIST_EVERY pages:

@@ -83,6 +83,8 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
             Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
     
             if (!revisions.isEmpty() && wikiModel != null) {
+                wikiModel.setUp();
+                wikiModel.setPageName(page.getTitle());
                 wikiModel.render(null, revisions.get(0).getText());
                 for (String cat_raw: wikiModel.getCategories().keySet()) {
                     String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
@@ -110,6 +112,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                     backLinks.add(page.getTitle());
                     newBackLinks.put(link, backLinks);
                 }
+                wikiModel.tearDown();
             }
     
             doExport(page, revisions, revisions_short);
