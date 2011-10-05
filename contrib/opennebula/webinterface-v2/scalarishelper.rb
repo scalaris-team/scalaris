@@ -8,14 +8,14 @@ class ScalarisHelper < OpenNebulaHelper
   def get_master_description()
     description = get_description(SCALARISIMAGE, "true", "",
                                   "{mgmt_server, {{127,0,0,1},14195,mgmt_server}}.")
-    puts description
+    #puts description
     description
   end
 
   def get_slave_description(ips, head_node)
     mgmt_server = "{mgmt_server, {{#{head_node.gsub(/\./, ',')}}, 14195, mgmt_server}}."
     description = get_description(SCALARISIMAGE, "false", ips, mgmt_server)
-    puts description
+    #puts description
     description
   end
 
@@ -28,21 +28,31 @@ class ScalarisHelper < OpenNebulaHelper
     info[:ip] = get_ip(ENV['VMID'])
     info[:rpm_version] = get_scalaris_version()
     info[:vmid] = ENV['VMID']
-    info.merge!(get_scalaris_info("get_node_info"))
+    #info[:state] = get_local_state()
+    node_info = get_scalaris_info("get_node_info")
+    if node_info != nil
+      info.merge!(node_info)
+    end
     info
   end
 
   def get_node_performance(instance, vmid)
     perf = {}
     perf[:vmid] = ENV['VMID']
-    perf.merge!(get_scalaris_info("get_node_performance"))
+    node_perf = get_scalaris_info("get_node_performance")
+    if node_perf != nil
+      perf.merge!(node_perf)
+    end
     perf
   end
 
   def get_service_info(instance)
     info = {}
     info[:rpm_version] = get_scalaris_version()
-    info.merge!(get_scalaris_info("get_service_info"))
+    service_info = get_scalaris_info("get_service_info")
+    if service_info != nil
+      info.merge!(service_info)
+    end
     info
   end
 

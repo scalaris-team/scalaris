@@ -2,6 +2,11 @@ Sequel.extension :migration
 
 DB = Sequel.sqlite('opennebula.db')
 
+if settings.test?
+  DB.drop_table(:vms)
+  DB.drop_table(:services)
+end
+
 DB.create_table? :services do
   primary_key :id
   DataTime    :created_at
@@ -14,6 +19,7 @@ DB.create_table? :vms do
   String      :one_vm_id
   foreign_key :service_id, :services
 end
+
 
 # models just work ...
 class Service < Sequel::Model

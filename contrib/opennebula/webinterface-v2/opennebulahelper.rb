@@ -50,9 +50,11 @@ class OpenNebulaHelper
   end
 
   def get_ip(one_id)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
+    if settings.test?
+      return settings.one_helper.get_ip(one_id)
+    end
+
+    pool = get_pool()
     vm = pool.find {|i| i.id.to_i == one_id.to_i}
     if vm == nil
       raise "unknown machine identifier"
@@ -63,23 +65,31 @@ class OpenNebulaHelper
   private
 
   def create_vm(description)
+    if settings.test?
+      return settings.one_helper.create_vm(description)
+    end
+
     client = Client.new(CREDENTIALS, ENDPOINT)
     client.call("vm.allocate", description)
   end
 
   def delete_vm(id)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
+    if settings.test?
+      return settings.one_helper.delete_vm(id)
+    end
+
+    pool = get_pool()
     vm = pool.find {|i| i.id == id.to_i}
     puts vm.class
     vm.finalize
   end
 
   def get_vms(instance)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
+    if settings.test?
+      return settings.one_helper.get_vms(instance)
+    end
+
+    pool = get_pool()
     vms = []
     if instance == nil
       raise "unknown service instance"
@@ -94,9 +104,7 @@ class OpenNebulaHelper
   end
 
   def get_ips(instance)
-    client = Client.new(CREDENTIALS, ENDPOINT)
-    pool = VirtualMachinePool.new(client, -1)
-    pool.info
+    pool = get_pool()
     ips = []
     if instance == nil
       raise "unknown service instance"
@@ -108,5 +116,12 @@ class OpenNebulaHelper
       end
     end
     ips
+  end
+
+  def get_pool()
+    client = Client.new(CREDENTIALS, ENDPOINT)
+    pool = VirtualMachinePool.new(client, -1)
+    pool.info
+    pool
   end
 end
