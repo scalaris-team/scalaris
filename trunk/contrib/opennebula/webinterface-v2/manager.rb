@@ -15,21 +15,34 @@ require 'hadoophelper.rb'
 
 set :views, Proc.new { File.join(root, "sc_views") }
 
-if TYPE == "scalaris"
-  helper = ScalarisHelper.new
-elsif TYPE == "hadoop"
-  helper = HadoopHelper.new
-else
-  exit
-end
+helper = nil
+instance = nil
+vmid = -1
 
-vmid = ENV['VMID']
-instance = Service.first(:master_node => vmid)
-if instance == nil
+if settings.test?
+  vmid = ENV['VMID']
+  helper = ScalarisHelper.new
+
   instance = Service.create(:master_node => vmid)
   instance.add_vm(:one_vm_id => vmid)
+else
+  if TYPE == "scalaris"
+    helper = ScalarisHelper.new
+  elsif TYPE == "hadoop"
+    helper = HadoopHelper.new
+  else
+    exit
+  end
+
+  vmid = ENV['VMID']
+  instance = Service.first(:master_node => vmid)
+  if instance == nil
+    instance = Service.create(:master_node => vmid)
+    instance.add_vm(:one_vm_id => vmid)
+  end
+  puts instance.id
 end
-puts instance.id
+
 
 get '/' do
   if TYPE == "hadoop"

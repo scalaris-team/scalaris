@@ -1,4 +1,4 @@
-module JSONRPC
+class JSONRPC
   def self.create_scalaris(params, helper, instance)
     user = params[0]
     res = ScalarisHelper.new.create()
@@ -112,10 +112,11 @@ module JSONRPC
     begin
       res = self.send(method, jsonreq["params"], helper, instance)
     rescue NoMethodError
-      puts $!
-      res[:error] = "undefined method #{method}"
+      #puts $!.backtrace
+      puts $!.message
+      res[:error] = "undefined method in #{method}: #{$!.message}"
     rescue
-      puts $!
+      puts $!.message
       res[:error] = $!.to_json
     end
     res[:id] = jsonreq['id']
@@ -123,6 +124,11 @@ module JSONRPC
   end
 
   def self.json_call(url, function, params)
+    if settings.test?
+      puts "mocked json_call"
+      return settings.json_helper.json_call(url, function, params)
+    end
+
     req = Net::HTTP::Post.new(url.path)
     req.add_field 'Content-Type', 'application/json'
     req.body =
