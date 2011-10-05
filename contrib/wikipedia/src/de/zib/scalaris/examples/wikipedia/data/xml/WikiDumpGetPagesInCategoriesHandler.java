@@ -109,6 +109,8 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
         Page page = page_xml.getPage();
         
         if (page.getCurRev() != null && wikiModel != null) {
+            wikiModel.setUp();
+            wikiModel.setPageName(page.getTitle());
             wikiModel.render(null, page.getCurRev().getText());
             
             boolean pageInAllowedCat = false;
@@ -156,6 +158,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
                 pageLinks.remove(""); // there may be empty links
                 linksOnPages.addAll(pageLinks);
             }
+            wikiModel.tearDown();
         }
         ++pageCount;
         // only export page list every PRINT_PAGES_EVERY pages:

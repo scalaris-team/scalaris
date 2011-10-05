@@ -141,8 +141,11 @@ public class Revision implements Serializable {
      * @return a list of categories of the revision
      */
     public Collection<String> parseCategories(WikiModel wikiModel) {
+        wikiModel.setUp();
         wikiModel.render(null, text);
-        return wikiModel.getCategories().keySet();
+        Collection<String> categories = wikiModel.getCategories().keySet();
+        wikiModel.tearDown();
+        return categories;
     }
 
     /**
@@ -156,8 +159,11 @@ public class Revision implements Serializable {
      * @return a list of categories of the revision
      */
     public Collection<String> parseTemplates(WikiModel wikiModel) {
+        wikiModel.setUp();
         wikiModel.render(null, text);
-        return wikiModel.getTemplates();
+        Collection<String> templates = wikiModel.getTemplates();
+        wikiModel.tearDown();
+        return templates;
     }
 
     /**

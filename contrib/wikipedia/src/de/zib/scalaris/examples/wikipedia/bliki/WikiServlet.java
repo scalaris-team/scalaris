@@ -604,6 +604,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 String redirectedPageName = wikiModel.getRedirectLink();
                 value.setRedirectedTo(redirectedPageName);
                 // add the content from the page directed to:
+                wikiModel.tearDown();
+                wikiModel.setUp();
                 mainText = wikiModel.render(wikiModel.getRedirectContent(redirectedPageName));
             }
             value.setPage(mainText);
