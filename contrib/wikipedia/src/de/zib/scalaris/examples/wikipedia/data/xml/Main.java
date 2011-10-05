@@ -228,9 +228,21 @@ public class Main {
             }
         }
         
+        Set<String> allowedPages = new HashSet<String>();
+        if (args.length >= 3 && !args[2].isEmpty()) {
+            FileReader inFile = new FileReader(args[2]);
+            BufferedReader br = new BufferedReader(inFile);
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.isEmpty()) {
+                    allowedPages.add(MyWikiModel.capFirst(line));
+                }
+            }
+        }
+        
         LinkedList<String> rootCategories = new LinkedList<String>();
-        if (args.length >= 3) {
-            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(2, args.length));
+        if (args.length >= 4) {
+            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(3, args.length));
             rootCategories.removeAll(Arrays.asList(""));
         }
         System.out.println("filtering by categories " + rootCategories.toString() + " ...");
@@ -252,6 +264,7 @@ public class Main {
 
         Set<String> pages = new HashSet<String>(categories);
         pages.add("Main Page");
+        pages.addAll(allowedPages);
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         while (recursionLvl >= 1) {
             // note: need to create a new file for each pass because it is being

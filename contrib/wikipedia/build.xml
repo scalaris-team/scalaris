@@ -126,6 +126,10 @@
     <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2, *.db)"/>
   </target>
 
+  <target name="import.get.allowed_pages" unless="allowed_pages">
+    <input addproperty="allowed_pages" defaultvalue="" message="Text file with additional page titles to include (one per line)"/>
+  </target>
+
   <target name="import.get.whitelist" unless="whitelist">
     <input addproperty="whitelist" defaultvalue="" message="Text file with page titles to import (one per line)"/>
   </target>
@@ -213,9 +217,10 @@
     </java>
   </target>
 
-  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.category1,import.get.category2,import.get.category3">
+  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
     <fail unless="data">You must specify the data property for 'ant filter'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant filter'.</fail>
+    <fail unless="allowed_pages">You must specify the allowed_pages property for 'ant filter'.</fail>
     <fail unless="category1">You must specify the category1 property for 'ant filter'.</fail>
     <fail unless="category2">You must specify the category2 property for 'ant filter'.</fail>
     <fail unless="category3">You must specify the category3 property for 'ant filter'.</fail>
@@ -226,6 +231,7 @@
       <arg value="filter"/>
       <arg value="${recursion_lvl}"/>
       <arg value="${max_time}"/>
+      <arg value="${allowed_pages}"/>
       <arg value="${category1}"/>
       <arg value="${category2}"/>
       <arg value="${category3}"/>
