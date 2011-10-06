@@ -119,6 +119,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 
     private static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     private static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
+    private static final Pattern MATCH_WIKI_IMAGE_SVG_PNG = Pattern.compile("\\.svg\\.png$");
     /*
      * http://simple.wiktionary.org/wiki/Main_Page
      * http://bar.wikipedia.org/wiki/Hauptseitn
@@ -1336,8 +1337,31 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             throws UnsupportedEncodingException, IOException, ServletException {
         // we need to fix the image title first, e.g. a prefix with the desired size may exist
         image = MATCH_WIKI_IMAGE_PX.matcher(image).replaceFirst("");
-        // add namespace - use English namespace for files (see below)
-        image = new String("File:" + image);
+        String realImageUrl = getWikiImageUrl(image);
+        if (realImageUrl != null) {
+            response.sendRedirect(realImageUrl);
+        } else {
+            // bliki may have created ".svg.png" from an original ".svg" image:
+            String new_image = MATCH_WIKI_IMAGE_SVG_PNG.matcher(image).replaceFirst(".svg");
+            if (!image.equals(new_image)
+                    && (realImageUrl = getWikiImageUrl(new_image)) != null) {
+                response.sendRedirect(realImageUrl);
+            } else {
+                response.sendRedirect(response.encodeRedirectURL("images/image.png"));
+            }
+        }
+    }
+
+    /**
+     * Retrieves the URL of an image from the Wikipedia related to the base URL
+     * of this wiki.
+     * 
+     * @param image
+     *            the name of the image as created by the bliki engine
+     */
+    protected String getWikiImageUrl(String image) {
+        // add namespace - "Image" is a default alias for "File" in any language
+        image = new String("Image:" + image);
         String fullBaseUrl = siteinfo.getBase();
         String baseUrl = "http://en.wikipedia.org";
         Matcher matcher = MATCH_WIKI_SITE_BASE.matcher(fullBaseUrl);
@@ -1356,11 +1380,10 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
 //            System.out.println("IMG-URL: " + imagePage.getImageUrl());
 
             if (imagePage.getImageThumbUrl() != null && !imagePage.getImageThumbUrl().isEmpty()) {
-                response.sendRedirect(imagePage.getImageThumbUrl());
-                return;
+                return imagePage.getImageThumbUrl();
             }
         }
-        response.sendRedirect(response.encodeRedirectURL("images/image.png"));
+        return null;
     }
     
     private MyScalarisWikiModel getWikiModel(Connection connection) {
