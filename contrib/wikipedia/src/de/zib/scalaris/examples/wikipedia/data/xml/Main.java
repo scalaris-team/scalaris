@@ -227,11 +227,19 @@ public class Main {
                 System.exit(-1);
             }
         }
+
+        String pageListFileName = "";
+        if (args.length >= 3 && !args[2].isEmpty()) {
+            pageListFileName = args[2];
+        } else {
+            System.err.println("need a pagelist file name for filter; arguments given: " + Arrays.toString(args));
+            System.exit(-1);
+        }
         
         Set<String> allowedPages = new HashSet<String>();
         allowedPages.add("Main Page");
-        if (args.length >= 3 && !args[2].isEmpty()) {
-            FileReader inFile = new FileReader(args[2]);
+        if (args.length >= 4 && !args[3].isEmpty()) {
+            FileReader inFile = new FileReader(args[3]);
             BufferedReader br = new BufferedReader(inFile);
             String line;
             while ((line = br.readLine()) != null) {
@@ -242,8 +250,8 @@ public class Main {
         }
         
         LinkedList<String> rootCategories = new LinkedList<String>();
-        if (args.length >= 4) {
-            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(3, args.length));
+        if (args.length >= 5) {
+            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(4, args.length));
             rootCategories.removeAll(Arrays.asList(""));
         }
         System.out.println("filtering by categories " + rootCategories.toString() + " ...");
@@ -254,14 +262,14 @@ public class Main {
         Set<String> categories = new HashSet<String>();
         categories.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories));
         
-        do {
-            FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
-            PrintWriter out = new PrintWriter(outFile);
-            for (String category : categories) {
-                out.println(category);
-            }
-            out.close();
-        } while(false);
+//        do {
+//            FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
+//            PrintWriter out = new PrintWriter(outFile);
+//            for (String category : categories) {
+//                out.println(category);
+//            }
+//            out.close();
+//        } while(false);
 
         Set<String> pages = new HashSet<String>(categories);
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
@@ -286,7 +294,7 @@ public class Main {
         }
 
         do {
-            FileWriter outFile = new FileWriter(filename + "-filtered_pagelist.txt");
+            FileWriter outFile = new FileWriter(pageListFileName);
             PrintWriter out = new PrintWriter(outFile);
             for (String page : pages) {
                 out.println(page);
