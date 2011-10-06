@@ -71,7 +71,7 @@ class JSONRPC
   end
 
   def self.list_nodes(params, helper, instance)
-    helper.list(instance)
+    {:result => helper.list(instance)}
   end
 
   def self.get_node_info(params, helper, instance)
@@ -79,7 +79,11 @@ class JSONRPC
     if(vmid == ENV["VMID"])
       {:result => helper.get_node_info(instance, vmid)}
     else
-      self.redirect_call_to_vm(vmid, "get_node_info", params, helper)
+      begin
+        {:result => self.redirect_call_to_vm(vmid, "get_node_info", params, helper)}
+      rescue
+        {:result => helper.redirect_to_vm_failed_with(vmid, "get_node_info", params, instance, $!)}
+      end
     end
   end
 
@@ -88,7 +92,11 @@ class JSONRPC
     if(vmid == ENV["VMID"])
       {:result => helper.get_node_performance(instance, vmid)}
     else
-      self.redirect_call_to_vm(vmid, "get_node_performance", params, helper)
+      begin
+        {:result => self.redirect_call_to_vm(vmid, "get_node_performance", params, helper)}
+      rescue
+        {:result => helper.redirect_to_vm_failed_with(vmid, "get_node_performance", params, instance, $!)}
+      end
     end
  end
 
@@ -111,11 +119,9 @@ class JSONRPC
     res = {}
     begin
       res = self.send(method, jsonreq["params"], helper, instance)
-    rescue NoMethodError
-      #puts $!.backtrace
-      puts $!.message
-      res[:error] = "undefined method in #{method}: #{$!.message}"
     rescue
+      puts $!.class
+      #puts $!.backtrace
       puts $!.message
       res[:error] = $!.to_json
     end
@@ -137,13 +143,14 @@ class JSONRPC
       :method => function,
       :params => params,
       :id => 0}.to_json
-    begin
+    #begin
       res = Net::HTTP.start(url.host, url.port){|http|http.request(req)}
       JSON.parse(res.body)
-    rescue
-      puts "#{url}: #{$!}"
-      nil
-    end
+    #rescue
+      #puts $!.class
+      #puts "#{url}: #{$!}"
+      #nil
+    #end
   end
 
   def self.redirect_call_to_vm(vmid, function, params, helper)

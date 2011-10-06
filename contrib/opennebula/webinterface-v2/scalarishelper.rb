@@ -29,9 +29,14 @@ class ScalarisHelper < OpenNebulaHelper
     info[:rpm_version] = get_scalaris_version()
     info[:vmid] = ENV['VMID']
     #info[:state] = get_local_state()
-    node_info = get_scalaris_info("get_node_info")
-    if node_info != nil
-      info.merge!(node_info)
+    begin
+      node_info = get_scalaris_info("get_node_info")
+      if node_info != nil
+        info.merge!(node_info)
+      end
+      info[:state] = "RUNNING"
+    rescue
+      info[:state] = "ERROR"
     end
     info
   end
@@ -39,9 +44,14 @@ class ScalarisHelper < OpenNebulaHelper
   def get_node_performance(instance, vmid)
     perf = {}
     perf[:vmid] = ENV['VMID']
-    node_perf = get_scalaris_info("get_node_performance")
-    if node_perf != nil
-      perf.merge!(node_perf)
+    begin
+      node_perf = get_scalaris_info("get_node_performance")
+      if node_perf != nil
+        perf.merge!(node_perf)
+      end
+      perf[:state] = "RUNNING"
+    rescue
+      perf[:state] = "ERROR"
     end
     perf
   end
@@ -49,16 +59,29 @@ class ScalarisHelper < OpenNebulaHelper
   def get_service_info(instance)
     info = {}
     info[:rpm_version] = get_scalaris_version()
-    service_info = get_scalaris_info("get_service_info")
-    if service_info != nil
-      info.merge!(service_info)
+    begin
+      service_info = get_scalaris_info("get_service_info")
+      if service_info != nil
+        info.merge!(service_info)
+      end
+      info[:state] = "RUNNING"
+    rescue
+      info[:state] = "ERROR"
     end
     info
   end
 
   def get_service_performance(instance)
     perf = {}
-    perf.merge!(get_scalaris_info("get_service_performance"))
+    begin
+      service_perf = get_scalaris_info("get_service_performance")
+      if service_perf != nil
+        perf.merge!(service_perf)
+      end
+      perf[:state] = "RUNNING"
+    rescue
+      perf[:state] = "ERROR"
+    end
     perf
   end
 
