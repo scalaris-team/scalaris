@@ -130,7 +130,7 @@ class JSONRPC
   end
 
   def self.json_call(url, function, params)
-    if settings.test?
+    if Sinatra::Application::test?
       puts "mocked json_call"
       return settings.json_helper.json_call(url, function, params)
     end
