@@ -50,7 +50,7 @@ class OpenNebulaHelper
   end
 
   def get_ip(one_id)
-    if settings.test?
+    if Sinatra::Application::test?
       return settings.one_helper.get_ip(one_id)
     end
 
@@ -79,27 +79,26 @@ class OpenNebulaHelper
   private
 
   def create_vm(description)
-    if settings.test?
+    if Sinatra::Application::test?
       return settings.one_helper.create_vm(description)
     end
-
+      
     client = Client.new(CREDENTIALS, ENDPOINT)
     client.call("vm.allocate", description)
   end
 
   def delete_vm(id)
-    if settings.test?
+    if Sinatra::Application::test?
       return settings.one_helper.delete_vm(id)
     end
 
     pool = get_pool()
     vm = pool.find {|i| i.id == id.to_i}
-    puts vm.class
     vm.finalize
   end
 
   def get_vms(instance)
-    if settings.test?
+    if Sinatra::Application::test?
       return settings.one_helper.get_vms(instance)
     end
 
