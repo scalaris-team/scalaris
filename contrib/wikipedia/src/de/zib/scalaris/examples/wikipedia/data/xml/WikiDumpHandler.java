@@ -47,7 +47,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     private Set<String> blacklist = null;
     private Set<String> whitelist = null;
     
-    protected MyWikiModel wikiModel;
+    protected MyParsingWikiModel wikiModel;
     
     /**
      * The time at the start of an import operation.

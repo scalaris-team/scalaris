@@ -149,6 +149,11 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
                 Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplates);
                 pages.addAll(tplChildren);
 //                System.out.println("added tpls: " + tplChildren.toString());
+                // add all included pages:
+                // note: there may be further includes but this needs to be
+                // handled by recursively parsing the XML file
+                pages.addAll(wikiModel.getIncludes());
+//                System.out.println("added includes: " + wikiModel.getIncludes().toString());
                 
                 String redirLink = wikiModel.getRedirectLink();
                 if (redirLink != null) {

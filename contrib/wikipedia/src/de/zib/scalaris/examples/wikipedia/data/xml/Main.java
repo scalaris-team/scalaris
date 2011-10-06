@@ -229,6 +229,7 @@ public class Main {
         }
         
         Set<String> allowedPages = new HashSet<String>();
+        allowedPages.add("Main Page");
         if (args.length >= 3 && !args[2].isEmpty()) {
             FileReader inFile = new FileReader(args[2]);
             BufferedReader br = new BufferedReader(inFile);
@@ -263,19 +264,20 @@ public class Main {
         } while(false);
 
         Set<String> pages = new HashSet<String>(categories);
-        pages.add("Main Page");
-        pages.addAll(allowedPages);
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
-        while (recursionLvl >= 1) {
+        while (recursionLvl >= 0) {
             // note: need to create a new file for each pass because it is being
             // closed at the end of a pass
             InputSource file = getFileReader(filename);
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetPagesInCategoriesHandler handler =
-                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, categories, pages);
+                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, categories, allowedPages);
             runXmlHandler(handler, file);
             pages.addAll(handler.getPages());
-            pages.addAll(handler.getLinksOnPages());
+            // allowed pages for the next recursion are the links in the current one
+            // note: do not include the previous pages
+            allowedPages.clear();
+            allowedPages.addAll(handler.getLinksOnPages());
             
             --recursionLvl;
             // note: all further recursion levels only get linked-in pages
