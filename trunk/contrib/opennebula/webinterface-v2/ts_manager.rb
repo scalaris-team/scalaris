@@ -36,7 +36,7 @@ class ManagerTest < Test::Unit::TestCase
     browser.post('/jsonrpc', body)
     res = JSON.parse(browser.last_response.body)
     assert_equal 0, res["id"], 0
-    assert_equal "undefined method in ttt: undefined method `ttt' for JSONRPC:Class", res["error"]
+    assert_equal "\"undefined method `ttt' for JSONRPC:Class\"", res["error"]
   end
 
   def test_list_nodes_works
@@ -49,13 +49,13 @@ class ManagerTest < Test::Unit::TestCase
     browser.post('/jsonrpc', body)
     res = JSON.parse(browser.last_response.body)
     assert_equal 0, res["id"]
-    assert_equal ["42"], res["peers"]
+    assert_equal ["42"], res["result"]["peers"]
   end
 
   def test_get_node_info_works
     info = {"result" => {"value" => {}}}
     json_helper = mock()
-    JSONRPC.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_node_info", []).returns(info)
+    json_helper.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_node_info", []).returns(info)
     one_helper = mock()
     one_helper.expects(:get_ip).with("42").returns("1.2.3.4")
     Sinatra::Application.set :json_helper, json_helper
@@ -73,7 +73,7 @@ class ManagerTest < Test::Unit::TestCase
   def test_get_service_info_works
     info = {"result" => {"value" => {}}}
     json_helper = mock()
-    JSONRPC.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_service_info", []).returns(info)
+    json_helper.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_service_info", []).returns(info)
     Sinatra::Application.set :json_helper, json_helper
     browser = Rack::Test::Session.new(Rack::MockSession.new(Sinatra::Application))
     body = json_call("get_service_info", [])
@@ -86,7 +86,7 @@ class ManagerTest < Test::Unit::TestCase
   def test_get_node_performance_works
     info = {"result" => {"value" => {}}}
     json_helper = mock()
-    JSONRPC.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_node_performance", []).returns(info)
+    json_helper.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_node_performance", []).returns(info)
     Sinatra::Application.set :json_helper, json_helper
     browser = Rack::Test::Session.new(Rack::MockSession.new(Sinatra::Application))
     body = json_call("get_node_performance", ['42'])
@@ -100,7 +100,7 @@ class ManagerTest < Test::Unit::TestCase
   def test_get_service_performance_works
     info = {"result" => {"value" => {}}}
     json_helper = mock()
-    JSONRPC.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_service_performance", []).returns(info)
+    json_helper.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_service_performance", []).returns(info)
     Sinatra::Application.set :json_helper, json_helper
     browser = Rack::Test::Session.new(Rack::MockSession.new(Sinatra::Application))
     body = json_call("get_service_performance", [])
@@ -125,4 +125,43 @@ class ManagerTest < Test::Unit::TestCase
     assert_equal 0, res["id"]
     assert_equal nil, res["result"]["vmid"]
   end
+
+  def test_redirect_unknown_works
+    info = {"result" => {"value" => {}}}
+    json_helper = mock()
+    json_helper.expects(:json_call).with(URI.parse("http://1.2.3.4:4567/jsonrpc"), "get_node_info", ["43"]).raises(NoMethodError, 'message')
+    Sinatra::Application.set :json_helper, json_helper
+
+    one_helper = mock()
+    one_helper.expects(:get_ip).with("43").returns("1.2.3.4")
+    Sinatra::Application.set :one_helper, one_helper
+
+    browser = Rack::Test::Session.new(Rack::MockSession.new(Sinatra::Application))
+    body = json_call("get_node_info", ["43"])
+    browser.post('/jsonrpc', body)
+
+    res = JSON.parse(browser.last_response.body)
+    assert_equal 0, res["id"]
+    assert_equal "43", res["result"]["vmid"]
+    assert_equal "UNKNOWN", res["result"]["state"]
+  end
+
+  def test_get_node_info_works
+    json_helper = mock()
+    json_helper.expects(:json_call).with(URI.parse("http://localhost:8000/jsonrpc.yaws"), "get_node_info", []).raises(NoMethodError, 'message')
+    one_helper = mock()
+    one_helper.expects(:get_ip).with("42").returns("1.2.3.4")
+    Sinatra::Application.set :json_helper, json_helper
+    Sinatra::Application.set :one_helper, one_helper
+    browser = Rack::Test::Session.new(Rack::MockSession.new(Sinatra::Application))
+    body = json_call("get_node_info", ['42'])
+    browser.post('/jsonrpc', body)
+
+    res = JSON.parse(browser.last_response.body)
+    assert_equal 0, res["id"]
+    assert_equal "42", res["result"]["vmid"]
+    assert_equal "1.2.3.4", res["result"]["ip"]
+  end
+
+
 end

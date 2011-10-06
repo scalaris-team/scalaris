@@ -62,6 +62,20 @@ class OpenNebulaHelper
     Nokogiri::XML(vm.to_xml).xpath("/VM/TEMPLATE/NIC/IP/text()").text
   end
 
+  def redirect_to_vm_failed_with(vmid, method, params, instance, ex)
+    puts ex.class
+    puts ex.message
+    vm = instance.vms_dataset.first(:one_vm_id => vmid)
+    result = {}
+    result[:vmid] = vmid
+    if vm == nil
+      result[:state] = "UNKNOWN"
+    else #vm has been started but is not reachable yet
+      result[:state] = "INIT"
+    end
+    result
+  end
+
   private
 
   def create_vm(description)
