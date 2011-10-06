@@ -1073,7 +1073,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     ps.println("starting import...");
                     String fileName = dumpsPath + File.separator + req_import;
                     if (fileName.endsWith(".db")) {
-                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName);
+                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, cFactory);
                     } else {
                         importHandler = new WikiDumpToScalarisHandler(
                                 de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
