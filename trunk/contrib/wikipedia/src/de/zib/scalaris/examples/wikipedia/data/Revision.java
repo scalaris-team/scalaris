@@ -15,11 +15,8 @@
  */
 package de.zib.scalaris.examples.wikipedia.data;
 
-import info.bliki.wiki.model.WikiModel;
-
 import java.io.Serializable;
 import java.util.Calendar;
-import java.util.Collection;
 
 /**
  * Represents a revision of a page.
@@ -128,42 +125,6 @@ public class Revision implements Serializable {
      */
     public String getText() {
         return text;
-    }
-
-    /**
-     * Parses the revision's text and returns all categories it belongs to.
-     * NOTE: the entire text of the revision is parsed which may take a while.
-     * 
-     * @param wikiModel
-     *            the wiki model to parse the categories from the revision's
-     *            text
-     * 
-     * @return a list of categories of the revision
-     */
-    public Collection<String> parseCategories(WikiModel wikiModel) {
-        wikiModel.setUp();
-        wikiModel.render(null, text);
-        Collection<String> categories = wikiModel.getCategories().keySet();
-        wikiModel.tearDown();
-        return categories;
-    }
-
-    /**
-     * Parses the revision's text and returns all categories it belongs to.
-     * NOTE: the entire text of the revision is parsed which may take a while.
-     * 
-     * @param wikiModel
-     *            the wiki model to parse the categories from the revision's
-     *            text
-     * 
-     * @return a list of categories of the revision
-     */
-    public Collection<String> parseTemplates(WikiModel wikiModel) {
-        wikiModel.setUp();
-        wikiModel.render(null, text);
-        Collection<String> templates = wikiModel.getTemplates();
-        wikiModel.tearDown();
-        return templates;
     }
 
     /**
