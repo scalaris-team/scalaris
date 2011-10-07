@@ -594,6 +594,7 @@ public class ScalarisDataHandler {
         // write:
         // get previous categories and templates:
         final MyWikiModel wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
+        wikiModel.setPageName(title);
         Set<String> oldCats = new HashSet<String>();
         Set<String> oldTpls = new HashSet<String>();
         Set<String> oldLnks = new HashSet<String>();
