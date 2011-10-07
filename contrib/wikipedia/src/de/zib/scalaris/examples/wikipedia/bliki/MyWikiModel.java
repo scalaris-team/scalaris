@@ -569,6 +569,17 @@ public class MyWikiModel extends WikiModel {
         super.setUp();
         fRedirectLink = null;
     }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.AbstractWikiModel#isTemplateTopic()
+     */
+    @Override
+    public boolean isTemplateTopic() {
+        // best to declare every page as a template topic
+        // -> e.g. does not remove <noinclude> tags in ordinary pages 
+        return true;
+//        return isTemplateNamespace(getNamespace(getPageName()));
+    }
     
     
 }
