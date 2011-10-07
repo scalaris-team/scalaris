@@ -100,6 +100,13 @@ fix_paths() {
     fi
 }
 
+fix_node_name() {
+    # if the given node name includes an '@', leave untouched
+    if ! echo $NODE_NAME | grep "@" >/dev/null ; then
+        NODE_NAME=$NODE_NAME@`hostname -f`
+    fi
+}
+
 # only get cookie from scalarisctl.conf if installed!
 get_cookie() {
     ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
@@ -186,14 +193,14 @@ checkinstallation() {
         echo "  'make java' will build the Java-API"
         echo "We were trying to run: $SCALARISCLIENT"
     else
-        ERLANGHOST=`$ERL -noinput -name boot -eval "io:format(\"~p~n\", [node()]), halt(0)."`
+        HOSTNAME=`hostname -f`
         JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
-        if [ "$ERLANGHOST" != "$JAVAHOST" ]; then
-            echo "WARNING: the hostnames reported by Erlang and Java do not match. You won't be"
-            echo " able to connect to erlang using the Java-API through scalaris.jar. Also, the"
+        if [ "$HOSTNAME" != "$JAVAHOST" ]; then
+            echo "WARNING: the hostnames reported by 'hostname -f' and Java do not match. You won't be"
+            echo " able to connect to Scalaris using the Java-API through scalaris.jar. Also, the"
             echo " java unit tests will probably not work."
-            echo " The java-api/scalaris script will work around this by asking erlang for its"
-            echo " hostname and using this for both."
+            echo " The java-api/scalaris script will work around this by using the value provided by"
+            echo " 'hostname -f' and using this for both."
             echo " If you implement your own application either do not use \"@localhost\" in the"
             echo " scalaris.properties file or set the scalaris.erlang.nodename system property"
             echo " with the correct hostname (only the domain name part after the \"@\") or fix"
@@ -201,8 +208,8 @@ checkinstallation() {
             echo " Please refer to your system's manual to set your hostname, e.g. change the"
             echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
             echo " the DNS."
-            echo "erlang: $ERL -noinput -name boot -eval \"io:format(\"~p~n\", [node()]), halt(0).\""
-            echo "     -> $ERLANGHOST"
+            echo "system: hostname -f"
+            echo "     -> $HOSTNAME"
             echo "java:   $SCALARISCLIENT -lh"
             echo "     -> $JAVAHOST"
         fi
@@ -298,7 +305,7 @@ scalarisstop(){
         -name ctl_$RANDOM \
         -pa $BEAMDIR \
         -noinput \
-        -s scalaris cli -extra $NODE_NAME@`hostname -f` stop
+        -s scalaris cli -extra $NODE_NAME stop
     popd > /dev/null
 }
 
@@ -308,7 +315,7 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME@`hostname -f` $*
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME $*
 }
 
 fix_paths
@@ -335,6 +342,8 @@ while getopts "dhifqmsvn:p:y:k:" optionName; do
 done
 
 shift $(($OPTIND-1))
+
+fix_node_name
 
 case $1 in
     checkinstallation)
