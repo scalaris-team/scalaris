@@ -22,6 +22,7 @@ import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.PageListResult;
+import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 
 /**
@@ -147,6 +148,9 @@ public class MyScalarisMagicWord extends MagicWord {
     public static final String MAGIC_REVISION_TIMESTAMP = "REVISIONTIMESTAMP";
 
     @SuppressWarnings("javadoc")
+    public static final String MAGIC_PAGE_SIZE = "PAGESIZE";
+
+    @SuppressWarnings("javadoc")
     public static final String MAGIC_SITE_NAME = "SITENAME";
 
     @SuppressWarnings("javadoc")
@@ -205,6 +209,7 @@ public class MyScalarisMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_SERVER);
         MY_MAGIC_WORDS.add(MAGIC_SCRIPT_PATH);
         MY_MAGIC_WORDS.add(MAGIC_SERVER_NAME);
+        MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
     }
     
     public static boolean isMagicWord(String name) {
@@ -296,7 +301,13 @@ public class MyScalarisMagicWord extends MagicWord {
 //            // TODO: implement
 //            return null;
 //            {{REVISIONUSER}}
-//            {{PAGESIZE:page name}}
+        } else if (name.equals(MAGIC_PAGE_SIZE)) {
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(model.connection, parameter);
+            int size = 0;
+            if (getRevResult.success) {
+                size = getRevResult.revision.getText().getBytes().length;
+            }
+            return model.formatStatisticNumber(rawNumber, size);
 //            {{PROTECTIONLEVEL:action}}
         /*
          * Technical metadata / Affects page content
