@@ -631,8 +631,6 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     + StringEscapeUtils.escapeHtml(String.valueOf(revision.getId())) + "</pre></p>" +
                     "<p>Last change:<pre>"
                     + StringEscapeUtils.escapeHtml(revision.getTimestamp()) + "</pre></p>" +
-                    "<p>Categories:<pre>"
-                    + StringEscapeUtils.escapeHtml(revision.parseCategories(wikiModel).toString()) + "</pre></p>" +
                     "<p>Request Parameters:<pre>"
                     + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
         }
