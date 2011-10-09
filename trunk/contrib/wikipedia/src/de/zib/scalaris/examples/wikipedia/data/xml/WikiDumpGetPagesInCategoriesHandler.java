@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +44,8 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     protected final Set<String> allowedCats;
     protected Map<String, Set<String>> categoryTree;
     protected Map<String, Set<String>> templateTree;
+    protected Map<String, Set<String>> includeTree;
+    protected Map<String, Set<String>> referenceTree;
 
     /**
      * Sets up a SAX XmlHandler exporting all page titles in the given
@@ -58,6 +61,10 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
      *            information about the categories and their dependencies
      * @param templateTree
      *            information about the templates and their dependencies
+     * @param includeTree
+     *            information about page includes
+     * @param referenceTree
+     *            information about references to a page
      * @param allowedCats
      *            include all pages in these categories
      * @param allowedPages
@@ -70,12 +77,16 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
     public WikiDumpGetPagesInCategoriesHandler(Set<String> blacklist,
             Calendar maxTime, Map<String, Set<String>> categoryTree,
             Map<String, Set<String>> templateTree,
+            Map<String, Set<String>> includeTree,
+            Map<String, Set<String>> referenceTree,
             Set<String> allowedCats, Set<String> allowedPages) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
         this.allowedCats = allowedCats;
         this.allowedPages = allowedPages;
         this.categoryTree = categoryTree;
         this.templateTree = templateTree;
+        this.includeTree = includeTree;
+        this.referenceTree = referenceTree;
         // we do not need to parse any other pages if the allowedCats set is empty!
         if (allowedCats.isEmpty()) {
             setPageCheckSkipRevisions(new CheckSkipRevisions() {
@@ -138,27 +149,16 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             }
             
             if (allowedPages.contains(page.getTitle()) || pageInAllowedCat || pageInAllowedTpl) {
-                pages.add(page.getTitle());
+                addToPages(page.getTitle());
                 System.out.println("added: " + page.getTitle());
                 // add only new categories to the pages:
                 // note: no need to include sub-categories
                 // note: parent categories are not included
-                pages.addAll(pageCategories);
-//                System.out.println("added cats: " + pageCategories.toString());
+                addToPages(pageCategories);
                 // add templates and their requirements:
                 Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplates);
-                pages.addAll(tplChildren);
-//                System.out.println("added tpls: " + tplChildren.toString());
-                // add all included pages:
-                // note: there may be further includes but this needs to be
-                // handled by recursively parsing the XML file
-                pages.addAll(wikiModel.getIncludes());
-//                System.out.println("added includes: " + wikiModel.getIncludes().toString());
-                
-                String redirLink = wikiModel.getRedirectLink();
-                if (redirLink != null) {
-                    pages.add(redirLink);
-                }
+                addToPages(tplChildren);
+                // add links for further processing
                 Set<String> pageLinks = wikiModel.getLinks();
                 pageLinks.remove(""); // there may be empty links
                 for (String pageLink : pageLinks) {
@@ -171,6 +171,20 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
         // only export page list every PRINT_PAGES_EVERY pages:
         if ((pageCount % PRINT_PAGES_EVERY) == 0) {
             msgOut.println("processed pages: " + pageCount);
+        }
+    }
+    
+    protected void addToPages(String title) {
+        if (pages.add(title)) {
+            // title not yet in pages -> add includes, redirects and pages redirecting to this page
+            addToPages(WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree, title)); // also has redirects
+            addToPages(WikiDumpGetCategoryTreeHandler.getAllChildren(referenceTree, title));
+        }
+    }
+    
+    protected void addToPages(Collection<? extends String> titles) {
+        for (String title : titles) {
+            addToPages(title);
         }
     }
 

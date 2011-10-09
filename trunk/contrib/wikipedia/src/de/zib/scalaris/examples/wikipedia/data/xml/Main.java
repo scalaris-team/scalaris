@@ -258,7 +258,9 @@ public class Main {
 
         Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
         Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
-        getCategoryTemplateTrees(filename, maxTime, categoryTree, templateTree);
+        Map<String, Set<String>> includeTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> referenceTree = new HashMap<String, Set<String>>();
+        getCategoryTemplateTrees(filename, maxTime, categoryTree, templateTree, includeTree, referenceTree);
         Set<String> categories = new HashSet<String>();
         categories.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories));
         
@@ -279,7 +281,7 @@ public class Main {
             InputSource file = getFileReader(filename);
             // need to get all subcategories recursively, as they must be included as well 
             WikiDumpGetPagesInCategoriesHandler handler =
-                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, categories, allowedPages);
+                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, includeTree, referenceTree, categories, allowedPages);
             runXmlHandler(handler, file);
             pages.addAll(handler.getPages());
             // allowed pages for the next recursion are the links in the current one
@@ -325,7 +327,9 @@ public class Main {
     protected static void getCategoryTemplateTrees(String filename,
             Calendar maxTime,
             Map<String, Set<String>> categoryTree,
-            Map<String, Set<String>> templateTree) throws RuntimeException,
+            Map<String, Set<String>> templateTree,
+            Map<String, Set<String>> includeTree,
+            Map<String, Set<String>> referenceTree) throws RuntimeException,
             FileNotFoundException, IOException, SAXException {
         File trees = new File(filename + "-trees.bin.gz");
         if (trees.exists()) {
@@ -342,6 +346,14 @@ public class Main {
                 Map<String, Set<String>> tplTree =
                         (Map<String, Set<String>>) ois.readObject();
                 templateTree.putAll(tplTree);
+                @SuppressWarnings("unchecked")
+                Map<String, Set<String>> inclTree =
+                        (Map<String, Set<String>>) ois.readObject();
+                includeTree.putAll(inclTree);
+                @SuppressWarnings("unchecked")
+                Map<String, Set<String>> refTree =
+                        (Map<String, Set<String>>) ois.readObject();
+                referenceTree.putAll(refTree);
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             } finally {
@@ -356,6 +368,8 @@ public class Main {
             runXmlHandler(handler, file);
             categoryTree.putAll(handler.getCategories());
             templateTree.putAll(handler.getTemplates());
+            templateTree.putAll(handler.getIncludes());
+            templateTree.putAll(handler.getReferences());
             
             // save trees to tree file
             System.out.println("saving category tree to " + trees.getName() + " ...");

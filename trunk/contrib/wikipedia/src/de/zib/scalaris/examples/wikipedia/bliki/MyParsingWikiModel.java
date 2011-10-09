@@ -121,6 +121,8 @@ public class MyParsingWikiModel extends MyWikiModel {
      */
     @Override
     public boolean appendRedirectLink(String redirectLink) {
+        // count redirect as include, too:
+        addInclude(redirectLink);
         return super.appendRedirectLink(redirectLink.intern());
     }
 
