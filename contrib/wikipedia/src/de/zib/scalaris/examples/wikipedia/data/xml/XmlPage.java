@@ -309,7 +309,7 @@ public class XmlPage extends DefaultHandler {
             }
         } else {
             if (localName.equals("title")) {
-                title = currentString.toString();
+                title = currentString.toString().intern();
             } else if (localName.equals("id")) {
                 id = currentString.toString();
             } else if (localName.equals("restrictions")) {

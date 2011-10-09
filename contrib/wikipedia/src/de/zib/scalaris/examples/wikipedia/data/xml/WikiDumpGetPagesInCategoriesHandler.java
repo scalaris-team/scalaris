@@ -117,7 +117,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             Set<String> pageCategories_raw = wikiModel.getCategories().keySet();
             ArrayList<String> pageCategories = new ArrayList<String>(pageCategories_raw.size());
             for (String cat_raw: pageCategories_raw) {
-                String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
+                String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw).intern();
                 pageCategories.add(category);
                 if (!pageInAllowedCat && allowedCats.contains(category)) {
 //                    System.out.println("page " + page.getTitle() + " in category " + category);
@@ -129,7 +129,7 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
             Set<String> pageTemplates_raw = wikiModel.getTemplates();
             ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
             for (String tpl_raw: pageTemplates_raw) {
-                String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
+                String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw).intern();
                 pageTemplates.add(template);
                 if (!pageInAllowedTpl && allowedCats.contains(template)) {
 //                    System.out.println("page " + page.getTitle() + " uses template " + template);
@@ -161,7 +161,9 @@ public class WikiDumpGetPagesInCategoriesHandler extends WikiDumpHandler {
                 }
                 Set<String> pageLinks = wikiModel.getLinks();
                 pageLinks.remove(""); // there may be empty links
-                linksOnPages.addAll(pageLinks);
+                for (String pageLink : pageLinks) {
+                    linksOnPages.add(pageLink.intern());
+                }
             }
             wikiModel.tearDown();
         }
