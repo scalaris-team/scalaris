@@ -118,13 +118,13 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             wikiModel.setPageName(page.getTitle());
             wikiModel.render(null, page.getCurRev().getText());
             for (String cat_raw: wikiModel.getCategories().keySet()) {
-                String category = wikiModel.getCategoryNamespace() + ":" + cat_raw;
+                String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw).intern();
                 updateSubCats(category, page.getTitle());
             }
             Set<String> pageTemplates_raw = wikiModel.getTemplates();
             ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
             for (String tpl_raw: pageTemplates_raw) {
-                String template = wikiModel.getTemplateNamespace() + ":" + tpl_raw;
+                String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw).intern();
                 updateSubCats(template, page.getTitle());
                 pageTemplates.add(template);
             }
