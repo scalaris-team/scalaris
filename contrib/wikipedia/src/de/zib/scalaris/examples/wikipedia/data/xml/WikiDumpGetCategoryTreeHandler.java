@@ -27,7 +27,6 @@ import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
-import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 
 /**
  * Provides abilities to read an xml wiki dump file and create a category (and
@@ -39,6 +38,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
     Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
     Map<String, Set<String>> templates = new HashMap<String, Set<String>>();
+    Map<String, Set<String>> includes = new HashMap<String, Set<String>>();
+    Map<String, Set<String>> references = new HashMap<String, Set<String>>();
 
     /**
      * Sets up a SAX XmlHandler extracting all categories from all pages except
@@ -57,39 +58,41 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     public WikiDumpGetCategoryTreeHandler(Set<String> blacklist,
             Calendar maxTime) throws RuntimeException {
         super(blacklist, null, 1, maxTime);
-        // since we do not use a whitelist, we can safely overwrite the skip
-        // revision handler:
-        // (otherwise we should also filter using the whitelist)
-        setPageCheckSkipRevisions(new CheckSkipRevisions() {
-            @Override
-            public boolean skipRevisions(String pageTitle) {
-                return !isTemplateOrCategory(pageTitle);
-            }
-        });
     }
     
-    private boolean isTemplateOrCategory(String pageTitle) {
-        return wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(pageTitle)) ||
-               wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(pageTitle));
+    private static void updateMap(Map<String, Set<String>> map, String key, String addToValue) {
+        Set<String> oldValue = map.get(key);
+        if (oldValue == null) {
+            oldValue = new HashSet<String>();
+            map.put(key, oldValue);
+        }
+        oldValue.add(addToValue);
+    }
+    
+    private static void updateMap(Map<String, Set<String>> map, String key, Collection<? extends String> addToValues) {
+        Set<String> oldValue = map.get(key);
+        if (oldValue == null) {
+            oldValue = new HashSet<String>(addToValues);
+            map.put(key, oldValue);
+        } else {
+            oldValue.addAll(addToValues);
+        }
     }
     
     private void updateSubCats(String category, String newSubCat) {
-        Set<String> subCats = categories.get(category);
-        if (subCats == null) {
-            subCats = new HashSet<String>();
-            categories.put(category, subCats);
-        }
-        subCats.add(newSubCat);
+        updateMap(categories, category, newSubCat);
     }
     
     private void updateTplReqs(String template, Collection<? extends String> requiredTpls) {
-        Set<String> subTpls = templates.get(template);
-        if (subTpls == null) {
-            subTpls = new HashSet<String>(requiredTpls);
-            templates.put(template, subTpls);
-        } else {
-            subTpls.addAll(requiredTpls);
-        }
+        updateMap(templates, template, requiredTpls);
+    }
+    
+    private void updateIncludes(String pageTitle, Collection<? extends String> includedPages) {
+        updateMap(includes, pageTitle, includedPages);
+    }
+    
+    private void updateReferences(String redirectTo, String referringPage) {
+        updateMap(references, redirectTo, referringPage);
     }
 
     /**
@@ -112,25 +115,39 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     protected void export(XmlPage page_xml) {
         Page page = page_xml.getPage();
 
-        if (page.getCurRev() != null && wikiModel != null &&
-                isTemplateOrCategory(page.getTitle())) {
+        if (page.getCurRev() != null && wikiModel != null) {
             wikiModel.setUp();
             wikiModel.setPageName(page.getTitle());
             wikiModel.render(null, page.getCurRev().getText());
-            for (String cat_raw: wikiModel.getCategories().keySet()) {
-                String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw).intern();
-                updateSubCats(category, page.getTitle());
+            final String namespace = MyWikiModel.getNamespace(page.getTitle());
+            final boolean isCategory = wikiModel.isCategoryNamespace(namespace);
+            final boolean isTemplate = wikiModel.isTemplateNamespace(namespace);
+            if (isCategory) {
+                for (String cat_raw: wikiModel.getCategories().keySet()) {
+                    String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw).intern();
+                    updateSubCats(category, page.getTitle());
+                }
             }
-            Set<String> pageTemplates_raw = wikiModel.getTemplates();
-            ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
-            for (String tpl_raw: pageTemplates_raw) {
-                String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw).intern();
-                updateSubCats(template, page.getTitle());
-                pageTemplates.add(template);
+            if (isCategory || isTemplate) {
+                Set<String> pageTemplates_raw = wikiModel.getTemplates();
+                ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
+                for (String tpl_raw: pageTemplates_raw) {
+                    String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw).intern();
+                    updateSubCats(template, page.getTitle());
+                    pageTemplates.add(template);
+                }
+                // also need the dependencies of each template:
+                if (isTemplate) {
+                    updateTplReqs(page.getTitle(), pageTemplates);
+                }
             }
-            // also need the dependencies of each template:
-            if (wikiModel.isTemplateNamespace(MyWikiModel.getNamespace(page.getTitle()))) {
-                updateTplReqs(page.getTitle(), pageTemplates);
+            Set<String> pageIncludes = wikiModel.getIncludes();
+            if (!pageIncludes.isEmpty()) {
+                updateIncludes(page.getTitle(), pageIncludes);
+            }
+            String pageRedirLink = wikiModel.getRedirectLink();
+            if (pageRedirLink != null) {
+                updateReferences(pageRedirLink, page.getTitle());
             }
             wikiModel.tearDown();
         }
@@ -164,6 +181,20 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         return templates;
     }
     
+    /**
+     * @return the includes
+     */
+    public Map<String, Set<String>> getIncludes() {
+        return includes;
+    }
+
+    /**
+     * @return the references
+     */
+    public Map<String, Set<String>> getReferences() {
+        return references;
+    }
+
     /**
      * Gets all sub categories that belong to a given root category
      * (recursively).
