@@ -2,6 +2,8 @@
 <project basedir="." default="build" name="WikiOnScalaris">
   <!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
   <property name="opterlang.version" value="1.5.4" />
+  <!-- debug level to use during compilation -->
+  <property name="debuglevel" value="lines" />
 
   <!-- All libraries needed to run the import task -->
   <path id="import.classpath">
