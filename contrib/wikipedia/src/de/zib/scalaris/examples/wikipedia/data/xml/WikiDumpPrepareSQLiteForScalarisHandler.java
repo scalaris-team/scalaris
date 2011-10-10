@@ -152,7 +152,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
                 stWrite.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of " + key + " failed (sqlite error)");
+            System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
         } catch (IOException e) {
             System.err.println("write of " + key + " failed");
         }
@@ -188,7 +188,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         } catch (FileNotFoundException e) {
             throw e;
         } catch (SQLiteException e) {
-            System.err.println("read of " + key + " failed (sqlite error)");
+            System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
             System.err.println("read of " + key + " failed (class not found)");
