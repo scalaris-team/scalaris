@@ -56,9 +56,12 @@ public class MyConfiguration extends Configuration {
              * simple.wikipedia.org
              * simple.wiktionary.org
              */
-            String baseUrl = new URL(namespace.getSiteinfo().getBase()).getHost();
-            String domain = baseUrl.split("\\.")[1];
-            INTERWIKI_MAP.remove(domain);
+            final String base = namespace.getSiteinfo().getBase();
+            if (!base.isEmpty()) {
+                String baseUrl = new URL(base).getHost();
+                String domain = baseUrl.split("\\.")[1];
+                INTERWIKI_MAP.remove(domain);
+            }
         } catch (Exception e) {
             // ignore if the URL is not valid
             e.printStackTrace();
