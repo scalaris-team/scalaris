@@ -156,6 +156,6 @@ class JSONRPC
   def self.redirect_call_to_vm(vmid, function, params, helper)
     ip = helper.get_ip(vmid)
     url = "http://" << ip << ":4567/jsonrpc"
-    self.json_call(URI.parse(url), function, params)
+    self.json_call(URI.parse(url), function, params)["result"]
   end
 end
