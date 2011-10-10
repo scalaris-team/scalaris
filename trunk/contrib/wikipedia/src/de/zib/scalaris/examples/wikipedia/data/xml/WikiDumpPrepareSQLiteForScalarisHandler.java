@@ -38,9 +38,9 @@ import com.almworks.sqlite4java.SQLiteStatement;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForScalarisHandler {
-    SQLiteConnection db;
-    SQLiteStatement stRead;
-    SQLiteStatement stWrite;
+    protected SQLiteConnection db;
+    protected SQLiteStatement stRead;
+    protected SQLiteStatement stWrite;
     
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -84,18 +84,10 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         return db;
     }
 
-    /**
-     * @return
-     * @throws SQLiteException
-     */
     static SQLiteStatement createReadStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT scalaris_key, scalaris_value FROM objects WHERE scalaris_key == ?");
+        return db.prepare("SELECT scalaris_value FROM objects WHERE scalaris_key == ?");
     }
 
-    /**
-     * @return
-     * @throws SQLiteException
-     */
     static SQLiteStatement createWriteStmt(SQLiteConnection db) throws SQLiteException {
         return db.prepare("REPLACE INTO objects (scalaris_key, scalaris_value) VALUES (?, ?);");
     }
@@ -145,9 +137,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
             oos.flush();
             oos.close();
             try {
-                stWrite.bind(1, key);
-                stWrite.bind(2, bos.toByteArray());
-                stWrite.step();
+                stWrite.bind(1, key).bind(2, bos.toByteArray()).stepThrough();
             } finally {
                 stWrite.reset();
             }
@@ -172,7 +162,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
                 stRead.bind(1, key);
                 if (stRead.step()) {
                     // there should only be one result
-                    byte[] value = stRead.columnBlob(1);
+                    byte[] value = stRead.columnBlob(0);
                     ObjectInputStream ois = new ObjectInputStream(
                             new GZIPInputStream(new ByteArrayInputStream(value)));
                     @SuppressWarnings("unchecked")
