@@ -246,7 +246,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 final Set<String> pageCategories_raw = wikiModel.getCategories().keySet();
                 ArrayList<String> pageCategories = new ArrayList<String>(pageCategories_raw.size());
                 for (String cat_raw: pageCategories_raw) {
-                    String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw).intern();
+                    String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw);
                     pageCategories.add(category);
                 }
                 writeValues(stWriteCategories, pageTitle, pageCategories);
@@ -257,7 +257,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 final Set<String> pageTemplates_raw = wikiModel.getTemplates();
                 ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
                 for (String tpl_raw: pageTemplates_raw) {
-                    String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw).intern();
+                    String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw);
                     pageTemplates.add(template);
                 }
                 writeValues(stWriteTemplates, pageTitle, pageTemplates);
@@ -521,8 +521,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "categories INNER JOIN pages AS page ON categories.title == page.id " +
                                 "INNER JOIN pages AS cat ON categories.category == cat.id");
                 while (stmt.step()) {
-                    String pageTitle = stmt.columnString(0).intern();
-                    String pageCategory = stmt.columnString(1).intern();
+                    String pageTitle = stmt.columnString(0);
+                    String pageCategory = stmt.columnString(1);
                     if (allowedCats.contains(pageCategory)) {
                         currentPages.add(pageTitle);
                     }
@@ -534,8 +534,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "templates INNER JOIN pages AS page ON templates.title == page.id " +
                                 "INNER JOIN pages AS tpl ON templates.template == tpl.id");
                 while (stmt.step()) {
-                    String pageTitle = stmt.columnString(0).intern();
-                    String pageTemplate = stmt.columnString(1).intern();
+                    String pageTitle = stmt.columnString(0);
+                    String pageTemplate = stmt.columnString(1);
                     if (allowedCats.contains(pageTemplate)) {
                         currentPages.add(pageTitle);
                     }
@@ -563,7 +563,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "INNER JOIN currentPages AS cp ON page.title == cp.title " +
                                 "INNER JOIN pages AS cat ON categories.category == cat.id");
                 while (stmt.step()) {
-                    String pageCategory = stmt.columnString(0).intern();
+                    String pageCategory = stmt.columnString(0);
                     addToPages(pages, pageCategory, includeTree, referenceTree);
                 }
                 stmt.reset();
@@ -575,7 +575,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "INNER JOIN currentPages AS cp ON page.title == cp.title " +
                                 "INNER JOIN pages AS tpl ON templates.template == tpl.id");
                 while (stmt.step()) {
-                    String pageTemplate = stmt.columnString(0).intern();
+                    String pageTemplate = stmt.columnString(0);
                     Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
                     addToPages(pages, tplChildren, includeTree, referenceTree);
                 }
@@ -588,7 +588,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "INNER JOIN currentPages AS cp ON page.title == cp.title " +
                                 "INNER JOIN pages AS lnk ON links.link == lnk.id");
                 while (stmt.step()) {
-                    String pageLink = stmt.columnString(0).intern();
+                    String pageLink = stmt.columnString(0);
                     if (!pageLink.isEmpty()) { // there may be empty links
                         pageLinks.add(pageLink);
                     }
