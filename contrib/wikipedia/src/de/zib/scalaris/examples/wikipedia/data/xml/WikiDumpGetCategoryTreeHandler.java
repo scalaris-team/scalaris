@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,11 +47,13 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
     protected String dbFileName;
     protected SQLiteConnection db = null;
+    protected SQLiteStatement stWritePages = null;
     protected SQLiteStatement stWriteCategories = null;
     protected SQLiteStatement stWriteTemplates = null;
     protected SQLiteStatement stWriteIncludes = null;
     protected SQLiteStatement stWriteRedirects = null;
     protected SQLiteStatement stWriteLinks = null;
+    protected Map<String, Integer> pages = new HashMap<String, Integer>();
     
     /**
      * Sets up a SAX XmlHandler extracting all categories from all pages except
@@ -115,44 +118,49 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         
     }
 
-    static SQLiteStatement createWriteCategoriesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("REPLACE INTO categories (title, category) VALUES (?, ?);");
-    }
-
-    static SQLiteStatement createWriteTemplatesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("REPLACE INTO templates (title, template) VALUES (?, ?);");
-    }
-
-    static SQLiteStatement createWriteIncludesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("REPLACE INTO includes (title, include) VALUES (?, ?);");
-    }
-
-    static SQLiteStatement createWriteRedirectsStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("REPLACE INTO redirects (title, redirect) VALUES (?, ?);");
-    }
-
-    static SQLiteStatement createWriteLinksStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("REPLACE INTO links (title, link) VALUES (?, ?);");
-    }
-
-    static void writeValue(SQLiteStatement stmt, String key, String value)
+    protected void writeValue(SQLiteStatement stmt, String key, String value)
             throws RuntimeException {
         writeValues(stmt, key, Arrays.asList(value));
     }
 
-    static void writeValues(SQLiteStatement stmt, String key, Collection<? extends String> values)
+    protected void writeValues(SQLiteStatement stmt, String key, Collection<? extends String> values)
             throws RuntimeException {
+        Integer key_id = pageToId(key);
+        LinkedList<Integer> values_id = new LinkedList<Integer>();
+        for (String value : values) {
+            values_id.add(pageToId(value));
+        }
         try {
             try {
-                stmt.bind(1, key);
-                for (String value : values) {
-                    stmt.bind(2, value).stepThrough().reset(false);
+                stmt.bind(1, key_id);
+                for (Integer value_id : values_id) {
+                    stmt.bind(2, value_id).stepThrough().reset(false);
                 }
             } finally {
                 stmt.reset();
             }
         } catch (SQLiteException e) {
             System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected Integer pageToId(String pageTitle) throws RuntimeException {
+        try {
+            Integer id = pages.get(pageTitle);
+            if (id == null) {
+                id = pages.size();
+                pages.put(pageTitle, id);
+                try {
+                    stWritePages.bind(1, id).bind(2, pageTitle).stepThrough();
+                } finally {
+                    stWritePages.reset();
+                }
+            }
+            return id;
+        } catch (SQLiteException e) {
+            System.err.println("write of " + pageTitle + " failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
         }
     }
 
@@ -160,8 +168,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             throws RuntimeException {
         SQLiteStatement stmt = null;
         try {
-            stmt = db.prepare("REPLACE INTO siteinfo (id, siteinfo) VALUES (?, ?);");
-            WikiDumpPrepareSQLiteForScalarisHandler.writeObject(stmt, "1", siteInfo);
+            stmt = db.prepare("REPLACE INTO properties (key, value) VALUES (?, ?);");
+            WikiDumpPrepareSQLiteForScalarisHandler.writeObject(stmt, "siteinfo", siteInfo);
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         } finally {
@@ -174,8 +182,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     static SiteInfo readSiteInfo(SQLiteConnection db) throws RuntimeException {
         SQLiteStatement stmt = null;
         try {
-            stmt = db.prepare("SELECT siteinfo FROM siteinfo WHERE id == ?");
-            return WikiDumpPrepareSQLiteForScalarisHandler.readObject(stmt, "1");
+            stmt = db.prepare("SELECT value FROM properties WHERE key == ?");
+            return WikiDumpPrepareSQLiteForScalarisHandler.readObject(stmt, "siteinfo");
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         } catch (FileNotFoundException e) {
@@ -355,22 +363,25 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
         try {
             db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
-            db.exec("CREATE TABLE categories(title STRING, category STRING);");
+            db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
+            db.exec("CREATE INDEX page_titles ON pages(title);");
+            db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");
             db.exec("CREATE INDEX cat_titles ON categories(title);");
-            db.exec("CREATE TABLE templates(title STRING, template STRING);");
+            db.exec("CREATE TABLE templates(title INTEGER, template INTEGER);");
             db.exec("CREATE INDEX tpl_titles ON templates(title);");
-            db.exec("CREATE TABLE includes(title STRING, include STRING);");
+            db.exec("CREATE TABLE includes(title INTEGER, include INTEGER);");
             db.exec("CREATE INDEX incl_titles ON includes(title);");
-            db.exec("CREATE TABLE redirects(title STRING, redirect STRING);");
+            db.exec("CREATE TABLE redirects(title INTEGER, redirect INTEGER);");
             db.exec("CREATE INDEX redir_titles ON redirects(title);");
-            db.exec("CREATE TABLE links(title STRING, link STRING);");
+            db.exec("CREATE TABLE links(title INTEGER, link INTEGER);");
             db.exec("CREATE INDEX lnk_titles ON links(title);");
-            db.exec("CREATE TABLE siteinfo(id STRING PRIMARY KEY ASC, siteinfo);");
-            stWriteCategories = createWriteCategoriesStmt(db);
-            stWriteTemplates = createWriteTemplatesStmt(db);
-            stWriteIncludes = createWriteIncludesStmt(db);
-            stWriteRedirects = createWriteRedirectsStmt(db);
-            stWriteLinks = createWriteLinksStmt(db);
+            db.exec("CREATE TABLE properties(key STRING PRIMARY KEY ASC, value);");
+            stWritePages = db.prepare("INSERT INTO pages (id, title) VALUES (?, ?);");
+            stWriteCategories = db.prepare("INSERT INTO categories (title, category) VALUES (?, ?);");
+            stWriteTemplates = db.prepare("INSERT INTO templates (title, template) VALUES (?, ?);");
+            stWriteIncludes = db.prepare("INSERT INTO includes (title, include) VALUES (?, ?);");
+            stWriteRedirects = db.prepare("INSERT INTO redirects (title, redirect) VALUES (?, ?);");
+            stWriteLinks = db.prepare("INSERT INTO links (title, link) VALUES (?, ?);");
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         }
@@ -406,8 +417,10 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             SiteInfo siteInfo = readSiteInfo(db);
             MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
             stmt = db
-                    .prepare("SELECT title, category FROM categories WHERE "
-                            + "title LIKE '" + wikiModel.getCategoryNamespace() + ":%'");
+                    .prepare("SELECT page.title, cat.title FROM " +
+                            "categories INNER JOIN pages AS page ON categories.title == page.id " +
+                            "INNER JOIN pages AS cat ON categories.category == cat.id " +
+                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%'");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String category = stmt.columnString(1).intern();
@@ -415,9 +428,11 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             }
             stmt.dispose();
             stmt = db
-                    .prepare("SELECT title, template FROM templates WHERE "
-                            + "title LIKE '" + wikiModel.getCategoryNamespace() + ":%' OR "
-                            + "title LIKE '" + wikiModel.getTemplateNamespace() + ":%'");
+                    .prepare("SELECT page.title, tpl.title FROM " +
+                            "templates INNER JOIN pages AS page ON templates.title == page.id " +
+                            "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
+                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%' OR "
+                            + "page.title LIKE '" + wikiModel.getTemplateNamespace() + ":%'");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String template = stmt.columnString(1).intern();
@@ -428,14 +443,20 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 }
             }
             stmt.dispose();
-            stmt = db.prepare("SELECT title, include FROM includes;");
+            stmt = db
+                    .prepare("SELECT page.title, incl.title FROM " +
+                            "includes INNER JOIN pages AS page ON includes.title == page.id " +
+                            "INNER JOIN pages AS incl ON includes.include == incl.id");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String include = stmt.columnString(1).intern();
                 updateMap(includeTree, pageTitle, include);
             }
             stmt.dispose();
-            stmt = db.prepare("SELECT title, redirect FROM redirects;");
+            stmt = db
+                    .prepare("SELECT page.title, redir.title FROM " +
+                            "redirects INNER JOIN pages AS page ON redirects.title == page.id " +
+                            "INNER JOIN pages AS redir ON redirects.redirect == redir.id");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String redirect = stmt.columnString(1).intern();
@@ -451,6 +472,159 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             if (db != null) {
                 db.dispose();
             }
+        }
+    }
+    
+    /**
+     * Extracts all pages in the given categories from the given DB.
+     * 
+     * @param dbFileName
+     *            name of the DB file
+     * @param allowedCats
+     *            include all pages in these categories
+     * @param allowedPages
+     *            a number of pages to include (also parses these pages for more
+     *            links)
+     * @param depth
+     *            follow links this deep
+     * @param templateTree
+     *            information about the templates and their dependencies
+     * @param includeTree
+     *            information about page includes
+     * @param referenceTree
+     *            information about references to a page
+     *            
+     * @return full list of allowed pages
+     * 
+     * @throws RuntimeException
+     *             if any error occurs
+     */
+    public static Set<String> getPagesInCategories(String dbFileName,
+            Set<String> allowedCats, Set<String> allowedPages, int depth,
+            Map<String, Set<String>> templateTree,
+            Map<String, Set<String>> includeTree,
+            Map<String, Set<String>> referenceTree) throws RuntimeException {
+        Set<String> pages = new HashSet<String>();
+        Set<String> pageLinks = new HashSet<String>();
+        SQLiteConnection db = null;
+        SQLiteStatement stmt = null;
+        try {
+            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
+            Set<String> currentPages = new HashSet<String>(allowedPages);
+            currentPages.addAll(allowedCats);
+
+            // note: allowedCats can contain categories or templates
+            if (!allowedCats.isEmpty()) {
+                // select all pages belonging to any of the allowed categories:
+                stmt = db
+                        .prepare("SELECT page.title, cat.title FROM " +
+                                "categories INNER JOIN pages AS page ON categories.title == page.id " +
+                                "INNER JOIN pages AS cat ON categories.category == cat.id");
+                while (stmt.step()) {
+                    String pageTitle = stmt.columnString(0).intern();
+                    String pageCategory = stmt.columnString(1).intern();
+                    if (allowedCats.contains(pageCategory)) {
+                        currentPages.add(pageTitle);
+                    }
+                }
+                stmt.dispose();
+                // select all pages belonging to any of the allowed templates:
+                stmt = db
+                        .prepare("SELECT page.title, tpl.title FROM " +
+                                "templates INNER JOIN pages AS page ON templates.title == page.id " +
+                                "INNER JOIN pages AS tpl ON templates.template == tpl.id");
+                while (stmt.step()) {
+                    String pageTitle = stmt.columnString(0).intern();
+                    String pageTemplate = stmt.columnString(1).intern();
+                    if (allowedCats.contains(pageTemplate)) {
+                        currentPages.add(pageTitle);
+                    }
+                }
+                stmt.dispose();
+            }
+
+            pageLinks = new HashSet<String>();
+            while(depth >= 0) {
+                System.out.println("recursion level: " + depth);
+                System.out.println("adding " + currentPages.size() + " pages");
+                db.exec("DROP TABLE IF EXISTS currentPages");
+                db.exec("CREATE TEMPORARY TABLE currentPages(title STRING PRIMARY KEY);");
+                stmt = db.prepare("INSERT INTO currentPages (title) VALUES (?);");
+                for (String pageTitle : currentPages) {
+                    addToPages(pages, pageTitle, includeTree, referenceTree);
+                    stmt.bind(1, pageTitle).stepThrough().reset();
+                }
+                
+                System.out.println("adding categories of " + currentPages.size() + " pages");
+                // add all categories the page belongs to
+                stmt = db
+                        .prepare("SELECT cat.title FROM categories " +
+                                "INNER JOIN pages AS page ON categories.title == page.id " +
+                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                "INNER JOIN pages AS cat ON categories.category == cat.id");
+                while (stmt.step()) {
+                    String pageCategory = stmt.columnString(0).intern();
+                    addToPages(pages, pageCategory, includeTree, referenceTree);
+                }
+                stmt.reset();
+                System.out.println("adding templates of " + currentPages.size() + " pages");
+                // add all templates (and their requirements) of the pages
+                stmt = db
+                        .prepare("SELECT tpl.title FROM templates " +
+                                "INNER JOIN pages AS page ON templates.title == page.id " +
+                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                "INNER JOIN pages AS tpl ON templates.template == tpl.id");
+                while (stmt.step()) {
+                    String pageTemplate = stmt.columnString(0).intern();
+                    Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
+                    addToPages(pages, tplChildren, includeTree, referenceTree);
+                }
+                stmt.reset();
+                System.out.println("adding links of " + currentPages.size() + " pages");
+                // add all links of the pages for further processing
+                stmt = db
+                        .prepare("SELECT lnk.title FROM links " +
+                                "INNER JOIN pages AS page ON links.title == page.id " +
+                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                "INNER JOIN pages AS lnk ON links.link == lnk.id");
+                while (stmt.step()) {
+                    String pageLink = stmt.columnString(0).intern();
+                    if (!pageLink.isEmpty()) { // there may be empty links
+                        pageLinks.add(pageLink);
+                    }
+                }
+                stmt.reset();
+                // for the next recursion:
+                currentPages = pageLinks;
+                pageLinks = new HashSet<String>();
+                --depth;
+            }
+            db.dispose();
+            
+            return pages;
+        } catch (SQLiteException e) {
+            System.err.println("read of category tree failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        } finally {
+            if (stmt != null) {
+                stmt.dispose();
+            }
+            if (db != null) {
+                db.dispose();
+            }
+        }
+    }
+    static protected void addToPages(Set<String> pages, String title, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
+        if (pages.add(title)) {
+            // title not yet in pages -> add includes, redirects and pages redirecting to this page
+            addToPages(pages, WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree, title), includeTree, referenceTree); // also has redirects
+            addToPages(pages, WikiDumpGetCategoryTreeHandler.getAllChildren(referenceTree, title), includeTree, referenceTree);
+        }
+    }
+    
+    static protected void addToPages(Set<String> pages, Collection<? extends String> titles, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
+        for (String title : titles) {
+            addToPages(pages, title, includeTree, referenceTree);
         }
     }
 }
