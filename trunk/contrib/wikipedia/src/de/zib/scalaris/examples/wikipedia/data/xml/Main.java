@@ -251,45 +251,7 @@ public class Main {
             rootCategories.removeAll(Arrays.asList(""));
         }
         System.out.println("filtering by categories " + rootCategories.toString() + " ...");
-
-        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> includeTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> referenceTree = new HashMap<String, Set<String>>();
-        getCategoryTemplateTrees(filename, maxTime, categoryTree, templateTree, includeTree, referenceTree);
-        Set<String> categories = new HashSet<String>();
-        categories.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(categoryTree, rootCategories));
-        
-//        do {
-//            FileWriter outFile = new FileWriter(filename + "-allowed_cats.txt");
-//            PrintWriter out = new PrintWriter(outFile);
-//            for (String category : categories) {
-//                out.println(category);
-//            }
-//            out.close();
-//        } while(false);
-
-        Set<String> pages = new HashSet<String>(categories);
-        System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
-        while (recursionLvl >= 0) {
-            // note: need to create a new file for each pass because it is being
-            // closed at the end of a pass
-            InputSource file = getFileReader(filename);
-            // need to get all subcategories recursively, as they must be included as well 
-            WikiDumpGetPagesInCategoriesHandler handler =
-                    new WikiDumpGetPagesInCategoriesHandler(blacklist, maxTime, categoryTree, templateTree, includeTree, referenceTree, categories, allowedPages);
-            runXmlHandler(handler, file);
-            pages.addAll(handler.getPages());
-            // allowed pages for the next recursion are the links in the current one
-            // note: do not include the previous pages
-            allowedPages.clear();
-            allowedPages.addAll(handler.getLinksOnPages());
-            
-            --recursionLvl;
-            // note: all further recursion levels only get linked-in pages
-            // (these categories have been completely covered)
-            categories.clear();
-        }
+        Set<String> pages = getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl);
 
         do {
             FileWriter outFile = new FileWriter(pageListFileName);
@@ -302,8 +264,11 @@ public class Main {
     }
 
     /**
+     * Extracts all allowed pages in the given root categories as well as those
+     * pages explicitly mentioned in a list of allowed pages.
+     * 
      * Gets the category and template trees from a file, i.e.
-     * <tt>filename + "-trees.bin"</tt>, or if this does not exist, builds the
+     * <tt>filename + "-trees.db"</tt>, or if this does not exist, builds the
      * trees and stores them to this file.
      * 
      * @param filename
@@ -320,27 +285,42 @@ public class Main {
      * @throws IOException
      * @throws SAXException
      */
-    protected static void getCategoryTemplateTrees(String filename,
-            Calendar maxTime,
-            Map<String, Set<String>> categoryTree,
-            Map<String, Set<String>> templateTree,
-            Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree) throws RuntimeException,
-            FileNotFoundException, IOException, SAXException {
+    protected static Set<String> getPageList(String filename, Calendar maxTime,
+            Set<String> allowedPages, LinkedList<String> rootCategories,
+            int recursionLvl) throws RuntimeException, FileNotFoundException,
+            IOException, SAXException {
+        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> includeTree = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> referenceTree = new HashMap<String, Set<String>>();
+
         File trees = new File(filename + "-trees.db");
         if (trees.exists()) {
             // read trees from tree file
             System.out.println("reading category tree from " + trees.getName() + " ...");
-            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(), categoryTree, templateTree, includeTree, referenceTree);
+            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
+                    categoryTree, templateTree, includeTree, referenceTree);
         } else {
             // build trees from xml file
-            // need to get all subcategories recursively, as they must be included as well 
+            // need to get all subcategories recursively, as they must be
+            // included as well
             System.out.println("building category tree from " + filename + " ...");
-            WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(blacklist, maxTime, trees.getName());
+            WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(
+                    blacklist, maxTime, trees.getName());
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
-            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(), categoryTree, templateTree, includeTree, referenceTree);
+            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
+                    categoryTree, templateTree, includeTree, referenceTree);
         }
+
+        System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
+        Set<String> allowedCats = new HashSet<String>();
+        allowedCats.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(
+                categoryTree, rootCategories));
+
+        return WikiDumpGetCategoryTreeHandler.getPagesInCategories(
+                trees.getName(), allowedCats, allowedPages, recursionLvl,
+                templateTree, includeTree, referenceTree);
     }
     
     /**
