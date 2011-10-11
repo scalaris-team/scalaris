@@ -97,7 +97,7 @@ public class MyParsingWikiModel extends MyWikiModel {
      *            the name of the article being included
      */
     public void addInclude(String includedName) {
-        includes.add(includedName.intern());
+        includes.add(includedName);
     }
 
     /* (non-Javadoc)
@@ -123,14 +123,6 @@ public class MyParsingWikiModel extends MyWikiModel {
     public boolean appendRedirectLink(String redirectLink) {
         // count redirect as include, too:
         addInclude(redirectLink);
-        return super.appendRedirectLink(redirectLink.intern());
-    }
-
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel#addLink(java.lang.String)
-     */
-    @Override
-    public void addLink(String topicName) {
-        super.addLink(topicName.intern());
+        return super.appendRedirectLink(redirectLink);
     }
 }
