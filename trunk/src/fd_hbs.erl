@@ -127,15 +127,8 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
                     _ ->
                         NewEntry =
                             case rempid_refcount(Entry) of
-                                0 -> %% retrigger delayed del watching
-                                    NewTime = os:timestamp(),
-                                    msg_delay:send_local(
-                                      1, self(),
-                                      {check_delayed_del_watching_of,
-                                       WatchedPid, NewTime}),
-                                    rempid_set_last_modified(Entry, NewTime);
-                                _ ->
-                                    rempid_set_pending_demonitor(Entry, false)
+                                0 -> trigger_delayed_del_watching(Entry);
+                                _ -> rempid_set_pending_demonitor(Entry, false)
                             end,
                         lists:keyreplace(WatchedPid, 1, RemPids, NewEntry)
                 end,
@@ -307,6 +300,19 @@ failureDetectorInterval() -> config:read(failure_detector_interval).
 -spec delayfactor() -> pos_integer().
 delayfactor() -> 4.
 
+-spec trigger_delayed_del_watching(rempid()) -> rempid().
+trigger_delayed_del_watching(RemPidEntry) ->
+    %% delayed demonitoring: remember current time self-inform on
+    %% pending demonitoring with current time.
+    %% actually delete if timestamp of the entry is still the same
+    %% after delay
+    WatchedPid = rempid_get_rempid(RemPidEntry),
+    Time = os:timestamp(),
+    msg_delay:send_local(1, self(),
+                         {check_delayed_del_watching_of, WatchedPid, Time}),
+    E1 = rempid_set_last_modified(RemPidEntry, Time),
+    rempid_set_pending_demonitor(E1, true).
+
 -spec state_new(comm:mypid(), [rempid()],
                 util:time(), util:time(), atom()) -> state().
 state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter,Table) ->
@@ -444,17 +450,7 @@ state_del_watched_pid(State, WatchedPid) ->
                 case {rempid_refcount(TmpEntry),
                       rempid_get_pending_demonitor(TmpEntry)} of
                     {0, false} -> %% dec to 0 and triggger new delayed message
-                        Time = os:timestamp(),
-                        %% delayed demonitoring: remember current time
-                        %% self-inform on pending demonitoring with current
-                        %% time.
-                        %% actually delete if timestamp of the entry is
-                        %% still the same after delay
-                        msg_delay:send_local(
-                          1, self(),
-                          {check_delayed_del_watching_of, WatchedPid, Time}),
-                        T2 = rempid_set_last_modified(TmpEntry, Time),
-                        rempid_set_pending_demonitor(T2, true);
+                        trigger_delayed_del_watching(TmpEntry);
                     {0, true} -> %% dec to 0 and no new delayed message needed
                         TmpEntry;
                     _ -> TmpEntry
