@@ -123,7 +123,7 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
                             fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid});
                             _ -> comm:send(RemHBS, {del_watching_of, WatchedPid})
                         end,
-                        lists:delete(WatchedPid, RemPids);
+                        lists:keydelete(WatchedPid, 1, RemPids);
                     _ ->
                         NewEntry =
                             case rempid_refcount(Entry) of
@@ -258,7 +258,7 @@ on({crashed, WatchedPid}, State) ->
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids
-    NewRemPids = lists:delete(WatchedPid, state_get_rem_pids(State)),
+    NewRemPids = lists:keydelete(WatchedPid, 1, state_get_rem_pids(State)),
     S1 = state_set_rem_pids(State, NewRemPids),
     %% delete subscription entries with this pid
     lists:foldl(fun({Sub, Cook}, StAgg) ->
@@ -453,7 +453,8 @@ state_del_watched_pid(State, WatchedPid) ->
                         msg_delay:send_local(
                           1, self(),
                           {check_delayed_del_watching_of, WatchedPid, Time}),
-                        rempid_set_last_modified(TmpEntry, Time);
+                        T2 = rempid_set_last_modified(TmpEntry, Time),
+                        rempid_set_pending_demonitor(T2, true);
                     {0, true} -> %% dec to 0 and no new delayed message needed
                         TmpEntry;
                     _ -> TmpEntry
