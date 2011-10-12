@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,13 +46,14 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static final int PRINT_PAGES_EVERY = 400;
     protected String dbFileName;
     protected SQLiteConnection db = null;
+    protected SQLiteStatement stGetPageId = null;
     protected SQLiteStatement stWritePages = null;
     protected SQLiteStatement stWriteCategories = null;
     protected SQLiteStatement stWriteTemplates = null;
     protected SQLiteStatement stWriteIncludes = null;
     protected SQLiteStatement stWriteRedirects = null;
     protected SQLiteStatement stWriteLinks = null;
-    protected Map<String, Integer> pages = new HashMap<String, Integer>();
+    protected long nextPageId = 0l;
     
     /**
      * Sets up a SAX XmlHandler extracting all categories from all pages except
@@ -115,7 +115,6 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
-        
     }
 
     protected void writeValue(SQLiteStatement stmt, String key, String value)
@@ -125,15 +124,15 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
     protected void writeValues(SQLiteStatement stmt, String key, Collection<? extends String> values)
             throws RuntimeException {
-        Integer key_id = pageToId(key);
-        LinkedList<Integer> values_id = new LinkedList<Integer>();
+        long key_id = pageToId(key);
+        LinkedList<Long> values_id = new LinkedList<Long>();
         for (String value : values) {
             values_id.add(pageToId(value));
         }
         try {
             try {
                 stmt.bind(1, key_id);
-                for (Integer value_id : values_id) {
+                for (Long value_id : values_id) {
                     stmt.bind(2, value_id).stepThrough().reset(false);
                 }
             } finally {
@@ -145,19 +144,28 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         }
     }
 
-    protected Integer pageToId(String pageTitle) throws RuntimeException {
+    protected long pageToId(String pageTitle) throws RuntimeException {
         try {
-            Integer id = pages.get(pageTitle);
-            if (id == null) {
-                id = pages.size();
-                pages.put(pageTitle, id);
+            long pageId = -1;
+            // try to find the page id in the pages table:
+            try {
+                stGetPageId.bind(1, pageTitle);
+                if (stGetPageId.step()) {
+                    pageId = stGetPageId.columnLong(0);
+                }
+            } finally {
+                stGetPageId.reset();
+            }
+            // page not found yet -> add to pages table:
+            if (pageId == -1) {
+                pageId = nextPageId++;
                 try {
-                    stWritePages.bind(1, id).bind(2, pageTitle).stepThrough();
+                    stWritePages.bind(1, pageId).bind(2, pageTitle).stepThrough();
                 } finally {
                     stWritePages.reset();
                 }
             }
-            return id;
+            return pageId;
         } catch (SQLiteException e) {
             System.err.println("write of " + pageTitle + " failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
@@ -376,6 +384,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             db.exec("CREATE TABLE links(title INTEGER, link INTEGER);");
             db.exec("CREATE INDEX lnk_titles ON links(title);");
             db.exec("CREATE TABLE properties(key STRING PRIMARY KEY ASC, value);");
+            stGetPageId = db.prepare("SELECT id FROM pages WHERE title == ?;");
             stWritePages = db.prepare("INSERT INTO pages (id, title) VALUES (?, ?);");
             stWriteCategories = db.prepare("INSERT INTO categories (title, category) VALUES (?, ?);");
             stWriteTemplates = db.prepare("INSERT INTO templates (title, template) VALUES (?, ?);");
