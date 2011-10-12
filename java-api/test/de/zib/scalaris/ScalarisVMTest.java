@@ -35,7 +35,6 @@ import de.zib.scalaris.ScalarisVM.GetInfoResult;
  * @version 3.6
  * @since 3.6
  */
-@Ignore
 public class ScalarisVMTest {
 
     protected enum DeleteAction {
@@ -142,8 +141,8 @@ public class ScalarisVMTest {
             assertTrue("mem_total (" + info.memTotal + ") >= 0", info.memTotal >= 0);
             assertTrue("uptime (" + info.uptime + ") >= 0", info.uptime >= 0);
             assertTrue("erlang_node (" + info.erlangNode + ") != \"\"", !info.erlangNode.isEmpty());
-            assertTrue("0 <= port (" + info.port + ") <= 65535", info.port >= 0 && info.port <= 65535);
-            assertTrue("0 <= yaws_port (" + info.yawsPort + ") <= 65535", info.yawsPort >= 0 && info.yawsPort <= 65535);
+            assertTrue("0 <= port (" + info.port + ") <= 65535", (info.port >= 0) && (info.port <= 65535));
+            assertTrue("0 <= yaws_port (" + info.yawsPort + ") <= 65535", (info.yawsPort >= 0) && (info.yawsPort <= 65535));
         } finally {
             conn.closeConnection();
         }
@@ -262,7 +261,7 @@ public class ScalarisVMTest {
      * @throws ConnectionException
      * @throws InterruptedException
      */
-    private final void testAddNodesX(int nodesToAdd) throws ConnectionException, InterruptedException {
+    private final void testAddNodesX(final int nodesToAdd) throws ConnectionException, InterruptedException {
         final ScalarisVM conn = new ScalarisVM();
         try {
             int size = conn.getNumberOfNodes();
@@ -347,7 +346,7 @@ public class ScalarisVMTest {
      * @throws ConnectionException
      * @throws InterruptedException
      */
-    private final void testDeleteNode(DeleteAction action) throws ConnectionException, InterruptedException {
+    private final void testDeleteNode(final DeleteAction action) throws ConnectionException, InterruptedException {
         final ScalarisVM conn = new ScalarisVM();
         try {
             final int size = conn.getNumberOfNodes();
@@ -475,7 +474,7 @@ public class ScalarisVMTest {
      * @throws ConnectionException
      * @throws InterruptedException
      */
-    private final void testDeleteNodesX(final int nodesToRemove, DeleteAction action) throws ConnectionException, InterruptedException {
+    private final void testDeleteNodesX(final int nodesToRemove, final DeleteAction action) throws ConnectionException, InterruptedException {
         final ScalarisVM conn = new ScalarisVM();
         try {
             final int size = conn.getNumberOfNodes();
@@ -613,7 +612,7 @@ public class ScalarisVMTest {
      * @throws ConnectionException
      * @throws InterruptedException
      */
-    private final void testDeleteNodesListX(final int nodesToRemove, DeleteAction action) throws ConnectionException, InterruptedException {
+    private final void testDeleteNodesListX(final int nodesToRemove, final DeleteAction action) throws ConnectionException, InterruptedException {
         final ScalarisVM conn = new ScalarisVM();
         try {
             final int size = conn.getNumberOfNodes();
@@ -657,7 +656,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetOtherVMs_NotConnected() throws ConnectionException, InterruptedException {
-        ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM();
         conn.closeConnection();
         conn.getOtherVMs(1);
     }
@@ -695,18 +694,21 @@ public class ScalarisVMTest {
         testGetOtherVMsX(3);
     }
 
-    private final void testGetOtherVMsX(int max) throws ConnectionException, InterruptedException {
-        ScalarisVM conn = new ScalarisVM();
+    private final void testGetOtherVMsX(final int max) throws ConnectionException, InterruptedException {
+        final ScalarisVM conn = new ScalarisVM();
         try {
-            List<String> result = conn.getOtherVMs(max);
+            final List<String> result = conn.getOtherVMs(max);
             assertTrue("list too long:" + result.toString(), result.size() <= max);
-            ConnectionFactory cf = new ConnectionFactory();
-            for (String node : result) {
+            final ConnectionFactory cf = new ConnectionFactory();
+            for (final String node : result) {
                 cf.setNode(node);
                 cf.setClientName(ConnectionFactory.getInstance().getClientName() + "2");
-                ScalarisVM conn2 = new ScalarisVM(cf.createConnection());
-                conn2.getInfo();
-                conn2.closeConnection();
+                final ScalarisVM conn2 = new ScalarisVM(cf.createConnection());
+                try {
+                    conn2.getInfo();
+                } finally {
+                    conn2.closeConnection();
+                }
             }
         } finally {
             conn.closeConnection();
