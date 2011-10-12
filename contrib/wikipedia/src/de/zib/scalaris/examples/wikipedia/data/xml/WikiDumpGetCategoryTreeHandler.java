@@ -502,12 +502,11 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
             pageLinks = new HashSet<String>();
             Set<String> newPages = new HashSet<String>();
+            db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
             while(depth >= 0) {
                 System.out.println("recursion level: " + depth);
                 System.out.println(" adding " + currentPages.size() + " pages");
                 do {
-                    db.exec("DROP TABLE IF EXISTS currentPages;");
-                    db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
                     for (String pageTitle : currentPages) {
                         addToPages(pages, newPages, pageTitle, includeTree, referenceTree);
@@ -516,6 +515,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                         pages.add(pageTitle);
                         stmt.bind(1, pageTitle).stepThrough().reset();
                     }
+                    stmt.reset();
 
                     System.out.println("  adding categories of " + currentPages.size() + " pages");
                     // add all categories the page belongs to
@@ -556,6 +556,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                         }
                     }
                     stmt.reset();
+                    db.exec("DELETE FROM currentPages;");
                     if (newPages.isEmpty()) {
                         break;
                     } else {
@@ -569,11 +570,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 pageLinks = new HashSet<String>();
                 --depth;
             }
-            db.dispose();
+            // no need to drop table - we set temporary tables to be in-memory only
+//            db.exec("DROP TABLE currentPages;");
             
             return pages;
         } catch (SQLiteException e) {
-            System.err.println("read of category tree failed (sqlite error: " + e.toString() + ")");
+            System.err.println("read of pages in categories failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } finally {
             if (stmt != null) {
