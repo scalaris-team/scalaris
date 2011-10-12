@@ -129,7 +129,7 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    whitelist.add(MyWikiModel.capFirst(line));
+                    whitelist.add(MyWikiModel.normalisePageTitle(line));
                 }
             }
             if (whitelist.isEmpty()) {
@@ -240,15 +240,18 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    allowedPages.add(MyWikiModel.capFirst(line));
+                    allowedPages.add(MyWikiModel.normalisePageTitle(line));
                 }
             }
         }
         
         LinkedList<String> rootCategories = new LinkedList<String>();
         if (args.length >= 5) {
-            rootCategories = new LinkedList<String>(Arrays.asList(args).subList(4, args.length));
-            rootCategories.removeAll(Arrays.asList(""));
+            for (String rCat : Arrays.asList(args).subList(4, args.length)) {
+                if (!rCat.isEmpty()) {
+                    rootCategories.add(MyWikiModel.normalisePageTitle(rCat));
+                }
+            }
         }
         System.out.println("filtering by categories " + rootCategories.toString() + " ...");
         Set<String> pages = getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl);

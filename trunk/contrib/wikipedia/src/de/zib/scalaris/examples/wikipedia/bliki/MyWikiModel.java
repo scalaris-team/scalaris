@@ -554,11 +554,25 @@ public class MyWikiModel extends WikiModel {
      *
      * @return a string with the first character being upper case
      */
-    public static String capFirst(final String value) {
+    private static String capFirst(final String value) {
         if (value.length() > 0) {
             return value.substring(0, 1).toUpperCase() + value.substring(1);
         }
         return "";
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param title
+     *            the original page title
+     * 
+     * @return the normalised page title
+     */
+    public static String normalisePageTitle(final String title) {
+        String[] parts = splitNsTitle(title);
+        return createFullPageName(capFirst(parts[0]), capFirst(parts[1]));
     }
 
     /* (non-Javadoc)
