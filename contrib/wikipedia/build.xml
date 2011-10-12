@@ -13,13 +13,6 @@
     <pathelement location="contrib/commons-lang-2.6.jar"/>
     <pathelement location="contrib/commons-compress-1.1.jar"/>
     <pathelement location="contrib/sqlite4java.jar"/>
-    <pathelement location="contrib/libsqlite4java-linux-amd64.so"/>
-    <pathelement location="contrib/libsqlite4java-linux-i386.so"/>
-    <pathelement location="contrib/libsqlite4java-osx-10.4.jnilib"/>
-    <pathelement location="contrib/libsqlite4java-osx-ppc.jnilib"/>
-    <pathelement location="contrib/libsqlite4java-osx.jnilib"/>
-    <pathelement location="contrib/sqlite4java-win32-x64.dll"/>
-    <pathelement location="contrib/sqlite4java-win32-x86.dll"/>
   </path>
 
   <!-- All libraries needed to build the sources -->
