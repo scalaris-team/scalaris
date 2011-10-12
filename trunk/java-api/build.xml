@@ -29,6 +29,8 @@
   <property name="jakarta.commons.cli.version" value="1.2" />
   <!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
   <property name="junit.version" value="4.8.2" />
+  <!-- debug level to use during compilation -->
+  <property name="debuglevel" value="source,lines" />
   <!-- ########## Build configuration (end) ########## -->
 
   <!-- ########## Run configuration (begin) ########## -->
@@ -230,12 +232,12 @@
   <!-- ########## Tools targets (begin) ########## -->
   <target name='tools.compile'>
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' includes="de/zib/tools/*.java" debug="true" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" />
   </target>
 
   <target name="tools.test.compile" depends="tools.compile">
     <mkdir dir="${scalaris.classes.dirname}" />
-    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" />
     <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
       <fileset dir="test" includes="de/zib/tools/*.properties" />
     </copy>
@@ -255,10 +257,10 @@
   <!-- ########## Scalaris targets (begin) ########## -->
   <target name='scalaris.compile' depends="tools.compile">
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" />
   </target>
   <target name='scalaris.examples.compile' depends="scalaris.compile">
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" debuglevel="${debuglevel}" />
   </target>
 
   <!-- package library and examples separately -->
@@ -359,7 +361,7 @@
 
   <target name="scalaris.test.compile" depends="scalaris.compile">
     <mkdir dir="${scalaris.classes.dirname}" />
-    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" />
     <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
       <fileset dir="test" includes="**/*.properties" />
     </copy>
