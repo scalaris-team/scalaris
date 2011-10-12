@@ -81,6 +81,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         db.exec("PRAGMA synchronous = OFF;");
         db.exec("PRAGMA journal_mode = OFF;");
         db.exec("PRAGMA locking_mode = EXCLUSIVE;");
+        db.exec("PRAGMA case_sensitive_like = true;"); 
         return db;
     }
 

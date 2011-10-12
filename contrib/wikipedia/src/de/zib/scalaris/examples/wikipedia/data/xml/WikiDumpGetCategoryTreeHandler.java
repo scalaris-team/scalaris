@@ -377,7 +377,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     .prepare("SELECT page.title, cat.title FROM " +
                             "categories INNER JOIN pages AS page ON categories.title == page.id " +
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
-                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%';");
+                            "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String category = stmt.columnString(1).intern();
@@ -388,8 +388,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     .prepare("SELECT page.title, tpl.title FROM " +
                             "templates INNER JOIN pages AS page ON templates.title == page.id " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
-                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%' OR "
-                            + "page.title LIKE '" + wikiModel.getTemplateNamespace() + ":%';");
+                            "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
+                            + "page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String template = stmt.columnString(1).intern();
@@ -677,7 +677,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             this.values = values;
         }
 
-        protected long pageToId(String pageTitle) throws RuntimeException {
+        protected long pageToId(String origPageTitle) throws RuntimeException {
+            String pageTitle = MyWikiModel.normalisePageTitle(origPageTitle);
             try {
                 long pageId = -1;
                 // try to find the page id in the pages table:

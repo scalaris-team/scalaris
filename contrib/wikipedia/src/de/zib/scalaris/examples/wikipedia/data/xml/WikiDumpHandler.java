@@ -116,7 +116,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      */
     private boolean inWhiteList(String pageTitle) {
         return WikiDumpHandler.this.whitelist.contains(pageTitle)
-                || WikiDumpHandler.this.whitelist.contains(MyWikiModel.capFirst(pageTitle));
+                || WikiDumpHandler.this.whitelist.contains(MyWikiModel.normalisePageTitle(pageTitle));
     }
 
     /**
