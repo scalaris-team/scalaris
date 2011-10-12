@@ -77,11 +77,18 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     static SQLiteConnection openDB(String fileName) throws SQLiteException {
         SQLiteConnection db = new SQLiteConnection(new File(fileName));
         db.open(true);
-        db.exec("PRAGMA cache_size = 200000;");
+        // set 1GB cache_size:
+        final SQLiteStatement stmt = db.prepare("PRAGMA page_size;");
+        if (stmt.step()) {
+            long cacheSize = stmt.columnLong(0);
+            db.exec("PRAGMA cache_size = " + (1024l*1024l*1024l / cacheSize) + ";");
+        }
         db.exec("PRAGMA synchronous = OFF;");
         db.exec("PRAGMA journal_mode = OFF;");
         db.exec("PRAGMA locking_mode = EXCLUSIVE;");
         db.exec("PRAGMA case_sensitive_like = true;"); 
+        db.exec("PRAGMA encoding = 'UTF-8';"); 
+        db.exec("PRAGMA temp_store = MEMORY;"); 
         return db;
     }
 
