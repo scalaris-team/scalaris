@@ -79,23 +79,23 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     }
 
     static SQLiteStatement createReadCategoriesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT category FROM categories WHERE title == ?");
+        return db.prepare("SELECT category FROM categories WHERE title == ?;");
     }
 
     static SQLiteStatement createReadTemplatesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT template FROM templates WHERE title == ?");
+        return db.prepare("SELECT template FROM templates WHERE title == ?;");
     }
 
     static SQLiteStatement createReadIncludesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT include FROM includes WHERE title == ?");
+        return db.prepare("SELECT include FROM includes WHERE title == ?;");
     }
 
     static SQLiteStatement createReadRedirectsStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT redirect FROM redirects WHERE title == ?");
+        return db.prepare("SELECT redirect FROM redirects WHERE title == ?;");
     }
 
     static SQLiteStatement createReadLinksStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT link FROM links WHERE title == ?");
+        return db.prepare("SELECT link FROM links WHERE title == ?;");
     }
     
     static Set<String> readValues(SQLiteStatement stmt, String key)
@@ -420,7 +420,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     .prepare("SELECT page.title, cat.title FROM " +
                             "categories INNER JOIN pages AS page ON categories.title == page.id " +
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
-                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%'");
+                            "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%';");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String category = stmt.columnString(1).intern();
@@ -432,7 +432,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "templates INNER JOIN pages AS page ON templates.title == page.id " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
                             "WHERE page.title LIKE '" + wikiModel.getCategoryNamespace() + ":%' OR "
-                            + "page.title LIKE '" + wikiModel.getTemplateNamespace() + ":%'");
+                            + "page.title LIKE '" + wikiModel.getTemplateNamespace() + ":%';");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String template = stmt.columnString(1).intern();
@@ -446,7 +446,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             stmt = db
                     .prepare("SELECT page.title, incl.title FROM " +
                             "includes INNER JOIN pages AS page ON includes.title == page.id " +
-                            "INNER JOIN pages AS incl ON includes.include == incl.id");
+                            "INNER JOIN pages AS incl ON includes.include == incl.id;");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String include = stmt.columnString(1).intern();
@@ -456,7 +456,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             stmt = db
                     .prepare("SELECT page.title, redir.title FROM " +
                             "redirects INNER JOIN pages AS page ON redirects.title == page.id " +
-                            "INNER JOIN pages AS redir ON redirects.redirect == redir.id");
+                            "INNER JOIN pages AS redir ON redirects.redirect == redir.id;");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0).intern();
                 String redirect = stmt.columnString(1).intern();
@@ -519,7 +519,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 stmt = db
                         .prepare("SELECT page.title, cat.title FROM " +
                                 "categories INNER JOIN pages AS page ON categories.title == page.id " +
-                                "INNER JOIN pages AS cat ON categories.category == cat.id");
+                                "INNER JOIN pages AS cat ON categories.category == cat.id;");
                 while (stmt.step()) {
                     String pageTitle = stmt.columnString(0);
                     String pageCategory = stmt.columnString(1);
@@ -532,7 +532,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 stmt = db
                         .prepare("SELECT page.title, tpl.title FROM " +
                                 "templates INNER JOIN pages AS page ON templates.title == page.id " +
-                                "INNER JOIN pages AS tpl ON templates.template == tpl.id");
+                                "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                 while (stmt.step()) {
                     String pageTitle = stmt.columnString(0);
                     String pageTemplate = stmt.columnString(1);
@@ -549,7 +549,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 System.out.println("recursion level: " + depth);
                 System.out.println("adding " + currentPages.size() + " pages");
                 do {
-                    db.exec("DROP TABLE IF EXISTS currentPages");
+                    db.exec("DROP TABLE IF EXISTS currentPages;");
                     db.exec("CREATE TEMPORARY TABLE currentPages(title STRING PRIMARY KEY);");
                     stmt = db.prepare("INSERT INTO currentPages (title) VALUES (?);");
                     for (String pageTitle : currentPages) {
@@ -564,7 +564,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             .prepare("SELECT cat.title FROM categories " +
                                     "INNER JOIN pages AS page ON categories.title == page.id " +
                                     "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                    "INNER JOIN pages AS cat ON categories.category == cat.id");
+                                    "INNER JOIN pages AS cat ON categories.category == cat.id;");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
                         addToPages(pages, newPages, pageCategory, includeTree, referenceTree);
@@ -576,7 +576,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             .prepare("SELECT tpl.title FROM templates " +
                                     "INNER JOIN pages AS page ON templates.title == page.id " +
                                     "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                    "INNER JOIN pages AS tpl ON templates.template == tpl.id");
+                                    "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                     while (stmt.step()) {
                         String pageTemplate = stmt.columnString(0);
                         Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
@@ -589,7 +589,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             .prepare("SELECT lnk.title FROM links " +
                                     "INNER JOIN pages AS page ON links.title == page.id " +
                                     "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                    "INNER JOIN pages AS lnk ON links.link == lnk.id");
+                                    "INNER JOIN pages AS lnk ON links.link == lnk.id;");
                     while (stmt.step()) {
                         String pageLink = stmt.columnString(0);
                         if (!pageLink.isEmpty()) { // there may be empty links
