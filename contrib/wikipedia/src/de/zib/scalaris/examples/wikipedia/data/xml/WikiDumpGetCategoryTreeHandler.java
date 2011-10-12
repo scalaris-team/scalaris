@@ -296,13 +296,13 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             String curChild = roots.remove(0);
             Set<String> subChilds = tree.get(curChild);
             if (subChilds != null) {
-                // only add new categories to the root categories
+                // only add new children to the root list
                 // (remove already processed ones)
                 // -> prevents endless loops in circles
-                Set<String> newCats = new HashSet<String>(subChilds);
-                newCats.removeAll(allChildren);
-                allChildren.addAll(subChilds);
-                roots.addAll(newCats);
+                Set<String> newChilds = new HashSet<String>(subChilds);
+                newChilds.removeAll(allChildren);
+                allChildren.addAll(newChilds);
+                roots.addAll(newChilds);
             }
         }
         return allChildren;
@@ -510,8 +510,10 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
                     for (String pageTitle : currentPages) {
-                        pages.add(pageTitle);
                         addToPages(pages, newPages, pageTitle, includeTree, referenceTree);
+                        // beware: add pageTitle to pages _AFTER_ adding its dependencies
+                        // (otherwise the dependencies won't be added)
+                        pages.add(pageTitle);
                         stmt.bind(1, pageTitle).stepThrough().reset();
                     }
 
