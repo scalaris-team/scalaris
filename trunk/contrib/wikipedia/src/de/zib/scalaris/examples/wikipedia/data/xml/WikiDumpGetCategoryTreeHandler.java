@@ -544,56 +544,67 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             }
 
             pageLinks = new HashSet<String>();
+            Set<String> newPages = new HashSet<String>();
             while(depth >= 0) {
                 System.out.println("recursion level: " + depth);
                 System.out.println("adding " + currentPages.size() + " pages");
-                db.exec("DROP TABLE IF EXISTS currentPages");
-                db.exec("CREATE TEMPORARY TABLE currentPages(title STRING PRIMARY KEY);");
-                stmt = db.prepare("INSERT INTO currentPages (title) VALUES (?);");
-                for (String pageTitle : currentPages) {
-                    addToPages(pages, pageTitle, includeTree, referenceTree);
-                    stmt.bind(1, pageTitle).stepThrough().reset();
-                }
-                
-                System.out.println("adding categories of " + currentPages.size() + " pages");
-                // add all categories the page belongs to
-                stmt = db
-                        .prepare("SELECT cat.title FROM categories " +
-                                "INNER JOIN pages AS page ON categories.title == page.id " +
-                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                "INNER JOIN pages AS cat ON categories.category == cat.id");
-                while (stmt.step()) {
-                    String pageCategory = stmt.columnString(0);
-                    addToPages(pages, pageCategory, includeTree, referenceTree);
-                }
-                stmt.reset();
-                System.out.println("adding templates of " + currentPages.size() + " pages");
-                // add all templates (and their requirements) of the pages
-                stmt = db
-                        .prepare("SELECT tpl.title FROM templates " +
-                                "INNER JOIN pages AS page ON templates.title == page.id " +
-                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                "INNER JOIN pages AS tpl ON templates.template == tpl.id");
-                while (stmt.step()) {
-                    String pageTemplate = stmt.columnString(0);
-                    Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
-                    addToPages(pages, tplChildren, includeTree, referenceTree);
-                }
-                stmt.reset();
-                System.out.println("adding links of " + currentPages.size() + " pages");
-                // add all links of the pages for further processing
-                stmt = db
-                        .prepare("SELECT lnk.title FROM links " +
-                                "INNER JOIN pages AS page ON links.title == page.id " +
-                                "INNER JOIN currentPages AS cp ON page.title == cp.title " +
-                                "INNER JOIN pages AS lnk ON links.link == lnk.id");
-                while (stmt.step()) {
-                    String pageLink = stmt.columnString(0);
-                    if (!pageLink.isEmpty()) { // there may be empty links
-                        pageLinks.add(pageLink);
+                do {
+                    db.exec("DROP TABLE IF EXISTS currentPages");
+                    db.exec("CREATE TEMPORARY TABLE currentPages(title STRING PRIMARY KEY);");
+                    stmt = db.prepare("INSERT INTO currentPages (title) VALUES (?);");
+                    for (String pageTitle : currentPages) {
+                        pages.add(pageTitle);
+                        addToPages(pages, newPages, pageTitle, includeTree, referenceTree);
+                        stmt.bind(1, pageTitle).stepThrough().reset();
                     }
-                }
-                stmt.reset();
+
+                    System.out.println(" adding categories of " + currentPages.size() + " pages");
+                    // add all categories the page belongs to
+                    stmt = db
+                            .prepare("SELECT cat.title FROM categories " +
+                                    "INNER JOIN pages AS page ON categories.title == page.id " +
+                                    "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                    "INNER JOIN pages AS cat ON categories.category == cat.id");
+                    while (stmt.step()) {
+                        String pageCategory = stmt.columnString(0);
+                        addToPages(pages, newPages, pageCategory, includeTree, referenceTree);
+                    }
+                    stmt.reset();
+                    System.out.println(" adding templates of " + currentPages.size() + " pages");
+                    // add all templates (and their requirements) of the pages
+                    stmt = db
+                            .prepare("SELECT tpl.title FROM templates " +
+                                    "INNER JOIN pages AS page ON templates.title == page.id " +
+                                    "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                    "INNER JOIN pages AS tpl ON templates.template == tpl.id");
+                    while (stmt.step()) {
+                        String pageTemplate = stmt.columnString(0);
+                        Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
+                        addToPages(pages, newPages, tplChildren, includeTree, referenceTree);
+                    }
+                    stmt.reset();
+                    System.out.println(" adding links of " + currentPages.size() + " pages");
+                    // add all links of the pages for further processing
+                    stmt = db
+                            .prepare("SELECT lnk.title FROM links " +
+                                    "INNER JOIN pages AS page ON links.title == page.id " +
+                                    "INNER JOIN currentPages AS cp ON page.title == cp.title " +
+                                    "INNER JOIN pages AS lnk ON links.link == lnk.id");
+                    while (stmt.step()) {
+                        String pageLink = stmt.columnString(0);
+                        if (!pageLink.isEmpty()) { // there may be empty links
+                            pageLinks.add(pageLink);
+                        }
+                    }
+                    stmt.reset();
+                    if (newPages.isEmpty()) {
+                        break;
+                    } else {
+                        System.out.println("adding " + newPages.size() + " dependencies");
+                        currentPages = newPages;
+                        newPages = new HashSet<String>();
+                    }
+                } while (true);
                 // for the next recursion:
                 currentPages = pageLinks;
                 pageLinks = new HashSet<String>();
@@ -614,17 +625,17 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             }
         }
     }
-    static protected void addToPages(Set<String> pages, String title, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
-        if (pages.add(title)) {
+    static protected void addToPages(Set<String> pages, Set<String> newPages, String title, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
+        if (!pages.contains(title) && newPages.add(title)) {
             // title not yet in pages -> add includes, redirects and pages redirecting to this page
-            addToPages(pages, WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree, title), includeTree, referenceTree); // also has redirects
-            addToPages(pages, WikiDumpGetCategoryTreeHandler.getAllChildren(referenceTree, title), includeTree, referenceTree);
+            addToPages(pages, newPages, WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree, title), includeTree, referenceTree); // also has redirects
+            addToPages(pages, newPages, WikiDumpGetCategoryTreeHandler.getAllChildren(referenceTree, title), includeTree, referenceTree);
         }
     }
     
-    static protected void addToPages(Set<String> pages, Collection<? extends String> titles, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
+    static protected void addToPages(Set<String> pages, Set<String> newPages, Collection<? extends String> titles, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
         for (String title : titles) {
-            addToPages(pages, title, includeTree, referenceTree);
+            addToPages(pages, newPages, title, includeTree, referenceTree);
         }
     }
 }
