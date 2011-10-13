@@ -601,8 +601,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                     addToParam_notice(request, "error getting category pages: " + catPagesResult.message);
                 }
             }
-            if (wikiModel.getRedirectLink() != null) {
-                String redirectedPageName = wikiModel.getRedirectLink();
+            String redirectedPageName = wikiModel.getRedirectLink();
+            if (redirectedPageName != null) {
                 value.setRedirectedTo(redirectedPageName);
                 // add the content from the page directed to:
                 wikiModel.tearDown();
