@@ -71,12 +71,26 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
     }
 
     /**
-     * @return
-     * @throws SQLiteException 
+     * Opens a connection to a database and sets some default PRAGMAs for better
+     * performance in our case.
+     * 
+     * @param fileName
+     *            the name of the DB file
+     * @param readOnly
+     *            whether to open the DB read-only or not
+     * 
+     * @return the DB connection
+     * 
+     * @throws SQLiteException
+     *             if the connection fails or a pragma could not be set
      */
-    static SQLiteConnection openDB(String fileName) throws SQLiteException {
+    static SQLiteConnection openDB(String fileName, boolean readOnly) throws SQLiteException {
         SQLiteConnection db = new SQLiteConnection(new File(fileName));
-        db.open(true);
+        if (readOnly) {
+            db.openReadonly();
+        } else {
+            db.open(true);
+        }
         // set 1GB cache_size:
         final SQLiteStatement stmt = db.prepare("PRAGMA page_size;");
         if (stmt.step()) {
@@ -205,7 +219,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPrepareForS
         super.setUp();
         
         try {
-            db = openDB(this.dbFileName);
+            db = openDB(this.dbFileName, false);
             db.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
             stRead = createReadStmt(db);
             stWrite = createWriteStmt(db);

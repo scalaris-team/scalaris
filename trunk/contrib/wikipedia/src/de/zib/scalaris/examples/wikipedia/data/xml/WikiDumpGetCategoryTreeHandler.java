@@ -370,7 +370,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         SQLiteConnection db = null;
         SQLiteStatement stmt = null;
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
+            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
             SiteInfo siteInfo = readSiteInfo(db);
             MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
             stmt = db
@@ -466,7 +466,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         SQLiteConnection db = null;
         SQLiteStatement stmt = null;
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
+            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
             Set<String> currentPages = new HashSet<String>(allowedPages);
             currentPages.addAll(allowedCats);
 
@@ -608,7 +608,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         public void run() {
             // set up DB:
             try {
-                db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName);
+                db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, false);
                 db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
                 db.exec("CREATE INDEX page_titles ON pages(title);");
                 db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");
