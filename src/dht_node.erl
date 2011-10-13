@@ -451,8 +451,7 @@ on({web_debug_info, Requestor}, State) ->
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{"",
                     lists:flatten(io_lib:format("~p", [DBEntry]))}
-                  || DBEntry <-
-                         lists:sublist(?DB:get_data(dht_node_state:get(State, db)), 50)],
+                  || DBEntry <- element(2, ?DB:get_chunk(dht_node_state:get(State, db), intervals:all(), 50))],
     DataList = case Load > 50 of
                    true  -> lists:append(DataListTmp, [{"...", ""}]);
                    false -> DataListTmp
