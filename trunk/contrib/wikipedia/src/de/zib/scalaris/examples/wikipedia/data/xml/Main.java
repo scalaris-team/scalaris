@@ -292,7 +292,6 @@ public class Main {
             Set<String> allowedPages, LinkedList<String> rootCategories,
             int recursionLvl) throws RuntimeException, FileNotFoundException,
             IOException, SAXException {
-        Map<String, Set<String>> categoryTree = new HashMap<String, Set<String>>();
         Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
         Map<String, Set<String>> includeTree = new HashMap<String, Set<String>>();
         Map<String, Set<String>> referenceTree = new HashMap<String, Set<String>>();
@@ -302,7 +301,7 @@ public class Main {
             // read trees from tree file
             System.out.println("reading category tree from " + trees.getName() + " ...");
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
-                    categoryTree, templateTree, includeTree, referenceTree);
+                    templateTree, includeTree, referenceTree);
         } else {
             // build trees from xml file
             // need to get all subcategories recursively, as they must be
@@ -313,13 +312,11 @@ public class Main {
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
-                    categoryTree, templateTree, includeTree, referenceTree);
+                    templateTree, includeTree, referenceTree);
         }
 
         System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
-        Set<String> allowedCats = new HashSet<String>();
-        allowedCats.addAll(WikiDumpGetCategoryTreeHandler.getAllChildren(
-                categoryTree, rootCategories));
+        Set<String> allowedCats = new HashSet<String>(rootCategories);
 
         return WikiDumpGetCategoryTreeHandler.getPagesInCategories(
                 trees.getName(), allowedCats, allowedPages, recursionLvl,
