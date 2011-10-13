@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import de.zib.scalaris.Connection;
@@ -28,6 +29,8 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
  */
 public class MyScalarisWikiModel extends MyWikiModel {
     protected Connection connection;
+    protected Map<String, String> pageCache = new HashMap<String, String>();
+    
     /**
      * Creates a new wiki model to render wiki text using the given connection
      * to Scalaris.
@@ -84,6 +87,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
 
     /**
      * Retrieves the contents of the given page from Scalaris.
+     * Caches retrieved pages in {@link #pageCache}.
      * 
      * @param namespace
      *            the namespace of the page
@@ -100,19 +104,24 @@ public class MyScalarisWikiModel extends MyWikiModel {
             Map<String, String> templateParameters) {
         if (connection != null) {
             String pageName = createFullPageName(namespace, articleName);
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
-            if (getRevResult.success) {
-                return getRevResult.revision.getText();
-            } else {
-//                        System.err.println(getRevResult.message);
-//                        return "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
-                /*
-                 * the page was not found and will never be - assume
-                 * an empty content instead of letting the model try
-                 * again (which is what it does if null is returned)
-                 */
-                return "";
+            String text = pageCache.get(pageName);
+            if (text == null) {
+                RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
+                if (getRevResult.success) {
+                    text = getRevResult.revision.getText();
+                } else {
+                    // System.err.println(getRevResult.message);
+                    // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
+                    /*
+                     * the page was not found and will never be - assume
+                     * an empty content instead of letting the model try
+                     * again (which is what it does if null is returned)
+                     */
+                    text = "";
+                }
+                pageCache.put(pageName, text);
             }
+            return text;
         } else {
             return null;
         }
@@ -141,5 +150,14 @@ public class MyScalarisWikiModel extends MyWikiModel {
             }
         }
         return "&#35;redirect [[" + pageName + "]]";
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel#setUp()
+     */
+    @Override
+    public void setUp() {
+        super.setUp();
+        pageCache = new HashMap<String, String>();
     }
 }

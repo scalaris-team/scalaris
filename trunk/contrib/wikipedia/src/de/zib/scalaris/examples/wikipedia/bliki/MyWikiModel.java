@@ -136,7 +136,8 @@ public class MyWikiModel extends WikiModel {
             if (processedMagicWord != null) {
                 return processedMagicWord;
             } else {
-                // note: templates are already cached, no need to cache them here
+                // note: cannot cache templates here since the implementation-specific
+                // retrievePage() method may depend in the exact parameters or not
                 
                 // (ugly) fix for template parameter replacement if no parameters given,
                 // e.g. "{{noun}}" in the simple English Wiktionary
@@ -583,6 +584,7 @@ public class MyWikiModel extends WikiModel {
         // WikiModel forgets to reset fRedirectLink
         super.setUp();
         fRedirectLink = null;
+        magicWordCache = new HashMap<String, String>();
     }
 
     /* (non-Javadoc)
