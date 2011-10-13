@@ -80,26 +80,6 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         super(blacklist, null, 1, maxTime);
         this.dbFileName = dbFileName;
     }
-
-    static SQLiteStatement createReadCategoriesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT category FROM categories WHERE title == ?;");
-    }
-
-    static SQLiteStatement createReadTemplatesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT template FROM templates WHERE title == ?;");
-    }
-
-    static SQLiteStatement createReadIncludesStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT include FROM includes WHERE title == ?;");
-    }
-
-    static SQLiteStatement createReadRedirectsStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT redirect FROM redirects WHERE title == ?;");
-    }
-
-    static SQLiteStatement createReadLinksStmt(SQLiteConnection db) throws SQLiteException {
-        return db.prepare("SELECT link FROM links WHERE title == ?;");
-    }
     
     static Set<String> readValues(SQLiteStatement stmt, String key)
             throws RuntimeException {
@@ -528,7 +508,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             .prepare("SELECT page.title FROM categories " +
                                     "INNER JOIN currentPages AS cp ON categories.category == cp.id " +
                                     "INNER JOIN pages AS page ON categories.title == page.id " +
-                                    //                                "INNER JOIN pages AS cat ON categories.category == cat.id" +
+                                    // "INNER JOIN pages AS cat ON categories.category == cat.id" +
                                     "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
@@ -541,7 +521,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             .prepare("SELECT page.title FROM templates " +
                                     "INNER JOIN currentPages AS cp ON templates.template == cp.id " +
                                     "INNER JOIN pages AS page ON templates.title == page.id " +
-                                    //                                "INNER JOIN pages AS tpl ON templates.template == tpl.id" +
+                                    // "INNER JOIN pages AS tpl ON templates.template == tpl.id" +
                                     "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
                                     + "page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
                     while (stmt.step()) {
@@ -678,7 +658,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     stmt = db
                             .prepare("SELECT cat.title FROM categories " +
                                     "INNER JOIN currentPages AS cp ON categories.title == cp.id " +
-                                    //                                    "INNER JOIN pages AS page ON categories.title == page.id " +
+                                    // "INNER JOIN pages AS page ON categories.title == page.id " +
                                     "INNER JOIN pages AS cat ON categories.category == cat.id;");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
@@ -690,7 +670,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     stmt = db
                             .prepare("SELECT tpl.title FROM templates " +
                                     "INNER JOIN currentPages AS cp ON templates.title == cp.id " +
-                                    //                                    "INNER JOIN pages AS page ON templates.title == page.id " +
+                                    // "INNER JOIN pages AS page ON templates.title == page.id " +
                                     "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                     while (stmt.step()) {
                         String pageTemplate = stmt.columnString(0);
@@ -703,7 +683,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     stmt = db
                             .prepare("SELECT lnk.title FROM links " +
                                     "INNER JOIN currentPages AS cp ON links.title == cp.id " +
-                                    //                                    "INNER JOIN pages AS page ON links.title == page.id " +
+                                    // "INNER JOIN pages AS page ON links.title == page.id " +
                                     "INNER JOIN pages AS lnk ON links.link == lnk.id;");
                     while (stmt.step()) {
                         String pageLink = stmt.columnString(0);
@@ -760,15 +740,10 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
                 db.exec("CREATE INDEX page_titles ON pages(title);");
                 db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");
-                db.exec("CREATE INDEX cat_titles ON categories(title);");
                 db.exec("CREATE TABLE templates(title INTEGER, template INTEGER);");
-                db.exec("CREATE INDEX tpl_titles ON templates(title);");
                 db.exec("CREATE TABLE includes(title INTEGER, include INTEGER);");
-                db.exec("CREATE INDEX incl_titles ON includes(title);");
                 db.exec("CREATE TABLE redirects(title INTEGER, redirect INTEGER);");
-                db.exec("CREATE INDEX redir_titles ON redirects(title);");
                 db.exec("CREATE TABLE links(title INTEGER, link INTEGER);");
-                db.exec("CREATE INDEX lnk_titles ON links(title);");
                 db.exec("CREATE TABLE properties(key STRING PRIMARY KEY ASC, value);");
                 stGetPageId = db.prepare("SELECT id FROM pages WHERE title == ?;");
                 stWritePages = db.prepare("INSERT INTO pages (id, title) VALUES (?, ?);");
@@ -792,6 +767,15 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     throw new RuntimeException(e);
                 }
                 job.run();
+            }
+            try {
+                db.exec("CREATE INDEX cat_titles ON categories(title);");
+                db.exec("CREATE INDEX tpl_titles ON templates(title);");
+                db.exec("CREATE INDEX incl_titles ON includes(title);");
+                db.exec("CREATE INDEX redir_titles ON redirects(title);");
+                db.exec("CREATE INDEX lnk_titles ON links(title);");
+            } catch (SQLiteException e) {
+                throw new RuntimeException(e);
             }
             if (db != null) {
                 db.dispose();
