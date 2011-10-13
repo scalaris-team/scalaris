@@ -17,6 +17,8 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
@@ -30,6 +32,9 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 public class MyScalarisWikiModel extends MyWikiModel {
     protected Connection connection;
     protected Map<String, String> pageCache = new HashMap<String, String>();
+    // e.g. "#REDIRECT [[France]]", "#REDIRECT:[[France]]"
+    private static final Pattern MATCH_WIKI_REDIRECT =
+            Pattern.compile("^#REDIRECT[^\\[]?\\[\\[:?([^\\]]*)\\]\\]$", Pattern.CASE_INSENSITIVE);
     
     /**
      * Creates a new wiki model to render wiki text using the given connection
@@ -102,13 +107,45 @@ public class MyScalarisWikiModel extends MyWikiModel {
     @Override
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters) {
+        return retrievePage(namespace, articleName, templateParameters, true);
+    }
+
+    /**
+     * Retrieves the contents of the given page from Scalaris. Caches retrieved
+     * pages in {@link #pageCache}.
+     * 
+     * @param namespace
+     *            the namespace of the page
+     * @param articleName
+     *            the page's name without the namespace
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
+     * @param followRedirect
+     *            whether to follow a redirect or not (at most one redirect
+     *            should be followed)
+     * 
+     * @return the page's contents or <tt>null</tt> if no connection exists
+     */
+    protected String retrievePage(String namespace, String articleName,
+            Map<String, String> templateParameters, boolean followRedirect) {
         if (connection != null) {
             String pageName = createFullPageName(namespace, articleName);
             String text = pageCache.get(pageName);
             if (text == null) {
+                // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
                 RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
                 if (getRevResult.success) {
                     text = getRevResult.revision.getText();
+                    final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
+                    if (getRevResult.page.isRedirect() && matcher.matches()) {
+                        // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
+                        String[] redirFullName = splitNsTitle(matcher.group(1));
+                        String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
+                        if (redirText != null && !redirText.isEmpty()) {
+                            text = redirText;
+                        }
+                    }
                 } else {
                     // System.err.println(getRevResult.message);
                     // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
