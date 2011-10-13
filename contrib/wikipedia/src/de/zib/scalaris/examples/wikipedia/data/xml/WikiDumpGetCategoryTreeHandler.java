@@ -379,8 +379,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
                             "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0).intern();
-                String category = stmt.columnString(1).intern();
+                String pageTitle = stmt.columnString(0);
+                String category = stmt.columnString(1);
                 updateMap(categoryTree, category, pageTitle);
             }
             stmt.dispose();
@@ -391,8 +391,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
                             + "page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0).intern();
-                String template = stmt.columnString(1).intern();
+                String pageTitle = stmt.columnString(0);
+                String template = stmt.columnString(1);
                 final String namespace = MyWikiModel.getNamespace(pageTitle);
                 updateMap(categoryTree, template, pageTitle);
                 if (wikiModel.isTemplateNamespace(namespace)) {
@@ -405,8 +405,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "includes INNER JOIN pages AS page ON includes.title == page.id " +
                             "INNER JOIN pages AS incl ON includes.include == incl.id;");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0).intern();
-                String include = stmt.columnString(1).intern();
+                String pageTitle = stmt.columnString(0);
+                String include = stmt.columnString(1);
                 updateMap(includeTree, pageTitle, include);
             }
             stmt.dispose();
@@ -415,8 +415,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "redirects INNER JOIN pages AS page ON redirects.title == page.id " +
                             "INNER JOIN pages AS redir ON redirects.redirect == redir.id;");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0).intern();
-                String redirect = stmt.columnString(1).intern();
+                String pageTitle = stmt.columnString(0);
+                String redirect = stmt.columnString(1);
                 updateMap(referenceTree, redirect, pageTitle);
             }
         } catch (SQLiteException e) {
