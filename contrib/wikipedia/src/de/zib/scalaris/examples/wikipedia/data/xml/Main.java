@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -234,6 +235,7 @@ public class Main {
         
         Set<String> allowedPages = new HashSet<String>();
         allowedPages.add("Main Page");
+        allowedPages.add("MediaWiki:Noarticletext");
         if (args.length >= 4 && !args[3].isEmpty()) {
             FileReader inFile = new FileReader(args[3]);
             BufferedReader br = new BufferedReader(inFile);
@@ -254,7 +256,8 @@ public class Main {
             }
         }
         System.out.println("filtering by categories " + rootCategories.toString() + " ...");
-        Set<String> pages = getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl);
+        TreeSet<String> pages = new TreeSet<String>(
+                getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl));
 
         do {
             FileWriter outFile = new FileWriter(pageListFileName);
