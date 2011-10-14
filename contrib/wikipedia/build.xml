@@ -152,6 +152,14 @@
   <target name="import.get.category3" unless="category3">
     <input addproperty="category3" defaultvalue="" message="Import pages in this category"/>
   </target>
+  
+  <property name="category4" value="" />
+  <property name="category5" value="" />
+  <property name="category6" value="" />
+  <property name="category7" value="" />
+  <property name="category8" value="" />
+  <property name="category9" value="" />
+  <property name="category10" value="" />
 
   <target name="import.get.filtered_pagelist" unless="filtered_pagelist" depends="import.get.data">
     <input addproperty="filtered_pagelist" defaultvalue="${data}-filtered_pagelist.txt" message="Write filtered pagelist to this file (will be created or overwritten)"/>
@@ -236,6 +244,13 @@
       <arg value="${category1}"/>
       <arg value="${category2}"/>
       <arg value="${category3}"/>
+      <arg value="${category4}"/>
+      <arg value="${category5}"/>
+      <arg value="${category6}"/>
+      <arg value="${category7}"/>
+      <arg value="${category8}"/>
+      <arg value="${category9}"/>
+      <arg value="${category10}"/>
       <classpath>
         <pathelement location="simplewiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
