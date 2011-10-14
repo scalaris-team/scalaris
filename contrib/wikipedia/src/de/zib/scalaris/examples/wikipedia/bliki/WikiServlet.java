@@ -169,8 +169,11 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             cFactory = new ConnectionFactory(properties);
         } else {
             cFactory = new ConnectionFactory();
-            cFactory.setClientName("wiki_renderer");
+            cFactory.setClientName("wiki");
         }
+        Random random = new Random();
+        String clientName = new BigInteger(128, random).toString(16);
+        cFactory.setClientName(cFactory.getClientName() + '_' + clientName);
         cFactory.setClientNameAppendUUID(true);
         cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
