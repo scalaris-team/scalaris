@@ -548,18 +548,40 @@ public class MyWikiModel extends WikiModel {
     }
 
     /**
-     * Capitalise the first letter of the given string.
-     *
+     * Normalises the given string, i.e. capitalises the first letter and
+     * replaces underscores with spaces.
+     * 
      * @param value
      *            the string
-     *
-     * @return a string with the first character being upper case
+     * 
+     * @return a normalised string
      */
-    private static String capFirst(final String value) {
-        if (value.length() > 0) {
-            return value.substring(0, 1).toUpperCase() + value.substring(1);
+    private static String normaliseName(final String value) {
+        StringBuilder sb = new StringBuilder(value.length());
+        boolean whiteSpace = true;
+        boolean first = true;
+        for (int i = 0; i < value.length(); ++i) {
+            char c = value.charAt(i);
+            switch (c) {
+                case ' ':
+                case '_':
+                    if (!whiteSpace) {
+                        sb.append(' ');
+                    }
+                    whiteSpace = true;
+                    break;
+                default:
+                    if (first) {
+                        sb.append(Character.toUpperCase(c));
+                        first = false;
+                    } else {
+                        sb.append(c);
+                    }
+                    whiteSpace = false;
+                    break;
+            }
         }
-        return "";
+        return sb.toString().trim();
     }
     
     /**
@@ -573,7 +595,7 @@ public class MyWikiModel extends WikiModel {
      */
     public static String normalisePageTitle(final String title) {
         String[] parts = splitNsTitle(title);
-        return createFullPageName(capFirst(parts[0]), capFirst(parts[1]));
+        return createFullPageName(normaliseName(parts[0]), normaliseName(parts[1]));
     }
 
     /* (non-Javadoc)
