@@ -119,7 +119,7 @@ on({web_debug_info, Requestor}, Nodes) ->
 -spec init(Options::[tuple()]) -> state().
 init(_Options) ->
     case config:read(start_dht_node) of
-        undefined ->
+        failed ->
             % if a dht_node is started, it will do this job:
             comm:init_and_wait_for_valid_pid();
         _ -> ok
