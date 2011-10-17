@@ -339,7 +339,7 @@ write_test(Config) ->
     OldRegistered = erlang:registered(),
     OldProcesses = unittest_helper:get_processes(),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0}]}]),
     Self = self(),
     BenchPid1 = erlang:spawn(fun() ->
                                      {Time, _} = util:tc(api_tx, write, ["1", 1]),
@@ -357,7 +357,8 @@ write_test(Config) ->
     receive {time, SecondWriteTime} -> ok
     end,
     util:wait_for_process_to_die(BenchPid2),
-    dht_node_move_SUITE:check_size2(4  * 2),
+    unittest_helper:check_ring_load(4  * 2),
+    unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), %doesn't matter
     _ = inets:stop(),

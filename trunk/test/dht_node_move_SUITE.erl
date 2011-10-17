@@ -90,7 +90,7 @@ init_per_testcase(_TestCase, Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring_with_ids(
       fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end,
-      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}]}]),
+      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0}]}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
     % note: do not change move_config parameters during a move, e.g. a join!
@@ -144,7 +144,8 @@ symm4_slide_succ_rcv_load(_Config) ->
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ_rcv_load"),
-    check_size2(440).
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data().
 
 %% @doc Test slide with successor, sending data to it (using api_tx in the bench server).
 symm4_slide_succ_send_load(_Config) ->
@@ -157,7 +158,8 @@ symm4_slide_succ_send_load(_Config) ->
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ_send_load"),
-    check_size2(440).
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data().
 
 %% @doc Test slide with successor, receiving data from it (using api_tx in the bench server).
 %%      Uses symmetric incremental slides.
@@ -194,7 +196,8 @@ symm4_slide_pred_send_load(_Config) ->
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred_send_load"),
-    check_size2(440).
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data().
 
 %% @doc Test slide with predecessor, receiving data from it (using api_tx in the bench server).
 symm4_slide_pred_rcv_load(_Config) ->
@@ -207,7 +210,8 @@ symm4_slide_pred_rcv_load(_Config) ->
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred_rcv_load"),
-    check_size2(440).
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data().
 
 %% @doc Test slide with predecessor, sending data to it (using api_tx in the bench server).
 %%      Uses symmetric incremental slides.
@@ -398,14 +402,16 @@ prop_symm4_slide_succ_rcv_load_timeouts_node(IgnoredMessages_) ->
 tester_symm4_slide_succ_rcv_load_timeouts_succ(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_succ_rcv_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -413,7 +419,8 @@ tester_symm4_slide_succ_rcv_load_timeouts_succ_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -421,7 +428,8 @@ tester_symm4_slide_succ_rcv_load_timeouts_node_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -429,7 +437,8 @@ tester_symm4_slide_succ_rcv_load_timeouts_succ_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -437,7 +446,8 @@ tester_symm4_slide_succ_rcv_load_timeouts_node_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -481,14 +491,16 @@ prop_symm4_slide_succ_send_load_timeouts_node(IgnoredMessages_) ->
 tester_symm4_slide_succ_send_load_timeouts_succ(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_succ_send_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -496,7 +508,8 @@ tester_symm4_slide_succ_send_load_timeouts_succ_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -504,7 +517,8 @@ tester_symm4_slide_succ_send_load_timeouts_node_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -512,7 +526,8 @@ tester_symm4_slide_succ_send_load_timeouts_succ_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -520,7 +535,8 @@ tester_symm4_slide_succ_send_load_timeouts_node_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -565,14 +581,16 @@ prop_symm4_slide_pred_send_load_timeouts_node(IgnoredMessages_) ->
 tester_symm4_slide_pred_send_load_timeouts_pred(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_pred_send_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -580,7 +598,8 @@ tester_symm4_slide_pred_send_load_timeouts_pred_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -588,7 +607,8 @@ tester_symm4_slide_pred_send_load_timeouts_node_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -596,7 +616,8 @@ tester_symm4_slide_pred_send_load_timeouts_pred_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -604,7 +625,8 @@ tester_symm4_slide_pred_send_load_timeouts_node_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -649,14 +671,16 @@ prop_symm4_slide_pred_rcv_load_timeouts_node(IgnoredMessages_) ->
 tester_symm4_slide_pred_rcv_load_timeouts_pred(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_pred_rcv_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -664,7 +688,8 @@ tester_symm4_slide_pred_rcv_load_timeouts_pred_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -672,7 +697,8 @@ tester_symm4_slide_pred_rcv_load_timeouts_node_incremental_symm(_Config) ->
     set_move_config_parameters_incremental_symm(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -680,7 +706,8 @@ tester_symm4_slide_pred_rcv_load_timeouts_pred_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -688,7 +715,8 @@ tester_symm4_slide_pred_rcv_load_timeouts_node_incremental(_Config) ->
     set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
-    check_size2(440),
+    unittest_helper:check_ring_load(440),
+    unittest_helper:check_data(),
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
@@ -809,12 +837,6 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
             ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
                      [PredOrSucc, NthNode, N, Node, Other, TargetId, X])
     end.
-
--spec check_size2(ExpSize::pos_integer()) -> ok.
-check_size2(ExpSize) ->
-    Ring = statistics:get_ring_details(),
-    Load = statistics:get_total_load(Ring),
-    ?equals(Load, ExpSize).
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
