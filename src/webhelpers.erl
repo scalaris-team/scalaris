@@ -225,6 +225,8 @@ flush_ring_cache() ->
 
 -spec extract_ring_info([node_details:node_details()])
         -> [{Label::string(), Value::string(), Known::boolean()}].
+extract_ring_info([]) ->
+    [];
 extract_ring_info([RingE]) ->
     Me_tmp = node:id(node_details:get(RingE, node)),
     Pred_tmp = node:id(node_details:get(RingE, pred)),
@@ -273,82 +275,49 @@ extract_ring_info2(RingE1, RingE2) ->
 getRingChart() ->
     RealRing = get_and_cache_ring(),
     Ring = [NodeDetails || {ok, NodeDetails} <- RealRing],
-    RingSize = length(Ring),
-    Content =
-        try
-            Data = extract_ring_info(Ring),
-            ColorAlphaInc = 1 / RingSize,
-            {_, DataStr0, ColorStr0} =
-                lists:foldr(
-                  fun({Label, Value, Known}, {I, DStr, CStr}) ->
-                          {CurColor, NewI} =
-                              case Known of
-                                  true ->
-                                      Alpha = case (1 - I * ColorAlphaInc) of
-                                                  X when X > 0.2 -> X;
-                                                  _ -> 0.2
-                                              end,
-                                      AlphaStr = io_lib:format("~.2f", [Alpha]),
-                                      {lists:flatten(["$.color.make(0, 128, 128, ", AlphaStr, ").toString()"]), I -1};
-                                  _ -> {"$.color.make(255, 255, 255, 1).toString()", I}
-                              end,
-                          CurData = lists:append(["{ label: \"", Label, "\", data: ", Value, " }"]),
-                          NewData = case DStr of
-                                        [] -> CurData;
-                                         _  -> lists:append([CurData, ", ", DStr])
-                                    end,
-                          NewColors = case CStr of
-                                          [] -> CurColor;
-                                         _  -> lists:append([CurColor, ", ", CStr])
-                                      end,
-                          {NewI, NewData, NewColors}
-                  end, {RingSize - 1, "", ""}, Data),
-            DataStr = lists:flatten(["var ring = [", DataStr0, "];\n"
-                                     "var colors = [", ColorStr0, "]\n"]),
-            PlotFun = "$.plot($(\"#ring\"), ring, {\n"
-                      " series: {\n"
-                      "  pie: {\n"
-                      "   show: true,\n"
-                      "   radius: 0.9,\n"
-                      "   innerRadius: 0.4,\n"
-                      "   label: {\n"
-                      "    show: true,\n"
-                      "    radius: 1.0,\n"
-                      "    formatter: function(label, series) {\n"
-                      "     return '<div style=\"font-size:8pt;text-align:center;padding:2px;color:white;\">'+label+'</div>';\n"
-                      "    },\n"
-                      "    background: { opacity: 0.5, color: '#000000' }\n"
-                      "   }\n"
-                      "  }\n"
-                      " },\n"
-                      " legend: { show: false },\n"
-                      " grid: { hoverable: true, clickable: true },\n"
-                      " colors: colors\n"
-                      "});\n"
-                      "$(\"#ring\").bind(\"plothover\", pieHover);\n"
-                      "$(\"#ring\").bind(\"plotclick\", pieClick);\n",
-            PieHover = "function pieHover(event, pos, obj) {\n"
-                       " if (!obj)\n"
-                       "  return;\n"
-                       " percent = parseFloat(obj.series.percent).toFixed(2);\n"
-                       " $(\"#ringhover\").html('<span style=\"font-weight: bold\">'+obj.series.label+' ('+percent+'%)</span>');\n"
-                       "}\n",
-            PieClick = "function pieClick(event, pos, obj) {\n"
-                       " if (!obj)\n"
-                       "  return;\n"
-                       " percent = parseFloat(obj.series.percent).toFixed(2);\n"
-                       " alert(''+obj.series.label+': '+percent+'%');\n"
-                       "}\n",
-            [{script, [{type, "text/javascript"}], lists:append(["$(function() {\n", DataStr, PlotFun, "});\n", PieHover, PieClick])},
-             {table, [],
-              [{tr, [],
-                [{td, [], {'div', [{id, "ring"}, {style, "width: 600px; height: 350px"}], []}},
-                 {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
-            ]
-        catch % ?RT methods might throw
-            throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
-        end,
-    Content.
+    case length(Ring) of
+        0 -> [];
+        RingSize ->
+            try
+                Data = extract_ring_info(Ring),
+                ColorAlphaInc = 1 / RingSize,
+                {_, DataStr0, ColorStr0} =
+                    lists:foldr(
+                      fun({Label, Value, Known}, {I, DStr, CStr}) ->
+                              {CurColor, NewI} =
+                                  case Known of
+                                      true ->
+                                          Alpha = case (1 - I * ColorAlphaInc) of
+                                                      X when X > 0.2 -> X;
+                                                      _ -> 0.2
+                                                  end,
+                                          AlphaStr = io_lib:format("~.2f", [Alpha]),
+                                          {lists:flatten(["$.color.make(0, 128, 128, ", AlphaStr, ").toString()"]), I -1};
+                                      _ -> {"$.color.make(255, 255, 255, 1).toString()", I}
+                                  end,
+                              CurData = lists:append(["{ label: \"", Label, "\", data: ", Value, " }"]),
+                              NewData = case DStr of
+                                            [] -> CurData;
+                                            _  -> lists:append([CurData, ", ", DStr])
+                                        end,
+                              NewColors = case CStr of
+                                              [] -> CurColor;
+                                              _  -> lists:append([CurColor, ", ", CStr])
+                                          end,
+                              {NewI, NewData, NewColors}
+                      end, {RingSize - 1, "", ""}, Data),
+                DataStr = lists:flatten(["var ring = [", DataStr0, "];\n"
+                                         "var colors = [", ColorStr0, "];\n"]),
+                [{script, [{type, "text/javascript"}], lists:append(["$(function() {\n", DataStr, "plot_ring(ring, colors);\n});\n"])},
+                 {table, [],
+                  [{tr, [],
+                    [{td, [], {'div', [{id, "ring"}, {style, "width: 600px; height: 350px"}], []}},
+                     {td, [], {'div', [{id, "ringhover"}, {style, "width: 100px; height: 350px"}], []}}]}]}
+                ]
+            catch % ?RT methods might throw
+                throw:not_supported -> [{p, [], "Sorry, pie chart not available (unknown error)."}]
+            end
+    end.
 
 -spec getRingRendered() -> html_type().
 getRingRendered() ->
@@ -680,28 +649,35 @@ getMonitorClientData() ->
            "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n"]),
     {script, [{type, "text/javascript"}], DataStr}.
 
--spec getMonitorRingData() -> html_type().
+-spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
     Monitor = pid_groups:find_a(monitor_perf),
-    ReqKeys = [{monitor_perf, "read_read"}, {dht_node, "lookup_hops"}, {api_tx, "req_list"}],
-    case statistics:getMonitorStats(Monitor, ReqKeys) of
-        [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
-        [{monitor_perf, "read_read", DataRR},
-         {dht_node, "lookup_hops", DataLH},
-         {api_tx, "req_list", DataTX}] -> ok
+    case Monitor of
+        failed ->
+            Prefix = {p, [], "NOTE: no monitor_perf in this VM"},
+            DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
+        Monitor ->
+            Prefix = [],
+            ReqKeys = [{monitor_perf, "read_read"}, {dht_node, "lookup_hops"}, {api_tx, "req_list"}],
+            case statistics:getMonitorStats(Monitor, ReqKeys) of
+                [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
+                [{monitor_perf, "read_read", DataRR},
+                 {dht_node, "lookup_hops", DataLH},
+                 {api_tx, "req_list", DataTX}] -> ok
+            end
     end,
     {_RRCountD, _RRCountPerSD, RRAvgMsD, RRMinMsD, RRMaxMsD, RRStddevMsD, _RRHistMsD} = DataRR,
     {_LHCountD, _LHCountPerSD, LHAvgCountD, LHMinCountD, LHMaxCountD, LHStddevCountD, _LHHistCountD} = DataLH,
     {_TXCountD, TXCountPerSD, TXAvgCountD, TXMinCountD, TXMaxCountD, TXStddevCountD, _TXHistCountD} = DataTX,
     RRAvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
-                                          [Time, Avg, Avg - Min, Max - Avg]
-                                  end, RRAvgMsD, RRMinMsD, RRMaxMsD),
+                                            [Time, Avg, Avg - Min, Max - Avg]
+                                    end, RRAvgMsD, RRMinMsD, RRMaxMsD),
     LHAvgMinMaxCountD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
-                                          [Time, Avg, Avg - Min, Max - Avg]
-                                  end, LHAvgCountD, LHMinCountD, LHMaxCountD),
+                                               [Time, Avg, Avg - Min, Max - Avg]
+                                       end, LHAvgCountD, LHMinCountD, LHMaxCountD),
     TXAvgMinMaxCountD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
-                                          [Time, Avg, Avg - Min, Max - Avg]
-                                  end, TXAvgCountD, TXMinCountD, TXMaxCountD),
+                                               [Time, Avg, Avg - Min, Max - Avg]
+                                       end, TXAvgCountD, TXMinCountD, TXMaxCountD),
     DataStr =
         lists:flatten(
           ["\n",
@@ -712,8 +688,8 @@ getMonitorRingData() ->
            "var tx_count_per_s_data = ",       io_lib:format("~p", [TXCountPerSD]), ";\n",
            "var tx_avg_min_max_ms_data = ",    io_lib:format("~p", [TXAvgMinMaxCountD]), ";\n",
            "var tx_stddev_ms_data = ",         io_lib:format("~p", [TXStddevCountD]), ";\n"]),
-    {script, [{type, "text/javascript"}], DataStr}.
-    
+    lists:flatten([Prefix, {script, [{type, "text/javascript"}], DataStr}]).
+
 
 %%%-----------------------------Misc----------------------------------
 
