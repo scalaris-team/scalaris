@@ -125,9 +125,10 @@ add_9_rm_5_test() ->
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
-    dht_node_move_SUITE:check_size2(4).
+    unittest_helper:check_ring_load(4),
+    unittest_helper:check_ring_data().
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
@@ -153,9 +154,10 @@ add_3_rm_3_load(Config) ->
 -spec add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer()) -> ok.
 add_x_rm_y_load(Config, X, Y) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
     stop_time(fun() -> add_x_rm_y_load_test(X, Y) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
-    dht_node_move_SUITE:check_size2(4).
+    unittest_helper:check_ring_load(4),
+    unittest_helper:check_ring_data().
 
 -spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer()) -> ok.
 add_x_rm_y_load_test(X, Y) ->
@@ -171,12 +173,13 @@ add_x_rm_y_load_test(X, Y) ->
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key()) -> true.
 prop_join_at(FirstId, SecondId) ->
     BenchSlaves = 2, BenchRuns = 50,
-    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
+    unittest_helper:make_ring_with_ids([FirstId], [{config, [pdb:get(log_path, ?MODULE), {monitor_perf_interval, 0} | join_parameters_list()]}]),
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
     util:wait_for_process_to_die(BenchPid),
-    dht_node_move_SUITE:check_size2(BenchSlaves * 4),
+    unittest_helper:check_ring_load(BenchSlaves * 4),
+    unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
     true.
 
@@ -244,13 +247,14 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
 
     unittest_helper:make_ring_with_ids(
       [FirstId],
-      [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE) | join_parameters_list()]}]),
+      [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE), {monitor_perf_interval, 0} | join_parameters_list()]}]),
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     util:wait_for_process_to_die(BenchPid),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),
-    dht_node_move_SUITE:check_size2(BenchSlaves * 4),
+    unittest_helper:check_ring_load(BenchSlaves * 4),
+    unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
 %%     randoms:stop(), % tester may need it
     _ = inets:stop(),

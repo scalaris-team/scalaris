@@ -43,7 +43,8 @@
          macro_equals/4, macro_equals/5,
          expect_no_message_timeout/1,
          prepare_config/1,
-         start_minimal_procs/3, stop_minimal_procs/1]).
+         start_minimal_procs/3, stop_minimal_procs/1,
+         check_ring_load/1, check_ring_data/0, check_ring_data/2]).
 
 -include("scalaris.hrl").
 
@@ -525,8 +526,8 @@ end_per_group(_Group, Config) ->
 -spec get_ring_data() -> [{pid(), 
                            {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, 
                            ?DB:db_as_list(), 
-                           {prred, comm:erl_pid_plain()},
-                           {succc, comm:erl_pid_plain()},
+                           {pred, comm:erl_pid_plain()},
+                           {succ, comm:erl_pid_plain()},
                            ok | timeout}].
 get_ring_data() ->
     DHTNodes = pid_groups:find_all(dht_node),
@@ -549,7 +550,7 @@ get_ring_data() ->
 
 -spec print_ring_data() -> ok.
 print_ring_data() ->
-    DataAll = unittest_helper:get_ring_data(),
+    DataAll = get_ring_data(),
     ct:pal("~.0p~n", [DataAll]).
 
 -include("unittest.hrl").
@@ -585,3 +586,95 @@ expect_no_message_timeout(Timeout) ->
             ?ct_fail("expected no message but got \"~.0p\"~n", [ActualMessage])
     after Timeout -> ok
 end.
+
+-spec check_ring_load(ExpLoad::pos_integer()) -> ok.
+check_ring_load(ExpLoad) ->
+    Ring = statistics:get_ring_details(),
+    Load = statistics:get_total_load(Ring),
+    ?equals(Load, ExpLoad).
+
+-spec check_ring_data() -> ok.
+check_ring_data() ->
+    check_ring_data(250, 8).
+
+-spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> ok.
+check_ring_data(Timeout, Retries) ->
+    Data = lists:append(
+             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- unittest_helper:get_ring_data()]),
+    case Retries < 1 of
+        true -> check_ring_data_all(Data, true);
+        _ ->
+            case check_ring_data_all(Data, false) of
+                true -> ok;
+                _    -> timer:sleep(Timeout),
+                        check_ring_data(Timeout, Retries - 1)
+            end
+    end.
+
+check_ring_data_all(Data, FailOnError) ->
+    check_ring_data_unique(Data, FailOnError) andalso
+        check_ring_data_repl_fac(Data, FailOnError) andalso
+        check_ring_data_lock_free(Data, FailOnError) andalso
+        check_ring_data_repl_exist(Data, FailOnError).
+
+-spec check_ring_data_unique(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+check_ring_data_unique(Data, FailOnError) ->
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, Data),
+    DataDiff = lists:subtract(Data, UniqueData),
+    case FailOnError of
+        true ->
+            ?equals_w_note(DataDiff, [], "duplicate elements detected");
+        _ when DataDiff =:= [] ->
+            true;
+        _ ->
+            ct:pal("check_ring_data: duplicate elements detected: ~p~n", [DataDiff]),
+            false
+    end.
+
+-spec check_ring_data_repl_fac(Data::[db_entry:entry()], FailOnError::boolean()) -> boolean().
+check_ring_data_repl_fac(Data, FailOnError) ->
+    ReplicaKeys0 = ?RT:get_replica_keys(?RT:hash_key("0")),
+    DataLen = length(Data),
+    ReplicaLen = length(ReplicaKeys0),
+    ReplicaRem = DataLen rem ReplicaLen,
+    case FailOnError of
+        true ->
+            ?equals(ReplicaRem, 0);
+        _ when ReplicaRem =:= 0 ->
+            true;
+        _ ->
+            ct:pal("check_ring_data: length(Data) = ~p not multiple of ~p~n", [DataLen, ReplicaLen]),
+            false
+    end.
+
+-spec check_ring_data_lock_free(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+check_ring_data_lock_free(Data, FailOnError) ->
+    Locked = [E || E <- Data, db_entry:is_locked(E)],
+    case FailOnError of
+        true -> ?equals_w_note(Locked, [], "ring is not lock-free");
+        _ when Locked =:= [] ->
+            true;
+        _ ->
+            ct:pal("check_ring_data: locked elements found: ~p~n", [Locked]),
+            false
+    end.
+
+-spec check_ring_data_repl_exist(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+check_ring_data_repl_exist(Data, FailOnError) ->
+    ElementsNotAllReplicas =
+        [E || E <- Data, not data_contains_all_replicas(Data, db_entry:get_key(E))],
+    case FailOnError of
+        true -> ?equals_w_note(ElementsNotAllReplicas, [], "missing replicas found");
+        _ when ElementsNotAllReplicas =:= [] ->
+            true;
+        _ ->
+            ct:pal("check_ring_data: elements with missing replicas:", [ElementsNotAllReplicas]),
+            false
+    end.
+
+data_contains_all_replicas(Data, Key) ->
+    Keys = ?RT:get_replica_keys(Key),
+    Replicas = [E || E <- Data, lists:member(db_entry:get_key(E), Keys)],
+    length(Keys) =:= length(Replicas).
