@@ -286,12 +286,16 @@ get_port(Pid) -> comm_layer:get_port(Pid).
 %%      (ugly hack to get a valid ip-address into the comm-layer)
 -spec init_and_wait_for_valid_pid() -> ok.
 init_and_wait_for_valid_pid() ->
-    KnownHosts = config:read(known_hosts),
+    KnownHosts1 = config:read(known_hosts),
     % maybe the list of known nodes is empty and we have a mgmt_server?
     MgmtServer = config:read(mgmt_server),
+    KnownHosts = case is_valid(MgmtServer) of
+                     true -> [MgmtServer | KnownHosts1];
+                     _ -> KnownHosts1
+                 end,
     % note, comm:this() may be invalid at this moment
     _ = [comm:send_to_group_member(KnownHost, service_per_vm, {hi})
-        || KnownHost <- [MgmtServer | KnownHosts]],
+        || KnownHost <- KnownHosts],
     timer:sleep(100),
     case comm:is_valid(comm:this()) of
         true  -> ok;
