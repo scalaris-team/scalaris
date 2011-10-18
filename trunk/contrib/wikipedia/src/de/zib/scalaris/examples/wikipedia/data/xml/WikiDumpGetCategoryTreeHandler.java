@@ -734,53 +734,77 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         
         @Override
         public void run() {
-            // set up DB:
             try {
-                db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, false);
-                db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
-                db.exec("CREATE INDEX page_titles ON pages(title);");
-                db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");
-                db.exec("CREATE TABLE templates(title INTEGER, template INTEGER);");
-                db.exec("CREATE TABLE includes(title INTEGER, include INTEGER);");
-                db.exec("CREATE TABLE redirects(title INTEGER, redirect INTEGER);");
-                db.exec("CREATE TABLE links(title INTEGER, link INTEGER);");
-                db.exec("CREATE TABLE properties(key STRING PRIMARY KEY ASC, value);");
-                stGetPageId = db.prepare("SELECT id FROM pages WHERE title == ?;");
-                stWritePages = db.prepare("INSERT INTO pages (id, title) VALUES (?, ?);");
-                stWriteCategories = db.prepare("INSERT INTO categories (title, category) VALUES (?, ?);");
-                stWriteTemplates = db.prepare("INSERT INTO templates (title, template) VALUES (?, ?);");
-                stWriteIncludes = db.prepare("INSERT INTO includes (title, include) VALUES (?, ?);");
-                stWriteRedirects = db.prepare("INSERT INTO redirects (title, redirect) VALUES (?, ?);");
-                stWriteLinks = db.prepare("INSERT INTO links (title, link) VALUES (?, ?);");
-            } catch (SQLiteException e) {
-                throw new RuntimeException(e);
-            }
-            initialised = true;
-            
-            // take jobs
-            
-            while(!(sqliteJobs.isEmpty() && stopWhenQueueEmpty)) {
-                SQLiteJob job;
+                // set up DB:
                 try {
-                    job = sqliteJobs.take();
-                } catch (InterruptedException e) {
+                    db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, false);
+                    db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
+                    db.exec("CREATE INDEX page_titles ON pages(title);");
+                    db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");
+                    db.exec("CREATE TABLE templates(title INTEGER, template INTEGER);");
+                    db.exec("CREATE TABLE includes(title INTEGER, include INTEGER);");
+                    db.exec("CREATE TABLE redirects(title INTEGER, redirect INTEGER);");
+                    db.exec("CREATE TABLE links(title INTEGER, link INTEGER);");
+                    db.exec("CREATE TABLE properties(key STRING PRIMARY KEY ASC, value);");
+                    stGetPageId = db.prepare("SELECT id FROM pages WHERE title == ?;");
+                    stWritePages = db.prepare("INSERT INTO pages (id, title) VALUES (?, ?);");
+                    stWriteCategories = db.prepare("INSERT INTO categories (title, category) VALUES (?, ?);");
+                    stWriteTemplates = db.prepare("INSERT INTO templates (title, template) VALUES (?, ?);");
+                    stWriteIncludes = db.prepare("INSERT INTO includes (title, include) VALUES (?, ?);");
+                    stWriteRedirects = db.prepare("INSERT INTO redirects (title, redirect) VALUES (?, ?);");
+                    stWriteLinks = db.prepare("INSERT INTO links (title, link) VALUES (?, ?);");
+                } catch (SQLiteException e) {
                     throw new RuntimeException(e);
                 }
-                job.run();
+                initialised = true;
+
+                // take jobs
+
+                while(!(sqliteJobs.isEmpty() && stopWhenQueueEmpty)) {
+                    SQLiteJob job;
+                    try {
+                        job = sqliteJobs.take();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    job.run();
+                }
+                try {
+                    db.exec("CREATE INDEX cat_titles ON categories(title);");
+                    db.exec("CREATE INDEX tpl_titles ON templates(title);");
+                    db.exec("CREATE INDEX incl_titles ON includes(title);");
+                    db.exec("CREATE INDEX redir_titles ON redirects(title);");
+                    db.exec("CREATE INDEX lnk_titles ON links(title);");
+                } catch (SQLiteException e) {
+                    throw new RuntimeException(e);
+                }
+            } finally {
+                if (stGetPageId != null) {
+                    stGetPageId.dispose();
+                }
+                if (stWritePages != null) {
+                    stWritePages.dispose();
+                }
+                if (stWriteCategories != null) {
+                    stWriteCategories.dispose();
+                }
+                if (stWriteTemplates != null) {
+                    stWriteTemplates.dispose();
+                }
+                if (stWriteIncludes != null) {
+                    stWriteIncludes.dispose();
+                }
+                if (stWriteRedirects != null) {
+                    stWriteRedirects.dispose();
+                }
+                if (stWriteLinks != null) {
+                    stWriteLinks.dispose();
+                }
+                if (db != null) {
+                    db.dispose();
+                }
+                initialised = false;
             }
-            try {
-                db.exec("CREATE INDEX cat_titles ON categories(title);");
-                db.exec("CREATE INDEX tpl_titles ON templates(title);");
-                db.exec("CREATE INDEX incl_titles ON includes(title);");
-                db.exec("CREATE INDEX redir_titles ON redirects(title);");
-                db.exec("CREATE INDEX lnk_titles ON links(title);");
-            } catch (SQLiteException e) {
-                throw new RuntimeException(e);
-            }
-            if (db != null) {
-                db.dispose();
-            }
-            initialised = false;
         }
     }
     
@@ -788,7 +812,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         public abstract void run();
     };
     
-    protected class SQLiteNoOpJob implements SQLiteJob {
+    protected static class SQLiteNoOpJob implements SQLiteJob {
         @Override
         public void run() {
         }
