@@ -161,6 +161,37 @@ public class MyScalarisMagicWord extends MagicWord {
 
     @SuppressWarnings("javadoc")
     public static final String MAGIC_SERVER_NAME = "SERVERNAME";
+    
+    // some behavioural switches:
+    // see https://www.mediawiki.org/wiki/Help:Magic_words#Behavior_switches and
+    // https://secure.wikimedia.org/wikipedia/en/wiki/Help:Magic_words#Behavior_switches
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_DISPLAY_TITLE = "DISPLAYTITLE";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_DEFAULT_SORT = "DEFAULTSORT";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NO_EDIT_SECTION = "__NOEDITSECTION__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NEW_SECTION_LINK = "__NEWSECTIONLINK__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NO_NEW_SECTION_LINK = "__NONEWSECTIONLINK__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_HIDDEN_CAT = "__HIDDENCAT__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NO_GALLERY = "__NOGALLERY__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_INDEX = "__INDEX__";
+
+    @SuppressWarnings("javadoc")
+    public static final String MAGIC_NO_INDEX = "__NOINDEX__";
 
     private static List<String> MY_MAGIC_WORDS = new ArrayList<String>();
 
@@ -210,6 +241,15 @@ public class MyScalarisMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_SCRIPT_PATH);
         MY_MAGIC_WORDS.add(MAGIC_SERVER_NAME);
         MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
+        MY_MAGIC_WORDS.add(MAGIC_DISPLAY_TITLE);
+        MY_MAGIC_WORDS.add(MAGIC_DEFAULT_SORT);
+        MY_MAGIC_WORDS.add(MAGIC_NO_EDIT_SECTION);
+        MY_MAGIC_WORDS.add(MAGIC_NEW_SECTION_LINK);
+        MY_MAGIC_WORDS.add(MAGIC_NO_NEW_SECTION_LINK);
+        MY_MAGIC_WORDS.add(MAGIC_HIDDEN_CAT);
+        MY_MAGIC_WORDS.add(MAGIC_NO_GALLERY);
+        MY_MAGIC_WORDS.add(MAGIC_INDEX);
+        MY_MAGIC_WORDS.add(MAGIC_NO_INDEX);
     }
     
     public static boolean isMagicWord(String name) {
@@ -430,6 +470,27 @@ public class MyScalarisMagicWord extends MagicWord {
             return MagicWord.processMagicWord(MAGIC_FULL_PAGE_NAME, parameter, model);
         } else if (name.equals(MAGIC_TALK_PAGE_NAME_E)) {
             return MagicWord.processMagicWord(MAGIC_TALK_PAGE_NAME, parameter, model);
+        /*
+         * Behavior switches
+         */
+        } else if (name.equals(MAGIC_DISPLAY_TITLE)) {
+            return "";
+        } else if (name.equals(MAGIC_DEFAULT_SORT)) {
+            return "";
+        } else if (name.equals(MAGIC_NO_EDIT_SECTION)) {
+            return "";
+        } else if (name.equals(MAGIC_NEW_SECTION_LINK)) {
+            return "";
+        } else if (name.equals(MAGIC_NO_NEW_SECTION_LINK)) {
+            return "";
+        } else if (name.equals(MAGIC_HIDDEN_CAT)) {
+            return "";
+        } else if (name.equals(MAGIC_NO_GALLERY)) {
+            return "";
+        } else if (name.equals(MAGIC_INDEX)) {
+            return "";
+        } else if (name.equals(MAGIC_NO_INDEX)) {
+            return "";
         }
         
         return name;
