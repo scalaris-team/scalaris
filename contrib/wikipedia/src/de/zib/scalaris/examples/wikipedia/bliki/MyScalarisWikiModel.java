@@ -131,8 +131,10 @@ public class MyScalarisWikiModel extends MyWikiModel {
             Map<String, String> templateParameters, boolean followRedirect) {
         if (connection != null) {
             String pageName = createFullPageName(namespace, articleName);
-            String text = pageCache.get(pageName);
-            if (text == null) {
+            if (pageCache.containsKey(pageName)) {
+                return pageCache.get(pageName);
+            } else {
+                String text = null;
                 // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
                 RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
                 if (getRevResult.success) {
@@ -149,19 +151,12 @@ public class MyScalarisWikiModel extends MyWikiModel {
                 } else {
                     // System.err.println(getRevResult.message);
                     // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
-                    /*
-                     * the page was not found and will never be - assume
-                     * an empty content instead of letting the model try
-                     * again (which is what it does if null is returned)
-                     */
-                    text = "";
                 }
                 pageCache.put(pageName, text);
+                return text;
             }
-            return text;
-        } else {
-            return null;
         }
+        return null;
     }
     
     /**
