@@ -17,8 +17,10 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.math.BigInteger;
 import java.text.NumberFormat;
 import java.util.Locale;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,6 +33,7 @@ import com.almworks.sqlite4java.SQLiteStatement;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
 
 /**
@@ -81,7 +84,13 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     public WikiDumpPreparedSQLiteToScalaris(String dbFileName) throws RuntimeException {
         this.dbFileName = dbFileName;
-        this.cFactory = ConnectionFactory.getInstance();
+        this.cFactory = new ConnectionFactory();
+        Random random = new Random();
+        String clientName = new BigInteger(128, random).toString(16);
+        this.cFactory.setClientName("wiki_import_" + clientName);
+        this.cFactory.setClientNameAppendUUID(true);
+        this.cFactory.setConnectionPolicy(
+                new RoundRobinConnectionPolicy(this.cFactory.getNodes()));
     }
 
     /**
@@ -186,7 +195,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         msgOut.println("Importing key/value pairs to Scalaris...");
         try {
             importStart();
-            SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects");
+            SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects;");
             while (st.step()) {
                 String key = st.columnString(0);
                 writeToScalaris(key, WikiDumpPrepareSQLiteForScalarisHandler.readObject(stRead, key));
