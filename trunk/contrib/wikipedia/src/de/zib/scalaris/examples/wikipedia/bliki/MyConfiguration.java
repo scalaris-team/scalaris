@@ -16,16 +16,17 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.wiki.model.Configuration;
+import info.bliki.wiki.template.ITemplateFunction;
 
 import java.net.URL;
 import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Wiki configuration with its own interwiki map.
+ * Wiki configuration with its own interwiki and template maps.
  * 
- * Note: {@link Configuration} uses a static interwiki map valid for all
- * instances.
+ * Note: {@link Configuration} uses a static interwiki and template function
+ * maps valid for all instances.
  * 
  * @author Nico Kruber, kruber@zib.de
  */
@@ -36,10 +37,17 @@ public class MyConfiguration extends Configuration {
     protected final Map<String, String> INTERWIKI_MAP = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
 
     /**
+     * Map the template's function name to the TemplateFunction implementation
+     */
+    protected final Map<String, ITemplateFunction> TEMPLATE_FUNCTION_MAP = new TreeMap<String, ITemplateFunction>(
+            String.CASE_INSENSITIVE_ORDER);
+
+    /**
      * Creates a wiki configuration with its own interwiki map.
      */
     public MyConfiguration() {
         INTERWIKI_MAP.putAll(Configuration.INTERWIKI_MAP);
+        TEMPLATE_FUNCTION_MAP.putAll(Configuration.TEMPLATE_FUNCTION_MAP);
     }
 
     /**
@@ -66,6 +74,7 @@ public class MyConfiguration extends Configuration {
             // ignore if the URL is not valid
             e.printStackTrace();
         }
+        TEMPLATE_FUNCTION_MAP.putAll(Configuration.TEMPLATE_FUNCTION_MAP);
     }
 
     /* (non-Javadoc)
@@ -82,6 +91,23 @@ public class MyConfiguration extends Configuration {
     @Override
     public String addInterwikiLink(String key, String value) {
         return INTERWIKI_MAP.put(key, value);
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.Configuration#addTemplateFunction(java.lang.String, info.bliki.wiki.template.ITemplateFunction)
+     */
+    @Override
+    public ITemplateFunction addTemplateFunction(String key,
+            ITemplateFunction value) {
+        return TEMPLATE_FUNCTION_MAP.put(key, value);
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.Configuration#getTemplateMap()
+     */
+    @Override
+    public Map<String, ITemplateFunction> getTemplateMap() {
+        return TEMPLATE_FUNCTION_MAP;
     }
 
 }

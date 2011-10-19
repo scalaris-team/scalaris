@@ -40,6 +40,12 @@ public class MyParsingWikiModel extends MyWikiModel {
     public MyParsingWikiModel(String imageBaseURL, String linkBaseURL,
             MyNamespace namespace) {
         super(imageBaseURL, linkBaseURL, namespace);
+        addTemplateFunction("#if", MyParsingIfTemplateFun.CONST);
+        addTemplateFunction("#iferror", MyParsingIfTemplateFun.CONST);
+        addTemplateFunction("#ifeq", MyParsingIfTemplateFun.CONST);
+        addTemplateFunction("#ifexist", MyParsingIfTemplateFun.CONST);
+        addTemplateFunction("#ifexpr", MyParsingIfTemplateFun.CONST);
+        addTemplateFunction("#switch", MyParsingSwitchTemplateFun.CONST);
     }
 
     /**
