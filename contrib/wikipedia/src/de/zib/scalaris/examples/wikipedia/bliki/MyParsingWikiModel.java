@@ -17,7 +17,6 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Wiki model which should be used during parsing of xml dumps.
@@ -25,8 +24,6 @@ import java.util.Set;
  * @author Nico Kruber, kruber@zib.de
  */
 public class MyParsingWikiModel extends MyWikiModel {
-
-    protected Set<String> includes = new HashSet<String>();
 
     /**
      * Creates a new wiki model to render wiki text.
@@ -69,7 +66,7 @@ public class MyParsingWikiModel extends MyWikiModel {
                         || magicWord.equals(MyScalarisMagicWord.MAGIC_PAGES_IN_CAT)) {
 //                  {{PAGESINCATEGORY:categoryname}}
 //                  {{PAGESINCAT:categoryname}}
-                    // -> add as an include
+                    // -> also add as an include
                     addInclude(createFullPageName(getCategoryNamespace(), parameter));
                     return "";
                 }
@@ -83,21 +80,8 @@ public class MyParsingWikiModel extends MyWikiModel {
                 }
                 return result.toString();
             }
-            return null;
         }
-        // e.g. page inclusions of the form "{{:Main Page/Introduction}}"
-        addInclude(createFullPageName(namespace, articleName));
         return null;
-    }
-
-    /**
-     * Adds an inclusion to the currently parsed page.
-     * 
-     * @param includedName
-     *            the name of the article being included
-     */
-    public void addInclude(String includedName) {
-        includes.add(includedName);
     }
 
     /* (non-Javadoc)
@@ -107,13 +91,6 @@ public class MyParsingWikiModel extends MyWikiModel {
     public void setUp() {
         super.setUp();
         includes = new HashSet<String>();
-    }
-
-    /**
-     * @return the references
-     */
-    public Set<String> getIncludes() {
-        return includes;
     }
 
     /* (non-Javadoc)

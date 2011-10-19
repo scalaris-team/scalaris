@@ -85,6 +85,8 @@ public class MyWikiModel extends WikiModel {
      */
     protected Map<String, String> magicWordCache = new HashMap<String, String>();
 
+    protected Set<String> includes = new HashSet<String>();
+
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("fullurl", MyFullurl.CONST);
@@ -131,26 +133,36 @@ public class MyWikiModel extends WikiModel {
     @Override
     public String getRawWikiContent(String namespace, String articleName,
             Map<String, String> templateParameters) {
-        if (isTemplateNamespace(namespace)) {
-            String processedMagicWord = getMagicWord(articleName);
-            if (processedMagicWord != null) {
-                return processedMagicWord;
-            } else {
-                // note: cannot cache templates here since the implementation-specific
-                // retrievePage() method may depend in the exact parameters or not
-                
-                // (ugly) fix for template parameter replacement if no parameters given,
-                // e.g. "{{noun}}" in the simple English Wiktionary
-                if (templateParameters != null && templateParameters.isEmpty()) {
-                    templateParameters.put("", null);
-                }
-                
-                String text = retrievePage(namespace, articleName, templateParameters);
-                if (text != null && !text.isEmpty()) {
-                    text = removeNoIncludeContents(text);
-                }
-                return text;
+        // Remove article from templates and add it by our conditions (see below).
+        // (was added by AbstractWikiModel#substituteTemplateCall)
+        templates.remove(articleName);
+        /* AbstractWikiModel#substituteTemplateCall sets the template
+         * namespace even for texts like "{{MediaWiki:Noarticletext NS Other}}"
+         * or "{{:Main Page/Introduction}}" which transcludes the page but does
+         * not need "Template:" prepended 
+         */
+        String namespace2;
+        String articleName2;
+        String processedMagicWord = null;
+        int index = articleName.indexOf(':');
+        if (index > 0) {
+            namespace2 = articleName.substring(0, index);
+            articleName2 = articleName.substring(index + 1).trim();
+            if (isTemplateNamespace(namespace)) {
+                // if it is a magic word, the first part is the word itself, the second its parameters
+                processedMagicWord = getMagicWord(articleName, namespace2, articleName2);
             }
+        } else {
+            namespace2 = namespace;
+            articleName2 = articleName;
+            if (isTemplateNamespace(namespace)) {
+                // if it is a magic word, there are no parameters
+                processedMagicWord = getMagicWord(articleName, articleName2, "");
+            }
+        }
+
+        if (processedMagicWord != null) {
+            return processedMagicWord;
         }
         
         if (getRedirectLink() != null) {
@@ -158,8 +170,29 @@ public class MyWikiModel extends WikiModel {
             return getRedirectContent(getRedirectLink());
         }
         
-        // e.g. page inclusions of the form "{{:Main Page/Introduction}}"
-        return retrievePage(namespace, articleName, templateParameters);
+        // set the corrected namespace and article name (see above)
+        namespace = namespace2;
+        articleName = articleName2;
+        if (isTemplateNamespace(namespace)) {
+            addTemplate(articleName);
+        } else {
+            addInclude(createFullPageName(namespace, articleName));
+        }
+        
+        // note: cannot cache templates here since the implementation-specific
+        // retrievePage() method may depend in the exact parameters or not
+
+        // (ugly) fix for template parameter replacement if no parameters given,
+        // e.g. "{{noun}}" in the simple English Wiktionary
+        if (templateParameters != null && templateParameters.isEmpty()) {
+            templateParameters.put("", null);
+        }
+
+        String text = retrievePage(namespace, articleName, templateParameters);
+        if (text != null && !text.isEmpty()) {
+            text = removeNoIncludeContents(text);
+        }
+        return text;
     }
 
     /**
@@ -177,14 +210,7 @@ public class MyWikiModel extends WikiModel {
      * @return the contents of the magic word or <tt>null</tt> if the template
      *         is no magic word
      */
-    private String getMagicWord(String templateName) {
-        String magicWord = templateName;
-        String parameter = "";
-        int index = magicWord.indexOf(':');
-        if (index > 0) {
-            parameter = magicWord.substring(index + 1).trim();
-            magicWord = magicWord.substring(0, index);
-        }
+    private String getMagicWord(String templateName, String magicWord, String parameter) {
         if (isMagicWord(magicWord)) {
             // cache values for magic words:
             if (magicWordCache.containsKey(templateName)) {
@@ -618,6 +644,23 @@ public class MyWikiModel extends WikiModel {
         // -> e.g. does not remove <noinclude> tags in ordinary pages 
         return true;
 //        return isTemplateNamespace(getNamespace(getPageName()));
+    }
+
+    /**
+     * Adds an inclusion to the currently parsed page.
+     * 
+     * @param includedName
+     *            the name of the article being included
+     */
+    public void addInclude(String includedName) {
+        includes.add(includedName);
+    }
+
+    /**
+     * @return the references
+     */
+    public Set<String> getIncludes() {
+        return includes;
     }
     
     
