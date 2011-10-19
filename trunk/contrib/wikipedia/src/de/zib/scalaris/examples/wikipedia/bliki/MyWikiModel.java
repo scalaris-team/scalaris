@@ -16,7 +16,6 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
-import info.bliki.wiki.filter.MagicWord;
 import info.bliki.wiki.filter.Util;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
@@ -227,7 +226,7 @@ public class MyWikiModel extends WikiModel {
 
     /**
      * Determines if a template name corresponds to a magic word using
-     * {@link MagicWord#isMagicWord(String)}.
+     * {@link MyMagicWord#isMagicWord(String)}.
      * 
      * @param name
      *            the template name
@@ -235,12 +234,12 @@ public class MyWikiModel extends WikiModel {
      * @return whether the template is a magic word or not
      */
     protected boolean isMagicWord(String name) {
-        return MagicWord.isMagicWord(name);
+        return MyMagicWord.isMagicWord(name);
     }
     
     /**
      * Retrieves the contents of the given magic word using
-     * {@link MagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)}.
+     * {@link MyMagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)}.
      * 
      * @param templateName
      *            the template's name without the namespace, e.g. a magic word
@@ -254,7 +253,7 @@ public class MyWikiModel extends WikiModel {
      */
     protected String retrieveMagicWord(String templateName, String magicWord,
             String parameter) {
-        return MagicWord.processMagicWord(templateName, parameter, this);
+        return MyMagicWord.processMagicWord(templateName, parameter, this);
     }
     
     /**
