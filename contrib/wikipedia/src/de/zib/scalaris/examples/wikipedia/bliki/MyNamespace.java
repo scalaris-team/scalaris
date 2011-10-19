@@ -168,7 +168,8 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
     @Override
     public String getSubjectspace(String talkNamespace) {
         for (Entry<String, String> entry: TALKSPACE_MAP.entrySet() ) {
-            if (entry.getValue().equals(talkNamespace)) {
+            String value = entry.getValue();
+            if (value != null && value.equals(talkNamespace)) {
                 return NAMESPACE_MAP.get(entry.getKey());
             }
         }
