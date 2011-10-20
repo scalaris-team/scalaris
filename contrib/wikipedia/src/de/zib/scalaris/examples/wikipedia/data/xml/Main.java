@@ -311,7 +311,7 @@ public class Main {
             // included as well
             System.out.println("building category tree from " + filename + " ...");
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(
-                    blacklist, maxTime, trees.getName());
+                    blacklist, maxTime, trees.getPath());
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
