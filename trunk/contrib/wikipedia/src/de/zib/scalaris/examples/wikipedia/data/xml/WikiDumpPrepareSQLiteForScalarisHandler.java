@@ -50,9 +50,9 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler {
-    protected SQLiteConnection db;
-    protected SQLiteStatement stRead;
-    protected SQLiteStatement stWrite;
+    protected SQLiteConnection db = null;
+    protected SQLiteStatement stRead = null;
+    protected SQLiteStatement stWrite = null;
     protected String dbFileName;
     protected ArrayBlockingQueue<SQLiteJob> sqliteJobs = new ArrayBlockingQueue<SQLiteJob>(UPDATE_PAGELIST_EVERY);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
@@ -237,7 +237,6 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         updatePageLists();
         sqliteWorker.stopWhenQueueEmpty = true;
         addSQLiteJob(new SQLiteNoOpJob());
-        importEnd();
         // wait for worker to close the DB
         while (sqliteWorker.initialised) {
             try {
@@ -246,6 +245,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 throw new RuntimeException(e);
             }
         }
+        importEnd();
     }
 
     /* (non-Javadoc)
