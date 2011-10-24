@@ -313,7 +313,6 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         super.tearDown();
         sqliteWorker.stopWhenQueueEmpty = true;
         addSQLiteJob(new SQLiteNoOpJob());
-        importEnd();
         // wait for worker to close the DB
         while (sqliteWorker.initialised) {
             try {
@@ -322,6 +321,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 throw new RuntimeException(e);
             }
         }
+        importEnd();
     }
     
     /**
