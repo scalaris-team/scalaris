@@ -5,8 +5,6 @@ import info.bliki.wiki.template.AbstractTemplateFunction;
 import info.bliki.wiki.template.ITemplateFunction;
 import info.bliki.wiki.template.Time;
 
-import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -15,6 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import com.clutch.dates.StringToTime;
+import com.clutch.dates.StringToTimeException;
 
 /**
  * A template parser function for <code>{{ #time: ... }}</code> syntax.
@@ -26,19 +27,19 @@ import java.util.Map;
  * Mediwiki's Help:Extension:ParserFunctions - #time</a>
  */
 public class MyTimeTemplateFun extends AbstractTemplateFunction {
-	/**
-	 * Static instance of this template function parser.
-	 */
-	public final static ITemplateFunction CONST = new MyTimeTemplateFun();
+    /**
+     * Static instance of this template function parser.
+     */
+    public final static ITemplateFunction CONST = new MyTimeTemplateFun();
 
-	protected static Map<String, String> FORMAT_WIKI_TO_JAVA = new HashMap<String, String>();
-	protected static SimpleDateFormat RFC822DATEFORMAT
-    = new SimpleDateFormat("EEE', 'dd' 'MMM' 'yyyy' 'HH:mm:ss' '+0000", Locale.US);
-	
-	static {
-	    // year
-	    FORMAT_WIKI_TO_JAVA.put("Y", "yyyy"); // 4-digit year, e.g. "2011"
-	    FORMAT_WIKI_TO_JAVA.put("y", "yy"); // 2-digit year, e.g. "11"
+    protected static Map<String, String> FORMAT_WIKI_TO_JAVA = new HashMap<String, String>();
+    protected static SimpleDateFormat RFC822DATEFORMAT = new SimpleDateFormat(
+            "EEE', 'dd' 'MMM' 'yyyy' 'HH:mm:ss' '+0000", Locale.US);
+    
+    static {
+        // year
+        FORMAT_WIKI_TO_JAVA.put("Y", "yyyy"); // 4-digit year, e.g. "2011"
+        FORMAT_WIKI_TO_JAVA.put("y", "yy"); // 2-digit year, e.g. "11"
         // FORMAT_WIKI_TO_JAVA.put("L", "??"); // 1 or 0 whether it's a leap year or not, e.g. "0"
         FORMAT_WIKI_TO_JAVA.put("o", "yyyy"); // ISO-8601 year number, e.g. "2011"
         
@@ -99,31 +100,37 @@ public class MyTimeTemplateFun extends AbstractTemplateFunction {
         // FORMAT_WIKI_TO_JAVA.put("xn", "??"); // Format the next numeric code as a raw ASCII number
         // FORMAT_WIKI_TO_JAVA.put("xN", "??"); // Like xn, but as a toggled flag, which endures until the end of the string or until the next appearance of xN in the string.
         // FORMAT_WIKI_TO_JAVA.put("Xr", "??"); // Format the next number as a roman numeral. Only works for numbers up to 3000
-	}
-	
-	/**
-	 * Creates a new parser for the #time template function.
-	 */
-	public MyTimeTemplateFun() {
-	}
+    }
+    
+    /**
+     * Creates a new parser for the #time template function.
+     */
+    public MyTimeTemplateFun() {
+    }
 
-	public String parseFunction(List<String> list, IWikiModel model, char[] src, int beginIndex, int endIndex) {
-		if (list.size() > 0) {
-			Date date;
-			DateFormat df = DateFormat.getDateInstance(DateFormat.MEDIUM, model.getLocale());
-			if (list.size() > 1) {
-				String dateTimeParameter = list.get(1);
+    public String parseFunction(List<String> list, IWikiModel model, char[] src, int beginIndex, int endIndex) {
+        if (list.size() > 0) {
+            Date date;
+            if (list.size() > 1) {
+                String dateTimeParameter = list.get(1);
 
-				try {
-					date = df.parse(dateTimeParameter);
-				} catch (ParseException e) {
-					return "<span class=\"error\">Error: invalid time</span>";
-				}
-			} else {
-				date = model.getCurrentTimeStamp();
-			}
+//                try {
+//                    DateFormat df = DateFormat.getDateInstance(DateFormat.MEDIUM, model.getLocale());
+//                    date = df.parse(dateTimeParameter);
+//                } catch (ParseException e) {
+//                    return "<span class=\"error\">Error: invalid time</span>";
+//                }
 
-			String condition = parse(list.get(0), model);
+                try {
+                    date = new StringToTime(dateTimeParameter);
+                } catch (StringToTimeException e) {
+                    return "<span class=\"error\">Error: invalid time</span>";
+                }
+            } else {
+                date = model.getCurrentTimeStamp();
+            }
+
+            String condition = parse(list.get(0), model);
             StringBuilder result = new StringBuilder(condition.length() * 2);
             boolean inDoubleQuotes = false;
             GregorianCalendar cal = new GregorianCalendar(model.getLocale());
@@ -205,8 +212,8 @@ public class MyTimeTemplateFun extends AbstractTemplateFunction {
                 }
                 result.append(curCh);
             }
-			return result.toString();
-		}
-		return null;
-	}
+            return result.toString();
+        }
+        return null;
+    }
 }
