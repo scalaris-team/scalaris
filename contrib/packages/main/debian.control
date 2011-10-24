@@ -1,5 +1,5 @@
 Source: scalaris-svn
-Section: unknown
+Section: database
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-common-test (>= 13.b.1), pkg-config
@@ -19,6 +19,7 @@ Description: Scalable Distributed key-value store
 
 Package: scalaris-svn-doc
 Conflicts: scalaris-svn-doc
+Section: doc
 Architecture: all
 Recommends: scalaris-svn (= ${binary:Version})
 Description: Documentation for scalaris

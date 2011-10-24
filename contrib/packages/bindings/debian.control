@@ -1,5 +1,5 @@
 Source: scalaris-svn-bindings
-Section: unknown
+Section: devel
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config, ruby, ruby1.8, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
@@ -7,6 +7,7 @@ Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-svn-java
 Conflicts: scalaris-java, scalaris-client
+Section: java
 Architecture: all
 Depends: java6-runtime
 Description: Java-API and Java-Client for scalaris
@@ -14,6 +15,7 @@ Description: Java-API and Java-Client for scalaris
 
 Package: scalaris-svn-ruby1.8
 Conflicts: scalaris-ruby1.8
+Section: ruby
 Architecture: all
 Depends: ruby, ruby1.8, rubygems1.8
 Description: Ruby-API and Ruby-client for scalaris
@@ -21,6 +23,7 @@ Description: Ruby-API and Ruby-client for scalaris
 
 Package: python-scalaris-svn
 Conflicts: python-scalaris
+Section: python
 Architecture: all
 Depends: python (>= 2.6.0)
 Description: Python-API and Python-client for scalaris
@@ -28,6 +31,7 @@ Description: Python-API and Python-client for scalaris
 
 Package: python3-scalaris-svn
 Conflicts: python3-scalaris
+Section: python
 Architecture: all
 Depends: python3
 Description: Python3-API and Python3-client for scalaris

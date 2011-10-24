@@ -1,5 +1,5 @@
 Source: scalaris-svn-examples-wiki
-Section: unknown
+Section: web
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
 Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, libservlet2.5-java, scalaris-svn-java (>= 2131)
