@@ -92,6 +92,7 @@ We build rpm and deb packages using checkouts from the latest tagged version as 
 || Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/] ||
 || Ubuntu || 10.10 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.10/] ||
 || Ubuntu || 11.04 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/] ||
+|| Ubuntu || 11.10 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
