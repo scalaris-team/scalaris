@@ -59,6 +59,8 @@ all() ->
      merkleSync_simple,
      merkleSync_parts,
      merkleSync_min_nodes
+     %artSync_noOutdated,
+     %artSync_simple
      ].
 
 suite() ->
@@ -102,6 +104,17 @@ get_merkle_tree_RepUpd_config() ->
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
      {rep_update_recon_method, merkle_tree}, %bloom, merkle_tree, art
+     {rep_update_resolve_method, simple},
+     {rep_update_recon_fpr, 0.1},
+     {rep_update_max_items, 100000},
+     {rep_update_sync_feedback, true},
+     {rep_update_negotiate_sync_interval, true}].
+
+get_art_RepUpd_config() ->
+    [{rep_update_activate, true},
+     {rep_update_interval, 100000000}, %stop trigger
+     {rep_update_trigger, trigger_periodic},
+     {rep_update_recon_method, art}, %bloom, merkle_tree, art
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 100000},
@@ -243,6 +256,20 @@ merkleSync_parts(Config) ->
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ART Tests
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+artSync_noOutdated(Config) ->
+    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_art_RepUpd_config()),
+    ?assert(Start =:= End),
+    ok.
+
+artSync_simple(Config) ->
+    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_art_RepUpd_config()),
+    ?assert(Start < End),    
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -251,7 +278,16 @@ merkleSync_parts(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_sync([tuple()], pos_integer(), pos_integer(), 0..100, pos_integer(), float(), [tuple()]) -> [float()].
+-spec start_sync(Config, NodeCount, DataCount, 
+                 OutdatedP, Rounds, Fpr, RepConfig) -> [Fpr] when
+    is_subtype(Config,      [tuple()]),
+    is_subtype(NodeCount,   pos_integer()),
+    is_subtype(DataCount,   pos_integer()),
+    is_subtype(OutdatedP,   0..100),        %outdated probability in percent
+    is_subtype(Rounds,      pos_integer()),
+    is_subtype(Fpr,         float()),
+    is_subtype(RepConfig,   [tuple()]).
+          
 start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     DestVersCount = NodeCount * 2 * DataCount,

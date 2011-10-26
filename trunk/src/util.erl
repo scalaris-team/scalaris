@@ -60,6 +60,7 @@
 -export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
          p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
          parallel_run/4]).
+-export([iif/3, proplist_get_value/2]).
 
 -export([empty/1]).
 
@@ -855,6 +856,19 @@ collect_while(GatherFun, Count) ->
         {false, Data} -> [Data];
         true          -> GatherFun(Count + 1);
         false         -> []
+    end.
+
+% @doc short-cut if selection
+-spec iif(boolean(), any(), any()) -> any().
+iif(true, X, _) -> X;
+iif(false, _, Y) -> Y.
+
+% @doc Gets the value of a property list - proplist:get_value/2 is 10x slower than this
+-spec proplist_get_value(atom(), [{atom(), any()}]) -> any().
+proplist_get_value(Key, List) ->
+    case lists:keyfind(Key, 1, List) of
+        {_K, V} -> V;
+        _ -> undefined
     end.
 
 %% empty shell_prompt_func
