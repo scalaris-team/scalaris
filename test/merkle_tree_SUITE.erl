@@ -94,7 +94,7 @@ sizeTest(_) ->
     ?equals(Size, Inner + Leafs),
     ok.
 
--spec prop_iter(intervals:key(), intervals:key(), 1..10000) -> true.
+-spec prop_iter(intervals:key(), intervals:key(), 5000) -> true.
 prop_iter(X, Y, Items) ->
     I = intervals:new('[', X, Y, ']'),
     ToInsert = if 

@@ -306,8 +306,12 @@ next([]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
--spec store_to_DOT(merkle_tree()) -> ok | io_error.
-store_to_DOT({merkle_tree, Conf, Root}) ->
+-spec store_to_DOT(merkle_tree()) -> ok.
+store_to_DOT(MerkleTree) ->
+    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree) end),
+    ok.
+
+store_to_DOT_p({merkle_tree, Conf, Root}) ->
     case file:open("../merkle_tree-graph.dot", [write]) of
         {ok, Fileid} ->
             io:fwrite(Fileid, "digraph merkle_tree { ~n", []),

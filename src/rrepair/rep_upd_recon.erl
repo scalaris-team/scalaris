@@ -62,13 +62,14 @@
         }).
 -type bloom_recon_struct() :: #bloom_recon_struct{}.
 
--type internal_buffer_struct() :: intervals:interval() |  
-                                  {intervals:interval(), comm:mypid()}.
+-type internal_params() :: {interval, intervals:interval()} |
+                           {senderPid, comm:mypid()} |
+                           {art, art:art()}.
 
 -type recon_struct() :: bloom_recon_struct() |
                         merkle_tree:merkle_tree() |
                         art:art() |
-                        internal_buffer_struct().
+                        [internal_params()].
 
 -record(ru_recon_stats,
         {
@@ -163,14 +164,16 @@ on({get_state_response, MyInterval}, State =
                              get_max_items(RMethod)})
     end,
     State#ru_recon_state{ recon_stage = build_struct,
-                          recon_struct = Intersection };
+                          recon_struct = [{interval, Intersection}] };
 
 on({get_state_response, MyInterval}, State = 
        #ru_recon_state{ recon_stage = res_shared_interval,
                         recon_method = RMethod,
-                        recon_struct = {Interval, ClientPid},
+                        recon_struct = Params,
                         dhtNodePid = DhtNodePid,
                         dest_ru_pid = ClientRU_Pid}) ->
+    Interval = util:proplist_get_value(interval, Params),
+    ClientPid = util:proplist_get_value(senderPid, Params),
     MappedIntersec = mapInterval(Interval, get_interval_quadrant(MyInterval)),
     case intervals:is_subset(MappedIntersec, MyInterval) of
         false ->
@@ -183,7 +186,6 @@ on({get_state_response, MyInterval}, State =
                             {get_chunk, self(), MappedIntersec, get_max_items(RMethod)})
     end,    
     State#ru_recon_state{ recon_stage = build_struct, 
-                          recon_struct = Interval, 
                           sync_pid = ClientPid };
 
 on({get_state_response, NodeDBInterval}, State = 
@@ -244,21 +246,25 @@ on({get_chunk_response, {RestI, DBList}}, State =
        #ru_recon_state{ recon_stage = build_struct,
                         recon_method = merkle_tree,
                         sync_pid = SrcPid,
-                        recon_struct = RStruct,
+                        recon_struct = Params,
                         sync_master = IsMaster,
                         dest_ru_pid = DestRU_Pid,
                         ownerRemotePid = OwnerPid,
                         dhtNodePid = DhtNodePid,
                         sync_round = Round,
-                        recon_stats = Stats })  ->
+                        recon_stats = Stats })  ->    
     {BuildTime, MerkleTree} = 
-        case merkle_tree:is_merkle_tree(RStruct) of
+        case merkle_tree:is_merkle_tree(Params) of
             true -> %extend tree
                 {BTime, NTree} = 
-                    util:tc(fun() -> add_to_tree(DBList, RStruct) end),
+                    util:tc(fun() -> add_to_tree(DBList, Params) end),
                 {Stats#ru_recon_stats.build_time + BTime, merkle_tree:gen_hash(NTree) };
             false -> %build new tree
-                util:tc(fun() -> build_recon_struct(merkle_tree, {RStruct, DBList}, {}) end)
+                Interval = util:proplist_get_value(interval, Params),
+                util:tc(fun() -> build_recon_struct(merkle_tree, 
+                                                    {Interval, DBList}, 
+                                                    {}) 
+                        end)
         end,
     case intervals:is_empty(RestI) of
         false ->
@@ -267,57 +273,59 @@ on({get_chunk_response, {RestI, DBList}}, State =
             State#ru_recon_state{ recon_struct = MerkleTree, 
                                   recon_stats = Stats#ru_recon_stats{ build_time = BuildTime } };        
         true ->
-            ToCompare = 
-                case IsMaster of
-                    true ->
-                        ?TRACE("MASTER SENDS ROOT CHECK", []),
-                        comm:send(SrcPid, 
-                                  {check_node, comm:this(), 
-                                   merkle_tree:get_interval(MerkleTree), 
-                                   merkle_tree:get_hash(MerkleTree)}),
-                        1;
-                    false -> 
-                        comm:send(DestRU_Pid, 
-                                  {request_recon, OwnerPid, Round, true, 
-                                   res_shared_interval, merkle_tree, 
-                                   {merkle_tree:get_interval(MerkleTree), comm:this()}}),
-                        0
-                end,
+            case IsMaster of
+                true ->
+                    ?TRACE("MASTER SENDS ROOT CHECK", []),
+                    comm:send(SrcPid, 
+                              {check_node, comm:this(), 
+                               merkle_tree:get_interval(MerkleTree), 
+                               merkle_tree:get_hash(MerkleTree)});
+                false -> 
+                    comm:send(DestRU_Pid, 
+                              {request_recon, OwnerPid, Round, true, 
+                               res_shared_interval, merkle_tree,
+                               [{interval, merkle_tree:get_interval(MerkleTree)},
+                                {senderPid, comm:this()}] 
+                              })
+            end,
+            NewStats = Stats#ru_recon_stats{ tree_compareLeft = util:iif(IsMaster, 1, 0),
+                                             tree_size = merkle_tree:size_detail(MerkleTree),
+                                             build_time = BuildTime
+                                           }, 
             State#ru_recon_state{ recon_stage = reconciliation, 
                                   recon_struct = MerkleTree, 
-                                  recon_stats = 
-                                          Stats#ru_recon_stats{ tree_compareLeft = ToCompare,
-                                                                tree_size = merkle_tree:size_detail(MerkleTree),
-                                                                build_time = BuildTime
-                                                              } 
+                                  recon_stats = NewStats
                                 }          
     end;
 
 on({get_chunk_response, {[], DBList}}, State = 
        #ru_recon_state{ recon_stage = build_struct, 
                         recon_method = art,
-                        recon_struct = RStruct,
+                        recon_struct = Params,
                         sync_master = IsMaster,
                         ownerRemotePid = OwnerPid,
                         dest_ru_pid = DestRU_Pid,
                         sync_round = Round,
                         recon_stats = Stats })  ->
+    ToBuild = util:iif(IsMaster, merkle_tree, art),
+    Interval = util:proplist_get_value(interval, Params),
+    {BuildTime, NewStruct} =
+        util:tc(fun() -> build_recon_struct(ToBuild, {Interval, DBList}, {}) end),    
     NewStats = 
         case IsMaster of
-            true ->
-                {BuildTime, NewStruct} =
-                    util:tc(fun() -> build_recon_struct(merkle_tree, {RStruct, DBList}, {}) end), 
-                %{SyncTime, Return} =
-                %util:tc(fun() -> do_recon_art(NewStruct, RStruct) end),
+            true -> 
+                ?TRACE("Start ART-RECON", []),
+                art_recon(NewStruct, util:proplist_get_value(art, Params)), %TODO measure sync time
                 Stats#ru_recon_stats { build_time = BuildTime,
-                                       %recon_time = SyncTime,
                                        tree_size = merkle_tree:size_detail(NewStruct) };
             false ->
-                {BuildTime, NewStruct} = 
-                    util:tc(fun() -> build_recon_struct(art, {RStruct, DBList}, {}) end),            
                 comm:send(DestRU_Pid, 
                           {request_recon, OwnerPid, Round, true, 
-                           res_shared_interval, art, NewStruct}),
+                           res_shared_interval, art,
+                           [{interval, art:get_interval(NewStruct)},
+                            {senderPid, comm:this()},
+                            {art, NewStruct}]
+                          }),
                 Stats#ru_recon_stats{ build_time = BuildTime }
         end,
     State#ru_recon_state{ recon_stage = reconciliation, 
@@ -374,12 +382,11 @@ on({crash, Pid}, State) ->
     comm:send_local(self(), {shutdown, {fail, crash_of_recon_node, Pid}}),
     State;
 
-on({shutdown, Reason}, State = #ru_recon_state{ ownerLocalPid = Owner, 
-                                                sync_round = Round,
-                                                recon_stats = Stats,
-                                                sync_master = Master,
-                                                recon_stage = Stage,
-                                                sync_start_time = SyncStartTime }) ->
+on({shutdown, Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
+                                        sync_round = Round,
+                                        recon_stats = Stats,
+                                        sync_master = Master,
+                                        sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
     NewStats = Stats#ru_recon_stats{ recon_time = timer:now_diff(erlang:now(), SyncStartTime) },
     comm:send_local(Owner, 
@@ -513,6 +520,18 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
               {request_resolve, Round, simple, {simple_detail_sync, ToSync},
                {true, OwnerPid}, {false, OwnerPid}}),
     1.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% art recon
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec art_recon(MyTree, Art) -> {ok, Stats} when
+    is_subtype(MyTree, merkle_tree:merkle_tree()),
+    is_subtype(Art,    art:art()),
+    is_subtype(Stats,  ru_recon_stats()).
+art_recon(_Tree, _Art) ->
+    %TODO
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
