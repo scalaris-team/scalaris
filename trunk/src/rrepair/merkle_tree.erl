@@ -30,7 +30,7 @@
          gen_hash/1, iterator/1, next/1,
          is_empty/1, is_leaf/1, get_bucket/1,
          is_merkle_tree/1,
-         get_hash/1, get_interval/1, get_childs/1,
+         get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_bucket_size/1, get_branch_factor/1,
          store_to_DOT/1]).
 
@@ -83,6 +83,12 @@ get_bucket_size({merkle_tree, Config, _}) ->
 -spec get_branch_factor(merkle_tree()) -> pos_integer().
 get_branch_factor({merkle_tree, Config, _}) -> 
     Config#mt_config.branch_factor.    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_root(merkle_tree()) -> mt_node() | undefined.
+get_root({merkle_tree, _, Root}) -> Root;
+get_root(_) -> undefined.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

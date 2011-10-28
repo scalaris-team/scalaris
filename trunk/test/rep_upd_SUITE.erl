@@ -51,21 +51,21 @@ all() ->
      blobCoding,
      mapInterval,
      bloomSync_simple,
-     bloomSync_FprCompare_check,
-     bloomSync_times,
-     bloomSync_parts,
-     bloomSync_min_nodes,
-     merkleSync_noOutdated,
+     %bloomSync_FprCompare_check,
+     %bloomSync_times,
+     %bloomSync_parts,
+     %bloomSync_min_nodes,
+     %merkleSync_noOutdated,
      merkleSync_simple,
-     merkleSync_parts,
-     merkleSync_min_nodes
-     %artSync_noOutdated,
-     %artSync_simple
+     %merkleSync_parts,
+     %merkleSync_min_nodes
+     artSync_noOutdated,
+     artSync_simple
      ].
 
 suite() ->
     [
-     {timetrap, {seconds, 60}}
+     {timetrap, {seconds, 30}}
     ].
 
 init_per_suite(Config) ->
@@ -265,7 +265,7 @@ artSync_noOutdated(Config) ->
     ok.
 
 artSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_art_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 70, 1, 0.2, get_art_RepUpd_config()),
     ?assert(Start < End),    
     ok.
 
