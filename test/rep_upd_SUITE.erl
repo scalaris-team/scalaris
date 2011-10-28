@@ -51,14 +51,14 @@ all() ->
      blobCoding,
      mapInterval,
      bloomSync_simple,
-     %bloomSync_FprCompare_check,
-     %bloomSync_times,
-     %bloomSync_parts,
-     %bloomSync_min_nodes,
-     %merkleSync_noOutdated,
+     bloomSync_FprCompare_check,
+     bloomSync_times,
+     bloomSync_parts,
+     bloomSync_min_nodes,
+     merkleSync_noOutdated,
      merkleSync_simple,
-     %merkleSync_parts,
-     %merkleSync_min_nodes
+     merkleSync_parts,
+     merkleSync_min_nodes,
      artSync_noOutdated,
      artSync_simple
      ].
