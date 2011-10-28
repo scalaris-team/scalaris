@@ -27,16 +27,20 @@
 -include("scalaris.hrl").
 
 -export([new/0, new/1, 
-         %get_merkle_tree/1,
-         get_interval/1,
+         get_interval/1, get_correction_factor/1,
          lookup/2]).
 
 -ifdef(with_export_type_support).
 -export_type([art/0, art_config/0]).
 -endif.
 
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
+
+-define(IIF(C, A, B), case C of
+                          true -> A;
+                          _ -> B
+                      end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
@@ -44,7 +48,7 @@
 
 -record(art_config,
         {
-         correction_factor = 1 :: non_neg_integer()
+         correction_factor = 0 :: non_neg_integer()
          }).
 -type art_config() :: #art_config{}.
 
@@ -66,6 +70,8 @@ new(Tree) ->
     InnerBF = ?REP_BLOOM:new(InnerCount, 0.01),
     LeafBF = ?REP_BLOOM:new(LeafCount, 0.1),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
+    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), 
+                                 ?REP_BLOOM:print(LBF)]),    
     {art, #art_config{}, merkle_tree:get_interval(Tree), IBF, LBF}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -73,50 +79,52 @@ new(Tree) ->
 % @doc returns interval of the packed merkle tree (art-structure)
 -spec get_interval(art()) -> intervals:interval().
 get_interval({art, _, I, _, _}) -> I.
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%-spec get_merkle_tree(intervals:interval()) -> merkle_tree:merkle_tree().
-%get_merkle_tree(I) ->
-%    merkle_tree:new(I, [{branch_factor, 32}, 
-%                        {bucket_size, 64}, 
-%                        {gen_hash_on, value}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec lookup(art(), merkle_tree:mt_node()) -> boolean().
-lookup(Art, Node) ->
-    lookup_cf(Art, Node, get_correction_factor(Art)).
+-spec lookup(merkle_tree:mt_node(), art()) -> boolean().
+lookup(Node, Art) ->
+    %?TRACE("MT=~p~nAT=~p", [merkle_tree:get_interval(Node), get_interval(Art)]),
+    lookup_cf([{Node, get_correction_factor(Art)}], Art).
+    %case intervals:is_subset(get_interval(Art), merkle_tree:get_interval(Node)) of        
+    %    true -> lookup_cf([{Node, get_correction_factor(Art)}], Art);
+    %    false -> false
+    %end.
 
--spec lookup_cf(Art, Node, CF) -> Result when
+-spec lookup_cf([{Node, CF}], Art) -> Result when
     is_subtype(Art,    art()),
     is_subtype(Node,   merkle_tree:mt_node()),
     is_subtype(CF,     non_neg_integer()),        %correction factor
     is_subtype(Result, boolean()).
 
-lookup_cf({art, I, IBF, LBF}, Node, 0) ->
-    NodeOk = intervals:in(merkle_tree:get_interval(Node), I),
+lookup_cf([], _Art) ->
+    true;
+lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
-    case merkle_tree:is_leaf(Node) of
-        true when NodeOk -> ?REP_BLOOM:is_element(LBF, NodeHash);
-        false when NodeOk -> ?REP_BLOOM:is_element(IBF, NodeHash);
-        _ -> false
-    end;
-lookup_cf({art, I, IBF, LBF} = Art, Node, CF) ->
-    NodeOk = intervals:in(merkle_tree:get_interval(Node), I),
+    BF = ?IIF(merkle_tree:is_leaf(Node), LBF, IBF),
+    ?TRACE("NodeHash=~p", [NodeHash]),
+    ?REP_BLOOM:is_element(BF, NodeHash) andalso
+        lookup_cf(L, Art);
+lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
-    case merkle_tree:is_leaf(Node) of
-        true when NodeOk -> ?REP_BLOOM:is_element(LBF, NodeHash);                                
-        false when NodeOk -> ?REP_BLOOM:is_element(IBF, NodeHash);
-        _ -> false
-    end
-        andalso
-        lists:foldl(fun(X, Res) -> Res andalso lookup_cf(Art, X, CF - 1) end, 
-                    true, 
-                    merkle_tree:get_childs(Node)).
+    IsLeaf = merkle_tree:is_leaf(Node),
+    BF = ?IIF(IsLeaf, LBF, IBF),
+    ?TRACE("NodeHash=~p~nIsLeaf=~p", [NodeHash, IsLeaf]),
+    case ?REP_BLOOM:is_element(BF, NodeHash) of
+        false -> false;
+        true -> case IsLeaf of
+                    true -> lookup_cf(L, Art);
+                    false ->
+                        NL = lists:append(lists:map(fun(X) -> {X, CF - 1} end, 
+                                                    merkle_tree:get_childs(Node)), 
+                                          L),
+                        lookup_cf(NL, Art)
+                end                        
+    end.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
+-spec get_correction_factor(art()) -> non_neg_integer().
 get_correction_factor({art, Config, _, _, _}) ->
     Config#art_config.correction_factor.
     

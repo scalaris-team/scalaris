@@ -33,8 +33,13 @@
 -export_type([db_chunk/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+
+-define(TRACE_KILL(X,Y), ok).
+%-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RECON(X,Y), ok).
+-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE_RESOLVE(X,Y), ok).
+%-define(TRACE_RESOLV(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -81,7 +86,7 @@ on({get_state, Sender, Key}, State =
        #rep_upd_state{ open_recon = Recon,
                        open_resolve = Resolve,
                        sync_round = Round }) ->
-    ?TRACE("GET STATE - Recon=~p  - Resolve=~p", [Recon, Resolve]),
+    ?TRACE_KILL("GET STATE - Recon=~p  - Resolve=~p", [Recon, Resolve]),
     Value = case Key of
                 open_recon -> Recon;
                 open_resolve -> Resolve;
@@ -125,12 +130,12 @@ on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
 
 on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
     Master andalso
-        ?TRACE("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p", 
+        ?TRACE_RECON("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p", 
                [Round, Sender, Master, rep_upd_recon:print_recon_stats(Stats)]),
     State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
 
 on({resolve_progress_report, Sender, Round, Stats}, State) ->
-    ?TRACE("RESOLVE OK - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
+    ?TRACE_RESOLVE("RESOLVE OK - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
            [Round, Sender, rep_upd_resolve:print_resolve_stats(Stats),
             State#rep_upd_state.open_recon, State#rep_upd_state.open_resolve]),    
     State#rep_upd_state{ open_resolve = State#rep_upd_state.open_resolve - 1 };

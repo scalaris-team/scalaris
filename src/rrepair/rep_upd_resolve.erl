@@ -135,11 +135,9 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
         end,
     State#ru_resolve_state{ stats = NewStats, feedbackItems = NewFBItems };
 
-on({shutdown, _}, State =
-         #ru_resolve_state{ 
-                         ownerLocalPid = Owner,
-                         sync_round = Round,
-                         stats = Stats }) ->
+on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,
+                                     sync_round = Round,
+                                     stats = Stats }) ->
     %DoSendResult TODO
     comm:send_local(Owner, {resolve_progress_report, self(), Round, Stats}),    
     kill.

@@ -33,8 +33,8 @@ all() -> [
           treeHash,
           branchTest,          
           storeToDot,
-          sizeTest,
-          tester_iter
+          sizeTest
+          %tester_iter
          ].
 
 suite() ->
