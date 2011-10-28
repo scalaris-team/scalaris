@@ -86,7 +86,7 @@
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
          sync_master        = false                                     :: boolean(),               %true if process is sync leader
          sync_round         = 0                                         :: float(),
-         recon_stats        = ru_recon_stats:new()                      :: ru_recon_stats:stats(),
+         stats              = ru_recon_stats:new()                      :: ru_recon_stats:stats(),
          sync_start_time    = {0, 0, 0}                                 :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
          }).
 -type state() :: #ru_recon_state{}.
@@ -205,7 +205,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
                         dhtNodePid = DhtNodePid,
                         ownerRemotePid = MyRU_Pid,
                         sync_master = SyncMaster,
-                        recon_stats = Stats }) ->
+                        stats = Stats }) ->
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE2("FORK RECON", []),
@@ -231,7 +231,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
         _ -> ok
     end,
     State#ru_recon_state{ recon_struct = SyncStruct, 
-                          recon_stats = ru_recon_stats:set([{build_time, BuildTime}], Stats) };
+                          stats = ru_recon_stats:set([{build_time, BuildTime}], Stats) };
 
 on({get_chunk_response, {RestI, DBList}}, State = 
        #ru_recon_state{ recon_stage = build_struct,
@@ -243,7 +243,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         ownerRemotePid = OwnerPid,
                         dhtNodePid = DhtNodePid,
                         sync_round = Round,
-                        recon_stats = Stats })  ->    
+                        stats = Stats })  ->    
     {BuildTime, MerkleTree} = 
         case merkle_tree:is_merkle_tree(Params) of
             true -> %extend tree
@@ -262,7 +262,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
             ?TRACE("TREE EXISTS - ADD REST - RestI=~p", [RestI]),
             comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items(merkle_tree)}),
             State#ru_recon_state{ recon_struct = MerkleTree, 
-                                  recon_stats = 
+                                  stats = 
                                       ru_recon_stats:set([{build_time, BuildTime}], 
                                                          Stats) };        
         true ->
@@ -287,7 +287,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           {build_time, BuildTime}], Stats), 
             State#ru_recon_state{ recon_stage = reconciliation, 
                                   recon_struct = MerkleTree, 
-                                  recon_stats = NewStats
+                                  stats = NewStats
                                 }          
     end;
 
@@ -299,7 +299,7 @@ on({get_chunk_response, {[], DBList}}, State =
                         ownerRemotePid = OwnerPid,
                         dest_ru_pid = DestRU_Pid,
                         sync_round = Round,
-                        recon_stats = Stats })  ->
+                        stats = Stats })  ->
     ToBuild = ?IIF(IsMaster, merkle_tree, art),
     Interval = util:proplist_get_value(interval, Params),
     {BuildTime, NewStruct} =
@@ -312,9 +312,8 @@ on({get_chunk_response, {[], DBList}}, State =
                     art_recon(NewStruct, util:proplist_get_value(art, Params), State),
                 comm:send_local(self(), {shutdown, art_sync_finished}),
                 ru_recon_stats:set([{build_time, BuildTime},
-                                    {tree_size, merkle_tree:size_detail(NewStruct)},
-                                    {tree_leafsSynced, ru_recon_stats:get(tree_leafsSynced, ARStats)}], 
-                                   Stats);
+                                    {tree_size, merkle_tree:size_detail(NewStruct)}], 
+                                   ARStats);
             false ->
                 comm:send(DestRU_Pid, 
                           {request_recon, OwnerPid, Round, true, 
@@ -328,7 +327,7 @@ on({get_chunk_response, {[], DBList}}, State =
         end,    
     State#ru_recon_state{ recon_stage = reconciliation, 
                           recon_struct = NewStruct, 
-                          recon_stats = NewStats };
+                          stats = NewStats };
     
 on({get_chunk_response, {RestI, DBList}}, State = 
        #ru_recon_state{ recon_stage = reconciliation,
@@ -382,7 +381,7 @@ on({crash, Pid}, State) ->
 
 on({shutdown, Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
                                         sync_round = Round,
-                                        recon_stats = Stats,
+                                        stats = Stats,
                                         sync_master = Master,
                                         sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
@@ -423,7 +422,7 @@ on({check_node, SrcPid, Interval, Hash}, State =
 on({check_node_response, Result, I, ChildHashs}, State = 
        #ru_recon_state{ sync_pid = SyncDest,
                         dest_ru_pid = SrcNode,
-                        recon_stats = Stats, 
+                        stats = Stats, 
                         ownerRemotePid = OwnerPid,
                         recon_struct = Tree,
                         sync_round = Round }) ->
@@ -463,7 +462,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
     end,
-    State#ru_recon_state{ recon_stats = FinalStats }.
+    State#ru_recon_state{ stats = FinalStats }.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
@@ -525,38 +524,43 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
     is_subtype(Stats,  ru_recon_stats:stats()).
 art_recon(Tree, Art, #ru_recon_state{ sync_round = Round, 
                                       dest_ru_pid = DestPid,
-                                      ownerRemotePid = OwnerPid }) ->
+                                      ownerRemotePid = OwnerPid,
+                                      stats = Stats }) ->
     case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
         true -> 
-            NodesToSync = 
-                art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, []),
-            ?TRACE("OK GET SYNC LEAFS",[]),
+            {NodesToSync, NStats} = 
+                art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
             _ = [reconcileLeaf(X, {DestPid, Round, OwnerPid}) || X <- NodesToSync],
-            {ok, ru_recon_stats:set([{tree_leafsSynced, erlang:length(NodesToSync)}],
-                                    ru_recon_stats:new())};
-        false -> {ok, ru_recon_stats:new()}
+            {ok, NStats};
+        false -> {ok, Stats}
     end.
 
--spec art_get_sync_leafs(Nodes, Art, Acc) -> Result when
+-spec art_get_sync_leafs(Nodes, Art, Stats, Acc) -> {ToSync, Stats} when
     is_subtype(Nodes,  [merkle_tree:mt_node()]),
     is_subtype(Art,    art:art()),
+    is_subtype(Stats,  ru_recon_stats:stats()),
     is_subtype(Acc,    [merkle_tree:mt_node()]),
-    is_subtype(Result, [merkle_tree:mt_node()]).
-art_get_sync_leafs([], _Art, ToSyncAcc) ->
-    ToSyncAcc;
-art_get_sync_leafs([Node | ToCheck], Art, ToSyncAcc) ->
+    is_subtype(ToSync, [merkle_tree:mt_node()]),
+    is_subtype(Stats,  ru_recon_stats:stats()).
+art_get_sync_leafs([], _Art, Stats, ToSyncAcc) ->
+    {ToSyncAcc, Stats};
+art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
+    Stats = ru_recon_stats:inc([{tree_nodesCompared, 1}], OStats),
+    IsLeaf = merkle_tree:is_leaf(Node),
     case art:lookup(Node, Art) of
         true ->
-            art_get_sync_leafs(ToCheck, Art, ToSyncAcc);
+            NStats = ru_recon_stats:inc([{tree_compareSkipped, ?IIF(IsLeaf, 0, merkle_tree:size(Node))}], 
+                                         Stats),
+            art_get_sync_leafs(ToCheck, Art, NStats, ToSyncAcc);
         false ->
-            case merkle_tree:is_leaf(Node) of
+            case IsLeaf of
                 true ->
-                    art_get_sync_leafs(ToCheck, Art, [Node | ToSyncAcc]);
+                    NStats = ru_recon_stats:inc([{tree_leafsSynced, 1}], Stats),
+                    art_get_sync_leafs(ToCheck, Art, NStats, [Node | ToSyncAcc]);
                 false ->
                     art_get_sync_leafs(
                            lists:append(merkle_tree:get_childs(Node), ToCheck), 
-                           Art, 
-                           ToSyncAcc)
+                           Art, Stats, ToSyncAcc)
             end
     end.
 
