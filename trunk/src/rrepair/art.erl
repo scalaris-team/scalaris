@@ -34,8 +34,8 @@
 -export_type([art/0, art_config/0]).
 -endif.
 
--define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 -define(IIF(C, A, B), case C of
                           true -> A;
@@ -48,7 +48,7 @@
 
 -record(art_config,
         {
-         correction_factor = 0 :: non_neg_integer()
+         correction_factor = 1 :: non_neg_integer()
          }).
 -type art_config() :: #art_config{}.
 

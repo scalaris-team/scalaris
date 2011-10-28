@@ -60,7 +60,8 @@ all() ->
      merkleSync_parts,
      merkleSync_min_nodes,
      artSync_noOutdated,
-     artSync_simple
+     artSync_simple,
+     artSync_min_nodes
      ].
 
 suite() ->
@@ -265,9 +266,14 @@ artSync_noOutdated(Config) ->
     ok.
 
 artSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 70, 1, 0.2, get_art_RepUpd_config()),
+    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_art_RepUpd_config()),
     ?assert(Start < End),    
     ok.
+
+artSync_min_nodes(Config) ->
+    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, get_art_RepUpd_config()),
+    ?assert(Start =:= End),
+    ok.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
