@@ -131,7 +131,7 @@ on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
 on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
     Master andalso
         ?TRACE_RECON("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p", 
-               [Round, Sender, Master, rep_upd_recon:print_recon_stats(Stats)]),
+               [Round, Sender, Master, ru_recon_stats:print(Stats)]),
     State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
 
 on({resolve_progress_report, Sender, Round, Stats}, State) ->

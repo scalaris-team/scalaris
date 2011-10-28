@@ -25,7 +25,6 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/2, check_config/0]).
--export([print_recon_stats/1]).
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1, 
@@ -34,7 +33,6 @@
 
 -ifdef(with_export_type_support).
 -export_type([recon_method/0, recon_struct/0, recon_stage/0, keyValVers/0]).
--export_type([ru_recon_stats/0]).
 -endif.
 
 
@@ -76,19 +74,6 @@
                         art:art() |
                         [internal_params()].
 
--record(ru_recon_stats,
-        {
-         tree_size          = {0, 0} :: merkle_tree:mt_size(),
-         tree_compareLeft   = 0      :: non_neg_integer(),
-         tree_nodesCompared = 0      :: non_neg_integer(),
-         tree_leafsSynced   = 0      :: non_neg_integer(),
-         tree_compareSkipped= 0      :: non_neg_integer(),
-         error_count        = 0      :: non_neg_integer(),
-         build_time         = 0      :: non_neg_integer(),   %in us
-         recon_time         = 0      :: non_neg_integer()    %in us
-         }). 
--type ru_recon_stats() :: #ru_recon_stats{}.
-
 -record(ru_recon_state,
         {
          ownerLocalPid      = ?required(ru_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
@@ -101,7 +86,7 @@
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
          sync_master        = false                                     :: boolean(),               %true if process is sync leader
          sync_round         = 0                                         :: float(),
-         recon_stats        = #ru_recon_stats{}                         :: ru_recon_stats(),
+         recon_stats        = ru_recon_stats:new()                      :: ru_recon_stats:stats(),
          sync_start_time    = {0, 0, 0}                                 :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
          }).
 -type state() :: #ru_recon_state{}.
@@ -246,7 +231,7 @@ on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
         _ -> ok
     end,
     State#ru_recon_state{ recon_struct = SyncStruct, 
-                          recon_stats = Stats#ru_recon_stats{ build_time = BuildTime } };
+                          recon_stats = ru_recon_stats:set([{build_time, BuildTime}], Stats) };
 
 on({get_chunk_response, {RestI, DBList}}, State = 
        #ru_recon_state{ recon_stage = build_struct,
@@ -264,7 +249,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
             true -> %extend tree
                 {BTime, NTree} = 
                     util:tc(fun() -> add_to_tree(DBList, Params) end),
-                {Stats#ru_recon_stats.build_time + BTime, merkle_tree:gen_hash(NTree) };
+                {ru_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
             false -> %build new tree
                 Interval = util:proplist_get_value(interval, Params),
                 util:tc(fun() -> build_recon_struct(merkle_tree, 
@@ -277,7 +262,9 @@ on({get_chunk_response, {RestI, DBList}}, State =
             ?TRACE("TREE EXISTS - ADD REST - RestI=~p", [RestI]),
             comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items(merkle_tree)}),
             State#ru_recon_state{ recon_struct = MerkleTree, 
-                                  recon_stats = Stats#ru_recon_stats{ build_time = BuildTime } };        
+                                  recon_stats = 
+                                      ru_recon_stats:set([{build_time, BuildTime}], 
+                                                         Stats) };        
         true ->
             case IsMaster of
                 true ->
@@ -294,10 +281,10 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                 {senderPid, comm:this()}] 
                               })
             end,
-            NewStats = Stats#ru_recon_stats{ tree_compareLeft = ?IIF(IsMaster, 1, 0),
-                                             tree_size = merkle_tree:size_detail(MerkleTree),
-                                             build_time = BuildTime
-                                           }, 
+            NewStats = ru_recon_stats:set(
+                         [{tree_compareLeft, ?IIF(IsMaster, 1, 0)},
+                          {tree_size, merkle_tree:size_detail(MerkleTree)},
+                          {build_time, BuildTime}], Stats), 
             State#ru_recon_state{ recon_stage = reconciliation, 
                                   recon_struct = MerkleTree, 
                                   recon_stats = NewStats
@@ -321,12 +308,13 @@ on({get_chunk_response, {[], DBList}}, State =
         case IsMaster of
             true -> 
                 %TODO measure sync time
-                {ok, ReconStats} = 
+                {ok, ARStats} = 
                     art_recon(NewStruct, util:proplist_get_value(art, Params), State),
                 comm:send_local(self(), {shutdown, art_sync_finished}),
-                Stats#ru_recon_stats { build_time = BuildTime,
-                                       tree_size = merkle_tree:size_detail(NewStruct),
-                                       tree_leafsSynced = ReconStats#ru_recon_stats.tree_leafsSynced };                
+                ru_recon_stats:set([{build_time, BuildTime},
+                                    {tree_size, merkle_tree:size_detail(NewStruct)},
+                                    {tree_leafsSynced, ru_recon_stats:get(tree_leafsSynced, ARStats)}], 
+                                   Stats);
             false ->
                 comm:send(DestRU_Pid, 
                           {request_recon, OwnerPid, Round, true, 
@@ -336,7 +324,7 @@ on({get_chunk_response, {[], DBList}}, State =
                             {art, NewStruct}]
                           }),
                 comm:send_local(self(), {shutdown, client_art_send}),
-                Stats#ru_recon_stats{ build_time = BuildTime }
+                ru_recon_stats:set([{build_time, BuildTime}], Stats)
         end,    
     State#ru_recon_state{ recon_stage = reconciliation, 
                           recon_struct = NewStruct, 
@@ -398,7 +386,7 @@ on({shutdown, Reason}, #ru_recon_state{ ownerLocalPid = Owner,
                                         sync_master = Master,
                                         sync_start_time = SyncStartTime }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
-    NewStats = Stats#ru_recon_stats{ recon_time = timer:now_diff(erlang:now(), SyncStartTime) },
+    NewStats = ru_recon_stats:set([{recon_time, timer:now_diff(erlang:now(), SyncStartTime)}], Stats),
     comm:send_local(Owner, 
                     {recon_progress_report, self(), Round, Master, NewStats}),
     kill;
@@ -435,25 +423,19 @@ on({check_node, SrcPid, Interval, Hash}, State =
 on({check_node_response, Result, I, ChildHashs}, State = 
        #ru_recon_state{ sync_pid = SyncDest,
                         dest_ru_pid = SrcNode,
-                        recon_stats = 
-                            #ru_recon_stats{ error_count = Errors,
-                                             tree_leafsSynced = LeafCount,
-                                             tree_compareSkipped = Skipped
-                                           } = Stats, 
+                        recon_stats = Stats, 
                         ownerRemotePid = OwnerPid,
                         recon_struct = Tree,
                         sync_round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
-    NewStats = Stats#ru_recon_stats{ 
-                    tree_compareLeft = Stats#ru_recon_stats.tree_compareLeft - 1,
-                    tree_nodesCompared = Stats#ru_recon_stats.tree_nodesCompared + 1 },
+    NewStats = ru_recon_stats:inc([{tree_compareLeft, -1}, {tree_nodesCompared, 1}], Stats),
     FinalStats = 
         case Result of
-            not_found -> NewStats#ru_recon_stats{ error_count = Errors + 1 };
-            ok -> NewStats#ru_recon_stats{ tree_compareSkipped = Skipped + merkle_tree:size(Node) };
+            not_found -> ru_recon_stats:inc([{error_count, 1}], NewStats); 
+            ok -> ru_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], NewStats); 
             fail_is_leaf ->
                 Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
-                NewStats#ru_recon_stats{ tree_leafsSynced = LeafCount + Leafs };               
+                ru_recon_stats:inc([{tree_leafsSynced, Leafs}], NewStats);               
             fail_node ->
                 MyChilds = merkle_tree:get_childs(Node),
                 {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
@@ -470,12 +452,13 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                                  merkle_tree:get_interval(X), 
                                                  merkle_tree:get_hash(X)}) 
                               end, NotMatched),
-                NewStats#ru_recon_stats{ 
-                    tree_compareLeft = NewStats#ru_recon_stats.tree_compareLeft + length(NotMatched),
-                    tree_nodesCompared = NewStats#ru_recon_stats.tree_nodesCompared + length(Matched),
-                    tree_compareSkipped = Skipped + SkippedSubNodes }        
+                ru_recon_stats:inc([{tree_compareLeft, length(NotMatched)},
+                                    {tree_nodesCompared, length(Matched)},
+                                    {tree_compareSkipped, SkippedSubNodes}], 
+                                   NewStats)    
         end,
-    if FinalStats#ru_recon_stats.tree_compareLeft =< 1 ->
+    CompLeft = ru_recon_stats:get(tree_compareLeft, FinalStats),
+    if CompLeft =< 1 ->
            comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
@@ -539,7 +522,7 @@ reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
     is_subtype(MyTree, merkle_tree:merkle_tree()),
     is_subtype(Art,    art:art()),
     is_subtype(State,  state()),
-    is_subtype(Stats,  ru_recon_stats()).
+    is_subtype(Stats,  ru_recon_stats:stats()).
 art_recon(Tree, Art, #ru_recon_state{ sync_round = Round, 
                                       dest_ru_pid = DestPid,
                                       ownerRemotePid = OwnerPid }) ->
@@ -549,8 +532,9 @@ art_recon(Tree, Art, #ru_recon_state{ sync_round = Round,
                 art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, []),
             ?TRACE("OK GET SYNC LEAFS",[]),
             _ = [reconcileLeaf(X, {DestPid, Round, OwnerPid}) || X <- NodesToSync],
-            {ok, #ru_recon_stats{ tree_leafsSynced = erlang:length(NodesToSync) }};
-        false -> {ok, #ru_recon_stats{}}
+            {ok, ru_recon_stats:set([{tree_leafsSynced, erlang:length(NodesToSync)}],
+                                    ru_recon_stats:new())};
+        false -> {ok, ru_recon_stats:new()}
     end.
 
 -spec art_get_sync_leafs(Nodes, Art, Acc) -> Result when
@@ -558,7 +542,7 @@ art_recon(Tree, Art, #ru_recon_state{ sync_round = Round,
     is_subtype(Art,    art:art()),
     is_subtype(Acc,    [merkle_tree:mt_node()]),
     is_subtype(Result, [merkle_tree:mt_node()]).
-art_get_sync_leafs([], Art, ToSyncAcc) ->
+art_get_sync_leafs([], _Art, ToSyncAcc) ->
     ToSyncAcc;
 art_get_sync_leafs([Node | ToCheck], Art, ToSyncAcc) ->
     case art:lookup(Node, Art) of
@@ -629,15 +613,6 @@ fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec print_recon_stats(ru_recon_stats()) -> [any()].
-print_recon_stats(Stats) ->
-    FieldNames = record_info(fields, ru_recon_stats),
-    Res = util:for_to_ex(1, length(FieldNames), 
-                         fun(I) ->
-                                 {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
-                         end),
-    [erlang:element(1, Stats), lists:flatten(lists:reverse(Res))].
 
 % @ doc filter, partition and map items of a list in one run
 -spec filterPartitionMap(fun((A) -> boolean()), fun((A) -> boolean()), fun((A) -> any()), [A]) -> {Satisfying::[any()], NonSatisfying::[any()]}.
