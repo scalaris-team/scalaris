@@ -131,21 +131,21 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
     ?TRACE("tx_tm_rtm:on(~p)~n", [Msg]),
 
     %% retrieve the item and handle the learner decide therein
-    {_, ItemState} = my_get_item_entry(ItemId, State),
+    {_, ItemState} = get_item_entry(ItemId, State),
     {ItemResult, NewItemState} = tx_item_state:add_learner_decide(ItemState, Msg),
-    _ = my_set_entry(NewItemState, State),
+    _ = set_entry(NewItemState, State),
 
     %% retrieve the tx entry and increment the number of paxos decided
     %% The TxState may be dropped, when hold_back (then it was newly created...).
     TxId = tx_item_state:get_txid(NewItemState),
-    {_, OldTxState} = my_get_tx_entry(TxId, State),
+    {_, OldTxState} = get_tx_entry(TxId, State),
     TxState = tx_state:inc_numpaxdecided(OldTxState),
 
     _ = case ItemResult of
             hold_back -> ok;
             state_updated ->
-                _ = my_set_entry(TxState, State),
-                my_trigger_delete_if_done(TxState);
+                _ = set_entry(TxState, State),
+                trigger_delete_if_done(TxState);
             {item_newly_decided, Decision} ->
                 {TxResult, TmpTxState} = tx_state:add_item_decision(TxState, Decision),
                 NewTxState =
@@ -153,14 +153,14 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
                         undecided -> TmpTxState;
                         false -> TmpTxState;
                         {tx_newly_decided, Result} ->
-                            T1TxState = my_inform_tps(TmpTxState, State, Result),
+                            T1TxState = inform_tps(TmpTxState, State, Result),
                             %% to inform, we do not need to know the new state
-                            my_inform_client(TxId, State, Result),
-                            my_inform_rtms(TxId, State, Result),
+                            inform_client(TxId, State, Result),
+                            inform_rtms(TxId, State, Result),
                             T1TxState
                     end,
-                _ = my_set_entry(NewTxState, State),
-                my_trigger_delete_if_done(NewTxState)
+                _ = set_entry(NewTxState, State),
+                trigger_delete_if_done(NewTxState)
         end,
     State;
 
@@ -176,13 +176,13 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
                               TLogTxItemIds, [GLLearner]),
     TxState = tx_state:set_status(TmpTxState, ok),
-    _ = my_set_entry(TxState, State),
+    _ = set_entry(TxState, State),
 
     ItemStates =
         [ begin
               TItemState = tx_item_state:new(ItemId, NewTid, TLogEntry),
               ItemState = tx_item_state:set_status(TItemState, ok),
-              _ = my_set_entry(ItemState, State),
+              _ = set_entry(ItemState, State),
               %% initialize local learner
               _ = [ learner:start_paxosid(GLLearner, element(1, X),
                                           Maj, comm:this(), ItemId)
@@ -190,8 +190,8 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
               ItemState
           end || {TLogEntry, ItemId} <- TLogTxItemIds ],
 
-    my_init_RTMs(TxState, ItemStates),
-    my_init_TPs(TxState, ItemStates),
+    init_RTMs(TxState, ItemStates),
+    init_TPs(TxState, ItemStates),
     %% send a weak timeout to ourselves to take further care
     %% if the tx is slow (or a majority of tps failed)
     msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, self(),
@@ -202,7 +202,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
 on({tx_tm_rtm_tid_isdone, TxId}, State) ->
     ?TRACE("tx_tm_rtm_tid_isdone ~p as ~p~n",
            [TxId, state_get_role(State)]),
-    {ErrCode, TxState} = my_get_tx_entry(TxId, State),
+    {ErrCode, TxState} = get_tx_entry(TxId, State),
     case ErrCode of
         new -> ok; %% already finished, nothing to be done
         uninitialized ->
@@ -264,7 +264,7 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
 on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
     ?TRACE("tx_tm_rtm:on({delete, ~p, ~p}) in ~p ~n",
            [TxId, Decision, state_get_role(State)]),
-    {ErrCode, TxState} = my_get_tx_entry(TxId, State),
+    {ErrCode, TxState} = get_tx_entry(TxId, State),
     %% inform RTMs on delete
     Role = state_get_role(State),
     {DeleteIt, NewState} =
@@ -275,7 +275,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 %% inform used learner to delete paxosids.
                 AllPaxIds =
                     [ begin
-                          {ok, ItemState} = my_get_item_entry(ItemId, State),
+                          {ok, ItemState} = get_item_entry(ItemId, State),
                           [ PaxId || {PaxId, _RTLog, _TP}
                                          <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
                       end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
@@ -290,7 +290,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                                      {learner_deleteids, lists:flatten(AllPaxIds)}),
                 {_DeleteIt = true, State};
             {ok, _} ->
-                %% the test my_trigger_delete was passed, at least by the TM
+                %% the test trigger_delete was passed, at least by the TM
                 %% RTMs only wait for all tp register messages, to not miss them
                 %% record, that every TP was informed and all paxids decided
                 TmpTxState = tx_state:set_numinformed(
@@ -300,7 +300,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                                 TmpTxState, tx_state:get_numids(TxState) *
                                     config:read(replication_factor)),
                 Tmp3TxState = tx_state:set_decided(Tmp2TxState, Decision),
-                _ = my_set_entry(Tmp3TxState, State),
+                _ = set_entry(Tmp3TxState, State),
                 Delete = tx_state:all_tps_registered(TxState),
                 TmpState =
                     case Delete of
@@ -311,7 +311,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 %% inform used acceptors to delete paxosids.
                 AllPaxIds =
                     [ begin
-                          {ok, ItemState} = my_get_item_entry(ItemId, State),
+                          {ok, ItemState} = get_item_entry(ItemId, State),
                           [ PaxId || {PaxId, _RTlog, _TP}
                                          <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
                       end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
@@ -349,7 +349,7 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
 on({tx_tm_rtm_delete_txid, TxId}, State) ->
     ?TRACE("tx_tm_rtm:on({delete_txid, ...}) ~n", []),
     %% Debug diagnostics and output:
-    %%     {Status, Entry} = my_get_tx_entry(TxId, State),
+    %%     {Status, Entry} = get_tx_entry(TxId, State),
     %%     case Status of
     %%         new -> ok; %% already deleted
     %%         uninitialized ->
@@ -368,7 +368,7 @@ on({tx_tm_rtm_delete_txid, TxId}, State) ->
 on({tx_tm_rtm_delete_itemid, TxItemId}, State) ->
     ?TRACE("tx_tm_rtm:on({delete_itemid, ...}) ~n", []),
     %% Debug diagnostics and output:
-    %% {Status, Entry} = my_get_item_entry(TxItemId, State),
+    %% {Status, Entry} = get_item_entry(TxItemId, State),
     %% case Status of
     %%     new -> ok; %% already deleted
     %%     uninitialized ->
@@ -382,13 +382,13 @@ on({tx_tm_rtm_delete_itemid, TxItemId}, State) ->
     pdb:delete(TxItemId, state_get_tablename(State)),
     State;
 
-%% sent by my_init_RTMs
+%% sent by init_RTMs
 on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
    ?TRACE("tx_tm_rtm:on({init_RTM, ...}) ~n", []),
 
     %% lookup transaction id locally and merge with given TxState
     Tid = tx_state:get_tid(TxState),
-    {LocalTxStatus, LocalTxEntry} = my_get_tx_entry(Tid, State),
+    {LocalTxStatus, LocalTxEntry} = get_tx_entry(Tid, State),
     {TmpEntry, NewState} =
         case LocalTxStatus of
             new ->
@@ -404,13 +404,13 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
                 {LocalTxEntry, State}
         end,
     NewEntry = tx_state:set_status(TmpEntry, ok),
-    _ = my_set_entry(NewEntry, NewState),
+    _ = set_entry(NewEntry, NewState),
 
     %% lookup items locally and merge with given ItemStates
     NewItemStates =
         [ begin
               EntryId = tx_item_state:get_itemid(Entry),
-              {LocalItemStatus, LocalItem} = my_get_item_entry(EntryId, NewState),
+              {LocalItemStatus, LocalItem} = get_item_entry(EntryId, NewState),
               TmpItem = case LocalItemStatus of
                             new -> Entry; %% nothing known locally
                             uninitialized ->
@@ -422,7 +422,7 @@ on({tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
                                 LocalItem
                         end,
               NewItem = tx_item_state:set_status(TmpItem, ok),
-              _ = my_set_entry(NewItem, NewState),
+              _ = set_entry(NewItem, NewState),
               NewItem
           end || Entry <- ItemStates],
 
@@ -455,7 +455,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
     Role = state_get_role(State),
     %% TODO merge register_TP and accept messages to a single message
     ?TRACE("tx_tm_rtm:on(~p) as ~p~n", [Msg, Role]),
-    {ErrCodeTx, TmpTxState} = my_get_tx_entry(Tid, State),
+    {ErrCodeTx, TmpTxState} = get_tx_entry(Tid, State),
     _ = case ok =/= ErrCodeTx of
         true -> %% new / uninitialized
             %% hold back and handle when corresponding tx_state is
@@ -465,19 +465,19 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
             NewTxState = tx_state:set_status(T2TxState, uninitialized),
 %%            msg_delay:send_local((config:read(tx_timeout) * 3) div 1000, self(),
  %%                                {tx_tm_rtm_delete_txid, Tid}),
-            my_set_entry(NewTxState, State);
+            set_entry(NewTxState, State);
         false -> %% ok
             TxState = tx_state:inc_numtpsregistered(TmpTxState),
-            _ = my_set_entry(TxState, State),
-            {ok, ItemState} = my_get_item_entry(ItemId, State),
+            _ = set_entry(TxState, State),
+            {ok, ItemState} = get_item_entry(ItemId, State),
 
             case {tx_state:is_decided(TxState), Role} of
                 {undecided, _} ->
                     %% store TP info to corresponding PaxosId
                     NewEntry =
                         tx_item_state:set_tp_for_paxosid(ItemState, TP, PaxosID),
-                    my_trigger_delete_if_done(TxState),
-                    my_set_entry(NewEntry, State);
+                    trigger_delete_if_done(TxState),
+                    set_entry(NewEntry, State);
                 {Decision, tx_tm} ->
                     %% if register_TP arrives after tx decision, inform the
                     %% slowly client directly
@@ -488,11 +488,11 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
                     msg_commit_reply(TP, {PaxosID, RTLogEntry}, Decision),
                     %% record in txstate and try to delete entry?
                     NewTxState = tx_state:inc_numinformed(TxState),
-                    my_trigger_delete_if_done(NewTxState),
-                    my_set_entry(NewTxState, State);
+                    trigger_delete_if_done(NewTxState),
+                    set_entry(NewTxState, State);
                 _ ->
                     %% RTMs check whether everything is done
-                    my_trigger_delete_if_done(TxState)
+                    trigger_delete_if_done(TxState)
             end
     end,
     State;
@@ -501,7 +501,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
 on({tx_tm_rtm_propose_yourself, Tid}, State) ->
     ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, state_get_role(State)]),
     %% after timeout take over and initiate new paxos round as proposer
-    {ErrCodeTx, TxState} = my_get_tx_entry(Tid, State),
+    {ErrCodeTx, TxState} = get_tx_entry(Tid, State),
     _ =
     case ErrCodeTx of
         new -> ok; %% takeover is not necessary. Was finished successfully.
@@ -522,7 +522,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             %% trigger paxos proposers for new round with own proposal 'abort'
             {_, TxItemIDs} = lists:unzip(tx_state:get_tlog_txitemids(TxState)),
             [ begin
-                  {_, ItemState} = my_get_item_entry(ItemId, State),
+                  {_, ItemState} = get_item_entry(ItemId, State),
                   case tx_item_state:get_decided(ItemState) of
                       false ->
                           GLLearner = state_get_gllearner(State),
@@ -613,7 +613,7 @@ on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
     tx_tm = state_get_role(State),
     RTMs = state_get_RTMs(State),
-    my_RTM_update(RTMs),
+    rtm_update(RTMs),
     State;
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -649,12 +649,12 @@ on_init({get_node_details_response, NodeDetails}, State) ->
                   {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
                 end,
                 {[], length(RTM_ids) - 1}, RTM_ids),
-    my_RTM_update(NewRTMs),
+    rtm_update(NewRTMs),
     state_set_RTMs(State, NewRTMs);
 
 on_init({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
-    my_RTM_update(state_get_RTMs(State)),
+    rtm_update(state_get_RTMs(State)),
     State;
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -697,8 +697,8 @@ on_init({crash, _Pid} = Msg, State) ->
     on(Msg, State).
 
 %% functions for periodic RTM updates
--spec my_RTM_update(rtms()) -> ok.
-my_RTM_update(RTMs) ->
+-spec rtm_update(rtms()) -> ok.
+rtm_update(RTMs) ->
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
               Key = get_rtmkey(RTM),
@@ -710,17 +710,17 @@ my_RTM_update(RTMs) ->
     ok.
 
 %% functions for tx processing
--spec my_init_RTMs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
-my_init_RTMs(TxState, ItemStates) ->
-    ?TRACE("tx_tm_rtm:my_init_RTMs~n", []),
+-spec init_RTMs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
+init_RTMs(TxState, ItemStates) ->
+    ?TRACE("tx_tm_rtm:init_RTMs~n", []),
     RTMs = tx_state:get_rtms(TxState),
     send_to_rtms(
       RTMs, fun(X) -> {tx_tm_rtm_init_RTM, TxState, ItemStates, get_nth(X)}
             end).
 
--spec my_init_TPs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
-my_init_TPs(TxState, ItemStates) ->
-    ?TRACE("tx_tm_rtm:my_init_TPs~n", []),
+-spec init_TPs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
+init_TPs(TxState, ItemStates) ->
+    ?TRACE("tx_tm_rtm:init_TPs~n", []),
     %% send to each TP its own record / request including the RTMs to
     %% be used
     Tid = tx_state:get_tid(TxState),
@@ -743,33 +743,33 @@ my_init_TPs(TxState, ItemStates) ->
       end || ItemState <- ItemStates ],
     ok.
 
--spec my_get_tx_entry(tx_state:tx_id(), state())
+-spec get_tx_entry(tx_state:tx_id(), state())
                      -> {new | ok | uninitialized, tx_state:tx_state()}.
-my_get_tx_entry(Id, State) ->
+get_tx_entry(Id, State) ->
     case pdb:get(Id, state_get_tablename(State)) of
         undefined -> {new, tx_state:new(Id)};
         Entry -> {tx_state:get_status(Entry), Entry}
     end.
 
--spec my_get_item_entry(tx_item_state:tx_item_id(), state()) ->
+-spec get_item_entry(tx_item_state:tx_item_id(), state()) ->
                                {new | uninitialized | ok,
                                 tx_item_state:tx_item_state()}.
-my_get_item_entry(Id, State) ->
+get_item_entry(Id, State) ->
     case pdb:get(Id, state_get_tablename(State)) of
         undefined -> {new, tx_item_state:new(Id)};
         Entry -> {tx_item_state:get_status(Entry), Entry}
     end.
 
--spec my_set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
+-spec set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
                    state()) -> state().
-my_set_entry(NewEntry, State) ->
+set_entry(NewEntry, State) ->
     pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
--spec my_inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
-my_inform_client(TxId, State, Result) ->
+-spec inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
+inform_client(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
-    {ok, TxState} = my_get_tx_entry(TxId, State),
+    {ok, TxState} = get_tx_entry(TxId, State),
     Client = tx_state:get_client(TxState),
     ClientsId = tx_state:get_clientsid(TxState),
     case Client of
@@ -778,13 +778,13 @@ my_inform_client(TxId, State, Result) ->
     end,
     ok.
 
--spec my_inform_tps(tx_state:tx_state(), state(), commit | abort) ->
+-spec inform_tps(tx_state:tx_state(), state(), commit | abort) ->
                            tx_state:tx_state().
-my_inform_tps(TxState, State, Result) ->
+inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
     %% inform TPs
     X = [ begin
-              {ok, ItemState} = my_get_item_entry(ItemId, State),
+              {ok, ItemState} = get_item_entry(ItemId, State),
               [ case comm:is_valid(TP) of
                     false -> unknown;
                     true -> msg_commit_reply(TP, {PaxId, RTLogEntry}, Result), ok
@@ -794,19 +794,19 @@ my_inform_tps(TxState, State, Result) ->
           end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
     Y = [ Z || Z <- lists:flatten(X), Z =:= ok ],
     NewTxState = tx_state:set_numinformed(TxState, length(Y)),
-%%    my_trigger_delete_if_done(NewTxState),
+%%    trigger_delete_if_done(NewTxState),
     NewTxState.
 
--spec my_inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
-my_inform_rtms(_TxId, _State, _Result) ->
+-spec inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
+inform_rtms(_TxId, _State, _Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
-    %%{ok, TxState} = my_get_tx_entry(_TxId, _State),
+    %%{ok, TxState} = get_tx_entry(_TxId, _State),
     %% @TODO inform RTMs?
     %% msg_commit_reply(Client, ClientsId, Result)
     ok.
 
--spec my_trigger_delete_if_done(tx_state:tx_state()) -> ok.
-my_trigger_delete_if_done(TxState) ->
+-spec trigger_delete_if_done(tx_state:tx_state()) -> ok.
+trigger_delete_if_done(TxState) ->
     ?TRACE("tx_tm_rtm:trigger delete?~n", []),
     case (tx_state:is_decided(TxState)) of
         undecided -> ok;
@@ -836,7 +836,7 @@ count_messages_per_type() ->
 %% enough_tps_registered(TxState, State) ->
 %%     BoolV =
 %%         [ begin
-%%               {ok, ItemState} = my_get_item_entry(X, State),
+%%               {ok, ItemState} = get_item_entry(X, State),
 %%               {_,_,TPs} =
 %%                   lists:unzip3(tx_item_state:get_paxosids_rtlogs_tps(ItemState)),
 %%               ValidTPs = [ Y || Y <- TPs, unknown =/= Y],

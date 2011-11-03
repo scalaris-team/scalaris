@@ -62,7 +62,7 @@ tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
                         {tx_tlog:tlog_entry(),
                          {pos_integer(), rdht_tx:result_entry()}}.
 work_phase(TLogEntry, {Num, Request}) ->
-    {NewTLogEntry, Result} = my_make_tlog_result_entry(TLogEntry, Request),
+    {NewTLogEntry, Result} = make_tlog_result_entry(TLogEntry, Request),
     {NewTLogEntry, {Num, Result}}.
 
 -spec work_phase(pid(), rdht_tx:req_id(), rdht_tx:request()) -> ok.
@@ -184,14 +184,14 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
     Key = tx_tlog:get_entry_key(TLogEntry),
     Request = {?MODULE, Key, WriteValue},
     {NewTLogEntry, NewResultEntry} =
-        my_make_tlog_result_entry(TLogEntry, Request),
+        make_tlog_result_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry, NewResultEntry),
     comm:send_local(ClientPid, Msg),
     State.
 
--spec my_make_tlog_result_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
+-spec make_tlog_result_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
         {tx_tlog:tlog_entry(), rdht_tx:result_entry()}.
-my_make_tlog_result_entry(TLogEntry, Request) ->
+make_tlog_result_entry(TLogEntry, Request) ->
     Module = tx_tlog:get_entry_operation(TLogEntry),
     Key = tx_tlog:get_entry_key(TLogEntry),
     Status = apply(Module, tlogentry_get_status, [TLogEntry]),

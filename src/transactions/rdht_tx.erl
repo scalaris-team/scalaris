@@ -71,7 +71,7 @@ req_list(TLog, PlainReqList) ->
     NumReqs = length(PlainReqList),
     ReqList = lists:zip(lists:seq(1, NumReqs), PlainReqList),
     %% split into 'rdht', 'delayed' and 'translog based' operations
-    {RdhtOps, Delayed, TransLogOps, Commit} = my_split_ops(TLog, ReqList),
+    {RdhtOps, Delayed, TransLogOps, Commit} = split_ops(TLog, ReqList),
 
     RdhtOpsWithReqIds = initiate_rdht_ops(RdhtOps),
     {NewTLog, TmpResultList, [], [], []} =
@@ -105,13 +105,13 @@ req_list(TLog, PlainReqList) ->
     end.
 
 %% implementation
--spec my_split_ops(tx_tlog:tlog(), [{pos_integer(), request()}])
+-spec split_ops(tx_tlog:tlog(), [{pos_integer(), request()}])
                   -> {[{pos_integer(), request()}],
                       [{pos_integer(), request()}],
                       [{pos_integer(), request()}],
                       [{pos_integer(), request()}]}.
-my_split_ops(TLog, ReqList) ->
-    ?TRACE("rdht_tx:my_split_ops(~p, ~p)~n", [TLog, ReqList]),
+split_ops(TLog, ReqList) ->
+    ?TRACE("rdht_tx:split_ops(~p, ~p)~n", [TLog, ReqList]),
     Splitter =
         fun(ReqEntry, {RdhtOps, Delayed, TransLogOps, Commit}) ->
           {_Num, Entry} = ReqEntry,
@@ -119,7 +119,7 @@ my_split_ops(TLog, ReqList) ->
               commit ->
                   {RdhtOps, Delayed, TransLogOps, [ReqEntry | Commit]};
               _ -> case {lists:keymember(element(2, Entry), 2, TLog),
-                         my_key_in_numbered_reqlist(element(2, Entry), RdhtOps)}
+                         key_in_numbered_reqlist(element(2, Entry), RdhtOps)}
                    of
                        {true,_} ->
                            {RdhtOps, Delayed, [ ReqEntry | TransLogOps ],
@@ -134,13 +134,13 @@ my_split_ops(TLog, ReqList) ->
     {A, B, C, D} = lists:foldl(Splitter, {[],[],[],[]}, ReqList),
     {lists:reverse(A), lists:reverse(B), lists:reverse(C), lists:reverse(D)}.
 
--spec my_key_in_numbered_reqlist(client_key(), [{pos_integer(), request()}])
+-spec key_in_numbered_reqlist(client_key(), [{pos_integer(), request()}])
                                 -> boolean().
-my_key_in_numbered_reqlist(_Key, []) -> false;
-my_key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
+key_in_numbered_reqlist(_Key, []) -> false;
+key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
     case Key =:= element(2, Entry) of
         true -> true;
-        false -> my_key_in_numbered_reqlist(Key, Tail)
+        false -> key_in_numbered_reqlist(Key, Tail)
     end.
 
 -spec initiate_rdht_ops([{pos_integer(), request()}])
