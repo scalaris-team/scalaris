@@ -37,6 +37,7 @@
 -export([set_tp_for_paxosid/3]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
+-export([add_learner_decide/2]).
 
 -ifdef(with_export_type_support).
 -export_type([tx_item_id/0, tx_item_state/0]).
@@ -149,3 +150,28 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
     Entry = lists:keyfind(PaxosId, 1, TPList),
     NewTPList = lists:keyreplace(PaxosId, 1, TPList, setelement(3, Entry, TP)),
     set_paxosids_rtlogs_tps(State, NewTPList).
+
+-spec add_learner_decide(tx_item_state(), comm:message()) ->
+                                {hold_back
+                                 | state_updated
+                                 | {item_newly_decided, prepared | abort},
+                                 tx_item_state()}.
+add_learner_decide(State, {learner_decide, _ItemId, _PaxosID, Value} = Msg) ->
+    case ok =/= get_status(State) of
+        true -> %% new | uninitialized
+            TmpState = tx_item_state:hold_back(Msg, State),
+            NewState = tx_item_state:set_status(TmpState, uninitialized),
+            {hold_back, NewState};
+        false -> %% ok
+            TmpState =
+                case Value of
+                    prepared -> tx_item_state:inc_numprepared(State);
+                    abort ->    tx_item_state:inc_numabort(State)
+                end,
+            case newly_decided(TmpState) of
+                false -> {state_updated, TmpState};
+                Decision ->
+                    NewState = set_decided(TmpState, Decision),
+                    {{item_newly_decided, Decision}, NewState}
+            end
+    end.
