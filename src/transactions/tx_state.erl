@@ -52,6 +52,8 @@
 -export([all_pax_decided/1]).
 -export([all_tps_registered/1]).
 
+-export([add_item_decision/2]).
+
 -ifdef(with_export_type_support).
 -export_type([tx_id/0, tx_state/0]).
 -endif.
@@ -203,3 +205,21 @@ all_pax_decided(State) ->
 all_tps_registered(State) ->
     %% @TODO use repl. degree
     get_numtpsregistered(State) =:= get_numids(State) * 4.
+
+-spec add_decision(tx_state(), prepared | abort) ->
+                          {undecided | false
+                           | {tx_newly_decided, abort | commit},
+                           tx_state()}.
+add_item_decision(State, Decision) ->
+    T1 =
+        case Decision of
+            prepared -> inc_numprepared(State);
+            abort    -> inc_numabort(State)
+        end,
+    case newly_decided(T1) of
+        undecided -> {undecided, T1};
+        false -> {false, T1};
+        Result -> %% commit or abort
+            T2 = set_decided(T1, Result),
+            {{tx_newly_decided, Result}, T2}
+    end.
