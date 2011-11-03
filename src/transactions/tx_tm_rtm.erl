@@ -130,9 +130,10 @@ init([]) ->
 on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
     ?TRACE("tx_tm_rtm:on(~p)~n", [Msg]),
 
-    %% retrieve the item from pdb and register the learner decide
+    %% retrieve the item and handle the learner decide therein
     {_, ItemState} = my_get_item_entry(ItemId, State),
     {ItemResult, NewItemState} = tx_item_state:add_learner_decide(ItemState, Msg),
+    _ = my_set_entry(NewItemState, State),
 
     %% retrieve the tx entry and increment the number of paxos decided
     %% The TxState may be dropped, when hold_back (then it was newly created...).
@@ -141,10 +142,8 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
     TxState = tx_state:inc_numpaxdecided(OldTxState),
 
     _ = case ItemResult of
-            hold_back ->
-                my_set_entry(NewItemState, State);
+            hold_back -> ok;
             state_updated ->
-                _ = my_set_entry(NewItemState, State),
                 _ = my_set_entry(TxState, State),
                 my_trigger_delete_if_done(TxState);
             {item_newly_decided, Decision} ->
@@ -160,7 +159,6 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
                             my_inform_rtms(TxId, State, Result),
                             T1TxState
                     end,
-                _ = my_set_entry(NewItemState, State),
                 _ = my_set_entry(NewTxState, State),
                 my_trigger_delete_if_done(NewTxState)
         end,
