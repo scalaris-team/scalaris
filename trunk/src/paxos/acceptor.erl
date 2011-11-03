@@ -108,12 +108,12 @@ init([]) ->
 -spec on(comm:message(), atom()) -> atom().
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
-    {_, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    {_, StateForID} = get_entry(PaxosID, ETSTableName),
     case acceptor_state:get_learners(StateForID) of
         Learners -> log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
         _ ->
             NewState = acceptor_state:set_learners(StateForID, Learners),
-            my_set_entry(NewState, ETSTableName),
+            set_entry(NewState, ETSTableName),
             case acceptor_state:accepted(NewState) of
                 true  -> inform_learners(PaxosID, NewState);
                 false -> ok
@@ -124,7 +124,7 @@ on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
 % need Sender & PaxosID
 on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     ?TRACE("acceptor:prepare for paxos id: ~p round ~p~n", [PaxosID,InRound]),
-    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case ErrCode of
         new -> msg_delay:send_local(
                  config:read(acceptor_noinit_timeout) div 1000, self(),
@@ -133,7 +133,7 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     end,
     case acceptor_state:add_prepare_msg(StateForID, InRound) of
         {ok, NewState} ->
-            my_set_entry(NewState, ETSTableName),
+            set_entry(NewState, ETSTableName),
             msg_ack(Proposer, PaxosID, InRound,
                     acceptor_state:get_value(NewState),
                     acceptor_state:get_raccepted(NewState));
@@ -143,7 +143,7 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
 
 on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = State) ->
     ?TRACE("acceptor:accept for paxos id: ~p round ~p~n", [PaxosID, InRound]),
-    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case ErrCode of
         new -> msg_delay:send_local((config:read(tx_timeout) * 4) div 1000, self(),
                          {acceptor_delete_if_no_learner, PaxosID});
@@ -151,7 +151,7 @@ on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = Sta
     end,
     _ = case acceptor_state:add_accept_msg(StateForID, InRound, InProposal) of
         {ok, NewState} ->
-            my_set_entry(NewState, ETSTableName),
+            set_entry(NewState, ETSTableName),
             inform_learners(PaxosID, NewState);
         {dropped, NewerRound} -> msg_naccepted(Proposer, PaxosID, NewerRound)
     end,
@@ -164,7 +164,7 @@ on({acceptor_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
 
 on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
     ?TRACE("acceptor:delete_if_no_learner~n", []),
-    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case {ErrCode, acceptor_state:get_learners(StateForID)} of
         {new, _} -> ok; %% already deleted
         {_, []} ->
@@ -176,7 +176,7 @@ on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
 
 on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
     ?TRACE("acceptor:add_learner~n", []),
-    {ErrCode, StateForID} = my_get_entry(PaxosID, ETSTableName),
+    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case ErrCode of
         new -> ok; %% do not support adding learners without prior initialize
         ok ->
@@ -186,17 +186,17 @@ on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
             end,
             NewLearners = [Learner | acceptor_state:get_learners(StateForID)],
             NStateForID = acceptor_state:set_learners(StateForID, NewLearners),
-            my_set_entry(NStateForID, ETSTableName)
+            set_entry(NStateForID, ETSTableName)
     end,
     State.
 
-my_get_entry(Id, TableName) ->
+get_entry(Id, TableName) ->
     case pdb:get(Id, TableName) of
         undefined -> {new, acceptor_state:new(Id)};
         Entry -> {ok, Entry}
     end.
 
-my_set_entry(NewEntry, TableName) ->
+set_entry(NewEntry, TableName) ->
     pdb:set(NewEntry, TableName).
 
 inform_learners(PaxosID, State) ->
