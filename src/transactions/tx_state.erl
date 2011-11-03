@@ -206,10 +206,10 @@ all_tps_registered(State) ->
     %% @TODO use repl. degree
     get_numtpsregistered(State) =:= get_numids(State) * 4.
 
--spec add_decision(tx_state(), prepared | abort) ->
-                          {undecided | false
-                           | {tx_newly_decided, abort | commit},
-                           tx_state()}.
+-spec add_item_decision(tx_state(), prepared | abort) ->
+                               {undecided | false
+                                | {tx_newly_decided, abort | commit},
+                                tx_state()}.
 add_item_decision(State, Decision) ->
     T1 =
         case Decision of
