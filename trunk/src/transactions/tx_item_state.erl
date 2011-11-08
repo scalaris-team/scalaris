@@ -37,7 +37,9 @@
 -export([set_tp_for_paxosid/3]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
+-export([get_numcommitted/1, inc_numcommitted/1]).
 -export([add_learner_decide/2]).
+-export([add_commit_ack/1]).
 
 -ifdef(with_export_type_support).
 -export_type([tx_item_id/0, tx_item_state/0]).
@@ -59,7 +61,8 @@
    non_neg_integer(), %%  9 Numabort, number of received abort votes
    [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}],         %% 10 [{PaxosID, RTLogEntry, TP}], involved PaxosIDs
    new | uninitialized | ok, %% 11 Status, item status
-   [tuple()]          %% 12 HoldBackQueue, when not initialized
+   [tuple()],         %% 12 HoldBackQueue, when not initialized
+   non_neg_integer()  %% 13 NumCommitted
  }.
 
 %% @TODO maybe the following entries are also necessary?:
@@ -71,7 +74,7 @@ new(ItemId) ->
     ReplDeg = config:read(replication_factor),
     {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
-     false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = []}.
+     false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = [], 0}.
 
 -spec new(tx_item_id(), tx_state:tx_id(), tx_tlog:tlog_entry())
          -> tx_item_state().
@@ -87,7 +90,7 @@ new(ItemId, TxId, TLogEntry) ->
     {ItemId, tx_item_state, TxId, TLogEntry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, PaxIDsRTLogsTPs,
-     uninitialized, _HoldBack = []}.
+     uninitialized, _HoldBack = [], 0}.
 
 -spec get_itemid(tx_item_state()) -> tx_item_id().
 get_itemid(State) ->         element(1, State).
@@ -129,6 +132,11 @@ hold_back(Msg, State) ->     setelement(12, State, [Msg | element(12, State)]).
 get_hold_back(State) ->      element(12, State).
 -spec set_hold_back(tx_item_state(), [comm:message()]) -> tx_item_state().
 set_hold_back(State, Queue) -> setelement(12, State, Queue).
+
+-spec get_numcommitted(tx_item_state()) -> non_neg_integer().
+get_numcommitted(State) ->    element(13, State).
+-spec inc_numcommitted(tx_item_state()) -> tx_item_state().
+inc_numcommitted(State) ->       setelement(13, State, element(13,State) + 1).
 
 -spec newly_decided(tx_item_state()) -> false | prepared | abort.
 newly_decided(State) ->
@@ -174,4 +182,15 @@ add_learner_decide(State, {learner_decide, _ItemId, _PaxosID, Value} = Msg) ->
                     NewState = set_decided(TmpState, Decision),
                     {{item_newly_decided, Decision}, NewState}
             end
+    end.
+
+-spec add_commit_ack(tx_item_state()) ->
+                            {item_newly_safe | state_updated,
+                            tx_item_state()}.
+add_commit_ack(State) ->
+    NewState = inc_numcommitted(State),
+    Maj = get_maj_for_prepared(NewState),
+    case get_numcommitted(NewState) of
+        Maj -> {item_newly_safe, NewState};
+        _   -> {state_updated, NewState}
     end.

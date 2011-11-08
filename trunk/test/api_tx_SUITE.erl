@@ -39,9 +39,10 @@ all()   -> [new_tlog_0,
             write2_read2,
             multi_write,
             write_test_race_mult_rings,
-            tester_encode_decode
+            tester_encode_decode,
+            random_write_read
            ].
-suite() -> [ {timetrap, {seconds, 40}} ].
+suite() -> [ {timetrap, {seconds, 100}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -375,3 +376,13 @@ prop_encode_decode(Value) ->
 
 tester_encode_decode(_Config) ->
     tester:test(?MODULE, prop_encode_decode, 1, 10000).
+
+random_write_read2(0) -> ok;
+random_write_read2(Count) ->
+    Key = lists:flatten(io_lib:format("~p", [Count])),
+    ?equals_w_note(api_tx:write(Key, Count), {ok}, Key),
+    ?equals_w_note(api_tx:read(Key), {ok, Count}, Key),
+    random_write_read2(Count -1).
+
+random_write_read(_) ->
+    random_write_read2(50000).
