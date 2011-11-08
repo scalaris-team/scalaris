@@ -46,6 +46,7 @@
 -export([get_numtpsregistered/1, inc_numtpsregistered/1]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
+-export([get_numcommitack/1, inc_numcommitack/1]).
 
 -export([newly_decided/1]).
 -export([all_tps_informed/1]).
@@ -53,6 +54,7 @@
 -export([all_tps_registered/1]).
 
 -export([add_item_decision/2]).
+-export([add_item_acked/1]).
 
 -ifdef(with_export_type_support).
 -export_type([tx_id/0, tx_state/0]).
@@ -77,7 +79,8 @@
          non_neg_integer(),        %% NumPaxDecided
          non_neg_integer(),        %% NumTpsRegistered
          new | uninitialized | ok, %% status: new / uninitialized / ok
-         [any()]                   %% HoldBack
+         [any()],                   %% HoldBack
+         non_neg_integer()         %% Number of items committed
          }.
 %% @TODO also necessary?
 %%               Majority of RTMs,
@@ -99,7 +102,7 @@ new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->
     {Tid, tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
      undecided, length(TLogTxItemIds),
      _Prepared = 0, _Aborts = 0, _Informed = 0, _PaxDecided = 0,
-     _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
+     _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = [], 0}.
 -spec new(tx_id()) -> tx_state().
 new(Tid) ->
     new(Tid, unknown, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
@@ -177,6 +180,11 @@ get_hold_back(State) -> element(17, State).
 -spec set_hold_back(tx_state(), [comm:message()]) -> tx_state().
 set_hold_back(State, Queue) -> setelement(17, State, Queue).
 
+-spec get_numcommitack(tx_state()) -> non_neg_integer().
+get_numcommitack(State) ->    element(18, State).
+-spec inc_numcommitack(tx_state()) -> tx_state().
+inc_numcommitack(State) ->    setelement(18, State, 1 + element(18, State)).
+
 -spec newly_decided(tx_state()) -> undecided | false | abort | commit.
 newly_decided(State) ->
     case (undecided =:= is_decided(State)) of
@@ -222,4 +230,14 @@ add_item_decision(State, Decision) ->
         Result -> %% commit or abort
             T2 = set_decided(T1, Result),
             {{tx_newly_decided, Result}, T2}
+    end.
+
+-spec add_item_acked(tx_state()) ->
+                            {all_items_acked | open, tx_state()}.
+add_item_acked(State) ->
+    NewState = inc_numcommitack(State),
+    NumAll = get_numids(NewState),
+    case get_numcommitack(NewState) of
+        NumAll -> {all_items_acked, NewState};
+        _      -> {open, NewState}
     end.
