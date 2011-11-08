@@ -42,15 +42,13 @@
 -export([get_numprepared/1, inc_numprepared/1]).
 -export([get_numabort/1, inc_numabort/1]).
 -export([get_numinformed/1, set_numinformed/2, inc_numinformed/1]).
--export([get_numpaxdecided/1, set_numpaxdecided/2, inc_numpaxdecided/1]).
+-export([get_numcommitack/1, inc_numcommitack/1]).
 -export([get_numtpsregistered/1, inc_numtpsregistered/1]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
--export([get_numcommitack/1, inc_numcommitack/1]).
 
 -export([newly_decided/1]).
 -export([all_tps_informed/1]).
--export([all_pax_decided/1]).
 -export([all_tps_registered/1]).
 
 -export([add_item_decision/2]).
@@ -101,8 +99,8 @@ is_tx_state(TxState) ->
 new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->
     {Tid, tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
      undecided, length(TLogTxItemIds),
-     _Prepared = 0, _Aborts = 0, _Informed = 0, _PaxDecided = 0,
-     _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = [], 0}.
+     _Prepared = 0, _Aborts = 0, _Informed = 0, _CommitsAcked = 0,
+     _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
 -spec new(tx_id()) -> tx_state().
 new(Tid) ->
     new(Tid, unknown, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
@@ -158,12 +156,10 @@ get_numinformed(State) ->         element(13, State).
 inc_numinformed(State) ->         setelement(13, State, 1 + element(13, State)).
 -spec set_numinformed(tx_state(), non_neg_integer()) -> tx_state().
 set_numinformed(State, Val) ->    setelement(13, State, Val).
--spec get_numpaxdecided(tx_state()) -> non_neg_integer().
-get_numpaxdecided(State) ->       element(14, State).
--spec inc_numpaxdecided(tx_state()) -> tx_state().
-inc_numpaxdecided(State) ->       setelement(14, State, 1 + element(14, State)).
--spec set_numpaxdecided(tx_state(), non_neg_integer()) -> tx_state().
-set_numpaxdecided(State, Val) ->  setelement(14, State, Val).
+-spec get_numcommitack(tx_state()) -> non_neg_integer().
+get_numcommitack(State) ->    element(14, State).
+-spec inc_numcommitack(tx_state()) -> tx_state().
+inc_numcommitack(State) ->    setelement(14, State, 1 + element(14, State)).
 -spec get_numtpsregistered(tx_state()) -> non_neg_integer().
 get_numtpsregistered(State) ->    element(15, State).
 -spec inc_numtpsregistered(tx_state()) -> tx_state().
@@ -180,10 +176,6 @@ get_hold_back(State) -> element(17, State).
 -spec set_hold_back(tx_state(), [comm:message()]) -> tx_state().
 set_hold_back(State, Queue) -> setelement(17, State, Queue).
 
--spec get_numcommitack(tx_state()) -> non_neg_integer().
-get_numcommitack(State) ->    element(18, State).
--spec inc_numcommitack(tx_state()) -> tx_state().
-inc_numcommitack(State) ->    setelement(18, State, 1 + element(18, State)).
 
 -spec newly_decided(tx_state()) -> undecided | false | abort | commit.
 newly_decided(State) ->
@@ -203,11 +195,6 @@ newly_decided(State) ->
 all_tps_informed(State) ->
     %% @TODO use repl. degree
     get_numinformed(State) =:= get_numids(State) * 4.
-
--spec all_pax_decided(tx_state()) -> boolean().
-all_pax_decided(State) ->
-    %% @TODO use repl. degree
-    get_numpaxdecided(State) =:= get_numids(State) * 4.
 
 -spec all_tps_registered(tx_state()) -> boolean().
 all_tps_registered(State) ->

@@ -175,8 +175,7 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
     %% retrieve the tx entry and increment the number of paxos decided
     %% The TxState may be dropped, when hold_back (then it was newly created...).
     TxId = tx_item_state:get_txid(NewItemState),
-    {_, OldTxState} = get_tx_entry(TxId, State),
-    TxState = tx_state:inc_numpaxdecided(OldTxState),
+    {_, TxState} = get_tx_entry(TxId, State),
 
     _ = case ItemResult of
             hold_back -> ok;
@@ -334,11 +333,8 @@ on({tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 TmpTxState = tx_state:set_numinformed(
                                TxState, tx_state:get_numids(TxState) *
                                    config:read(replication_factor)),
-                Tmp2TxState = tx_state:set_numpaxdecided(
-                                TmpTxState, tx_state:get_numids(TxState) *
-                                    config:read(replication_factor)),
-                Tmp3TxState = tx_state:set_decided(Tmp2TxState, Decision),
-                _ = set_entry(Tmp3TxState, State),
+                Tmp2TxState = tx_state:set_decided(TmpTxState, Decision),
+                _ = set_entry(Tmp2TxState, State),
                 Delete = tx_state:all_tps_registered(TxState),
                 TmpState =
                     case Delete of
@@ -852,7 +848,6 @@ trigger_delete_if_done(TxState) ->
             case tx_state:all_tps_informed(TxState)
                 andalso tx_state:get_numids(TxState)
                     =:= tx_state:get_numcommitack(TxState)
-                %%        andalso tx_state:all_pax_decided(TxState)
                 %%    andalso tx_state:all_tps_registered(TxState)
             of
                 true ->
