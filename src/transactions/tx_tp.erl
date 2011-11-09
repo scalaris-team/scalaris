@@ -90,7 +90,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
 -spec on_tx_commitreply({tx_item_state:paxos_id(),
                          tx_tlog:tlog_entry(),
                          comm:mypid(),
-                         tx_item_state:item_id()},
+                         tx_item_state:tx_item_id()},
                         commit | abort, dht_node_state:state())
                        -> dht_node_state:state().
 on_tx_commitreply({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
@@ -123,7 +123,7 @@ on_tx_commitreply({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_Sta
             DHT_Node_State
     end.
 
--spec on_tx_commitreply_fwd(comm:mypid(), tx_item_state:item_id(),
+-spec on_tx_commitreply_fwd(comm:mypid(), tx_item_state:tx_item_id(),
                             tx_tlog:tlog_entry(),
                             commit | abort, prepared | abort,
                             dht_node_state:state())
