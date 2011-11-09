@@ -22,15 +22,14 @@
     <pathelement location="contrib/jetty-libs/servlet-api-2.5.jar"/>
   </path>
 
+  <!-- All libraries needed to run jetty -->
+  <path id="jetty.classpath">
+    <fileset dir="contrib/jetty-libs" includes="*.jar"/>
+    <fileset dir="contrib/jetty-libs/jsp" includes="*.jar"/>
+  </path>
+
   <!-- jetty server and jetty ant plugin classes (to launch jetty from ant) -->
-  <taskdef resource="tasks.properties" loaderref="jetty.loader">
-    <classpath>
-      <path>
-        <fileset dir="contrib/jetty-libs" includes="*.jar"/>
-        <fileset dir="contrib/jetty-libs/jsp" includes="*.jar"/>
-      </path>
-    </classpath>
-  </taskdef>
+  <taskdef classpathref="jetty.classpath" resource="tasks.properties" loaderref="jetty.loader" />
 
   <!-- Create build directory and copy static files -->
   <macrodef name="scalaris.check.jars">
