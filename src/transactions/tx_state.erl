@@ -74,11 +74,10 @@
          non_neg_integer(),        %% NumPrepared,
          non_neg_integer(),        %% NumAbort,
          non_neg_integer(),        %% NumTPsInformed
-         non_neg_integer(),        %% NumPaxDecided
+         non_neg_integer(),        %% Number of items committed
          non_neg_integer(),        %% NumTpsRegistered
          new | uninitialized | ok, %% status: new / uninitialized / ok
-         [any()],                   %% HoldBack
-         non_neg_integer()         %% Number of items committed
+         [any()]                   %% HoldBack
          }.
 %% @TODO also necessary?
 %%               Majority of RTMs,
