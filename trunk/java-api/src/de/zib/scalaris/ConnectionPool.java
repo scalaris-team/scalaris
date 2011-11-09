@@ -15,7 +15,7 @@
  */
 package de.zib.scalaris;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 
 /**
  * Implements a simple connection pool for Scalaris connections.
@@ -37,7 +37,7 @@ public class ConnectionPool {
     /**
      * All available connections not checked out yet.
      */
-    protected ArrayList<Connection> availableConns;
+    protected LinkedList<Connection> availableConns;
     /**
      * Number of checked out connections.
      */
@@ -55,7 +55,7 @@ public class ConnectionPool {
             final int maxConnections) {
         this.cFactory = cFactory;
         this.maxConnections = maxConnections;
-        availableConns = new ArrayList<Connection>(maxConnections);
+        availableConns = new LinkedList<Connection>();
     }
 
     /**
@@ -73,7 +73,7 @@ public class ConnectionPool {
         Connection conn = null;
         // use first available connection (if any):
         if (!availableConns.isEmpty()) {
-            conn = availableConns.remove(0);
+            conn = availableConns.remove();
             ++checkedOut;
         } else if ((maxConnections == 0) || (checkedOut < maxConnections)) {
             conn = cFactory.createConnection();
