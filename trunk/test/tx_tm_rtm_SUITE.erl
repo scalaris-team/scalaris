@@ -35,7 +35,7 @@ all() ->
      all_tp_crash
     ].
 
-suite() -> [{timetrap, {seconds, 90}}].
+suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
