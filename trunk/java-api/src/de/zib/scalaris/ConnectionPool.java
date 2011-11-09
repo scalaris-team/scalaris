@@ -89,7 +89,7 @@ public class ConnectionPool {
      *
      * @param timeout
      *            number of milliseconds to wait at most for a valid connection
-     *            to appear
+     *            to appear (<tt>0</tt> to wait forever)
      *
      * @return a connection to Scalaris or <tt>null</tt> if the timeout has been
      *         hit
@@ -122,7 +122,7 @@ public class ConnectionPool {
     public synchronized void releaseConnection(final Connection conn) {
         availableConns.add(conn);
         --checkedOut;
-        notifyAll();
+        notify();
     }
 
     /**
