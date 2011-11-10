@@ -32,7 +32,7 @@
          is_merkle_tree/1,
          get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_bucket_size/1, get_branch_factor/1,
-         store_to_DOT/1]).
+         store_to_DOT/2]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
@@ -41,6 +41,14 @@
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
+
+-define(IIF(C, A, B), case C of
+                          true -> A;
+                          _ -> B
+                      end).
+
+-define(DOT_SHORTNAME_ENABLED, true).
+-define(DOT_SHORTNAME(X), ?IIF(?DOT_SHORTNAME_ENABLED, b, X)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
@@ -273,14 +281,15 @@ node_size({_, C, _, _, _}) ->
 % @doc Returns a tuple with number of inner nodes and leaf nodes.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
-    size_detail_node(Root, {0, 0}).
+    size_detail_node([Root], {0, 0}).
 
--spec size_detail_node(mt_node(), mt_size()) -> mt_size().
-size_detail_node({_, _, _, _, []}, {Inner, Leafs}) ->
-    {Inner, Leafs + 1};
-size_detail_node({_, _, _, _, Childs}, {Inner, Leafs}) ->
-    lists:foldl(fun(Node, {I, L}) -> size_detail_node(Node, {I, L}) end, 
-                {Inner + 1, Leafs}, Childs).
+-spec size_detail_node([mt_node()], mt_size()) -> mt_size().
+size_detail_node([], Result) -> 
+    Result;
+size_detail_node([{_, _, _, _, []} | R], {Inner, Leafs}) ->
+    size_detail_node(R, {Inner, Leafs+1});
+size_detail_node([{_, _, _, _, Childs} | R], {Inner, Leafs}) ->
+    size_detail_node(lists:append(Childs, R), {Inner+1, Leafs}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -312,18 +321,19 @@ next([]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
--spec store_to_DOT(merkle_tree()) -> ok.
-store_to_DOT(MerkleTree) ->
-    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree) end),
+-spec store_to_DOT(merkle_tree(), [char()]) -> ok.
+store_to_DOT(MerkleTree, FileName) ->
+    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree, FileName) end),
     ok.
 
-store_to_DOT_p({merkle_tree, Conf, Root}) ->
-    case file:open("../merkle_tree-graph.dot", [write]) of
+store_to_DOT_p({merkle_tree, Conf, Root}, FileName) ->
+    case file:open("../" ++ FileName ++ ".dot", [write]) of
         {ok, Fileid} ->
             io:fwrite(Fileid, "digraph merkle_tree { ~n", []),
             io:fwrite(Fileid, "    style=filled;~n", []),
             store_node_to_DOT(Root, Fileid, 1, 2, Conf),
             io:fwrite(Fileid, "} ~n", []),
+            _ = file:truncate(Fileid),
             _ = file:close(Fileid),
             ok;
         {_, _} ->
@@ -334,7 +344,9 @@ store_to_DOT_p({merkle_tree, Conf, Root}) ->
 store_node_to_DOT({_, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s ; ~p/~p\", shape=box]~n", 
-              [MyId, erlang:atom_to_list(LBr), LKey, RKey, erlang:atom_to_list(RBr), C, BuckSize]),
+              [MyId, erlang:atom_to_list(LBr), 
+               ?DOT_SHORTNAME(LKey), ?DOT_SHORTNAME(RKey), 
+               erlang:atom_to_list(RBr), C, BuckSize]),
     NextFreeId;
 store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
     io:fwrite(Fileid, "    ~p -> { ~p", [MyId, NextFreeId]),
@@ -347,8 +359,10 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
                                          {NodeId + 1 , store_node_to_DOT(Node, Fileid, NodeId, NextFree, TConf)}
                                  end, {NextFreeId, NNFreeId}, Childs),
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
-    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]", 
-              [MyId, erlang:atom_to_list(LBr), LKey, RKey, erlang:atom_to_list(RBr)]),
+    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]~n", 
+              [MyId, erlang:atom_to_list(LBr), 
+               ?DOT_SHORTNAME(LKey), ?DOT_SHORTNAME(RKey), 
+               erlang:atom_to_list(RBr)]),
     NNNFreeId.
 
 

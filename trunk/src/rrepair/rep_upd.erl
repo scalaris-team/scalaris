@@ -38,8 +38,8 @@
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE_RECON(X,Y), ok).
 -define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE_RESOLVE(X,Y), ok).
-%-define(TRACE_RESOLV(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RESOLVE(X,Y), ok).
+-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -72,7 +72,7 @@
     {recon_forked} | 
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
-        Master::boolean(), Stats::rep_upd_recon:ru_recon_stats()} |
+        Master::boolean(), Stats::ru_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
         Stats::rep_upd_resolve:ru_resolve_stats()}.
 
@@ -129,16 +129,18 @@ on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
     State#rep_upd_state{ open_recon = Recon + 1 };
 
 on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
+    OpenRecon = State#rep_upd_state.open_recon - 1,
     Master andalso
-        ?TRACE_RECON("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p", 
-               [Round, Sender, Master, ru_recon_stats:print(Stats)]),
-    State#rep_upd_state{ open_recon = State#rep_upd_state.open_recon - 1 };
+        ?TRACE_RECON("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
+               [Round, Sender, Master, ru_recon_stats:print(Stats), OpenRecon]),
+    State#rep_upd_state{ open_recon = OpenRecon };
 
 on({resolve_progress_report, Sender, Round, Stats}, State) ->
+    OpenResolve = State#rep_upd_state.open_resolve - 1,
     ?TRACE_RESOLVE("RESOLVE OK - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
            [Round, Sender, rep_upd_resolve:print_resolve_stats(Stats),
-            State#rep_upd_state.open_recon, State#rep_upd_state.open_resolve]),    
-    State#rep_upd_state{ open_resolve = State#rep_upd_state.open_resolve - 1 };
+            State#rep_upd_state.open_recon, OpenResolve]),    
+    State#rep_upd_state{ open_resolve = OpenResolve };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Web Debug Message handling

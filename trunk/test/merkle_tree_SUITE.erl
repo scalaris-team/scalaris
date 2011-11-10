@@ -29,12 +29,13 @@
 -include("unittest.hrl").
 
 all() -> [
-          insert_bucketing,
-          treeHash,
-          branchTest,          
-          storeToDot,
-          sizeTest
-          %tester_iter
+          %performance,
+          tester_branch_bucket,
+          tester_size,
+          tester_store_to_dot,          
+          tester_tree_hash,
+          tester_insert,
+          tester_iter          
          ].
 
 suite() ->
@@ -49,80 +50,156 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-insert_bucketing(_) ->    
-    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
-    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
-                       [{1, DefBucketSize - 1}]),
-    ?equals(merkle_tree:size(Tree1), 1),
-    Tree2 = add_to_tree(1000 - DefBucketSize + 1, 1000, Tree1),
-    ?equals(merkle_tree:size(Tree2), 3),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc measures performance of merkle_tree operations
+performance(_) ->
+    % PARAMETER
+    ExecTimes = 100,
+    ToAdd = 2000,
+    
+    %I = intervals:new('[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'),    
+    I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
+    InitTree = merkle_tree:new(I),
+    TestTree = build_tree(InitTree, ToAdd),
+    {Inner, Leafs} = merkle_tree:size_detail(TestTree),
+    
+    %measure build times
+    BT = measure_util:time_avg(fun() -> build_tree(InitTree, ToAdd) end,
+                               [], ExecTimes, false),
+        
+    %measure iteration time
+    IT = measure_util:time_avg(fun() -> 
+                                       count_iter(merkle_tree:iterator(TestTree), 0) 
+                               end, 
+                               [], ExecTimes, false),    
+    
+    ct:pal("
+            Merkle_Tree Performance
+            ------------------------
+            PARAMETER: AddedItems=~p ; ExecTimes=~p
+            TreeSize: InnerNodes=~p ; Leafs=~p,
+            BuildTime (ms)= ~p
+            IterationTime (us)= ~p", 
+           [ToAdd, ExecTimes, Inner, Leafs,
+            measure_util:print_result(BT, ms), 
+            measure_util:print_result(IT, us)]),
     ok.
 
-treeHash(_) ->
-    Interval = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
-    Tree1 = build_tree(Interval, [{450, 500}, {1, 63}]),
-    Tree2 = build_tree(Interval, [{450, 500}, {1, 63}]),
-    Tree3 = build_tree(Interval, [{451, 500}, {1, 63}]),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Tests branching and bucketing
+-spec prop_branch_bucket(intervals:key(), intervals:key(), 
+                         BranchFactor::2..16, BucketSize::24..512) -> true.
+prop_branch_bucket(L, L, _, _) -> true;
+prop_branch_bucket(L, R, Branch, Bucket) ->
+    Tree = merkle_tree:new(intervals:new('[', L, R, ']'),
+                           [{branch_factor, Branch},
+                            {bucket_size, Bucket}]),    
+    Tree1 = build_tree(Tree, Bucket),
+    Tree2 = build_tree(Tree, 2 * Bucket),
+    %ct:pal("Branch=~p ; Bucket=~p ; Tree1Size=~p ; Tree2Size=~p", 
+    %       [Branch, Bucket, merkle_tree:size(Tree1), merkle_tree:size(Tree2)]),
+    ?equals(merkle_tree:size(Tree1), 1),    
+    ?equals(merkle_tree:size(Tree2), 1 + Branch),    
+    true.
+
+tester_branch_bucket(_) ->
+    tester:test(?MODULE, prop_branch_bucket, 4, 10).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Tests hash generation
+-spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
+prop_tree_hash(L, L, _) ->
+    true;
+prop_tree_hash(L, R, ToAdd) ->
+    %ct:pal("prop_tree_hash params: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
+    I = intervals:new('[', L, R, ']'),
+    Tree1 = build_tree(merkle_tree:new(I), ToAdd),
+    Tree2 = build_tree(merkle_tree:new(I), ToAdd),
+    Tree3 = build_tree(merkle_tree:new(I), ToAdd + 1),    
     RootHash1 = merkle_tree:get_hash(Tree1),
     RootHash2 = merkle_tree:get_hash(Tree2),
-    RootHash3 = merkle_tree:get_hash(Tree3),
-    ct:pal("Hash1=[~p]~nHash2=[~p]~nHash3=[~p]", [RootHash1, RootHash2, RootHash3]),
+    RootHash3 = merkle_tree:get_hash(Tree3),    
+    %ct:pal("Hash1=[~p]~nHash2=[~p]~nHash3=[~p]", [RootHash1, RootHash2, RootHash3]),
     ?equals(RootHash1, RootHash2),
     ?assert(RootHash1 > 0),
     ?assert(RootHash3 > 0),
     ?assert(RootHash3 =/= RootHash1),
-    ok.
+    true.
 
-branchTest(_) ->
-    Interval = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100), ']'),
-    Tree1 = build_tree(Interval, {3, 5}, [{1, 5}, {50, 55}]),
-    Tree2 = build_tree(Interval, {3, 10}, [{1, 10}, {50, 60}]),
-    Tree3 = build_tree(Interval, {10, 10}, [{1, 10}, {11, 15}, {40, 49}, {90, 99}]),
-    ?equals(merkle_tree:size(Tree1), 4),
-    ?equals(merkle_tree:size(Tree2), 4),
-    ?equals(merkle_tree:size(Tree3), 11),
-    ok.
+tester_tree_hash(_) ->
+    tester:test(?MODULE, prop_tree_hash, 3, 10).
 
-sizeTest(_) ->
-    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
-    Tree1 = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
-                       [{1, DefBucketSize - 1}]),
-    Tree2 = add_to_tree(1000 - 2 * DefBucketSize, 1000, Tree1),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree2),
-    Size = merkle_tree:size(Tree2),
-    ct:pal("Size=~p ; InnerCount=~p ; Leafs=~p", [Size, Inner, Leafs]),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_insert(intervals:key(), intervals:key(), 1..1000) -> true.
+prop_insert(L, L, _) -> true;
+prop_insert(L, R, ToAdd) ->
+    I = intervals:new('[', L, R, ']'),
+    Tree1 = build_tree(merkle_tree:new(I), ToAdd),
+    Tree2 = build_tree(merkle_tree:new(I), ToAdd),
+    Tree3 = build_tree(merkle_tree:new(I), 2 * ToAdd),
+    Size1 = merkle_tree:size(Tree1),
+    Size2 = merkle_tree:size(Tree2),
+    Size3 = merkle_tree:size(Tree3),
+    %ct:pal("ToAdd=~p ; Tree1Size=~p ; Tree2Size=~p ; Tree3Size=~p", [ToAdd, Size1, Size2,Size3]),
+    ?equals(Size1, Size2),
+    ?assert(Size1 < Size3),
+    true.
+
+tester_insert(_) ->
+    tester:test(?MODULE, prop_insert, 3, 2).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_size(intervals:key(), intervals:key(), 1..100) -> true.
+prop_size(L, L, _) ->
+    true;
+prop_size(L, R, ToAdd) ->
+    I = intervals:new('[', L, R, ']'),
+    Tree = build_tree(merkle_tree:new(I), ToAdd),
+    Size = merkle_tree:size(Tree),
+    {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ?equals(Size, Inner + Leafs),
-    ok.
+    true.
+    
+tester_size(_) ->
+  tester:test(?MODULE, prop_size, 3, 10).
 
--spec prop_iter(intervals:key(), intervals:key(), 5000) -> true.
-prop_iter(X, Y, Items) ->
-    I = intervals:new('[', X, Y, ']'),
-    ToInsert = if 
-                   erlang:abs(Y - X) < Items -> erlang:abs(Y - X) - 10;
-                   true -> Items
-               end,
-    {_, LKey, _RKey, _} = intervals:get_bounds(I),
-    {BuildT, Tree} = util:tc(fun() -> add_to_tree(LKey + 1, LKey + ToInsert, merkle_tree:new(I)) end),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_iter(intervals:key(), intervals:key(), 1000..4000) -> true.
+prop_iter(L, L, _) -> true;
+prop_iter(L, R, ToAdd) ->
+    I = intervals:new('[', L, R, ']'),
+    Tree = build_tree(merkle_tree:new(I), ToAdd),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     {IterateT, Count} = util:tc(fun() -> count_iter(merkle_tree:iterator(Tree), 0) end),
     ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n"
-           "Tree: BuildingTime=~p s ; IterationTime=~p s", 
-           [X, Y, Items, BuildT / (1000*1000), IterateT / (1000*1000)]),
+           "Tree: IterationTime=~p s", 
+           [L, R, ToAdd, IterateT / (1000*1000)]),
     ?equals(Count, Inner + Leafs),
     true.
 
 tester_iter(_Config) ->
     %prop_iter(0, 10000001, 10000).
-    tester:test(?MODULE, prop_iter, 3, 1).
+    tester:test(?MODULE, prop_iter, 3, 5).
 
-storeToDot(_) ->
-    DefBucketSize = merkle_tree:get_bucket_size(merkle_tree:empty()),
-    Tree = build_tree(intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(1000), ']'),
-                       [{1, 3*DefBucketSize - 1}, {1000 - 4*DefBucketSize + 1, 1000}]),
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_store_to_dot(intervals:key(), intervals:key(), 1..1000) -> true.
+prop_store_to_dot(L, L, _) -> true;
+prop_store_to_dot(L, R, ToAdd) ->
+    Tree = build_tree(merkle_tree:new(intervals:new('[', L, R, ']')), ToAdd),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    ct:pal("Tree Size - Inner=~p ; Leafs=~p", [Inner, Leafs]),
-    merkle_tree:store_to_DOT(Tree),
-    ok.
+    ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p", [ToAdd, Inner, Leafs]),
+    merkle_tree:store_to_DOT(Tree, "StoreToDotTest"),
+    true.
+
+tester_store_to_dot(_) ->
+  tester:test(?MODULE, prop_store_to_dot, 3, 2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper
@@ -136,26 +213,31 @@ count_iter(Iter, Count) ->
         {_, Iter2} -> count_iter(Iter2, Count + 1)
     end.
 
--spec build_tree(intervals:interval(), [{Min::pos_integer(), Max::pos_integer()}]) 
-        -> merkle_tree:merkle_tree().
-build_tree(Interval, KeyIntervalList) ->
-    build_tree(Interval, {}, KeyIntervalList).
+-spec build_tree(Tree, AddCount) -> MerkleTree when
+    is_subtype(Tree,        merkle_tree:merkle_tree()),
+    is_subtype(AddCount,    pos_integer()),
+    is_subtype(MerkleTree,  merkle_tree:merkle_tree()).
+build_tree(Tree, AddCount) ->
+    I = merkle_tree:get_interval(Tree),
+    build_tree_p(Tree, [{I, AddCount}]).
 
-build_tree(Interval, Config, KeyIntervalList) ->
-    Tree1 = lists:foldl(fun({From, To}, Tree) -> 
-                                add_to_tree(From, To, Tree)
-                        end,
-                        case size(Config) of                            
-                            2 ->
-                                {Branch, Bucket} = Config,
-                                merkle_tree:new(Interval, 
-                                                [{branch_factor, Branch}, {bucket_size, Bucket}]);
-                            _ -> merkle_tree:new(Interval)
-                        end,
-                        KeyIntervalList),
-    merkle_tree:gen_hash(Tree1).
+build_tree_p(Tree, []) ->
+    merkle_tree:gen_hash(Tree);
+build_tree_p(Tree, [{I, Add} | R]) ->    
+    case Add > 100 of
+        true -> 
+            [I1, I2] = intervals:split(I, 2),
+            build_tree_p(Tree, [{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R]);
+        false -> 
+            {_, IL, IR, _} = intervals:get_bounds(I),
+            ToAdd = util:for_to_ex(1, Add, 
+                                   fun(Index) -> 
+                                           ?RT:get_split_key(IL, IR, {Index, Add}) 
+                                   end),
+            NTree = lists:foldl(fun(Key, AccTree) -> 
+                                        merkle_tree:insert(Key, Key, AccTree) 
+                                end,
+                                Tree, ToAdd),
+            build_tree_p(NTree, R)                                  
+    end.
 
-add_to_tree(To, To, Tree) ->
-    Tree;
-add_to_tree(From, To, Tree) ->
-    add_to_tree(From + 1, To, merkle_tree:insert(rt_SUITE:number_to_key(From), someVal, Tree)).

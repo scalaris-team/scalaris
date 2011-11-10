@@ -632,7 +632,7 @@ split(I, 1) -> [I];
 split(I, Parts) ->
     case is_continuous(I) of
         true -> lists:reverse(split2(intervals:get_bounds(I), Parts, []));
-        false -> erlang:throw('interval is not continuouss')
+        false -> erlang:throw('interval is not continuous')
     end.
 
 -spec split2({left_bracket(), key(), key(), right_bracket()}, pos_integer(), Acc::[interval()]) -> [interval()].
