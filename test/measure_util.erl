@@ -24,14 +24,19 @@
 
 -module(measure_util).
 
--export([time_avg/4]).
+
+-export([time_avg/4, print_result/2]).
+
+-type measure_result() :: { Min::non_neg_integer(), 
+                            Max::non_neg_integer(),
+                            Med::non_neg_integer(), 
+                            Avg::non_neg_integer()
+                           }.
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
 %      Result = {MinTime, MaxTime, MedianTime, AverageTime}
--spec time_avg(fun(), [term()], pos_integer(), boolean())
-        -> {Min::non_neg_integer(), Max::non_neg_integer(),
-            Med::non_neg_integer(), Avg::non_neg_integer()}.
+-spec time_avg(fun(), [term()], pos_integer(), boolean()) -> measure_result().
 time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     L = util:s_repeatAndCollect(
           fun() -> {Time, _} = util:tc(Fun, Args), Time end,
@@ -46,3 +51,20 @@ time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     Med = lists:nth(((Length + 1) div 2), lists:sort(Times)),
     Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg}.
+
+-spec print_result(measure_result(), us|ms|s) -> [{atom(), any()}].
+print_result({Min, Max, Med, Avg}, us) ->
+    [{min, Min},
+     {max, Max},
+     {med, Med},
+     {avg, Avg}];
+print_result({Min, Max, Med, Avg}, ms) ->
+    [{min, Min / 1000},
+     {max, Max / 1000},
+     {med, Med / 1000},
+     {avg, Avg / 1000}];
+print_result({Min, Max, Med, Avg}, s) ->
+    [{min, Min / 100000},
+     {max, Max / 100000},
+     {med, Med / 100000},
+     {avg, Avg / 100000}].

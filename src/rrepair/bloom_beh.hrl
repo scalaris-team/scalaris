@@ -109,4 +109,4 @@ calc_FPR(M, N, K) ->
 -spec is_element_(bloom_filter_t(), key()) -> boolean().
 -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
 -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
--spec print_(bloom_filter_t()) -> ok.
+-spec print_(bloom_filter_t()) -> [{atom(), any()}].
