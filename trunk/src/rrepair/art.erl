@@ -1,5 +1,5 @@
 % @copyright 2011 Zuse Institute Berlin
-
+%
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,7 +11,7 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-
+%
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Approximate Reconciliation Tree (ART) implementation
 %%         Represents a packed merkle tree.
@@ -26,8 +26,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/0, new/1, 
-         get_interval/1, get_correction_factor/1,
+-export([new/0, new/1, new/2,
+         get_interval/1, get_correction_factor/1, get_config/1,
          lookup/2]).
 
 -ifdef(with_export_type_support).
@@ -46,11 +46,10 @@
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--record(art_config,
-        {
-         correction_factor = 1 :: non_neg_integer()
-         }).
--type art_config() :: #art_config{}.
+-type art_config_param() :: {correction_factor, non_neg_integer()} |
+                            {inner_bf_fpr,      float()} |
+                            {leaf_bf_fpr,       float()}.
+-type art_config()       :: [art_config_param()].
 
 -type art() :: { art,
                  Config     :: art_config(), 
@@ -61,18 +60,32 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Returns default art configuration.
+-spec default_art_config() -> art_config().
+default_art_config() ->
+    [{correction_factor, 1},
+     {inner_bf_fpr, 0.01},
+     {leaf_bf_fpr, 0.1}].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec new() -> art().
-new() -> {art, #art_config{}, intervals:empty(), empty, empty}.
+new() -> {art, default_art_config(), intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
 new(Tree) ->
+    new(Tree, default_art_config()).
+
+-spec new(merkle_tree:merkle_tree(), art_config()) -> art().
+new(Tree, _Config) ->
+    Config = merge_prop_lists(default_art_config(), _Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
-    InnerBF = ?REP_BLOOM:new(InnerCount, 0.01),
-    LeafBF = ?REP_BLOOM:new(LeafCount, 0.1),
+    InnerBF = ?REP_BLOOM:new(InnerCount, util:proplist_get_value(inner_bf_fpr, Config)),
+    LeafBF = ?REP_BLOOM:new(LeafCount, util:proplist_get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
     ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), 
                                  ?REP_BLOOM:print(LBF)]),    
-    {art, #art_config{}, merkle_tree:get_interval(Tree), IBF, LBF}.
+    {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -81,12 +94,24 @@ new(Tree) ->
 get_interval({art, _, I, _, _}) -> I.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+-spec get_correction_factor(art()) -> non_neg_integer().
+get_correction_factor({art, Config, _, _, _}) ->
+    util:proplist_get_value(correction_factor, Config).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_config(art()) -> art_config().
+get_config({art, Config, _, _, _}) ->
+    Config.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec lookup(merkle_tree:mt_node(), art()) -> boolean().
 lookup(Node, Art) ->
     %?TRACE("MT=~p~nAT=~p", [merkle_tree:get_interval(Node), get_interval(Art)]),
     lookup_cf([{Node, get_correction_factor(Art)}], Art).
-    %case intervals:is_subset(get_interval(Art), merkle_tree:get_interval(Node)) of        
+    %case get_interval(Art) =:= merkle_tree:get_interval(Node) of        
     %    true -> lookup_cf([{Node, get_correction_factor(Art)}], Art);
     %    false -> false
     %end.
@@ -123,12 +148,6 @@ lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     end.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
--spec get_correction_factor(art()) -> non_neg_integer().
-get_correction_factor({art, Config, _, _, _}) ->
-    Config#art_config.correction_factor.
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -150,3 +169,9 @@ fill_bloom(Iter, IBF, LBF) ->
                 end,
             fill_bloom(Iter2, IBF2, LBF2)
     end.
+
+merge_prop_lists(DefList, ListB) ->
+    lists:foldl(fun({Key, Val}, Acc) ->                         
+                        [{Key, util:proplist_get_value(Key, ListB, Val)} | Acc] 
+                end, [], DefList).
+    
