@@ -74,6 +74,7 @@ We build rpm and deb packages using checkouts from the latest tagged version as 
 || *Distribution* || *Version* || *Download* ||
 || Fedora || 14 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/] ||
 || Fedora || 15 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/] ||
+|| Fedora || 16 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/] ||
 || Mandriva || 2010 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010/] ||
 || Mandriva || 2010.1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010.1/] ||
 || openSUSE || 11.3 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris-svn.ymp 1-Click Install (unstable)] ||
