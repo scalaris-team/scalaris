@@ -78,6 +78,14 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+end_per_testcase(_TestCase, _Config) ->
+    unittest_helper:stop_ring(),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 get_rrepair_config_parameter() ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
@@ -121,10 +129,6 @@ get_art_RepUpd_config() ->
      {rep_update_max_items, 100000},
      {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, true}].
-
-end_per_testcase(_TestCase, _Config) ->
-    unittest_helper:stop_ring(),
-    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Test Functions

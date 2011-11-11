@@ -42,13 +42,8 @@
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
--define(IIF(C, A, B), case C of
-                          true -> A;
-                          _ -> B
-                      end).
-
--define(DOT_SHORTNAME_ENABLED, true).
--define(DOT_SHORTNAME(X), ?IIF(?DOT_SHORTNAME_ENABLED, b, X)).
+%-define(DOT_SHORTNAME(X), X).
+-define(DOT_SHORTNAME(X), b).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
@@ -342,10 +337,10 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName) ->
 
 -spec store_node_to_DOT(mt_node(), pid(), pos_integer(), pos_integer(), mt_config()) -> pos_integer().
 store_node_to_DOT({_, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
-    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
     io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s ; ~p/~p\", shape=box]~n", 
               [MyId, erlang:atom_to_list(LBr), 
-               ?DOT_SHORTNAME(LKey), ?DOT_SHORTNAME(RKey), 
+               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey), 
                erlang:atom_to_list(RBr), C, BuckSize]),
     NextFreeId;
 store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
@@ -358,10 +353,10 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
     {_, NNNFreeId} = lists:foldl(fun(Node, {NodeId, NextFree}) -> 
                                          {NodeId + 1 , store_node_to_DOT(Node, Fileid, NodeId, NextFree, TConf)}
                                  end, {NextFreeId, NNFreeId}, Childs),
-    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
     io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]~n", 
               [MyId, erlang:atom_to_list(LBr), 
-               ?DOT_SHORTNAME(LKey), ?DOT_SHORTNAME(RKey), 
+               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey), 
                erlang:atom_to_list(RBr)]),
     NNNFreeId.
 

@@ -60,7 +60,7 @@
 -export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
          p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
          parallel_run/4]).
--export([proplist_get_value/2]).
+-export([proplist_get_value/2, proplist_get_value/3]).
 
 -export([empty/1]).
 
@@ -866,6 +866,15 @@ proplist_get_value(Key, List) ->
         _ -> undefined
     end.
 
+% @doc If List contains a key-value pair named key, the value will be returned
+%      otherwise default.
+-spec proplist_get_value(atom(), [{atom(), any()}], any()) -> any().
+proplist_get_value(Key, List, Default) ->
+    case proplist_get_value(Key, List) of 
+        undefined -> Default;
+        V -> V
+    end.
+    
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
 empty(_) -> "".

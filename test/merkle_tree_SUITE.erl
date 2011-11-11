@@ -111,8 +111,7 @@ tester_branch_bucket(_) ->
 
 % @doc Tests hash generation
 -spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
-prop_tree_hash(L, L, _) ->
-    true;
+prop_tree_hash(L, L, _) -> true;
 prop_tree_hash(L, R, ToAdd) ->
     %ct:pal("prop_tree_hash params: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
     I = intervals:new('[', L, R, ']'),
@@ -155,8 +154,7 @@ tester_insert(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_size(intervals:key(), intervals:key(), 1..100) -> true.
-prop_size(L, L, _) ->
-    true;
+prop_size(L, L, _) -> true;
 prop_size(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
     Tree = build_tree(merkle_tree:new(I), ToAdd),
