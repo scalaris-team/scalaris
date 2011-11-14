@@ -15,8 +15,8 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 
 /**
  * Generic bean for lists of pages, i.e. page titles.
@@ -51,7 +51,7 @@ public class WikiPageListBean extends WikiPageBeanBase {
          */
         PageSearchForm
     }
-    private List<String> pages = new LinkedList<String>();
+    private Collection<String> pages = new LinkedList<String>();
 
     private String fromPage = "";
     private String toPage = "";
@@ -70,14 +70,14 @@ public class WikiPageListBean extends WikiPageBeanBase {
     /**
      * @return the subCategories
      */
-    public List<String> getPages() {
+    public Collection<String> getPages() {
         return pages;
     }
 
     /**
      * @param pages the pages to set
      */
-    public void setPages(List<String> pages) {
+    public void setPages(Collection<String> pages) {
         this.pages = pages;
     }
 

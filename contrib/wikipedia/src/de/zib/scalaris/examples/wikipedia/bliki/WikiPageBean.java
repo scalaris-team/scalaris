@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -45,8 +46,8 @@ public class WikiPageBean extends WikiPageBeanBase {
     
     private List<ShortRevision> revisions = new LinkedList<ShortRevision>();
     
-    private List<String> subCategories = new LinkedList<String>();
-    private List<String> categoryPages = new LinkedList<String>();
+    private Collection<String> subCategories = new LinkedList<String>();
+    private Collection<String> categoryPages = new LinkedList<String>();
     
     /**
      * returns whether the originally requested page is available
@@ -115,28 +116,28 @@ public class WikiPageBean extends WikiPageBeanBase {
     /**
      * @return the subCategories
      */
-    public List<String> getSubCategories() {
+    public Collection<String> getSubCategories() {
         return subCategories;
     }
 
     /**
      * @param subCategories the subCategories to set
      */
-    public void setSubCategories(List<String> subCategories) {
+    public void setSubCategories(Collection<String> subCategories) {
         this.subCategories = subCategories;
     }
 
     /**
      * @return the categoryPages
      */
-    public List<String> getCategoryPages() {
+    public Collection<String> getCategoryPages() {
         return categoryPages;
     }
 
     /**
      * @param categoryPages the categoryPages to set
      */
-    public void setCategoryPages(List<String> categoryPages) {
+    public void setCategoryPages(Collection<String> categoryPages) {
         this.categoryPages = categoryPages;
     }
 
