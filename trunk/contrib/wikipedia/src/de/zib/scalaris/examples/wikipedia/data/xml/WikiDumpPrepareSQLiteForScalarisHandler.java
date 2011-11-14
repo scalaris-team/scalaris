@@ -238,12 +238,10 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         sqliteWorker.stopWhenQueueEmpty = true;
         addSQLiteJob(new SQLiteNoOpJob());
         // wait for worker to close the DB
-        while (sqliteWorker.initialised) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        try {
+            sqliteWorker.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
         importEnd();
     }
