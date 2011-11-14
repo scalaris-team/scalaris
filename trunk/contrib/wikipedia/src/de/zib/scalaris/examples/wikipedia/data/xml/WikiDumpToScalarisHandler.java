@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -231,13 +232,13 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         scalaris_key = ScalarisDataHandler.getPageListKey();
         worker = new MyScalarisAddToPageListRunnable(scalaris_key, newPages, scalaris_tx, ScalarisDataHandler.getPageCountKey());
         executor.execute(worker);
-        newPages = new LinkedList<String>();
+        newPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
         
         // list of articles:
         scalaris_key = ScalarisDataHandler.getArticleListKey();
         worker = new MyScalarisAddToPageListRunnable(scalaris_key, newArticles, scalaris_tx, ScalarisDataHandler.getArticleCountKey());
         executor.execute(worker);
-        newArticles = new LinkedList<String>();
+        newArticles = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
         
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {

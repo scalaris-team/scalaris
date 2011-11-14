@@ -22,9 +22,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -309,8 +309,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     protected void updatePageLists() {
         addSQLiteJob(new SQLiteUpdatePageListsJob(newPages, newArticles,
                 newCategories, newTemplates, newBackLinks, stRead, stWrite, wikiModel));
-        newPages = new LinkedList<String>();
-        newArticles = new LinkedList<String>();
+        newPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
+        newArticles = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
         newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
         newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
         newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
@@ -434,26 +434,24 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             List<String> pageList;
             try {
                 pageList = readObject(scalaris_key);
+                pageList.addAll(newPages);
             } catch (FileNotFoundException e) {
-                pageList = new LinkedList<String>();
+                pageList = new ArrayList<String>(newPages);
             }
-            pageList.addAll(newPages);
             writeObject(scalaris_key, pageList);
             writeObject(ScalarisDataHandler.getPageCountKey(), pageList.size());
-            newPages = new LinkedList<String>();
             
             // list of articles:
             scalaris_key = ScalarisDataHandler.getArticleListKey();
             List<String> articleList;
             try {
                 articleList = readObject(scalaris_key);
+                articleList.addAll(newArticles);
             } catch (FileNotFoundException e) {
-                articleList = new LinkedList<String>();
+                articleList = new ArrayList<String>(newArticles);
             }
-            articleList.addAll(newArticles);
             writeObject(scalaris_key, articleList);
             writeObject(ScalarisDataHandler.getArticleCountKey(), articleList.size());
-            newArticles = new LinkedList<String>();
             
             // list of pages in each category:
             for (Entry<String, List<String>> category: newCategories.entrySet()) {
@@ -461,15 +459,14 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 List<String> catPageList;
                 try {
                     catPageList = readObject(scalaris_key);
+                    catPageList.addAll(category.getValue());
                 } catch (FileNotFoundException e) {
-                    catPageList = new LinkedList<String>();
+                    catPageList = new ArrayList<String>(category.getValue());
                 }
-                catPageList.addAll(category.getValue());
                 writeObject(scalaris_key, catPageList);
                 scalaris_key = ScalarisDataHandler.getCatPageCountKey(category.getKey(), wikiModel.getNamespace());
                 writeObject(scalaris_key, catPageList.size());
             }
-            newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
         
             // list of pages a template is used in:
             for (Entry<String, List<String>> template: newTemplates.entrySet()) {
@@ -477,13 +474,12 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 List<String> tplPageList;
                 try {
                     tplPageList = readObject(scalaris_key);
+                    tplPageList.addAll(template.getValue());
                 } catch (FileNotFoundException e) {
-                    tplPageList = new LinkedList<String>();
+                    tplPageList = new ArrayList<String>(template.getValue());
                 }
-                tplPageList.addAll(template.getValue());
                 writeObject(scalaris_key, tplPageList);
             }
-            newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
             
             // list of pages linking to other pages:
             for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
@@ -491,13 +487,12 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 List<String> backLinksPageList;
                 try {
                     backLinksPageList = readObject(scalaris_key);
+                    backLinksPageList.addAll(backlinks.getValue());
                 } catch (FileNotFoundException e) {
-                    backLinksPageList = new LinkedList<String>();
+                    backLinksPageList = new ArrayList<String>(backlinks.getValue());
                 }
-                backLinksPageList.addAll(backlinks.getValue());
                 writeObject(scalaris_key, backLinksPageList);
             }
-            newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
         }
     }
     
