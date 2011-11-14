@@ -23,6 +23,7 @@ import info.bliki.wiki.model.WikiModel;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -440,11 +441,50 @@ public class MyWikiModel extends WikiModel {
      * @return a 2-element array with the namespace (index 0) and the page title
      *         (index 1)
      */
-    public static String[] splitNsTitle(String fullTitle) {
+    public String[] splitNsTitle(String fullTitle) {
+        return splitNsTitle(fullTitle, getNamespace());
+    }
+
+    /**
+     * Splits the given full title into its namespace and page title components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return a 2-element array with the namespace (index 0) and the page title
+     *         (index 1)
+     */
+    public static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject) {
+        return splitNsTitle(fullTitle, nsObject, true);
+    }
+
+    /**
+     * Splits the given full title into its namespace and page title components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * @param onlyValidNs
+     *            whether only valid namespaces should be split off
+     * 
+     * @return a 2-element array with the namespace (index 0) and the page title
+     *         (index 1)
+     */
+    private static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject, boolean onlyValidNs) {
         int colonIndex = fullTitle.indexOf(':');
         if (colonIndex != (-1)) {
-            return new String[] { fullTitle.substring(0, colonIndex),
-                    fullTitle.substring(colonIndex + 1) };
+            String maybeNs = fullTitle.substring(0, colonIndex);
+            if (!onlyValidNs || nsObject.getNumberByName(maybeNs) != null) {
+                // this is a real namespace
+                return new String[] { maybeNs,
+                        fullTitle.substring(colonIndex + 1) };
+            } else {
+                // page belongs to the main namespace and only contains a colon
+                return new String[] { "", fullTitle };
+            }
         }
         return new String[] {"", fullTitle};
     }
@@ -458,11 +498,29 @@ public class MyWikiModel extends WikiModel {
      * @return the namespace part of the title or an empty string if no
      *         namespace
      * 
-     * @see #getTitleName(String)
-     * @see #splitNsTitle(String)
+     * @see #getTitleName(String, MyNamespace)
+     * @see #splitNsTitle(String, MyNamespace)
      */
-    public static String getNamespace(String title) {
-        return splitNsTitle(title)[0];
+    public String getNamespace(String title) {
+        return getNamespace(title, getNamespace());
+    }
+
+    /**
+     * Returns the namespace of a given page title.
+     * 
+     * @param title
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the namespace part of the title or an empty string if no
+     *         namespace
+     * 
+     * @see #getTitleName(String, MyNamespace)
+     * @see #splitNsTitle(String, MyNamespace)
+     */
+    public static String getNamespace(String title, final MyNamespace nsObject) {
+        return splitNsTitle(title, nsObject)[0];
     }
 
     /**
@@ -473,11 +531,28 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the title part of the page title
      * 
-     * @see #getNamespace(String)
-     * @see #splitNsTitle(String)
+     * @see #getNamespace(String, MyNamespace)
+     * @see #splitNsTitle(String, MyNamespace)
      */
-    public static String getTitleName(String title) {
-        return splitNsTitle(title)[1];
+    public String getTitleName(String title) {
+        return getTitleName(title, getNamespace());
+    }
+
+    /**
+     * Returns the name of a given page title without its namespace.
+     * 
+     * @param title
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the title part of the page title
+     * 
+     * @see #getNamespace(String, MyNamespace)
+     * @see #splitNsTitle(String, MyNamespace)
+     */
+    public static String getTitleName(String title, final MyNamespace nsObject) {
+        return splitNsTitle(title, nsObject)[1];
     }
 
     /**
@@ -490,8 +565,24 @@ public class MyWikiModel extends WikiModel {
      * @return a 3-element array with the namespace (index 0), the base page
      *         (index 1) and the sub page (index 2)
      */
-    public static String[] splitNsBaseSubPage(String fullTitle) {
-        String[] split1 = splitNsTitle(fullTitle);
+    public String[] splitNsBaseSubPage(String fullTitle) {
+        return splitNsBaseSubPage(fullTitle, getNamespace());
+    }
+
+    /**
+     * Splits the given full title into its namespace, base and sub page
+     * components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return a 3-element array with the namespace (index 0), the base page
+     *         (index 1) and the sub page (index 2)
+     */
+    public static String[] splitNsBaseSubPage(String fullTitle, final MyNamespace nsObject) {
+        String[] split1 = splitNsTitle(fullTitle, nsObject);
         String namespace = split1[0];
         String title = split1[1];
         int colonIndex = title.lastIndexOf('/');
@@ -618,9 +709,143 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page title
      */
-    public static String normalisePageTitle(final String title) {
-        String[] parts = splitNsTitle(title);
+    public String normalisePageTitle(final String title) {
+        return normalisePageTitle(title, getNamespace());
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param title
+     *            the original page title
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the normalised page title
+     */
+    public static String normalisePageTitle(final String title, final MyNamespace nsObject) {
+        String[] parts = splitNsTitle(title, nsObject);
         return createFullPageName(normaliseName(parts[0]), normaliseName(parts[1]));
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param <T>
+     * 
+     * @param titles
+     *            the original page titles
+     * @param normalisedTitles
+     *            the container to write the normalised titles to
+     * 
+     * @return the normalised page titles
+     */
+    public <T extends Collection<String>> T normalisePageTitles(final T titles, T normalisedTitles) {
+        return MyWikiModel.<T>normalisePageTitles(titles, getNamespace(), normalisedTitles);
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param <T>
+     * 
+     * @param titles
+     *            the original page titles
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * @param normalisedTitles
+     *            the container to write the normalised titles to
+     * 
+     * @return the normalised page titles
+     */
+    public static <T extends Collection<String>> T normalisePageTitles(final Collection<String> titles, final MyNamespace nsObject, T normalisedTitles) {
+        for (String title: titles) {
+            normalisedTitles.add(MyWikiModel.normalisePageTitle(title, nsObject));
+        }
+        return normalisedTitles;
+    }
+    
+    /**
+     * De-normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param title
+     *            the normalised page title
+     * 
+     * @return the original page title
+     */
+    public String denormalisePageTitle(final String title) {
+        return denormalisePageTitle(title, getNamespace());
+    }
+    
+    /**
+     * De-normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param title
+     *            the normalised page title
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the original page title
+     */
+    public static String denormalisePageTitle(final String title, final MyNamespace nsObject) {
+        String[] parts = splitNsTitle(title, nsObject, false);
+        return createFullPageName(
+                nsObject.getNamespaceByNumber(Integer.parseInt(parts[0])),
+                normaliseName(parts[1]));
+    }
+    
+    /**
+     * De-normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param <T>
+     * 
+     * @param titles
+     *            the normalised page titles
+     * 
+     * @return the original page title
+     */
+    public <T extends Collection<String>> T denormalisePageTitles(final T titles) {
+        return MyWikiModel.<T>denormalisePageTitles(titles, getNamespace());
+    }
+    
+    /**
+     * De-normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param <T>
+     * 
+     * @param titles
+     *            the normalised page titles
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the original page title
+     */
+    public static <T extends Collection<String>> T denormalisePageTitles(final T titles, final MyNamespace nsObject) {
+        @SuppressWarnings("unchecked")
+        Class<T> clazz = (Class<T>) titles.getClass();
+        T denormalisedTitles;
+        try {
+            denormalisedTitles = clazz.getConstructor(int.class).newInstance(titles.size());
+        } catch (NoSuchMethodException e) {
+            try {
+                denormalisedTitles = clazz.newInstance();
+            } catch (Exception e1) {
+                throw new RuntimeException(e);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        for (String title: titles) {
+            denormalisedTitles.add(MyWikiModel.denormalisePageTitle(title, nsObject));
+        }
+        return denormalisedTitles;
     }
 
     /* (non-Javadoc)

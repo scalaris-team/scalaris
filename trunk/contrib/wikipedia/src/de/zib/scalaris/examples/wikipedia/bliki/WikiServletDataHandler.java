@@ -76,66 +76,88 @@ public interface WikiServletDataHandler<Connection> {
     /**
      * Gets the key to store {@link Revision} objects at.
      * 
-     * @param title the title of the page
-     * @param id    the id of the revision
+     * @param title
+     *            the title of the page
+     * @param id
+     *            the id of the revision
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getRevKey(String title, int id);
+    public String getRevKey(String title, int id, final MyNamespace nsObject);
     
     /**
      * Gets the key to store {@link Page} objects at.
      * 
-     * @param title the title of the page
+     * @param title
+     *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getPageKey(String title);
+    public String getPageKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the list of revisions of a page at.
      * 
-     * @param title the title of the page
+     * @param title
+     *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getRevListKey(String title);
+    public String getRevListKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the list of pages belonging to a category at.
      * 
-     * @param title the category title (including <tt>Category:</tt>)
+     * @param title
+     *            the category title (including <tt>Category:</tt>)
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getCatPageListKey(String title);
+    public String getCatPageListKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the number of pages belonging to a category at.
      * 
-     * @param title the category title (including <tt>Category:</tt>)
+     * @param title
+     *            the category title (including <tt>Category:</tt>)
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getCatPageCountKey(String title);
+    public String getCatPageCountKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the list of pages using a template at.
      * 
-     * @param title the template title (including <tt>Template:</tt>)
+     * @param title
+     *            the template title (including <tt>Template:</tt>)
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getTplPageListKey(String title);
+    public String getTplPageListKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the list of pages linking to the given title.
      * 
-     * @param title the page's title
+     * @param title
+     *            the page's title
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public String getBackLinksPageListKey(String title);
+    public String getBackLinksPageListKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the number of page edits.
@@ -152,10 +174,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page history on success
      */
-    public PageHistoryResult getPageHistory(Connection connection, String title);
+    public PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject);
 
     /**
      * Retrieves the current, i.e. most up-to-date, version of a page from
@@ -165,10 +189,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page and revision on success
      */
-    public RevisionResult getRevision(Connection connection, String title);
+    public RevisionResult getRevision(Connection connection, String title, final MyNamespace nsObject);
     
     /**
      * Retrieves the given version of a page from Scalaris.
@@ -179,10 +205,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the title of the page
      * @param id
      *            the id of the version
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page and revision on success
      */
-    public RevisionResult getRevision(Connection connection, String title, int id);
+    public RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject);
     
     /**
      * Retrieves a list of available pages from Scalaris.
@@ -212,10 +240,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the category
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesInCategory(Connection connection, String title);
+    public PageListResult getPagesInCategory(Connection connection, String title, final MyNamespace nsObject);
     
     /**
      * Retrieves a list of pages using the given template from Scalaris.
@@ -224,10 +254,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the template
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesInTemplate(Connection connection, String title);
+    public PageListResult getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject);
     
     /**
      * Retrieves a list of pages linking to the given page from Scalaris.
@@ -236,10 +268,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesLinkingTo(Connection connection, String title);
+    public PageListResult getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject);
     
     /**
      * Retrieves the number of available pages from Scalaris.
@@ -269,10 +303,12 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to Scalaris
      * @param title
      *            the title of the category
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the number of pages on success
      */
-    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title);
+    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject);
     
     /**
      * Retrieves the number of available articles, i.e. pages in the main
@@ -307,10 +343,10 @@ public interface WikiServletDataHandler<Connection> {
      * @param newRev
      *            the new revision to add
      * @param prevRevId
-     *            the version of the previously existing revision or
-     *            <tt>-1</tt> if there was no previous revision or
-     *            <tt>-2</tt> if the previous revision is unknown and should
-     *            be determined during the save
+     *            the version of the previously existing revision or <tt>-1</tt>
+     *            if there was no previous revision or <tt>-2</tt> if the
+     *            previous revision is unknown and should be determined during
+     *            the save
      * @param restrictions
      *            new restrictions of the page or <tt>null</tt> if they should
      *            not be changed
@@ -319,10 +355,12 @@ public interface WikiServletDataHandler<Connection> {
      *            and templates)
      * @param username
      *            name of the user editing the page (for enforcing restrictions)
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return success status
      */
     public SavePageResult savePage(Connection connection, String title,
             Revision newRev, int prevRevId, Map<String, String> restrictions,
-            SiteInfo siteinfo, String username);
+            SiteInfo siteinfo, String username, final MyNamespace nsObject);
 }

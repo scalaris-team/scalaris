@@ -370,38 +370,38 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public String getRevKey(String title, int id) {
-        return ScalarisDataHandler.getRevKey(title, id);
+    public String getRevKey(String title, int id, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getRevKey(title, id, nsObject);
     }
 
     @Override
-    public String getPageKey(String title) {
-        return ScalarisDataHandler.getPageKey(title);
+    public String getPageKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPageKey(title, nsObject);
     }
 
     @Override
-    public String getRevListKey(String title) {
-        return ScalarisDataHandler.getRevListKey(title);
+    public String getRevListKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getRevListKey(title, nsObject);
     }
 
     @Override
-    public String getCatPageListKey(String title) {
-        return ScalarisDataHandler.getCatPageListKey(title);
+    public String getCatPageListKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getCatPageListKey(title, nsObject);
     }
 
     @Override
-    public String getCatPageCountKey(String title) {
-        return ScalarisDataHandler.getCatPageCountKey(title);
+    public String getCatPageCountKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getCatPageCountKey(title, nsObject);
     }
 
     @Override
-    public String getTplPageListKey(String title) {
-        return ScalarisDataHandler.getTplPageListKey(title);
+    public String getTplPageListKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getTplPageListKey(title, nsObject);
     }
 
     @Override
-    public String getBackLinksPageListKey(String title) {
-        return ScalarisDataHandler.getBackLinksPageListKey(title);
+    public String getBackLinksPageListKey(String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getBackLinksPageListKey(title, nsObject);
     }
 
     @Override
@@ -410,18 +410,18 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public PageHistoryResult getPageHistory(Connection connection, String title) {
-        return ScalarisDataHandler.getPageHistory(connection, title);
+    public PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPageHistory(connection, title, nsObject);
     }
 
     @Override
-    public RevisionResult getRevision(Connection connection, String title) {
-        return ScalarisDataHandler.getRevision(connection, title);
+    public RevisionResult getRevision(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getRevision(connection, title, nsObject);
     }
 
     @Override
-    public RevisionResult getRevision(Connection connection, String title, int id) {
-        return ScalarisDataHandler.getRevision(connection, title, id);
+    public RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getRevision(connection, title, id, nsObject);
     }
 
     @Override
@@ -435,18 +435,18 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public PageListResult getPagesInCategory(Connection connection, String title) {
-        return ScalarisDataHandler.getPagesInCategory(connection, title);
+    public PageListResult getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPagesInCategory(connection, title, nsObject);
     }
 
     @Override
-    public PageListResult getPagesInTemplate(Connection connection, String title) {
-        return ScalarisDataHandler.getPagesInTemplate(connection, title);
+    public PageListResult getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPagesInTemplate(connection, title, nsObject);
     }
 
     @Override
-    public PageListResult getPagesLinkingTo(Connection connection, String title) {
-        return ScalarisDataHandler.getPagesLinkingTo(connection, title);
+    public PageListResult getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPagesLinkingTo(connection, title, nsObject);
     }
 
     @Override
@@ -460,8 +460,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title) {
-        return ScalarisDataHandler.getPagesInCategoryCount(connection, title);
+    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject) {
+        return ScalarisDataHandler.getPagesInCategoryCount(connection, title, nsObject);
     }
 
     @Override
@@ -477,8 +477,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     @Override
     public SavePageResult savePage(Connection connection, String title,
             Revision newRev, int prevRevId, Map<String, String> restrictions,
-            SiteInfo siteinfo, String username) {
+            SiteInfo siteinfo, String username, final MyNamespace nsObject) {
         return ScalarisDataHandler.savePage(connection, title, newRev,
-                prevRevId, restrictions, siteinfo, username);
+                prevRevId, restrictions, siteinfo, username, nsObject);
     }
 }

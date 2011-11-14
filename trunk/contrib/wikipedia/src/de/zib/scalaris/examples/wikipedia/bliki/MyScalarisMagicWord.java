@@ -153,7 +153,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
          * Technical metadata / Latest revision to current page
          */
         if (name.equals(MAGIC_PAGE_SIZE)) {
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(model.connection, parameter);
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(model.connection, parameter, model.getNamespace());
             int size = 0;
             if (getRevResult.success) {
                 size = getRevResult.revision.unpackedText().getBytes().length;
@@ -204,7 +204,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
 //            {{NUMBEROFACTIVEUSERS}}
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
             String category = MyWikiModel.createFullPageName(model.getCategoryNamespace(), parameter.trim());
-            BigIntegerResult catListResult = ScalarisDataHandler.getPagesInCategoryCount(model.connection, category);
+            BigIntegerResult catListResult = ScalarisDataHandler.getPagesInCategoryCount(model.connection, category, model.getNamespace());
             if (catListResult.success) {
                 return model.formatStatisticNumber(rawNumber, catListResult.number);
             }

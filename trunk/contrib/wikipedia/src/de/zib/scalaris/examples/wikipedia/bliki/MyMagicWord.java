@@ -282,11 +282,11 @@ public class MyMagicWord extends MagicWord {
             
         } else if (name.equals(MAGIC_BASE_PAGE_NAME) || name.equals(MAGIC_BASE_PAGE_NAME_E)) {
             String pagename = getPageName(parameter, model);
-            String[] split = MyWikiModel.splitNsBaseSubPage(pagename);
+            String[] split = model.splitNsBaseSubPage(pagename);
             return split[1];
         } else if (name.equals(MAGIC_SUB_PAGE_NAME) || name.equals(MAGIC_SUB_PAGE_NAME_E)) {
             String pagename = getPageName(parameter, model);
-            String[] split = MyWikiModel.splitNsBaseSubPage(pagename);
+            String[] split = model.splitNsBaseSubPage(pagename);
             if (split[2].isEmpty()) {
                 return split[1];
             } else {
@@ -295,7 +295,7 @@ public class MyMagicWord extends MagicWord {
         } else if (name.equals(MAGIC_SUBJECT_PAGE_NAME) || name.equals(MAGIC_SUBJECT_PAGE_NAME_E) ||
                 name.equals(MAGIC_ARTICLE_PAGE_NAME) || name.equals(MAGIC_ARTICLE_PAGE_NAME_E)) {
             String pagename = getPageName(parameter, model);
-            String[] split = MyWikiModel.splitNsTitle(pagename);
+            String[] split = model.splitNsTitle(pagename);
             String subjectSpace = model.getNamespace().getSubjectspace(split[0]);
             if (subjectSpace == null || subjectSpace.isEmpty()) {
                 subjectSpace = "";
@@ -305,7 +305,7 @@ public class MyMagicWord extends MagicWord {
             return subjectSpace + split[1];
         } else if (name.equals(MAGIC_TALK_PAGE_NAME) || name.equals(MAGIC_TALK_PAGE_NAME_E)) {
             String pagename = getPageName(parameter, model);
-            String[] split = MyWikiModel.splitNsTitle(pagename);
+            String[] split = model.splitNsTitle(pagename);
             if (split[0].equals(model.getNamespace().getTalk())) {
                 return pagename;
             } else {
@@ -324,10 +324,10 @@ public class MyMagicWord extends MagicWord {
 
         } else if (name.equals(MAGIC_NAMESPACE) || name.equals(MAGIC_NAMESPACE_E)) {
             String pagename = getPageName(parameter, model);
-            return MyWikiModel.getNamespace(pagename);
+            return model.getNamespace(pagename);
         } else if (name.equals(MAGIC_TALK_SPACE) || name.equals(MAGIC_TALK_SPACE_E)) {
             String pagename = getPageName(parameter, model);
-            String pageNamespace = MyWikiModel.getNamespace(pagename);
+            String pageNamespace = model.getNamespace(pagename);
             String talkspace = model.getNamespace().getTalkspace(pageNamespace);
             if (talkspace == null) {
                 return "";
@@ -337,7 +337,7 @@ public class MyMagicWord extends MagicWord {
         } else if (name.equals(MAGIC_SUBJECT_SPACE) || name.equals(MAGIC_SUBJECT_SPACE_E) ||
                 name.equals(MAGIC_ARTICLE_SPACE) || name.equals(MAGIC_ARTICLE_SPACE_E)) {
             String pagename = getPageName(parameter, model);
-            String talkNamespace = MyWikiModel.getNamespace(pagename);
+            String talkNamespace = model.getNamespace(pagename);
             String subjectspace = model.getNamespace().getSubjectspace(talkNamespace);
             if (subjectspace == null) {
                 return "";

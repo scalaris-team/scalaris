@@ -38,6 +38,7 @@ import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.bliki.MyScalarisWikiModel;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -275,20 +276,20 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             throws UnsupportedOperationException {
         for (Revision rev : revisions) {
             addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
-                    ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId()),
+                    ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace()),
                     rev, stWrite));
         }
         addSQLiteJob(new SQLiteWriteObjectJob<List<ShortRevision>>(
-                ScalarisDataHandler.getRevListKey(page.getTitle()),
+                ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()),
                 revisions_short, stWrite));
         addSQLiteJob(new SQLiteWriteObjectJob<Page>(
-                ScalarisDataHandler.getPageKey(page.getTitle()),
+                ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()),
                 page, stWrite));
 
-        newPages.add(page.getTitle());
+        newPages.add(wikiModel.normalisePageTitle(page.getTitle()));
         // simple article filter: only pages in main namespace:
-        if (MyScalarisWikiModel.getNamespace(page.getTitle()).isEmpty()) {
-            newArticles.add(page.getTitle());
+        if (MyScalarisWikiModel.getNamespace(page.getTitle(), wikiModel.getNamespace()).isEmpty()) {
+            newArticles.add(wikiModel.normalisePageTitle(page.getTitle()));
         }
         // only export page list every UPDATE_PAGELIST_EVERY pages:
         if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
@@ -298,7 +299,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     
     protected void updatePageLists() {
         addSQLiteJob(new SQLiteUpdatePageListsJob(newPages, newArticles,
-                newCategories, newTemplates, newBackLinks, stRead, stWrite));
+                newCategories, newTemplates, newBackLinks, stRead, stWrite, wikiModel));
         newPages = new LinkedList<String>();
         newArticles = new LinkedList<String>();
         newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
@@ -385,12 +386,14 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         HashMap<String, List<String>> newCategories;
         HashMap<String, List<String>> newTemplates;
         HashMap<String, List<String>> newBackLinks;
+        final MyWikiModel wikiModel;
         
         public SQLiteUpdatePageListsJob(List<String> newPages, List<String> newArticles,
                 HashMap<String, List<String>> newCategories,
                 HashMap<String, List<String>> newTemplates,
                 HashMap<String, List<String>> newBackLinks,
-                SQLiteStatement stRead, SQLiteStatement stWrite) {
+                SQLiteStatement stRead, SQLiteStatement stWrite,
+                final MyWikiModel wikiModel) {
             this.newPages = newPages;
             this.newArticles = newArticles;
             this.newCategories = newCategories;
@@ -398,6 +401,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             this.newBackLinks = newBackLinks;
             this.stRead = stRead;
             this.stWrite = stWrite;
+            this.wikiModel = wikiModel;
         }
 
         protected <T> T readObject(String key)
@@ -444,7 +448,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             
             // list of pages in each category:
             for (Entry<String, List<String>> category: newCategories.entrySet()) {
-                scalaris_key = ScalarisDataHandler.getCatPageListKey(category.getKey());
+                scalaris_key = ScalarisDataHandler.getCatPageListKey(category.getKey(), wikiModel.getNamespace());
                 List<String> catPageList;
                 try {
                     catPageList = readObject(scalaris_key);
@@ -453,14 +457,14 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 }
                 catPageList.addAll(category.getValue());
                 writeObject(scalaris_key, catPageList);
-                scalaris_key = ScalarisDataHandler.getCatPageCountKey(category.getKey());
+                scalaris_key = ScalarisDataHandler.getCatPageCountKey(category.getKey(), wikiModel.getNamespace());
                 writeObject(scalaris_key, catPageList.size());
             }
             newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
         
             // list of pages a template is used in:
             for (Entry<String, List<String>> template: newTemplates.entrySet()) {
-                scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey());
+                scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey(), wikiModel.getNamespace());
                 List<String> tplPageList;
                 try {
                     tplPageList = readObject(scalaris_key);
@@ -474,7 +478,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             
             // list of pages linking to other pages:
             for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
-                scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey());
+                scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey(), wikiModel.getNamespace());
                 List<String> backLinksPageList;
                 try {
                     backLinksPageList = readObject(scalaris_key);
