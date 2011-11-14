@@ -353,7 +353,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     .prepare("SELECT page.title, tpl.title FROM " +
                             "templates INNER JOIN pages AS page ON templates.title == page.id " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
-                            "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
+                            "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
             while (stmt.step()) {
                 String pageTitle = stmt.columnString(0);
                 String template = stmt.columnString(1);
@@ -399,9 +399,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            name of the DB file
      * @param allowedCats
      *            include all pages in these categories
-     * @param allowedPages
+     * @param allowedPages0
      *            a number of pages to include (also parses these pages for more
-     *            links)
+     *            links - will be normalised)
      * @param depth
      *            follow links this deep
      * @param templateTree
@@ -419,7 +419,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *             if any error occurs
      */
     public static Set<String> getPagesInCategories(String dbFileName,
-            Set<String> allowedCats, Set<String> allowedPages, int depth,
+            Set<String> allowedCats, Set<String> allowedPages0, int depth,
             Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
             Map<String, Set<String>> referenceTree,
@@ -431,6 +431,11 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
             Set<String> allowedCatsFull = getSubCategories(allowedCats, db,
                     templateTree, includeTree, referenceTree, msgOut);
+
+            SiteInfo siteInfo = readSiteInfo(db);
+            MyNamespace namespace = new MyNamespace(siteInfo);
+            Set<String> allowedPages = new HashSet<String>(allowedPages0.size());
+            MyWikiModel.normalisePageTitles(allowedPages0, namespace, allowedPages);
 
             Set<String> currentPages = new HashSet<String>();
             currentPages.addAll(allowedPages);
@@ -514,7 +519,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "INNER JOIN currentPages AS cp ON categories.category == cp.id " +
                                     "INNER JOIN pages AS page ON categories.title == page.id " +
                                     // "INNER JOIN pages AS cat ON categories.category == cat.id" +
-                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
+                                    "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
@@ -527,8 +532,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "INNER JOIN currentPages AS cp ON templates.template == cp.id " +
                                     "INNER JOIN pages AS page ON templates.title == page.id " +
                                     // "INNER JOIN pages AS tpl ON templates.template == tpl.id" +
-                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
-                                    + "page.title LIKE '" + MyWikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
+                                    "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
+                                    + "page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
                     while (stmt.step()) {
                         String pageTemplate = stmt.columnString(0);
                         Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
@@ -844,7 +849,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         }
 
         protected long pageToId(String origPageTitle) throws RuntimeException {
-            String pageTitle = MyWikiModel.normalisePageTitle(origPageTitle);
+            String pageTitle = wikiModel.normalisePageTitle(origPageTitle);
             try {
                 long pageId = -1;
                 // try to find the page id in the pages table:

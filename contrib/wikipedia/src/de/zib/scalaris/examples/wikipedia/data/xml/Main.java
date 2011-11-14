@@ -41,7 +41,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
 
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler.ReportAtShutDown;
 
@@ -130,7 +129,7 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    whitelist.add(MyWikiModel.normalisePageTitle(line));
+                    whitelist.add(line);
                 }
             }
             if (whitelist.isEmpty()) {
@@ -242,7 +241,7 @@ public class Main {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.isEmpty()) {
-                    allowedPages.add(MyWikiModel.normalisePageTitle(line));
+                    allowedPages.add(line);
                 }
             }
         }
@@ -251,7 +250,7 @@ public class Main {
         if (args.length >= 5) {
             for (String rCat : Arrays.asList(args).subList(4, args.length)) {
                 if (!rCat.isEmpty()) {
-                    rootCategories.add(MyWikiModel.normalisePageTitle(rCat));
+                    rootCategories.add(rCat);
                 }
             }
         }

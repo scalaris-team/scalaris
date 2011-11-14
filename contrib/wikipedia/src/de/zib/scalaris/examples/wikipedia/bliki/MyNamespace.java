@@ -19,7 +19,9 @@ import info.bliki.Messages;
 import info.bliki.wiki.namespaces.Namespace;
 
 import java.util.ListResourceBundle;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -31,6 +33,8 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  */
 public class MyNamespace extends Namespace implements NamespaceUtils {
     private SiteInfo siteinfo;
+    protected final Map<String, Integer> NAMESPACE_INT_MAP =
+            new TreeMap<String, Integer>(String.CASE_INSENSITIVE_ORDER);
     
     /**
      * Resource bundle derived from a given {@link SiteInfo} object.
@@ -134,6 +138,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
     public MyNamespace(SiteInfo siteinfo) {
         super(new MyResourceBundle(siteinfo));
         this.siteinfo = siteinfo;
+        initializeIntNamespaces();
         initializeTalkNamespaces();
     }
 
@@ -162,6 +167,38 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
         TALKSPACE_MAP.put(fNamespacesLowercase[17], getCategory_talk()); // category_talk
     }
 
+    /**
+     * Initialises a mapping of namespace strings to integers.
+     */
+    private void initializeIntNamespaces() {
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.MEDIA_NAMESPACE_KEY), Namespace.MEDIA_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.SPECIAL_NAMESPACE_KEY), Namespace.SPECIAL_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.MAIN_NAMESPACE_KEY), Namespace.MAIN_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.TALK_NAMESPACE_KEY), Namespace.TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.USER_NAMESPACE_KEY), Namespace.USER_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.USER_TALK_NAMESPACE_KEY), Namespace.USER_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.PROJECT_NAMESPACE_KEY), Namespace.PROJECT_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.PROJECT_TALK_NAMESPACE_KEY), Namespace.PROJECT_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.FILE_NAMESPACE_KEY), Namespace.FILE_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.FILE_TALK_NAMESPACE_KEY), Namespace.FILE_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.MEDIAWIKI_NAMESPACE_KEY), Namespace.MEDIAWIKI_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.MEDIAWIKI_TALK_NAMESPACE_KEY), Namespace.MEDIAWIKI_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.TEMPLATE_NAMESPACE_KEY), Namespace.TEMPLATE_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.TEMPLATE_TALK_NAMESPACE_KEY), Namespace.TEMPLATE_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.HELP_NAMESPACE_KEY), Namespace.HELP_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.HELP_TALK_NAMESPACE_KEY), Namespace.HELP_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.CATEGORY_NAMESPACE_KEY), Namespace.CATEGORY_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put(getNamespaceByNumber(Namespace.CATEGORY_TALK_NAMESPACE_KEY), Namespace.CATEGORY_TALK_NAMESPACE_KEY);
+        // Aliases as defined by
+        // https://secure.wikimedia.org/wikipedia/en/wiki/Wikipedia:Namespace#Aliases
+        NAMESPACE_INT_MAP.put("WP", Namespace.PROJECT_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Project", Namespace.PROJECT_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("WT", Namespace.PROJECT_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Project talk", Namespace.PROJECT_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Image", Namespace.FILE_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Image talk", Namespace.FILE_TALK_NAMESPACE_KEY);
+    }
+
     /* (non-Javadoc)
      * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getSubjectspace(java.lang.String)
      */
@@ -183,13 +220,25 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
     public SiteInfo getSiteinfo() {
         return siteinfo;
     }
+
+    /**
+     * Gets the integer number of the given namespace.
+     * 
+     * @param namespace
+     *            the namespace
+     * 
+     * @return an integer or <tt>null</tt> if this is no namespace
+     */
+    public Integer getNumberByName(String namespace) {
+        return NAMESPACE_INT_MAP.get(namespace);
+    }
     
     /* (non-Javadoc)
      * @see de.zib.scalaris.examples.wikipedia.bliki.NamespaceUtils#getTalkPageFromPageName(java.lang.String)
      */
     @Override
     public String getTalkPageFromPageName(String pageName) {
-        String[] pnSplit = MyWikiModel.splitNsTitle(pageName);
+        String[] pnSplit = MyWikiModel.splitNsTitle(pageName, this);
         String talkspace = getTalkspace(pnSplit[0]);
         if (talkspace == null) {
             return pnSplit[1];
@@ -203,7 +252,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     @Override
     public String getPageNameFromTalkPage(String talkPageName) {
-        String[] pnSplit = MyWikiModel.splitNsTitle(talkPageName);
+        String[] pnSplit = MyWikiModel.splitNsTitle(talkPageName, this);
         String namespace = pnSplit[0];
         String talkspace = getTalkspace(namespace);
         if (talkspace == null || !namespace.equals(talkspace)) {
@@ -218,7 +267,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     @Override
     public boolean isTalkPage(String pageName) {
-        String namespace = MyWikiModel.getNamespace(pageName);
+        String namespace = MyWikiModel.getNamespace(pageName, this);
         String talkspace = getTalkspace(namespace);
         if (talkspace == null || !namespace.equals(talkspace)) {
             return false;

@@ -315,7 +315,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             value.setFormTitle("What links here");
             value.setFormType(FormType.TargetPageForm);
             value.setTarget(req_target);
-            PageListResult result = getPagesLinkingTo(connection, req_target);
+            PageListResult result = getPagesLinkingTo(connection, req_target, namespace);
             handleViewSpecialPageList(request, response, result, value, connection);
         } else if (req_title.equals("Special:SpecialPages")) {
             handleViewSpecialPages(request, response, connection);
@@ -386,7 +386,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             HttpServletResponse response, Connection connection) throws IOException {
         RandomTitleResult result = getRandomArticle(connection, new Random());
         if (result.success) {
-            response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(result.title, "UTF-8")));
+            response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.title, namespace), "UTF-8")));
         } else {
             response.sendRedirect(response.encodeRedirectURL("?title=Main Page&notice=error: can not view random page: <pre>" + result.message + "</pre>"));
         }
@@ -413,12 +413,12 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         // get revision id to load:
         int req_oldid = WikiServlet.getParam_oldid(request);
 
-        RevisionResult result = getRevision(connection, title, req_oldid);
+        RevisionResult result = getRevision(connection, title, req_oldid, namespace);
         if (result.page_not_existing) {
             handleViewPageNotExisting(request, response, title, connection);
             return;
         } else if (result.rev_not_existing) {
-            result = getRevision(connection, title);
+            result = getRevision(connection, title, namespace);
             addToParam_notice(request, "revision " + req_oldid + " not found - loaded current revision instead");
         }
         
@@ -488,20 +488,22 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         wikiModel.setPageName(title);
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.unpackedText());
-            if (wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(title))) {
-                PageListResult catPagesResult = getPagesInCategory(connection, title);
+            if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
+                PageListResult catPagesResult = getPagesInCategory(connection, title, namespace);
                 if (catPagesResult.success) {
                     LinkedList<String> subCategories = new LinkedList<String>();
                     LinkedList<String> categoryPages = new LinkedList<String>();
-                    for (String page: catPagesResult.pages) {
-                        String pageNamespace = MyWikiModel.getNamespace(page);
+                    final List<String> catPageList = wikiModel.denormalisePageTitles(catPagesResult.pages);
+                    for (String page: catPageList) {
+                        String pageNamespace = wikiModel.getNamespace(page);
                         if (wikiModel.isCategoryNamespace(pageNamespace)) {
-                            subCategories.add(MyWikiModel.getTitleName(page));
+                            subCategories.add(wikiModel.getTitleName(page));
                         } else if (wikiModel.isTemplateNamespace(pageNamespace)) {
                             // all pages using a template are in the category, too
-                            PageListResult tplResult = getPagesInTemplate(connection, page);
+                            PageListResult tplResult = getPagesInTemplate(connection, page, namespace);
                             if (tplResult.success) {
-                                categoryPages.addAll(tplResult.pages);
+                                final List<String> tplPageList = wikiModel.denormalisePageTitles(tplResult.pages);
+                                categoryPages.addAll(tplPageList);
                             }
                         } else {
                             categoryPages.add(page);
@@ -580,7 +582,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         int render = WikiServlet.getParam_renderer(request);
         String notExistingTitle = "MediaWiki:Noarticletext";
 
-        RevisionResult result = getRevision(connection, notExistingTitle);
+        RevisionResult result = getRevision(connection, notExistingTitle, namespace);
         
         WikiPageBean value;
         if (result.success) {
@@ -622,7 +624,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
     private void handleViewPageHistory(HttpServletRequest request,
             HttpServletResponse response, String title, Connection connection)
             throws ServletException, IOException {
-        PageHistoryResult result = getPageHistory(connection, title);
+        PageHistoryResult result = getPageHistory(connection, title, namespace);
         if (result.not_existing) {
             handleViewPageNotExisting(request, response, title, connection);
             return;
@@ -674,8 +676,9 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             WikiPageListBean value, Connection connection)
             throws ServletException, IOException {
         if (result.success) {
+            final List<String> pageList = MyWikiModel.denormalisePageTitles(result.pages, namespace);
             value.setNotice(WikiServlet.getParam_notice(request));
-            Collections.sort(result.pages, String.CASE_INSENSITIVE_ORDER);
+            Collections.sort(pageList, String.CASE_INSENSITIVE_ORDER);
             String nsPrefix = namespace.getNamespaceByNumber(value.getNamespaceId());
             if (!nsPrefix.isEmpty()) {
                 nsPrefix += ":";
@@ -688,7 +691,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             String search = value.getSearch().toLowerCase();
             if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty() || !search.isEmpty()) {
                 // only show pages with this prefix:
-                for (Iterator<String> it = result.pages.iterator(); it.hasNext(); ) {
+                for (Iterator<String> it = pageList.iterator(); it.hasNext(); ) {
                     String cur = it.next();
                     // case-insensitive "startsWith" check:
                     if (!cur.regionMatches(true, 0, prefix, 0, prefix.length())) {
@@ -702,7 +705,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     }
                 }
             }
-            value.setPages(result.pages);
+            value.setPages(pageList);
             
             value.setWikiTitle(siteinfo.getSitename());
             value.setWikiNamespace(namespace);
@@ -958,9 +961,9 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         int req_oldid = WikiServlet.getParam_oldid(request);
 
         WikiPageEditBean value = new WikiPageEditBean();
-        RevisionResult result = getRevision(connection, title, req_oldid);
+        RevisionResult result = getRevision(connection, title, req_oldid, namespace);
         if (result.rev_not_existing) {
-            result = getRevision(connection, title);
+            result = getRevision(connection, title, namespace);
             addToParam_notice(request, "revision " + req_oldid + " not found - loaded current revision instead");
         }
 
@@ -1027,7 +1030,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary);
             newRev.setUnpackedText(content);
 
-            SavePageResult result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
+            SavePageResult result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "", namespace);
             for (WikiEventHandler handler: eventHandlers) {
                 handler.onPageSaved(result);
             }

@@ -36,7 +36,6 @@ import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.SaveResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -186,17 +185,17 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         // ignore the (rest of the) page if a failure occured
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         for (Revision rev : revisions) {
-            String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId());
+            String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
             requests.addWrite(key, rev);
         }
-        requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle()), revisions_short);
-        requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle()), page);
+        requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short);
+        requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()), page);
         Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
         executor.execute(worker);
-        newPages.add(page.getTitle());
+        newPages.add(wikiModel.normalisePageTitle(page.getTitle()));
         // simple article filter: only pages in main namespace:
-        if (MyWikiModel.getNamespace(page.getTitle()).isEmpty()) {
-            newArticles.add(page.getTitle());
+        if (wikiModel.getNamespace(page.getTitle()).isEmpty()) {
+            newArticles.add(wikiModel.normalisePageTitle(page.getTitle()));
         }
         // only export page list every UPDATE_PAGELIST_EVERY pages:
         if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
@@ -233,15 +232,15 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
             final String catName = category.getKey();
-            scalaris_key = ScalarisDataHandler.getCatPageListKey(catName);
-            worker = new MyScalarisAddToPageListRunnable(scalaris_key, category.getValue(), scalaris_tx, ScalarisDataHandler.getCatPageCountKey(catName));
+            scalaris_key = ScalarisDataHandler.getCatPageListKey(catName, wikiModel.getNamespace());
+            worker = new MyScalarisAddToPageListRunnable(scalaris_key, category.getValue(), scalaris_tx, ScalarisDataHandler.getCatPageCountKey(catName, wikiModel.getNamespace()));
             executor.execute(worker);
         }
         newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
 
         // list of pages a template is used in:
         for (Entry<String, List<String>> template: newTemplates.entrySet()) {
-            scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey());
+            scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey(), wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key, template.getValue(), scalaris_tx);
             executor.execute(worker);
         }
@@ -249,7 +248,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         
         // list of pages linking to other pages:
         for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
-            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey());
+            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey(), wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key, backlinks.getValue(), scalaris_tx);
             executor.execute(worker);
         }

@@ -19,6 +19,7 @@ import java.io.PrintStream;
 import java.text.NumberFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -28,7 +29,6 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyParsingWikiModel;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.XmlPage.CheckSkipRevisions;
 
@@ -78,8 +78,8 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      * @param blacklist
      *            a number of page titles to ignore
      * @param whitelist
-     *            only import these pages (pages in this list must begin with a
-     *            capital letter!)
+     *            only import these pages (pages in this list will be normalised
+     *            once the site info is read)
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
@@ -117,7 +117,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      */
     private boolean inWhiteList(String pageTitle) {
         return WikiDumpHandler.this.whitelist.contains(pageTitle)
-                || WikiDumpHandler.this.whitelist.contains(MyWikiModel.normalisePageTitle(pageTitle));
+                || WikiDumpHandler.this.whitelist.contains(wikiModel.normalisePageTitle(pageTitle));
     }
 
     /**
@@ -242,6 +242,12 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     
     private void setUpWikiModel(SiteInfo siteinfo) {
         wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteinfo));
+        // we are now able to normalise the page titles in the whitelist:
+        if (whitelist != null) {
+            Set<String> oldWhitelist = whitelist;
+            whitelist = new HashSet<String>(oldWhitelist.size());
+            wikiModel.normalisePageTitles(oldWhitelist, whitelist);
+        }
     }
 
     /**

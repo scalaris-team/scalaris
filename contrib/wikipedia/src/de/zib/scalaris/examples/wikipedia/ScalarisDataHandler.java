@@ -96,79 +96,86 @@ public class ScalarisDataHandler {
     /**
      * Gets the key to store {@link Revision} objects at.
      * 
-     * @param title the title of the page
-     * @param id    the id of the revision
+     * @param title     the title of the page
+     * @param id        the id of the revision
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getRevKey(String title, int id) {
-        return title + ":rev:" + id;
+    public final static String getRevKey(String title, int id, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":rev:" + id;
     }
     
     /**
      * Gets the key to store {@link Page} objects at.
      * 
-     * @param title the title of the page
+     * @param title     the title of the page
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getPageKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":page";
+    public final static String getPageKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":page";
     }
     
     /**
      * Gets the key to store the list of revisions of a page at.
      * 
-     * @param title the title of the page
+     * @param title     the title of the page
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getRevListKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":revs";
+    public final static String getRevListKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":revs";
     }
     
     /**
      * Gets the key to store the list of pages belonging to a category at.
      * 
-     * @param title the category title (including <tt>Category:</tt>)
+     * @param title     the category title (including <tt>Category:</tt>)
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getCatPageListKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":cpages";
+    public final static String getCatPageListKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":cpages";
     }
     
     /**
      * Gets the key to store the number of pages belonging to a category at.
      * 
-     * @param title the category title (including <tt>Category:</tt>)
+     * @param title     the category title (including <tt>Category:</tt>)
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getCatPageCountKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":cpages:count";
+    public final static String getCatPageCountKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":cpages:count";
     }
     
     /**
      * Gets the key to store the list of pages using a template at.
      * 
-     * @param title the template title (including <tt>Template:</tt>)
+     * @param title     the template title (including <tt>Template:</tt>)
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getTplPageListKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":tpages";
+    public final static String getTplPageListKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":tpages";
     }
     
     /**
      * Gets the key to store the list of pages linking to the given title.
      * 
-     * @param title the page's title
+     * @param title     the page's title
+     * @param nsObject  the namespace for page title normalisation
      * 
      * @return Scalaris key
      */
-    public final static String getBackLinksPageListKey(String title) {
-        return MyWikiModel.normalisePageTitle(title) + ":blpages";
+    public final static String getBackLinksPageListKey(String title, final MyNamespace nsObject) {
+        return MyWikiModel.normalisePageTitle(title, nsObject) + ":blpages";
     }
     
     /**
@@ -187,10 +194,12 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page history on success
      */
-    public static PageHistoryResult getPageHistory(Connection connection, String title) {
+    public static PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject) {
         if (connection == null) {
             return new PageHistoryResult(false, "no connection to Scalaris");
         }
@@ -199,35 +208,35 @@ public class ScalarisDataHandler {
 
         scalaris_single = new TransactionSingleOp(connection);
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-        requests.addRead(getPageKey(title)).addRead(getRevListKey(title));
+        requests.addRead(getPageKey(title, nsObject)).addRead(getRevListKey(title, nsObject));
         
         TransactionSingleOp.ResultList results;
         try {
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title) + "\" or \"" + getRevListKey(title) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" or \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
         }
         
         Page page;
         try {
             page = results.processReadAt(0).jsonValue(Page.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + getPageKey(title) + "\"");
+            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + getPageKey(title, nsObject) + "\"");
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
         }
 
         List<ShortRevision> revisions;
         try {
             revisions = results.processReadAt(1).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + getRevListKey(title) + "\" does not exist");
+            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + getRevListKey(title, nsObject) + "\" does not exist");
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
         }
         return new PageHistoryResult(page, revisions);
     }
@@ -240,11 +249,13 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page and revision on success
      */
-    public static RevisionResult getRevision(Connection connection, String title) {
-        return getRevision(connection, title, -1);
+    public static RevisionResult getRevision(Connection connection, String title, final MyNamespace nsObject) {
+        return getRevision(connection, title, -1, nsObject);
     }
 
     /**
@@ -256,10 +267,12 @@ public class ScalarisDataHandler {
      *            the title of the page
      * @param id
      *            the id of the version
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page and revision on success
      */
-    public static RevisionResult getRevision(Connection connection, String title, int id) {
+    public static RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject) {
         if (connection == null) {
             return new RevisionResult(false, "no connection to Scalaris");
         }
@@ -272,7 +285,7 @@ public class ScalarisDataHandler {
         RevisionResult result = new RevisionResult();
 
         Page page;
-        scalaris_key = getPageKey(title);
+        scalaris_key = getPageKey(title, nsObject);
         try {
             page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
         } catch (NotFoundException e) {
@@ -291,7 +304,7 @@ public class ScalarisDataHandler {
 
         // load requested version if it is not the current one cached in the Page object
         if (id != page.getCurRev().getId() && id >= 0) {
-            scalaris_key = getRevKey(title, id);
+            scalaris_key = getRevKey(title, id, nsObject);
             try {
                 Revision revision = scalaris_single.read(scalaris_key).jsonValue(Revision.class);
                 result.revision = revision;
@@ -346,11 +359,13 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the category
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public static PageListResult getPagesInCategory(Connection connection, String title) {
-        return getPageList2(connection, getCatPageListKey(title), false);
+    public static PageListResult getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
+        return getPageList2(connection, getCatPageListKey(title, nsObject), false);
     }
 
     /**
@@ -360,11 +375,13 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the template
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public static PageListResult getPagesInTemplate(Connection connection, String title) {
-        return getPageList2(connection, getTplPageListKey(title), true);
+    public static PageListResult getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
+        return getPageList2(connection, getTplPageListKey(title, nsObject), true);
     }
 
     /**
@@ -374,11 +391,13 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the page
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
-    public static PageListResult getPagesLinkingTo(Connection connection, String title) {
-        return getPageList2(connection, getBackLinksPageListKey(title), false);
+    public static PageListResult getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
+        return getPageList2(connection, getBackLinksPageListKey(title, nsObject), false);
     }
 
     /**
@@ -447,11 +466,13 @@ public class ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the category
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return a result object with the number of pages on success
      */
-    public static BigIntegerResult getPagesInCategoryCount(Connection connection, String title) {
-        return getInteger2(connection, getCatPageCountKey(title), false);
+    public static BigIntegerResult getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject) {
+        return getInteger2(connection, getCatPageCountKey(title, nsObject), false);
     }
 
     /**
@@ -546,12 +567,14 @@ public class ScalarisDataHandler {
      *            and templates)
      * @param username
      *            name of the user editing the page (for enforcing restrictions)
+     * @param nsObject
+     *            the namespace for page title normalisation
      * 
      * @return success status
      */
     public static SavePageResult savePage(Connection connection, String title,
             Revision newRev, int prevRevId, Map<String, String> restrictions,
-            SiteInfo siteinfo, String username) {
+            SiteInfo siteinfo, String username, final MyNamespace nsObject) {
         if (connection == null) {
             return new SavePageResult(false, "no connection to Scalaris");
         }
@@ -562,8 +585,8 @@ public class ScalarisDataHandler {
         // check that the current version is still up-to-date:
         // read old version first, then write
         int oldRevId = -1;
-        String pageInfoKey = getPageKey(title);
-        String revListKey = getRevListKey(title);
+        String pageInfoKey = getPageKey(title, nsObject);
+        String revListKey = getRevListKey(title, nsObject);
         
         Transaction.RequestList requests = new Transaction.RequestList();
         requests.addRead(pageInfoKey).addRead(revListKey);
@@ -631,26 +654,42 @@ public class ScalarisDataHandler {
         // get previous categories and templates:
         final MyWikiModel wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
         wikiModel.setPageName(title);
-        Set<String> oldCats = new HashSet<String>();
-        Set<String> oldTpls = new HashSet<String>();
-        Set<String> oldLnks = new HashSet<String>();
+        Set<String> oldCats;
+        Set<String> oldTpls;
+        Set<String> oldLnks;
         if (oldRevId != -1 && result.oldPage != null && result.oldPage.getCurRev() != null) {
             // get a list of previous categories and templates:
             wikiModel.setUp();
             wikiModel.render(null, result.oldPage.getCurRev().unpackedText());
-            oldCats = wikiModel.getCategories().keySet();
-            oldTpls = wikiModel.getTemplates();
-            oldLnks = wikiModel.getLinks();
+            final Set<String> oldCats0 = wikiModel.getCategories().keySet();
+            final Set<String> oldTpls0 = wikiModel.getTemplates();
+            final Set<String> oldLnks0 = wikiModel.getLinks();
+            oldCats = new HashSet<String>(oldCats0.size());
+            oldTpls = new HashSet<String>(oldTpls0.size());
+            oldLnks = new HashSet<String>(oldLnks0.size());
+            MyWikiModel.normalisePageTitles(oldCats0, nsObject, oldCats);
+            MyWikiModel.normalisePageTitles(oldTpls0, nsObject, oldTpls);
+            MyWikiModel.normalisePageTitles(oldLnks0, nsObject, oldLnks);
             wikiModel.tearDown();
+        } else {
+            oldCats = new HashSet<String>();
+            oldTpls = new HashSet<String>();
+            oldLnks = new HashSet<String>();
         }
         // get new categories and templates
         wikiModel.setUp();
         wikiModel.render(null, newRev.unpackedText());
         // note: do not tear down the wiki model - the following statements
         // still need it and it will be removed at the end of the method anyway
-        Set<String> newCats = wikiModel.getCategories().keySet();
-        Set<String> newTpls = wikiModel.getTemplates();
-        Set<String> newLnks = wikiModel.getLinks();
+        final Set<String> newCats0 = wikiModel.getCategories().keySet();
+        final Set<String> newTpls0 = wikiModel.getTemplates();
+        final Set<String> newLnks0 = wikiModel.getLinks();
+        Set<String> newCats = new HashSet<String>(newCats0.size());
+        Set<String> newTpls = new HashSet<String>(newTpls0.size());
+        Set<String> newLnks = new HashSet<String>(newLnks0.size());
+        MyWikiModel.normalisePageTitles(newCats0, nsObject, newCats);
+        MyWikiModel.normalisePageTitles(newTpls0, nsObject, newTpls);
+        MyWikiModel.normalisePageTitles(newLnks0, nsObject, newLnks);
         Difference catDiff = new Difference(oldCats, newCats);
         Difference tplDiff = new Difference(oldTpls, newTpls);
         Difference lnkDiff = new Difference(oldLnks, newLnks);
@@ -659,24 +698,24 @@ public class ScalarisDataHandler {
         Difference.GetPageListKey catPageKeygen = new Difference.GetPageListAndCountKey() {
             @Override
             public String getPageListKey(String name) {
-                return getCatPageListKey(wikiModel.getCategoryNamespace() + ":" + name);
+                return getCatPageListKey(wikiModel.getCategoryNamespace() + ":" + name, nsObject);
             }
 
             @Override
             public String getPageCountKey(String name) {
-                return getCatPageCountKey(wikiModel.getCategoryNamespace() + ":" + name);
+                return getCatPageCountKey(wikiModel.getCategoryNamespace() + ":" + name, nsObject);
             }
         };
         Difference.GetPageListKey tplPageKeygen = new Difference.GetPageListKey() {
             @Override
             public String getPageListKey(String name) {
-                return getTplPageListKey(wikiModel.getTemplateNamespace() + ":" + name);
+                return getTplPageListKey(wikiModel.getTemplateNamespace() + ":" + name, nsObject);
             }
         };
         Difference.GetPageListKey lnkPageKeygen = new Difference.GetPageListKey() {
             @Override
             public String getPageListKey(String name) {
-                return getBackLinksPageListKey(name);
+                return getBackLinksPageListKey(name, nsObject);
             }
         };
         requests = new Transaction.RequestList();
@@ -755,7 +794,7 @@ public class ScalarisDataHandler {
         if (oldRevId == -1) {
             pageListKeys.add(getPageListKey());
             pageListKeys.add(getPageCountKey());
-            if (MyWikiModel.getNamespace(title).isEmpty()) {
+            if (wikiModel.getNamespace(title).isEmpty()) {
                 pageListKeys.add(getArticleListKey());
                 pageListKeys.add(getArticleCountKey());
             }
@@ -777,11 +816,12 @@ public class ScalarisDataHandler {
             }
 
             requests = new Transaction.RequestList();
+            final List<String> newPages = Arrays.asList(wikiModel.normalisePageTitle(title));
             for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
                 String pageList_key = (String) it.next();
                 String pageCount_key = (String) it.next();
                 
-                pageListResult = updatePageList_prepare_write(results, requests, pageList_key, pageCount_key, new LinkedList<String>(), Arrays.asList(title), 0);
+                pageListResult = updatePageList_prepare_write(results, requests, pageList_key, pageCount_key, new LinkedList<String>(), newPages, 0);
                 if (!result.success) {
                     result.success = false;
                     result.message = pageListResult.message;
@@ -791,9 +831,9 @@ public class ScalarisDataHandler {
             }
         }
         
-        requests.addWrite(getPageKey(title), result.newPage)
-                .addWrite(getRevKey(title, newRev.getId()), newRev)
-                .addWrite(getRevListKey(title), result.newShortRevs).addCommit();
+        requests.addWrite(getPageKey(title, nsObject), result.newPage)
+                .addWrite(getRevKey(title, newRev.getId(), nsObject), newRev)
+                .addWrite(getRevListKey(title, nsObject), result.newShortRevs).addCommit();
         try {
             results = scalaris_tx.req_list(requests);
 
@@ -1042,10 +1082,11 @@ public class ScalarisDataHandler {
      *            Scalaris key for the number of pages in the list (may be null
      *            if not used)
      * @param entriesToRemove
-     *            page names to remove
+     *            (normalised) page names to remove
      * @param entriesToAdd
-     *            page names to add
-     * @param firstOp 
+     *            (normalised) page names to add
+     * @param firstOp
+     *            number of the first operation in the result set
      * 
      * @return the result of the operation
      */
@@ -1060,7 +1101,7 @@ public class ScalarisDataHandler {
         }
         // note: no need to read the old count - we already have a list of all pages and can calculate the count on our own
         int oldCount = pages.size();
-
+        
         int count = oldCount;
         boolean listChanged = false;
         
@@ -1130,9 +1171,9 @@ public class ScalarisDataHandler {
      *            Scalaris key for the number of pages in the list (may be null
      *            if not used)
      * @param entriesToRemove
-     *            list of page names to remove from the list
+     *            list of (normalised) page names to remove from the list
      * @param entriesToAdd
-     *            list of page names to add to the list
+     *            list of (normalised) page names to add to the list
      * 
      * @return the result of the operation
      */
