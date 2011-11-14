@@ -1,0 +1,10 @@
+1) download & extract the new tomcat
+2) remove <tomcat-dir>/webapps/*
+3) keep <old-tomcat-dir>/webapps/ROOT/index.jsp
+4) in <tomcat-dir>/conf/server.xml search for the active "Connector" tag and add
+URIEncoding="UTF-8"
+-> sets default parameter encoding to UTF-8 (required by the wiki app)
+5) make symlink to <wiki-dir>/simplewiki
+cd <tomcat-dir>/webapps
+ln -s ../../../simplewiki ./simplewiki
+6) change paths in <wiki-dir>/build.xml

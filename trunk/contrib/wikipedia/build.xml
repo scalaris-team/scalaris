@@ -32,6 +32,8 @@
   <!-- jetty server and jetty ant plugin classes (to launch jetty from ant) -->
   <taskdef classpathref="jetty.classpath" resource="tasks.properties" loaderref="jetty.loader" />
 
+  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.22" />
+
   <!-- Create build directory and copy static files -->
   <macrodef name="scalaris.check.jars">
     <sequential>
@@ -105,9 +107,11 @@
     <delete file="scalaris-wiki.war"/>
     <delete file="scalaris-wiki-plugin-api.jar"/>
   </target>
+  
+  <target name="run" depends="run-jetty" />
 
   <!-- starts a jetty server which provides the wiki website -->
-  <target name="run" depends="build,scalaris.properties">
+  <target name="run-jetty" depends="build,scalaris.properties">
     <jetty tempDirectory="bin/jetty-temp">
       <systemProperties>
         <systemProperty name="scalaris.node" value="${scalaris.node}"/>
@@ -116,6 +120,19 @@
       <!-- scan every 5 seconds for changes in class files, then re-deploy -->
       <webApp name="${ant.project.name} - simplewiki" warfile="simplewiki" contextpath="/simplewiki" scanIntervalSeconds="5"/>
     </jetty>
+  </target>
+
+  <!-- starts a tomcat server which provides the wiki website -->
+  <target name="run-tomcat" depends="build,scalaris.properties">
+    <java classname="org.apache.catalina.startup.Bootstrap" fork="true">
+      <classpath>
+        <pathelement location="${tomcat.home}/bin/bootstrap.jar"/>
+        <pathelement location="${tomcat.home}/bin/tomcat-juli.jar"/>
+      </classpath>
+      <sysproperty key="catalina.home" value="${tomcat.home}" />
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+    </java>
   </target>
 
   <target name="import.get.data" unless="data">
