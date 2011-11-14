@@ -316,14 +316,14 @@ public class XmlPage extends DefaultHandler {
                             // keep only the newest (old) revision
                             revisions.clear();
                         }
+                        if (maxRevisions != (-1) && revisions.size() >= maxRevisions) {
+                            revisions.remove(revisions.firstKey());
+                        }
                         if (!revisions.isEmpty()) {
                             revisions.lastEntry().getValue().setUnpackedText(lastRevText);
                         }
                         revisions.put(curRev.getId(), curRev);
                         lastRevText = currentRevision.getText();
-                        if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
-                            revisions.remove(revisions.firstKey());
-                        }
                     }
                 }
             } else {
