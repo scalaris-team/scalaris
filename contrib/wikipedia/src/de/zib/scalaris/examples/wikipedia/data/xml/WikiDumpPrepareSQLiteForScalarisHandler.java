@@ -118,6 +118,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             long cacheSize = stmt.columnLong(0);
             db.exec("PRAGMA cache_size = " + (1024l*1024l*1024l / cacheSize) + ";");
         }
+        stmt.dispose();
         db.exec("PRAGMA synchronous = OFF;");
         db.exec("PRAGMA journal_mode = OFF;");
         db.exec("PRAGMA locking_mode = EXCLUSIVE;");
