@@ -726,7 +726,9 @@ public class MyWikiModel extends WikiModel {
      */
     public static String normalisePageTitle(final String title, final MyNamespace nsObject) {
         String[] parts = splitNsTitle(title, nsObject);
-        return createFullPageName(normaliseName(parts[0]), normaliseName(parts[1]));
+        return createFullPageName(
+                nsObject.getNumberByName(parts[0]).toString(),
+                normaliseName(parts[1]));
     }
     
     /**
