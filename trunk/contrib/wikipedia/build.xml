@@ -20,18 +20,10 @@
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
     <path refid="import.classpath"/>
-    <pathelement location="contrib/jetty-libs/servlet-api-2.5.jar"/>
+	<pathelement location="contrib/apache-tomcat-7.0.22/lib/servlet-api.jar"/>
   </path>
 
-  <!-- All libraries needed to run jetty -->
-  <path id="jetty.classpath">
-    <fileset dir="contrib/jetty-libs" includes="*.jar"/>
-    <fileset dir="contrib/jetty-libs/jsp" includes="*.jar"/>
-  </path>
-
-  <!-- jetty server and jetty ant plugin classes (to launch jetty from ant) -->
-  <taskdef classpathref="jetty.classpath" resource="tasks.properties" loaderref="jetty.loader" />
-
+  <property name="jetty.home" value="contrib/jetty-hightide-8.0.4.v20111024" />
   <property name="tomcat.home" value="contrib/apache-tomcat-7.0.22" />
 
   <!-- Create build directory and copy static files -->
@@ -112,14 +104,14 @@
 
   <!-- starts a jetty server which provides the wiki website -->
   <target name="run-jetty" depends="build,scalaris.properties">
-    <jetty tempDirectory="bin/jetty-temp">
-      <systemProperties>
-        <systemProperty name="scalaris.node" value="${scalaris.node}"/>
-        <systemProperty name="scalaris.cookie" value="${scalaris.cookie}"/>
-      </systemProperties>
-      <!-- scan every 5 seconds for changes in class files, then re-deploy -->
-      <webApp name="${ant.project.name} - simplewiki" warfile="simplewiki" contextpath="/simplewiki" scanIntervalSeconds="5"/>
-    </jetty>
+    <java classname="org.eclipse.jetty.start.Main" fork="true">
+      <classpath>
+        <pathelement location="${jetty.home}/start.jar"/>
+      </classpath>
+      <sysproperty key="jetty.home" value="${jetty.home}" />
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+    </java>
   </target>
 
   <!-- starts a tomcat server which provides the wiki website -->

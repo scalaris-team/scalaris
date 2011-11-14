@@ -1,0 +1,12 @@
+1) download the jetty-hightide distribution from
+http://dist.codehaus.org/jetty/ 
+2) extract jetty
+3) remove <jetty-dir>/javadoc, <jetty-dir>/webapps/*
+4) keep <old-jetty-dir>/webapps/root/index.jsp
+5a) remove <jetty-dir>/contexts/*.xml except for hightide.xml
+5b) remove <jetty-dir>/contexts-available
+6) make symlink to <wiki-dir>/simplewiki
+cd <jetty-dir>/webapps
+ln -s ../../../simplewiki ./simplewiki
+7) change paths in <wiki-dir>/build.xml
+8) update links in <scalaris-dir>/java-api/test-lib
