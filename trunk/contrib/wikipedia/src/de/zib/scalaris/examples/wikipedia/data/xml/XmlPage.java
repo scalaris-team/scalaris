@@ -296,6 +296,7 @@ public class XmlPage extends DefaultHandler {
                     Revision curRev = currentRevision.getRevision();
                     if (maxTime == null ||
                             !Revision.stringToCalendar(curRev.getTimestamp()).after(maxTime)) {
+                        curRev.setUnpackedText(currentRevision.getText());
                         revisions.put(curRev.getId(), curRev);
                         if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
                             revisions.remove(revisions.firstKey());
