@@ -184,7 +184,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             wikiModel.setUp();
             final String pageTitle = page.getTitle();
             wikiModel.setPageName(pageTitle);
-            wikiModel.render(null, page.getCurRev().getText());
+            wikiModel.render(null, page.getCurRev().unpackedText());
             
             // categories:
             do {

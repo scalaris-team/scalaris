@@ -12,6 +12,7 @@
     <pathelement location="contrib/bliki-core-3.0.17-SNAPSHOT.jar"/>
     <pathelement location="contrib/commons-lang-2.6.jar"/>
     <pathelement location="contrib/commons-compress-1.1.jar"/>
+    <pathelement location="contrib/commons-codec-1.4.jar"/>
     <pathelement location="contrib/sqlite4java.jar"/>
     <pathelement location="contrib/stringtotime-1.0.4.jar"/>
   </path>

@@ -157,7 +157,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
             RevisionResult getRevResult = ScalarisDataHandler.getRevision(model.connection, parameter);
             int size = 0;
             if (getRevResult.success) {
-                size = getRevResult.revision.getText().getBytes().length;
+                size = getRevResult.revision.unpackedText().getBytes().length;
             }
             return model.formatStatisticNumber(rawNumber, size);
 //      } else if (name.equals(MAGIC_REVISION_ID)) {

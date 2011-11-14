@@ -203,7 +203,8 @@ public class XmlRevision extends DefaultHandler {
      */
     public void endRevision(String uri, String localName, String qName) {
         final_revision = new Revision(Integer.parseInt(id), timestamp,
-                minorChange, currentContributor.getContributor(), comment, text);
+                minorChange, currentContributor.getContributor(), comment);
+        final_revision.setUnpackedText(text);
     }
 
     /**
