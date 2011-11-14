@@ -204,7 +204,6 @@ public class XmlRevision extends DefaultHandler {
     public void endRevision(String uri, String localName, String qName) {
         final_revision = new Revision(Integer.parseInt(id), timestamp,
                 minorChange, currentContributor.getContributor(), comment);
-        final_revision.setUnpackedText(text);
     }
 
     /**
@@ -255,5 +254,14 @@ public class XmlRevision extends DefaultHandler {
      */
     public Revision getRevision() {
         return final_revision;
+    }
+
+    /**
+     * Gets the revision's (uncompressed) text.
+     * 
+     * @return the text
+     */
+    public String getText() {
+        return text;
     }
 }
