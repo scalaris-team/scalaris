@@ -54,6 +54,7 @@ public class ScalarisDataHandler {
     public final static String getSiteInfoKey() {
         return "siteinfo";
     }
+    
     /**
      * Gets the key to store the (complete) list of pages at.
      * 
@@ -62,6 +63,7 @@ public class ScalarisDataHandler {
     public final static String getPageListKey() {
         return "pages";
     }
+    
     /**
      * Gets the key to store the number of pages at.
      * 
@@ -70,6 +72,7 @@ public class ScalarisDataHandler {
     public final static String getPageCountKey() {
         return "pages:count";
     }
+    
     /**
      * Gets the key to store the (complete) list of articles, i.e. pages in
      * the main namespace) at.
@@ -79,6 +82,7 @@ public class ScalarisDataHandler {
     public final static String getArticleListKey() {
         return "articles";
     }
+    
     /**
      * Gets the key to store the number of articles, i.e. pages in the main
      * namespace, at.
@@ -88,6 +92,7 @@ public class ScalarisDataHandler {
     public final static String getArticleCountKey() {
         return "articles:count";
     }
+    
     /**
      * Gets the key to store {@link Revision} objects at.
      * 
@@ -99,6 +104,7 @@ public class ScalarisDataHandler {
     public final static String getRevKey(String title, int id) {
         return title + ":rev:" + id;
     }
+    
     /**
      * Gets the key to store {@link Page} objects at.
      * 
@@ -109,6 +115,7 @@ public class ScalarisDataHandler {
     public final static String getPageKey(String title) {
         return MyWikiModel.normalisePageTitle(title) + ":page";
     }
+    
     /**
      * Gets the key to store the list of revisions of a page at.
      * 
@@ -119,6 +126,7 @@ public class ScalarisDataHandler {
     public final static String getRevListKey(String title) {
         return MyWikiModel.normalisePageTitle(title) + ":revs";
     }
+    
     /**
      * Gets the key to store the list of pages belonging to a category at.
      * 
@@ -129,6 +137,18 @@ public class ScalarisDataHandler {
     public final static String getCatPageListKey(String title) {
         return MyWikiModel.normalisePageTitle(title) + ":cpages";
     }
+    
+    /**
+     * Gets the key to store the number of pages belonging to a category at.
+     * 
+     * @param title the category title (including <tt>Category:</tt>)
+     * 
+     * @return Scalaris key
+     */
+    public final static String getCatPageCountKey(String title) {
+        return MyWikiModel.normalisePageTitle(title) + ":cpages:count";
+    }
+    
     /**
      * Gets the key to store the list of pages using a template at.
      * 
@@ -139,6 +159,7 @@ public class ScalarisDataHandler {
     public final static String getTplPageListKey(String title) {
         return MyWikiModel.normalisePageTitle(title) + ":tpages";
     }
+    
     /**
      * Gets the key to store the list of pages linking to the given title.
      * 
@@ -149,6 +170,7 @@ public class ScalarisDataHandler {
     public final static String getBackLinksPageListKey(String title) {
         return MyWikiModel.normalisePageTitle(title) + ":blpages";
     }
+    
     /**
      * Gets the key to store the number of page edits.
      * 
@@ -419,6 +441,20 @@ public class ScalarisDataHandler {
     }
 
     /**
+     * Retrieves the number of pages in the given category from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static BigIntegerResult getPagesInCategoryCount(Connection connection, String title) {
+        return getInteger2(connection, getCatPageCountKey(title), false);
+    }
+
+    /**
      * Retrieves the number of available articles, i.e. pages in the main
      * namespace, from Scalaris.
      * 
@@ -620,10 +656,15 @@ public class ScalarisDataHandler {
         Difference lnkDiff = new Difference(oldLnks, newLnks);
 
         // write differences (categories, templates, backlinks)
-        Difference.GetPageListKey catPageKeygen = new Difference.GetPageListKey() {
+        Difference.GetPageListKey catPageKeygen = new Difference.GetPageListAndCountKey() {
             @Override
             public String getPageListKey(String name) {
                 return getCatPageListKey(wikiModel.getCategoryNamespace() + ":" + name);
+            }
+
+            @Override
+            public String getPageCountKey(String name) {
+                return getCatPageCountKey(wikiModel.getCategoryNamespace() + ":" + name);
             }
         };
         Difference.GetPageListKey tplPageKeygen = new Difference.GetPageListKey() {
@@ -832,6 +873,17 @@ public class ScalarisDataHandler {
             public abstract String getPageListKey(String name);
         }
         
+        static public interface GetPageListAndCountKey extends GetPageListKey {
+            /**
+             * Gets the Scalaris key for a page list counter for the given
+             * article's name.
+             * 
+             * @param name the name of an article
+             * @return the key for Scalaris
+             */
+            public abstract String getPageCountKey(String name);
+        }
+        
         /**
          * Adds read operations to the given request list as required by
          * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}.
@@ -852,6 +904,10 @@ public class ScalarisDataHandler {
             for (Set<String> curList : changes) {
                 for (String name: curList) {
                     readRequests.addRead(keyGen.getPageListKey(name));
+                    if (keyGen instanceof GetPageListAndCountKey) {
+                        GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
+                        readRequests.addRead(keyCountGen.getPageCountKey(name));
+                    }
                     ++ops;
                 }
             }
@@ -914,6 +970,10 @@ public class ScalarisDataHandler {
                     writeRequests.addWrite(scalaris_key, pageList);
                 } catch (Exception e) {
                     return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage());
+                }
+                if (keyGen instanceof GetPageListAndCountKey) {
+                    GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
+                    writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
                 }
             }
             return new SaveResult();

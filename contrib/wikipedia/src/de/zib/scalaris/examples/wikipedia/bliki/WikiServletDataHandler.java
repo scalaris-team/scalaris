@@ -111,6 +111,15 @@ public interface WikiServletDataHandler<Connection> {
     public String getCatPageListKey(String title);
     
     /**
+     * Gets the key to store the number of pages belonging to a category at.
+     * 
+     * @param title the category title (including <tt>Category:</tt>)
+     * 
+     * @return Scalaris key
+     */
+    public String getCatPageCountKey(String title);
+    
+    /**
      * Gets the key to store the list of pages using a template at.
      * 
      * @param title the template title (including <tt>Template:</tt>)
@@ -252,6 +261,18 @@ public interface WikiServletDataHandler<Connection> {
      * @return a result object with the number of articles on success
      */
     public BigIntegerResult getArticleCount(Connection connection);
+
+    /**
+     * Retrieves the number of pages in the given category from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title);
     
     /**
      * Retrieves the number of available articles, i.e. pages in the main

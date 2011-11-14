@@ -390,6 +390,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
+    public String getCatPageCountKey(String title) {
+        return ScalarisDataHandler.getCatPageCountKey(title);
+    }
+
+    @Override
     public String getTplPageListKey(String title) {
         return ScalarisDataHandler.getTplPageListKey(title);
     }
@@ -455,6 +460,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
+    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title) {
+        return ScalarisDataHandler.getPagesInCategoryCount(connection, title);
+    }
+
+    @Override
     public BigIntegerResult getStatsPageEdits(Connection connection) {
         return ScalarisDataHandler.getStatsPageEdits(connection);
     }
@@ -471,5 +481,4 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         return ScalarisDataHandler.savePage(connection, title, newRev,
                 prevRevId, restrictions, siteinfo, username);
     }
-
 }

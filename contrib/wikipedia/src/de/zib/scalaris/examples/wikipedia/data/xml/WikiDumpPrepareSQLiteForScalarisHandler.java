@@ -453,6 +453,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 }
                 catPageList.addAll(category.getValue());
                 writeObject(scalaris_key, catPageList);
+                scalaris_key = ScalarisDataHandler.getCatPageCountKey(category.getKey());
+                writeObject(scalaris_key, catPageList.size());
             }
             newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
         
