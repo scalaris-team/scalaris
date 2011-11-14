@@ -885,7 +885,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         @Override
         public void run() {
             long key_id = pageToId(key);
-            LinkedList<Long> values_id = new LinkedList<Long>();
+            ArrayList<Long> values_id = new ArrayList<Long>(values.size());
             for (String value : values) {
                 values_id.add(pageToId(value));
             }

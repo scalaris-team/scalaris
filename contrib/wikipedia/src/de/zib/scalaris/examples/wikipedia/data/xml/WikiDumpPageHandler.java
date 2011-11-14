@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -26,8 +25,8 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
     protected static final int NEW_TPLS_HASH_DEF_SIZE = 100;
     protected static final int NEW_BLNKS_HASH_DEF_SIZE = 100;
     
-    protected List<String> newPages = new LinkedList<String>();
-    protected List<String> newArticles = new LinkedList<String>();
+    protected ArrayList<String> newPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
+    protected ArrayList<String> newArticles = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
     protected HashMap<String, List<String>> newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
     protected HashMap<String, List<String>> newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
     protected HashMap<String, List<String>> newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
