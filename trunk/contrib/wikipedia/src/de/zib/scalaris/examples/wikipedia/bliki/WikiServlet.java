@@ -167,10 +167,20 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
     /**
      * Sets up the connection to the DB server.
      * 
-     * @param config
-     *            the servlet's configuration
+     * @param request
+     *            the request to the servlet
      */
     abstract protected Connection getConnection(HttpServletRequest request);
+
+    /**
+     * Releases the connection to the DB server, e.g. closes it.
+     * 
+     * @param request
+     *            the request to the servlet
+     * @param conn
+     *            the connection to release
+     */
+    abstract protected void releaseConnection(HttpServletRequest request, Connection conn);
 
     @Override
     public void destroy() {
@@ -190,155 +200,159 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             showImage(request, response, image);
             return;
         }
-        
+
         Connection connection = getConnection(request);
         if (connection == null) {
             showEmptyPage(request, response); // should forward to another page
             return; // return just in case
         }
-        if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
-            showImportPage(request, response, connection); // should forward to another page
-            return; // return just in case
-        }
-        request.setCharacterEncoding("UTF-8");
-        response.setCharacterEncoding("UTF-8");
-        
-        // show empty page for testing purposes if a parameter called "test" exists:
-        if (request.getParameter("test") != null) {
-            showEmptyPage(request, response);
-            return;
-        }
-        
-        // get parameters:
-        String req_title = request.getParameter("title");
-        if (req_title == null) {
-            req_title = MAIN_PAGE;
-        }
-        
-        String req_action = request.getParameter("action");
+        try {
+            if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
+                showImportPage(request, response, connection); // should forward to another page
+                return; // return just in case
+            }
+            request.setCharacterEncoding("UTF-8");
+            response.setCharacterEncoding("UTF-8");
 
-        if (req_title.equals("Special:Random")) {
-            handleViewRandomPage(request, response, connection);
-        } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
-            String req_from = request.getParameter("from");
-            if (req_from == null) {
-                req_from = ""; // shows all pages
-                int slashIndex = req_title.indexOf('/');
-                if (slashIndex != (-1)) {
-                    req_from = req_title.substring(slashIndex + 1);
-                }
+            // show empty page for testing purposes if a parameter called "test" exists:
+            if (request.getParameter("test") != null) {
+                showEmptyPage(request, response);
+                return;
             }
-            String req_to = request.getParameter("to");
-            if (req_to == null) {
-                req_to = ""; // shows all pages
-            }
-            // use default namespace (id 0) for invalid values
-            int nsId = parseInt(request.getParameter("namespace"), 0);
-            WikiPageListBean value = new WikiPageListBean();
-            value.setPageHeading("All pages");
-            value.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
-            value.setFormTitle("All pages");
-            value.setFormType(FormType.FromToForm);
-            value.setFromPage(req_from);
-            value.setToPage(req_to);
-            PageListResult result;
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-                value.setNamespaceId(nsId);
-            }
-            handleViewSpecialPageList(request, response, result, value, connection);
-        } else if (req_title.startsWith("Special:PrefixIndex")) {
-            String req_prefix = request.getParameter("prefix");
-            if (req_prefix == null) {
-                req_prefix = ""; // shows all pages
-                int slashIndex = req_title.indexOf('/');
-                if (slashIndex != (-1)) {
-                    req_prefix = req_title.substring(slashIndex + 1);
-                }
-            }
-            // use default namespace (id 0) for invalid values
-            int nsId = parseInt(request.getParameter("namespace"), 0);
-            WikiPageListBean value = new WikiPageListBean();
-            value.setPageHeading("All pages");
-            value.setTitle("Special:PrefixIndex&prefix=" + req_prefix);
-            value.setFormTitle("All pages");
-            value.setFormType(FormType.PagePrefixForm);
-            value.setPrefix(req_prefix);
-            PageListResult result;
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-                value.setNamespaceId(nsId);
-            }
-            handleViewSpecialPageList(request, response, result, value, connection);
-        } else if (req_title.startsWith("Special:Search")) {
-            String req_search = request.getParameter("search");
-            if (req_search == null) {
-                req_search = ""; // shows all pages
-                int slashIndex = req_title.indexOf('/');
-                if (slashIndex != (-1)) {
-                    req_search = req_title.substring(slashIndex + 1);
-                }
-            }
-            // use default namespace (id 0) for invalid values
-            int nsId = parseInt(request.getParameter("namespace"), 0);
-            WikiPageListBean value = new WikiPageListBean();
-            value.setPageHeading("Search");
-            value.setTitle("Special:Search&search=" + req_search);
-            value.setFormTitle("Search results");
-            value.setFormType(FormType.PageSearchForm);
-            value.setSearch(req_search);
-            PageListResult result;
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-                value.setNamespaceId(nsId);
-            }
-            handleViewSpecialPageList(request, response, result, value, connection);
-        } else if (req_title.startsWith("Special:WhatLinksHere")) {
-            String req_target = request.getParameter("target");
-            if (req_target == null) {
-                req_target = ""; // will show an empty page list
-                // maybe we got the name separated with a '/' in the title:
-                int slashIndex = req_title.indexOf('/');
-                if (slashIndex != (-1)) {
-                    req_target = req_title.substring(slashIndex + 1);
-                }
-            }
-            WikiPageListBean value = new WikiPageListBean();
-            value.setPageHeading("Pages that link to \"" + req_target + "\"");
-            value.setTitle("Special:WhatLinksHere&target=" + req_target);
-            value.setFormTitle("What links here");
-            value.setFormType(FormType.TargetPageForm);
-            value.setTarget(req_target);
-            PageListResult result = getPagesLinkingTo(connection, req_target, namespace);
-            handleViewSpecialPageList(request, response, result, value, connection);
-        } else if (req_title.equals("Special:SpecialPages")) {
-            handleViewSpecialPages(request, response, connection);
-        } else if (req_title.equals("Special:Statistics")) {
-            handleViewSpecialStatistics(request, response, connection);
-        } else if (req_title.equals("Special:Version")) {
-            handleViewSpecialVersion(request, response, connection);
-        } else if (req_action == null || req_action.equals("view")) {
-            handleViewPage(request, response, req_title, connection);
-        } else if (req_action.equals("history")) {
-            handleViewPageHistory(request, response, req_title, connection);
-        } else if (req_action.equals("edit")) {
-            handleEditPage(request, response, req_title, connection);
-        } else {
-            // default: show page
-            handleViewPage(request, response, req_title, connection);
-        }
 
-        // if the request has not been forwarded, print a general error
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
-        out.write("An unknown error occured, please contact your administrator. A server restart may be required.");
-        out.close();
+            // get parameters:
+            String req_title = request.getParameter("title");
+            if (req_title == null) {
+                req_title = MAIN_PAGE;
+            }
+
+            String req_action = request.getParameter("action");
+
+            if (req_title.equals("Special:Random")) {
+                handleViewRandomPage(request, response, connection);
+            } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
+                String req_from = request.getParameter("from");
+                if (req_from == null) {
+                    req_from = ""; // shows all pages
+                    int slashIndex = req_title.indexOf('/');
+                    if (slashIndex != (-1)) {
+                        req_from = req_title.substring(slashIndex + 1);
+                    }
+                }
+                String req_to = request.getParameter("to");
+                if (req_to == null) {
+                    req_to = ""; // shows all pages
+                }
+                // use default namespace (id 0) for invalid values
+                int nsId = parseInt(request.getParameter("namespace"), 0);
+                WikiPageListBean value = new WikiPageListBean();
+                value.setPageHeading("All pages");
+                value.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
+                value.setFormTitle("All pages");
+                value.setFormType(FormType.FromToForm);
+                value.setFromPage(req_from);
+                value.setToPage(req_to);
+                PageListResult result;
+                if (nsId == 0) {
+                    result = getArticleList(connection);
+                } else {
+                    result = getPageList(connection);
+                    value.setNamespaceId(nsId);
+                }
+                handleViewSpecialPageList(request, response, result, value, connection);
+            } else if (req_title.startsWith("Special:PrefixIndex")) {
+                String req_prefix = request.getParameter("prefix");
+                if (req_prefix == null) {
+                    req_prefix = ""; // shows all pages
+                    int slashIndex = req_title.indexOf('/');
+                    if (slashIndex != (-1)) {
+                        req_prefix = req_title.substring(slashIndex + 1);
+                    }
+                }
+                // use default namespace (id 0) for invalid values
+                int nsId = parseInt(request.getParameter("namespace"), 0);
+                WikiPageListBean value = new WikiPageListBean();
+                value.setPageHeading("All pages");
+                value.setTitle("Special:PrefixIndex&prefix=" + req_prefix);
+                value.setFormTitle("All pages");
+                value.setFormType(FormType.PagePrefixForm);
+                value.setPrefix(req_prefix);
+                PageListResult result;
+                if (nsId == 0) {
+                    result = getArticleList(connection);
+                } else {
+                    result = getPageList(connection);
+                    value.setNamespaceId(nsId);
+                }
+                handleViewSpecialPageList(request, response, result, value, connection);
+            } else if (req_title.startsWith("Special:Search")) {
+                String req_search = request.getParameter("search");
+                if (req_search == null) {
+                    req_search = ""; // shows all pages
+                    int slashIndex = req_title.indexOf('/');
+                    if (slashIndex != (-1)) {
+                        req_search = req_title.substring(slashIndex + 1);
+                    }
+                }
+                // use default namespace (id 0) for invalid values
+                int nsId = parseInt(request.getParameter("namespace"), 0);
+                WikiPageListBean value = new WikiPageListBean();
+                value.setPageHeading("Search");
+                value.setTitle("Special:Search&search=" + req_search);
+                value.setFormTitle("Search results");
+                value.setFormType(FormType.PageSearchForm);
+                value.setSearch(req_search);
+                PageListResult result;
+                if (nsId == 0) {
+                    result = getArticleList(connection);
+                } else {
+                    result = getPageList(connection);
+                    value.setNamespaceId(nsId);
+                }
+                handleViewSpecialPageList(request, response, result, value, connection);
+            } else if (req_title.startsWith("Special:WhatLinksHere")) {
+                String req_target = request.getParameter("target");
+                if (req_target == null) {
+                    req_target = ""; // will show an empty page list
+                    // maybe we got the name separated with a '/' in the title:
+                    int slashIndex = req_title.indexOf('/');
+                    if (slashIndex != (-1)) {
+                        req_target = req_title.substring(slashIndex + 1);
+                    }
+                }
+                WikiPageListBean value = new WikiPageListBean();
+                value.setPageHeading("Pages that link to \"" + req_target + "\"");
+                value.setTitle("Special:WhatLinksHere&target=" + req_target);
+                value.setFormTitle("What links here");
+                value.setFormType(FormType.TargetPageForm);
+                value.setTarget(req_target);
+                PageListResult result = getPagesLinkingTo(connection, req_target, namespace);
+                handleViewSpecialPageList(request, response, result, value, connection);
+            } else if (req_title.equals("Special:SpecialPages")) {
+                handleViewSpecialPages(request, response, connection);
+            } else if (req_title.equals("Special:Statistics")) {
+                handleViewSpecialStatistics(request, response, connection);
+            } else if (req_title.equals("Special:Version")) {
+                handleViewSpecialVersion(request, response, connection);
+            } else if (req_action == null || req_action.equals("view")) {
+                handleViewPage(request, response, req_title, connection);
+            } else if (req_action.equals("history")) {
+                handleViewPageHistory(request, response, req_title, connection);
+            } else if (req_action.equals("edit")) {
+                handleEditPage(request, response, req_title, connection);
+            } else {
+                // default: show page
+                handleViewPage(request, response, req_title, connection);
+            }
+
+            // if the request has not been forwarded, print a general error
+            response.setContentType("text/html");
+            PrintWriter out = response.getWriter();
+            out.write("An unknown error occured, please contact your administrator. A server restart may be required.");
+            out.close();
+        } finally {
+            releaseConnection(request, connection);
+        }
     }
 
     /*
@@ -355,20 +369,24 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             showEmptyPage(request, response); // should forward to another page
             return; // return just in case
         }
-        if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
-            showImportPage(request, response, connection); // should forward to another page
-            return; // return just in case
+        try {
+            if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
+                showImportPage(request, response, connection); // should forward to another page
+                return; // return just in case
+            }
+            request.setCharacterEncoding("UTF-8");
+            response.setCharacterEncoding("UTF-8");
+
+            handleEditPageSubmitted(request, response, request.getParameter("title"), connection);
+
+            // if the request has not been forwarded, print a general error
+            response.setContentType("text/html");
+            PrintWriter out = response.getWriter();
+            out.write("An unknown error occured, please contact your administrator. A server restart may be required.");
+            out.close();
+        } finally {
+            releaseConnection(request, connection);
         }
-        request.setCharacterEncoding("UTF-8");
-        response.setCharacterEncoding("UTF-8");
-        
-        handleEditPageSubmitted(request, response, request.getParameter("title"), connection);
-        
-        // if the request has not been forwarded, print a general error
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
-        out.write("An unknown error occured, please contact your administrator. A server restart may be required.");
-        out.close();
     }
 
     /**

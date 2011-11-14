@@ -41,6 +41,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.RoundRobinConnectionPolicy;
+import de.zib.scalaris.ConnectionPool;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
@@ -65,8 +66,10 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
 public class WikiServletScalaris extends WikiServlet<Connection> {
 
     private static final long serialVersionUID = 1L;
+    private static final int CONNECTION_POOL_SIZE = 100;
+    private static final int MAX_WAIT_FOR_CONNECTION = 10000; // 10s
     
-    private ConnectionFactory cFactory;
+    private ConnectionPool cPool;
 
     /**
      * Default constructor creating the servlet.
@@ -97,6 +100,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             properties = null;
         }
         
+        ConnectionFactory cFactory;
         if (properties != null) {
             cFactory = new ConnectionFactory(properties);
         } else {
@@ -109,6 +113,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         cFactory.setClientNameAppendUUID(true);
         cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
+        cPool = new ConnectionPool(cFactory, CONNECTION_POOL_SIZE);
         loadSiteInfo();
         loadPlugins();
     }
@@ -123,7 +128,12 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     protected synchronized boolean loadSiteInfo() {
         TransactionSingleOp scalaris_single;
         try {
-            scalaris_single = new TransactionSingleOp(cFactory.createConnection());
+            Connection conn = cPool.getConnection(MAX_WAIT_FOR_CONNECTION);
+            if (conn == null) {
+                System.err.println("Could not get a connection to Scalaris for siteinfo, waited " + MAX_WAIT_FOR_CONNECTION + "ms");
+                return false;
+            }
+            scalaris_single = new TransactionSingleOp(conn);
             try {
                 siteinfo = scalaris_single.read("siteinfo").jsonValue(SiteInfo.class);
                 // TODO: fix siteinfo's base url
@@ -144,13 +154,19 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     /**
      * Sets up the connection to the Scalaris erlang node once on the server.
      * 
-     * @param config
-     *            the servlet's configuration
+     * @param request
+     *            the request to the servlet
      */
     @Override
     protected Connection getConnection(HttpServletRequest request) {
         try {
-            return cFactory.createConnection();
+            Connection conn = cPool.getConnection(MAX_WAIT_FOR_CONNECTION);
+            if (conn == null) {
+                System.err.println("Could not get a connection to Scalaris, waited " + MAX_WAIT_FOR_CONNECTION + "ms");
+                addToParam_notice(request, "error: <pre>Could not get a connection to Scalaris, waited " + MAX_WAIT_FOR_CONNECTION + "ms</pre>");
+                return null;
+            }
+            return conn;
         } catch (Exception e) {
             if (request != null) {
                 addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
@@ -160,6 +176,19 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             }
             return null;
         }
+    }
+
+    /**
+     * Releases the connection back into the Scalaris connection pool.
+     * 
+     * @param request
+     *            the request to the servlet
+     * @param conn
+     *            the connection to release
+     */
+    @Override
+    protected void releaseConnection(HttpServletRequest request, Connection conn) {
+        cPool.releaseConnection(conn);
     }
     
     /**
@@ -226,11 +255,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     ps.println("starting import...");
                     String fileName = dumpsPath + File.separator + req_import;
                     if (fileName.endsWith(".db")) {
-                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, cFactory);
+                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, cPool.getConnectionFactory());
                     } else {
                         importHandler = new WikiDumpToScalarisHandler(
                                 de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
-                                null, maxRevisions, null, maxTime, cFactory);
+                                null, maxRevisions, null, maxTime, cPool.getConnectionFactory());
                     }
                     importHandler.setMsgOut(ps);
                     this.new ImportThread(importHandler, fileName, ps).start();
