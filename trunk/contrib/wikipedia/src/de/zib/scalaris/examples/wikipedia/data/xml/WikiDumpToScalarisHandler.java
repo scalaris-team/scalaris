@@ -232,8 +232,9 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
-            scalaris_key = ScalarisDataHandler.getCatPageListKey(category.getKey());
-            worker = new MyScalarisAddToPageListRunnable(scalaris_key, category.getValue(), scalaris_tx);
+            final String catName = category.getKey();
+            scalaris_key = ScalarisDataHandler.getCatPageListKey(catName);
+            worker = new MyScalarisAddToPageListRunnable(scalaris_key, category.getValue(), scalaris_tx, ScalarisDataHandler.getCatPageCountKey(catName));
             executor.execute(worker);
         }
         newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);

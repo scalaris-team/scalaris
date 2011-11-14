@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
-import de.zib.scalaris.examples.wikipedia.PageListResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 
@@ -205,12 +204,10 @@ public class MyScalarisMagicWord extends MyMagicWord {
 //            {{NUMBEROFACTIVEUSERS}}
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
             String category = MyWikiModel.createFullPageName(model.getCategoryNamespace(), parameter.trim());
-            PageListResult catListResult = ScalarisDataHandler.getPagesInCategory(model.connection, category);
-            int number = 0;
+            BigIntegerResult catListResult = ScalarisDataHandler.getPagesInCategoryCount(model.connection, category);
             if (catListResult.success) {
-                number = catListResult.pages.size();
+                return model.formatStatisticNumber(rawNumber, catListResult.number);
             }
-            return model.formatStatisticNumber(rawNumber, number);
 //            {{NUMBERINGROUP:groupname}}
 //            {{NUMINGROUP:groupname}}
 //        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE) || name.equals(MAGIC_PAGES_IN_NS)) {
