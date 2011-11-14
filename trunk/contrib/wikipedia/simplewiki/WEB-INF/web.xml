@@ -4,12 +4,12 @@
 	<servlet>
 		<description>
 		</description>
-		<display-name>WikiServlet</display-name>
-		<servlet-name>WikiServlet</servlet-name>
-		<servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServlet</servlet-class>
+		<display-name>WikiServletScalaris</display-name>
+		<servlet-name>WikiServletScalaris</servlet-name>
+		<servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
 	</servlet>
 	<servlet-mapping>
-		<servlet-name>WikiServlet</servlet-name>
+		<servlet-name>WikiServletScalaris</servlet-name>
 		<url-pattern>/wiki</url-pattern>
 	</servlet-mapping><welcome-file-list>
 		<welcome-file>index.jsp</welcome-file>
