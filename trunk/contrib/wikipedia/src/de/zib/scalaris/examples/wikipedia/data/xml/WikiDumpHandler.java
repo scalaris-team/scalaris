@@ -84,15 +84,19 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions (useful to
      *            create dumps of a wiki at a specific point in time)
      */
-    public WikiDumpHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar maxTime) {
+    public WikiDumpHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions, Calendar minTime, Calendar maxTime) {
         this.blacklist = blacklist;
         this.whitelist = whitelist;
-        currentPage = new XmlPage(maxRevisions, maxTime);
+        currentPage = new XmlPage(maxRevisions, minTime, maxTime);
         // if a whitelist is given, do not render any other page:
         if (whitelist != null) {
             currentPage.setCheckSkipRevisions(new CheckSkipRevisions() {

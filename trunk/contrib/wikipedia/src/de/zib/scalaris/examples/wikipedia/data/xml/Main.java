@@ -100,30 +100,45 @@ public class Main {
     private static void doImport(String filename, String[] args, boolean prepare) throws RuntimeException, IOException,
             SAXException, FileNotFoundException {
         
+        int i = 0;
         int maxRevisions = -1;
-        if (args.length >= 1) {
+        if (args.length > i) {
             try {
-                maxRevisions = Integer.parseInt(args[0]);
+                maxRevisions = Integer.parseInt(args[i]);
             } catch (NumberFormatException e) {
-                System.err.println("no number: " + args[0]);
+                System.err.println("no number: " + args[i]);
                 System.exit(-1);
             }
         }
+        ++i;
+        
+        // a timestamp in ISO8601 format
+        Calendar minTime = null;
+        if (args.length > i && !args[i].isEmpty()) {
+            try {
+                minTime = Revision.stringToCalendar(args[i]);
+            } catch (IllegalArgumentException e) {
+                System.err.println("no date in ISO8601: " + args[i]);
+                System.exit(-1);
+            }
+        }
+        ++i;
         
         // a timestamp in ISO8601 format
         Calendar maxTime = null;
-        if (args.length >= 2 && !args[1].isEmpty()) {
+        if (args.length > i && !args[i].isEmpty()) {
             try {
-                maxTime = Revision.stringToCalendar(args[1]);
+                maxTime = Revision.stringToCalendar(args[i]);
             } catch (IllegalArgumentException e) {
-                System.err.println("no date in ISO8601: " + args[1]);
+                System.err.println("no date in ISO8601: " + args[i]);
                 System.exit(-1);
             }
         }
+        ++i;
         
         Set<String> whitelist = null;
-        if (args.length >= 3 && !args[2].isEmpty()) {
-            FileReader inFile = new FileReader(args[2]);
+        if (args.length > i && !args[i].isEmpty()) {
+            FileReader inFile = new FileReader(args[i]);
             BufferedReader br = new BufferedReader(inFile);
             whitelist = new HashSet<String>();
             String line;
@@ -136,18 +151,20 @@ public class Main {
                 whitelist = null;
             }
         }
+        ++i;
 
         if (prepare) {
             // only prepare the import to Scalaris, i.e. pre-process K/V pairs?
             String dbFileName = "";
-            if (args.length >= 4 && !args[3].isEmpty()) {
-                dbFileName = args[3];
+            if (args.length > i && !args[i].isEmpty()) {
+                dbFileName = args[i];
             } else {
                 System.err.println("need a DB file name for prepare; arguments given: " + Arrays.toString(args));
                 System.exit(-1);
             }
+            ++i;
             WikiDumpHandler handler =
-                    new WikiDumpPrepareSQLiteForScalarisHandler(blacklist, whitelist, maxRevisions, maxTime, dbFileName);
+                    new WikiDumpPrepareSQLiteForScalarisHandler(blacklist, whitelist, maxRevisions, minTime, maxTime, dbFileName);
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
         } else {
@@ -163,7 +180,7 @@ public class Main {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             } else {
                 WikiDumpHandler handler =
-                        new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, maxTime);
+                        new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, minTime, maxTime);
                 InputSource file = getFileReader(filename);
                 runXmlHandler(handler, file);
             }
@@ -203,40 +220,44 @@ public class Main {
      */
     private static void doFilter(String filename, String[] args) throws RuntimeException, IOException,
             SAXException, FileNotFoundException {
+        int i = 0;
         int recursionLvl = 1;
-        if (args.length >= 1) {
+        if (args.length > i) {
             try {
-                recursionLvl = Integer.parseInt(args[0]);
+                recursionLvl = Integer.parseInt(args[i]);
             } catch (NumberFormatException e) {
-                System.err.println("no number: " + args[0]);
+                System.err.println("no number: " + args[i]);
                 System.exit(-1);
             }
         }
+        ++i;
         
         // a timestamp in ISO8601 format
         Calendar maxTime = null;
-        if (args.length >= 2 && !args[1].isEmpty()) {
+        if (args.length > i && !args[i].isEmpty()) {
             try {
-                maxTime = Revision.stringToCalendar(args[1]);
+                maxTime = Revision.stringToCalendar(args[i]);
             } catch (IllegalArgumentException e) {
-                System.err.println("no date in ISO8601: " + args[1]);
+                System.err.println("no date in ISO8601: " + args[i]);
                 System.exit(-1);
             }
         }
+        ++i;
 
         String pageListFileName = "";
-        if (args.length >= 3 && !args[2].isEmpty()) {
-            pageListFileName = args[2];
+        if (args.length > i && !args[i].isEmpty()) {
+            pageListFileName = args[i];
         } else {
             System.err.println("need a pagelist file name for filter; arguments given: " + Arrays.toString(args));
             System.exit(-1);
         }
+        ++i;
         
         Set<String> allowedPages = new HashSet<String>();
         allowedPages.add("Main Page");
         allowedPages.add("MediaWiki:Noarticletext");
-        if (args.length >= 4 && !args[3].isEmpty()) {
-            FileReader inFile = new FileReader(args[3]);
+        if (args.length > i && !args[i].isEmpty()) {
+            FileReader inFile = new FileReader(args[i]);
             BufferedReader br = new BufferedReader(inFile);
             String line;
             while ((line = br.readLine()) != null) {
@@ -245,10 +266,11 @@ public class Main {
                 }
             }
         }
+        ++i;
         
         LinkedList<String> rootCategories = new LinkedList<String>();
-        if (args.length >= 5) {
-            for (String rCat : Arrays.asList(args).subList(4, args.length)) {
+        if (args.length > i) {
+            for (String rCat : Arrays.asList(args).subList(i, args.length)) {
                 if (!rCat.isEmpty()) {
                     rootCategories.add(rCat);
                 }
@@ -310,7 +332,7 @@ public class Main {
             // included as well
             WikiDumpHandler.println(System.out, "building category tree from " + filename + " ...");
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(
-                    blacklist, maxTime, trees.getPath());
+                    blacklist, null, maxTime, trees.getPath());
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),

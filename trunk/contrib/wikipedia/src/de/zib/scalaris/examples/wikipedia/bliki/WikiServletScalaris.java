@@ -230,7 +230,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     } else {
                         importHandler = new WikiDumpToScalarisHandler(
                                 de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
-                                null, maxRevisions, maxTime, cFactory);
+                                null, maxRevisions, null, maxTime, cFactory);
                     }
                     importHandler.setMsgOut(ps);
                     this.new ImportThread(importHandler, fileName, ps).start();
