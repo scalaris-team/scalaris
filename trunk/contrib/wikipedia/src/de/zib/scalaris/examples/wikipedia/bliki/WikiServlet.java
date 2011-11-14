@@ -24,8 +24,8 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -517,9 +518,10 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
                 PageListResult catPagesResult = getPagesInCategory(connection, title, namespace);
                 if (catPagesResult.success) {
-                    LinkedList<String> subCategories = new LinkedList<String>();
-                    LinkedList<String> categoryPages = new LinkedList<String>();
-                    final List<String> catPageList = wikiModel.denormalisePageTitles(catPagesResult.pages);
+                    TreeSet<String> subCategories = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+                    TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+                    final List<String> catPageList = new ArrayList<String>(catPagesResult.pages.size());
+                    wikiModel.denormalisePageTitles(catPagesResult.pages, catPageList);
                     for (String page: catPageList) {
                         String pageNamespace = wikiModel.getNamespace(page);
                         if (wikiModel.isCategoryNamespace(pageNamespace)) {
@@ -528,7 +530,8 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                             // all pages using a template are in the category, too
                             PageListResult tplResult = getPagesInTemplate(connection, page, namespace);
                             if (tplResult.success) {
-                                final List<String> tplPageList = wikiModel.denormalisePageTitles(tplResult.pages);
+                                final List<String> tplPageList = new ArrayList<String>(tplResult.pages.size());
+                                wikiModel.denormalisePageTitles(tplResult.pages, tplPageList);
                                 categoryPages.addAll(tplPageList);
                             } else {
                                 if (tplResult.connect_failed) {
@@ -542,8 +545,6 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                             categoryPages.add(page);
                         }
                     }
-                    Collections.sort(subCategories);
-                    Collections.sort(categoryPages);
                     value.setSubCategories(subCategories);
                     value.setCategoryPages(categoryPages);
                 } else {
@@ -724,9 +725,9 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             WikiPageListBean value, Connection connection)
             throws ServletException, IOException {
         if (result.success) {
-            final List<String> pageList = MyWikiModel.denormalisePageTitles(result.pages, namespace);
+            final TreeSet<String> pageList = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+            MyWikiModel.denormalisePageTitles(result.pages, namespace, pageList);
             value.setNotice(WikiServlet.getParam_notice(request));
-            Collections.sort(pageList, String.CASE_INSENSITIVE_ORDER);
             String nsPrefix = namespace.getNamespaceByNumber(value.getNamespaceId());
             if (!nsPrefix.isEmpty()) {
                 nsPrefix += ":";

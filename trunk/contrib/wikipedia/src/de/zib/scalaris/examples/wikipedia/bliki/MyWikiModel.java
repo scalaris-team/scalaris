@@ -809,11 +809,13 @@ public class MyWikiModel extends WikiModel {
      * 
      * @param titles
      *            the normalised page titles
+     * @param denormalisedTitles
+     *            the container to write the de-normalised titles to
      * 
      * @return the original page title
      */
-    public <T extends Collection<String>> T denormalisePageTitles(final T titles) {
-        return MyWikiModel.<T>denormalisePageTitles(titles, getNamespace());
+    public <T extends Collection<String>> T denormalisePageTitles(final T titles, T denormalisedTitles) {
+        return MyWikiModel.<T>denormalisePageTitles(titles, getNamespace(), denormalisedTitles);
     }
     
     /**
@@ -826,24 +828,12 @@ public class MyWikiModel extends WikiModel {
      *            the normalised page titles
      * @param nsObject
      *            the namespace for determining how to split the title
+     * @param denormalisedTitles
+     *            the container to write the de-normalised titles to
      * 
      * @return the original page title
      */
-    public static <T extends Collection<String>> T denormalisePageTitles(final T titles, final MyNamespace nsObject) {
-        @SuppressWarnings("unchecked")
-        Class<T> clazz = (Class<T>) titles.getClass();
-        T denormalisedTitles;
-        try {
-            denormalisedTitles = clazz.getConstructor(int.class).newInstance(titles.size());
-        } catch (NoSuchMethodException e) {
-            try {
-                denormalisedTitles = clazz.newInstance();
-            } catch (Exception e1) {
-                throw new RuntimeException(e);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    public static <T extends Collection<String>> T denormalisePageTitles(final T titles, final MyNamespace nsObject, T denormalisedTitles) {
         for (String title: titles) {
             denormalisedTitles.add(MyWikiModel.denormalisePageTitle(title, nsObject));
         }
