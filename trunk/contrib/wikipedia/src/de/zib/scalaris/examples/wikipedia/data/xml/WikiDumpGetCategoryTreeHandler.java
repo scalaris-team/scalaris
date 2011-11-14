@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.FileNotFoundException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -238,7 +239,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         ++pageCount;
         // only export page list every UPDATE_PAGELIST_EVERY pages:
         if ((pageCount % PRINT_PAGES_EVERY) == 0) {
-            msgOut.println("processed pages: " + pageCount);
+            println("processed pages: " + pageCount);
         }
     }
 
@@ -411,6 +412,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            information about page includes
      * @param referenceTree
      *            information about references to a page
+     * @param msgOut
+     *            the output stream to write status messages to
      *            
      * @return full list of allowed pages
      * 
@@ -421,14 +424,15 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             Set<String> allowedCats, Set<String> allowedPages, int depth,
             Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree) throws RuntimeException {
+            Map<String, Set<String>> referenceTree,
+            PrintStream msgOut) throws RuntimeException {
         SQLiteConnection db = null;
         try {
             db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
             db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
 
             Set<String> allowedCatsFull = getSubCategories(allowedCats, db,
-                    templateTree, includeTree, referenceTree);
+                    templateTree, includeTree, referenceTree, msgOut);
 
             Set<String> currentPages = new HashSet<String>();
             currentPages.addAll(allowedPages);
@@ -436,7 +440,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             currentPages.addAll(getPagesDirectlyInCategories(allowedCatsFull, db));
 
             Set<String> pages = getRecursivePages(currentPages, depth, db,
-                    templateTree, includeTree, referenceTree);
+                    templateTree, includeTree, referenceTree, msgOut);
             
             // no need to drop table - we set temporary tables to be in-memory only
 //            db.exec("DROP TABLE currentPages;");
@@ -468,6 +472,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            information about page includes
      * @param referenceTree
      *            information about references to a page
+     * @param msgOut
+     *            the output stream to write status messages to
      * 
      * @return the set of the given categories and all their sub-categories
      * 
@@ -477,7 +483,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static Set<String> getSubCategories(Set<String> allowedCats,
             SQLiteConnection db, Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree) throws SQLiteException {
+            Map<String, Set<String>> referenceTree,
+            PrintStream msgOut) throws SQLiteException {
         Set<String> allowedCatsFull = new HashSet<String>();
         Set<String> currentPages = new HashSet<String>();
         Set<String> newPages = new HashSet<String>();
@@ -490,7 +497,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 SiteInfo siteInfo = readSiteInfo(db);
                 MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
 
-                System.out.println(" determining sub-categories of " + allowedCats.toString() + "");
+                println(msgOut, " determining sub-categories of " + allowedCats.toString() + "");
                 do {
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
                     for (String pageTitle : currentPages) {
@@ -502,7 +509,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     }
                     stmt.dispose();
 
-                    System.out.println("  adding sub-categories of " + currentPages.size() + " categories or templates");
+                    println(msgOut, "  adding sub-categories of " + currentPages.size() + " categories or templates");
                     // add all categories the page belongs to
                     stmt = db
                             .prepare("SELECT page.title FROM categories " +
@@ -515,7 +522,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
-                    System.out.println("  adding sub-templates or -categories of " + currentPages.size() + " categories or templates");
+                    println(msgOut, "  adding sub-templates or -categories of " + currentPages.size() + " categories or templates");
                     // add all templates (and their requirements) of the pages
                     stmt = db
                             .prepare("SELECT page.title FROM templates " +
@@ -534,7 +541,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     if (newPages.isEmpty()) {
                         break;
                     } else {
-                        System.out.println(" adding " + newPages.size() + " dependencies");
+                        println(msgOut, " adding " + newPages.size() + " dependencies");
                         currentPages = newPages;
                         newPages = new HashSet<String>();
                     }
@@ -623,6 +630,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            information about page includes
      * @param referenceTree
      *            information about references to a page
+     * @param msgOut
+     *            the output stream to write status messages to
      * 
      * @return the whole set of pages
      * 
@@ -632,7 +641,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     private static Set<String> getRecursivePages(Set<String> currentPages,
             int depth, SQLiteConnection db, Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree)
+            Map<String, Set<String>> referenceTree,
+            PrintStream msgOut)
             throws SQLiteException {
         Set<String> allPages = new HashSet<String>();
         Set<String> newPages = new HashSet<String>();
@@ -640,8 +650,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         SQLiteStatement stmt = null;
         try {
             while(depth >= 0) {
-                System.out.println("recursion level: " + depth);
-                System.out.println(" adding " + currentPages.size() + " pages");
+                println(msgOut, "recursion level: " + depth);
+                println(msgOut, " adding " + currentPages.size() + " pages");
                 do {
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
                     for (String pageTitle : currentPages) {
@@ -653,7 +663,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     }
                     stmt.dispose();
 
-                    System.out.println("  adding categories of " + currentPages.size() + " pages");
+                    println(msgOut, "  adding categories of " + currentPages.size() + " pages");
                     // add all categories the page belongs to
                     stmt = db
                             .prepare("SELECT cat.title FROM categories " +
@@ -665,7 +675,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                         addToPages(allPages, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
-                    System.out.println("  adding templates of " + currentPages.size() + " pages");
+                    println(msgOut, "  adding templates of " + currentPages.size() + " pages");
                     // add all templates (and their requirements) of the pages
                     stmt = db
                             .prepare("SELECT tpl.title FROM templates " +
@@ -678,7 +688,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                         addToPages(allPages, newPages, tplChildren, includeTree, referenceTree);
                     }
                     stmt.dispose();
-                    System.out.println("  adding links of " + currentPages.size() + " pages");
+                    println(msgOut, "  adding links of " + currentPages.size() + " pages");
                     // add all links of the pages for further processing
                     stmt = db
                             .prepare("SELECT lnk.title FROM links " +
@@ -696,7 +706,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     if (newPages.isEmpty()) {
                         break;
                     } else {
-                        System.out.println(" adding " + newPages.size() + " dependencies");
+                        println(msgOut, " adding " + newPages.size() + " dependencies");
                         currentPages = newPages;
                         newPages = new HashSet<String>();
                     }

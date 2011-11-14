@@ -164,7 +164,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
             final double speed = (((double) importedKeys) * 1000) / timeTaken;
             NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
             nf.setGroupingUsed(true);
-            msgOut.println("Finished import (" + nf.format(speed) + " pages/s)");
+            println("Finished import (" + nf.format(speed) + " pages/s)");
         }
     }
 
@@ -192,7 +192,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      * be consistent.
      */
     public void writeToScalaris() {
-        msgOut.println("Importing key/value pairs to Scalaris...");
+        println("Importing key/value pairs to Scalaris...");
         try {
             importStart();
             SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects;");
@@ -242,7 +242,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
             }
             executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
             
-            msgOut.println("imported K/V pairs to Scalaris: " + importedKeys);
+            println("imported K/V pairs to Scalaris: " + importedKeys);
         }
     }
 
@@ -293,5 +293,30 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     @Override
     public void tearDown() {
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void print(String message) {
+        WikiDumpHandler.print(msgOut, message);
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * Includes a newline character at the end.
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void println(String message) {
+        WikiDumpHandler.println(msgOut, message);
     }
 }

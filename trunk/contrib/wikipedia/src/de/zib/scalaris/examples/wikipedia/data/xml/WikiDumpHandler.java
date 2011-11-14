@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.io.PrintStream;
 import java.text.NumberFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
 import java.util.Set;
 
@@ -327,7 +328,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
             final double speed = (((double) pageCount) * 1000) / timeTaken;
             NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
             nf.setGroupingUsed(true);
-            msgOut.println("Finished import (" + nf.format(speed) + " pages/s)");
+            println("Finished import (" + nf.format(speed) + " pages/s)");
         }
     }
 
@@ -337,6 +338,60 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     @Override
     public void setMsgOut(PrintStream msgOut) {
         this.msgOut = msgOut;
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void print(String message) {
+        print(msgOut, message);
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * Includes a newline character at the end.
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void println(String message) {
+        println(msgOut, message);
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * 
+     * @param msgOut
+     *            the output stream to write to
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    static public void print(PrintStream msgOut, String message) {
+        msgOut.print("[" + (new Date()).toString() + "] " + message);
+    }
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * Includes a newline character at the end.
+     * 
+     * @param msgOut
+     *            the output stream to write to
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    static public void println(PrintStream msgOut, String message) {
+        msgOut.println("[" + (new Date()).toString() + "] " + message);
     }
 
     /**

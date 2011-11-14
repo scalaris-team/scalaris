@@ -255,7 +255,7 @@ public class Main {
                 }
             }
         }
-        System.out.println("filtering by categories " + rootCategories.toString() + " ...");
+        WikiDumpHandler.println(System.out, "filtering by categories " + rootCategories.toString() + " ...");
         TreeSet<String> pages = new TreeSet<String>(
                 getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl));
 
@@ -302,14 +302,14 @@ public class Main {
         File trees = new File(filename + "-trees.db");
         if (trees.exists()) {
             // read trees from tree file
-            System.out.println("reading category tree from " + trees.getName() + " ...");
+            WikiDumpHandler.println(System.out, "reading category tree from " + trees.getName() + " ...");
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
                     templateTree, includeTree, referenceTree);
         } else {
             // build trees from xml file
             // need to get all subcategories recursively, as they must be
             // included as well
-            System.out.println("building category tree from " + filename + " ...");
+            WikiDumpHandler.println(System.out, "building category tree from " + filename + " ...");
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(
                     blacklist, maxTime, trees.getPath());
             InputSource file = getFileReader(filename);
@@ -318,12 +318,12 @@ public class Main {
                     templateTree, includeTree, referenceTree);
         }
 
-        System.out.println("creating list of pages to import (recursion level: " + recursionLvl + ") ...");
+        WikiDumpHandler.println(System.out, "creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         Set<String> allowedCats = new HashSet<String>(rootCategories);
 
         return WikiDumpGetCategoryTreeHandler.getPagesInCategories(
                 trees.getName(), allowedCats, allowedPages, recursionLvl,
-                templateTree, includeTree, referenceTree);
+                templateTree, includeTree, referenceTree, System.out);
     }
     
     /**
