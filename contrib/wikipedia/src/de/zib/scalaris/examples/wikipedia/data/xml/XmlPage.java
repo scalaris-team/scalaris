@@ -68,6 +68,7 @@ public class XmlPage extends DefaultHandler {
     protected boolean skipRevisions;
     
     protected XmlRevision currentRevision = new XmlRevision();
+    protected String lastRevText = null;
     
     protected Page final_page;
 
@@ -82,6 +83,12 @@ public class XmlPage extends DefaultHandler {
      * <tt>null/tt> imports all revisions.
      */
     protected Calendar maxTime;
+    
+    /**
+     * Minimum time a revision should have (only one revision older than this
+     * will be imported) - <tt>null/tt> imports all revisions.
+     */
+    protected Calendar minTime;
 
     /**
      * Creates a new page with an empty title, id and no revision.
@@ -89,13 +96,18 @@ public class XmlPage extends DefaultHandler {
      * @param maxRevisions
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
      */
-    public XmlPage(int maxRevisions, Calendar maxTime) {
+    public XmlPage(int maxRevisions, Calendar minTime, Calendar maxTime) {
         super();
         this.maxRevisions = maxRevisions;
+        this.minTime = minTime;
         this.maxTime = maxTime;
         init();
     }
@@ -121,8 +133,8 @@ public class XmlPage extends DefaultHandler {
     
     /**
      * Resets all instance variables. Afterwards, the object has the same state
-     * as a newly created one with the given {@link #maxRevisions} and
-     * {@link #maxTime}.
+     * as a newly created one with the given {@link #maxRevisions},
+     * {@link #maxTime} and {@link #minTime}.
      */
     public void reset() {
         init();
@@ -267,6 +279,7 @@ public class XmlPage extends DefaultHandler {
         Revision curRev = null;
         if (!revisions.isEmpty()) {
             curRev = revisions.lastEntry().getValue();
+            curRev.setUnpackedText(lastRevText);
         }
         final_page = new Page(title,
                 Integer.parseInt(id), redirect, restrictions_map, curRev);
@@ -294,10 +307,20 @@ public class XmlPage extends DefaultHandler {
                 if (!skipRevisions) {
                     currentRevision.endRevision(uri, localName, qName);
                     Revision curRev = currentRevision.getRevision();
+                    // check rev not too new:
                     if (maxTime == null ||
                             !Revision.stringToCalendar(curRev.getTimestamp()).after(maxTime)) {
-                        curRev.setUnpackedText(currentRevision.getText());
+                        // check rev not too old:
+                        if (minTime != null &&
+                                Revision.stringToCalendar(curRev.getTimestamp()).compareTo(minTime) <= 0) {
+                            // keep only the newest (old) revision
+                            revisions.clear();
+                        }
+                        if (!revisions.isEmpty()) {
+                            revisions.lastEntry().getValue().setUnpackedText(lastRevText);
+                        }
                         revisions.put(curRev.getId(), curRev);
+                        lastRevText = currentRevision.getText();
                         if (maxRevisions != (-1) && revisions.size() > maxRevisions) {
                             revisions.remove(revisions.firstKey());
                         }

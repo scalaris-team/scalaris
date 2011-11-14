@@ -65,6 +65,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
@@ -73,9 +77,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions,
+    public WikiDumpToScalarisHandler(Set<String> blacklist,
+            Set<String> whitelist, int maxRevisions, Calendar minTime,
             Calendar maxTime) throws RuntimeException {
-        super(blacklist, whitelist, maxRevisions, maxTime);
+        super(blacklist, whitelist, maxRevisions, minTime, maxTime);
         init(ConnectionFactory.getInstance());
     }
 
@@ -91,6 +96,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
@@ -101,10 +110,11 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpToScalarisHandler(Set<String> blacklist, Set<String> whitelist, int maxRevisions,
-            Calendar maxTime, ConnectionFactory cFactory)
+    public WikiDumpToScalarisHandler(Set<String> blacklist,
+            Set<String> whitelist, int maxRevisions, Calendar maxTime,
+            Calendar minTime, ConnectionFactory cFactory)
             throws RuntimeException {
-        super(blacklist, whitelist, maxRevisions, maxTime);
+        super(blacklist, whitelist, maxRevisions, minTime, maxTime);
         init(cFactory);
     }
 

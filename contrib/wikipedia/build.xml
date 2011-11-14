@@ -89,7 +89,7 @@
   <target name="build" depends="init">
     <echo message="Download Wiktionary dump:                'ant download'"/>
     <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
-    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
     <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
     <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
       <src path="src"/>
@@ -132,6 +132,10 @@
 
   <target name="import.get.max_revisions" unless="max_revisions">
     <input addproperty="max_revisions" defaultvalue="2" message="Maximum number of revisions per page starting with the most recent one (-1 for all revisions)"/>
+  </target>
+
+  <target name="import.get.min_time" unless="min_time">
+    <input addproperty="min_time" defaultvalue="" message="Import at most one revision older than this date in ISO8601 format, e.g. 2004-01-07T08:09:29Z, (empty for all revisions)"/>
   </target>
 
   <target name="import.get.max_time" unless="max_time">
@@ -183,7 +187,7 @@
 
   <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
 
-  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,import.get.whitelist,scalaris.properties">
+  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
     <fail unless="data">You must specify the data property for 'ant import'.</fail>
     <fail unless="max_revisions">You must specify the max_revisions property for 'ant import'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant import'.</fail>
@@ -194,6 +198,7 @@
       <arg value="${data}"/>
       <arg value="import"/>
       <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
       <arg value="${max_time}"/>
       <arg value="${whitelist}"/>
       <classpath>
@@ -204,7 +209,7 @@
     </java>
   </target>
   
-  <target name="prepare" depends="build,import.get.data,import.get.max_revisions,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+  <target name="prepare" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
     <fail unless="data">You must specify the data property for 'ant prepare'.</fail>
     <fail unless="max_revisions">You must specify the max_revisions property for 'ant prepare'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant prepare'.</fail>
@@ -214,6 +219,7 @@
       <arg value="${data}"/>
       <arg value="prepare"/>
       <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
       <arg value="${max_time}"/>
       <arg value="${whitelist}"/>
       <arg value="${prepare_db}"/>
@@ -225,7 +231,7 @@
     </java>
   </target>
 
-  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
+  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.min_time,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
     <fail unless="data">You must specify the data property for 'ant filter'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant filter'.</fail>
     <fail unless="filtered_pagelist">You must specify the filtered_pagelist property for 'ant filter'.</fail>
@@ -239,6 +245,7 @@
       <arg value="${data}"/>
       <arg value="filter"/>
       <arg value="${recursion_lvl}"/>
+      <arg value="${min_time}"/>
       <arg value="${max_time}"/>
       <arg value="${filtered_pagelist}"/>
       <arg value="${allowed_pages}"/>

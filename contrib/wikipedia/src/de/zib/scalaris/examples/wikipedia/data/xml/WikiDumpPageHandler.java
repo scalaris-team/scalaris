@@ -44,14 +44,18 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
      *            maximum number of revisions per page (starting with the most
      *            recent) - <tt>-1/tt> imports all revisions
      *            (useful to speed up the import / reduce the DB size)
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
      *            (useful to create dumps of a wiki at a specific point in time)
      */
     public WikiDumpPageHandler(Set<String> blacklist, Set<String> whitelist,
-            int maxRevisions, Calendar maxTime) {
-        super(blacklist, whitelist, maxRevisions, maxTime);
+            int maxRevisions, Calendar minTime, Calendar maxTime) {
+        super(blacklist, whitelist, maxRevisions, minTime, maxTime);
     }
 
     /**

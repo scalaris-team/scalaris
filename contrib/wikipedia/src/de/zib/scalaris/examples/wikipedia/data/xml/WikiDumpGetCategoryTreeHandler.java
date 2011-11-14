@@ -65,6 +65,10 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * 
      * @param blacklist
      *            a number of page titles to ignore
+     * @param minTime
+     *            minimum time a revision should have (only one revision older
+     *            than this will be imported) - <tt>null/tt> imports all
+     *            revisions
      * @param maxTime
      *            maximum time a revision should have (newer revisions are
      *            omitted) - <tt>null/tt> imports all revisions
@@ -77,8 +81,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *             if the creation of the SQLite DB fails
      */
     public WikiDumpGetCategoryTreeHandler(Set<String> blacklist,
-            Calendar maxTime, String dbFileName) throws RuntimeException {
-        super(blacklist, null, 1, maxTime);
+            Calendar minTime, Calendar maxTime, String dbFileName)
+            throws RuntimeException {
+        super(blacklist, null, 1, minTime, maxTime);
         this.dbFileName = dbFileName;
     }
     
