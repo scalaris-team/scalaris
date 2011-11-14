@@ -16,20 +16,27 @@ public class Result {
      */
     public String message;
     /**
+     * Indicates whether the connection to the DB failed or not.
+     */
+    public boolean connect_failed;
+    /**
      * Creates a successful result with an empty message.
      */
     public Result() {
         this.success = true;
         this.message = "";
+        this.connect_failed = false;
     }
     /**
      * Creates a new custom result.
      * 
-     * @param success the success status
-     * @param message the message to use
+     * @param success       the success status
+     * @param message       the message to use
+     * @param connectFailed whether the connection to the DB failed or not
      */
-    public Result(boolean success, String message) {
+    public Result(boolean success, String message, boolean connectFailed) {
         this.success = success;
         this.message = message;
+        this.connect_failed = connectFailed;
     }
 }

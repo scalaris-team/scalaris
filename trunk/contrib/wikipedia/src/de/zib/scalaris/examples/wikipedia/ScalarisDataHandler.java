@@ -29,6 +29,7 @@ import java.util.Random;
 import java.util.Set;
 
 import de.zib.scalaris.Connection;
+import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
@@ -201,7 +202,7 @@ public class ScalarisDataHandler {
      */
     public static PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject) {
         if (connection == null) {
-            return new PageHistoryResult(false, "no connection to Scalaris");
+            return new PageHistoryResult(false, "no connection to Scalaris", true);
         }
         
         TransactionSingleOp scalaris_single;
@@ -214,29 +215,29 @@ public class ScalarisDataHandler {
         try {
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" or \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" or \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         
         Page page;
         try {
             page = results.processReadAt(0).jsonValue(Page.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + getPageKey(title, nsObject) + "\"");
+            PageHistoryResult result = new PageHistoryResult(false, "page not found at \"" + getPageKey(title, nsObject) + "\"", false);
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getPageKey(title, nsObject) + "\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
 
         List<ShortRevision> revisions;
         try {
             revisions = results.processReadAt(1).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
-            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + getRevListKey(title, nsObject) + "\" does not exist");
+            PageHistoryResult result = new PageHistoryResult(false, "revision list \"" + getRevListKey(title, nsObject) + "\" does not exist", false);
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage());
+            return new PageHistoryResult(false, "unknown exception reading \"" + getRevListKey(title, nsObject) + "\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         return new PageHistoryResult(page, revisions);
     }
@@ -274,7 +275,7 @@ public class ScalarisDataHandler {
      */
     public static RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject) {
         if (connection == null) {
-            return new RevisionResult(false, "no connection to Scalaris");
+            return new RevisionResult(false, "no connection to Scalaris", true);
         }
         
         TransactionSingleOp scalaris_single;
@@ -298,6 +299,7 @@ public class ScalarisDataHandler {
             result.success = false;
             result.message = "unknown exception reading \"" + scalaris_key + "\" from Scalaris: " + e.getMessage();
             result.page_not_existing = true;
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         result.page = page;
@@ -318,6 +320,7 @@ public class ScalarisDataHandler {
                 result.success = false;
                 result.message = "unknown exception reading \"" + scalaris_key + "\" from Scalaris: " + e.getMessage();
                 result.rev_not_existing = true;
+                result.connect_failed = e instanceof ConnectionException;
                 return result;
             }
         } else {
@@ -416,7 +419,7 @@ public class ScalarisDataHandler {
     private static PageListResult getPageList2(Connection connection,
             String scalaris_key, boolean failNotFound) {
         if (connection == null) {
-            return new PageListResult(false, "no connection to Scalaris");
+            return new PageListResult(false, "no connection to Scalaris", true);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
@@ -425,12 +428,12 @@ public class ScalarisDataHandler {
             return new PageListResult(pages);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new PageListResult(false, "unknown exception reading page list at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+                return new PageListResult(false, "unknown exception reading page list at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage(), false);
             } else {
                 return new PageListResult(new LinkedList<String>());
             }
         } catch (Exception e) {
-            return new PageListResult(false, "unknown exception reading page list at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            return new PageListResult(false, "unknown exception reading page list at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
     }
 
@@ -504,7 +507,7 @@ public class ScalarisDataHandler {
     private static BigIntegerResult getInteger2(Connection connection,
             String scalaris_key, boolean failNotFound) {
         if (connection == null) {
-            return new BigIntegerResult(false, "no connection to Scalaris");
+            return new BigIntegerResult(false, "no connection to Scalaris", true);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
@@ -513,12 +516,12 @@ public class ScalarisDataHandler {
             return new BigIntegerResult(number);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+                return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage(), false);
             } else {
                 return new BigIntegerResult(BigInteger.valueOf(0));
             }
         } catch (Exception e) {
-            return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage());
+            return new BigIntegerResult(false, "unknown exception reading (integral) number at \"" + scalaris_key + "\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
     }
 
@@ -534,7 +537,7 @@ public class ScalarisDataHandler {
      */
     public static RandomTitleResult getRandomArticle(Connection connection, Random random) {
         if (connection == null) {
-            return new RandomTitleResult(false, "no connection to Scalaris");
+            return new RandomTitleResult(false, "no connection to Scalaris", true);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
@@ -543,7 +546,7 @@ public class ScalarisDataHandler {
             String randomTitle = pages.get(random.nextInt(pages.size())).stringValue();
             return new RandomTitleResult(randomTitle);
         } catch (Exception e) {
-            return new RandomTitleResult(false, "unknown exception reading page list at \"pages\" from Scalaris: " + e.getMessage());
+            return new RandomTitleResult(false, "unknown exception reading page list at \"pages\" from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
     }
 
@@ -576,7 +579,7 @@ public class ScalarisDataHandler {
             Revision newRev, int prevRevId, Map<String, String> restrictions,
             SiteInfo siteinfo, String username, final MyNamespace nsObject) {
         if (connection == null) {
-            return new SavePageResult(false, "no connection to Scalaris");
+            return new SavePageResult(false, "no connection to Scalaris", true);
         }
         
         Transaction scalaris_tx = new Transaction(connection);
@@ -596,7 +599,7 @@ public class ScalarisDataHandler {
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
 //          e.printStackTrace();
-            return new SavePageResult(false, "unknown exception getting page info (" + pageInfoKey + ") or revision info (" + revListKey + ") from Scalaris: " + e.getMessage());
+            return new SavePageResult(false, "unknown exception getting page info (" + pageInfoKey + ") or revision info (" + revListKey + ") from Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         
         try {
@@ -615,6 +618,7 @@ public class ScalarisDataHandler {
 //          e.printStackTrace();
             result.success = false;
             result.message = "unknown exception reading \"" + pageInfoKey + "\" from Scalaris: " + e.getMessage();
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         
@@ -646,6 +650,7 @@ public class ScalarisDataHandler {
 //          e.printStackTrace();
             result.success = false;
             result.message = "unknown exception reading \"" + revListKey + "\" from Scalaris: " + e.getMessage();
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         result.newShortRevs.add(0, new ShortRevision(newRev));
@@ -729,6 +734,7 @@ public class ScalarisDataHandler {
             //          e.printStackTrace();
             result.success = false;
             result.message = "unknown exception reading page lists for page \"" + title + "\" from Scalaris: " + e.getMessage();
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         requests = new Transaction.RequestList();
@@ -737,18 +743,21 @@ public class ScalarisDataHandler {
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
         pageListResult = tplDiff.updatePageLists_prepare_write(results, requests, tplPageKeygen, title, catPageReads);
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
         pageListResult = lnkDiff.updatePageLists_prepare_write(results, requests, lnkPageKeygen, title, catPageReads + tplPageReads);
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
         results = null;
@@ -758,24 +767,28 @@ public class ScalarisDataHandler {
             //          e.printStackTrace();
             result.success = false;
             result.message = "unknown exception writing page lists for page \"" + title + "\" to Scalaris: " + e.getMessage();
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         pageListResult = catDiff.updatePageLists_check_writes(results, catPageKeygen, title, 0);
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
         pageListResult = tplDiff.updatePageLists_check_writes(results, tplPageKeygen, title, catPageReads);
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
         pageListResult = lnkDiff.updatePageLists_check_writes(results, lnkPageKeygen, title, catPageReads + tplPageReads);
         if (!pageListResult.success) {
             result.success = false;
             result.message = pageListResult.message;
+            result.connect_failed = pageListResult.connect_failed;
             return result;
         }
 
@@ -812,6 +825,7 @@ public class ScalarisDataHandler {
 //                e.printStackTrace();
                 result.success = false;
                 result.message = "unknown exception reading page lists for page \"" + title + "\" to Scalaris: " + e.getMessage();
+                result.connect_failed = e instanceof ConnectionException;
                 return result;
             }
 
@@ -825,6 +839,7 @@ public class ScalarisDataHandler {
                 if (!result.success) {
                     result.success = false;
                     result.message = pageListResult.message;
+                    result.connect_failed = pageListResult.connect_failed;
                     return result;
                 }
                 pageListWrites.add((Integer) pageListResult.info);
@@ -847,6 +862,7 @@ public class ScalarisDataHandler {
                 if (!pageListResult.success) {
                     result.success = false;
                     result.message = pageListResult.message;
+                    result.connect_failed = pageListResult.connect_failed;
                     return result;
                 }
                 ++curOp;
@@ -860,6 +876,7 @@ public class ScalarisDataHandler {
 //          e.printStackTrace();
             result.success = false;
             result.message = "unknown exception writing page \"" + title + "\" to Scalaris: " + e.getMessage();
+            result.connect_failed = e instanceof ConnectionException;
             return result;
         }
         
@@ -989,7 +1006,7 @@ public class ScalarisDataHandler {
                 } catch (NotFoundException e) {
                     // this is ok
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage());
+                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
             }
             // add to new page list
@@ -1003,13 +1020,13 @@ public class ScalarisDataHandler {
                     // this is ok
                     pageList = new LinkedList<String>();
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage());
+                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
                 pageList.add(title);
                 try {
                     writeRequests.addWrite(scalaris_key, pageList);
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage());
+                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
                 if (keyGen instanceof GetPageListAndCountKey) {
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
@@ -1045,7 +1062,7 @@ public class ScalarisDataHandler {
                     try {
                         writeResults.processWriteAt(firstOp++);
                     } catch (Exception e) {
-                        return new SaveResult(false, "unknown exception updating \"" + keyGen.getPageListKey(name) + "\" in Scalaris: " + e.getMessage());
+                        return new SaveResult(false, "unknown exception updating \"" + keyGen.getPageListKey(name) + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                     }
                 }
             }
@@ -1097,7 +1114,7 @@ public class ScalarisDataHandler {
         } catch (NotFoundException e) {
             pages = new LinkedList<String>();
         } catch (Exception e) {
-            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage());
+            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         // note: no need to read the old count - we already have a list of all pages and can calculate the count on our own
         int oldCount = pages.size();
@@ -1155,7 +1172,7 @@ public class ScalarisDataHandler {
                 writeResults.processWriteAt(firstOp + i);
             }
         } catch (Exception e) {
-            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage());
+            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         return new SaveResult();
     }
@@ -1199,7 +1216,7 @@ public class ScalarisDataHandler {
                 return result;
             }
         } catch (Exception e) {
-            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage());
+            return new SaveResult(false, "unknown exception updating \"" + pageList_key + "\" and \"" + pageCount_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
         }
         return new SaveResult();
     }

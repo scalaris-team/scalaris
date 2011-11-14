@@ -48,10 +48,11 @@ public class RevisionResult extends Result {
     /**
      * Creates a new custom result.
      * 
-     * @param success the success status
-     * @param message the message to use
+     * @param success       the success status
+     * @param message       the message to use
+     * @param connectFailed whether the connection to the DB failed or not
      */
-    public RevisionResult(boolean success, String message) {
-        super(success, message);
+    public RevisionResult(boolean success, String message, boolean connectFailed) {
+        super(success, message, connectFailed);
     }
 }

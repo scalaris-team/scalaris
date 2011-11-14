@@ -398,13 +398,18 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
      *            the response of the current operation
      * 
      * @throws IOException
-     *            if the forward fails
+     *             if the forward fails
+     * @throws ServletException
      */
     private void handleViewRandomPage(HttpServletRequest request,
-            HttpServletResponse response, Connection connection) throws IOException {
+            HttpServletResponse response, Connection connection)
+            throws IOException, ServletException {
         RandomTitleResult result = getRandomArticle(connection, new Random());
         if (result.success) {
             response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.title, namespace), "UTF-8")));
+        } else if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response);
         } else {
             response.sendRedirect(response.encodeRedirectURL("?title=Main Page&notice=error: can not view random page: <pre>" + result.message + "</pre>"));
         }
@@ -432,7 +437,11 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         int req_oldid = WikiServlet.getParam_oldid(request);
 
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
-        if (result.page_not_existing) {
+        if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response);
+            return;
+        } else if (result.page_not_existing) {
             handleViewPageNotExisting(request, response, title, connection);
             return;
         } else if (result.rev_not_existing) {
@@ -453,6 +462,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     .getRequestDispatcher("page.jsp");
             dispatcher.forward(request, response);
         } else {
+            setParam_error(request, "ERROR: revision unavailable");
             addToParam_notice(request, "error: unknown error getting page " + title + ":" + req_oldid + ": <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
         }
@@ -492,12 +502,10 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
      */
     private WikiPageBean renderRevision(String title, Revision revision,
             int renderer, HttpServletRequest request, Connection connection) {
-        String notice = WikiServlet.getParam_notice(request);
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
         WikiPageBean value = new WikiPageBean();
-        value.setNotice(notice);
         MyWikiModel wikiModel = getWikiModel(connection);
         String fullUrl = extractFullUrl(request.getRequestURL().toString());
         if (fullUrl != null) {
@@ -522,6 +530,13 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                             if (tplResult.success) {
                                 final List<String> tplPageList = wikiModel.denormalisePageTitles(tplResult.pages);
                                 categoryPages.addAll(tplPageList);
+                            } else {
+                                if (tplResult.connect_failed) {
+                                    setParam_error(request, "ERROR: DB connection failed");
+                                } else {
+                                    setParam_error(request, "ERROR: template page list unavailable");
+                                }
+                                addToParam_notice(request, "error getting pages using template: " + tplResult.message);
                             }
                         } else {
                             categoryPages.add(page);
@@ -532,6 +547,11 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     value.setSubCategories(subCategories);
                     value.setCategoryPages(categoryPages);
                 } else {
+                    if (catPagesResult.connect_failed) {
+                        setParam_error(request, "ERROR: DB connection failed");
+                    } else {
+                        setParam_error(request, "ERROR: category page list unavailable");
+                    }
                     addToParam_notice(request, "error getting category pages: " + catPagesResult.message);
                 }
             }
@@ -569,7 +589,8 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
         }
 
-        value.setTitle(title);
+        value.setNotice(WikiServlet.getParam_notice(request));
+        value.setTitle(getParam_error(request) + title);
         value.setVersion(revision.getId());
         value.setWikiTitle(siteinfo.getSitename());
         value.setWikiNamespace(namespace);
@@ -605,11 +626,15 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         WikiPageBean value;
         if (result.success) {
             value = renderRevision(title, result.revision, render, request, connection);
+        } else if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response);
+            return;
         } else {
 //            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
             value = new WikiPageBean();
             value.setPage("Page not available.");
-            value.setTitle(title);
+            value.setTitle(getParam_error(request) + title);
         }
         // re-set version (we are only showing this page due to a non-existing page)
         value.setVersion(-1);
@@ -643,7 +668,11 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             HttpServletResponse response, String title, Connection connection)
             throws ServletException, IOException {
         PageHistoryResult result = getPageHistory(connection, title, namespace);
-        if (result.not_existing) {
+        if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response);
+            return;
+        } else if (result.not_existing) {
             handleViewPageNotExisting(request, response, title, connection);
             return;
         }
@@ -655,8 +684,8 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             if (!result.page.checkEditAllowed("")) {
                 value.setEditRestricted(true);
             }
-            
-            value.setTitle(title);
+
+            value.setTitle(getParam_error(request) + title);
             if (!result.revisions.isEmpty()) { 
                 value.setVersion(result.revisions.get(0).getId());
             }
@@ -669,6 +698,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     .getRequestDispatcher("pageHistory.jsp");
             dispatcher.forward(request, response);
         } else {
+            setParam_error(request, "ERROR: revision list unavailable");
             addToParam_notice(request, "error: unknown error getting revision list for page " + title + ": <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
         }
@@ -734,9 +764,16 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                     .getRequestDispatcher("pageSpecial_pagelist.jsp");
             dispatcher.forward(request, response);
         } else {
-            addToParam_notice(request, "error: unknown error getting page list for " + value.getTitle() + ": <pre>" + result.message + "</pre>");
+            if (result.connect_failed) {
+                setParam_error(request, "ERROR: DB connection failed");
+            } else {
+                setParam_error(request, "ERROR: page list unavailable");
+                addToParam_notice(request, "error: unknown error getting page list for " + value.getTitle() + ": <pre>" + result.message + "</pre>");
+            }
             showEmptyPage(request, response);
+            return;
         }
+        value.setTitle(getParam_error(request) + value.getTitle());
     }
 
     private void handleViewSpecialPages(HttpServletRequest request,
@@ -938,6 +975,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             HttpServletResponse response) throws ServletException, IOException {
         WikiPageBean value = new WikiPageBean();
         value.setNotice(WikiServlet.getParam_notice(request));
+        value.setTitle(getParam_error(request));
         request.setAttribute("pageBean", value);
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
         dispatcher.forward(request, response);
@@ -980,7 +1018,11 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
 
         WikiPageEditBean value = new WikiPageEditBean();
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
-        if (result.rev_not_existing) {
+        if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response);
+            return;
+        } else if (result.rev_not_existing) {
             result = getRevision(connection, title, namespace);
             addToParam_notice(request, "revision " + req_oldid + " not found - loaded current revision instead");
         }
@@ -990,6 +1032,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             value.setNewPage(true);
         } else if (result.rev_not_existing) {
             // DB corrupt
+            setParam_error(request, "ERROR: revision unavailable");
             addToParam_notice(request, "error: unknown error getting current revision of page \"" + title + "\": <pre>" + result.message + "</pre>");
             showEmptyPage(request, response);
             return;
@@ -1004,7 +1047,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
 
         // set the textarea's contents:
         value.setNotice(WikiServlet.getParam_notice(request));
-        value.setTitle(title);
+        value.setTitle(getParam_error(request) + title);
         value.setWikiTitle(siteinfo.getSitename());
         value.setWikiNamespace(namespace);
 
@@ -1060,6 +1103,11 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                 return;
             } else {
                 // set error message and show the edit page again (see below)
+                if (result.connect_failed) {
+                    setParam_error(request, "ERROR: DB connection failed");
+                } else {
+                    setParam_error(request, "ERROR: conflicting edit");
+                }
                 addToParam_notice(request, "error: could not save page: <pre>" + result.message + "</pre>");
             }
         }
@@ -1080,7 +1128,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         value.setPreview(wikiModel.render(content));
         value.setPage(content);
         value.setVersion(oldVersion);
-        value.setTitle(title);
+        value.setTitle(getParam_error(request) + title);
         value.setSummary(request.getParameter("wpSummary"));
         value.setWikiTitle(siteinfo.getSitename());
         value.setWikiNamespace(namespace);
@@ -1164,7 +1212,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
     abstract protected MyWikiModel getWikiModel(Connection connection);
 
     /**
-     * Adds the given notice to the notice attribute .
+     * Adds the given notice to the notice attribute.
      * 
      * @param request
      *            the http request
@@ -1178,24 +1226,72 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
     }
 
     /**
-     * Returns the notice parameter (or attribute if the parameter does not exist) or an empty string if both are not present
+     * Returns the notice parameter.
      * 
      * @param request
      *            the http request
+     * 
      * @return the notice parameter or ""
+     * 
+     * @see #getParam(HttpServletRequest, String)
      */
     public static String getParam_notice(HttpServletRequest request) {
-        String req_notice = request.getParameter("notice");
-        if (req_notice == null) {
-            Object temp = request.getAttribute("notice");
+        return getParam(request, "notice");
+    }
+
+    /**
+     * Returns the given parameter (or attribute if the parameter does not
+     * exist, or an empty string if both are not present).
+     * 
+     * @param request
+     *            the http request
+     * @param name
+     *            the name of the parameter
+     * 
+     * @return the notice parameter or ""
+     */
+    public static String getParam(HttpServletRequest request, String name) {
+        String parValue = request.getParameter(name);
+        if (parValue == null) {
+            Object temp = request.getAttribute(name);
             if (temp instanceof String) {
-                req_notice = (String) temp; 
+                parValue = (String) temp; 
             }
         }
-        if (req_notice == null) {
+        if (parValue == null) {
             return new String("");
         } else {
-            return req_notice;
+            return parValue;
+        }
+    }
+
+    /**
+     * Returns the error parameter.
+     * 
+     * @param request
+     *            the http request
+     * 
+     * @return the error parameter or ""
+     * 
+     * @see #getParam(HttpServletRequest, String)
+     */
+    public static String getParam_error(HttpServletRequest request) {
+        return getParam(request, "error");
+    }
+
+    /**
+     * Sets the error attribute. Once set, it cannot be changed with this
+     * method.
+     * 
+     * @param request
+     *            the http request
+     * @param error
+     *            the error to set
+     */
+    public static void setParam_error(HttpServletRequest request, String error) {
+        String req_error = getParam(request, "error");
+        if (req_error.isEmpty()) {
+            request.setAttribute("error", error + " - ");
         }
     }
 

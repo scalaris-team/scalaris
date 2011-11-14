@@ -163,12 +163,16 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             Connection conn = cPool.getConnection(MAX_WAIT_FOR_CONNECTION);
             if (conn == null) {
                 System.err.println("Could not get a connection to Scalaris, waited " + MAX_WAIT_FOR_CONNECTION + "ms");
-                addToParam_notice(request, "error: <pre>Could not get a connection to Scalaris, waited " + MAX_WAIT_FOR_CONNECTION + "ms</pre>");
+                if (request != null) {
+                    setParam_error(request, "ERROR: DB unavailable");
+                    addToParam_notice(request, "error: <pre>Could not get a connection to Scalaris, waited " + MAX_WAIT_FOR_CONNECTION + "ms</pre>");
+                }
                 return null;
             }
             return conn;
         } catch (Exception e) {
             if (request != null) {
+                setParam_error(request, "ERROR: DB unavailable");
                 addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
             } else {
                 System.out.println(e);
@@ -207,7 +211,6 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             HttpServletResponse response, Connection connection)
             throws ServletException, IOException {
         WikiPageBean value = new WikiPageBean();
-        value.setTitle("Import Wiki dump");
         value.setNotAvailable(true);
         request.setAttribute("pageBean", value);
         
@@ -271,6 +274,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
                     content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
                 } catch (Exception e) {
+                    setParam_error(request, "ERROR: import failed");
                     addToParam_notice(request, "error: <pre>" + e.getMessage() + "</pre>");
                     currentImport = "";
                 }
@@ -305,6 +309,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         }
 
         value.setNotice(WikiServlet.getParam_notice(request));
+        value.setTitle(getParam_error(request) + "Import Wiki dump");
         value.setPage(content.toString());
         
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
