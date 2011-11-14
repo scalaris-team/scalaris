@@ -84,7 +84,7 @@ public class ShortRevision implements Serializable {
         this.minor = revision.isMinor();
         this.contributor = revision.getContributor();
         this.comment = revision.getComment();
-        this.size = revision.getText().length();
+        this.size = revision.unpackedText().length();
     }
 
     /**

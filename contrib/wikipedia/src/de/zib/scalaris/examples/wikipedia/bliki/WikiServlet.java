@@ -576,7 +576,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
         }
         wikiModel.setPageName(title);
         if (renderer > 0) {
-            String mainText = wikiModel.render(revision.getText());
+            String mainText = wikiModel.render(revision.unpackedText());
             if (wikiModel.isCategoryNamespace(MyWikiModel.getNamespace(title))) {
                 PageListResult catPagesResult = ScalarisDataHandler.getPagesInCategory(connection, title);
                 if (catPagesResult.success) {
@@ -629,7 +629,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
                 sb.append(request.getHeader(element) + "\n");
             }
             value.setPage("<p>WikiText:<pre>"
-                    + StringEscapeUtils.escapeHtml(revision.getText()) + "</pre></p>" +
+                    + StringEscapeUtils.escapeHtml(revision.unpackedText()) + "</pre></p>" +
                     "<p>Version:<pre>"
                     + StringEscapeUtils.escapeHtml(String.valueOf(revision.getId())) + "</pre></p>" +
                     "<p>Last change:<pre>"
@@ -1225,7 +1225,7 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             if (!result.page.checkEditAllowed("")) {
                 value.setEditRestricted(true);
             }
-            value.setPage(StringEscapeUtils.escapeHtml(result.revision.getText()));
+            value.setPage(StringEscapeUtils.escapeHtml(result.revision.unpackedText()));
             value.setVersion(result.revision.getId());
         }
 
@@ -1272,7 +1272,8 @@ public class WikiServlet extends HttpServlet implements Servlet, WikiServletCont
             contributor.setIp(request.getRemoteAddr());
             String timestamp = Revision.calendarToString(Calendar.getInstance(TimeZone.getTimeZone("UTC")));
             int newRevId = (oldVersion == -1) ? 1 : oldVersion + 1;
-            Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary, content);
+            Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary);
+            newRev.setUnpackedText(content);
 
             SavePageResult result = ScalarisDataHandler.savePage(connection, title, newRev, oldVersion, null, siteinfo, "");
             for (WikiEventHandler handler: eventHandlers) {

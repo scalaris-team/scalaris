@@ -138,7 +138,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
                 // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
                 RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName);
                 if (getRevResult.success) {
-                    text = getRevResult.revision.getText();
+                    text = getRevResult.revision.unpackedText();
                     final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
                     if (getRevResult.page.isRedirect() && matcher.matches()) {
                         // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
@@ -175,7 +175,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
             if (getRevResult.success) {
                 // make PAGENAME in the redirected content work as expected
                 setPageName(pageName);
-                return getRevResult.revision.getText();
+                return getRevResult.revision.unpackedText();
             } else {
 //                System.err.println(getRevResult.message);
 //                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";

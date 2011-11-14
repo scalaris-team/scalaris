@@ -601,7 +601,7 @@ public class ScalarisDataHandler {
         if (oldRevId != -1 && result.oldPage != null && result.oldPage.getCurRev() != null) {
             // get a list of previous categories and templates:
             wikiModel.setUp();
-            wikiModel.render(null, result.oldPage.getCurRev().getText());
+            wikiModel.render(null, result.oldPage.getCurRev().unpackedText());
             oldCats = wikiModel.getCategories().keySet();
             oldTpls = wikiModel.getTemplates();
             oldLnks = wikiModel.getLinks();
@@ -609,7 +609,7 @@ public class ScalarisDataHandler {
         }
         // get new categories and templates
         wikiModel.setUp();
-        wikiModel.render(null, newRev.getText());
+        wikiModel.render(null, newRev.unpackedText());
         // note: do not tear down the wiki model - the following statements
         // still need it and it will be removed at the end of the method anyway
         Set<String> newCats = wikiModel.getCategories().keySet();
