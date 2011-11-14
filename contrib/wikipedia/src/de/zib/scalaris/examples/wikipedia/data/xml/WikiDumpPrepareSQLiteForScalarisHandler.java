@@ -295,8 +295,12 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         if (MyScalarisWikiModel.getNamespace(page.getTitle(), wikiModel.getNamespace()).isEmpty()) {
             newArticles.add(wikiModel.normalisePageTitle(page.getTitle()));
         }
-        // only export page list every UPDATE_PAGELIST_EVERY pages:
-        if ((newPages.size() % UPDATE_PAGELIST_EVERY) == 0) {
+        // export page list whenever the number of new pages is more than
+        // UPDATE_PAGELIST_EVERY,
+        // also limit the number of changes in SQLiteUpdatePageListsJob to
+        // (2 + UPDATE_PAGELIST_EVERY)
+        if ((newPages.size() >= UPDATE_PAGELIST_EVERY) || // note: no need to check newArticles (is <= newPages)
+                ((newCategories.size() + newTemplates.size() + newBackLinks.size()) >= UPDATE_PAGELIST_EVERY)) {
             updatePageLists();
         }
     }
