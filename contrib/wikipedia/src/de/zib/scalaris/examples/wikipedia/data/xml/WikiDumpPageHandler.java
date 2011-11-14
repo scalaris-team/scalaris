@@ -118,7 +118,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
             doExport(page, revisions, revisions_short);
         }
         if ((pageCount % UPDATE_PAGELIST_EVERY) == 0) {
-            msgOut.println("processed pages: " + pageCount);
+            println("processed pages: " + pageCount);
         }
     }
 

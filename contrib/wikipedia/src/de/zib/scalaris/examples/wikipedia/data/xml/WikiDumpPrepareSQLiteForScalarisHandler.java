@@ -216,7 +216,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     @Override
     public void setUp() {
         super.setUp();
-        msgOut.println("Pre-processing pages to key/value pairs...");
+        println("Pre-processing pages to key/value pairs...");
         sqliteWorker.start();
         // wait for worker to initialise the DB and the prepared statements
         while (!sqliteWorker.initialised) {

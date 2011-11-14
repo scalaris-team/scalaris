@@ -54,4 +54,25 @@ public interface WikiDump {
      */
     public abstract void tearDown();
 
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void print(String message);
+
+    /**
+     * Prints a message to the chosen output stream (includes a timestamp).
+     * Includes a newline character at the end.
+     * 
+     * @param message
+     *            the message to print
+     * 
+     * @see #setMsgOut(PrintStream)
+     */
+    public void println(String message);
+
 }
