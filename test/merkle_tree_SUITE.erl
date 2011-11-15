@@ -61,12 +61,15 @@ performance(_) ->
     %I = intervals:new('[', ?MINUS_INFINITY, ?PLUS_INFINITY, ']'),    
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     InitTree = merkle_tree:new(I),
-    TestTree = build_tree(InitTree, ToAdd),
+    TestTree = merkle_tree_builder:build(InitTree, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(TestTree),
     
     %measure build times
-    BT = measure_util:time_avg(fun() -> build_tree(InitTree, ToAdd) end,
-                               [], ExecTimes, false),
+    BT = measure_util:time_avg(
+           fun() -> 
+                   merkle_tree_builder:build(InitTree, ToAdd, uniform) 
+           end,
+           [], ExecTimes, false),
         
     %measure iteration time
     IT = measure_util:time_avg(fun() -> 
@@ -96,8 +99,8 @@ prop_branch_bucket(L, R, Branch, Bucket) ->
     Tree = merkle_tree:new(intervals:new('[', L, R, ']'),
                            [{branch_factor, Branch},
                             {bucket_size, Bucket}]),    
-    Tree1 = build_tree(Tree, Bucket),
-    Tree2 = build_tree(Tree, 2 * Bucket),
+    Tree1 = merkle_tree_builder:build(Tree, Bucket, uniform),
+    Tree2 = merkle_tree_builder:build(Tree, 2 * Bucket, uniform),
     %ct:pal("Branch=~p ; Bucket=~p ; Tree1Size=~p ; Tree2Size=~p", 
     %       [Branch, Bucket, merkle_tree:size(Tree1), merkle_tree:size(Tree2)]),
     ?equals(merkle_tree:size(Tree1), 1),    
@@ -115,9 +118,9 @@ prop_tree_hash(L, L, _) -> true;
 prop_tree_hash(L, R, ToAdd) ->
     %ct:pal("prop_tree_hash params: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
     I = intervals:new('[', L, R, ']'),
-    Tree1 = build_tree(merkle_tree:new(I), ToAdd),
-    Tree2 = build_tree(merkle_tree:new(I), ToAdd),
-    Tree3 = build_tree(merkle_tree:new(I), ToAdd + 1),    
+    Tree1 = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
+    Tree2 = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
+    Tree3 = merkle_tree_builder:build(merkle_tree:new(I), ToAdd + 1, uniform),    
     RootHash1 = merkle_tree:get_hash(Tree1),
     RootHash2 = merkle_tree:get_hash(Tree2),
     RootHash3 = merkle_tree:get_hash(Tree3),    
@@ -137,9 +140,9 @@ tester_tree_hash(_) ->
 prop_insert(L, L, _) -> true;
 prop_insert(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
-    Tree1 = build_tree(merkle_tree:new(I), ToAdd),
-    Tree2 = build_tree(merkle_tree:new(I), ToAdd),
-    Tree3 = build_tree(merkle_tree:new(I), 2 * ToAdd),
+    Tree1 = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
+    Tree2 = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
+    Tree3 = merkle_tree_builder:build(merkle_tree:new(I), 2 * ToAdd, uniform),
     Size1 = merkle_tree:size(Tree1),
     Size2 = merkle_tree:size(Tree2),
     Size3 = merkle_tree:size(Tree3),
@@ -157,7 +160,7 @@ tester_insert(_) ->
 prop_size(L, L, _) -> true;
 prop_size(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
-    Tree = build_tree(merkle_tree:new(I), ToAdd),
+    Tree = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
     Size = merkle_tree:size(Tree),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ?equals(Size, Inner + Leafs),
@@ -172,7 +175,7 @@ tester_size(_) ->
 prop_iter(L, L, _) -> true;
 prop_iter(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
-    Tree = build_tree(merkle_tree:new(I), ToAdd),
+    Tree = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     {IterateT, Count} = util:tc(fun() -> count_iter(merkle_tree:iterator(Tree), 0) end),
     ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n"
@@ -190,7 +193,8 @@ tester_iter(_Config) ->
 -spec prop_store_to_dot(intervals:key(), intervals:key(), 1..1000) -> true.
 prop_store_to_dot(L, L, _) -> true;
 prop_store_to_dot(L, R, ToAdd) ->
-    Tree = build_tree(merkle_tree:new(intervals:new('[', L, R, ']')), ToAdd),
+    I = intervals:new('[', L, R, ']'),
+    Tree = merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p", [ToAdd, Inner, Leafs]),
     merkle_tree:store_to_DOT(Tree, "StoreToDotTest"),
@@ -209,33 +213,5 @@ count_iter(Iter, Count) ->
     case Next of
         none -> Count;
         {_, Iter2} -> count_iter(Iter2, Count + 1)
-    end.
-
--spec build_tree(Tree, AddCount) -> MerkleTree when
-    is_subtype(Tree,        merkle_tree:merkle_tree()),
-    is_subtype(AddCount,    pos_integer()),
-    is_subtype(MerkleTree,  merkle_tree:merkle_tree()).
-build_tree(Tree, AddCount) ->
-    I = merkle_tree:get_interval(Tree),
-    build_tree_p(Tree, [{I, AddCount}]).
-
-build_tree_p(Tree, []) ->
-    merkle_tree:gen_hash(Tree);
-build_tree_p(Tree, [{I, Add} | R]) ->    
-    case Add > 100 of
-        true -> 
-            [I1, I2] = intervals:split(I, 2),
-            build_tree_p(Tree, [{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R]);
-        false -> 
-            {_, IL, IR, _} = intervals:get_bounds(I),
-            ToAdd = util:for_to_ex(1, Add, 
-                                   fun(Index) -> 
-                                           ?RT:get_split_key(IL, IR, {Index, Add}) 
-                                   end),
-            NTree = lists:foldl(fun(Key, AccTree) -> 
-                                        merkle_tree:insert(Key, Key, AccTree) 
-                                end,
-                                Tree, ToAdd),
-            build_tree_p(NTree, R)                                  
     end.
 
