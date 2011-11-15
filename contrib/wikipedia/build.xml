@@ -69,9 +69,9 @@
   </target>
 
   <target name="init" depends="scalaris.update.jars">
-    <mkdir dir="simplewiki/WEB-INF/classes"/>
-    <mkdir dir="simplewiki/WEB-INF/lib"/>
-    <copy todir="simplewiki/WEB-INF/lib" flatten="true" preservelastmodified="true">
+    <mkdir dir="scalaris-wiki/WEB-INF/classes"/>
+    <mkdir dir="scalaris-wiki/WEB-INF/lib"/>
+    <copy todir="scalaris-wiki/WEB-INF/lib" flatten="true" preservelastmodified="true">
       <fileset dir="contrib" includes="*.jar"/>
       <fileset dir="contrib" includes="*.so"/>
       <fileset dir="contrib" includes="*.jnilib"/>
@@ -85,7 +85,7 @@
     <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
     <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
     <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
-    <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="simplewiki/WEB-INF/classes">
+    <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="scalaris-wiki/WEB-INF/classes">
       <src path="src"/>
       <classpath refid="build.classpath"/>
     </javac>
@@ -93,8 +93,8 @@
 
   <!-- Deletes the generated class files and the temporary files created by jetty (compiled jsps, logs,...) -->
   <target name="clean">
-    <delete dir="simplewiki/WEB-INF/classes"/>
-    <delete dir="simplewiki/WEB-INF/lib"/>
+    <delete dir="scalaris-wiki/WEB-INF/classes"/>
+    <delete dir="scalaris-wiki/WEB-INF/lib"/>
     <delete dir="bin/jetty-temp"/>
     <delete file="scalaris-wiki.war"/>
     <delete file="scalaris-wiki-plugin-api.jar"/>
@@ -211,7 +211,7 @@
       <arg value="${max_time}"/>
       <arg value="${whitelist}"/>
       <classpath>
-        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
         <pathelement path="${java.class.path}"/>
       </classpath>
@@ -233,7 +233,7 @@
       <arg value="${whitelist}"/>
       <arg value="${prepare_db}"/>
       <classpath>
-        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
         <pathelement path="${java.class.path}"/>
       </classpath>
@@ -269,7 +269,7 @@
       <arg value="${category9}"/>
       <arg value="${category10}"/>
       <classpath>
-        <pathelement location="simplewiki/WEB-INF/classes"/>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
         <pathelement path="${java.class.path}"/>
       </classpath>
@@ -278,14 +278,14 @@
 
   <target name="dist" depends="build">
     <jar jarfile="scalaris-wiki.war" update="false">
-      <fileset dir="simplewiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
-      <fileset dir="simplewiki" includes="WEB-INF/dumps/empty.xml" />
+      <fileset dir="scalaris-wiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
+      <fileset dir="scalaris-wiki" includes="WEB-INF/dumps/empty.xml" />
     </jar>
   </target>
 
   <target name="plugin-api" depends="build">
     <jar jarfile="scalaris-wiki-plugin-api.jar" update="false">
-      <fileset dir="simplewiki/WEB-INF/classes"
+      <fileset dir="scalaris-wiki/WEB-INF/classes"
         includes="de/zib/scalaris/examples/wikipedia/*.class,
         de/zib/scalaris/examples/wikipedia/data/*.class,
         de/zib/scalaris/examples/wikipedia/plugin/*.class"
