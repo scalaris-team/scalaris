@@ -587,25 +587,26 @@ expect_no_message_timeout(Timeout) ->
     after Timeout -> ok
 end.
 
--spec check_ring_load(ExpLoad::pos_integer()) -> ok.
+-spec check_ring_load(ExpLoad::pos_integer()) -> ok | no_return().
 check_ring_load(ExpLoad) ->
     Ring = statistics:get_ring_details(),
     Load = statistics:get_total_load(Ring),
     ?equals(Load, ExpLoad).
 
--spec check_ring_data() -> ok.
+-spec check_ring_data() -> boolean().
 check_ring_data() ->
     check_ring_data(250, 8).
 
--spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> ok.
+-spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> boolean().
 check_ring_data(Timeout, Retries) ->
     Data = lists:append(
              [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- unittest_helper:get_ring_data()]),
     case Retries < 1 of
-        true -> check_ring_data_all(Data, true);
+        true ->
+            check_ring_data_all(Data, true);
         _ ->
             case check_ring_data_all(Data, false) of
-                true -> ok;
+                true -> true;
                 _    -> timer:sleep(Timeout),
                         check_ring_data(Timeout, Retries - 1)
             end
@@ -617,7 +618,7 @@ check_ring_data_all(Data, FailOnError) ->
         check_ring_data_lock_free(Data, FailOnError) andalso
         check_ring_data_repl_exist(Data, FailOnError).
 
--spec check_ring_data_unique(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+-spec check_ring_data_unique(Data::[db_entry:entry()], FailOnError::boolean()) -> boolean().
 check_ring_data_unique(Data, FailOnError) ->
     UniqueData = lists:usort(fun(A, B) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
@@ -625,7 +626,8 @@ check_ring_data_unique(Data, FailOnError) ->
     DataDiff = lists:subtract(Data, UniqueData),
     case FailOnError of
         true ->
-            ?equals_w_note(DataDiff, [], "duplicate elements detected");
+            ?equals_w_note(DataDiff, [], "duplicate elements detected"),
+            true;
         _ when DataDiff =:= [] ->
             true;
         _ ->
@@ -649,11 +651,13 @@ check_ring_data_repl_fac(Data, FailOnError) ->
             false
     end.
 
--spec check_ring_data_lock_free(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+-spec check_ring_data_lock_free(Data::[db_entry:entry()], FailOnError::boolean()) -> boolean().
 check_ring_data_lock_free(Data, FailOnError) ->
     Locked = [E || E <- Data, db_entry:is_locked(E)],
     case FailOnError of
-        true -> ?equals_w_note(Locked, [], "ring is not lock-free");
+        true ->
+            ?equals_w_note(Locked, [], "ring is not lock-free"),
+            true;
         _ when Locked =:= [] ->
             true;
         _ ->
@@ -661,12 +665,14 @@ check_ring_data_lock_free(Data, FailOnError) ->
             false
     end.
 
--spec check_ring_data_repl_exist(Data::[db_entry:entry()], FailOnError::boolean()) -> ok.
+-spec check_ring_data_repl_exist(Data::[db_entry:entry()], FailOnError::boolean()) -> boolean().
 check_ring_data_repl_exist(Data, FailOnError) ->
     ElementsNotAllReplicas =
         [E || E <- Data, not data_contains_all_replicas(Data, db_entry:get_key(E))],
     case FailOnError of
-        true -> ?equals_w_note(ElementsNotAllReplicas, [], "missing replicas found");
+        true ->
+            ?equals_w_note(ElementsNotAllReplicas, [], "missing replicas found"),
+            true;
         _ when ElementsNotAllReplicas =:= [] ->
             true;
         _ ->
