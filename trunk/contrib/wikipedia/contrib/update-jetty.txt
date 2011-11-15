@@ -5,8 +5,8 @@ http://dist.codehaus.org/jetty/
 4) keep <old-jetty-dir>/webapps/root/index.jsp
 5a) remove <jetty-dir>/contexts/*.xml except for hightide.xml
 5b) remove <jetty-dir>/contexts-available
-6) make symlink to <wiki-dir>/simplewiki
+6) make symlink to <wiki-dir>/scalaris-wiki
 cd <jetty-dir>/webapps
-ln -s ../../../simplewiki ./simplewiki
+ln -s ../../../scalaris-wiki ./scalaris-wiki
 7) change paths in <wiki-dir>/build.xml
 8) update links in <scalaris-dir>/java-api/test-lib
