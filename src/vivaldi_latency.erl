@@ -29,15 +29,20 @@
 -export([measure_latency/3, check_config/0]).
 
 % state of the vivaldi loop
--type(state() ::
+-type state() ::
     {Owner::comm:erl_local_pid(),
      RemotePid::comm:mypid(),
      Token::{vivaldi:network_coordinate(), vivaldi:error()},
      Start::{MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()} | unknown,
-     Latencies::[vivaldi:latency()]}).
+     Count::non_neg_integer(),
+     Latencies::[vivaldi:latency()]}.
 
 % accepted messages of vivaldi_latency processes
--type(message() :: {pong} | {start_ping} | {shutdown}).
+-type message() ::
+    {pong} |
+    {start_ping} |
+    {shutdown} |
+    {'DOWN', MonitorRef::any(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -45,28 +50,29 @@
 
 %% @doc message handler
 -spec on(Message::message(), State::state()) -> state().
-on({pong}, {Owner, RemotePid, Token, Start, Latencies}) ->
+on({{pong}, Count}, {Owner, RemotePid, Token, Start, Count, Latencies}) when Start =/= unknown ->
     Stop = erlang:now(),
     NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
-    case length(NewLatencies) =:= config:read(vivaldi_count_measurements) of
+    case Count =:= config:read(vivaldi_count_measurements) of
         true ->
             comm:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;
         false ->
             comm:send_local_after(config:read(vivaldi_measurements_delay),
-                              self(), {start_ping}),
-            {Owner, RemotePid, Token, unknown, NewLatencies}
+                                  self(), {start_ping}),
+            {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
 
-on({start_ping}, {Owner, RemotePid, Token, _, Latencies}) ->
-    comm:send(RemotePid, {ping, comm:this()}),
-    {Owner, RemotePid, Token, erlang:now(), Latencies};
+on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
+    NewCount = Count + 1,
+    comm:send(RemotePid, {ping, comm:this_with_cookie(NewCount)}),
+    {Owner, RemotePid, Token, erlang:now(), NewCount, Latencies};
 
 on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
     kill;
 
-on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Latencies}) ->
+on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
     log:log(info, "shutdown vivaldi_latency due to vivaldi shutting down", []),
     kill.
 
@@ -79,7 +85,7 @@ init({Owner, RemotePid, Token}) ->
     comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
     comm:send_local(self(), {start_ping}),
     erlang:monitor(process, Owner),
-    {Owner, RemotePid, Token, unknown, []}.
+    {Owner, RemotePid, Token, unknown, 0, []}.
 
 -spec measure_latency(comm:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
