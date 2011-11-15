@@ -40,7 +40,6 @@ import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
-import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.ConnectionPool;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
@@ -111,7 +110,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         String clientName = new BigInteger(128, random).toString(16);
         cFactory.setClientName(cFactory.getClientName() + '_' + clientName);
         cFactory.setClientNameAppendUUID(true);
-        cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
+//        cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
         cPool = new ConnectionPool(cFactory, CONNECTION_POOL_SIZE);
         loadSiteInfo();
