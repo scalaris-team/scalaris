@@ -42,8 +42,7 @@
 %% initialization
 -export([init_and_wait_for_valid_pid/0]).
 %% Sending messages
--export([send/2, send_local/2, send_local_after/3, send_to_group_member/3,
-         send_with_shepherd/3]).
+-export([send/2, send/3, send_local/2, send_local_after/3]).
 %% Pid manipulation
 -export([make_global/1, make_local/1]).
 -export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
@@ -58,7 +57,8 @@
 
 -ifdef(with_export_type_support).
 -export_type([message/0, message_tag/0, mypid/0,
-              erl_local_pid/0, erl_local_pid_with_cookie/0]).
+              erl_local_pid/0, erl_local_pid_with_cookie/0,
+              send_options/0]).
 % for comm_layer
 -export_type([erl_pid_plain/0]).
 % for tester_scheduler
@@ -99,18 +99,41 @@
 -type message_with_cookie() :: {message_plain(), any()}.
 -type message() :: message_plain() | message_with_cookie().
 -type group_message() :: {send_to_group_member, atom(), message()}.
+-type send_options() :: [{shepherd, Pid::erl_local_pid()} |
+                         {group_member, Process::atom()} |
+                         quiet].
 
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
 -ifdef(TCP_LAYER).
 send(Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    comm_layer:send(RealPid, RealMessage).
+    comm_layer:send(RealPid, RealMessage, []).
 -endif.
 -ifdef(BUILTIN). %% @hidden
 send(Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
     send_local(RealPid, RealMessage).
+-endif.
+
+%% @doc Sends a message to an arbitrary process with the given options.
+%%      If a shepherd is given, it will be informed when the sending fails;
+%%      with a message of the form:
+%%       {send_error, Pid, Message}.
+%%      If a group_member is given, the message is send to an arbitrary process
+%%      of another node instructing it to forward the message to a process in
+%%      its group with the given name.
+-spec send(mypid(), message() | group_message(), send_options()) -> ok.
+-ifdef(TCP_LAYER).
+send(Pid, Message, Options) ->
+    {RealMsg, CLOptions} = pack_group_member(Message, Options),
+    comm_layer:send(Pid, RealMsg, CLOptions).
+-endif.
+-ifdef(BUILTIN). %% @hidden
+send(Pid, Message, Options) ->
+    % note: ignore shepherd with BUILTIN
+    {RealMsg, _} = pack_group_member(Message, Options),
+    send(Pid, RealMsg).
 -endif.
 
 %% @doc Sends a message to a local process given by its local pid
@@ -127,25 +150,6 @@ send_local(Pid, Message) ->
 send_local_after(Delay, Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
     erlang:send_after(Delay, RealPid, RealMessage).
-
-%% @doc Sends a message to an arbitrary process of another node instructing it
-%%      to forward the message to a process in its group with the given name.
--spec send_to_group_member(mypid(), atom(), message()) -> ok.
-send_to_group_member(DestNode, Processname, Mesg) ->
-    send(DestNode, {send_to_group_member, Processname, Mesg}).
-
-%% @doc Sends a message to an arbitrary process. When the sending fails, the
-%%      shepherd process will be informed with a message of the form:
-%%       {send_error, Pid, Message}.
--spec send_with_shepherd(mypid(), message() | group_message(), erl_local_pid()) -> ok.
--ifdef(TCP_LAYER).
-send_with_shepherd(Pid, Message, Shepherd) ->
-    comm_layer:send_with_shepherd(Pid, Message, Shepherd).
--endif.
--ifdef(BUILTIN). %% @hidden
-send_with_shepherd(Pid, Message, _Shepherd) ->
-    send(Pid, Message).
--endif.
 
 -spec make_global(erl_pid_plain()) -> mypid().
 -ifdef(TCP_LAYER).
@@ -271,6 +275,17 @@ get_msg_tag(Message)
 unpack_cookie({Pid, c, Cookie}, Message) -> {Pid, {Message, Cookie}};
 unpack_cookie(Pid, Message) -> {Pid, Message}.
 
+%% @doc Creates a group member message and filter out the send options for the
+%%      comm_layer process.
+-spec pack_group_member(message(), send_options()) -> {message(), comm_layer:send_options()}.
+pack_group_member(Message, Options) ->
+    case proplists:split(Options, [group_member]) of
+        {[[]], CLOptions} ->
+            {Message, CLOptions};
+        {[[{group_member, Process} | _]], CLOptions} ->
+            {{send_to_group_member, Process, Message}, CLOptions}
+    end.
+
 -ifdef(TCP_LAYER).
 -spec get_ip(mypid()) -> inet:ip_address().
 %% @doc TCP_LAYER: Gets the IP address of the given (global) mypid().
@@ -294,10 +309,10 @@ init_and_wait_for_valid_pid() ->
                      _ -> KnownHosts1
                  end,
     % note, comm:this() may be invalid at this moment
-    _ = [comm:send_to_group_member(KnownHost, service_per_vm, {hi})
+    _ = [send(KnownHost, {hi}, [{group_member, service_per_vm}])
         || KnownHost <- KnownHosts],
     timer:sleep(100),
-    case comm:is_valid(comm:this()) of
+    case is_valid(this()) of
         true  -> ok;
         false -> init_and_wait_for_valid_pid()
     end.

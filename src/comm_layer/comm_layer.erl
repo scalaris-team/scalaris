@@ -27,15 +27,22 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([send/2, send_with_shepherd/3, this/0, is_valid/1, is_local/1, make_local/1,
+-export([send/3, this/0, is_valid/1, is_local/1, make_local/1,
          get_ip/1, get_port/1, report_send_error/4]).
+
+-ifdef(with_export_type_support).
+-export_type([send_options/0]).
+-endif.
 
 -include("scalaris.hrl").
 
 -type process_id() :: {inet:ip_address(), comm_server:tcp_port(), comm:erl_pid_plain()}.
+-type send_options() :: [{shepherd, Pid::comm:erl_local_pid()} |
+                         quiet].
 
--spec send_with_shepherd(process_id(), comm:message(), comm:erl_local_pid() | unknown) -> ok.
-send_with_shepherd(Target, Message, Shepherd) ->
+%% @doc send message via tcp, if target is not in same Erlang VM.
+-spec send(process_id(), comm:message(), send_options()) -> ok.
+send(Target, Message, Options) ->
     IsLocal = is_local(Target),
     case is_valid(Target) of
         true when IsLocal ->
@@ -50,29 +57,24 @@ send_with_shepherd(Target, Message, Shepherd) ->
                     log:log(warn,
                             "[ CC ] Cannot locally send msg to unknown named"
                             " process ~p: ~.0p~n", [LocalTarget, Message]),
-                    report_send_error(Shepherd, Target, Message, unknown_named_process);
+                    report_send_error(Options, Target, Message, unknown_named_process);
                 _ ->
                     PID ! Message,
                     case is_process_alive(PID) of
                         false ->
-                            report_send_error(Shepherd, Target, Message, local_target_not_alive);
+                            report_send_error(Options, Target, Message, local_target_not_alive);
                         true ->
                             ok
                     end
             end,
             ok;
         true ->
-            comm_server:send(Target, Message, Shepherd);
+            comm_server:send(Target, Message, Options);
         _ ->
             log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
             log:log(error,"[ CL ] stacktrace: ~w", [util:get_stacktrace()]),
             ok
     end.
-
-%% @doc send message via tcp, if target is not in same Erlang VM.
--spec send(process_id(), comm:message()) -> ok.
-send(Target, Message) ->
-    send_with_shepherd(Target, Message, unknown).
 
 %% @doc returns process descriptor for the calling process
 -spec this() -> process_id().
@@ -114,12 +116,16 @@ get_ip({IP, _Port, _Pid}) -> IP.
 -spec get_port(process_id()) -> comm_server:tcp_port().
 get_port({_IP, Port, _Pid}) -> Port.
 
--spec report_send_error(unknown | comm:erl_local_pid(), process_id(), comm:message(), atom()) -> ok.
-report_send_error(Shepherd, Target, Message, Reason) ->
-    case Shepherd of
-        unknown ->
-            log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, drop message ~.0p due to ~p",
-                    [self(), pid_groups:my_pidname(), Target, Message, Reason]),
+-spec report_send_error(send_options(), process_id(), comm:message(), atom()) -> ok.
+report_send_error(Options, Target, Message, Reason) ->
+    case proplists:get_value(shepherd, Options) of
+        undefined ->
+            case proplists:get_bool(quiet, Options) of
+                false ->
+                    log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, drop message ~.0p due to ~p",
+                            [self(), pid_groups:my_pidname(), Target, Message, Reason]),
+                _ -> ok
+            end,
             ok;
         ShepherdPid ->
             comm:send_local(ShepherdPid, {send_error, Target, Message})

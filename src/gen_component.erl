@@ -368,7 +368,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
             comm:send(Pid, {pong}),
             loop(Module, On, State, ComponentState);
         %% forward a message to group member by its process name
-        %% initiated via comm:send_to_group_member()
+        %% initiated via comm:send/3 with group_member
         {send_to_group_member, Processname, Msg} ->
             Pid = pid_groups:get_my(Processname),
             case Pid of

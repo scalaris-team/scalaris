@@ -39,9 +39,9 @@
 
 -type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set(), trigger:state()}).
 
-% prevent warnings in the log by mis-using comm:send_with_shepherd/3
+% prevent warnings in the log by mis-using comm:send/3 with a shepherd
 %-define(SEND(Pid, Msg), comm:send(Pid, Msg)).
--define(SEND(Pid, Msg), comm:send_with_shepherd(Pid, Msg, self())).
+-define(SEND(Pid, Msg), comm:send(Pid, Msg, [{shepherd, self()}])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface

@@ -104,9 +104,9 @@
     {get_values_best, SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
-% prevent warnings in the log by mis-using comm:send_with_shepherd/3
-%-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_to_group_member(Pid, Process, Msg)).
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_with_shepherd(Pid, {send_to_group_member, Process, Msg} , self())).
+% prevent warnings in the log
+% (node availability is not that important to gossip)
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet])).
 
 %% @doc Activates the gossip process. If not activated, the gossip process will
 %%      queue most messages without processing them.
@@ -295,10 +295,6 @@ on_active({get_state, Source_PID, OtherValues} = Msg,
                  enter_round(MyPreviousState, MyState, OtherValues, MyRange)}
             end,
     {MyNewPreviousState, MyNewState, NewQueuesMessages, TriggerState, MyRange};
-
-on_active({send_error, _Target, {send_to_group_member, gossip, {get_state, _, _}}}, State) ->
-    % ignore (node availability is not that important to gossip)
-    State;
 
 on_active({get_state_response, OtherValues},
           {MyPreviousState, MyState, QueuedMessages, TriggerState, MyRange}) ->

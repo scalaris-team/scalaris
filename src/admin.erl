@@ -321,7 +321,7 @@ print_ages() ->
     mgmt_server:node_list(),
     _ = receive
             {get_list_response, List} ->
-                [ comm:send_to_group_member(Node, cyclon, {get_ages, self()}) || Node <- List ]
+                [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
         end,
     worker_loop().
 
@@ -341,7 +341,7 @@ check_routing_tables(Port) ->
     mgmt_server:node_list(),
     _ = receive
             {get_list_response, List} ->
-                [ comm:send_to_group_member(Node, routing_table, {check, Port}) || Node <- List ]
+                [ comm:send(Node, {check, Port}, [{group_member, routing_table}]) || Node <- List ]
         end,
     ok.
 

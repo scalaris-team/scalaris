@@ -67,9 +67,9 @@
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
-% prevent warnings in the log by mis-using comm:send_with_shepherd/3
-%-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_to_group_member(Pid, Process, Msg)).
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send_with_shepherd(Pid, {send_to_group_member, Process, Msg} , self())).
+% prevent warnings in the log
+% (the entry for a failed node will age and will be removed when it is old enough)
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet])).
 
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
@@ -223,10 +223,6 @@ on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) 
     comm:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
-
-on_active({send_error, _Target, {send_to_group_member, cyclon, {cy_subset, _, _}}}, State) ->
-    % ignore - the entry for this node will age and will be removed when it is old enough
-    State;
 
 on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles, TriggerState}) ->
     %io:format("subset_response~n", []),

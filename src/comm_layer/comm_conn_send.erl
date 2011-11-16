@@ -40,7 +40,8 @@
      Socket               :: inet:socket() | notconnected,
      StartTime            :: util:time(),
      SentMsgCount         :: non_neg_integer(),
-     MsgQueue             :: [{DestPid::pid(), Message::comm:message()}],
+     MsgQueue             :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
+                              OQueue::[comm_layer:send_options()]},
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer()}.
@@ -72,7 +73,7 @@ init({DestIP, DestPort, LocalListenPort}) ->
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
-on({send, DestPid, Message, Shepherd}, State) ->
+on({send, DestPid, Message, Options}, State) ->
     Socket = case socket(State) of
                  notconnected ->
                      log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
@@ -83,7 +84,7 @@ on({send, DestPid, Message, Shepherd}, State) ->
              end,
     case Socket of
         fail ->
-            comm_layer:report_send_error(Shepherd,
+            comm_layer:report_send_error(Options,
                                          {dest_ip(State), dest_port(State), DestPid},
                                          Message, tcp_connect_failed),
             %%reconnect
@@ -96,13 +97,13 @@ on({send, DestPid, Message, Shepherd}, State) ->
                             %% start message bundle for sending
                             %% io:format("MQL ~p~n", [MQL]),
                             MaxBundle = util:max(200, MQL div 100),
-                            T1 = set_msg_queue(State, {[{DestPid, Message}], [Shepherd]}),
+                            T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
                             T2 = set_msg_queue_len(T1, 1),
                             set_desired_bundle_size(T2, util:min(MQL,MaxBundle));
                        true ->
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
-                                     DestPid, Message, Shepherd),
+                                     DestPid, Message, Options),
                             T1 = set_socket(State, NewSocket),
                             inc_s_msg_count(T1)
                     end;
@@ -111,13 +112,13 @@ on({send, DestPid, Message, Shepherd}, State) ->
                     MSBS = msgs_since_bundle_start(State),
                     case (QL + MSBS) >= DBS of
                         true ->
-                            {MsgQueue, ShepherdQueue} = msg_queue(State),
+                            {MsgQueue, OptionQueue} = msg_queue(State),
                             MQueue = [{DestPid, Message} | MsgQueue],
-                            SQueue = [Shepherd | ShepherdQueue],
+                            OQueue = [Options | OptionQueue],
 %%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
-                                     unpack_msg_bundle, MQueue, SQueue),
+                                     unpack_msg_bundle, MQueue, OQueue),
                             T1State = set_socket(State, NewSocket),
                             T2State = inc_s_msg_count(T1State),
                             T3State = set_msg_queue(T2State, {[], []}),
@@ -125,9 +126,9 @@ on({send, DestPid, Message, Shepherd}, State) ->
                             _T5State = set_msgs_since_bundle_start(T4State,0);
                         false ->
                             %% add to message bundle
-                            {MsgQueue, ShepherdQueue} = msg_queue(State),
+                            {MsgQueue, OptionQueue} = msg_queue(State),
                             T1 = set_msg_queue(State, {[{DestPid, Message} | MsgQueue],
-                                                       [Shepherd | ShepherdQueue]}),
+                                                       [Options | OptionQueue]}),
                             set_msg_queue_len(T1, QL + 1)
                     end
             end
@@ -175,11 +176,11 @@ on(UnknownMessage, State) ->
     log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
     send_bundle_if_ready(State).
 
--spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:erl_local_pid() | unknown) ->
+-spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm_layer:send_options()) ->
                    notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], list(comm:erl_local_pid() | unknown)) ->
+          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], [comm_layer:send_options()]) ->
                    notconnected | inet:socket().
-send({Address, Port, Socket}, Pid, Message, Shepherd) ->
+send({Address, Port, Socket}, Pid, Message, Options) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message},
                                    [{compressed, 2}, {minor_version, 1}]),
     NewSocket =
@@ -190,7 +191,7 @@ send({Address, Port, Socket}, Pid, Message, Shepherd) ->
                 ?LOG_MESSAGE(Message, byte_size(BinaryMessage)),
                 Socket;
             {error, closed} ->
-                report_bundle_error(Shepherd,
+                report_bundle_error(Options,
                                     {Address, Port, Pid},
                                     Message, socket_closed),
                 log:log(warn,"[ CC ] sending closed connection", []),
@@ -199,9 +200,9 @@ send({Address, Port, Socket}, Pid, Message, Shepherd) ->
             {error, timeout} ->
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
                         [Address, Port, timeout]),
-                send({Address, Port, Socket}, Pid, Message, Shepherd);
+                send({Address, Port, Socket}, Pid, Message, Options);
             {error, Reason} ->
-                report_bundle_error(Shepherd,
+                report_bundle_error(Options,
                                     {Address, Port, Pid},
                                     Message, Reason),
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
@@ -258,10 +259,10 @@ send_bundle_if_ready(InState) ->
                 true ->
                     Socket = socket(State),
                     %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
-                    {MQueue, SQueue} = msg_queue(State),
+                    {MQueue, OQueue} = msg_queue(State),
                     NewSocket =
                         send({dest_ip(State), dest_port(State), Socket},
-                             unpack_msg_bundle, MQueue, SQueue),
+                             unpack_msg_bundle, MQueue, OQueue),
                     T1State = set_socket(State, NewSocket),
                     T2State = inc_s_msg_count(T1State),
                     T3State = set_msg_queue(T2State, {[], []}),
@@ -276,7 +277,7 @@ send_bundle_if_ready(InState) ->
 state_new(DestIP, DestPort, LocalListenPort) ->
     {DestIP, DestPort, LocalListenPort, notconnected,
      _StartTime = erlang:now(), _SentMsgCount = 0,
-     _MsgQueue = [], _Len = 0,
+     _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0}.
 
 dest_ip(State)                -> element(1, State).
@@ -306,19 +307,14 @@ status(State) ->
          _            -> connected
      end.
 
-report_bundle_error(Shepherd, {Address, Port, Pid}, Message, Reason) ->
-    case is_list(Shepherd) of
-        true ->
-            zip_and_foldr(fun (ShepherdX, {DestPid, MessageX}) ->
-                                  comm_layer:report_send_error(ShepherdX,
-                                                               {Address, Port, DestPid},
-                                                               MessageX, Reason)
-                          end, Shepherd, Message);
-        false ->
-            comm_layer:report_send_error(Shepherd,
-                                         {Address, Port, Pid},
-                                         Message, Reason)
-    end.
+report_bundle_error(Options, {Address, Port, _Pid}, Message, Reason) when is_list(Options) ->
+    zip_and_foldr(
+      fun (OptionsX, {DestPid, MessageX}) ->
+               comm_layer:report_send_error(
+                 OptionsX, {Address, Port, DestPid}, MessageX, Reason)
+      end, Options, Message);
+report_bundle_error(Options, {Address, Port, Pid}, Message, Reason) ->
+    comm_layer:report_send_error(Options, {Address, Port, Pid}, Message, Reason).
 
 zip_and_foldr(_F, [], []) ->
     ok;
