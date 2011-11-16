@@ -220,6 +220,13 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                 showEmptyPage(request, response);
                 return;
             }
+            
+            // if the "search" parameter exists, show the search
+            String req_search = request.getParameter("search");
+            if (req_search != null) {
+                handleSearch(request, response, connection, req_search);
+                return;
+            }
 
             // get parameters:
             String req_title = request.getParameter("title");
@@ -287,7 +294,6 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                 }
                 handleViewSpecialPageList(request, response, result, value, connection);
             } else if (req_title.startsWith("Special:Search")) {
-                String req_search = request.getParameter("search");
                 if (req_search == null) {
                     req_search = ""; // shows all pages
                     int slashIndex = req_title.indexOf('/');
@@ -295,22 +301,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
                         req_search = req_title.substring(slashIndex + 1);
                     }
                 }
-                // use default namespace (id 0) for invalid values
-                int nsId = parseInt(request.getParameter("namespace"), 0);
-                WikiPageListBean value = new WikiPageListBean();
-                value.setPageHeading("Search");
-                value.setTitle("Special:Search&search=" + req_search);
-                value.setFormTitle("Search results");
-                value.setFormType(FormType.PageSearchForm);
-                value.setSearch(req_search);
-                PageListResult result;
-                if (nsId == 0) {
-                    result = getArticleList(connection);
-                } else {
-                    result = getPageList(connection);
-                    value.setNamespaceId(nsId);
-                }
-                handleViewSpecialPageList(request, response, result, value, connection);
+                handleSearch(request, response, connection, req_search);
             } else if (req_title.startsWith("Special:WhatLinksHere")) {
                 String req_target = request.getParameter("target");
                 if (req_target == null) {
@@ -354,6 +345,42 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         } finally {
             releaseConnection(request, connection);
         }
+    }
+
+    /**
+     * Shows the page search for the given search string.
+     * 
+     * @param request
+     *            the HTTP request
+     * @param response
+     *            the response object
+     * @param connection
+     *            connection to the database
+     * @param req_search
+     *            search string
+     * 
+     * @throws ServletException
+     * @throws IOException
+     */
+    private void handleSearch(HttpServletRequest request,
+            HttpServletResponse response, Connection connection,
+            String req_search) throws ServletException, IOException {
+        // use default namespace (id 0) for invalid values
+        int nsId = parseInt(request.getParameter("namespace"), 0);
+        WikiPageListBean value = new WikiPageListBean();
+        value.setPageHeading("Search");
+        value.setTitle("Special:Search&search=" + req_search);
+        value.setFormTitle("Search results");
+        value.setFormType(FormType.PageSearchForm);
+        value.setSearch(req_search);
+        PageListResult result;
+        if (nsId == 0) {
+            result = getArticleList(connection);
+        } else {
+            result = getPageList(connection);
+            value.setNamespaceId(nsId);
+        }
+        handleViewSpecialPageList(request, response, result, value, connection);
     }
 
     /*
