@@ -474,7 +474,7 @@ process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _Qu
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:self_with_cookie({send_failed, []}),
-            comm:send_with_shepherd(Pid, {lookup_aux, Key, Hops + 1, Msg}, Self)
+            comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
 process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}}, {send_failed, FailedPids}}, {join, JoinState, _QueuedMessages} = State) ->
@@ -486,7 +486,7 @@ process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}}, {send_fa
         {ok, {_, Pid}} ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:self_with_cookie({send_failed, [Target | FailedPids]}),
-            comm:send_with_shepherd(Pid, {lookup_aux, Key, Hops + 1, Msg}, Self)
+            comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
     

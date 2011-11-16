@@ -33,10 +33,10 @@ lookup_aux(State, Key, Hops, Msg) ->
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> % found node -> terminate
             P = node:pidX(nodelist:succ(Neighbors)),
-            comm:send_with_shepherd(P, {lookup_fin, Key, Hops + 1, Msg}, self());
+            comm:send(P, {lookup_fin, Key, Hops + 1, Msg}, [{shepherd, self()}]);
         _ ->
             P = ?RT:next_hop(State, Key),
-            comm:send_with_shepherd(P, {lookup_aux, Key, Hops + 1, Msg}, self())
+            comm:send(P, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, self()}])
     end.
 %% userdevguide-end dht_node_lookup:routing
 

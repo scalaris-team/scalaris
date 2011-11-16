@@ -72,9 +72,9 @@ init([RemotePid]) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
     TableName = pdb:new(?MODULE, [set, protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
-    comm:send_with_shepherd(
-      RemoteFDPid,
-      {subscribe_heartbeats, comm:this(), RemotePid}, shepherd_new()),
+    comm:send(RemoteFDPid,
+              {subscribe_heartbeats, comm:this(), RemotePid},
+              [{shepherd, shepherd_new()}]),
 
     %% no periodic alive check inside same vm (to succeed unittests)
     case comm:is_local(RemotePid) of
@@ -183,7 +183,7 @@ on({periodic_alive_check}, State) ->
     ?TRACEPONG("Pinger periodic_alive_check~n", []),
     Now = os:timestamp(),
     CrashedAfter = state_get_crashed_after(State),
-    comm:send_with_shepherd(
+    comm:send(
       state_get_rem_hbs(State),
       {pong, comm:this(),
        timer:now_diff(
@@ -193,7 +193,7 @@ on({periodic_alive_check}, State) ->
                            %% the following is the reduction rate
                            %% when increased earlier
                            + failureDetectorInterval() div 3))},
-     shepherd_new()),
+      [{shepherd, shepherd_new()}]),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
                    true -> report_crash(State);
                    false -> State
@@ -215,8 +215,8 @@ on({{send_error, Target, Message}, ShepherdCookie}, State) ->
         end,
     case NextOp of
         {retry} ->
-            comm:send_with_shepherd(Target, Message,
-                                    shepherd_inc(ShepherdCookie)),
+            comm:send(Target, Message,
+                      [{shepherd, shepherd_inc(ShepherdCookie)}]),
             State;
         {delay, Sec, Retries} ->
             msg_delay:send_local(
@@ -421,12 +421,12 @@ state_add_watched_pid(State, WatchedPid) ->
             %% add to remote site
             RemHBS = state_get_rem_hbs(State),
             case comm:make_local(RemHBS) of
-                fd -> comm:send_with_shepherd(
+                fd -> comm:send(
                         RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid},
-                        shepherd_new());
-                _ -> comm:send_with_shepherd(
-                       RemHBS, {add_watching_of, WatchedPid},
-                       shepherd_new())
+                        [{shepherd, shepherd_new()}]);
+                _  -> comm:send(
+                        RemHBS, {add_watching_of, WatchedPid},
+                        [{shepherd, shepherd_new()}])
             end,
             %% add to list
             state_set_rem_pids(

@@ -186,9 +186,9 @@ on_active({cy_cache, []}, State)  ->
 on_active({cy_cache, [Node] = _Cache},
           {Centroids, Sizes, _ResetTriggerState, _ClusterTriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
-    comm:send_to_group_member(node:pidX(Node), dc_clustering,
-                              {clustering_shuffle, comm:this(),
-                               Centroids, Sizes}),
+    comm:send(node:pidX(Node),
+              {clustering_shuffle, comm:this(), Centroids, Sizes},
+              [{group_member, dc_clustering}]),
     State;
 
 % have been asked to shuffle

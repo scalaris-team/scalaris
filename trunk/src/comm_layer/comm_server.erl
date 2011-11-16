@@ -64,9 +64,9 @@ tcp_options() ->
      {send_timeout, config:read(tcp_send_timeout)}
 ].
 
--spec send({inet:ip_address(), tcp_port(), pid()}, term(), comm:erl_local_pid()) -> ok.
-send({Address, Port, Pid}, Message, Shepherd) ->
-    ?MODULE ! {send, Address, Port, Pid, Message, Shepherd},
+-spec send({inet:ip_address(), tcp_port(), pid()}, term(), comm_layer:send_options()) -> ok.
+send({Address, Port, Pid}, Message, Options) ->
+    ?MODULE ! {send, Address, Port, Pid, Message, Options},
     ok.
 
 -spec set_local_address(inet:ip_address() | undefined, tcp_port()) -> ok.
@@ -95,7 +95,7 @@ get_local_address_port() ->
 
 %% @doc message handler
 -spec on(message(), State::null) -> null.
-on({send, Address, Port, Pid, Message, Shepherd}, State) ->
+on({send, Address, Port, Pid, Message, Options}, State) ->
     case erlang:get({Address, Port}) of
         undefined ->
             %% start Erlang process responsible for the connection
@@ -105,7 +105,7 @@ on({send, Address, Port, Pid, Message, Shepherd}, State) ->
             Pid;
         ConnPid -> ok
     end,
-    ConnPid ! {send, Pid, Message, Shepherd},
+    ConnPid ! {send, Pid, Message, Options},
     State;
 
 on({set_local_address, Address, Port, Client}, State) ->

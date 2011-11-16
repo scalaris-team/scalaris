@@ -182,9 +182,9 @@ on_active({cy_cache, [Node] = _Cache},
     % do not exchange states with itself
     case node:is_me(Node) of
         false ->
-            comm:send_to_group_member(node:pidX(Node), vivaldi,
-                                         {vivaldi_shuffle, comm:this(),
-                                          Coordinate, Confidence});
+            comm:send(node:pidX(Node),
+                      {vivaldi_shuffle, comm:this(), Coordinate, Confidence},
+                      [{group_member, vivaldi}, quiet]);
         true -> ok
     end,
     State;

@@ -44,11 +44,11 @@ issue_send_reply(Id, Target, Msg, Parents) ->
 
 -spec send_reply(Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {send_to_group_member, Proc, Msg}, [], Shepherd) ->
-    comm:send_with_shepherd(Target, {send_to_group_member, Proc, {bulkowner_reply, Id, Msg}}, Shepherd);
+    comm:send(Target, {bulkowner_reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
 send_reply(Id, Target, Msg, [], Shepherd) ->
-    comm:send_with_shepherd(Target, {bulkowner_reply, Id, Msg}, Shepherd);
+    comm:send(Target, {bulkowner_reply, Id, Msg}, [{shepherd, Shepherd}]);
 send_reply(Id, Target, Msg, [Parent | Rest], Shepherd) ->
-    comm:send_with_shepherd(Parent, {bulkowner_reply, Id, Target, Msg, Rest}, Shepherd).
+    comm:send(Parent, {bulkowner_reply, Id, Target, Msg, Rest}, [{shepherd, Shepherd}]).
 
 -spec send_reply_failed(Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid(), FailedPid::comm:mypid()) -> ok.
 send_reply_failed(_Id, Target, Msg, [], _Shepherd, Target) ->

@@ -135,8 +135,8 @@ get_other_vms(MaxVMs) ->
         lists:append(
           [begin
                GlobalPid = comm:make_global(Pid),
-               comm:send_to_group_member(GlobalPid, cyclon,
-                                         {get_subset_rand, MaxVMs, self()}),
+               comm:send(GlobalPid, {get_subset_rand, MaxVMs, self()},
+                         [{group_member, cyclon}]),
                receive
                    {cy_cache, Cache} ->
                        [{node:erlNode(Node),

@@ -455,7 +455,7 @@ process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
 send(Pid, Message, MoveFullId) ->
     Shepherd = comm:self_with_cookie({move, MoveFullId}),
     ?TRACE_SEND(Pid, Message),
-    comm:send_with_shepherd(Pid, Message, Shepherd).
+    comm:send(Pid, Message, [{shepherd, Shepherd}]).
 
 %% @doc Sends a move message using the dht_node as the shepherd to handle
 %%      broken connections. This does not require a slide_op being set up.
@@ -465,7 +465,7 @@ send(Pid, Message, MoveFullId) ->
 send_no_slide(Pid, Message, Timeouts) ->
     Shepherd = comm:self_with_cookie({move, timeouts, Timeouts}),
     ?TRACE_SEND(Pid, Message),
-    comm:send_with_shepherd(Pid, Message, Shepherd).
+    comm:send(Pid, Message, [{shepherd, Shepherd}]).
 
 %% @doc Sends a move message using the dht_node as the shepherd to handle
 %%      broken connections. The target node is determined from the SlideOp.

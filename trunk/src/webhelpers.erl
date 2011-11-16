@@ -81,7 +81,7 @@ getVivaldiMap() ->
     _ = [erlang:spawn(
            fun() ->
                    SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
-                   comm:send_to_group_member(Pid, vivaldi, {get_coordinate, SourcePid})
+                   comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
            end) || Pid <- Nodes],
     CC_list = get_vivaldi(Nodes, [], 0),
     renderVivaldiMap(CC_list, Nodes).
