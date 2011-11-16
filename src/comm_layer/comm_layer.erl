@@ -28,7 +28,7 @@
 -vsn('$Id$').
 
 -export([send/2, send_with_shepherd/3, this/0, is_valid/1, is_local/1, make_local/1,
-         get_ip/1, get_port/1, report_send_error/3]).
+         get_ip/1, get_port/1, report_send_error/4]).
 
 -include("scalaris.hrl").
 
@@ -50,12 +50,12 @@ send_with_shepherd(Target, Message, Shepherd) ->
                     log:log(warn,
                             "[ CC ] Cannot locally send msg to unknown named"
                             " process ~p: ~.0p~n", [LocalTarget, Message]),
-                    report_send_error(Shepherd, Target, Message);
+                    report_send_error(Shepherd, Target, Message, unknown_named_process);
                 _ ->
                     PID ! Message,
                     case is_process_alive(PID) of
                         false ->
-                            report_send_error(Shepherd, Target, Message);
+                            report_send_error(Shepherd, Target, Message, local_target_not_alive);
                         true ->
                             ok
                     end
@@ -114,12 +114,12 @@ get_ip({IP, _Port, _Pid}) -> IP.
 -spec get_port(process_id()) -> comm_server:tcp_port().
 get_port({_IP, Port, _Pid}) -> Port.
 
--spec report_send_error(unknown | comm:erl_local_pid(), process_id(), comm:message()) -> ok.
-report_send_error(Shepherd, Target, Message) ->
+-spec report_send_error(unknown | comm:erl_local_pid(), process_id(), comm:message(), atom()) -> ok.
+report_send_error(Shepherd, Target, Message, Reason) ->
     case Shepherd of
         unknown ->
-            log:log(warn, "~p (name: ~.0p) Connection to ~.0p failed, drop message ~.0p",
-                    [self(), pid_groups:my_pidname(), Target, Message]),
+            log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, drop message ~.0p due to ~p",
+                    [self(), pid_groups:my_pidname(), Target, Message, Reason]),
             ok;
         ShepherdPid ->
             comm:send_local(ShepherdPid, {send_error, Target, Message})
