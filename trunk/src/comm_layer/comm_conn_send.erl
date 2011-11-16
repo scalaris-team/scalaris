@@ -85,7 +85,7 @@ on({send, DestPid, Message, Shepherd}, State) ->
         fail ->
             comm_layer:report_send_error(Shepherd,
                                          {dest_ip(State), dest_port(State), DestPid},
-                                         Message),
+                                         Message, tcp_connect_failed),
             %%reconnect
             set_socket(State, notconnected);
         _ ->
@@ -192,7 +192,7 @@ send({Address, Port, Socket}, Pid, Message, Shepherd) ->
             {error, closed} ->
                 report_bundle_error(Shepherd,
                                     {Address, Port, Pid},
-                                    Message),
+                                    Message, socket_closed),
                 log:log(warn,"[ CC ] sending closed connection", []),
                 gen_tcp:close(Socket),
                 notconnected;
@@ -203,7 +203,7 @@ send({Address, Port, Socket}, Pid, Message, Shepherd) ->
             {error, Reason} ->
                 report_bundle_error(Shepherd,
                                     {Address, Port, Pid},
-                                    Message),
+                                    Message, Reason),
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
                         [Address, Port, Reason]),
                 gen_tcp:close(Socket),
@@ -306,18 +306,18 @@ status(State) ->
          _            -> connected
      end.
 
-report_bundle_error(Shepherd, {Address, Port, Pid}, Message) ->
+report_bundle_error(Shepherd, {Address, Port, Pid}, Message, Reason) ->
     case is_list(Shepherd) of
         true ->
             zip_and_foldr(fun (ShepherdX, {DestPid, MessageX}) ->
                                   comm_layer:report_send_error(ShepherdX,
                                                                {Address, Port, DestPid},
-                                                               MessageX)
+                                                               MessageX, Reason)
                           end, Shepherd, Message);
         false ->
             comm_layer:report_send_error(Shepherd,
                                          {Address, Port, Pid},
-                                         Message)
+                                         Message, Reason)
     end.
 
 zip_and_foldr(_F, [], []) ->
