@@ -123,7 +123,7 @@ report_send_error(Options, Target, Message, Reason) ->
             case proplists:get_bool(quiet, Options) of
                 false ->
                     log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, drop message ~.0p due to ~p",
-                            [self(), pid_groups:my_pidname(), Target, Message, Reason]),
+                            [self(), pid_groups:my_pidname(), Target, Message, Reason]);
                 _ -> ok
             end,
             ok;
