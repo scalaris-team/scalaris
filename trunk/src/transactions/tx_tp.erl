@@ -28,7 +28,7 @@
 
 %%% functions for gen_component module and supervisor callbacks
 -export([init/0, on_init_TP/2]).
--export([on_tx_commitreply/3, on_tx_commitreply_fwd/6]).
+-export([on_do_commit_abort/3, on_do_commit_abort_fwd/6]).
 
 -spec init() -> atom().
 init() ->
@@ -87,14 +87,14 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
         end,
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
--spec on_tx_commitreply({tx_item_state:paxos_id(),
-                         tx_tlog:tlog_entry(),
-                         comm:mypid(),
-                         tx_item_state:tx_item_id()},
-                        commit | abort, dht_node_state:state())
-                       -> dht_node_state:state().
-on_tx_commitreply({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
-    ?TRACE("tx_tp:on_tx_commitreply({, ...})~n", []),
+-spec on_do_commit_abort({tx_item_state:paxos_id(),
+                          tx_tlog:tlog_entry(),
+                          comm:mypid(),
+                          tx_item_state:tx_item_id()},
+                         commit | abort, dht_node_state:state())
+                        -> dht_node_state:state().
+on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
+    ?TRACE("tx_tp:on_do_commit_abort({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
     % get own proposal for lock release
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
@@ -113,22 +113,22 @@ on_tx_commitreply({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_Sta
                 true ->
                     %% we are not in a hurry, tx is already commited and we are the slow minority
                     msg_delay:send_local(
-                      1, self(), {tx_tm_rtm_commit_reply, Id, Result});
+                      1, self(), {tp_do_commit_abort, Id, Result});
                 false ->
                     % we don't have an own proposal yet (no validate seen), so we forward msg as is.
                     dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                               {tx_tm_rtm_commit_reply, Id,
+                                               {tp_do_commit_abort, Id,
                                                 Result})
             end,
             DHT_Node_State
     end.
 
--spec on_tx_commitreply_fwd(comm:mypid(), tx_item_state:tx_item_id(),
-                            tx_tlog:tlog_entry(),
-                            commit | abort, prepared | abort,
-                            dht_node_state:state())
+-spec on_do_commit_abort_fwd(comm:mypid(), tx_item_state:tx_item_id(),
+                             tx_tlog:tlog_entry(),
+                             commit | abort, prepared | abort,
+                             dht_node_state:state())
                            -> dht_node_state:state().
-on_tx_commitreply_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
+on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
     NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State),
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
@@ -145,7 +145,7 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
         false ->
             %% forward commit to now responsible node
             dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                       {tx_tm_rtm_commit_reply_fwd,
+                                       {tp_do_commit_abort_fwd,
                                         TM, TMItemId, RTLogEntry,
                                         Result, OwnProposal}),
             DB

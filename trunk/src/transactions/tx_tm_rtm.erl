@@ -51,6 +51,10 @@
 msg_commit_reply(Client, ClientsID, Result) ->
     comm:send(Client, {tx_tm_rtm_commit_reply, ClientsID, Result}).
 
+-spec msg_tp_do_commit_abort(comm:mypid(), any(), commit | abort) -> ok.
+msg_tp_do_commit_abort(TP, Id, Result) ->
+    comm:send(TP, {tp_do_commit_abort, Id, Result}).
+
 %% public interface for transaction validation using Paxos-Commit.
 %% ClientsID may be nil, its not used by tx_tm. It will be repeated in
 %% replies to allow to map replies to the right requests in the
@@ -519,7 +523,7 @@ on({register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
                     {PaxosID, RTLogEntry, _TP} =
                         lists:keyfind(PaxosID, 1,
                           tx_item_state:get_paxosids_rtlogs_tps(ItemState)),
-                    msg_commit_reply(TP, {PaxosID, RTLogEntry, comm:this(), ItemId}, Decision),
+                    msg_tp_do_commit_abort(TP, {PaxosID, RTLogEntry, comm:this(), ItemId}, Decision),
                     %% record in txstate and try to delete entry?
                     NewTxState = tx_state:inc_numinformed(TxState),
                     trigger_delete_if_done(NewTxState),
@@ -821,7 +825,7 @@ inform_tps(TxState, State, Result) ->
               {ok, ItemState} = get_item_entry(ItemId, State),
               [ case comm:is_valid(TP) of
                     false -> unknown;
-                    true -> msg_commit_reply(TP, {PaxId, RTLogEntry, comm:this(), ItemId}, Result), ok
+                    true -> msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry, comm:this(), ItemId}, Result), ok
                 end
                 || {PaxId, RTLogEntry, TP}
                        <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]

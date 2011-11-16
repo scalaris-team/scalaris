@@ -194,10 +194,10 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
 %% messages handled as a transaction participant (TP)
 on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
-on({tx_tm_rtm_commit_reply, Id, Result}, State) ->
-    tx_tp:on_tx_commitreply(Id, Result, State);
-on({tx_tm_rtm_commit_reply_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
-    tx_tp:on_tx_commitreply_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
+on({tp_do_commit_abort, Id, Result}, State) ->
+    tx_tp:on_do_commit_abort(Id, Result, State);
+on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
+    tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see api_dht_raw.erl and dht_node_look up.erl)
