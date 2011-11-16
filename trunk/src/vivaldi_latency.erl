@@ -39,7 +39,7 @@
 
 % accepted messages of vivaldi_latency processes
 -type message() ::
-    {pong} |
+    {{pong}, Count::pos_integer()} |
     {start_ping} |
     {shutdown} |
     {'DOWN', MonitorRef::any(), process, Owner::comm:erl_local_pid(), Info::any()}.
@@ -62,6 +62,10 @@ on({{pong}, Count}, {Owner, RemotePid, Token, Start, Count, Latencies}) when Sta
                                   self(), {start_ping}),
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
+
+on({{pong}, _Count}, State) ->
+    % ignore unrelated pong messages
+    State;
 
 on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
     NewCount = Count + 1,
