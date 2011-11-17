@@ -477,7 +477,7 @@ process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _Qu
             comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}}, {send_failed, FailedPids}}, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}, _Reason}, {send_failed, FailedPids}}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
     case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
         failed ->

@@ -203,7 +203,7 @@ on({periodic_alive_check}, State) ->
                           self(), {periodic_alive_check}),
     NewState;
 
-on({{send_error, Target, Message}, ShepherdCookie}, State) ->
+on({{send_error, Target, Message, _Reason}, ShepherdCookie}, State) ->
     NextOp =
         case N = shepherd_retries(ShepherdCookie) of
             1 -> {retry};

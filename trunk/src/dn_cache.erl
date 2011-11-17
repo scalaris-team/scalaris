@@ -34,7 +34,7 @@
     {add_zombie_candidate, node:node_type() | comm:mypid()} |
     {subscribe, comm:erl_local_pid()} |
     {unsubscribe, comm:erl_local_pid()} |
-    {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}} |
+    {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}, Reason::atom()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
 -type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set(), trigger:state()}).
@@ -109,7 +109,7 @@ on({subscribe, Node}, {Queue, Subscribers, TriggerState}) ->
 on({unsubscribe, Node}, {Queue, Subscribers, TriggerState}) ->
     {Queue, gb_sets:del_element(Node, Subscribers), TriggerState};
 
-on({send_error, _Target, {ping, ThisWithCookie}}, {Queue, Subscribers, TriggerState}) ->
+on({send_error, _Target, {ping, ThisWithCookie}, _Reason}, {Queue, Subscribers, TriggerState}) ->
     {_This, {{null}, Node}} = comm:unpack_cookie(ThisWithCookie, {null}),
     {add_to_queue(Queue, Node), Subscribers, TriggerState};
 

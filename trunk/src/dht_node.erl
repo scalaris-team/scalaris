@@ -414,15 +414,15 @@ on({bulkowner_gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HDat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handling of failed sends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({send_error, Target, {lookup_aux, _, _, _} = Message}, State) ->
+on({send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({{send_error, Target, {lookup_aux, _, _, _} = Message}, {send_failed, _Pids}}, State) ->
+on({{send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, {send_failed, _Pids}}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({send_error, FailedTarget, {bulkowner_reply, Id, Target, Msg, Parents}}, State) ->
+on({send_error, FailedTarget, {bulkowner_reply, Id, Target, Msg, Parents}, _Reason}, State) ->
     bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
     State;
 
-on({send_error, Target, {lookup_fin, _, _, _} = Message}, State) ->
+on({send_error, Target, {lookup_fin, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -119,7 +119,7 @@ send(Pid, Message) ->
 %% @doc Sends a message to an arbitrary process with the given options.
 %%      If a shepherd is given, it will be informed when the sending fails;
 %%      with a message of the form:
-%%       {send_error, Pid, Message}.
+%%       {send_error, Pid, Message, Reason}.
 %%      If a group_member is given, the message is send to an arbitrary process
 %%      of another node instructing it to forward the message to a process in
 %%      its group with the given name.

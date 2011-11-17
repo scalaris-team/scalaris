@@ -279,7 +279,7 @@ reply_with_send_error(Msg, State) ->
     _ = [begin
              case {Target, FailMsgCookie} of
                  {null, ok} -> ok;
-                 _ -> comm:send(Target, {{send_error, comm:this(), Msg}, FailMsgCookie})
+                 _ -> comm:send(Target, {{send_error, comm:this(), Msg, unittest}, FailMsgCookie})
              end
          end|| {Target, FailMsgCookie} <- lists:usort(FailMsgs)],
     State.
