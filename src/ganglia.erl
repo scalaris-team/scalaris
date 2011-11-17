@@ -65,6 +65,10 @@ update(Tree) ->
     DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
                                     || P <- pid_groups:find_all(dht_node)]),
     _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
+    RRDMetrics = fetch_rrd_metrics(),
+    LocalLoad = fetch_local_load(),
+    _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics],
+    _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- LocalLoad],
     traverse(gb_trees:iterator(Tree)).
 
 %% -spec update_timer({Timer::string(), Count::pos_integer(), Min::number(), Avg::number(), Max::number()}, SinceLast::number()) -> ok.
@@ -86,8 +90,11 @@ traverse(Iter1) ->
 
 -spec gmetric(Slope::both | positive, Metric::string(), Type::string(), Value::number(), Unit::string()) -> string().
 gmetric(Slope, Metric, Type, Value, Unit) ->
-    os:cmd(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
-                         [Slope, Metric, Type, Value, Unit])).
+    Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
+                         [Slope, Metric, Type, Value, Unit])),
+    Res = os:cmd(Cmd),
+    %io:format("~s: ~w~n", [Cmd, Res]),
+    Res.
 
 -spec monitor_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
 monitor_vivaldi_errors(Group, Idx) ->
@@ -110,3 +117,39 @@ monitor_per_dht_node(F, Nodes) ->
                         _ = F(Group, Idx),
                         Idx + 1
                 end, 0, DHTNodes).
+
+-spec fetch_rrd_metrics() -> list().
+fetch_rrd_metrics() ->
+    ClientMonitor = pid_groups:pid_of("clients_group", monitor),
+    [{_, _, RRD}] = monitor:get_rrds(ClientMonitor, [{api_tx, "req_list"}]),
+    case RRD of
+        undefined ->
+            [];
+        _ ->
+            {From_, To_, Value} = hd(rrd:dump(RRD)),
+            Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+            {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
+            AvgPerS = Count / Diff_in_s,
+            Avg = Sum / Count,
+            [{"tx latency", "float", Avg, "ms"},
+             {"transactions/s", "int32", AvgPerS, "1/s"}]
+    end.
+
+% @doc aggregate the number of key-value pairs stored in this VM
+-spec fetch_local_load() -> list().
+fetch_local_load() ->
+    Pairs = lists:foldl(fun (Pid, Agg) ->
+                                Agg + get_load(Pid)
+                        end, 0, pid_groups:find_all(dht_node)),
+    [{"kv pairs", "int32", Pairs, "pairs"}].
+
+% @doc get number of key-value pairs stored in given node
+-spec get_load(Pid::comm:erl_local_pid()) -> integer().
+get_load(Pid) ->
+    comm:send_local(Pid, {get_node_details, comm:this(), [load]}),
+    receive
+        {get_node_details_response, Details} ->
+            node_details:get(Details, load)
+    after 2000 ->
+            0
+    end.
