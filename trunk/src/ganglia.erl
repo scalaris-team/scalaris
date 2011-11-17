@@ -120,19 +120,25 @@ monitor_per_dht_node(F, Nodes) ->
 
 -spec fetch_rrd_metrics() -> list().
 fetch_rrd_metrics() ->
-    ClientMonitor = pid_groups:pid_of("clients_group", monitor),
-    [{_, _, RRD}] = monitor:get_rrds(ClientMonitor, [{api_tx, "req_list"}]),
-    case RRD of
-        undefined ->
-            [];
-        _ ->
-            {From_, To_, Value} = hd(rrd:dump(RRD)),
-            Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-            {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
-            AvgPerS = Count / Diff_in_s,
-            Avg = Sum / Count,
-            [{"tx latency", "float", Avg, "ms"},
-             {"transactions/s", "int32", AvgPerS, "1/s"}]
+    case pid_groups:pid_of("clients_group", monitor) of
+        failed -> [];
+        ClientMonitor ->
+            case monitor:get_rrds(ClientMonitor, [{api_tx, "req_list"}]) of
+                [] -> [];
+                [{_, _, RRD}] ->
+                    case RRD of
+                        undefined ->
+                            [];
+                        _ ->
+                            {From_, To_, Value} = hd(rrd:dump(RRD)),
+                            Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+                            {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
+                            AvgPerS = Count / Diff_in_s,
+                            Avg = Sum / Count,
+                            [{"tx latency", "float", Avg, "ms"},
+                             {"transactions/s", "int32", AvgPerS, "1/s"}]
+                    end
+            end
     end.
 
 % @doc aggregate the number of key-value pairs stored in this VM
