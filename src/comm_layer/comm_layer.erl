@@ -134,6 +134,6 @@ report_send_error(Options, Target, Message, Reason) ->
             end,
             ok;
         ShepherdPid ->
-            comm:send_local(ShepherdPid, {send_error, Target, Message})
+            comm:send_local(ShepherdPid, {send_error, Target, Message, Reason})
     end,
     ok.

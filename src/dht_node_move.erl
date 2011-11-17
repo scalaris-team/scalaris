@@ -103,13 +103,13 @@
 -ifdef(forward_or_recursive_types_are_not_allowed).
 -type move_message() ::
     move_message1() |
-    {{send_error, Target::comm:mypid(), Message::comm:message()}, {move, timeouts, Timeouts::non_neg_integer()}} |
-    {{send_error, Target::comm:mypid(), Message::comm:message()}, {move, MoveFullId::slide_op:id()}}.
+    {{send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {move, timeouts, Timeouts::non_neg_integer()}} |
+    {{send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {move, MoveFullId::slide_op:id()}}.
 -else.
 -type move_message() ::
     move_message1() |
-    {{send_error, Target::comm:mypid(), Message::move_message1()}, {move, timeouts, Timeouts::non_neg_integer()}} |
-    {{send_error, Target::comm:mypid(), Message::move_message1()}, {move, MoveFullId::slide_op:id()}}.
+    {{send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {move, timeouts, Timeouts::non_neg_integer()}} |
+    {{send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {move, MoveFullId::slide_op:id()}}.
 -endif.
 
 %% @doc Processes move messages for the dht_node and implements the node move
@@ -401,7 +401,7 @@ process_move_msg({move, rm_db_range, MoveFullId} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     dht_node_state:rm_db_range(State, MoveFullId);
 
-process_move_msg({{send_error, Target, Message}, {move, timeouts, Timeouts}} = _Msg, MyState) ->
+process_move_msg({{send_error, Target, Message, _Reason}, {move, timeouts, Timeouts}} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     NewTimeouts = Timeouts + 1,
     MaxRetries = get_send_msg_retries(),
@@ -414,7 +414,7 @@ process_move_msg({{send_error, Target, Message}, {move, timeouts, Timeouts}} = _
     end,
     MyState;
 
-process_move_msg({{send_error, Target, Message}, {move, MoveFullId}} = _Msg, MyState) ->
+process_move_msg({{send_error, Target, Message, _Reason}, {move, MoveFullId}} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
