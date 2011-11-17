@@ -1149,7 +1149,7 @@ continue_slide_delta(State, PredOrSucc, SlideOp) ->
                     abort_slide(State1, TargetNode, MoveFullId, null, SourcePid, Tag,
                                 Type, Reason, true)
             end;
-        {jump, continue, NewTargetId} ->
+        {jump, continue, _NewTargetId} ->
             % TODO
             accept_delta2(State, PredOrSucc, SlideOp);
         {leave, continue} ->
@@ -1217,7 +1217,7 @@ finish_delta_ack_continue(State, PredOrSucc, SlideOp, NewSlideId) ->
             finish_delta_ack_next(
               State, PredOrSucc, SlideOp, Type, NewSlideId, MyNode,
               TargetNode, NewTargetId, Tag, OtherMTE, SourcePid);
-        {jump, continue, NewTargetId} ->
+        {jump, continue, _NewTargetId} ->
             % TODO
             finish_delta_ack(State, PredOrSucc, SlideOp);
         {leave, continue} ->
