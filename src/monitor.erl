@@ -172,7 +172,7 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
     comm:send_local(MyMonitor, {report_rrd, Process, Key, OldValue, Value}).
 
 %% @doc Retrieve individual RRDs from monitor
--spec get_rrds(MonitorPid::comm:mypid(), Keys::table_index()) -> list(rrd:rrd()).
+-spec get_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> list({atom(), key(), rrd:rrd() | undefined}).
 get_rrds(MonitorPid, Keys) ->
     comm:send_local(MonitorPid, {get_rrds, Keys, comm:this()}),
     receive
