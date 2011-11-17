@@ -147,7 +147,7 @@ java-test: compile java
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -203,7 +203,7 @@ python-test: compile python
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -281,7 +281,7 @@ python3-test: compile python3
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -323,7 +323,7 @@ ruby-test: compile
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -337,39 +337,39 @@ interop-test: compile java java-scalaris.test.compile python
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
 	sleep 5s ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.java_write.log 2>&1; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2>&1; \
 	JAVA_WRITE_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.python_write.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2>&1 ; \
 	PYTHON_JSON_WRITE_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.ruby_write.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_write.log 2>&1 ; \
 	RUBY_JSON_WRITE_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.java_read_java.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_java.log 2>&1 ; \
 	JAVA_READ_JAVA_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.java_read_python.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_python.log 2>&1 ; \
 	JAVA_READ_PYTHON_JSON_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.java_read_ruby.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_ruby.log 2>&1 ; \
 	JAVA_READ_RUBY_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.python_read_java.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_java.log 2>&1 ; \
 	PYTHON_JSON_READ_JAVA_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.python_read_python.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_python.log 2>&1 ; \
 	PYTHON_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.python_read_ruby.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_ruby.log 2>&1 ; \
 	PYTHON_JSON_READ_RUBY_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test java > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_java.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_java.log 2>&1 ; \
 	RUBY_JSON_READ_JAVA_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_python.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_python.log 2>&1 ; \
 	RUBY_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)/interop.ruby_read_ruby.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_read_ruby.log 2>&1 ; \
 	RUBY_JSON_READ_RUBY_JSON_FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$JAVA_WRITE_FAILED -ne 0 -o $$PYTHON_JSON_WRITE_FAILED -ne 0 -o $$RUBY_JSON_WRITE_FAILED -ne 0 -o $$JAVA_READ_JAVA_FAILED -ne 0 -o $$JAVA_READ_PYTHON_JSON_FAILED -ne 0 -o $$JAVA_READ_RUBY_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_JAVA_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_RUBY_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_JAVA_FAILED -ne 0 -o $$RUBY_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_RUBY_JSON_FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  cat log/$(SCALARIS_JTEST_NAME)/interop.*write*.log ; \
-	  cat log/$(SCALARIS_JTEST_NAME)/interop.*read*.log ; \
+	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*write*.log ; \
+	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*read*.log ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -385,27 +385,27 @@ interop3-test: interop-test python3
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
 	sleep 5s ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)/interop.python_write.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2>&1 ; \
 	PYTHON_JSON_WRITE_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py write interop_test3 > log/$(SCALARIS_JTEST_NAME)/interop.python3_write.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py write interop_test3 > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_write.log 2>&1 ; \
 	PYTHON3_JSON_WRITE_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.python_read_python.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_python.log 2>&1 ; \
 	PYTHON_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test3 json_python > log/$(SCALARIS_JTEST_NAME)/interop.python_read_python3.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test3 json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_python3.log 2>&1 ; \
 	PYTHON_JSON_READ_PYTHON3_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)/interop.python3_read_python.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_read_python.log 2>&1 ; \
 	PYTHON3_JSON_READ_PYTHON_JSON_FAILED=$$? ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py read interop_test3 json_python > log/$(SCALARIS_JTEST_NAME)/interop.python3_read_python3.log 2>&1 ; \
+	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py read interop_test3 json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_read_python3.log 2>&1 ; \
 	PYTHON3_JSON_READ_PYTHON3_JSON_FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ -o $$PYTHON_JSON_WRITE_FAILED -ne 0 -o $$PYTHON3_JSON_WRITE_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON3_JSON_FAILED -ne 0 -o $$PYTHON3_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON3_JSON_READ_PYTHON3_JSON_FAILED -ne 0 ]; then \
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  cat log/$(SCALARIS_JTEST_NAME)/interop.*write*.log ; \
-	  cat log/$(SCALARIS_JTEST_NAME)/interop.*read*.log ; \
+	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*write*.log ; \
+	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*read*.log ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)/* ; \
+	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
