@@ -555,8 +555,8 @@ public class ScalarisDataHandler {
      * 
      * @param connection
      *            the connection to use
-     * @param title
-     *            the title of the page
+     * @param title0
+     *            the (unnormalised) title of the page
      * @param newRev
      *            the new revision to add
      * @param prevRevId
@@ -575,21 +575,22 @@ public class ScalarisDataHandler {
      * 
      * @return success status
      */
-    public static SavePageResult savePage(Connection connection, String title,
-            Revision newRev, int prevRevId, Map<String, String> restrictions,
-            SiteInfo siteinfo, String username, final MyNamespace nsObject) {
+    public static SavePageResult savePage(final Connection connection, final String title0,
+            final Revision newRev, final int prevRevId, final Map<String, String> restrictions,
+            final SiteInfo siteinfo, final String username, final MyNamespace nsObject) {
         if (connection == null) {
             return new SavePageResult(false, "no connection to Scalaris", true);
         }
         
+        String title = MyWikiModel.normalisePageTitle(title0, nsObject);
         Transaction scalaris_tx = new Transaction(connection);
         SavePageResult result = new SavePageResult();
 
         // check that the current version is still up-to-date:
         // read old version first, then write
         int oldRevId = -1;
-        String pageInfoKey = getPageKey(title, nsObject);
-        String revListKey = getRevListKey(title, nsObject);
+        String pageInfoKey = getPageKey(title0, nsObject);
+        String revListKey = getRevListKey(title0, nsObject);
         
         Transaction.RequestList requests = new Transaction.RequestList();
         requests.addRead(pageInfoKey).addRead(revListKey);
@@ -612,7 +613,7 @@ public class ScalarisDataHandler {
         } catch (NotFoundException e) {
             // this is ok and means that the page did not exist yet
             result.newPage = new Page();
-            result.newPage.setTitle(title);
+            result.newPage.setTitle(title0);
             result.newPage.setCurRev(newRev);
         } catch (Exception e) {
 //          e.printStackTrace();
@@ -643,7 +644,7 @@ public class ScalarisDataHandler {
 //              e.printStackTrace();
                 // corrupt DB - don't save page
                 result.success = false;
-                result.message = "revision list for page \"" + title + "\" not found at \"" + revListKey + "\"";
+                result.message = "revision list for page \"" + title0 + "\" not found at \"" + revListKey + "\"";
                 return result;
             }
         } catch (Exception e) {
@@ -658,7 +659,7 @@ public class ScalarisDataHandler {
         // write:
         // get previous categories and templates:
         final MyWikiModel wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
-        wikiModel.setPageName(title);
+        wikiModel.setPageName(title0);
         Set<String> oldCats;
         Set<String> oldTpls;
         Set<String> oldLnks;
@@ -666,15 +667,10 @@ public class ScalarisDataHandler {
             // get a list of previous categories and templates:
             wikiModel.setUp();
             wikiModel.render(null, result.oldPage.getCurRev().unpackedText());
-            final Set<String> oldCats0 = wikiModel.getCategories().keySet();
-            final Set<String> oldTpls0 = wikiModel.getTemplates();
-            final Set<String> oldLnks0 = wikiModel.getLinks();
-            oldCats = new HashSet<String>(oldCats0.size());
-            oldTpls = new HashSet<String>(oldTpls0.size());
-            oldLnks = new HashSet<String>(oldLnks0.size());
-            MyWikiModel.normalisePageTitles(oldCats0, nsObject, oldCats);
-            MyWikiModel.normalisePageTitles(oldTpls0, nsObject, oldTpls);
-            MyWikiModel.normalisePageTitles(oldLnks0, nsObject, oldLnks);
+            // note: no need to normalise the pages, we will do so during the write/read key generation
+            oldCats = wikiModel.getCategories().keySet();
+            oldTpls = wikiModel.getTemplates();
+            oldLnks = wikiModel.getLinks();
             wikiModel.tearDown();
         } else {
             oldCats = new HashSet<String>();
@@ -686,15 +682,10 @@ public class ScalarisDataHandler {
         wikiModel.render(null, newRev.unpackedText());
         // note: do not tear down the wiki model - the following statements
         // still need it and it will be removed at the end of the method anyway
-        final Set<String> newCats0 = wikiModel.getCategories().keySet();
-        final Set<String> newTpls0 = wikiModel.getTemplates();
-        final Set<String> newLnks0 = wikiModel.getLinks();
-        Set<String> newCats = new HashSet<String>(newCats0.size());
-        Set<String> newTpls = new HashSet<String>(newTpls0.size());
-        Set<String> newLnks = new HashSet<String>(newLnks0.size());
-        MyWikiModel.normalisePageTitles(newCats0, nsObject, newCats);
-        MyWikiModel.normalisePageTitles(newTpls0, nsObject, newTpls);
-        MyWikiModel.normalisePageTitles(newLnks0, nsObject, newLnks);
+        // note: no need to normalise the pages, we will do so during the write/read key generation
+        final Set<String> newCats = wikiModel.getCategories().keySet();
+        final Set<String> newTpls = wikiModel.getTemplates();
+        final Set<String> newLnks = wikiModel.getLinks();
         Difference catDiff = new Difference(oldCats, newCats);
         Difference tplDiff = new Difference(oldTpls, newTpls);
         Difference lnkDiff = new Difference(oldLnks, newLnks);
@@ -733,7 +724,7 @@ public class ScalarisDataHandler {
         } catch (Exception e) {
             //          e.printStackTrace();
             result.success = false;
-            result.message = "unknown exception reading page lists for page \"" + title + "\" from Scalaris: " + e.getMessage();
+            result.message = "unknown exception reading page lists for page \"" + title0 + "\" from Scalaris: " + e.getMessage();
             result.connect_failed = e instanceof ConnectionException;
             return result;
         }
@@ -766,7 +757,7 @@ public class ScalarisDataHandler {
         } catch (Exception e) {
             //          e.printStackTrace();
             result.success = false;
-            result.message = "unknown exception writing page lists for page \"" + title + "\" to Scalaris: " + e.getMessage();
+            result.message = "unknown exception writing page lists for page \"" + title0 + "\" to Scalaris: " + e.getMessage();
             result.connect_failed = e instanceof ConnectionException;
             return result;
         }
@@ -807,7 +798,7 @@ public class ScalarisDataHandler {
         if (oldRevId == -1) {
             pageListKeys.add(getPageListKey());
             pageListKeys.add(getPageCountKey());
-            if (wikiModel.getNamespace(title).isEmpty()) {
+            if (wikiModel.getNamespace(title0).isEmpty()) {
                 pageListKeys.add(getArticleListKey());
                 pageListKeys.add(getArticleCountKey());
             }
@@ -824,13 +815,13 @@ public class ScalarisDataHandler {
             } catch (Exception e) {
 //                e.printStackTrace();
                 result.success = false;
-                result.message = "unknown exception reading page lists for page \"" + title + "\" to Scalaris: " + e.getMessage();
+                result.message = "unknown exception reading page lists for page \"" + title0 + "\" to Scalaris: " + e.getMessage();
                 result.connect_failed = e instanceof ConnectionException;
                 return result;
             }
 
             requests = new Transaction.RequestList();
-            final List<String> newPages = Arrays.asList(wikiModel.normalisePageTitle(title));
+            final List<String> newPages = Arrays.asList(title);
             for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
                 String pageList_key = (String) it.next();
                 String pageCount_key = (String) it.next();
@@ -846,9 +837,9 @@ public class ScalarisDataHandler {
             }
         }
         
-        requests.addWrite(getPageKey(title, nsObject), result.newPage)
-                .addWrite(getRevKey(title, newRev.getId(), nsObject), newRev)
-                .addWrite(getRevListKey(title, nsObject), result.newShortRevs).addCommit();
+        requests.addWrite(getPageKey(title0, nsObject), result.newPage)
+                .addWrite(getRevKey(title0, newRev.getId(), nsObject), newRev)
+                .addWrite(getRevListKey(title0, nsObject), result.newShortRevs).addCommit();
         try {
             results = scalaris_tx.req_list(requests);
 
@@ -875,7 +866,7 @@ public class ScalarisDataHandler {
         } catch (Exception e) {
 //          e.printStackTrace();
             result.success = false;
-            result.message = "unknown exception writing page \"" + title + "\" to Scalaris: " + e.getMessage();
+            result.message = "unknown exception writing page \"" + title0 + "\" to Scalaris: " + e.getMessage();
             result.connect_failed = e instanceof ConnectionException;
             return result;
         }
@@ -951,7 +942,7 @@ public class ScalarisDataHandler {
          *            object creating the Scalaris key for the page lists (based
          *            on a set entry)
          * @param title
-         *            page name to update
+         *            (normalised) page name to update
          * 
          * @return the number of added requests, i.e. operations
          */
@@ -986,7 +977,7 @@ public class ScalarisDataHandler {
          *            object creating the Scalaris key for the page lists (based
          *            on a set entry)
          * @param title
-         *            page name to update
+         *            (normalised) page name to update
          * @param firstOp
          *            position of the first operation in the result list
          * 
@@ -998,7 +989,7 @@ public class ScalarisDataHandler {
             // remove from old page list
             for (String name: onlyOld) {
                 scalaris_key = keyGen.getPageListKey(name);
-//                System.out.println("-" + scalaris_key);
+//                System.out.println(scalaris_key + " -= " + title);
                 try {
                     List<String> pageList = readResults.processReadAt(firstOp++).stringListValue();
                     pageList.remove(title);
@@ -1012,7 +1003,7 @@ public class ScalarisDataHandler {
             // add to new page list
             for (String name: onlyNew) {
                 scalaris_key = keyGen.getPageListKey(name);
-//                System.out.println("+" + scalaris_key);
+//              System.out.println(scalaris_key + " += " + title);
                 List<String> pageList;
                 try {
                     pageList = readResults.processReadAt(firstOp++).stringListValue();
@@ -1048,7 +1039,7 @@ public class ScalarisDataHandler {
          *            object creating the Scalaris key for the page lists (based
          *            on a set entry)
          * @param title
-         *            page name to update
+         *            (normalised) page name to update
          * @param firstOp
          *            position of the first operation in the result list
          * 
