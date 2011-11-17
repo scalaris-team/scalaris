@@ -35,6 +35,8 @@
 % functions sending monitoring values directly to the monitor process
 -export([monitor_set_value/3, client_monitor_set_value/3]).
 
+-export([get_rrds/2]).
+
 -type key() :: string().
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.
@@ -168,6 +170,18 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
     % discarded all logged data from the previous (unreported) time slot
     % -> send OldValue, too
     comm:send_local(MyMonitor, {report_rrd, Process, Key, OldValue, Value}).
+
+%% @doc Retrieve individual RRDs from monitor
+-spec get_rrds(MonitorPid::comm:mypid(), Keys::table_index()) -> list(rrd:rrd()).
+get_rrds(MonitorPid, Keys) ->
+    comm:send_local(MonitorPid, {get_rrds, Keys, comm:this()}),
+    receive
+        {get_rrds_response, Response} ->
+            Response
+    after
+        2000 ->
+            []
+    end.
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
