@@ -59,12 +59,18 @@ send(Target, Message, Options) ->
                             " process ~p: ~.0p~n", [LocalTarget, Message]),
                     report_send_error(Options, Target, Message, unknown_named_process);
                 _ ->
-                    PID ! Message,
                     case is_process_alive(PID) of
                         false ->
-                            report_send_error(Options, Target, Message, local_target_not_alive);
+                            report_send_error(Options, Target, Message,
+                                              local_target_not_alive);
                         true ->
-                            ok
+                            %% minor gap of error reporting, if PID
+                            %% dies at this moment, but better than a
+                            %% false positive reporting when first
+                            %% sending and then checking, if message
+                            %% leads to process termination (as in the
+                            %% RPCs of the Java binding)
+                            PID ! Message, ok
                     end
             end,
             ok;
