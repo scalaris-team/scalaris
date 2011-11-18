@@ -105,16 +105,8 @@
 
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
--ifdef(TCP_LAYER).
 send(Pid, Message) ->
-    {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    comm_layer:send(RealPid, RealMessage, []).
--endif.
--ifdef(BUILTIN). %% @hidden
-send(Pid, Message) ->
-    {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    send_local(RealPid, RealMessage).
--endif.
+    send(Pid, Message, []).
 
 %% @doc Sends a message to an arbitrary process with the given options.
 %%      If a shepherd is given, it will be informed when the sending fails;
@@ -126,14 +118,15 @@ send(Pid, Message) ->
 -spec send(mypid(), message() | group_message(), send_options()) -> ok.
 -ifdef(TCP_LAYER).
 send(Pid, Message, Options) ->
-    {RealMsg, CLOptions} = pack_group_member(Message, Options),
-    comm_layer:send(Pid, RealMsg, CLOptions).
+    {RealPid, RealMsg1} = unpack_cookie(Pid, Message),
+    comm_layer:send(RealPid, pack_group_member(RealMsg1, Options), Options).
 -endif.
 -ifdef(BUILTIN). %% @hidden
 send(Pid, Message, Options) ->
-    % note: ignore shepherd with BUILTIN
-    {RealMsg, _} = pack_group_member(Message, Options),
-    send(Pid, RealMsg).
+    {RealPid, RealMsg1} = unpack_cookie(Pid, Message),
+    % note: ignore further options, e.g. shepherd, with BUILTIN
+    RealPid ! pack_group_member(RealMsg1, Options),
+    ok.
 -endif.
 
 %% @doc Sends a message to a local process given by its local pid
@@ -277,13 +270,15 @@ unpack_cookie(Pid, Message) -> {Pid, Message}.
 
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_layer process.
--spec pack_group_member(message(), send_options()) -> {message(), comm_layer:send_options()}.
+-spec pack_group_member(message(), send_options()) -> message().
+pack_group_member(Message, []) ->
+    Message;
+pack_group_member(Message, [{shepherd, _Shepherd}]) ->
+    Message;
 pack_group_member(Message, Options) ->
-    case proplists:split(Options, [group_member]) of
-        {[[]], CLOptions} ->
-            {Message, CLOptions};
-        {[[{group_member, Process} | _]], CLOptions} ->
-            {{send_to_group_member, Process, Message}, CLOptions}
+    case lists:keyfind(group_member, 1, Options) of
+        false                   -> Message;
+        {group_member, Process} -> {send_to_group_member, Process, Message}
     end.
 
 -ifdef(TCP_LAYER).
