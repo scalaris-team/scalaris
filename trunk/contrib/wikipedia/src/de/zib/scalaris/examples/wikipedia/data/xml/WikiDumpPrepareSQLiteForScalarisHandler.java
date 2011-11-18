@@ -127,7 +127,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         stmt.dispose();
         db.exec("PRAGMA synchronous = OFF;");
         db.exec("PRAGMA journal_mode = OFF;");
-        db.exec("PRAGMA locking_mode = EXCLUSIVE;");
+//        db.exec("PRAGMA locking_mode = EXCLUSIVE;");
         db.exec("PRAGMA case_sensitive_like = true;"); 
         db.exec("PRAGMA encoding = 'UTF-8';"); 
         db.exec("PRAGMA temp_store = MEMORY;"); 
@@ -624,7 +624,6 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         @Override
         public void run() {
             // NOTE: need to normalise every page title!!
-            String scalaris_key;
             SQLiteStatement stmt = null;
             try {
                 // list of pages in each category:
@@ -646,14 +645,13 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                             catPageList.add(stmtPage);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getCatPageListKey(category0, wikiModel.getNamespace());
-                            writeObject(scalaris_key, catPageList);
-                            scalaris_key = ScalarisDataHandler.getCatPageCountKey(category0, wikiModel.getNamespace());
-                            writeObject(scalaris_key, catPageList.size());
+                            writeCatToScalaris(category0, catPageList);
                             category0 = stmtCat0;
-                            catPageList.clear();
                             catPageList.add(stmtPage);
                         }
+                    }
+                    if (category0 != null && !catPageList.isEmpty()) {
+                        writeCatToScalaris(category0, catPageList);
                     }
                     stmt.dispose();
                 } while (false);
@@ -677,12 +675,13 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                             tplPageList.add(stmtPage);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getTplPageListKey(template0, wikiModel.getNamespace());
-                            writeObject(scalaris_key, tplPageList);
+                            writeTplToScalaris(template0, tplPageList);
                             template0 = stmtTpl0;
-                            tplPageList.clear();
                             tplPageList.add(stmtPage);
                         }
+                    }
+                    if (template0 != null && !tplPageList.isEmpty()) {
+                        writeTplToScalaris(template0, tplPageList);
                     }
                     stmt.dispose();
                 } while (false);
@@ -706,12 +705,13 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                             backLinksPageList.add(stmtLnkSrc);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
-                            writeObject(scalaris_key, backLinksPageList);
+                            writeLnkToScalaris(linkDest0, backLinksPageList);
                             linkDest0 = stmtLnkDest0;
-                            backLinksPageList.clear();
                             backLinksPageList.add(stmtLnkSrc);
                         }
+                    }
+                    if (linkDest0 != null && !backLinksPageList.isEmpty()) {
+                        writeLnkToScalaris(linkDest0, backLinksPageList);
                     }
                     stmt.dispose();
                 } while (false);
@@ -723,6 +723,47 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt.dispose();
                 }
             }
+        }
+
+        /**
+         * @param category0
+         * @param catPageList
+         * @throws RuntimeException
+         */
+        private void writeCatToScalaris(String category0,
+                List<String> catPageList) throws RuntimeException {
+            String scalaris_key;
+            scalaris_key = ScalarisDataHandler.getCatPageListKey(category0, wikiModel.getNamespace());
+            writeObject(scalaris_key, catPageList);
+            scalaris_key = ScalarisDataHandler.getCatPageCountKey(category0, wikiModel.getNamespace());
+            writeObject(scalaris_key, catPageList.size());
+            catPageList.clear();
+        }
+
+        /**
+         * @param template0
+         * @param tplPageList
+         * @throws RuntimeException
+         */
+        private void writeTplToScalaris(String template0,
+                List<String> tplPageList) throws RuntimeException {
+            String scalaris_key;
+            scalaris_key = ScalarisDataHandler.getTplPageListKey(template0, wikiModel.getNamespace());
+            writeObject(scalaris_key, tplPageList);
+            tplPageList.clear();
+        }
+
+        /**
+         * @param linkDest0
+         * @param backLinksPageList
+         * @throws RuntimeException
+         */
+        private void writeLnkToScalaris(String linkDest0,
+                List<String> backLinksPageList) throws RuntimeException {
+            String scalaris_key;
+            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
+            writeObject(scalaris_key, backLinksPageList);
+            backLinksPageList.clear();
         }
     }
     
