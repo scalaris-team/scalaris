@@ -30,18 +30,12 @@
 -export([send/3, this/0, is_valid/1, is_local/1, make_local/1,
          get_ip/1, get_port/1, report_send_error/4]).
 
--ifdef(with_export_type_support).
--export_type([send_options/0]).
--endif.
-
 -include("scalaris.hrl").
 
 -type process_id() :: {inet:ip_address(), comm_server:tcp_port(), comm:erl_pid_plain()}.
--type send_options() :: [{shepherd, Pid::comm:erl_local_pid()} |
-                         quiet].
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
--spec send(process_id(), comm:message(), send_options()) -> ok.
+-spec send(process_id(), comm:message(), comm:send_options()) -> ok.
 send(Target, Message, Options) ->
     IsLocal = is_local(Target),
     case is_valid(Target) of
@@ -122,7 +116,7 @@ get_ip({IP, _Port, _Pid}) -> IP.
 -spec get_port(process_id()) -> comm_server:tcp_port().
 get_port({_IP, Port, _Pid}) -> Port.
 
--spec report_send_error(send_options(), process_id(), comm:message(), atom()) -> ok.
+-spec report_send_error(comm:send_options(), process_id(), comm:message(), atom()) -> ok.
 report_send_error(Options, Target, Message, Reason) ->
     case proplists:get_value(shepherd, Options) of
         undefined ->

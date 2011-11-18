@@ -43,7 +43,7 @@
      SentMsgCount         :: non_neg_integer(),
      ReceivedMsgCount     :: non_neg_integer(),
      MsgQueue             :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
-                              OQueue::[comm_layer:send_options()]},
+                              OQueue::[comm:send_options()]},
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer()}.
@@ -241,9 +241,9 @@ on(UnknownMessage, State) ->
     log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
     send_bundle_if_ready(State).
 
--spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm_layer:send_options()) ->
+-spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options()) ->
                    notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], [comm_layer:send_options()]) ->
+          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()]) ->
                    notconnected | inet:socket().
 send({Address, Port, Socket}, Pid, Message, Options) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message},

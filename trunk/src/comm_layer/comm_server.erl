@@ -67,7 +67,7 @@ tcp_options() ->
      {send_timeout, config:read(tcp_send_timeout)}
 ].
 
--spec send({inet:ip_address(), tcp_port(), pid()}, term(), comm_layer:send_options()) -> ok.
+-spec send({inet:ip_address(), tcp_port(), pid()}, term(), comm:send_options()) -> ok.
 send({Address, Port, Pid}, Message, Options) ->
     ?MODULE ! {send, Address, Port, Pid, Message, Options},
     ok.
