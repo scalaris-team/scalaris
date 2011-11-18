@@ -952,11 +952,12 @@ public class ScalarisDataHandler {
             for (Set<String> curList : changes) {
                 for (String name: curList) {
                     readRequests.addRead(keyGen.getPageListKey(name));
+                    ++ops;
                     if (keyGen instanceof GetPageListAndCountKey) {
                         GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
                         readRequests.addRead(keyCountGen.getPageCountKey(name));
+                        ++ops;
                     }
-                    ++ops;
                 }
             }
             return ops;
@@ -990,14 +991,21 @@ public class ScalarisDataHandler {
             for (String name: onlyOld) {
                 scalaris_key = keyGen.getPageListKey(name);
 //                System.out.println(scalaris_key + " -= " + title);
+                List<String> pageList;
                 try {
-                    List<String> pageList = readResults.processReadAt(firstOp++).stringListValue();
+                    pageList = readResults.processReadAt(firstOp).stringListValue();
+                    ++firstOp;
                     pageList.remove(title);
                     writeRequests.addWrite(scalaris_key, pageList);
 //                } catch (NotFoundException e) {
 //                    // this is NOT ok
                 } catch (Exception e) {
                     return new SaveResult(false, "unknown exception removing \"" + title + "\" from \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
+                }
+                if (keyGen instanceof GetPageListAndCountKey) {
+                    ++firstOp;
+                    GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
+                    writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
                 }
             }
             // add to new page list
@@ -1006,7 +1014,8 @@ public class ScalarisDataHandler {
 //              System.out.println(scalaris_key + " += " + title);
                 List<String> pageList;
                 try {
-                    pageList = readResults.processReadAt(firstOp++).stringListValue();
+                    pageList = readResults.processReadAt(firstOp).stringListValue();
+                    ++firstOp;
                 } catch (NotFoundException e) {
                     // this is ok
                     pageList = new LinkedList<String>();
@@ -1020,6 +1029,7 @@ public class ScalarisDataHandler {
                     return new SaveResult(false, "unknown exception adding \"" + title + "\" to \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
                 if (keyGen instanceof GetPageListAndCountKey) {
+                    ++firstOp;
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
                     writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
                 }
