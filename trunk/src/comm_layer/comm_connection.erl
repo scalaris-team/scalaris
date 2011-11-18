@@ -32,7 +32,7 @@
 
 -include("scalaris.hrl").
 
--export([start_link/5, init/1, on/2]).
+-export([start_link/6, init/1, on/2]).
 
 -type state() ::
     {DestIP               :: inet:ip_address(),
@@ -57,10 +57,15 @@
 
 -spec start_link(pid_groups:groupname(), DestIP::inet:ip_address(),
                  comm_server:tcp_port(), inet:socket() | notconnected,
-                 Channel::main | prio) -> {ok, pid()}.
-start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Channel) ->
+                 Channel::main | prio, Dir::'rcv' | 'send' | 'both') -> {ok, pid()}.
+start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Channel, Dir) ->
     {_, LocalListenPort} = comm_server:get_local_address_port(),
-    PidName = atom_to_list(Channel) ++ " <-> " ++ integer_to_list(IP1) ++ "."
+    DirStr = case Dir of
+                 'rcv'  -> " <-  ";
+                 'send' -> "  -> ";
+                 'both' -> " <-> "
+             end,
+    PidName = atom_to_list(Channel) ++ DirStr ++ integer_to_list(IP1) ++ "."
         ++ integer_to_list(IP2) ++ "." ++ integer_to_list(IP3) ++ "."
         ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
     gen_component:start_link(?MODULE,

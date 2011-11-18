@@ -114,14 +114,14 @@ get_local_address_port() ->
 %%      Socket is the initial socket when a connection needs to be created.
 -spec get_connection(Address::inet:ip_address(), Port::tcp_port(),
                      Socket::inet:socket() | notconnected,
-                     Channel::main | prio) -> pid().
-get_connection(Address, Port, Socket, Channel) ->
-    case erlang:get({Address, Port, Channel}) of
+                     Channel::main | prio, Dir::'rcv' | 'send' | 'both') -> pid().
+get_connection(Address, Port, Socket, Channel, Dir) ->
+    case erlang:get({Address, Port, Channel, Dir}) of
         undefined ->
             %% start Erlang process responsible for the connection
             {ok, ConnPid} = comm_connection:start_link(
-                              pid_groups:my_groupname(), Address, Port, Socket, Channel),
-            erlang:put({Address, Port, Channel}, ConnPid),
+                              pid_groups:my_groupname(), Address, Port, Socket, Channel, Dir),
+            erlang:put({Address, Port, Channel, Dir}, ConnPid),
             ok;
         ConnPid -> ok
     end,
@@ -132,11 +132,19 @@ get_connection(Address, Port, Socket, Channel) ->
 on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
     % helper for comm_acceptor as we need to synchronise the creation of
     % connections in order to prevent multiple connections to/from a single IP
-    ConnPid = get_connection(Address, Port, Socket, Channel),
+    {Channel, Dir} = case Channel of
+                         main -> {main, 'rcv'};
+                         prio -> {prio, 'both'}
+                     end,
+    ConnPid = get_connection(Address, Port, Socket, Channel, Dir),
     Client ! {create_connection_done, ConnPid},
     State;
 on({send, Address, Port, Pid, Message, Options}, State) ->
-    ConnPid = get_connection(Address, Port, notconnected, proplists:get_value(channel, Options, main)),
+    {Channel, Dir} = case proplists:get_value(channel, Options, main) of
+                         main -> {main, 'send'};
+                         prio -> {prio, 'both'}
+                     end,
+    ConnPid = get_connection(Address, Port, notconnected, Channel, Dir),
     ConnPid ! {send, Pid, Message, Options},
     State;
 
