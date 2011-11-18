@@ -994,10 +994,10 @@ public class ScalarisDataHandler {
                     List<String> pageList = readResults.processReadAt(firstOp++).stringListValue();
                     pageList.remove(title);
                     writeRequests.addWrite(scalaris_key, pageList);
-                } catch (NotFoundException e) {
-                    // this is ok
+//                } catch (NotFoundException e) {
+//                    // this is NOT ok
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
+                    return new SaveResult(false, "unknown exception removing \"" + title + "\" from \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
             }
             // add to new page list
@@ -1011,13 +1011,13 @@ public class ScalarisDataHandler {
                     // this is ok
                     pageList = new LinkedList<String>();
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
+                    return new SaveResult(false, "unknown exception reading \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
                 pageList.add(title);
                 try {
                     writeRequests.addWrite(scalaris_key, pageList);
                 } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception updating \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
+                    return new SaveResult(false, "unknown exception adding \"" + title + "\" to \"" + scalaris_key + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                 }
                 if (keyGen instanceof GetPageListAndCountKey) {
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
@@ -1053,7 +1053,7 @@ public class ScalarisDataHandler {
                     try {
                         writeResults.processWriteAt(firstOp++);
                     } catch (Exception e) {
-                        return new SaveResult(false, "unknown exception updating \"" + keyGen.getPageListKey(name) + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
+                        return new SaveResult(false, "unknown exception validating the addition of \"" + title + "\" to \"" + keyGen.getPageListKey(name) + "\" in Scalaris: " + e.getMessage(), e instanceof ConnectionException);
                     }
                 }
             }
