@@ -95,7 +95,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                     if (catPages == null) {
                         catPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
                     }
-                    catPages.add(wikiModel.normalisePageTitle(page.getTitle()));
+                    catPages.add(page.getTitle());
                     newCategories.put(category, catPages);
                 }
                 for (String tpl_raw: wikiModel.getTemplates()) {
@@ -104,7 +104,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                     if (templatePages == null) {
                         templatePages = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
                     }
-                    templatePages.add(wikiModel.normalisePageTitle(page.getTitle()));
+                    templatePages.add(page.getTitle());
                     newTemplates.put(template, templatePages);
                 }
                 for (String link: wikiModel.getLinks()) {
@@ -112,7 +112,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                     if (backLinks == null) {
                         backLinks = new ArrayList<String>(UPDATE_PAGELIST_EVERY / 4);
                     }
-                    backLinks.add(wikiModel.normalisePageTitle(page.getTitle()));
+                    backLinks.add(page.getTitle());
                     newBackLinks.put(link, backLinks);
                 }
                 wikiModel.tearDown();

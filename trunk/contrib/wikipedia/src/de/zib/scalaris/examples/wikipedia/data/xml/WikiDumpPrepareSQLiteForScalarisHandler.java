@@ -299,10 +299,10 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()),
                 page, stWrite));
 
-        newPages.add(wikiModel.normalisePageTitle(page.getTitle()));
+        newPages.add(page.getTitle());
         // simple article filter: only pages in main namespace:
         if (MyScalarisWikiModel.getNamespace(page.getTitle(), wikiModel.getNamespace()).isEmpty()) {
-            newArticles.add(wikiModel.normalisePageTitle(page.getTitle()));
+            newArticles.add(page.getTitle());
         }
         // export page/article list whenever the number of new pages is more
         // than UPDATE_PAGELIST_EVERY,
@@ -449,8 +449,18 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             WikiDumpPrepareSQLiteForScalarisHandler.writeObject(stWrite, key, value);
         }
         
-        protected long pageToId(String origPageTitle) throws RuntimeException {
-            String pageTitle = wikiModel.normalisePageTitle(origPageTitle);
+        /**
+         * Converts a page to an integer ID and inserts the name into the
+         * (temporary) page table.
+         * 
+         * @param pageTitle
+         *            (normalised) page title
+         * 
+         * @return the ID of the page
+         * 
+         * @throws RuntimeException
+         */
+        protected long pageToId(String pageTitle) throws RuntimeException {
             try {
                 long pageId = -1;
                 // try to find the page id in the pages table:
@@ -488,9 +498,19 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         List<String> newPages;
         List<String> newArticles;
         
+        /**
+         * Writes the page and article list to the DB.
+         * 
+         * @param newPages
+         *            (un-normalised) list of page titles
+         * @param newArticles
+         *            (un-normalised) list of page titles of articles
+         */
         public SQLiteUpdatePageLists1Job(List<String> newPages, List<String> newArticles) {
-            this.newPages = newPages;
-            this.newArticles = newArticles;
+            this.newPages = new ArrayList<String>(newPages.size());
+            wikiModel.normalisePageTitles(newPages, this.newPages);
+            this.newArticles = new ArrayList<String>(newArticles.size());
+            wikiModel.normalisePageTitles(newPages, this.newArticles);
         }
         
         @Override
@@ -533,6 +553,16 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         HashMap<String, List<String>> newTemplates;
         HashMap<String, List<String>> newBackLinks;
         
+        /**
+         * Writes (temporary) page list mappings to the DB.
+         * 
+         * @param newCategories
+         *            (un-normalised) category mappings
+         * @param newTemplates
+         *            (un-normalised) template mappings
+         * @param newBackLinks
+         *            (un-normalised) link mappings
+         */
         public SQLiteUpdateTmpPageLists2Job(
                 HashMap<String, List<String>> newCategories,
                 HashMap<String, List<String>> newTemplates,
@@ -593,6 +623,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         
         @Override
         public void run() {
+            // NOTE: need to normalise every page title!!
             String scalaris_key;
             SQLiteStatement stmt = null;
             try {
@@ -602,23 +633,24 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT cat.title, page.title FROM categories as categories " +
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
                             "INNER JOIN pages AS page ON categories.page == page.id;");
-                    String category = null;
+                    String category0 = null;
                     List<String> catPageList = new ArrayList<String>(1000);
                     while (stmt.step()) {
-                        final String stmtCat = stmt.columnString(0);
-                        final String stmtPage = stmt.columnString(1);
-                        if (category == null) {
-                            category = stmtCat;
+                        final String stmtCat0 = stmt.columnString(0);
+                        final String stmtPage0 = stmt.columnString(1);
+                        final String stmtPage = wikiModel.normalisePageTitle(stmtPage0);
+                        if (category0 == null) {
+                            category0 = stmtCat0;
                             catPageList.add(stmtPage);
-                        } else if (category.equals(stmtCat)) {
+                        } else if (category0.equals(stmtCat0)) {
                             catPageList.add(stmtPage);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getCatPageListKey(category, wikiModel.getNamespace());
+                            scalaris_key = ScalarisDataHandler.getCatPageListKey(category0, wikiModel.getNamespace());
                             writeObject(scalaris_key, catPageList);
-                            scalaris_key = ScalarisDataHandler.getCatPageCountKey(category, wikiModel.getNamespace());
+                            scalaris_key = ScalarisDataHandler.getCatPageCountKey(category0, wikiModel.getNamespace());
                             writeObject(scalaris_key, catPageList.size());
-                            category = stmtCat;
+                            category0 = stmtCat0;
                             catPageList.clear();
                             catPageList.add(stmtPage);
                         }
@@ -632,21 +664,22 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT tpl.title, page.title FROM templates as templates " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
                             "INNER JOIN pages AS page ON templates.page == page.id;");
-                    String template = null;
+                    String template0 = null;
                     List<String> tplPageList = new ArrayList<String>(1000);
                     while (stmt.step()) {
-                        final String stmtTpl = stmt.columnString(0);
-                        final String stmtPage = stmt.columnString(1);
-                        if (template == null) {
-                            template = stmtTpl;
+                        final String stmtTpl0 = stmt.columnString(0);
+                        final String stmtPage0 = stmt.columnString(1);
+                        final String stmtPage = wikiModel.normalisePageTitle(stmtPage0);
+                        if (template0 == null) {
+                            template0 = stmtTpl0;
                             tplPageList.add(stmtPage);
-                        } else if (template.equals(stmtTpl)) {
+                        } else if (template0.equals(stmtTpl0)) {
                             tplPageList.add(stmtPage);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getTplPageListKey(template, wikiModel.getNamespace());
+                            scalaris_key = ScalarisDataHandler.getTplPageListKey(template0, wikiModel.getNamespace());
                             writeObject(scalaris_key, tplPageList);
-                            template = stmtTpl;
+                            template0 = stmtTpl0;
                             tplPageList.clear();
                             tplPageList.add(stmtPage);
                         }
@@ -660,21 +693,22 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT lnkDest.title, lnkSrc.title FROM links as links " +
                             "INNER JOIN pages AS lnkDest ON links.lnkDest == lnkDest.id " +
                             "INNER JOIN pages AS lnkSrc ON links.lnkSrc == lnkSrc.id;");
-                    String linkDest = null;
+                    String linkDest0 = null;
                     List<String> backLinksPageList = new ArrayList<String>(1000);
                     while (stmt.step()) {
-                        final String stmtLnkDest = stmt.columnString(0);
-                        final String stmtLnkSrc = stmt.columnString(1);
-                        if (linkDest == null) {
-                            linkDest = stmtLnkDest;
+                        final String stmtLnkDest0 = stmt.columnString(0);
+                        final String stmtLnkSrc0 = stmt.columnString(1);
+                        final String stmtLnkSrc = wikiModel.normalisePageTitle(stmtLnkSrc0);
+                        if (linkDest0 == null) {
+                            linkDest0 = stmtLnkDest0;
                             backLinksPageList.add(stmtLnkSrc);
-                        } else if (linkDest.equals(stmtLnkDest)) {
+                        } else if (linkDest0.equals(stmtLnkDest0)) {
                             backLinksPageList.add(stmtLnkSrc);
                         } else {
                             // write old, accumulate new
-                            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(linkDest, wikiModel.getNamespace());
+                            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
                             writeObject(scalaris_key, backLinksPageList);
-                            linkDest = stmtLnkDest;
+                            linkDest0 = stmtLnkDest0;
                             backLinksPageList.clear();
                             backLinksPageList.add(stmtLnkSrc);
                         }
