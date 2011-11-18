@@ -118,8 +118,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0, tickFormatter: msFormatter } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#rr_lat").bind("plothover", plotHover);
  $.plot($("#lh_count"),
@@ -130,8 +129,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0 } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#lh_count").bind("plothover", plotHover);
  $.plot($("#tx_count"), [ {data: tx_count_per_s_data, label: "Count / s"} ], {
@@ -139,8 +137,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0 } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#tx_count").bind("plothover", plotHover);
  var asym_yerrbars = { 
@@ -155,8 +152,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0, tickFormatter: msFormatter } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#tx_lat").bind("plothover", plotHover);
  var previousPoint = null;
