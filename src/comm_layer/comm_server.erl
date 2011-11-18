@@ -31,12 +31,12 @@
 
 -export([start_link/1, init/1, on/2]).
 -export([send/3, tcp_options/0]).
--export([unregister_connection/2, create_connection/3,
+-export([unregister_connection/2, create_connection/4,
          set_local_address/2, get_local_address_port/0]).
 
 -type tcp_port() :: 0..65535.
 -type message() ::
-    {create_connection, Address::inet:ip_address(), Port::tcp_port(), Socket::inet:socket() | notconnected, Client::pid()} |
+    {create_connection, Address::inet:ip_address(), Port::tcp_port(), Socket::inet:socket() | notconnected, Channel::main | prio, Client::pid()} |
     {send, Address::inet:ip_address(), Port::tcp_port(), Pid::pid(), Message::comm:message()} |
     {unregister_conn, Address::inet:ip_address(), Port::tcp_port(), Client::pid()} |
     {set_local_address, Address::inet:ip_address(), Port::tcp_port(), Client::pid()}.
@@ -73,9 +73,10 @@ send({Address, Port, Pid}, Message, Options) ->
     ok.
 
 %% @doc Synchronous call to create (or get) a connection for the given Address+Port using Socket.
--spec create_connection(Address::inet:ip_address(), Port::tcp_port(), Socket::inet:socket()) -> pid().
-create_connection(Address, Port, Socket) ->
-    ?MODULE ! {create_connection, Address, Port, Socket, self()},
+-spec create_connection(Address::inet:ip_address(), Port::tcp_port(),
+                        Socket::inet:socket(), Channel::main | prio) -> pid().
+create_connection(Address, Port, Socket, Channel) ->
+    ?MODULE ! {create_connection, Address, Port, Socket, Channel, self()},
     receive {create_connection_done, ConnPid} -> ConnPid end.
 
 %% @doc Synchronous call to de-register a connection with the comm server.
@@ -112,14 +113,15 @@ get_local_address_port() ->
 %%      Only a single connection to any IP+Port combination is created.
 %%      Socket is the initial socket when a connection needs to be created.
 -spec get_connection(Address::inet:ip_address(), Port::tcp_port(),
-                     Socket::inet:socket() | notconnected) -> pid().
-get_connection(Address, Port, Socket) ->
-    case erlang:get({Address, Port}) of
+                     Socket::inet:socket() | notconnected,
+                     Channel::main | prio) -> pid().
+get_connection(Address, Port, Socket, Channel) ->
+    case erlang:get({Address, Port, Channel}) of
         undefined ->
             %% start Erlang process responsible for the connection
             {ok, ConnPid} = comm_connection:start_link(
-                              pid_groups:my_groupname(), Address, Port, Socket),
-            erlang:put({Address, Port}, ConnPid),
+                              pid_groups:my_groupname(), Address, Port, Socket, Channel),
+            erlang:put({Address, Port, Channel}, ConnPid),
             ok;
         ConnPid -> ok
     end,
@@ -127,14 +129,14 @@ get_connection(Address, Port, Socket) ->
 
 %% @doc message handler
 -spec on(message(), State::null) -> null.
-on({create_connection, Address, Port, Socket, Client}, State) ->
+on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
     % helper for comm_acceptor as we need to synchronise the creation of
     % connections in order to prevent multiple connections to/from a single IP
-    ConnPid = get_connection(Address, Port, Socket),
+    ConnPid = get_connection(Address, Port, Socket, Channel),
     Client ! {create_connection_done, ConnPid},
     State;
 on({send, Address, Port, Pid, Message, Options}, State) ->
-    ConnPid = get_connection(Address, Port, notconnected),
+    ConnPid = get_connection(Address, Port, notconnected, proplists:get_value(channel, Options, main)),
     ConnPid ! {send, Pid, Message, Options},
     State;
 

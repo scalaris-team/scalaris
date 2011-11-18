@@ -62,6 +62,8 @@
     {get_coordinate, comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 %% @doc Activates the vivaldi process. If not activated, the vivaldi process
 %%      will queue most messages without processing them.
 -spec activate() -> ok.
@@ -82,7 +84,7 @@ deactivate() ->
 %% @doc Sends a response message to a request for the vivaldi coordinate.
 -spec msg_get_coordinate_response(comm:mypid(), network_coordinate(), error()) -> ok.
 msg_get_coordinate_response(Pid, Coordinate, Confidence) ->
-    comm:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}).
+    comm:send(Pid, {vivaldi_get_coordinate_response, Coordinate, Confidence}, ?SEND_OPTIONS).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters
@@ -184,7 +186,7 @@ on_active({cy_cache, [Node] = _Cache},
         false ->
             comm:send(node:pidX(Node),
                       {vivaldi_shuffle, comm:this(), Coordinate, Confidence},
-                      [{group_member, vivaldi}, quiet]);
+                      ?SEND_OPTIONS ++ [{group_member, vivaldi}, quiet]);
         true -> ok
     end,
     State;

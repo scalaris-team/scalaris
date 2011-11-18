@@ -43,6 +43,8 @@
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm, buffer_response, OtherNeighbors::nodelist:neighborhood()}).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
 
@@ -106,9 +108,9 @@ on({rm_trigger},
                 end,
             % send succ and pred our known nodes and request their nodes
             Message = {rm, buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
-            comm:send(node:pidX(Succ), Message),
+            comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
             case Pred =/= Succ of
-                true -> comm:send(node:pidX(Pred), Message);
+                true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
                 _    -> ok
             end,
             NewTriggerState = trigger:next(TriggerState, Interval),
@@ -164,7 +166,7 @@ on({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
           end,
           RequestPredsMinCount, RequestSuccsMinCount),
     comm:send(node:pidX(nodelist:node(OtherNeighbors)),
-              {rm, buffer_response, NeighborsToSend}),
+              {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
     {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
@@ -306,7 +308,7 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     ThisWithCookie = comm:this_with_cookie(rm),
     case comm:is_valid(ThisWithCookie) of
         true ->
-            _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]})
+            _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]}, ?SEND_OPTIONS)
                  || Node <- NewNodes],
             ok;
         false -> ok

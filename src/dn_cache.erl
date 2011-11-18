@@ -39,9 +39,7 @@
 
 -type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set(), trigger:state()}).
 
-% prevent warnings in the log by mis-using comm:send/3 with a shepherd
-%-define(SEND(Pid, Msg), comm:send(Pid, Msg)).
--define(SEND(Pid, Msg), comm:send(Pid, Msg, [{shepherd, self()}])).
+-define(SEND_OPTIONS, [{channel, prio}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
@@ -90,7 +88,8 @@ on({trigger}, {Queue, Subscribers, TriggerState}) ->
                                         true -> node:pidX(X);
                                         _    -> X
                                     end,
-                              ?SEND(Pid, {ping, comm:this_with_cookie(X)})
+                              comm:send(Pid, {ping, comm:this_with_cookie(X)},
+                                        ?SEND_OPTIONS ++ [{shepherd, self()}])
                       end, Queue),
     NewTriggerState = trigger:next(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), Subscribers, NewTriggerState};

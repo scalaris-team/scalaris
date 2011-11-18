@@ -32,7 +32,7 @@
 
 -include("scalaris.hrl").
 
--export([start_link/4, init/1, on/2]).
+-export([start_link/5, init/1, on/2]).
 
 -type state() ::
     {DestIP               :: inet:ip_address(),
@@ -56,11 +56,11 @@
 %% be startable via supervisor, use gen_component
 
 -spec start_link(pid_groups:groupname(), DestIP::inet:ip_address(),
-                 comm_server:tcp_port(), inet:socket() | notconnected)
-        -> {ok, pid()}.
-start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket) ->
+                 comm_server:tcp_port(), inet:socket() | notconnected,
+                 Channel::main | prio) -> {ok, pid()}.
+start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Channel) ->
     {_, LocalListenPort} = comm_server:get_local_address_port(),
-    PidName = "<-> " ++ integer_to_list(IP1) ++ "."
+    PidName = atom_to_list(Channel) ++ " <-> " ++ integer_to_list(IP1) ++ "."
         ++ integer_to_list(IP2) ++ "." ++ integer_to_list(IP3) ++ "."
         ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
     gen_component:start_link(?MODULE,
@@ -99,7 +99,8 @@ on({send, DestPid, Message, Options}, State) ->
                      log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
                      new_connection(dest_ip(State),
                                     dest_port(State),
-                                    local_listen_port(State));
+                                    local_listen_port(State),
+                                    proplists:get_value(channel, Options, main));
                  S -> S
              end,
     case Socket of
@@ -277,8 +278,10 @@ send({Address, Port, Socket}, Pid, Message, Options) ->
     end,
     NewSocket.
 
--spec new_connection(inet:ip_address(), comm_server:tcp_port(), comm_server:tcp_port()) -> inet:socket() | fail.
-new_connection(Address, Port, MyPort) ->
+-spec new_connection(inet:ip_address(), comm_server:tcp_port(),
+                     comm_server:tcp_port(), Channel::main | prio | unknown)
+        -> inet:socket() | fail.
+new_connection(Address, Port, MyPort, Channel) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
                          ++ comm_server:tcp_options(),
                          config:read(tcp_connect_timeout)) of
@@ -292,7 +295,7 @@ new_connection(Address, Port, MyPort) ->
                             comm_server:set_local_address(MyAddress, MyPort);
                         _ -> ok
                     end,
-                    Message = term_to_binary({endpoint, MyAddress, MyPort},
+                    Message = term_to_binary({endpoint, MyAddress, MyPort, Channel},
                                              [{compressed, 2}, {minor_version, 1}]),
                     _ = gen_tcp:send(Socket, Message),
                     Socket;
@@ -301,7 +304,7 @@ new_connection(Address, Port, MyPort) ->
                     log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
                             [Address, Reason]),
                     gen_tcp:close(Socket),
-                    new_connection(Address, Port, MyPort)
+                    new_connection(Address, Port, MyPort, Channel)
             end;
         {error, Reason} ->
             log:log(info,"[ CC ] couldn't connect to ~.0p:~.0p (~.0p)",
@@ -343,21 +346,21 @@ state_new(DestIP, DestPort, LocalListenPort, Socket) ->
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0}.
 
-dest_ip(State)                -> element(1, State).
-dest_port(State)              -> element(2, State).
-local_listen_port(State)      -> element(3, State).
-socket(State)                 -> element(4, State).
-set_socket(State, Val)        -> setelement(4, State, Val).
-started(State)                -> element(5, State).
-s_msg_count(State)            -> element(6, State).
-inc_s_msg_count(State)        -> setelement(6, State, s_msg_count(State) + 1).
-r_msg_count(State)            -> element(7, State).
-inc_r_msg_count(State)        -> setelement(7, State, r_msg_count(State) + 1).
-msg_queue(State)              -> element(8, State).
-set_msg_queue(State, Val)     -> setelement(8, State, Val).
-msg_queue_len(State)          -> element(9, State).
-set_msg_queue_len(State, Val) -> setelement(9, State, Val).
-desired_bundle_size(State)    -> element(10, State).
+dest_ip(State)                 -> element(1, State).
+dest_port(State)               -> element(2, State).
+local_listen_port(State)       -> element(3, State).
+socket(State)                  -> element(4, State).
+set_socket(State, Val)         -> setelement(4, State, Val).
+started(State)                 -> element(5, State).
+s_msg_count(State)             -> element(6, State).
+inc_s_msg_count(State)         -> setelement(6, State, s_msg_count(State) + 1).
+r_msg_count(State)             -> element(7, State).
+inc_r_msg_count(State)         -> setelement(7, State, r_msg_count(State) + 1).
+msg_queue(State)               -> element(8, State).
+set_msg_queue(State, Val)      -> setelement(8, State, Val).
+msg_queue_len(State)           -> element(9, State).
+set_msg_queue_len(State, Val)  -> setelement(9, State, Val).
+desired_bundle_size(State)     -> element(10, State).
 set_desired_bundle_size(State, Val) -> setelement(10, State, Val).
 msgs_since_bundle_start(State) ->
     element(11, State).

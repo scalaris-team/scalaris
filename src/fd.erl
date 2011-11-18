@@ -39,6 +39,8 @@
 -type(cookie() :: '$fd_nil' | any()).
 -type(state() :: ok).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 %% @doc generates a failure detector for the calling process on the given pid.
 -spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
 subscribe([]) -> ok;
@@ -121,7 +123,7 @@ on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
             [Res] -> element(2, Res)
         end,
     comm:send_local(HBPid, {add_watching_of, TargetPid}),
-    comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}),
+    comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}, ?SEND_OPTIONS),
     State;
 
 on({pong, RemHBSSubscriber, RemoteDelay}, State) ->
@@ -150,7 +152,7 @@ on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
 %%                            {pid_groups:pid_to_name(comm:make_local(TargetPid)), Cookie}};
 %%                   _ ->
 %%                       comm:send(comm:get(pid_groups, TargetPid),
-%%                                 {group_and_name_of, TargetPid, comm:this()}),
+%%                                 {group_and_name_of, TargetPid, comm:this()}, ?SEND_OPTIONS),
 %%                       receive
 %%                           {group_and_name_of_response, Name} ->
 %%                               {Subscriber, {pid_groups:pid_to_name2(Name), Cookie}}

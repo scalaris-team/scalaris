@@ -34,6 +34,8 @@
     {{get_node_details_response, NodeDetails::node_details:node_details()}, rm} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
 
@@ -67,7 +69,8 @@ on({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details, comm:this_with_cookie(rm), [pred]});
+                          {get_node_details, comm:this_with_cookie(rm), [pred]},
+                          ?SEND_OPTIONS);
         _    -> ok
     end,
     {Neighborhood, trigger:next(TriggerState)};
@@ -75,7 +78,8 @@ on({rm_trigger}, {Neighborhood, TriggerState}) ->
 on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),
-                           nodelist:succs(Neighborhood)}),
+                           nodelist:succs(Neighborhood)},
+              ?SEND_OPTIONS),
     State;
 
 % got node_details from our successor
@@ -161,7 +165,7 @@ check_config() ->
 %%      its list of successors.
 -spec get_successorlist(comm:mypid()) -> ok.
 get_successorlist(RemoteDhtNodePid) ->
-    comm:send(RemoteDhtNodePid, {rm, get_succlist, comm:this()}).
+    comm:send(RemoteDhtNodePid, {rm, get_succlist, comm:this()}, ?SEND_OPTIONS).
 
 %% @doc the length of the successor list
 -spec predListLength() -> pos_integer().

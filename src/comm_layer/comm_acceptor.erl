@@ -69,7 +69,7 @@ server(LS) ->
             % to use the same connection for sending messages)
             receive
                 {tcp, S, Msg} ->
-                    {endpoint, Address, Port} = binary_to_term(Msg),
+                    {endpoint, Address, Port, Channel} = binary_to_term(Msg),
                     % auto determine remote address, if not sent correctly
                     NewAddress =
                         if Address =:= {0,0,0,0}
@@ -80,7 +80,8 @@ server(LS) ->
                                 end;
                            true -> Address
                         end,
-                    ConnPid = comm_server:create_connection(NewAddress, Port, S),
+                    ConnPid =
+                        comm_server:create_connection(NewAddress, Port, S, Channel),
                     % note: need to set controlling process from here as we created the socket
                     _ = gen_tcp:controlling_process(S, ConnPid),
                     _ = inet:setopts(S, comm_server:tcp_options()),

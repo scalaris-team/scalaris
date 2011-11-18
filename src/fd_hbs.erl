@@ -56,6 +56,8 @@
        [{comm:mypid(), reference()}]
      }).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 %% Akronyms: HBS =:= (local) heartbeat server instance
 
 %% @doc spawns a fd_hbs instance
@@ -74,7 +76,7 @@ init([RemotePid]) ->
     RemoteFDPid = comm:get(fd, RemotePid),
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid},
-              [{shepherd, shepherd_new()}]),
+              ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]),
 
     %% no periodic alive check inside same vm (to succeed unittests)
     case comm:is_local(RemotePid) of
@@ -120,8 +122,8 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
                     Time -> %% untouched for whole wait period
                         RemHBS = state_get_rem_hbs(State),
                         case comm:make_local(RemHBS) of
-                            fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid});
-                            _ -> comm:send(RemHBS, {del_watching_of, WatchedPid})
+                            fd -> comm:send(RemHBS, {del_watching_of_via_fd, comm:this(), WatchedPid}, ?SEND_OPTIONS);
+                            _ -> comm:send(RemHBS, {del_watching_of, WatchedPid}, ?SEND_OPTIONS)
                         end,
                         lists:keydelete(WatchedPid, 1, RemPids);
                     _ ->
@@ -159,7 +161,7 @@ on({stop}, _State) ->
 
 on({pong_via_fd, RemHBSSubscriber, RemoteDelay}, State) ->
     ?TRACEPONG("fd_hbs pong via fd~n", []),
-    comm:send(RemHBSSubscriber, {update_remote_hbs_to, comm:this()}),
+    comm:send(RemHBSSubscriber, {update_remote_hbs_to, comm:this()}, ?SEND_OPTIONS),
     NewState = state_set_rem_hbs(State, RemHBSSubscriber),
     on({pong, RemHBSSubscriber, RemoteDelay}, NewState);
 
@@ -193,7 +195,7 @@ on({periodic_alive_check}, State) ->
                            %% the following is the reduction rate
                            %% when increased earlier
                            + failureDetectorInterval() div 3))},
-      [{shepherd, shepherd_new()}]),
+      ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
                    true -> report_crash(State);
                    false -> State
@@ -216,7 +218,7 @@ on({{send_error, Target, Message, _Reason}, ShepherdCookie}, State) ->
     case NextOp of
         {retry} ->
             comm:send(Target, Message,
-                      [{shepherd, shepherd_inc(ShepherdCookie)}]),
+                      ?SEND_OPTIONS ++ [{shepherd, shepherd_inc(ShepherdCookie)}]),
             State;
         {delay, Sec, Retries} ->
             msg_delay:send_local(
@@ -265,7 +267,7 @@ on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
     %% send crash report to remote end.
     comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid)}),
+              {crashed, comm:make_global(WatchedPid)}, ?SEND_OPTIONS),
     %% delete WatchedPid and MonRef locally (MonRef is already
     %% invalid, as Pid crashed)
     _S1 = state_del_monitor(State, comm:make_global(WatchedPid)).
@@ -423,10 +425,10 @@ state_add_watched_pid(State, WatchedPid) ->
             case comm:make_local(RemHBS) of
                 fd -> comm:send(
                         RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid},
-                        [{shepherd, shepherd_new()}]);
+                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]);
                 _  -> comm:send(
                         RemHBS, {add_watching_of, WatchedPid},
-                        [{shepherd, shepherd_new()}])
+                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}])
             end,
             %% add to list
             state_set_rem_pids(
