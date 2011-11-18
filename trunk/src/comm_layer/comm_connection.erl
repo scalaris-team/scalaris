@@ -16,10 +16,11 @@
 %% @author Florian Schintke <schintke@zib.de>
 
 %% @doc creates and destroys connections and represents the endpoint
-%%      of a connection where messages are send to the network.
+%%      of a connection where messages are received from and send to the
+%%      network.
 %% @end
 %% @version $Id$
--module(comm_conn_send).
+-module(comm_connection).
 -author('schuett@zib.de').
 -author('schintke@zib.de').
 -vsn('$Id$').
@@ -31,7 +32,7 @@
 
 -include("scalaris.hrl").
 
--export([start_link/3, init/1, on/2]).
+-export([start_link/4, init/1, on/2]).
 
 -type state() ::
     {DestIP               :: inet:ip_address(),
@@ -40,6 +41,7 @@
      Socket               :: inet:socket() | notconnected,
      StartTime            :: util:time(),
      SentMsgCount         :: non_neg_integer(),
+     ReceivedMsgCount     :: non_neg_integer(),
      MsgQueue             :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
                               OQueue::[comm_layer:send_options()]},
      MsgQueueLen          :: non_neg_integer(),
@@ -53,23 +55,41 @@
 
 %% be startable via supervisor, use gen_component
 
--spec start_link(pid_groups:groupname(), inet:ip_address(),
-                 comm_server:tcp_port()) -> {ok, pid()}.
-start_link(CommLayerGroup, DestIP, DestPort) ->
-    {IP1, IP2, IP3, IP4} = DestIP,
+-spec start_link(pid_groups:groupname(), DestIP::inet:ip_address(),
+                 comm_server:tcp_port(), inet:socket() | notconnected)
+        -> {ok, pid()}.
+start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket) ->
     {_, LocalListenPort} = comm_server:get_local_address_port(),
-    PidName = "to > " ++ integer_to_list(IP1) ++ "."
+    PidName = "<-> " ++ integer_to_list(IP1) ++ "."
         ++ integer_to_list(IP2) ++ "." ++ integer_to_list(IP3) ++ "."
         ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
     gen_component:start_link(?MODULE,
-                             {DestIP, DestPort, LocalListenPort},
+                             {DestIP, DestPort, LocalListenPort, Socket},
                              [{pid_groups_join_as, CommLayerGroup, PidName}]).
 
 %% @doc initialize: return initial state.
 -spec init({DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
-            LocalListenPort::comm_server:tcp_port()}) -> state().
-init({DestIP, DestPort, LocalListenPort}) ->
-    state_new(DestIP, DestPort, LocalListenPort).
+            LocalListenPort::comm_server:tcp_port(),
+            Socket::inet:socket() | notconnected}) -> state().
+init({DestIP, DestPort, LocalListenPort, Socket}) ->
+    state_new(DestIP, DestPort, LocalListenPort, Socket).
+
+%% @doc Forwards a message to the given PID or named process.
+%%      Logs a warning if the process does not exist.
+-spec forward_msg(Process::pid() | atom(), Message::comm:message()) -> ok.
+forward_msg(Process, Message) ->
+    PID = case is_pid(Process) of
+              true -> Process;
+              false -> whereis(Process)
+          end,
+    case PID of
+        undefined ->
+            log:log(warn,
+                    "[ CC ] Cannot accept msg for unknown named"
+                        " process ~p: ~.0p~n", [Process, Message]);
+        _ -> PID ! Message
+    end,
+    ok.
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
@@ -137,6 +157,19 @@ on({send, DestPid, Message, Options}, State) ->
 on({tcp, Socket, Data}, State) ->
     NewState =
         case binary_to_term(Data) of
+            {deliver, unpack_msg_bundle, Message} ->
+                ?TRACE("Received message ~.0p", [Message]),
+                lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg) end,
+                            ok, Message),
+                %% may fail, when tcp just closed
+                _ = inet:setopts(Socket, [{active, once}]),
+                inc_r_msg_count(State);
+            {deliver, Process, Message} ->
+                ?TRACE("Received message ~.0p", [Message]),
+                forward_msg(Process, Message),
+                %% may fail, when tcp just closed
+                _ = inet:setopts(Socket, [{active, once}]),
+                inc_r_msg_count(State);
             {user_close} ->
                 log:log(warn,"[ CC ] tcp user_close request", []),
                 gen_tcp:close(Socket),
@@ -157,16 +190,48 @@ on({tcp_closed, Socket}, State) ->
 on({web_debug_info, Requestor}, State) ->
     Now = erlang:now(),
     Runtime = timer:now_diff(Now, started(State)) / 1000000,
+    {SentPerS, ReceivedPerS} =
+        if Runtime =< 0 -> {"n/a", "n/a"};
+           true         -> {s_msg_count(State) / Runtime,
+                            r_msg_count(State) / Runtime}
+        end,
+    case socket(State) of
+        notconnected ->
+            MyAddress = MyPort = "n/a",
+            PeerAddress = PeerPort = "n/a",
+            ok;
+        Socket ->
+            case inet:sockname(Socket) of
+                {ok, {MyAddress, MyPort}} -> ok;
+                {error, _Reason1}          -> MyAddress = MyPort = "n/a"
+            end,
+            case inet:peername(Socket) of
+                {ok, {PeerAddress, PeerPort}} -> ok;
+                {error, _Reason2}              -> PeerAddress = PeerPort = "n/a"
+            end
+    end,
     KeyValueList =
         [
          {"status",
           lists:flatten(io_lib:format("~p", [status(State)]))},
+         {"my IP:",
+          lists:flatten(io_lib:format("~p", [MyAddress]))},
+         {"my port",
+          lists:flatten(io_lib:format("~p", [MyPort]))},
+         {"peer IP:",
+          lists:flatten(io_lib:format("~p", [PeerAddress]))},
+         {"peer port",
+          lists:flatten(io_lib:format("~p", [PeerPort]))},
          {"running since (s)",
           lists:flatten(io_lib:format("~p", [Runtime]))},
          {"sent_tcp_messages",
           lists:flatten(io_lib:format("~p", [s_msg_count(State)]))},
          {"~ sent messages/s",
-          lists:flatten(io_lib:format("~p", [s_msg_count(State) / Runtime]))}
+          lists:flatten(io_lib:format("~p", [SentPerS]))},
+         {"received_tcp_messages",
+          lists:flatten(io_lib:format("~p", [r_msg_count(State)]))},
+         {"~ received messages/s",
+          lists:flatten(io_lib:format("~p", [ReceivedPerS]))}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     send_bundle_if_ready(State);
@@ -218,7 +283,8 @@ new_connection(Address, Port, MyPort) ->
                          ++ comm_server:tcp_options(),
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
-            % send end point data
+            % send end point data (the other node needs to know my listen port
+            % in order to have only a single connection to me)
             case inet:sockname(Socket) of
                 {ok, {MyAddress, _SocketPort}} ->
                     case comm_server:get_local_address_port() of
@@ -226,16 +292,12 @@ new_connection(Address, Port, MyPort) ->
                             comm_server:set_local_address(MyAddress, MyPort);
                         _ -> ok
                     end,
-                    case inet:peername(Socket) of
-                        {ok, {_RemoteIP, _RemotePort}} ->
-                            Socket;
-                        {error, Reason} ->
-                            log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
-                                    [Address, Reason]),
-                            gen_tcp:close(Socket),
-                            new_connection(Address, Port, MyPort)
-                    end;
+                    Message = term_to_binary({endpoint, MyAddress, MyPort},
+                                             [{compressed, 2}, {minor_version, 1}]),
+                    _ = gen_tcp:send(Socket, Message),
+                    Socket;
                 {error, Reason} ->
+                    % note: this should not occur since the socket was just created with 'ok'
                     log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
                             [Address, Reason]),
                     gen_tcp:close(Socket),
@@ -273,10 +335,11 @@ send_bundle_if_ready(InState) ->
     end.
 
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
-                LocalListenPort::comm_server:tcp_port()) -> state().
-state_new(DestIP, DestPort, LocalListenPort) ->
-    {DestIP, DestPort, LocalListenPort, notconnected,
-     _StartTime = erlang:now(), _SentMsgCount = 0,
+                LocalListenPort::comm_server:tcp_port(),
+                Socket::inet:socket() | notconnected) -> state().
+state_new(DestIP, DestPort, LocalListenPort, Socket) ->
+    {DestIP, DestPort, LocalListenPort, Socket,
+     _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0}.
 
@@ -288,18 +351,20 @@ set_socket(State, Val)        -> setelement(4, State, Val).
 started(State)                -> element(5, State).
 s_msg_count(State)            -> element(6, State).
 inc_s_msg_count(State)        -> setelement(6, State, s_msg_count(State) + 1).
-msg_queue(State)              -> element(7, State).
-set_msg_queue(State, Val)     -> setelement(7, State, Val).
-msg_queue_len(State)          -> element(8, State).
-set_msg_queue_len(State, Val) -> setelement(8, State, Val).
-desired_bundle_size(State)    -> element(9, State).
-set_desired_bundle_size(State, Val) -> setelement(9, State, Val).
+r_msg_count(State)            -> element(7, State).
+inc_r_msg_count(State)        -> setelement(7, State, r_msg_count(State) + 1).
+msg_queue(State)              -> element(8, State).
+set_msg_queue(State, Val)     -> setelement(8, State, Val).
+msg_queue_len(State)          -> element(9, State).
+set_msg_queue_len(State, Val) -> setelement(9, State, Val).
+desired_bundle_size(State)    -> element(10, State).
+set_desired_bundle_size(State, Val) -> setelement(10, State, Val).
 msgs_since_bundle_start(State) ->
-    element(10, State).
+    element(11, State).
 inc_msgs_since_bundle_start(State) ->
-    setelement(10, State, msgs_since_bundle_start(State) + 1).
+    setelement(11, State, msgs_since_bundle_start(State) + 1).
 set_msgs_since_bundle_start(State, Val) ->
-    setelement(10, State, Val).
+    setelement(11, State, Val).
 
 status(State) ->
      case socket(State) of
