@@ -111,8 +111,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0 } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#reqlist_cnt").bind("plothover", plotHover);
  var asym_yerrbars = { 
@@ -127,8 +126,7 @@ $(function() {
   xaxes: xaxes,
   yaxes: [ { min: 0, tickFormatter: msFormatter } ],
   legend: legend,
-  grid: grid,
-  zoom: {interactive: true}, pan: {interactive: true}
+  grid: grid
  });
  $("#reqlist_lat").bind("plothover", plotHover);
  var previousPoint = null;
