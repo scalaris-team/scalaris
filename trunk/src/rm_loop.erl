@@ -86,6 +86,8 @@
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
     {rm, unsubscribe, Pid::pid(), Tag::any()}).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -115,13 +117,13 @@ leave() ->
 %%      it of a new successor.
 -spec notify_new_succ(Node::comm:mypid(), NewSucc::node:node_type()) -> ok.
 notify_new_succ(Node, NewSucc) ->
-    comm:send(Node, {rm, notify_new_succ, NewSucc}).
+    comm:send(Node, {rm, notify_new_succ, NewSucc}, ?SEND_OPTIONS).
 
 %% @doc Sends a message to the remote node's dht_node process notifying
 %%      it of a new predecessor.
 -spec notify_new_pred(Node::comm:mypid(), NewPred::node:node_type()) -> ok.
 notify_new_pred(Node, NewPred) ->
-    comm:send(Node, {rm, notify_new_pred, NewPred}).
+    comm:send(Node, {rm, notify_new_pred, NewPred}, ?SEND_OPTIONS).
 
 %% @doc Sends a message to the local node's dht_node process notifying
 %%      it of a finished slide.
@@ -256,8 +258,8 @@ on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     Me = nodelist:node(Neighborhood),
     Pred = nodelist:pred(Neighborhood),
     Succ = nodelist:succ(Neighborhood),
-    comm:send(node:pidX(Succ), {rm, pred_left, Me, Pred}),
-    comm:send(node:pidX(Pred), {rm, succ_left, Me, Succ}),
+    comm:send(node:pidX(Succ), {rm, pred_left, Me, Pred}, ?SEND_OPTIONS),
+    comm:send(node:pidX(Pred), {rm, succ_left, Me, Succ}, ?SEND_OPTIONS),
     comm:send_local(self(), {move, node_leave}), % msg to dht_node
     ?RM:leave(RM_State),
     {RM_State, true, SubscrTable};
@@ -286,7 +288,7 @@ on({rm, check_ring, Token, Master}, {RM_State, _HasLeft, _SubscrTable} = State) 
         {Token, Me} -> io:format(" [RM ] Token back with Value: ~p~n",[Token]);
         {Token, _}  ->
             Pred = nodelist:pred(Neighborhood),
-            comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Master})
+            comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Master}, ?SEND_OPTIONS)
     end,
     State;
 
@@ -295,7 +297,7 @@ on({rm, init_check_ring, Token}, {RM_State, _HasLeft, _SubscrTable} = State) ->
     Neighborhood = ?RM:get_neighbors(RM_State),
     Me = nodelist:node(Neighborhood),
     Pred = nodelist:pred(Neighborhood),
-    comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Me}),
+    comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Me}, ?SEND_OPTIONS),
     State;
 
 on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->

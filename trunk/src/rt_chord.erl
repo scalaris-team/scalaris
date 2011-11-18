@@ -33,6 +33,8 @@
        {rt_get_node_response, Index::index(), Node::node:node_type()}.
 %% userdevguide-end rt_chord:types
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 % Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("rt_beh.hrl").
@@ -226,7 +228,7 @@ check_config() ->
         (any(), rt_loop:state_active()) -> unknown_event.
 handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(Source_PID, {rt_get_node_response, Index, MyNode}),
+    comm:send(Source_PID, {rt_get_node_response, Index, MyNode}, ?SEND_OPTIONS),
     State;
 handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     OldRT = rt_loop:get_rt(State),

@@ -365,7 +365,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
             loop(Module, On, State, NewComponentState);
         % handle failure detector messages
         {ping, Pid} ->
-            comm:send(Pid, {pong}),
+            comm:send(Pid, {pong}, [{channel, prio}]),
             loop(Module, On, State, ComponentState);
         %% forward a message to group member by its process name
         %% initiated via comm:send/3 with group_member

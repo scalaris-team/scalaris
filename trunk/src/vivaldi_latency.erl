@@ -44,6 +44,8 @@
     {shutdown} |
     {'DOWN', MonitorRef::any(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
+-define(SEND_OPTIONS, [{channel, prio}]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -69,7 +71,7 @@ on({{pong}, _Count}, State) ->
 
 on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
     NewCount = Count + 1,
-    comm:send(RemotePid, {ping, comm:this_with_cookie(NewCount)}),
+    comm:send(RemotePid, {ping, comm:this_with_cookie(NewCount)}, ?SEND_OPTIONS),
     {Owner, RemotePid, Token, erlang:now(), NewCount, Latencies};
 
 on({shutdown}, _State) ->

@@ -67,9 +67,10 @@
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
+-define(SEND_OPTIONS, [{channel, prio}]).
 % prevent warnings in the log
 % (the entry for a failed node will age and will be removed when it is old enough)
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet])).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet, {channel, prio}])).
 
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
@@ -220,7 +221,7 @@ on_active({cy_subset, SourcePid, PSubset}, {Cache, Node, Cycles, TriggerState}) 
     %io:format("subset~n", []),
     % this is received at node Q -> integrate results of node P
     ForSend = cyclon_cache:get_random_subset(get_shuffle_length(), Cache),
-    comm:send(SourcePid, {cy_subset_response, ForSend, PSubset}),
+    comm:send(SourcePid, {cy_subset_response, ForSend, PSubset}, ?SEND_OPTIONS),
     NewCache = cyclon_cache:merge(Cache, Node, PSubset, ForSend, get_cache_size()),
     {NewCache, Node, Cycles, TriggerState};
 
