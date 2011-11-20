@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
@@ -151,6 +152,23 @@ public class Benchmark {
         testGroup = "transbench_inc";
         runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
                 testTypes, testTypesStr, testBench, testGroup, 7);
+
+        System.out.println("-----");
+        System.out.println("Benchmark read 5 + write 5:");
+        results = getResultArray(3, 2);
+        testTypes = new Class[] {OtpErlangBinary.class, String.class};
+        testTypesStr = new String[] {"OEB", "S"};
+        columns = new String[] {
+                "Transaction.read(OtpErlangString) + Transaction.write(OtpErlangString, OtpErlangBinary)",
+                "Transaction.read(String) + Transaction.write(String, String)" };
+        testBench = new Class[] {TransRead5Write5Bench1.class, TransRead5Write5Bench2.class, TransRead5Write5Bench3.class};
+        rows = new String[] {
+                "separate connection",
+                "re-use connection",
+                "re-use object" };
+        testGroup = "transbench_r5w5";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 10);
     }
 
     protected static final class TransSingleOpBench1<T> extends BenchRunnable<T> {
@@ -352,6 +370,147 @@ public class Benchmark {
         }
     }
 
+    protected static abstract class TransReadXWriteXBench<T> extends BenchRunnable<T> {
+        private String[] keys;
+        private T[] valueInit;
+        private T[] valueWrite;
+
+        @SuppressWarnings("unchecked")
+        public TransReadXWriteXBench(String key, T value, int nrKeys)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value);
+            keys = new String[nrKeys];
+            valueInit = (T[]) Array.newInstance(value.getClass(), nrKeys);
+            valueWrite = (T[]) Array.newInstance(value.getClass(), nrKeys);
+            for (int i = 0; i < keys.length; ++i) {
+                keys[i] = key + "_" + i;
+                valueInit[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
+                valueWrite[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
+            }
+        }
+
+        @Override
+        protected void pre_init() throws Exception {
+            final Transaction tx_init = new Transaction();
+            Transaction.RequestList reqs = new Transaction.RequestList();
+            for (int i = 0; i < keys.length; ++i) {
+                reqs.addWrite(keys[i], valueInit[i]);
+            }
+            reqs.addCommit();
+            Transaction.ResultList results = tx_init.req_list(reqs);
+            for (int i = 0; i < keys.length; ++i) {
+                results.processWriteAt(i);
+            }
+            tx_init.closeConnection();
+        }
+
+        protected void operation(Transaction tx, int j) throws Exception {
+            Transaction.RequestList reqs;
+            Transaction.ResultList results;
+            reqs = new Transaction.RequestList();
+            // read old values into the transaction
+            for (int i = 0; i < keys.length; ++i) {
+                if (value instanceof OtpErlangObject) {
+                    reqs.addRead(new OtpErlangString(keys[i]));
+                } else {
+                    reqs.addRead(keys[i]);
+                }
+            }
+            reqs.addCommit();
+            results = tx.req_list(reqs);
+            for (int i = 0; i < keys.length; ++i) {
+                results.processReadAt(i);
+            }
+            
+            // write new values...
+            reqs = new Transaction.RequestList();
+            for (int i = 0; i < keys.length; ++i) {
+                T value = valueWrite[j % valueWrite.length];
+                if (value instanceof OtpErlangObject) {
+                    reqs.addWrite(new OtpErlangString(keys[i]), (OtpErlangObject) value);
+                } else {
+                    reqs.addWrite(keys[i], value);
+                }
+            }
+            reqs.addCommit();
+            results = tx.req_list(reqs);
+            for (int i = 0; i < keys.length; ++i) {
+                results.processWriteAt(i);
+            }
+        }
+    }
+
+    protected static final class TransRead5Write5Bench1<T> extends TransReadXWriteXBench<T> {
+        public TransRead5Write5Bench1(String key, T value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction tx = new Transaction();
+            operation(tx, j);
+            tx.closeConnection();
+        }
+    }
+
+    protected static final class TransRead5Write5Bench2<T> extends TransReadXWriteXBench<T> {
+        protected Connection connection;
+        
+        public TransRead5Write5Bench2(String key, T value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            connection = ConnectionFactory.getInstance().createConnection();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            connection.close();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction tx = new Transaction(connection);
+            operation(tx, j);
+        }
+    }
+
+    protected static final class TransRead5Write5Bench3<T> extends TransReadXWriteXBench<T> {
+        Transaction transaction;
+
+        public TransRead5Write5Bench3(String key, T value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            transaction = new Transaction();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            transaction.closeConnection();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            operation(transaction, j);
+        }
+    }
+
     /**
      * Abstract base class of a test run that is to be run in a thread.
      *
@@ -466,6 +625,7 @@ public class Benchmark {
                     this.speed = testEnd(transactionsPerTestRun);
                     break;
                 } catch (final Exception e) {
+                    // e.printStackTrace();
                 }
             }
         }
