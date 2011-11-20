@@ -47,10 +47,6 @@ public class Benchmark {
      */
     protected static final long benchTime = System.currentTimeMillis();
     /**
-     * The time at the start of a single benchmark.
-     */
-    protected static long timeAtStart = 0;
-    /**
      * Cut 5% off of both ends of the result list.
      */
     protected static final int percentToRemove = 5;
@@ -97,222 +93,262 @@ public class Benchmark {
         cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
         System.out.println("Number of available nodes: " + nodes.size());
         System.out.println("-> Using " + parallelRuns + " parallel instances per test run...");
-        long[][] results = getResultArray(3, 2);
+        long[][] results;
         String[] columns;
         String[] rows;
+        @SuppressWarnings("rawtypes")
+        Class[] testTypes;
+        String[] testTypesStr;
+        @SuppressWarnings("rawtypes")
+        Class[] testBench;
+        String testGroup;
 
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
-
-        try {
-            if (benchmarks.contains(1)) {
-                results[0][0] =
-                    transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(2)) {
-                results[1][0] =
-                    transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(3)) {
-                results[2][0] =
-                    transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transsinglebench_OEB_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(4)) {
-                results[0][1] =
-                    transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(5)) {
-                results[1][1] =
-                    transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(6)) {
-                results[2][1] =
-                    transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-
+        results = getResultArray(3, 2);
+        testTypes = new Class[] {OtpErlangBinary.class, String.class};
+        testTypesStr = new String[] {"OEB", "S"};
         columns = new String[] {
                 "TransactionSingleOp.write(OtpErlangString, OtpErlangBinary)",
                 "TransactionSingleOp.write(String, String)" };
+        testBench = new Class[] {TransSingleOpBench1.class, TransSingleOpBench2.class, TransSingleOpBench3.class};
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
                 "re-use object" };
-        printResults(columns, rows, results, testruns);
+        testGroup = "transsinglebench";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 1);
 
-
-        results = getResultArray(3, 2);
         System.out.println("-----");
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
-
-        try {
-            if (benchmarks.contains(1)) {
-                results[0][0] =
-                    transBench1(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(2)) {
-                results[1][0] =
-                    transBench2(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(3)) {
-                results[2][0] =
-                    transBench3(testruns, getRandom(BENCH_DATA_SIZE, OtpErlangBinary.class), "transbench_OEB_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(4)) {
-                results[0][1] =
-                    transBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(5)) {
-                results[1][1] =
-                    transBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(6)) {
-                results[2][1] =
-                    transBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-             // e.printStackTrace();
-        }
-
+        results = getResultArray(3, 2);
+        testTypes = new Class[] {OtpErlangBinary.class, String.class};
+        testTypesStr = new String[] {"OEB", "S"};
         columns = new String[] {
                 "Transaction.write(OtpErlangString, OtpErlangBinary)",
                 "Transaction.write(String, String)" };
+        testBench = new Class[] {TransBench1.class, TransBench2.class, TransBench3.class};
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
                 "re-use object" };
-        printResults(columns, rows, results, testruns);
+        testGroup = "transbench";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 1);
 
-
-        results = getResultArray(3, 1);
         System.out.println("-----");
         System.out.println("Benchmark incrementing an integer key (read+write):");
-
-        if (benchmarks.contains(7)) {
-            try {
-                results[0][0] = transIncrementBench1(testruns, "transbench_inc_1");
-                TimeUnit.SECONDS.sleep(1);
-            } catch (final Exception e) {
-                // e.printStackTrace();
-            }
-        }
-        if (benchmarks.contains(8)) {
-            try {
-                results[1][0] = transIncrementBench2(testruns, "transbench_inc_2");
-                TimeUnit.SECONDS.sleep(1);
-            } catch (final Exception e) {
-                // e.printStackTrace();
-            }
-        }
-        if (benchmarks.contains(9)) {
-            try {
-                results[2][0] = transIncrementBench3(testruns, "transbench_inc_3");
-            } catch (final Exception e) {
-                // e.printStackTrace();
-            }
-        }
-
+        results = getResultArray(3, 1);
+        testTypes = new Class[] {null};
+        testTypesStr = new String[] {"null"};
         columns = new String[] {
                 "Transaction.read(String).intValue() + Transaction.write(String, Integer)" };
+        testBench = new Class[] {TransIncrementBench1.class, TransIncrementBench2.class, TransIncrementBench3.class};
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
                 "re-use object" };
-        printResults(columns, rows, results, testruns);
+        testGroup = "transbench_inc";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 7);
     }
 
-    /**
-     * Prints a result table.
-     *
-     * @param columns
-     *            names of the columns
-     * @param rows
-     *            names of the rows (max 25 chars to protect the layout)
-     *
-     * @param results
-     *            the results to print (results[i][j]: i = row, j = column)
-     */
-    protected static void printResults(final String[] columns, final String[] rows,
-            final long[][] results, final int testruns) {
-        System.out.println("Test runs: " + testruns + ", each using " + transactionsPerTestRun + " transactions");
-        System.out
-                .println("                         \tspeed (transactions / second)");
-        final String firstColumn = "                         ";
-        System.out.print(firstColumn);
-        for (int i = 0; i < columns.length; ++i) {
-            System.out.print("\t(" + (i + 1) + ")");
+    protected static final class TransSingleOpBench1<T> extends BenchRunnable<T> {
+        public TransSingleOpBench1(String key, T value) {
+            super(key, value);
         }
-        System.out.println();
 
-        for (int i = 0; i < rows.length; ++i) {
-            System.out.print(rows[i]
-                    + firstColumn.substring(0,
-                            firstColumn.length() - rows[i].length() - 1));
-            for (int j = 0; j < columns.length; j++) {
-                if (results[i][j] == -1) {
-                    System.out.print("\tn/a");
-                } else {
-                    System.out.print("\t" + results[i][j]);
-                }
+        @Override
+        protected void operation(int j) throws Exception {
+            final TransactionSingleOp transaction = new TransactionSingleOp();
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
             }
-            System.out.println();
+            transaction.closeConnection();
+        }
+    }
+
+    protected static final class TransSingleOpBench2<T> extends BenchRunnable2<T> {
+        public TransSingleOpBench2(String key, T value) {
+            super(key, value);
         }
 
-        for (int i = 0; i < columns.length; i++) {
-            System.out.println("(" + (i + 1) + ") " + columns[i]);
+        @Override
+        protected void operation(int j) throws Exception {
+            final TransactionSingleOp transaction = new TransactionSingleOp(connection);
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
+            }
+        }
+    }
+
+    protected static final class TransSingleOpBench3<T> extends BenchRunnable<T> {
+        TransactionSingleOp transaction;
+
+        public TransSingleOpBench3(String key, T value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            transaction = new TransactionSingleOp();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            transaction.closeConnection();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
+            }
+        }
+    }
+
+    protected static final class TransBench1<T> extends BenchRunnable<T> {
+        public TransBench1(String key, T value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction transaction = new Transaction();
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
+            }
+            transaction.commit();
+            transaction.closeConnection();
+        }
+    }
+
+    protected static final class TransBench2<T> extends BenchRunnable2<T> {
+        public TransBench2(String key, T value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction transaction = new Transaction(connection);
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
+            }
+            transaction.commit();
+        }
+    }
+
+    protected static final class TransBench3<T> extends BenchRunnable<T> {
+        Transaction transaction;
+
+        public TransBench3(String key, T value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            transaction = new Transaction();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            transaction.closeConnection();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            if (value instanceof OtpErlangObject) {
+                transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
+            } else {
+                transaction.write(key + '_' + j, value);
+            }
+            transaction.commit();
+        }
+    }
+
+    protected static abstract class TransIncrementBench extends BenchRunnable<Object> {
+        public TransIncrementBench(String key, Object value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void pre_init() throws Exception {
+            final Transaction tx_init = new Transaction();
+            tx_init.write(key, 0);
+            tx_init.commit();
+            tx_init.closeConnection();
+        }
+    }
+
+    protected static final class TransIncrementBench1 extends TransIncrementBench {
+        public TransIncrementBench1(String key, Object value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction transaction = new Transaction();
+            final int value_old = transaction.read(key).intValue();
+            transaction.write(key, value_old + 1);
+            transaction.commit();
+            transaction.closeConnection();
+        }
+    }
+
+    protected static final class TransIncrementBench2 extends BenchRunnable2<Object> {
+        public TransIncrementBench2(String key, Object value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void pre_init() throws Exception {
+            final Transaction tx_init = new Transaction();
+            tx_init.write(key, 0);
+            tx_init.commit();
+            tx_init.closeConnection();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final Transaction transaction = new Transaction(connection);
+            final int value_old = transaction.read(key).intValue();
+            transaction.write(key, value_old + 1);
+            transaction.commit();
+        }
+    }
+
+    protected static final class TransIncrementBench3 extends TransIncrementBench {
+        Transaction transaction;
+
+        public TransIncrementBench3(String key, Object value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            transaction = new Transaction();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            transaction.closeConnection();
+        }
+
+        @Override
+        protected void operation(int j) throws Exception {
+            final int value_old = transaction.read(key).intValue();
+            transaction.write(key, value_old + 1);
+            transaction.commit();
         }
     }
 
@@ -333,11 +369,11 @@ public class Benchmark {
         /**
          * The time at the start of a single benchmark.
          */
-        protected long timeAtStart = 0;
+        private long timeAtStart = 0;
         /**
          * The speed of the benchmark in operations/s.
          */
-        public long speed = -1;
+        private long speed = -1;
 
         /**
          * The key to operate on.
@@ -366,7 +402,7 @@ public class Benchmark {
          *
          * Sets the time the benchmark was started.
          */
-        final protected void testBegin() {
+        final private void testBegin() {
             timeAtStart = System.currentTimeMillis();
         }
 
@@ -376,7 +412,7 @@ public class Benchmark {
          * Calculates the time the benchmark took and the number of transactions
          * performed during this time.
          */
-        final protected long testEnd(final int testRuns) {
+        final private long testEnd(final int testRuns) {
             final long timeTaken = System.currentTimeMillis() - timeAtStart;
             final long speed = (testRuns * 1000) / timeTaken;
             return speed;
@@ -409,16 +445,12 @@ public class Benchmark {
         /**
          * The operation to execute during the benchmark.
          *
-         * @param key
-         *            the key to operate on
-         * @param value
-         *            the value to use
          * @param j
          *            transaction number
          *
          * @throws Exception
          */
-        abstract protected void operation(String key, T value, int j) throws Exception;
+        abstract protected void operation(int j) throws Exception;
 
         @Override
         public void run() {
@@ -428,7 +460,7 @@ public class Benchmark {
                     testBegin();
                     init();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
-                        operation(key, value, j);
+                        operation(j);
                     }
                     cleanup();
                     this.speed = testEnd(transactionsPerTestRun);
@@ -437,29 +469,31 @@ public class Benchmark {
                 }
             }
         }
+
+        /**
+         * @return the speed
+         */
+        public long getSpeed() {
+            return speed;
+        }
     }
 
-    /**
-     * Call this method when a benchmark is started.
-     *
-     * Sets the time the benchmark was started.
-     */
-    final protected static void testBegin() {
-        timeAtStart = System.currentTimeMillis();
-    }
+    protected static abstract class BenchRunnable2<T> extends BenchRunnable<T> {
+        protected Connection connection;
 
-    /**
-     * Call this method when a benchmark is finished.
-     *
-     * Calculates the time the benchmark took and the number of transactions
-     * performed during this time.
-     *
-     * @return the number of achieved transactions per second
-     */
-    final protected static long testEnd(final int testRuns) {
-        final long timeTaken = System.currentTimeMillis() - timeAtStart;
-        final long speed = (testRuns * 1000) / timeTaken;
-        return speed;
+        protected BenchRunnable2(String key, T value) {
+            super(key, value);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            connection = ConnectionFactory.getInstance().createConnection();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            connection.close();
+        }
     }
 
     /**
@@ -527,6 +561,10 @@ public class Benchmark {
             throws IllegalArgumentException, SecurityException,
             InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {
+        if (c == null) {
+            return null;
+        }
+        
         final byte[] data = new byte[size];
         final Random r = new Random();
         r.nextBytes(data);
@@ -566,7 +604,7 @@ public class Benchmark {
                 long speed;
                 try {
                     benchThread.join();
-                    speed = benchThread.speed;
+                    speed = benchThread.getSpeed();
                 } catch (InterruptedException e) {
                     speed = -1;
                 }
@@ -602,6 +640,28 @@ public class Benchmark {
         return avgSpeed;
     }
 
+    @SuppressWarnings("unchecked")
+    protected static void runBenchAndPrintResults(final int testruns,
+            final Set<Integer> benchmarks, long[][] results, String[] columns,
+            String[] rows, @SuppressWarnings("rawtypes") Class[] testTypes, String[] testTypesStr,
+            @SuppressWarnings("rawtypes") Class[] testBench, String testGroup,
+            int firstBenchId) {
+        for (int test = 0; test < results.length * results[0].length; ++test) {
+            try {
+                if (benchmarks.contains(test + firstBenchId)) {
+                    final int i = test % results.length;
+                    final int j = test / results.length;
+                    results[i][j] =
+                        runBench(testruns, getRandom(BENCH_DATA_SIZE, testTypes[j]), testGroup + "_" + testTypesStr[j] + "_" + (i+1), testBench[i]);
+                    TimeUnit.SECONDS.sleep(1);
+                }
+            } catch (final Exception e) {
+                 e.printStackTrace();
+            }
+        }
+        printResults(columns, rows, results, testruns);
+    }
+
     /**
      * Performs a benchmark writing objects using a new
      * {@link TransactionSingleOp} object for each test.
@@ -617,27 +677,28 @@ public class Benchmark {
      *            must therefore be unique)
      *
      * @return the number of achieved transactions per second
+     * @throws NoSuchMethodException 
+     * @throws InvocationTargetException 
+     * @throws IllegalAccessException 
+     * @throws InstantiationException 
+     * @throws SecurityException 
+     * @throws IllegalArgumentException 
      */
-    protected static <T> long transSingleOpBench1(final int testRuns, final T value, final String name) {
+    @SuppressWarnings("unchecked")
+    protected static <T> long runBench(final int testRuns, final T value,
+            final String name,
+            @SuppressWarnings("rawtypes") Class<? extends BenchRunnable> clazz)
+            throws IllegalArgumentException, SecurityException,
+            InstantiationException, IllegalAccessException,
+            InvocationTargetException, NoSuchMethodException {
         final String key = benchTime + name;
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
             BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
             for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        final TransactionSingleOp transaction = new TransactionSingleOp();
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                        transaction.closeConnection();
-                    }
-                };
+                worker[thread] = clazz.getConstructor(String.class, Object.class)
+                        .newInstance(key + '_' + i + '_' + thread, value);
                 worker[thread].start();
             }
             int failed = 0;
@@ -651,453 +712,44 @@ public class Benchmark {
     }
 
     /**
-     * Performs a benchmark writing objects using a new
-     * {@link TransactionSingleOp} but re-using a single {@link Connection} for
-     * each test.
+     * Prints a result table.
      *
-     * @param <T>
-     *            type of the value to write
-     * @param testRuns
-     *            the number of times to write the value
-     * @param value
-     *            the value to write
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
+     * @param columns
+     *            names of the columns
+     * @param rows
+     *            names of the rows (max 25 chars to protect the layout)
      *
-     * @return the number of achieved transactions per second
+     * @param results
+     *            the results to print (results[i][j]: i = row, j = column)
      */
-    protected static <T> long transSingleOpBench2(final int testRuns, final T value, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
+    protected static void printResults(final String[] columns, final String[] rows,
+            final long[][] results, final int testruns) {
+        System.out.println("Test runs: " + testruns + ", each using " + transactionsPerTestRun + " transactions");
+        System.out
+                .println("                         \tspeed (transactions / second)");
+        final String firstColumn = "                         ";
+        System.out.print(firstColumn);
+        for (int i = 0; i < columns.length; ++i) {
+            System.out.print("\t(" + (i + 1) + ")");
+        }
+        System.out.println();
 
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    Connection connection;
-                    @Override
-                    protected void init() throws Exception {
-                        connection = ConnectionFactory.getInstance().createConnection();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        connection.close();
-                    }
-
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        final TransactionSingleOp transaction = new TransactionSingleOp(connection);
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                    }
-                };
-                worker[thread].start();
+        for (int i = 0; i < rows.length; ++i) {
+            System.out.print(rows[i]
+                    + firstColumn.substring(0,
+                            firstColumn.length() - rows[i].length() - 1));
+            for (int j = 0; j < columns.length; j++) {
+                if (results[i][j] == -1) {
+                    System.out.print("\tn/a");
+                } else {
+                    System.out.print("\t" + results[i][j]);
+                }
             }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
+            System.out.println();
         }
 
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing objects using a single
-     * {@link TransactionSingleOp} object for all tests.
-     *
-     * @param <T>
-     *            type of the value to write
-     * @param testRuns
-     *            the number of times to write the value
-     * @param value
-     *            the value to write
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static <T> long transSingleOpBench3(final int testRuns, final T value, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    TransactionSingleOp transaction;
-                    @Override
-                    protected void init() throws Exception {
-                        transaction = new TransactionSingleOp();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        transaction.closeConnection();
-                    }
-
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
+        for (int i = 0; i < columns.length; i++) {
+            System.out.println("(" + (i + 1) + ") " + columns[i]);
         }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing objects using a new {@link Transaction} for
-     * each test.
-     *
-     * @param <T>
-     *            type of the value to write
-     * @param testRuns
-     *            the number of times to write the value
-     * @param value
-     *            the value to write
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static <T> long transBench1(final int testRuns, final T value, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        final Transaction transaction = new Transaction();
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                        transaction.commit();
-                        transaction.closeConnection();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing objects using a new {@link Transaction} but
-     * re-using a single {@link Connection} for each test.
-     *
-     * @param <T>
-     *            type of the value to write
-     * @param testRuns
-     *            the number of times to write the value
-     * @param value
-     *            the value to write
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static <T> long transBench2(final int testRuns, final T value, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    Connection connection;
-                    @Override
-                    protected void init() throws Exception {
-                        connection = ConnectionFactory.getInstance().createConnection();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        connection.close();
-                    }
-
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        final Transaction transaction = new Transaction(connection);
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                        transaction.commit();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing objects using a single {@link Transaction}
-     * object for all tests.
-     *
-     * @param <T>
-     *            type of the value to write
-     * @param testRuns
-     *            the number of times to write the value
-     * @param value
-     *            the value to write
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static <T> long transBench3(final int testRuns, final T value, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<T>(key + '_' + i + '_' + thread, value) {
-                    Transaction transaction;
-                    @Override
-                    protected void init() throws Exception {
-                        transaction = new Transaction();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        transaction.closeConnection();
-                    }
-
-                    @Override
-                    protected void operation(String key, T value, int j) throws Exception {
-                        if (value instanceof OtpErlangObject) {
-                            transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
-                        } else {
-                            transaction.write(key + '_' + j, value);
-                        }
-                        transaction.commit();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing {@link Integer} numbers on a single key and
-     * increasing them using a new {@link Transaction} for each test.
-     *
-     * @param testRuns
-     *            the number of times to write the value
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static long transIncrementBench1(final int testRuns, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
-                    @Override
-                    protected void pre_init() throws Exception {
-                        final Transaction tx_init = new Transaction();
-                        tx_init.write(key, 0);
-                        tx_init.commit();
-                        tx_init.closeConnection();
-                    }
-                    @Override
-                    protected void operation(String key, Object value, int j) throws Exception {
-                        final Transaction transaction = new Transaction();
-                        final int value_old = transaction.read(key).intValue();
-                        transaction.write(key, value_old + 1);
-                        transaction.commit();
-                        transaction.closeConnection();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing {@link Integer} numbers on a single key and
-     * increasing them using a new {@link Transaction} but re-using a single
-     * {@link Connection} for each test.
-     *
-     * @param testRuns
-     *            the number of times to write the value
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static long transIncrementBench2(final int testRuns, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
-                    Connection connection;
-                    @Override
-                    protected void pre_init() throws Exception {
-                        final Transaction tx_init = new Transaction();
-                        tx_init.write(key, 0);
-                        tx_init.commit();
-                        tx_init.closeConnection();
-                    }
-
-                    @Override
-                    protected void init() throws Exception {
-                        connection = ConnectionFactory.getInstance().createConnection();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        connection.close();
-                    }
-
-                    @Override
-                    protected void operation(String key, Object value, int j) throws Exception {
-                        final Transaction transaction = new Transaction(connection);
-                        final int value_old = transaction.read(key).intValue();
-                        transaction.write(key, value_old + 1);
-                        transaction.commit();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
-    }
-
-    /**
-     * Performs a benchmark writing objects using a single {@link Transaction}
-     * object for all tests.
-     *
-     * @param testRuns
-     *            the number of times to write the value
-     * @param name
-     *            the name of the benchmark (will be used as part of the key and
-     *            must therefore be unique)
-     *
-     * @return the number of achieved transactions per second
-     */
-    protected static long transIncrementBench3(final int testRuns, final String name) {
-        final String key = benchTime + name;
-        final long[] results = new long[testRuns];
-
-        for (int i = 0; i < testRuns; ++i) {
-            @SuppressWarnings("unchecked")
-            BenchRunnable<Object> worker[] = new BenchRunnable[parallelRuns];
-            for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = new BenchRunnable<Object>(key + '_' + i + '_' + thread, null) {
-                    Transaction transaction;
-                    @Override
-                    protected void pre_init() throws Exception {
-                        final Transaction tx_init = new Transaction();
-                        tx_init.write(key, 0);
-                        tx_init.commit();
-                        tx_init.closeConnection();
-                    }
-
-                    @Override
-                    protected void init() throws Exception {
-                        transaction = new Transaction();
-                    }
-
-                    @Override
-                    protected void cleanup() throws Exception {
-                        transaction.closeConnection();
-                    }
-
-                    @Override
-                    protected void operation(String key, Object value, int j) throws Exception {
-                        final int value_old = transaction.read(key).intValue();
-                        transaction.write(key, value_old + 1);
-                        transaction.commit();
-                    }
-                };
-                worker[thread].start();
-            }
-            int failed = 0;
-            failed = integrateResults(results, i, worker, failed);
-            if (failed >= 3) {
-                return -1;
-            }
-        }
-
-        return getAvgSpeed(results);
     }
 }
