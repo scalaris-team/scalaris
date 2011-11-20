@@ -16,13 +16,16 @@
 package de.zib.scalaris.examples;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.Benchmark;
+import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.PeerNode;
+import de.zib.scalaris.RoundRobinConnectionPolicy;
 
 /**
  * Mini benchmark of the {@link de.zib.scalaris.Transaction} and
@@ -98,199 +101,56 @@ public class FastStringBenchmark extends Benchmark {
      *            the benchmarks to run (1-9 or -1 for all benchmarks)
      */
     public static void minibench(final int testruns, final Set<Integer> benchmarks) {
-        long[][] results = getResultArray(3, 3);
+        ConnectionFactory cf = ConnectionFactory.getInstance();
+        List<PeerNode> nodes = cf.getNodes();
+        parallelRuns = nodes.size();
+        // set a connection policy that goes through the available nodes in a round-robin fashion:
+        cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
+        System.out.println("Number of available nodes: " + nodes.size());
+        System.out.println("-> Using " + parallelRuns + " parallel instances per test run...");
+        long[][] results;
         String[] columns;
         String[] rows;
+        @SuppressWarnings("rawtypes")
+        Class[] testTypes;
+        String[] testTypesStr;
+        @SuppressWarnings("rawtypes")
+        Class[] testBench;
+        String testGroup;
 
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
-
-        try {
-            if (benchmarks.contains(1)) {
-                results[0][0] =
-                    transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(2)) {
-                results[1][0] =
-                    transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(3)) {
-                results[2][0] =
-                    transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transsinglebench_S_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(4)) {
-                results[0][1] =
-                    transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(5)) {
-                results[1][1] =
-                    transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(6)) {
-                results[2][1] =
-                    transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transsinglebench_EVBS_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(7)) {
-                results[0][2] =
-                    transSingleOpBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(8)) {
-                results[1][2] =
-                    transSingleOpBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(9)) {
-                results[2][2] =
-                    transSingleOpBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transsinglebench_EVFS_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-
+        results = getResultArray(3, 3);
+        testTypes = new Class[] {String.class, ErlangValueBitString.class, ErlangValueFastString.class};
+        testTypesStr = new String[] {"S", "EVBS", "EVFS"};
         columns = new String[] {
                 "TransactionSingleOp.write(String, String)",
                 "TransactionSingleOp.write(String, ErlangValueBitString)",
                 "TransactionSingleOp.write(String, ErlangValueFastString)" };
+        testBench = new Class[] {Benchmark.TransSingleOpBench1.class, Benchmark.TransSingleOpBench2.class, Benchmark.TransSingleOpBench3.class};
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
                 "re-use object" };
-        printResults(columns, rows, results, testruns);
+        testGroup = "transsinglebench";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 1);
 
-
-        results = getResultArray(3, 3);
         System.out.println("-----");
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
-
-        try {
-            if (benchmarks.contains(1)) {
-                results[0][0] =
-                    transBench1(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(2)) {
-                results[1][0] =
-                    transBench2(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(3)) {
-                results[2][0] =
-                    transBench3(testruns, getRandom(BENCH_DATA_SIZE, String.class), "transbench_S_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(4)) {
-                results[0][1] =
-                    transBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(5)) {
-                results[1][1] =
-                    transBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(6)) {
-                results[2][1] =
-                    transBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueBitString.class), "transbench_EVBS_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(7)) {
-                results[0][2] =
-                    transBench1(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_1");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(8)) {
-                results[1][2] =
-                    transBench2(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_2");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-        try {
-            if (benchmarks.contains(9)) {
-                results[2][2] =
-                    transBench3(testruns, getRandom(BENCH_DATA_SIZE, ErlangValueFastString.class), "transbench_EVFS_3");
-                TimeUnit.SECONDS.sleep(1);
-            }
-        } catch (final Exception e) {
-            // e.printStackTrace();
-        }
-
+        results = getResultArray(3, 3);
+        testTypes = new Class[] {String.class, ErlangValueBitString.class, ErlangValueFastString.class};
+        testTypesStr = new String[] {"S", "EVBS", "EVFS"};
         columns = new String[] {
                 "Transaction.write(String, String)",
                 "Transaction.write(String, ErlangValueBitString)",
                 "Transaction.write(String, ErlangValueFastString)" };
+        testBench = new Class[] {Benchmark.TransBench1.class, Benchmark.TransBench2.class, Benchmark.TransBench3.class};
         rows = new String[] {
                 "separate connection",
                 "re-use connection",
                 "re-use object" };
-        printResults(columns, rows, results, testruns);
+        testGroup = "transsinglebench";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 1);
     }
 }
