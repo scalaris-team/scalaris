@@ -306,6 +306,14 @@ public class Benchmark {
             tx_init.commit();
             tx_init.closeConnection();
         }
+
+        protected void operation(final Transaction tx, final int j) throws Exception {
+            final int value_old = tx.read(key).intValue();
+            final Transaction.RequestList reqs = new Transaction.RequestList();
+            reqs.addWrite(key, value_old + 1).addCommit();
+            final Transaction.ResultList results = tx.req_list(reqs);
+            results.processWriteAt(0);
+        }
     }
 
     protected static final class TransIncrementBench1 extends TransIncrementBench {
@@ -316,32 +324,32 @@ public class Benchmark {
         @Override
         protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction();
-            final int value_old = transaction.read(key).intValue();
-            transaction.write(key, value_old + 1);
-            transaction.commit();
+            operation(transaction, j);
             transaction.closeConnection();
         }
     }
 
-    protected static final class TransIncrementBench2 extends BenchRunnable2<Object> {
+    protected static final class TransIncrementBench2 extends TransIncrementBench {
+        protected Connection connection;
+
         public TransIncrementBench2(final String key, final Object value) {
             super(key, value);
         }
 
         @Override
-        protected void pre_init() throws Exception {
-            final Transaction tx_init = new Transaction();
-            tx_init.write(key, 0);
-            tx_init.commit();
-            tx_init.closeConnection();
+        protected void init() throws Exception {
+            connection = ConnectionFactory.getInstance().createConnection();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            connection.close();
         }
 
         @Override
         protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction(connection);
-            final int value_old = transaction.read(key).intValue();
-            transaction.write(key, value_old + 1);
-            transaction.commit();
+            operation(transaction, j);
         }
     }
 
@@ -364,9 +372,7 @@ public class Benchmark {
 
         @Override
         protected void operation(final int j) throws Exception {
-            final int value_old = transaction.read(key).intValue();
-            transaction.write(key, value_old + 1);
-            transaction.commit();
+            operation(transaction, j);
         }
     }
 
