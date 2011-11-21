@@ -288,7 +288,7 @@ send({Address, Port, Socket}, Pid, Message, Options) ->
         -> inet:socket() | fail.
 new_connection(Address, Port, MyPort, Channel) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
-                         ++ comm_server:tcp_options(),
+                         ++ comm_server:tcp_options(Channel),
                          config:read(tcp_connect_timeout)) of
         {ok, Socket} ->
             % send end point data (the other node needs to know my listen port
