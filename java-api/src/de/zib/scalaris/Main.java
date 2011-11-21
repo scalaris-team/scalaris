@@ -99,7 +99,7 @@ public class Main {
                 for (int i = 1; i < Math.min(10, optionValues.length); ++i) {
                     final String benchmarks_str = optionValues[i];
                     if (benchmarks_str.equals("all")) {
-                        for (int j = 1; j <= 15; ++j) {
+                        for (int j = 1; j <= 18; ++j) {
                             benchmarks.add(j);
                         }
                     } else {

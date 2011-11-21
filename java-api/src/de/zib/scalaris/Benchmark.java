@@ -22,6 +22,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -174,6 +175,22 @@ public class Benchmark {
         testGroup = "transbench_r5w5";
         runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
                 testTypes, testTypesStr, testBench, testGroup, 10);
+
+        System.out.println("-----");
+        System.out.println("Benchmark appending to a String list (read+write):");
+        results = getResultArray(3, 1);
+        testTypes = new Class[] {String.class};
+        testTypesStr = new String[] {"S"};
+        columns = new String[] {
+                "Transaction.read(String).intValue() + Transaction.write(String, Integer)" };
+        testBench = new Class[] {TransAppendToListBench1.class, TransAppendToListBench2.class, TransAppendToListBench3.class};
+        rows = new String[] {
+                "separate connection",
+                "re-use connection",
+                "re-use object" };
+        testGroup = "transbench_append";
+        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
+                testTypes, testTypesStr, testBench, testGroup, 16);
     }
 
     protected static final class TransSingleOpBench1<T> extends BenchRunnable<T> {
@@ -507,6 +524,114 @@ public class Benchmark {
         Transaction transaction;
 
         public TransRead5Write5Bench3(final String key, final T value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            transaction = new Transaction();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            transaction.closeConnection();
+        }
+
+        @Override
+        protected void operation(final int j) throws Exception {
+            operation(transaction, j);
+        }
+    }
+
+    protected static abstract class TransAppendToListBench extends BenchRunnable<String> {
+        private final List<String> valueInit;
+
+        public TransAppendToListBench(final String key, final String value, final int nrKeys)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value);
+            valueInit = new ArrayList<String>(nrKeys);
+            for (int i = 0; i < nrKeys; ++i) {
+                valueInit.add(getRandom(BENCH_DATA_SIZE, String.class));
+            }
+        }
+
+        @Override
+        protected void pre_init(final int j) throws Exception {
+            final Transaction tx_init = new Transaction();
+            final Transaction.RequestList reqs = new Transaction.RequestList();
+            reqs.addWrite(key + j, valueInit).addCommit();
+            final Transaction.ResultList results = tx_init.req_list(reqs);
+            results.processWriteAt(0);
+            tx_init.closeConnection();
+        }
+
+        protected void operation(final Transaction tx, final int j) throws Exception {
+            Transaction.RequestList reqs;
+            reqs = new Transaction.RequestList();
+            // read old list into the transaction
+            final List<String> list = tx.read(key + j).stringListValue();
+
+            // write new list ...
+            reqs = new Transaction.RequestList();
+            list.add(value);
+            reqs.addWrite(key + j, value).addCommit();
+            final Transaction.ResultList results = tx.req_list(reqs);
+            results.processWriteAt(0);
+        }
+    }
+
+    protected static final class TransAppendToListBench1 extends TransAppendToListBench {
+        public TransAppendToListBench1(final String key, final String value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void operation(final int j) throws Exception {
+            final Transaction tx = new Transaction();
+            operation(tx, j);
+            tx.closeConnection();
+        }
+    }
+
+    protected static final class TransAppendToListBench2 extends TransAppendToListBench {
+        protected Connection connection;
+
+        public TransAppendToListBench2(final String key, final String value)
+                throws IllegalArgumentException, SecurityException,
+                InstantiationException, IllegalAccessException,
+                InvocationTargetException, NoSuchMethodException {
+            super(key, value, 5);
+        }
+
+        @Override
+        protected void init() throws Exception {
+            connection = ConnectionFactory.getInstance().createConnection();
+        }
+
+        @Override
+        protected void cleanup() throws Exception {
+            connection.close();
+        }
+
+        @Override
+        protected void operation(final int j) throws Exception {
+            final Transaction tx = new Transaction(connection);
+            operation(tx, j);
+        }
+    }
+
+    protected static final class TransAppendToListBench3 extends TransAppendToListBench {
+        Transaction transaction;
+
+        public TransAppendToListBench3(final String key, final String value)
                 throws IllegalArgumentException, SecurityException,
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException, NoSuchMethodException {
