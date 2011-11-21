@@ -189,7 +189,7 @@ public class Transaction {
          * request and returns the value that has been read.
          *
          * @param pos
-         *            the position in the result list
+         *            the position in the result list (starting at 0)
          *
          * @return the stored value
          *
@@ -210,7 +210,7 @@ public class Transaction {
          * a write request.
          *
          * @param pos
-         *            the position in the result list
+         *            the position in the result list (starting at 0)
          *
          * @throws TimeoutException
          *             if a timeout occurred while trying to write the value

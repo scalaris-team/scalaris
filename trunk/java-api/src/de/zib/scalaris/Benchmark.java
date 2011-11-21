@@ -87,8 +87,8 @@ public class Benchmark {
      *            the benchmarks to run
      */
     public static void minibench(final int testruns, final Set<Integer> benchmarks) {
-        ConnectionFactory cf = ConnectionFactory.getInstance();
-        List<PeerNode> nodes = cf.getNodes();
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        final List<PeerNode> nodes = cf.getNodes();
         parallelRuns = nodes.size();
         // set a connection policy that goes through the available nodes in a round-robin fashion:
         cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
@@ -172,12 +172,12 @@ public class Benchmark {
     }
 
     protected static final class TransSingleOpBench1<T> extends BenchRunnable<T> {
-        public TransSingleOpBench1(String key, T value) {
+        public TransSingleOpBench1(final String key, final T value) {
             super(key, value);
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final TransactionSingleOp transaction = new TransactionSingleOp();
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
@@ -189,12 +189,12 @@ public class Benchmark {
     }
 
     protected static final class TransSingleOpBench2<T> extends BenchRunnable2<T> {
-        public TransSingleOpBench2(String key, T value) {
+        public TransSingleOpBench2(final String key, final T value) {
             super(key, value);
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final TransactionSingleOp transaction = new TransactionSingleOp(connection);
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
@@ -207,7 +207,7 @@ public class Benchmark {
     protected static final class TransSingleOpBench3<T> extends BenchRunnable<T> {
         TransactionSingleOp transaction;
 
-        public TransSingleOpBench3(String key, T value) {
+        public TransSingleOpBench3(final String key, final T value) {
             super(key, value);
         }
 
@@ -222,7 +222,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
             } else {
@@ -232,12 +232,12 @@ public class Benchmark {
     }
 
     protected static final class TransBench1<T> extends BenchRunnable<T> {
-        public TransBench1(String key, T value) {
+        public TransBench1(final String key, final T value) {
             super(key, value);
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction();
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
@@ -250,12 +250,12 @@ public class Benchmark {
     }
 
     protected static final class TransBench2<T> extends BenchRunnable2<T> {
-        public TransBench2(String key, T value) {
+        public TransBench2(final String key, final T value) {
             super(key, value);
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction(connection);
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
@@ -269,7 +269,7 @@ public class Benchmark {
     protected static final class TransBench3<T> extends BenchRunnable<T> {
         Transaction transaction;
 
-        public TransBench3(String key, T value) {
+        public TransBench3(final String key, final T value) {
             super(key, value);
         }
 
@@ -284,7 +284,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             if (value instanceof OtpErlangObject) {
                 transaction.write(new OtpErlangString(key + '_' + j), (OtpErlangObject) value);
             } else {
@@ -295,7 +295,7 @@ public class Benchmark {
     }
 
     protected static abstract class TransIncrementBench extends BenchRunnable<Object> {
-        public TransIncrementBench(String key, Object value) {
+        public TransIncrementBench(final String key, final Object value) {
             super(key, value);
         }
 
@@ -309,12 +309,12 @@ public class Benchmark {
     }
 
     protected static final class TransIncrementBench1 extends TransIncrementBench {
-        public TransIncrementBench1(String key, Object value) {
+        public TransIncrementBench1(final String key, final Object value) {
             super(key, value);
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction();
             final int value_old = transaction.read(key).intValue();
             transaction.write(key, value_old + 1);
@@ -324,7 +324,7 @@ public class Benchmark {
     }
 
     protected static final class TransIncrementBench2 extends BenchRunnable2<Object> {
-        public TransIncrementBench2(String key, Object value) {
+        public TransIncrementBench2(final String key, final Object value) {
             super(key, value);
         }
 
@@ -337,7 +337,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction transaction = new Transaction(connection);
             final int value_old = transaction.read(key).intValue();
             transaction.write(key, value_old + 1);
@@ -348,7 +348,7 @@ public class Benchmark {
     protected static final class TransIncrementBench3 extends TransIncrementBench {
         Transaction transaction;
 
-        public TransIncrementBench3(String key, Object value) {
+        public TransIncrementBench3(final String key, final Object value) {
             super(key, value);
         }
 
@@ -363,7 +363,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final int value_old = transaction.read(key).intValue();
             transaction.write(key, value_old + 1);
             transaction.commit();
@@ -371,42 +371,45 @@ public class Benchmark {
     }
 
     protected static abstract class TransReadXWriteXBench<T> extends BenchRunnable<T> {
-        private String[] keys;
-        private T[] valueInit;
-        private T[] valueWrite;
+        private final String[] keys;
+        private final T[] valueWrite;
 
         @SuppressWarnings("unchecked")
-        public TransReadXWriteXBench(String key, T value, int nrKeys)
+        public TransReadXWriteXBench(final String key, final T value, final int nrKeys)
                 throws IllegalArgumentException, SecurityException,
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException, NoSuchMethodException {
             super(key, value);
             keys = new String[nrKeys];
-            valueInit = (T[]) Array.newInstance(value.getClass(), nrKeys);
             valueWrite = (T[]) Array.newInstance(value.getClass(), nrKeys);
             for (int i = 0; i < keys.length; ++i) {
                 keys[i] = key + "_" + i;
-                valueInit[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
                 valueWrite[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
             }
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         protected void pre_init() throws Exception {
+            final T[] valueInit;
+            valueInit = (T[]) Array.newInstance(value.getClass(), keys.length);
+            for (int i = 0; i < keys.length; ++i) {
+                valueInit[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
+            }
             final Transaction tx_init = new Transaction();
-            Transaction.RequestList reqs = new Transaction.RequestList();
+            final Transaction.RequestList reqs = new Transaction.RequestList();
             for (int i = 0; i < keys.length; ++i) {
                 reqs.addWrite(keys[i], valueInit[i]);
             }
             reqs.addCommit();
-            Transaction.ResultList results = tx_init.req_list(reqs);
+            final Transaction.ResultList results = tx_init.req_list(reqs);
             for (int i = 0; i < keys.length; ++i) {
                 results.processWriteAt(i);
             }
             tx_init.closeConnection();
         }
 
-        protected void operation(Transaction tx, int j) throws Exception {
+        protected void operation(final Transaction tx, final int j) throws Exception {
             Transaction.RequestList reqs;
             Transaction.ResultList results;
             reqs = new Transaction.RequestList();
@@ -423,11 +426,11 @@ public class Benchmark {
             for (int i = 0; i < keys.length; ++i) {
                 results.processReadAt(i);
             }
-            
+
             // write new values...
             reqs = new Transaction.RequestList();
             for (int i = 0; i < keys.length; ++i) {
-                T value = valueWrite[j % valueWrite.length];
+                final T value = valueWrite[j % valueWrite.length];
                 if (value instanceof OtpErlangObject) {
                     reqs.addWrite(new OtpErlangString(keys[i]), (OtpErlangObject) value);
                 } else {
@@ -443,7 +446,7 @@ public class Benchmark {
     }
 
     protected static final class TransRead5Write5Bench1<T> extends TransReadXWriteXBench<T> {
-        public TransRead5Write5Bench1(String key, T value)
+        public TransRead5Write5Bench1(final String key, final T value)
                 throws IllegalArgumentException, SecurityException,
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException, NoSuchMethodException {
@@ -451,7 +454,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction tx = new Transaction();
             operation(tx, j);
             tx.closeConnection();
@@ -460,8 +463,8 @@ public class Benchmark {
 
     protected static final class TransRead5Write5Bench2<T> extends TransReadXWriteXBench<T> {
         protected Connection connection;
-        
-        public TransRead5Write5Bench2(String key, T value)
+
+        public TransRead5Write5Bench2(final String key, final T value)
                 throws IllegalArgumentException, SecurityException,
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException, NoSuchMethodException {
@@ -479,7 +482,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             final Transaction tx = new Transaction(connection);
             operation(tx, j);
         }
@@ -488,7 +491,7 @@ public class Benchmark {
     protected static final class TransRead5Write5Bench3<T> extends TransReadXWriteXBench<T> {
         Transaction transaction;
 
-        public TransRead5Write5Bench3(String key, T value)
+        public TransRead5Write5Bench3(final String key, final T value)
                 throws IllegalArgumentException, SecurityException,
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException, NoSuchMethodException {
@@ -506,7 +509,7 @@ public class Benchmark {
         }
 
         @Override
-        protected void operation(int j) throws Exception {
+        protected void operation(final int j) throws Exception {
             operation(transaction, j);
         }
     }
@@ -551,7 +554,7 @@ public class Benchmark {
          * @param value
          *            the value to use
          */
-        public BenchRunnable(String key, T value) {
+        public BenchRunnable(final String key, final T value) {
             this.key = key;
             this.value = value;
         }
@@ -586,6 +589,15 @@ public class Benchmark {
         }
 
         /**
+         * Will be called before the benchmark starts with all possible
+         * variations of "j" in the {@link #operation(int)} call.
+         *
+         * @throws Exception
+         */
+        protected void pre_init(final int j) throws Exception {
+        }
+
+        /**
          * Will be called at the start of the benchmark.
          *
          * @throws Exception
@@ -613,9 +625,12 @@ public class Benchmark {
 
         @Override
         public void run() {
-            for (int retry = 0; retry < 3 && !stop; ++retry) {
+            for (int retry = 0; (retry < 3) && !stop; ++retry) {
                 try {
                     pre_init();
+                    for (int j = 0; j < transactionsPerTestRun; ++j) {
+                        pre_init(j);
+                    }
                     testBegin();
                     init();
                     for (int j = 0; j < transactionsPerTestRun; ++j) {
@@ -641,7 +656,7 @@ public class Benchmark {
     protected static abstract class BenchRunnable2<T> extends BenchRunnable<T> {
         protected Connection connection;
 
-        protected BenchRunnable2(String key, T value) {
+        protected BenchRunnable2(final String key, final T value) {
             super(key, value);
         }
 
@@ -724,7 +739,7 @@ public class Benchmark {
         if (c == null) {
             return null;
         }
-        
+
         final byte[] data = new byte[size];
         final Random r = new Random();
         r.nextBytes(data);
@@ -751,21 +766,21 @@ public class Benchmark {
      *
      * @return (new) number of failed threads
      */
-    private static <T> int integrateResults(final long[] results, int i,
-            BenchRunnable<T>[] worker, int failed) {
-        for (BenchRunnable<T> benchThread : worker) {
+    private static <T> int integrateResults(final long[] results, final int i,
+            final BenchRunnable<T>[] worker, int failed) {
+        for (final BenchRunnable<T> benchThread : worker) {
             if (failed >= 3) {
                 benchThread.stop = true;
                 try {
                     benchThread.join();
-                } catch (InterruptedException e) {
+                } catch (final InterruptedException e) {
                 }
             } else {
                 long speed;
                 try {
                     benchThread.join();
                     speed = benchThread.getSpeed();
-                } catch (InterruptedException e) {
+                } catch (final InterruptedException e) {
                     speed = -1;
                 }
                 if (speed < 0) {
@@ -802,11 +817,11 @@ public class Benchmark {
 
     @SuppressWarnings("unchecked")
     protected static void runBenchAndPrintResults(final int testruns,
-            final Set<Integer> benchmarks, long[][] results, String[] columns,
-            String[] rows, @SuppressWarnings("rawtypes") Class[] testTypes, String[] testTypesStr,
-            @SuppressWarnings("rawtypes") Class[] testBench, String testGroup,
-            int firstBenchId) {
-        for (int test = 0; test < results.length * results[0].length; ++test) {
+            final Set<Integer> benchmarks, final long[][] results, final String[] columns,
+            final String[] rows, @SuppressWarnings("rawtypes") final Class[] testTypes, final String[] testTypesStr,
+            @SuppressWarnings("rawtypes") final Class[] testBench, final String testGroup,
+            final int firstBenchId) {
+        for (int test = 0; test < (results.length * results[0].length); ++test) {
             try {
                 if (benchmarks.contains(test + firstBenchId)) {
                     final int i = test % results.length;
@@ -837,17 +852,17 @@ public class Benchmark {
      *            must therefore be unique)
      *
      * @return the number of achieved transactions per second
-     * @throws NoSuchMethodException 
-     * @throws InvocationTargetException 
-     * @throws IllegalAccessException 
-     * @throws InstantiationException 
-     * @throws SecurityException 
-     * @throws IllegalArgumentException 
+     * @throws NoSuchMethodException
+     * @throws InvocationTargetException
+     * @throws IllegalAccessException
+     * @throws InstantiationException
+     * @throws SecurityException
+     * @throws IllegalArgumentException
      */
     @SuppressWarnings("unchecked")
     protected static <T> long runBench(final int testRuns, final T value,
             final String name,
-            @SuppressWarnings("rawtypes") Class<? extends BenchRunnable> clazz)
+            @SuppressWarnings("rawtypes") final Class<? extends BenchRunnable> clazz)
             throws IllegalArgumentException, SecurityException,
             InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {
@@ -855,10 +870,16 @@ public class Benchmark {
         final long[] results = new long[testRuns];
 
         for (int i = 0; i < testRuns; ++i) {
-            BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
+            final BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
             for (int thread = 0; thread < parallelRuns; ++thread) {
-                worker[thread] = clazz.getConstructor(String.class, Object.class)
-                        .newInstance(key + '_' + i + '_' + thread, value);
+                final Class<? extends Object> valueClazz = (value == null) ? Object.class : value.getClass();
+                try {
+                    worker[thread] = clazz.getConstructor(String.class, valueClazz)
+                            .newInstance(key + '_' + i + '_' + thread, value);
+                } catch (final NoSuchMethodException e) {
+                    worker[thread] = clazz.getConstructor(String.class, Object.class)
+                            .newInstance(key + '_' + i + '_' + thread, value);
+                }
                 worker[thread].start();
             }
             int failed = 0;
