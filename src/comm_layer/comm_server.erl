@@ -30,7 +30,7 @@
 -endif.
 
 -export([start_link/1, init/1, on/2]).
--export([send/3, tcp_options/0]).
+-export([send/3, tcp_options/1]).
 -export([unregister_connection/2, create_connection/4,
          set_local_address/2, get_local_address_port/0]).
 
@@ -56,16 +56,18 @@ init([]) ->
     _ = ets:new(?MODULE, [set, protected, named_table]),
     _State = null.
 
--spec tcp_options() -> [{term(), term()}].
-tcp_options() ->
-%    [{active, once}, {nodelay, true}, {send_timeout, config:read(tcp_send_timeout)}].
+-spec tcp_options(Channel::main | prio) -> [{term(), term()}].
+tcp_options(Channel) ->
+    TcpSendTimeout = case Channel of
+                         prio -> config:read(tcp_send_timeout);
+                         main -> infinity
+                     end,
     [{active, once},
      {nodelay, true},
      {keepalive, true},
      {reuseaddr, true},
      {delay_send, true},
-     {send_timeout, config:read(tcp_send_timeout)}
-].
+     {send_timeout, TcpSendTimeout}].
 
 -spec send({inet:ip_address(), tcp_port(), pid()}, term(), comm:send_options()) -> ok.
 send({Address, Port, Pid}, Message, Options) ->
