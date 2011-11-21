@@ -256,7 +256,7 @@ public class ErlangValue {
         // need special handling if OTP returned an empty list
         if (value instanceof OtpErlangList) {
             try {
-                return new OtpErlangString((OtpErlangList) value).stringValue();
+                return ((OtpErlangList) value).stringValue();
             } catch (final OtpErlangException e) {
                 throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString: " + e.getMessage());
             }
