@@ -739,9 +739,13 @@ public class Benchmark {
         if (c == null) {
             return null;
         }
+        final Random r = new Random();
+        if (Integer.class.isAssignableFrom(c)) {
+            final int par = r.nextInt();
+            return c.getConstructor(int.class).newInstance(par);
+        }
 
         final byte[] data = new byte[size];
-        final Random r = new Random();
         r.nextBytes(data);
         try {
             return c.getConstructor(byte[].class).newInstance(data);
