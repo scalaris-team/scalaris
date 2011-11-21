@@ -17,6 +17,11 @@ package de.zib.scalaris;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -753,6 +758,20 @@ public class Benchmark {
 
         final byte[] data = new byte[size];
         r.nextBytes(data);
+        if (String.class.isAssignableFrom(c)) {
+            final Charset charset = Charset.forName("UTF-8");
+            final CharsetDecoder decoder = charset.newDecoder();
+            decoder.onMalformedInput(CodingErrorAction.REPLACE);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+            String par;
+            try {
+                par = decoder.decode(ByteBuffer.wrap(data)).toString();
+                return c.getConstructor(String.class).newInstance(par);
+            } catch (final CharacterCodingException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+
         try {
             return c.getConstructor(byte[].class).newInstance(data);
         } catch (final NoSuchMethodException e) {
