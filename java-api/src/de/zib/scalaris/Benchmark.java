@@ -435,7 +435,11 @@ public class Benchmark {
             reqs.addCommit();
             results = tx.req_list(reqs);
             for (int i = 0; i < keys.length; ++i) {
-                results.processReadAt(i);
+                if (value instanceof OtpErlangObject) {
+                    results.processReadAt(i).value();
+                } else {
+                    results.processReadAt(i).stringValue();
+                }
             }
 
             // write new values...
