@@ -37,6 +37,9 @@
 %% conversion between ?DB:value() and client_value():
 -export([encode_value/1, decode_value/1]).
 
+%% INTERNAL - only for api_tx_ext:
+-export([req_list2/2]).
+
 -ifdef(with_export_type_support).
 -export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0]).
 -endif.
