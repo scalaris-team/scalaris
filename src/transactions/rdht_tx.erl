@@ -30,15 +30,15 @@
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0, request/0, result_entry/0, result/0]).
+-export_type([req_id/0, request/0, request_on_key/0, result_entry/0, result/0]).
 -endif.
 
 -type req_id() :: util:global_uid().
--type request() :: {rdht_tx_read, client_key()}
-                 | {rdht_tx_write, client_key(), ?DB:value()}
-                 | {commit}.
+-type request_on_key() :: {rdht_tx_read, client_key()}
+                        | {rdht_tx_write, client_key(), client_value()}.
+-type request() :: request_on_key() | {commit}.
 
--type result_entry_read() :: {ok, ?DB:value()} | {fail, timeout | not_found}.
+-type result_entry_read() :: {ok, client_value()} | {fail, timeout | not_found}.
 -type result_entry_write() :: {ok} | {fail, timeout}.
 -type result_entry_commit() :: {ok} | {fail, abort | timeout}.
 -type result_entry() :: result_entry_read()
