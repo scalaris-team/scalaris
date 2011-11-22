@@ -36,7 +36,25 @@
          dump/1, to_list/1, export_rt_to_dht_node/2,
          handle_custom_message/2,
          check/4, check/5,
-         check_config/0]).
+         check_config/0,
+         client_key_to_binary/1]).
+
+-spec client_key_to_binary(Key::client_key()) -> binary().
+client_key_to_binary(Key) ->
+    case unicode:characters_to_binary(Key) of
+        {incomplete, Encoded, Rest} ->
+            RestBin = unicode:characters_to_binary(Rest, latin1),
+            <<Encoded/binary, RestBin/binary>>;
+        {error, Encoded, [Invalid | Rest]} when Invalid >= 16#D800 andalso Invalid =< 16#DFFF ->
+            % nevertheless encode the invalid unicode character in range
+            % 16#D800 to 16#DFFF
+            X = unicode:characters_to_binary([Invalid - 4096]),
+            % map to the "correct" binary:
+            <<X1, X2:2/binary>> = X,
+            RestBin = client_key_to_binary(Rest),
+            <<Encoded/binary, (X1 + 1), X2/binary, RestBin/binary>>;
+        Bin -> Bin
+    end.
 
 % note: can not use wrapper methods for all methods to make dialyzer happy
 % about the opaque types since it doesn't recognize the module's own opaque
