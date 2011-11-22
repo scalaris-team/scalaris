@@ -56,7 +56,7 @@ hash_key(Key) -> hash_key_(Key).
 %%      opaque key type).
 -spec hash_key_(client_key()) -> key_t().
 hash_key_(Key) ->
-    <<N:128>> = erlang:md5(unicode:characters_to_binary(Key)),
+    <<N:128>> = erlang:md5(client_key_to_binary(Key)),
     N.
 
 %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
