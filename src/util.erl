@@ -350,6 +350,8 @@ dumpX(Keys, ValueFun) ->
 -spec minus([T], [T]) -> [T].
 minus([], _ExcludeList) ->
     [];
+minus([_|_] = L, [Excluded]) ->
+    [E || E <- L, E =/= Excluded];
 minus([_|_] = L, ExcludeList) ->
     ExcludeSet = ordsets:from_list(ExcludeList),
     [E || E <- L, not ordsets:is_element(E, ExcludeSet)].
