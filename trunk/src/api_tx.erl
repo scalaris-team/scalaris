@@ -25,36 +25,41 @@
 %% @version $Id$
 -module(api_tx).
 -author('schintke@zib.de').
+-author('kruber@zib.de').
 -vsn('$Id$').
 
 %% Perform a chain of operations (passing a transaction log) and
 %% finally commit the transaction.
--export([new_tlog/0, req_list/1, req_list/2, read/2, write/3, commit/1]).
+-export([new_tlog/0, req_list/1, req_list/2,
+         read/2, write/3, set_change/4, number_add/3, test_and_set/4, commit/1]).
 
 %% Perform single operation transactions.
--export([read/1, write/2, test_and_set/3, req_list_commit_each/1]).
-
-%% conversion between ?DB:value() and client_value():
--export([encode_value/1, decode_value/1]).
-
-%% INTERNAL - only for api_tx_ext:
--export([req_list2/2]).
+-export([req_list_commit_each/1,
+         read/1, write/2, set_change/3, number_add/2, test_and_set/3]).
 
 -ifdef(with_export_type_support).
--export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0]).
+-export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0,
+              request_on_key/0]).
 -endif.
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
 % Public Interface
--type request() :: {read, client_key()}
-                 | {write, client_key(), client_value()}
-                 | {commit}.
+-type request_on_key() ::
+          {read, client_key()}
+        | {write, client_key(), client_value()}
+        | {set_change, client_key(), ToAdd::[client_value()], ToRemove::[client_value()]}
+        | {number_add, client_key(), number()}
+        | {test_and_set, client_key(), Old::client_value(), New::client_value()}.
+-type request() :: request_on_key() | {commit}.
 -type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
 -type write_result() :: {ok} | {fail, timeout}.
+-type listop_result() :: write_result() | {fail, not_a_list}.
+-type numberop_result() :: write_result() | {fail, not_a_number}.
 -type commit_result() :: {ok} | {fail, abort | timeout}.
--type result() :: read_result() | write_result() | commit_result().
+-type testandset_result() :: commit_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
+-type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
 
 %% @doc Get an empty transaction log to start a new transaction.
 -spec new_tlog() -> tx_tlog:tlog().
@@ -84,22 +89,8 @@ req_list(TLog, ReqList) ->
 
 %% @doc Perform several requests inside a transaction (internal implementation).
 -spec req_list2(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
-req_list2([], [{commit}]) ->
-    {[], [{ok}]};
 req_list2(TLog, ReqList) ->
-    %% @todo should choose a dht_node in the local VM at random or even
-    %% better round robin.
-    %% replace operations by corresponding module names in ReqList
-    %% number requests in ReqList to keep ordering more easily
-    RDHT_ReqList = [ case Entry of
-                         {read, Key} -> {rdht_tx_read, Key};
-                         {write, Key, Value} -> {rdht_tx_write, Key, encode_value(Value)};
-                         {commit} -> {commit}
-                     end || Entry <- ReqList ],
-    %% sanity checks on ReqList:
-    %% @TODO Scan for fail in TransLog, then return immediately?
-    {NewTLog, Results} = rdht_tx:req_list(TLog, RDHT_ReqList),
-    {NewTLog, [decode_rdht_result(Result) || Result <- Results]}.
+    rdht_tx0:req_list(TLog, ReqList).
 
 %% @doc Perform a read inside a transaction.
 -spec read(tx_tlog:tlog(), client_key())
@@ -113,6 +104,29 @@ read(TLog, Key) ->
            -> {tx_tlog:tlog(), write_result()}.
 write(TLog, Key, Value) ->
     {NewTLog, [Result]} = req_list(TLog, [{write, Key, Value}]),
+    {NewTLog, Result}.
+
+%% @doc Perform a set_change operation inside a transaction.
+-spec set_change(tx_tlog:tlog(), client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
+           -> {tx_tlog:tlog(), listop_result()}.
+set_change(TLog, Key, ToAdd, ToRemove) ->
+    {NewTLog, [Result]} = req_list(TLog, [{set_change, Key, ToAdd, ToRemove}]),
+    {NewTLog, Result}.
+
+%% @doc Perform a set_change operation inside a transaction.
+-spec number_add(tx_tlog:tlog(), client_key(), ToAdd::number())
+           -> {tx_tlog:tlog(), numberop_result()}.
+number_add(TLog, Key, ToAdd) ->
+    {NewTLog, [Result]} = req_list(TLog, [{number_add, Key, ToAdd}]),
+    {NewTLog, Result}.
+
+%% @doc Atomically compare and set a value for a key inside a transaction.
+%%      If the value stored at Key is the same as OldValue, then NewValue will
+%%      be stored.
+-spec test_and_set(tx_tlog:tlog(), Key::client_key(), OldValue::client_value(), NewValue::client_value())
+        -> {tx_tlog:tlog(), testandset_result()}.
+test_and_set(TLog, Key, OldValue, NewValue) ->
+    {NewTLog, [Result]} = req_list(TLog, [{test_and_set, Key, OldValue, NewValue}]),
     {NewTLog, Result}.
 
 %% @doc Finish a transaction and materialize it atomically on the DHT.
@@ -135,21 +149,39 @@ write(Key, Value) ->
     {_TLog, [_Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
     Res2.
 
+%% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
+-spec set_change(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
+           -> listop_result().
+set_change(Key, ToAdd, ToRemove) ->
+    ReqList = [{set_change, Key, ToAdd, ToRemove}, {commit}],
+    {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
+    case Res1 of
+        X when erlang:is_tuple(X) andalso erlang:element(1, X) =:= fail -> X;
+        _ -> Res2
+    end.
+
+%% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
+-spec number_add(client_key(), ToAdd::number())
+           -> numberop_result().
+number_add(Key, ToAdd) ->
+    ReqList = [{number_add, Key, ToAdd}, {commit}],
+    {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
+    case Res1 of
+        X when erlang:is_tuple(X) andalso erlang:element(1, X) =:= fail -> X;
+        _ -> Res2
+    end.
+
 %% @doc Atomically compare and set a value for a key (not as part of a transaction).
 %%      If the value stored at Key is the same as OldValue, then NewValue will
 %%      be stored.
 -spec test_and_set(Key::client_key(), OldValue::client_value(), NewValue::client_value())
-        -> commit_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
+        -> testandset_result().
 test_and_set(Key, OldValue, NewValue) ->
-    ReadReqList = [{read, Key}],
-    WriteReqList = [{write, Key, NewValue}, {commit}],
-    {TLog, [Result]} = req_list(tx_tlog:empty(), ReadReqList),
-    case Result of
-        X = {fail, timeout} -> X;
-        Y = {fail, not_found} -> Y;
-        {ok, OldValue} -> {_TLog2, [_, Res2]} = req_list(TLog, WriteReqList),
-                          Res2;
-        {ok, RealOldValue} -> {fail, {key_changed, RealOldValue}}
+    ReqList = [{test_and_set, Key, OldValue, NewValue}, {commit}],
+    {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
+    case Res1 of
+        X when erlang:is_tuple(X) andalso erlang:element(1, X) =:= fail -> X;
+        _ -> Res2
     end.
 
 -spec req_list_commit_each([request()]) -> [result()].
@@ -157,25 +189,8 @@ req_list_commit_each(ReqList) ->
     [ case Req of
           {read, Key} -> read(Key);
           {write, Key, Value} -> write(Key, Value);
+          {set_change, Key, ToAdd, ToRemove} -> set_change(Key, ToAdd, ToRemove);
+          {number_add, Key, ToAdd} -> number_add(Key, ToAdd);
+          {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
           _ -> {fail, abort}
       end || Req <- ReqList].
-
--spec encode_value(client_value()) -> ?DB:value().
-encode_value(Value) when is_atom(Value) orelse is_boolean(Value) orelse
-                             is_number(Value) ->
-    Value;
-encode_value(Value) when is_binary(Value) ->
-    % do not compress a binary
-    erlang:term_to_binary(Value, [{minor_version, 1}]);
-encode_value(Value) ->
-    erlang:term_to_binary(Value, [{compressed, 6}, {minor_version, 1}]).
-
--spec decode_value(?DB:value()) -> client_value().
-decode_value(Value) when is_binary(Value) ->
-    erlang:binary_to_term(Value);
-decode_value(Value) ->
-    Value.
-
--spec decode_rdht_result(rdht_tx:result_entry()) -> result().
-decode_rdht_result({ok, Value}) -> {ok, decode_value(Value)};
-decode_rdht_result(X) -> X.

@@ -27,6 +27,7 @@
 -export([add_entry/2]).
 -export([filter_by_key/2]).
 -export([filter_by_status/2]).
+-export([update_status_by_key/3]).
 -export([is_sane_for_commit/1]).
 %%-export([update_entry/4]).
 
@@ -47,7 +48,7 @@
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status()    :: {fail, atom()} | value | not_found.
+-type tx_status()    :: {fail, term()} | value | not_found.
 -type tx_op()        :: rdht_tx_read | rdht_tx_write.
 -opaque tlog_entry() ::
           { tx_op(),                  %% operation
@@ -76,14 +77,22 @@ filter_by_key(TransLog, Key) ->
 filter_by_status(TransLog, Status) ->
     [ X || X <- TransLog, Status =:= get_entry_status(X) ].
 
+-spec update_status_by_key(tlog(), client_key() | ?RT:key(), tx_status()) -> tlog().
+update_status_by_key(TransLog, Key, Status) ->
+    [ case get_entry_key(X) of
+          Key -> set_entry_status(X, Status);
+          _   -> X
+      end || X <- TransLog ].
+
+-spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
+entry_is_sane_for_commit(Entry, Acc) ->
+    Acc andalso
+        not (is_tuple(get_entry_status(Entry)) andalso
+                 fail =:= element(1, get_entry_status(Entry))).
+
 -spec is_sane_for_commit(tlog()) -> boolean().
 is_sane_for_commit(TLog) ->
-    EntrySane =
-        fun(Entry, Acc) ->
-                Acc andalso
-                    {fail, timeout} =/= get_entry_status(Entry)
-        end,
-    lists:foldl(EntrySane, true, TLog).
+    lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
@@ -102,7 +111,7 @@ set_entry_key(Entry, Val)    -> setelement(2, Entry, Val).
 -spec get_entry_status(tlog_entry()) -> tx_status().
 get_entry_status(Element)    -> element(3, Element).
 
--spec set_entry_status(tlog_entry(), tx_status) -> tlog_entry().
+-spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val)    -> setelement(3, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
