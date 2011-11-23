@@ -24,9 +24,11 @@
 
 -include("unittest.hrl").
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 all() ->
-    [next_hop, next_hop2, tester_get_split_key, tester_get_split_key_half,
+    [tester_client_key_to_binary, tester_hash_key,
+     next_hop, next_hop2, tester_get_split_key, tester_get_split_key_half,
      additional_tests].
 
 suite() ->
@@ -42,6 +44,24 @@ end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+-spec prop_client_key_to_binary(Key1::client_key(), Key2::client_key()) -> true | no_return().
+prop_client_key_to_binary(Key1, Key2) ->
+    Bin1 = ?RT:client_key_to_binary(Key1),
+    Bin2 = ?RT:client_key_to_binary(Key2),
+    ?implies(Key1 =/= Key2, Bin1 =/= Bin2).
+    
+tester_client_key_to_binary(_Config) ->
+    tester:test(?MODULE, prop_client_key_to_binary, 2, 50000).
+
+-spec prop_hash_key(Key::client_key()) -> true.
+prop_hash_key(Key) ->
+    % only verify that no exception is thrown during hashing
+    ?RT:hash_key(Key),
+    true.
+    
+tester_hash_key(_Config) ->
+    tester:test(?MODULE, prop_hash_key, 1, 100000).
 
 number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
