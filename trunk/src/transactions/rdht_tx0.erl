@@ -74,13 +74,8 @@ map_phase1([Request | Rest], _LastKey, FirstReqs) ->
         {write, Key, Value} ->
             map_phase1(Rest, Key, [{rdht_tx_write, Key, Value} | FirstReqs]);
         % special (2-steps) functions:
-        {set_change, Key, [], []} -> % no op
-            map_phase1(Rest, Key, FirstReqs);
         {set_change, Key, _ToAdd, _ToRemove} ->
             map_phase1(Rest, Key, [{rdht_tx_read, Key} | FirstReqs]);
-        {number_add, Key, X} when X == 0 -> % no op
-            % note: tolerate integer and float
-            map_phase1(Rest, Key, FirstReqs);
         {number_add, Key, _X} ->
             map_phase1(Rest, Key, [{rdht_tx_read, Key} | FirstReqs]);
         {test_and_set, Key, _Old, _New} ->
@@ -112,15 +107,17 @@ map_phase2([Request | Rest], TLog0, Results0, AbortCommits) ->
             {commit} when AbortCommits ->
                 {TLog0, {fail, abort}};
             % special functions:
-            {set_change, _Key, [], []} ->
-                {TLog0, {ok}};
             {set_change, Key, ToAdd, ToRemove} ->
                 {TLog1, Result1} = single_req(TLog0, {rdht_tx_read, Key}),
                 case Result1 of
                     {ok, OldValue} when erlang:is_list(OldValue) ->
-                        NewValue1 = lists:append(ToAdd, OldValue),
-                        NewValue2 = util:minus(NewValue1, ToRemove),
-                        single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue2)});
+                        case ToAdd =:= [] andalso ToRemove =:= [] of
+                            true -> {TLog1, {ok}}; % no op
+                            _ ->
+                                NewValue1 = lists:append(ToAdd, OldValue),
+                                NewValue2 = util:minus(NewValue1, ToRemove),
+                                single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue2)})
+                        end;
                     {fail, not_found} ->
                         NewValue2 = util:minus(ToAdd, ToRemove),
                         single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue2)});
@@ -131,15 +128,16 @@ map_phase2([Request | Rest], TLog0, Results0, AbortCommits) ->
                     X when erlang:is_tuple(X) ->
                         {TLog1, X}
                 end;
-            {number_add, _Key, X} when X == 0 -> % no op
-                % note: tolerate integer and float
-                {TLog0, {ok}};
             {number_add, Key, X} ->
                 {TLog1, Result1} = single_req(TLog0, {rdht_tx_read, Key}),
                 case Result1 of
                     {ok, OldValue} when erlang:is_number(OldValue) ->
-                        NewValue = OldValue + X,
-                        single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue)});
+                        case X == 0 of % also accepts 0.0
+                            true -> {TLog1, {ok}}; % no op
+                            _ ->
+                                NewValue = OldValue + X,
+                                single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue)})
+                        end;
                     {fail, not_found} ->
                         NewValue = X,
                         single_req(TLog1, {rdht_tx_write, Key, encode_value(NewValue)});
