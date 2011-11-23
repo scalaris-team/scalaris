@@ -151,7 +151,7 @@ write(Key, Value) ->
 
 %% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
 -spec set_change(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
-           -> listop_result().
+           -> listop_result() | {fail, abort}.
 set_change(Key, ToAdd, ToRemove) ->
     ReqList = [{set_change, Key, ToAdd, ToRemove}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -162,7 +162,7 @@ set_change(Key, ToAdd, ToRemove) ->
 
 %% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
 -spec number_add(client_key(), ToAdd::number())
-           -> numberop_result().
+           -> numberop_result() | {fail, abort}.
 number_add(Key, ToAdd) ->
     ReqList = [{number_add, Key, ToAdd}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -175,7 +175,7 @@ number_add(Key, ToAdd) ->
 %%      If the value stored at Key is the same as OldValue, then NewValue will
 %%      be stored.
 -spec test_and_set(Key::client_key(), OldValue::client_value(), NewValue::client_value())
-        -> testandset_result().
+        -> testandset_result() | {fail, abort}.
 test_and_set(Key, OldValue, NewValue) ->
     ReqList = [{test_and_set, Key, OldValue, NewValue}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
