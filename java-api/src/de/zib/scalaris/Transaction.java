@@ -183,63 +183,6 @@ public class Transaction {
         ResultList(final OtpErlangList results) {
             super(results);
         }
-
-        /**
-         * Processes the result at the given position which originated from a read
-         * request and returns the value that has been read.
-         *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @return the stored value
-         *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch the value
-         * @throws NotFoundException
-         *             if the requested key does not exist
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        public ErlangValue processReadAt(final int pos) throws TimeoutException,
-                NotFoundException, UnknownException {
-            return super.processReadAt_(pos);
-        }
-
-        /**
-         * Processes the result at the given position which originated from
-         * a write request.
-         *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        public void processWriteAt(final int pos) throws TimeoutException,
-                UnknownException {
-            super.processWriteAt_(pos);
-        }
-
-        /**
-         * Processes the result at the given position which originated from
-         * a commit request.
-         *
-         * @param pos
-         *            the position in the result list
-         *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
-         * @throws AbortException
-         *             if the commit failed
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        void processCommitAt(final int pos) throws TimeoutException,
-                AbortException, UnknownException {
-            super.processCommitAt_(pos);
-        }
     }
 
     /**
