@@ -48,11 +48,16 @@ client_key_to_binary(Key) ->
         {error, Encoded, [Invalid | Rest]} when Invalid >= 16#D800 andalso Invalid =< 16#DFFF ->
             % nevertheless encode the invalid unicode character in range
             % 16#D800 to 16#DFFF
-            X = unicode:characters_to_binary([Invalid - 4096]),
+            <<X1, X2:2/binary>> = unicode:characters_to_binary([Invalid - 4096]),
             % map to the "correct" binary:
-            <<X1, X2:2/binary>> = X,
             RestBin = client_key_to_binary(Rest),
             <<Encoded/binary, (X1 + 1), X2/binary, RestBin/binary>>;
+        {error, Encoded, [Invalid | Rest]} when Invalid =:= 16#FFFE orelse Invalid =:= 16#FFFF ->
+            % nevertheless encode the invalid unicode character
+            <<X1:2/binary, X2>> = unicode:characters_to_binary([Invalid - 2]),
+            % map to the "correct" binary:
+            RestBin = client_key_to_binary(Rest),
+            <<Encoded/binary, X1/binary, (X2 + 1), RestBin/binary>>;
         Bin -> Bin
     end.
 
