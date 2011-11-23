@@ -537,7 +537,7 @@ zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->
 zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
     AccIn.
 
-%% @doc Sorts like '=</2' but also defines the order of integers/floats
+%% @doc Sorts like erlang:'=&lt;'/2 but also defines the order of integers/floats
 %%      representing the same value.
 -spec '=:<'(T, T) -> boolean().
 '=:<'(T1, T2) ->
