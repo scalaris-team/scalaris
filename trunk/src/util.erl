@@ -35,7 +35,7 @@
          minus/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
-         zipfoldl/5, safe_split/2,
+         zipfoldl/5, safe_split/2, '=:<'/2,
          split_unique/2, split_unique/3, split_unique/4,
          ssplit_unique/2, ssplit_unique/3, ssplit_unique/4,
          smerge2/2, smerge2/3, smerge2/4,
@@ -536,6 +536,30 @@ zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->
     zipfoldl(ZipFun, FoldFun, L1R, L2R, FoldFun(ZipFun(L1H, L2H), AccIn));
 zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
     AccIn.
+
+%% @doc Sorts like '=</2' but also defines the order of integers/floats
+%%      representing the same value.
+-spec '=:<'(T, T) -> boolean().
+'=:<'(T1, T2) ->
+    case (T1 == T2) andalso (T1 =/= T2) of
+        true when erlang:is_number(T1) andalso erlang:is_number(T2) ->
+            erlang:is_integer(T1);
+        true when erlang:is_tuple(T1) andalso erlang:is_tuple(T2) ->
+            '=:<'(erlang:tuple_to_list(T1), erlang:tuple_to_list(T2));
+        true when erlang:is_list(T1) andalso erlang:is_list(T2) ->
+            % recursively check '=<'
+            '=:<_lists'(T1, T2);
+        _ -> erlang:'=<'(T1, T2)
+    end.
+
+%% @doc Compare two lists which are equal based on erlang:'=='/2.
+-spec '=:<_lists'(T::list(), T::list()) -> boolean().
+'=:<_lists'([], []) -> true;
+'=:<_lists'([H1 | R1], [H2 | R2]) ->
+    case (H1 == H2) andalso (H1 =/= H2) of
+        true  -> '=:<'(H1, H2);
+        false -> '=:<_lists'(R1, R2)
+    end.
 
 %% @doc Splits off N elements from List. If List is not large enough, the whole
 %%      list is returned.
