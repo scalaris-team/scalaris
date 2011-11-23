@@ -330,11 +330,13 @@ public class Benchmark {
         }
 
         protected void operation(final Transaction tx, final int j) throws Exception {
-            final int value_old = tx.read(key).intValue();
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addWrite(key, value_old + 1).addCommit();
+            reqs.addNumberAdd(key, 1).addCommit();
+//            final int value_old = tx.read(key).intValue();
+//            reqs.addWrite(key, value_old + 1).addCommit();
             final Transaction.ResultList results = tx.req_list(reqs);
-            results.processWriteAt(0);
+//            results.processWriteAt(0);
+            results.processNumberAddAt(0);
         }
     }
 
@@ -573,15 +575,18 @@ public class Benchmark {
         protected void operation(final Transaction tx, final int j) throws Exception {
             Transaction.RequestList reqs;
             reqs = new Transaction.RequestList();
-            // read old list into the transaction
-            final List<String> list = tx.read(key + j).stringListValue();
-
-            // write new list ...
-            reqs = new Transaction.RequestList();
-            list.add(value);
-            reqs.addWrite(key + j, value).addCommit();
+            reqs.addSetChange(key + j, Arrays.asList(value), new ArrayList<String>(0));
+            reqs.addCommit();
+//            // read old list into the transaction
+//            final List<String> list = tx.read(key + j).stringListValue();
+//
+//            // write new list ...
+//            reqs = new Transaction.RequestList();
+//            list.add(value);
+//            reqs.addWrite(key + j, value).addCommit();
             final Transaction.ResultList results = tx.req_list(reqs);
-            results.processWriteAt(0);
+//            results.processWriteAt(0);
+            results.processSetChangeAt(0);
         }
     }
 

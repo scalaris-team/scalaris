@@ -18,7 +18,6 @@ package de.zib.scalaris;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
 
 /**
  * Provides methods to read and write key/value pairs to/from a scalaris ring.
@@ -162,8 +161,7 @@ public class TransactionSingleOp {
          * @return this {@link RequestList} object
          *
          * @throws UnsupportedOperationException
-         *             if the operation is unsupported, e.g. there may only be one
-         *             "commit" in a request list and no request after that
+         *             always thrown in this class
          */
         @Override
         public RequestList addCommit() {
@@ -201,43 +199,16 @@ public class TransactionSingleOp {
         }
 
         /**
-         * Processes the result at the given position which originated from a read
-         * request and returns the value that has been read.
+         * Throws an {@link UnsupportedOperationException} as a commit is not
+         * supported here.
          *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @return the stored value
-         *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch the value
-         * @throws NotFoundException
-         *             if the requested key does not exist
-         * @throws UnknownException
-         *             if any other error occurs
+         * @throws UnsupportedOperationException
+         *             always thrown in this class
          */
-        public ErlangValue processReadAt(final int pos) throws TimeoutException,
-                NotFoundException, UnknownException {
-            return super.processReadAt_(pos);
-        }
-
-        /**
-         * Processes the result at the given position which originated from
-         * a write request.
-         *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
-         * @throws AbortException
-         *             if the commit failed
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        public void processWriteAt(final int pos) throws TimeoutException,
-                AbortException, UnknownException {
-            super.processCommitAt_(pos);
+        @Override
+        public void processCommitAt(final int pos) throws TimeoutException,
+                AbortException, UnknownException, UnsupportedOperationException {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -268,7 +239,7 @@ public class TransactionSingleOp {
         try {
             /*
              * possible return values:
-             *  [{ok} | {ok, Value} | {fail, abort | timeout | not_found}]
+             *  [api_tx:result()]
              */
             return new ResultList((OtpErlangList) received_raw);
         } catch (final ClassCastException e) {
@@ -366,7 +337,8 @@ public class TransactionSingleOp {
             throws ConnectionException, TimeoutException, AbortException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_tx", "write",
                 new OtpErlangObject[] { key, value });
-        CommonErlangObjects.processResult_commit(received_raw);
+        CommonErlangObjects.checkResult_failAbort(received_raw);
+        CommonErlangObjects.processResult_write(received_raw);
     }
 
     /**
@@ -419,15 +391,15 @@ public class TransactionSingleOp {
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
      * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
+     *             if a timeout occurred while trying to fetch/write the value
      * @throws AbortException
      *             if the commit of the write failed
      * @throws NotFoundException
      *             if the requested key does not exist
-     * @throws UnknownException
-     *             if any other error occurs
      * @throws KeyChangedException
      *             if the key did not match <tt>old_value</tt>
+     * @throws UnknownException
+     *             if any other error occurs
      *
      * @since 2.9
      */
@@ -437,36 +409,8 @@ public class TransactionSingleOp {
             NotFoundException, KeyChangedException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_tx", "test_and_set",
                 new OtpErlangObject[] { key, old_value, new_value });
-        /*
-         * possible return values:
-         *  {ok} | {fail, timeout | abort | not_found | {key_changed, RealOldValue}
-         */
-        try {
-            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
-                final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
-                    throw new NotFoundException(received_raw);
-                } else {
-                    final OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;
-                    if (reason_tpl.elementAt(0).equals(
-                            CommonErlangObjects.keyChangedAtom)
-                            && (reason_tpl.arity() == 2)) {
-                        throw new KeyChangedException(reason_tpl.elementAt(1));
-                    }
-                }
-            }
-            throw new UnknownException(received_raw);
-        } catch (final ClassCastException e) {
-            // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
-        }
+        CommonErlangObjects.checkResult_failAbort(received_raw);
+        CommonErlangObjects.processResult_testAndSet(received_raw);
     }
 
     /**
