@@ -341,12 +341,13 @@ public class Transaction {
             return new ResultList(new OtpErlangList());
         }
         OtpErlangObject received_raw = null;
+        final OtpErlangList erlangReqList = req.getErlangReqList();
         if (transLog == null) {
             received_raw = connection.doRPC("api_tx", "req_list",
-                    new OtpErlangObject[] { req.getErlangReqList() });
+                    new OtpErlangObject[] { erlangReqList });
         } else {
             received_raw = connection.doRPC("api_tx", "req_list",
-                    new OtpErlangObject[] { transLog, req.getErlangReqList() });
+                    new OtpErlangObject[] { transLog, erlangReqList });
         }
         try {
             /*
