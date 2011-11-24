@@ -183,6 +183,129 @@ public class Transaction {
         ResultList(final OtpErlangList results) {
             super(results);
         }
+
+        /**
+         * Processes the result at the given position which originated from a read
+         * request and returns the value that has been read.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @return the stored value
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to fetch the value
+         * @throws NotFoundException
+         *             if the requested key does not exist
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public ErlangValue processReadAt(final int pos) throws TimeoutException,
+                NotFoundException, UnknownException {
+            return new ErlangValue(
+                    CommonErlangObjects.processResult_read(results.elementAt(pos)));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a write request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public void processWriteAt(final int pos) throws TimeoutException,
+                UnknownException {
+            CommonErlangObjects.processResult_write(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a set_change request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws NotAListException
+         *             if the previously stored value was no list
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processSetChangeAt(final int pos) throws TimeoutException,
+                NotAListException, UnknownException {
+            CommonErlangObjects.processResult_setChange(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a number_add request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws NotANumberException
+         *             if the previously stored value was not a number
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processNumberAddAt(final int pos) throws TimeoutException,
+                NotANumberException, UnknownException {
+            CommonErlangObjects.processResult_numberAdd(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a number_add request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to fetch/write the value
+         * @throws NotFoundException
+         *             if the requested key does not exist
+         * @throws KeyChangedException
+         *             if the key did not match <tt>old_value</tt>
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processTestAndSetAt(final int pos) throws TimeoutException,
+                NotFoundException, KeyChangedException, UnknownException {
+            CommonErlangObjects.processResult_testAndSet(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a commit request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws AbortException
+         *             if the commit failed
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public void processCommitAt(final int pos) throws TimeoutException,
+                AbortException, UnknownException {
+            CommonErlangObjects.processResult_commit(results.elementAt(pos));
+        }
     }
 
     /**

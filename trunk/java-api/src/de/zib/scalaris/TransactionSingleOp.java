@@ -185,7 +185,7 @@ public class TransactionSingleOp {
      * {@link TransactionSingleOp#req_list(RequestList)}.
      *
      * @author Nico Kruber, kruber@zib.de
-     * @version 3.5
+     * @version 3.8
      * @since 3.5
      */
     public static class ResultList extends de.zib.scalaris.ResultList {
@@ -199,16 +199,120 @@ public class TransactionSingleOp {
         }
 
         /**
-         * Throws an {@link UnsupportedOperationException} as a commit is not
-         * supported here.
+         * Processes the result at the given position which originated from a read
+         * request and returns the value that has been read.
          *
-         * @throws UnsupportedOperationException
-         *             always thrown in this class
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @return the stored value
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to fetch the value
+         * @throws NotFoundException
+         *             if the requested key does not exist
+         * @throws UnknownException
+         *             if any other error occurs
          */
-        @Override
-        public void processCommitAt(final int pos) throws TimeoutException,
-                AbortException, UnknownException, UnsupportedOperationException {
-            throw new UnsupportedOperationException();
+        public ErlangValue processReadAt(final int pos) throws TimeoutException,
+                NotFoundException, UnknownException {
+            return new ErlangValue(
+                    CommonErlangObjects.processResult_read(results.elementAt(pos)));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a write request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws AbortException
+         *             if the commit of the write failed
+         * @throws UnknownException
+         *             if any other error occurs
+         */
+        public void processWriteAt(final int pos) throws TimeoutException,
+                AbortException, UnknownException {
+            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
+            CommonErlangObjects.processResult_write(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a set_change request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws NotAListException
+         *             if the previously stored value was no list
+         * @throws AbortException
+         *             if the commit of the write failed
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processSetChangeAt(final int pos) throws TimeoutException,
+                NotAListException, AbortException, UnknownException {
+            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
+            CommonErlangObjects.processResult_setChange(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a number_add request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to write the value
+         * @throws NotANumberException
+         *             if the previously stored value was not a number
+         * @throws AbortException
+         *             if the commit of the write failed
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processNumberAddAt(final int pos) throws TimeoutException,
+                NotANumberException, AbortException, UnknownException {
+            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
+            CommonErlangObjects.processResult_numberAdd(results.elementAt(pos));
+        }
+
+        /**
+         * Processes the result at the given position which originated from
+         * a number_add request.
+         *
+         * @param pos
+         *            the position in the result list (starting at 0)
+         *
+         * @throws TimeoutException
+         *             if a timeout occurred while trying to fetch/write the value
+         * @throws NotFoundException
+         *             if the requested key does not exist
+         * @throws KeyChangedException
+         *             if the key did not match <tt>old_value</tt>
+         * @throws AbortException
+         *             if the commit of the write failed
+         * @throws UnknownException
+         *             if any other error occurs
+         *
+         * @since 3.8
+         */
+        public void processTestAndSetAt(final int pos) throws TimeoutException,
+                NotFoundException, KeyChangedException, AbortException,
+                UnknownException {
+            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
+            CommonErlangObjects.processResult_testAndSet(results.elementAt(pos));
         }
     }
 
