@@ -126,34 +126,42 @@ public class MyScalarisMagicWord extends MyMagicWord {
      * word.
      * 
      * @param name      the template name, i.e. a magic word
-     * @param parameter the template parameters
+     * @param origParameter the template parameters
      * @param model     the currently used model
      * 
      * @return the value of the magic word
      * 
      * @see <a href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
      */
-    public static String processMagicWord(String name, String parameter, MyScalarisWikiModel model) {
+    public static String processMagicWord(final String name,
+            final String origParameter, final MyScalarisWikiModel model) {
         if (!isMyMagicWord(name)) {
-            return MyMagicWord.processMagicWord(name, parameter, model);
+            return MyMagicWord.processMagicWord(name, origParameter, model);
         }
+
+        final String statKey = name + ":" + origParameter;
         
         // check whether numbers should be printed in raw format and
         // remove this tag from the parameter string:
         boolean rawNumber = false;
-        if (parameter.equals("R")) {
+        String parameter;
+        if (origParameter.equals("R")) {
             parameter = "";
             rawNumber = true;
-        } else if (parameter.endsWith("|R")) {
-            parameter = parameter.substring(0, parameter.length() - 2);
+        } else if (origParameter.endsWith("|R")) {
+            parameter = origParameter.substring(0, origParameter.length() - 2);
             rawNumber = true;
+        } else {
+            parameter = origParameter;
         }
         
         /*
          * Technical metadata / Latest revision to current page
          */
         if (name.equals(MAGIC_PAGE_SIZE)) {
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(model.connection, parameter, model.getNamespace());
+            RevisionResult getRevResult = ScalarisDataHandler.getRevision(
+                    model.connection, parameter, model.getNamespace());
+            model.addStat(statKey, getRevResult.time);
             int size = 0;
             if (getRevResult.success) {
                 size = getRevResult.revision.unpackedText().getBytes().length;
@@ -185,11 +193,14 @@ public class MyScalarisMagicWord extends MyMagicWord {
          */
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
             BigIntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
+            model.addStat(statKey, pageCountResult.time);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
-            BigIntegerResult pageCountResult = ScalarisDataHandler.getArticleCount(model.connection);
+            BigIntegerResult pageCountResult = ScalarisDataHandler
+                    .getArticleCount(model.connection);
+            model.addStat(statKey, pageCountResult.time);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
@@ -203,8 +214,12 @@ public class MyScalarisMagicWord extends MyMagicWord {
             return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFACTIVEUSERS}}
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
-            String category = MyWikiModel.createFullPageName(model.getCategoryNamespace(), parameter.trim());
-            BigIntegerResult catListResult = ScalarisDataHandler.getPagesInCategoryCount(model.connection, category, model.getNamespace());
+            String category = MyWikiModel.createFullPageName(
+                    model.getCategoryNamespace(), parameter.trim());
+            BigIntegerResult catListResult = ScalarisDataHandler
+                    .getPagesInCategoryCount(model.connection, category,
+                            model.getNamespace());
+            model.addStat(statKey, catListResult.time);
             if (catListResult.success) {
                 return model.formatStatisticNumber(rawNumber, catListResult.number);
             }

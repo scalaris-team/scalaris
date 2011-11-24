@@ -20,9 +20,15 @@ public class Result {
      */
     public boolean connect_failed;
     /**
-     * Creates a successful result with an empty message.
+     * Time in milliseconds for this operation.
      */
-    public Result() {
+    public long time;
+    /**
+     * Creates a successful result with an empty message.
+     * 
+     * @param time  time in milliseconds for this operation
+     */
+    public Result(long time) {
         this.success = true;
         this.message = "";
         this.connect_failed = false;
@@ -30,11 +36,12 @@ public class Result {
     /**
      * Creates a new custom result.
      * 
-     * @param success       the success status
-     * @param message       the message to use
-     * @param connectFailed whether the connection to the DB failed or not
+     * @param success        the success status
+     * @param message        the message to use
+     * @param connectFailed  whether the connection to the DB failed or not
+     * @param time           time in milliseconds for this operation
      */
-    public Result(boolean success, String message, boolean connectFailed) {
+    public Result(boolean success, String message, boolean connectFailed, long time) {
         this.success = success;
         this.message = message;
         this.connect_failed = connectFailed;

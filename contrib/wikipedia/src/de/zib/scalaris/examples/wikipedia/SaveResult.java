@@ -13,18 +13,21 @@ public class SaveResult extends Result {
     public Object info;
     /**
      * Creates a new successful result.
+     * 
+     * @param time  time in milliseconds for this operation
      */
-    public SaveResult() {
-        super();
+    public SaveResult(long time) {
+        super(time);
     }
     /**
      * Creates a new custom result.
      * 
-     * @param success       the success status
-     * @param message       the message to use
-     * @param connectFailed whether the connection to the DB failed or not
+     * @param success        the success status
+     * @param message        the message to use
+     * @param connectFailed  whether the connection to the DB failed or not
+     * @param time           time in milliseconds for this operation
      */
-    public SaveResult(boolean success, String message, boolean connectFailed) {
-        super(success, message, connectFailed);
+    public SaveResult(boolean success, String message, boolean connectFailed, long time) {
+        super(success, message, connectFailed, time);
     }
 }

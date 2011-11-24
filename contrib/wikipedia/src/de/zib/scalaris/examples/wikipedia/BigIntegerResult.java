@@ -16,20 +16,22 @@ public class BigIntegerResult extends Result {
     /**
      * Creates a new successful result with the given page list.
      * 
-     * @param number the retrieved number
+     * @param number  the retrieved number
+     * @param time    time in milliseconds for this operation
      */
-    public BigIntegerResult(BigInteger number) {
-        super();
+    public BigIntegerResult(BigInteger number, long time) {
+        super(time);
         this.number = number;
     }
     /**
      * Creates a new custom result.
      * 
-     * @param success       the success status
-     * @param message       the message to use
-     * @param connectFailed whether the connection to the DB failed or not
+     * @param success        the success status
+     * @param message        the message to use
+     * @param connectFailed  whether the connection to the DB failed or not
+     * @param time           time in milliseconds for this operation
      */
-    public BigIntegerResult(boolean success, String message, boolean connectFailed) {
-        super(success, message, connectFailed);
+    public BigIntegerResult(boolean success, String message, boolean connectFailed, long time) {
+        super(success, message, connectFailed, time);
     }
 }

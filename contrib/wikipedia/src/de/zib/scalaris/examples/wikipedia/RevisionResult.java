@@ -18,41 +18,45 @@ public class RevisionResult extends Result {
      */
     public Page page = null;
     /**
-     * Whether the pages does not exist.
+     * Whether the pages exists or not.
      */
     public boolean page_not_existing = false;
     /**
-     * Whether the requested revision does not exist.
+     * Whether the requested revision exists or not.
      */
     public boolean rev_not_existing = false;
     
     /**
-     * Creates a new successful result with no {@link #revision} or
-     * {@link #page}.
-     * 
-     * Either {@link #success} should be set to false or {@link #revision}
-     * and {@link #page} should be set for a valid result object.
-     */
-    public RevisionResult() {
-        super();
-    }
-    /**
      * Creates a new successful result with the given revision.
-     * 
-     * @param revision the retrieved revision
+     *
+     * @param page      the retrieved page 
+     * @param revision  the retrieved revision
+     * @param time      time in milliseconds for this operation
      */
-    public RevisionResult(Revision revision) {
-        super();
+    public RevisionResult(Page page, Revision revision, long time) {
+        super(time);
+        this.page = page;
         this.revision = revision;
     }
     /**
      * Creates a new custom result.
      * 
-     * @param success       the success status
-     * @param message       the message to use
-     * @param connectFailed whether the connection to the DB failed or not
+     * @param success            the success status
+     * @param message            the message to use
+     * @param connectFailed      whether the connection to the DB failed or not
+     * @param page               page on success (if retrieved)
+     * @param revision           revision on success
+     * @param page_not_existing  whether the pages exists or not
+     * @param rev_not_existing   whether the requested revision exists or not
+     * @param time               time in milliseconds for this operation
      */
-    public RevisionResult(boolean success, String message, boolean connectFailed) {
-        super(success, message, connectFailed);
+    public RevisionResult(boolean success, String message,
+            boolean connectFailed, Page page, Revision revision,
+            boolean page_not_existing, boolean rev_not_existing, long time) {
+        super(success, message, connectFailed, time);
+        this.page = page;
+        this.revision = revision;
+        this.page_not_existing = page_not_existing;
+        this.rev_not_existing = rev_not_existing;
     }
 }
