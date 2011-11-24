@@ -877,7 +877,7 @@ public class Benchmark {
      *             invocation of s.checkPackageAccess() denies access to the
      *             package of this class
      */
-    protected static <T> T getRandom(final int size, final Class<T> c)
+    public static <T> T getRandom(final int size, final Class<T> c)
             throws IllegalArgumentException, SecurityException,
             InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {

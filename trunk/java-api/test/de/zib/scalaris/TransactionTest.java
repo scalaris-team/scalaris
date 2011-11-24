@@ -18,6 +18,7 @@ package de.zib.scalaris;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.junit.Test;
@@ -604,6 +605,56 @@ public class TransactionTest {
             }
         } finally {
             conn.closeConnection();
+        }
+    }
+
+    /**
+     * Tests the performance of the Transaction class with a very long list of
+     * random strings (enable manually).
+     *
+     * @throws ConnectionException
+     * @throws TimeoutException
+     * @throws NotFoundException
+     * @throws ClassCastException
+     * @throws AbortException
+     * @throws UnknownException
+     */
+//    @Test
+    public void testPerformance1() throws ConnectionException,
+            TimeoutException, NotFoundException, ClassCastException,
+            AbortException, UnknownException {
+        final String key = "_testPerformance1_";
+        final Transaction t = new Transaction();
+        try {
+            System.out.println(("[" + new Date()).toString() + "] 1a");
+            final ArrayList<String> list = new ArrayList<String>(100000);
+            for (int i = 0; i < 100000; ++i) {
+//                list.add(testData[i % testData.length]);
+                try {
+                    list.add(Benchmark.getRandom(20, String.class));
+                } catch (final Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            System.out.println(("[" + new Date()).toString() + "] 1b");
+            final Transaction.RequestList reqs = new Transaction.RequestList();
+            reqs.addWrite(testTime + key, list).addCommit();
+            System.out.println(("[" + new Date()).toString() + "] 2a");
+            t.req_list(reqs);
+            System.out.println(("[" + new Date()).toString() + "] 2b");
+
+            // commit the transaction and try to read the data with a new one:
+            final ErlangValue readVal = t.read(testTime + key);
+            System.out.println(("[" + new Date()).toString() + "] 3");
+            final List<String> actual = readVal.stringListValue();
+            System.out.println(("[" + new Date()).toString() + "] 4");
+            assertEquals(list, actual);
+//            reqs = new Transaction.RequestList();
+//            reqs.addCommit();
+            t.req_list(reqs);
+            System.out.println(("[" + new Date()).toString() + "] 5");
+        } finally {
+            t.closeConnection();
         }
     }
 }
