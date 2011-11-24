@@ -71,7 +71,8 @@ import de.zib.scalaris.examples.wikipedia.plugin.WikiPlugin;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public abstract class WikiServlet <Connection> extends HttpServlet implements Servlet, WikiServletContext, WikiServletDataHandler<Connection> {
+public abstract class WikiServlet<Connection> extends HttpServlet implements
+        Servlet, WikiServletContext, WikiServletDataHandler<Connection> {
     protected static final String MAIN_PAGE = "Main Page";
     protected static final int IMPORT_REDIRECT_EVERY = 5; // seconds
 
@@ -869,7 +870,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        PageListResult result = new PageListResult(new LinkedList<String>(), 0);
         handleViewSpecialPageList(request, response, result, value, connection);
     }
 
@@ -929,7 +930,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        PageListResult result = new PageListResult(new LinkedList<String>(), 0);
         handleViewSpecialPageList(request, response, result, value, connection);
     }
 
@@ -984,7 +985,7 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
         
         value.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        PageListResult result = new PageListResult(new LinkedList<String>(), 0);
         handleViewSpecialPageList(request, response, result, value, connection);
     }
     
@@ -1071,6 +1072,8 @@ public abstract class WikiServlet <Connection> extends HttpServlet implements Se
             }
             value.setPage(StringEscapeUtils.escapeHtml(result.revision.unpackedText()));
             value.setVersion(result.revision.getId());
+        } else {
+            value.setEditRestricted(true);
         }
 
         // set the textarea's contents:
