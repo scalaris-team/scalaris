@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>,
-%%         Nico Kruber <kruber@zib.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc API for transactional access to replicated DHT items.
 %% For single request/single item operations, we provide read/1,
 %% write/2, and test_and_set/3 functions that directly commit.
