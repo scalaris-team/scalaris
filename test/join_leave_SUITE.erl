@@ -46,7 +46,7 @@ groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
     [].
 
-suite() -> [ {timetrap, {seconds, 30}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
