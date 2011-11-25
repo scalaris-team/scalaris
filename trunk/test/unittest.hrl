@@ -22,7 +22,9 @@
 %% @copyright 2007 Thorsten Schuett
 %% @version $Id$
 
+-ifdef(have_ctline_support).
 -compile({parse_transform, ct_line}).
+-endif.
 
 %% @doc Fails the currently run unit test with a reason that is made of the
 %%      given Date formatted using the Format string (see io_lib:format/2).
