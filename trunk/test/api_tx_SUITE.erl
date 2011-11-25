@@ -53,7 +53,7 @@ all()   -> [new_tlog_0,
             tester_test_and_set_not_existing,
             tester_test_and_set
            ].
-suite() -> [ {timetrap, {seconds, 100}} ].
+suite() -> [ {timetrap, {seconds, 200}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
