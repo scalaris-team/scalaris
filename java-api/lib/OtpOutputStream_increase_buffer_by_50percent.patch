@@ -1,5 +1,5 @@
 diff --git a/lib/jinterface/java_src/com/ericsson/otp/erlang/OtpOutputStream.java b/lib/jinterface/java_src/com/ericsson/otp/erlang/OtpOutputStream.java
-index 1813501..2c88f42 100644
+index 1813501..8b64910 100644
 --- a/lib/jinterface/java_src/com/ericsson/otp/erlang/OtpOutputStream.java
 +++ b/lib/jinterface/java_src/com/ericsson/otp/erlang/OtpOutputStream.java
 @@ -25,6 +25,7 @@ import java.io.UnsupportedEncodingException;
@@ -10,17 +10,18 @@ index 1813501..2c88f42 100644
  
  /**
   * Provides a stream for encoding Erlang terms to external format, for
-@@ -39,9 +40,6 @@ public class OtpOutputStream extends ByteArrayOutputStream {
+@@ -38,8 +39,8 @@ import java.text.DecimalFormat;
+ public class OtpOutputStream extends ByteArrayOutputStream {
      /** The default initial size of the stream. * */
      public static final int defaultInitialSize = 2048;
- 
--    /** The default increment used when growing the stream. * */
--    public static final int defaultIncrement = 2048;
 -
+-    /** The default increment used when growing the stream. * */
++ 
++    /** The default increment used when growing the stream (increment at least this much). * */
+     public static final int defaultIncrement = 2048;
+ 
      // static formats, used to encode floats and doubles
-     private static final DecimalFormat eform = new DecimalFormat("e+00;e-00");
-     private static final BigDecimal ten = new BigDecimal(10.0);
-@@ -95,6 +93,37 @@ public class OtpOutputStream extends ByteArrayOutputStream {
+@@ -95,6 +96,39 @@ public class OtpOutputStream extends ByteArrayOutputStream {
      }
  
      /**
@@ -45,9 +46,11 @@ index 1813501..2c88f42 100644
 +	int oldCapacity = super.buf.length;
 +	if (minCapacity > oldCapacity) {
 +	    int newCapacity = (oldCapacity * 3)/2 + 1;
-+    	    if (newCapacity < minCapacity)
++	    if (newCapacity < oldCapacity + defaultIncrement)
++		newCapacity = oldCapacity + defaultIncrement;
++	    if (newCapacity < minCapacity)
 +		newCapacity = minCapacity;
-+            // minCapacity is usually close to size, so this is a win:
++	    // minCapacity is usually close to size, so this is a win:
 +	    final byte[] tmp = new byte[newCapacity];
 +	    System.arraycopy(super.buf, 0, tmp, 0, super.count);
 +	    super.buf = tmp;
@@ -58,7 +61,7 @@ index 1813501..2c88f42 100644
       * Write one byte to the stream.
       * 
       * @param b
-@@ -102,13 +131,7 @@ public class OtpOutputStream extends ByteArrayOutputStream {
+@@ -102,13 +136,7 @@ public class OtpOutputStream extends ByteArrayOutputStream {
       * 
       */
      public void write(final byte b) {
@@ -73,7 +76,7 @@ index 1813501..2c88f42 100644
  	super.buf[super.count++] = b;
      }
  
-@@ -122,14 +145,7 @@ public class OtpOutputStream extends ByteArrayOutputStream {
+@@ -122,14 +150,7 @@ public class OtpOutputStream extends ByteArrayOutputStream {
  
      @Override
      public void write(final byte[] buf) {
