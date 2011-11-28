@@ -232,12 +232,12 @@
   <!-- ########## Tools targets (begin) ########## -->
   <target name='tools.compile'>
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
   </target>
 
   <target name="tools.test.compile" depends="tools.compile">
     <mkdir dir="${scalaris.classes.dirname}" />
-    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/tools/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
     <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
       <fileset dir="test" includes="de/zib/tools/*.properties" />
     </copy>
@@ -257,10 +257,10 @@
   <!-- ########## Scalaris targets (begin) ########## -->
   <target name='scalaris.compile' depends="tools.compile">
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
   </target>
   <target name='scalaris.examples.compile' depends="scalaris.compile">
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" debuglevel="${debuglevel}" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
   </target>
 
   <!-- package library and examples separately -->
@@ -361,7 +361,7 @@
 
   <target name="scalaris.test.compile" depends="scalaris.compile">
     <mkdir dir="${scalaris.classes.dirname}" />
-    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" />
+    <javac encoding="UTF-8" srcdir='test' destdir='${scalaris.classes.dirname}' classpathref="scalaris.test.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
     <copy includeemptydirs="false" todir="${scalaris.classes.dirname}">
       <fileset dir="test" includes="**/*.properties" />
     </copy>
