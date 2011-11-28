@@ -147,24 +147,27 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      * the resource bundle.
      */
     private void initializeTalkNamespaces() {
-        TALKSPACE_MAP.put(fNamespacesLowercase[0], null); // media
-        TALKSPACE_MAP.put(fNamespacesLowercase[1], null); // special
-        TALKSPACE_MAP.put(fNamespacesLowercase[2], getTalk()); // ""
-        TALKSPACE_MAP.put(fNamespacesLowercase[3], getTalk()); // talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[4], getUser_talk()); // user
-        TALKSPACE_MAP.put(fNamespacesLowercase[5], getUser_talk()); // user_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[6], getMeta_talk()); // project
-        TALKSPACE_MAP.put(fNamespacesLowercase[7], getMeta_talk()); // project_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[8], getImage_talk()); // image
-        TALKSPACE_MAP.put(fNamespacesLowercase[9], getImage_talk()); // image_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[10], getMediaWiki_talk()); // mediawiki
-        TALKSPACE_MAP.put(fNamespacesLowercase[11], getMediaWiki_talk()); // mediawiki_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[12], getTemplate_talk()); // template
-        TALKSPACE_MAP.put(fNamespacesLowercase[13], getTemplate_talk()); // template_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[14], getHelp_talk()); // help
-        TALKSPACE_MAP.put(fNamespacesLowercase[15], getHelp_talk()); // help_talk
-        TALKSPACE_MAP.put(fNamespacesLowercase[16], getCategory_talk()); // category
-        TALKSPACE_MAP.put(fNamespacesLowercase[17], getCategory_talk()); // category_talk
+        // remove (false) mappings set by Namespace#Namespace(java.util.ResourceBundle)
+        TALKSPACE_MAP.clear();
+        // add correct mappings:
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.MEDIA_NAMESPACE_KEY), null); // media
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.SPECIAL_NAMESPACE_KEY), null); // special
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.MAIN_NAMESPACE_KEY), getTalk()); // ""
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.TALK_NAMESPACE_KEY), getTalk()); // talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.USER_NAMESPACE_KEY), getUser_talk()); // user
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.USER_TALK_NAMESPACE_KEY), getUser_talk()); // user_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.PROJECT_NAMESPACE_KEY), getMeta_talk()); // project
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.PROJECT_TALK_NAMESPACE_KEY), getMeta_talk()); // project_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.FILE_NAMESPACE_KEY), getImage_talk()); // image
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.FILE_TALK_NAMESPACE_KEY), getImage_talk()); // image_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.MEDIAWIKI_NAMESPACE_KEY), getMediaWiki_talk()); // mediawiki
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.MEDIAWIKI_TALK_NAMESPACE_KEY), getMediaWiki_talk()); // mediawiki_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.TEMPLATE_NAMESPACE_KEY), getTemplate_talk()); // template
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.TEMPLATE_TALK_NAMESPACE_KEY), getTemplate_talk()); // template_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.HELP_NAMESPACE_KEY), getHelp_talk()); // help
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.HELP_TALK_NAMESPACE_KEY), getHelp_talk()); // help_talk
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.CATEGORY_NAMESPACE_KEY), getCategory_talk()); // category
+        TALKSPACE_MAP.put(getNamespaceByNumber(Namespace.CATEGORY_TALK_NAMESPACE_KEY), getCategory_talk()); // category_talk
     }
 
     /**
