@@ -32,6 +32,7 @@ public class Result {
         this.success = true;
         this.message = "";
         this.connect_failed = false;
+        this.time = time;
     }
     /**
      * Creates a new custom result.
@@ -45,5 +46,6 @@ public class Result {
         this.success = success;
         this.message = message;
         this.connect_failed = connectFailed;
+        this.time = time;
     }
 }
