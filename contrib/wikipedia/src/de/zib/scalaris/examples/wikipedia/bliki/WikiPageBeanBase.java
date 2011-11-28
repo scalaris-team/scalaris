@@ -15,6 +15,12 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 
 /**
  * Bean with common content to display in a jsp. 
@@ -38,6 +44,8 @@ public class WikiPageBeanBase {
     private MyNamespace wikiNamespace = new MyNamespace();
     protected String redirectedTo = "";
     private boolean isEditRestricted = false;
+    protected Map<String, List<Long>> stats = new LinkedHashMap<String, List<Long>>();
+    
     /**
      * the content of the site
      */
@@ -48,6 +56,27 @@ public class WikiPageBeanBase {
      */
     public WikiPageBeanBase() {
         super();
+    }
+    
+    /**
+     * Creates a page bean from a given {@link WikiPageBeanBase}.
+     * 
+     * @param other
+     *            the page bean to copy properties from
+     */
+    public WikiPageBeanBase(WikiPageBeanBase other) {
+        super();
+        this.title = other.title;
+        version = other.version;
+        notice = other.notice;
+        error = other.error;
+        wikiTitle = other.wikiTitle;
+        wikiLang = other.wikiLang;
+        wikiLangDir = other.wikiLangDir;
+        wikiNamespace = other.wikiNamespace;
+        redirectedTo = other.redirectedTo;
+        isEditRestricted = other.isEditRestricted;
+        stats = new LinkedHashMap<String, List<Long>>(other.stats);
     }
 
     /**
@@ -190,4 +219,65 @@ public class WikiPageBeanBase {
         this.isEditRestricted = isEditRestricted;
     }
 
+    /**
+     * @return the stats
+     */
+    public Map<String, List<Long>> getStats() {
+        return stats;
+    }
+
+    /**
+     * @param stats the stats to set
+     */
+    public void setStats(Map<String, List<Long>> stats) {
+        this.stats = stats;
+    }
+
+    /**
+     * Adds the time needed to retrieve the given page to the collected
+     * statistics.
+     * 
+     * @param title
+     *            the title of the page
+     * @param value
+     *            the number of milliseconds it took to retrieve the page
+     */
+    public void addStat(String title, long value) {
+        List<Long> l = stats.get(title);
+        if (l == null) {
+            stats.put(title, l = new ArrayList<Long>(2));
+        }
+        l.add(value);
+    }
+
+    /**
+     * Adds the time needed to retrieve the given page to the collected
+     * statistics.
+     * 
+     * @param title
+     *            the title of the page
+     * @param value
+     *            multiple number of milliseconds it took to retrieve the page
+     */
+    public void addStats(String title, List<Long> value) {
+        List<Long> l = stats.get(title);
+        if (l == null) {
+            stats.put(title, l = new ArrayList<Long>(value.size()));
+        }
+        l.addAll(value);
+    }
+
+    /**
+     * Adds the time needed to retrieve the given page to the collected
+     * statistics.
+     * 
+     * @param values
+     *            a mapping between page titles and the number of milliseconds
+     *            it took to retrieve the page
+     */
+    public void addStats(Map<String, List<Long>> values) {
+        for (Entry<String, List<Long>> value : values.entrySet()) {
+            addStats(value.getKey(), value.getValue());
+        }
+    }
 }

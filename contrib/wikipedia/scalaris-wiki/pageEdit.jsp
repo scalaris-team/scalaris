@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List"%>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageEditBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -332,6 +333,11 @@ ${ pageBean.preview }
                 <ul id="footer-icons" class="noprint">
                 </ul>
                 <div style="clear:both"></div>
+                <pre id="db_timings" style="padding:0;line-height:0.7em;font-size:0.7em">
+<% for (Map.Entry<String,List<Long>> stats : pageBean.getStats().entrySet()) { %>
+<%= stats.getKey() %>: <%= stats.getValue().toString() %>
+<% } %>
+                </pre>
         </div>
         <!-- /footer -->
 </body>
