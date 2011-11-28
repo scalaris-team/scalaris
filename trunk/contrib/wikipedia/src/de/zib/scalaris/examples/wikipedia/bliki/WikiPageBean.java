@@ -50,6 +50,23 @@ public class WikiPageBean extends WikiPageBeanBase {
     private Collection<String> categoryPages = new LinkedList<String>();
     
     /**
+     * Creates an empty page bean.
+     */
+    public WikiPageBean() {
+        super();
+    }
+    
+    /**
+     * Creates a page bean from a given {@link WikiPageBeanBase}.
+     * 
+     * @param other
+     *            the page bean to copy properties from
+     */
+    public WikiPageBean(WikiPageBeanBase other) {
+        super(other);
+    }
+
+    /**
      * returns whether the originally requested page is available
      * 
      * @return the availability status
