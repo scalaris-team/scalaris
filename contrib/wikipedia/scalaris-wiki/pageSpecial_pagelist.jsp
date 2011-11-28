@@ -8,6 +8,9 @@
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
+<!--<% if (!pageBean.getError().isEmpty()) { %>
+<error>${ pageBean.error }</error>
+<% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
 <% /* 
@@ -43,7 +46,7 @@
             <div id="siteNotice"><!-- centralNotice loads here -->${ pageBean.notice }</div>
             <!-- /sitenotice -->
             <!-- firstHeading -->
-            <h1 id="firstHeading" class="firstHeading">${ pageBean.pageHeading }</h1>
+            <h1 id="firstHeading" class="firstHeading">${ pageBean.error }${ pageBean.pageHeading }</h1>
             <!-- /firstHeading -->
             <!-- bodyContent -->
             <div id="bodyContent">

@@ -7,6 +7,9 @@
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <title>Changing ${ pageBean.title } - ${ pageBean.wikiTitle }</title>
+<!--<% if (!pageBean.getError().isEmpty()) { %>
+<error>${ pageBean.error }</error>
+<% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
 <% /* 
@@ -47,9 +50,9 @@
             <!-- firstHeading -->
             <h1 id="firstHeading" class="firstHeading">
           <% if (!pageBean.isEditRestricted()) { %>
-            ${ pageBean.title }
+            ${ pageBean.error }${ pageBean.title }
           <% } else {%>
-            View source
+            ${ pageBean.error }View source
           <% } %>
             </h1>
             <!-- /firstHeading -->

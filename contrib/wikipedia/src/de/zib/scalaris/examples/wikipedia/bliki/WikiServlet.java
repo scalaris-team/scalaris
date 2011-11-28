@@ -650,7 +650,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
 
         page.setNotice(WikiServlet.getParam_notice(request));
-        page.setTitle(getParam_error(request) + title);
+        page.setError(getParam_error(request));
+        page.setTitle(title);
         page.setVersion(revision.getId());
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
@@ -696,7 +697,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         } else {
 //            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
             page.setPage("Page not available.");
-            page.setTitle(getParam_error(request) + title);
+            page.setError(getParam_error(request));
+            page.setTitle(title);
         }
         // re-set version (we are only showing this page due to a non-existing page)
         page.setVersion(-1);
@@ -750,7 +752,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 page.setEditRestricted(true);
             }
 
-            page.setTitle(getParam_error(request) + title);
+            page.setError(getParam_error(request));
+            page.setTitle(title);
             if (!result.revisions.isEmpty()) { 
                 page.setVersion(result.revisions.get(0).getId());
             }
@@ -840,7 +843,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             showEmptyPage(request, response, page);
             return;
         }
-        page.setTitle(getParam_error(request) + page.getTitle());
+        page.setError(getParam_error(request));
+        page.setTitle(page.getTitle());
     }
 
     /**
@@ -1095,7 +1099,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, WikiPageBeanBase page)
             throws ServletException, IOException {
         page.setNotice(WikiServlet.getParam_notice(request));
-        page.setTitle(getParam_error(request));
+        page.setError(getParam_error(request));
         request.setAttribute("pageBean", new WikiPageBean(page));
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
         dispatcher.forward(request, response);
@@ -1172,7 +1176,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         // set the textarea's contents:
         page.setNotice(WikiServlet.getParam_notice(request));
-        page.setTitle(getParam_error(request) + title);
+        page.setError(getParam_error(request));
+        page.setTitle(title);
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
@@ -1256,7 +1261,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.addStats(wikiModel.getStats());
         page.setPage(content);
         page.setVersion(oldVersion);
-        page.setTitle(getParam_error(request) + title);
+        page.setError(getParam_error(request));
+        page.setTitle(title);
         page.setSummary(request.getParameter("wpSummary"));
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);

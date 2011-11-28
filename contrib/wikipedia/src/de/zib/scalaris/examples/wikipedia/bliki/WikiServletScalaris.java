@@ -209,9 +209,9 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     protected synchronized void showImportPage(HttpServletRequest request,
             HttpServletResponse response, Connection connection)
             throws ServletException, IOException {
-        WikiPageBean value = new WikiPageBean();
-        value.setNotAvailable(true);
-        request.setAttribute("pageBean", value);
+        WikiPageBean page = new WikiPageBean();
+        page.setNotAvailable(true);
+        request.setAttribute("pageBean", page);
         
         StringBuilder content = new StringBuilder();
         String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
@@ -307,9 +307,10 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             }
         }
 
-        value.setNotice(WikiServlet.getParam_notice(request));
-        value.setTitle(getParam_error(request) + "Import Wiki dump");
-        value.setPage(content.toString());
+        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setError(getParam_error(request));
+        page.setTitle("Import Wiki dump");
+        page.setPage(content.toString());
         
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
         dispatcher.forward(request, response);
