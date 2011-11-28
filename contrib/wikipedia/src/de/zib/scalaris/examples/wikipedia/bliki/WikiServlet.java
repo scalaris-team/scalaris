@@ -1072,7 +1072,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             value.setPage(StringEscapeUtils.escapeHtml(result.revision.unpackedText()));
             value.setVersion(result.revision.getId());
-        } else {
+        } else if (!value.isNewPage()) {
             value.setEditRestricted(true);
         }
 
