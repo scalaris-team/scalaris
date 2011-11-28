@@ -38,6 +38,7 @@ public class WikiPageBeanBase {
      */
     private int version = 0;
     private String notice = "";
+    private String error = "";
     private String wikiTitle = "Wikipedia";
     private String wikiLang = "en";
     private String wikiLangDir = "ltr";
@@ -279,5 +280,19 @@ public class WikiPageBeanBase {
         for (Entry<String, List<Long>> value : values.entrySet()) {
             addStats(value.getKey(), value.getValue());
         }
+    }
+
+    /**
+     * @return the error
+     */
+    public String getError() {
+        return error;
+    }
+
+    /**
+     * @param error the error to set
+     */
+    public void setError(String error) {
+        this.error = error;
     }
 }
