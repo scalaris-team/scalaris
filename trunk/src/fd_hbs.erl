@@ -205,7 +205,7 @@ on({periodic_alive_check}, State) ->
                           self(), {periodic_alive_check}),
     NewState;
 
-on({{send_error, Target, Message, _Reason}, ShepherdCookie}, State) ->
+on({{send_error, Target, Message, Reason}, ShepherdCookie}, State) ->
     NextOp =
         case N = shepherd_retries(ShepherdCookie) of
             1 -> {retry};
@@ -223,7 +223,7 @@ on({{send_error, Target, Message, _Reason}, ShepherdCookie}, State) ->
         {delay, Sec, Retries} ->
             msg_delay:send_local(
               Sec, self(),
-              {{send_error, Target, Message}, {retries, Retries}}),
+              {{send_error, Target, Message, Reason}, {retries, Retries}}),
             State;
         {giveup} ->
             log:log(warn, "[ FD ] Sending ~.0p failed 3 times. "
