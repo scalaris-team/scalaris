@@ -28,15 +28,18 @@
 -export([filter_by_key/2]).
 -export([filter_by_status/2]).
 -export([update_status_by_key/3]).
+-export([add_or_update_status_by_key/3]).
 -export([is_sane_for_commit/1]).
-%%-export([update_entry/4]).
+-export([update_entry/2]).
 
 %% Operations on entries of TransLogs
 -export([new_entry/5]).
 -export([get_entry_operation/1]).
+-export([set_entry_operation/2]).
 -export([get_entry_key/1,    set_entry_key/2]).
 -export([get_entry_status/1, set_entry_status/2]).
 -export([get_entry_value/1]).
+-export([set_entry_value/2]).
 -export([get_entry_version/1]).
 
 %% TranslogEntry: {Operation, Key, Status, Value, Version}
@@ -50,7 +53,7 @@
 
 -type tx_status()    :: {fail, term()} | value | not_found.
 -type tx_op()        :: rdht_tx_read | rdht_tx_write.
--opaque tlog_entry() ::
+-type tlog_entry() ::
           { tx_op(),                  %% operation
             client_key() | ?RT:key(), %% key | hashed and replicated key
             tx_status(),              %% status
@@ -84,6 +87,17 @@ update_status_by_key(TransLog, Key, Status) ->
           _   -> X
       end || X <- TransLog ].
 
+-spec add_or_update_status_by_key(tlog(),
+                                  client_key() | ?RT:key(),
+                                  tx_status()) -> tlog().
+add_or_update_status_by_key(TLog, Key, Status) ->
+    case lists:keyfind(Key, 2, TLog) of
+        false ->
+            Entry = new_entry(rdht_tx_write, Key, Status, 0, 0),
+            add_entry(TLog, Entry);
+        _ -> update_status_by_key(TLog, Key, Status)
+    end.
+
 -spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
 entry_is_sane_for_commit(Entry, Acc) ->
     Acc andalso
@@ -94,13 +108,21 @@ entry_is_sane_for_commit(Entry, Acc) ->
 is_sane_for_commit(TLog) ->
     lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
+-spec update_entry(tlog(), tlog_entry()) -> tlog().
+update_entry(TLog, Entry) ->
+    lists:keyreplace(get_entry_key(Entry), 2, TLog, Entry).
+
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
 new_entry(Op, Key, Status, Val, Vers) ->
 %    #tlog_entry{op = Op, key = Key, status = Status, val = Val, vers = Vers}.
     {Op, Key, Status, Val, Vers}.
+
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
+
+-spec set_entry_operation(tlog_entry(), tx_op()) -> tlog_entry().
+set_entry_operation(Element, Val) -> setelement(1, Element, Val).
 
 -spec get_entry_key(tlog_entry()) -> client_key() | ?RT:key().
 get_entry_key(Element)       -> element(2, Element).
@@ -116,6 +138,9 @@ set_entry_status(Element, Val)    -> setelement(3, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
 get_entry_value(Element)     -> element(4, Element).
+
+-spec set_entry_value(tlog_entry(), any()) -> tlog_entry().
+set_entry_value(Element, Val)     -> setelement(4, Element, Val).
 
 -spec get_entry_version(tlog_entry()) -> integer().
 get_entry_version(Element)   -> element(5, Element).

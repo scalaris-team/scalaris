@@ -75,7 +75,7 @@ req_list(ReqList) ->
 %%      execution time.
 -spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
 req_list(TLog, ReqList) ->
-    {TimeInUs, Result} = util:tc(fun req_list2/2, [TLog, ReqList]),
+    {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/2, [TLog, ReqList]),
     monitor:client_monitor_set_value(
       ?MODULE, "req_list",
       fun(Old) ->
@@ -87,11 +87,6 @@ req_list(TLog, ReqList) ->
               rrd:add_now(TimeInUs / 1000, Old2)
       end),
     Result.
-
-%% @doc Perform several requests inside a transaction (internal implementation).
--spec req_list2(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
-req_list2(TLog, ReqList) ->
-    rdht_tx0:req_list(TLog, ReqList).
 
 %% @doc Perform a read inside a transaction.
 -spec read(tx_tlog:tlog(), client_key())
