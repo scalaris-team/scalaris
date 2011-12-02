@@ -41,7 +41,7 @@ prop_is_binary(Value) ->
     is_binary(Value).
 
 test_is_binary(_Config) ->
-    tester:test(?MODULE, prop_is_binary, 1, 25).
+    tester:test(?MODULE, prop_is_binary, 1, 25, [multi_threaded]).
 
 %% @doc Creates a ring with Size rangom IDs.
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
