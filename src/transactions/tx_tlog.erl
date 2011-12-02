@@ -22,28 +22,21 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
-%% Operations on TransLogs
+%% Operations on TLogs
 -export([empty/0]).
 -export([add_entry/2]).
--export([filter_by_key/2]).
--export([filter_by_status/2]).
--export([update_status_by_key/3]).
 -export([add_or_update_status_by_key/3]).
--export([is_sane_for_commit/1]).
 -export([update_entry/2]).
+-export([find_entry_by_key/2]).
+-export([is_sane_for_commit/1]).
 
-%% Operations on entries of TransLogs
+%% Operations on entries of TLogs
 -export([new_entry/5]).
--export([get_entry_operation/1]).
--export([set_entry_operation/2]).
--export([get_entry_key/1,    set_entry_key/2]).
--export([get_entry_status/1, set_entry_status/2]).
--export([get_entry_value/1]).
--export([set_entry_value/2]).
+-export([get_entry_operation/1, set_entry_operation/2]).
+-export([get_entry_key/1,       set_entry_key/2]).
+-export([get_entry_status/1,    set_entry_status/2]).
+-export([get_entry_value/1,     set_entry_value/2]).
 -export([get_entry_version/1]).
-
-%% TranslogEntry: {Operation, Key, Status, Value, Version}
-%% Sample: {read,"key3",value,"value3",0}
 
 -ifdef(with_export_type_support).
 -export_type([tlog/0, tlog_entry/0]).
@@ -51,19 +44,20 @@
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status()    :: {fail, term()} | value | not_found.
--type tx_op()        :: rdht_tx_read | rdht_tx_write.
+-type tx_status() :: {fail, term()} | value | not_found.
+-type tx_op()     :: rdht_tx_read   | rdht_tx_write.
+
+-type tlog_key() :: client_key() | ?RT:key().
+%% TLogEntry: {Operation, Key, Status, Value, Version}
+%% Sample: {read,"key3",value,"value3",0}
 -type tlog_entry() ::
           { tx_op(),                  %% operation
-            client_key() | ?RT:key(), %% key | hashed and replicated key
+            tlog_key, %% key | hashed and replicated key
             tx_status(),              %% status
             any(),                    %% value
             integer()                 %% version
           }.
-
 -type tlog() :: [tlog_entry()].
-
-%% Public tlog methods:
 
 % @doc create an empty list
 -spec empty() -> tlog().
@@ -72,31 +66,26 @@ empty() -> [].
 -spec add_entry(tlog(), tlog_entry()) -> tlog().
 add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 
--spec filter_by_key(tlog(), client_key() | ?RT:key()) -> tlog().
-filter_by_key(TransLog, Key) ->
-    [ X || X <- TransLog, Key =:= get_entry_key(X) ].
-
--spec filter_by_status(tlog(), tx_status()) -> tlog().
-filter_by_status(TransLog, Status) ->
-    [ X || X <- TransLog, Status =:= get_entry_status(X) ].
-
--spec update_status_by_key(tlog(), client_key() | ?RT:key(), tx_status()) -> tlog().
-update_status_by_key(TransLog, Key, Status) ->
-    [ case get_entry_key(X) of
-          Key -> set_entry_status(X, Status);
-          _   -> X
-      end || X <- TransLog ].
-
 -spec add_or_update_status_by_key(tlog(),
-                                  client_key() | ?RT:key(),
+                                  tlog_key(),
                                   tx_status()) -> tlog().
 add_or_update_status_by_key(TLog, Key, Status) ->
     case lists:keyfind(Key, 2, TLog) of
         false ->
             Entry = new_entry(rdht_tx_write, Key, Status, 0, 0),
             add_entry(TLog, Entry);
-        _ -> update_status_by_key(TLog, Key, Status)
+        Entry ->
+            NewEntry = set_entry_status(Entry, Status),
+            update_entry(TLog, NewEntry)
     end.
+
+-spec update_entry(tlog(), tlog_entry()) -> tlog().
+update_entry(TLog, Entry) ->
+    lists:keyreplace(get_entry_key(Entry), 2, TLog, Entry).
+
+-spec find_entry_by_key(tlog(), tlog_key()) -> tlog_entry() | false.
+find_entry_by_key(TLog, Key) ->
+    lists:keyfind(Key, 2, TLog).
 
 -spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
 entry_is_sane_for_commit(Entry, Acc) ->
@@ -108,9 +97,6 @@ entry_is_sane_for_commit(Entry, Acc) ->
 is_sane_for_commit(TLog) ->
     lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
--spec update_entry(tlog(), tlog_entry()) -> tlog().
-update_entry(TLog, Entry) ->
-    lists:keyreplace(get_entry_key(Entry), 2, TLog, Entry).
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
