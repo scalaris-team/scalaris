@@ -284,7 +284,7 @@ do_reqs_on_tlog(TLog, ReqList) ->
 do_reqs_on_tlog_iter(TLog, [], Acc) -> {TLog, lists:reverse(Acc)};
 do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
     Key = req_get_key(Req),
-    Entry = lists:keyfind(Key, 2, TLog),
+    Entry = tx_tlog:find_entry_by_key(TLog, Key),
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
@@ -369,7 +369,7 @@ tlog_set_change(Entry, Key, ToAdd, ToDel) ->
 -spec tlog_number_add(tx_tlog:tlog_entry(), client_key(),
                       client_value()) ->
                              {tx_tlog:tlog_entry(), result_entry_write()}.
-tlog_number_add(Entry, Key, X)
+tlog_number_add(Entry, _Key, X)
   when (not erlang:is_number(X)) ->
     Error = {fail, not_a_number},
     {tx_tlog:set_entry_status(Entry, Error), Error};
