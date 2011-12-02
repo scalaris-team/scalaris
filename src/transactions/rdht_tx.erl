@@ -145,7 +145,7 @@ upd_tlog_via_rdht(TLog, ReqList) ->
 
     %% merge TLogs (insert fail, abort, when version mismatch
     %% in reads for same key is detected)
-    _MTLog = merge_tlogs(TLog, lists:keysort(2, RTLog)).
+    _MTLog = merge_tlogs(TLog, tx_tlog:sort_by_key(RTLog)).
 
 %% @doc Requests, that need information from the DHT.
 -spec first_req_per_key_not_in_tlog(tx_tlog:tlog(), [request_on_key()]) ->
