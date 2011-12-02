@@ -27,6 +27,7 @@
 -export([add_entry/2]).
 -export([add_or_update_status_by_key/3]).
 -export([update_entry/2]).
+-export([sort_by_key/1]).
 -export([find_entry_by_key/2]).
 -export([is_sane_for_commit/1]).
 
@@ -82,6 +83,9 @@ add_or_update_status_by_key(TLog, Key, Status) ->
 -spec update_entry(tlog(), tlog_entry()) -> tlog().
 update_entry(TLog, Entry) ->
     lists:keyreplace(get_entry_key(Entry), 2, TLog, Entry).
+
+-spec sort_by_key(tlog()) -> tlog().
+sort_by_key(TLog) -> lists:keysort(2, TLog).
 
 -spec find_entry_by_key(tlog(), tlog_key()) -> tlog_entry() | false.
 find_entry_by_key(TLog, Key) ->
