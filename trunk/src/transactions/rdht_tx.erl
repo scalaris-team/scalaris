@@ -26,9 +26,9 @@
 
 -export([req_list/2]).
 -export([check_config/0]).
+-export([encode_value/1, decode_value/1]).
 
 %% export to silence dialyzer
--export([encode_value/1, decode_value/1]).
 -export([decode_result/1]).
 
 -include("scalaris.hrl").
