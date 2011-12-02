@@ -133,12 +133,12 @@ req_list_2(_Config) ->
 
     %% try commit not as last operation in request list
     ?equals_pattern(api_tx:req_list(EmptyTLog, [{commit}, {read, "A"}]),
-                    {_TLog, [{fail, abort}, {ok, 8}]}),
+                    {_TLog, [{fail, abort}, _]}),
 
     %% try commit not as last operation in request list with longer list
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{commit}, {read, "A"}, {read, "B"}]),
-                    {_TLog, [{fail, abort}, {ok, 8}, {ok,9}]}),
+                    {_TLog, [{fail, abort}, _, _]}),
 
     %% ops based on tlog
     {NonExistReadTLog, _Res1} = api_tx:read(EmptyTLog, "req_list_2_C"),

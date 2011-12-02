@@ -18,6 +18,7 @@
 %% @version $Id$
 -module(rdht_tx).
 -author('schintke@zib.de').
+-author('kruber@zib.de').
 -vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
@@ -26,224 +27,413 @@
 -export([req_list/2]).
 -export([check_config/0]).
 
+%% export to silence dialyzer
+-export([decode_result/1]).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0, request/0, request_on_key/0, result_entry/0, result/0]).
+-export_type([req_id/0, request/0, result_entry/0]).
 -endif.
 
 -type req_id() :: util:global_uid().
--type request_on_key() :: {rdht_tx_read, client_key()}
-                        | {rdht_tx_write, client_key(), client_value()}.
+-type request_on_key() ::
+        {rdht_tx_read,  client_key()}
+      | {rdht_tx_write, client_key(), client_value()}
+      | {test_and_set,  client_key(), client_value(), client_value()}
+      | {set_change,    client_key(), client_value(), client_value()}
+      | {number_add,    client_key(), client_value()}.
+
 -type request() :: request_on_key() | {commit}.
 
--type result_entry_read() :: {ok, client_value()} | {fail, timeout | not_found}.
--type result_entry_write() :: {ok} | {fail, timeout}.
+-type result_entry_read() ::
+        {ok, client_value()} | {fail, abort | timeout | not_found}.
+-type result_entry_write()  :: {ok} | {fail, abort | timeout}.
 -type result_entry_commit() :: {ok} | {fail, abort | timeout}.
 -type result_entry() :: result_entry_read()
                       | result_entry_write()
                       | result_entry_commit().
--type result() :: [ result_entry() ].
+-type results() :: [ result_entry() ].
 
--spec req_list(tx_tlog:tlog(), [request()]) ->
-        {tx_tlog:tlog(), result()}.
-%% single request and empty translog, done separately for optimization only
-req_list([], [SingleReq]) ->
-    RdhtOpWithReqId = initiate_rdht_ops([{1, SingleReq}]),
-    {NewTLog, TmpResultList, [], [], []} =
-        collect_results_and_do_translogops({[], [], RdhtOpWithReqId, [], []}),
-    {_ReqNum, Result} = lists:unzip(TmpResultList),
-    {NewTLog, Result};
+%% @doc Perform several requests inside a transaction.
+-spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), results()}.
+req_list([], [{commit}]) -> {[], [{ok}]};
+req_list(TLog, ReqList) ->
+    %% PRE: TLog is sorted by key, implicitly given, as
+    %%      we only generate sorted TLogs.
+    ?TRACE("rdht_tx:req_list(~p, ~p)~n", [TLog, ReqList]),
 
-req_list([], [{rdht_tx_write, _K, _V} = SingleReq, {commit}]) ->
-    {TLog, [Res1]} = req_list(tx_tlog:empty(), [SingleReq]),
-    {TLog, [Res1, commit(TLog)]};
+    %% (0) Check TLog? Consts performance, may save some requests
 
-req_list(TLog, PlainReqList) ->
-    ?TRACE("rdht_tx:req_list(~p, ~p)~n", [TLog, PlainReqList]),
-    %% PRE: no 'abort/tx_failed' in TLog
+    %% (1) Ensure commit is only at end of req_list (otherwise abort),
+    %% (2) transform native ops to module names
+    %% (3) encode write values to ?DB:value format
+    %% (4) drop {commit} request at end &and remember whether to
+    %%     commit or not
+    {ReqList1, OKorAbort, FoundCommitAtEnd} =
+        rl_chk_and_encode(ReqList, [], ok),
+
+    case OKorAbort of
+        abort -> tlog_and_results_to_abort(TLog, ReqList);
+        ok ->
+            TLog2 = upd_tlog_via_rdht(TLog, ReqList1),
+
+            %% perform all requests based on TLog to compute result
+            %% entries
+            {NewClientTLog, Results} = do_reqs_on_tlog(TLog2, ReqList1),
+
+            %% do commit (if requested) and append the commit result
+            %% to result list
+            case FoundCommitAtEnd of
+                true ->
+                    CommitRes = commit(NewClientTLog),
+                    {tx_tlog:empty(), Results ++ [CommitRes]};
+                false ->
+                    {NewClientTLog, Results}
+            end
+    end.
+
+%% @doc Check whether commit is only at end (OKorAbort).
+%%      Encode all values of write requests.
+%%      Replace native operations by corresponding module names.
+%%      Cut commit at end and inform caller via boolean (CommitAtEnd).
+-spec rl_chk_and_encode(
+        InTodo::[api_tx:request()], Acc::[api_tx:request()], ok|abort)
+                       -> {Acc::[request_on_key()], ok|abort, CommitAtEnd::boolean()}.
+rl_chk_and_encode([], Acc, OKorAbort) ->
+    {lists:reverse(Acc), OKorAbort, false};
+rl_chk_and_encode([{commit}], Acc, OKorAbort) ->
+    {lists:reverse(Acc), OKorAbort, true};
+rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
+    case Req of
+        {read, Key} ->
+            rl_chk_and_encode(RL, [{rdht_tx_read, Key} | Acc], OKorAbort);
+        {write, Key, Value} ->
+            rl_chk_and_encode(RL, [{rdht_tx_write, Key,
+                                    encode_value(Value)} | Acc],
+                              OKorAbort);
+        {commit} ->
+            log:log(warn, "Commit not at end of a req_list. Deciding abort."),
+            rl_chk_and_encode(RL, [{commit} | Acc], abort);
+        Op ->
+            rl_chk_and_encode(RL, [Op | Acc], OKorAbort)
+    end.
+
+%% @doc Fill all fields with {fail, abort} information.
+-spec tlog_and_results_to_abort(tx_tlog:tlog(), [request()]) ->
+                                       {tx_tlog:tlog(), results()}.
+tlog_and_results_to_abort(TLog, ReqList) ->
+    NewTLog = [ tx_tlog:add_or_update_status_by_key(TLog,
+                                                    req_get_key(X),
+                                                    {fail, abort})
+                || X <- ReqList, X =/= {commit} ],
+    {NewTLog, [ {fail, abort} || _ <- ReqList ]}.
+
+%% @doc Send requests to the DHT, gather replies and merge TLogs.
+-spec upd_tlog_via_rdht(tx_tlog:tlog(), [request_on_key()]) -> tx_tlog:tlog().
+upd_tlog_via_rdht(TLog, ReqList) ->
+    %% what to get from rdht? (also check old TLog)
+    USReqList = lists:ukeysort(2, ReqList),
+    ReqListonRDHT = first_req_per_key_not_in_tlog(TLog, USReqList),
+
+    %% perform RDHT operations to collect missing TLog entries
     %% rdht requests for independent keys are processed in parallel.
-    %% requests for the same key are executed in order with
-    %% accumulated translog.
-    %% if translog entry exists, do work_phase inside this process to
-    %% reduce overall latency.
-    NumReqs = length(PlainReqList),
-    ReqList = lists:zip(lists:seq(1, NumReqs), PlainReqList),
-    %% split into 'rdht', 'delayed' and 'translog based' operations
-    {RdhtOps, Delayed, TransLogOps, Commit} = split_ops(TLog, ReqList),
+    ReqListWithReqIds = initiate_rdht_ops(ReqListonRDHT),
 
-    RdhtOpsWithReqIds = initiate_rdht_ops(RdhtOps),
-    {NewTLog, TmpResultList, [], [], []} =
-        collect_results_and_do_translogops({TLog, [], RdhtOpsWithReqIds,
-                                            Delayed, TransLogOps}),
-    %% Now all op lists are empty.
-    %% @TODO only if TransLog is ok, do the validation here if requested
-    CommitResults =
-        case Commit of
-            []               -> [];
-            [{NumReqs,{commit}}] -> [{NumReqs, commit(NewTLog)}];
-            [{Pos,{commit}}] ->
-                log:log(warn, "Commit not at end of a request list. "
-                        "Deciding abort."),
-                [{Pos, {fail, abort}}];
-            Commits          ->
-                log:log(warn, "Multiple commits in a request list. "
-                        "Deciding abort."),
-                [ {Num, {fail, abort}} || {Num, {commit}} <- Commits ]
-        end,
-    %% Sort resultlist and eliminate numbering
-    {_, ResultList} = lists:unzip(
-                        lists:sort(fun(A, B) ->
-                                           element(1, A) =< element(1, B)
-                                   end, TmpResultList ++ CommitResults)),
-    %% return the NewTLog and a result list
-    %% if a commit was done, cleanup the TLog, its of no value anymore.
-    case Commit of
-        [] -> {NewTLog, ResultList};
-        _  -> {tx_tlog:empty(), ResultList}
+    RTLog = collect_replies(tx_tlog:empty(), ReqListWithReqIds),
+
+    %% merge TLogs (insert fail, abort, when version mismatch
+    %% in reads for same key is detected)
+    _MTLog = merge_tlogs(TLog, lists:keysort(2, RTLog)).
+
+%% @doc Requests, that need information from the DHT.
+-spec first_req_per_key_not_in_tlog(tx_tlog:tlog(), [request_on_key()]) ->
+                                           [request_on_key()].
+first_req_per_key_not_in_tlog(SortedTLog, USortedReqList) ->
+    %% PRE: no {commit} requests in SortedReqList
+    %% POST: returns requests in reverse order, but thats sufficient.
+    first_req_per_key_not_in_tlog_iter(SortedTLog, USortedReqList, []).
+
+%% @doc Helper to acquire requests, that need information from the DHT.
+-spec first_req_per_key_not_in_tlog_iter(tx_tlog:tlog(),
+                                         [request_on_key()],
+                                         [request_on_key()]) ->
+                                                [request_on_key()].
+first_req_per_key_not_in_tlog_iter(_, [], Acc) -> Acc;
+first_req_per_key_not_in_tlog_iter([], USortedReqList, Acc) ->
+    USortedReqList ++ Acc;
+first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
+                                   [Req | RTail] = USReqList,
+                                   Acc) ->
+    TKey = tx_tlog:get_entry_key(TEntry),
+    case TKey =:= req_get_key(Req) of
+        true ->
+            %% key is in TLog, rdht op not necessary
+            case req_get_op(Req) of
+                rdht_tx_read ->
+                    %% when operation is a read and TLog is optimized, we
+                    %% need the op anyway to calculate the result entry.
+                    %% Not yet activated:
+                    %% first_req_per_key_not_in_tlog_iter
+                    %%   (USTLog, RTail, [Req | Acc]);
+                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
+                _ ->
+                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
+            end;
+        false ->
+            case TKey < req_get_key(Req) of
+                true ->
+                    %% jump to next Tlog entry
+                    first_req_per_key_not_in_tlog_iter(TTail, USReqList, Acc);
+                false ->
+                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, [Req | Acc])
+            end
     end.
 
-%% implementation
--spec split_ops(tx_tlog:tlog(), [{pos_integer(), request()}])
-                  -> {[{pos_integer(), request()}],
-                      [{pos_integer(), request()}],
-                      [{pos_integer(), request()}],
-                      [{pos_integer(), request()}]}.
-split_ops(TLog, ReqList) ->
-    ?TRACE("rdht_tx:split_ops(~p, ~p)~n", [TLog, ReqList]),
-    Splitter =
-        fun(ReqEntry, {RdhtOps, Delayed, TransLogOps, Commit}) ->
-          {_Num, Entry} = ReqEntry,
-          case element(1, Entry) of
-              commit ->
-                  {RdhtOps, Delayed, TransLogOps, [ReqEntry | Commit]};
-              _ -> case {lists:keymember(element(2, Entry), 2, TLog),
-                         key_in_numbered_reqlist(element(2, Entry), RdhtOps)}
-                   of
-                       {true,_} ->
-                           {RdhtOps, Delayed, [ ReqEntry | TransLogOps ],
-                            Commit};
-                       {false, true} ->
-                           {RdhtOps, [ReqEntry | Delayed], TransLogOps, Commit};
-                       {false, false} ->
-                           {[ReqEntry | RdhtOps], Delayed, TransLogOps, Commit}
-                   end
-          end
-        end,
-    {A, B, C, D} = lists:foldl(Splitter, {[],[],[],[]}, ReqList),
-    {lists:reverse(A), lists:reverse(B), lists:reverse(C), lists:reverse(D)}.
-
--spec key_in_numbered_reqlist(client_key(), [{pos_integer(), request()}])
-                                -> boolean().
-key_in_numbered_reqlist(_Key, []) -> false;
-key_in_numbered_reqlist(Key, [{_Num, Entry} | Tail]) ->
-    case Key =:= element(2, Entry) of
-        true -> true;
-        false -> key_in_numbered_reqlist(Key, Tail)
-    end.
-
--spec initiate_rdht_ops([{pos_integer(), request()}])
-                       -> [{req_id(), {pos_integer(), request()}}].
+%% @doc Trigger operations for the DHT.
+-spec initiate_rdht_ops([request_on_key()]) -> [{req_id(), request_on_key()}].
 initiate_rdht_ops(ReqList) ->
     ?TRACE("rdht_tx:initiate_rdht_ops(~p)~n", [ReqList]),
+    %% @todo should choose a dht_node in the local VM at random or even
+    %% better round robin.
     [ begin
           NewReqId = util:get_global_uid(), % local id not sufficient
-          apply(element(1, Entry), work_phase, [self(), NewReqId, Entry]),
-          {NewReqId, {Num, Entry}}
-      end || {Num, Entry} <- ReqList ].
+          OpModule = case req_get_op(Entry) of
+                         rdht_tx_read -> rdht_tx_read;
+                         rdht_tx_write -> rdht_tx_write;
+                         test_and_set -> rdht_tx_read;
+                         set_change -> rdht_tx_read;
+                         number_add -> rdht_tx_read
+                     end,
+          apply(OpModule, work_phase, [self(), NewReqId, Entry]),
+          {NewReqId, Entry}
+      end || Entry <- ReqList ].
 
--spec collect_results_and_do_translogops(
-        {tx_tlog:tlog(),
-         [{pos_integer(), result_entry()}],
-         [{req_id(), {pos_integer(), request()}}],
-         [{pos_integer(), request()}],
-         [{pos_integer(), request()}]}) ->
-        {tx_tlog:tlog(),
-         [{pos_integer(), result_entry()}],
-         [{req_id(), {pos_integer(), request()}}],
-         [{pos_integer(), request()}],
-         [{pos_integer(), request()}]}.
-%% all ops done -> terminate!
-collect_results_and_do_translogops({TLog, Results, [], [], []}) ->
-    {TLog, Results, [], [], []};
-%% single request and empty translog, done separately for optimization only
-collect_results_and_do_translogops({[], [], [RdhtOpWithReqId], [], []}
-                                   = Args) ->
-    {_, RdhtId, RdhtTlog, RdhtResult} = receive_answer(),
-    case lists:keyfind(RdhtId, 1, [RdhtOpWithReqId]) of
+%% @doc Collect replies from the quorum DHT operations.
+-spec collect_replies(tx_tlog:tlog(), [{req_id(), request_on_key()}]) -> tx_tlog:tlog().
+collect_replies(TLog, []) -> TLog;
+collect_replies(TLog, ReqIdsReqList) ->
+    ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsReqList]),
+    {_, ReqId, RdhtTlogEntry} = receive_answer(),
+    case lists:keyfind(ReqId, 1, ReqIdsReqList) of
         false ->
             %% Drop outdated result...
-            collect_results_and_do_translogops(Args);
+            collect_replies(TLog, ReqIdsReqList);
         _ ->
-            {_, {Num,_}} = RdhtOpWithReqId,
-            {[RdhtTlog], [{Num, RdhtResult}], [], [], []}
-    end;
-%% all translogops done -> wait for a RdhtOpReply
-collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
-                                    Delayed, []} = Args) ->
-    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [Args]),
-    {_, TRdhtId, _, _} = TReply = receive_answer(),
-    case lists:keyfind(TRdhtId, 1, RdhtOpsWithReqIds) of
-        false ->
-            %% Drop outdated result...
-            collect_results_and_do_translogops(Args);
-        _ ->
-            {_, RdhtId, RdhtTlog, RdhtResult} = TReply,
-            %% add TLog entry, as it is guaranteed a new entry
-            NewTLog = [RdhtTlog | TLog],
-            %% lookup Num for Result entry and add that
-            NumList = [ X || {TmpId, {X, _}} <- RdhtOpsWithReqIds,
-                             TmpId =:= RdhtId],
-            [ThisNum] = NumList,
-            NewResults = [{ThisNum, RdhtResult} | Results],
-            NewRdhtOpsWithReqIds =
-                [ X || {ThisId, _} = X <- RdhtOpsWithReqIds, ThisId =/= RdhtId],
-            %% release correspondig delayed ops to translogops
-            Key = tx_tlog:get_entry_key(RdhtTlog),
-            {NewTransLogOps, NewDelayed} =
-                lists:partition(
-                  fun({_Num, Req}) -> Key =:= erlang:element(2, Req)
-                  end, Delayed),
-            %% repeat tail recursively
-            collect_results_and_do_translogops(
-              {NewTLog, NewResults, NewRdhtOpsWithReqIds,
-               NewDelayed, NewTransLogOps})
-    end;
-%% do translog ops
-collect_results_and_do_translogops({TLog, Results, RdhtOpsWithReqIds,
-                                    Delayed, TransLogOps} = _Args) ->
-    ?TRACE("rdht_tx:collect_results_and_do_translogops(~p)~n", [_Args]),
-    {NewTLog, TmpResults} = do_translogops(TransLogOps, {TLog, []}),
-    collect_results_and_do_translogops(
-      {NewTLog, TmpResults ++ Results, RdhtOpsWithReqIds, Delayed, []}).
+            %% add TLog entry, as it is guaranteed a necessary entry
+            NewTLog = [RdhtTlogEntry | TLog],
+            NewReqIdsReqList = lists:keydelete(ReqId, 1, ReqIdsReqList),
+            collect_replies(NewTLog, NewReqIdsReqList)
+    end.
 
--spec do_translogops([{pos_integer(), request()}],
-                     {tx_tlog:tlog(), [result()]}) ->
-                            {tx_tlog:tlog(), [result()]}.
-do_translogops([], Results) -> Results;
-do_translogops([{Num, Entry} | TransLogOpsTail], {TLog, OldResults}) ->
-    %% do the translogops one by one, to always use the newest TLog
-    ?TRACE("rdht_tx:do_translogops(~p, ~p)~n",
-           [[{Num, Entry} | TransLogOpsTail], {TLog, OldResults}]),
-    Key = element(2, Entry),
-    [TLogEntry] = tx_tlog:filter_by_key(TLog, Key),
-    {TmpTLogEntry, Result} =
-        apply(element(1, Entry), work_phase, [TLogEntry, {Num, Entry}]),
-    %% which entry to use?
-    NewTLog =
-        case {tx_tlog:get_entry_operation(TLogEntry),
-              tx_tlog:get_entry_operation(TmpTLogEntry)} of
-            {rdht_tx_read, rdht_tx_read} -> TLog;
-            {rdht_tx_write, rdht_tx_read} -> TLog;
-            {rdht_tx_write, rdht_tx_write} ->
-                TLog1 = lists:delete(TLogEntry, TLog),
-                tx_tlog:add_entry(TLog1, TmpTLogEntry);
-            {rdht_tx_read, rdht_tx_write} ->
-                TLog1 = lists:delete(TLogEntry, TLog),
-                tx_tlog:add_entry(TLog1, TmpTLogEntry)
+%% @doc Merge TLog entries, if same key. Check for version mismatch,
+%%      take over values.
+-spec merge_tlogs(tx_tlog:tlog(), tx_tlog:tlog()) -> tx_tlog:tlog().
+merge_tlogs(SortedTLog, SortedRTLog) ->
+    merge_tlogs_iter(SortedTLog, SortedRTLog, []).
+
+-spec merge_tlogs_iter(tx_tlog:tlog(), tx_tlog:tlog(), tx_tlog:tlog()) ->
+                              tx_tlog:tlog().
+merge_tlogs_iter([], [], Acc)          -> Acc;
+merge_tlogs_iter([], SortedRTLog, [])  -> SortedRTLog;
+merge_tlogs_iter([], SortedRTLog, Acc) -> lists:reverse(Acc) ++ SortedRTLog;
+merge_tlogs_iter(SortedTLog, [], Acc)  -> lists:reverse(Acc) ++ SortedTLog;
+merge_tlogs_iter([TEntry | TTail] = SortedTLog,
+                 [RTEntry | RTTail] = SortedRTLog,
+                 Acc) ->
+    TKey = tx_tlog:get_entry_key(TEntry),
+    RTKey = tx_tlog:get_entry_key(RTEntry),
+    case TKey =:= RTKey of
+        true ->
+            %% key was in TLog, new entry is newer and contains value
+            %% for read?
+            case tx_tlog:get_entry_operation(TEntry) of
+                rdht_tx_read ->
+                    %% check versions: if mismatch -> change status to abort
+                    NewTLogEntry =
+                        case tx_tlog:get_entry_version(TEntry)
+                            =/= tx_tlog:get_entry_version(RTEntry) of
+                            true ->
+                                tx_tlog:set_entry_status(RTEntry, {fail, abort});
+                            false -> RTEntry
+                        end,
+                    merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
+                _ ->
+                    log:log(warn,
+                            "Duplicate key in TLog merge should not happen"),
+                    merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
+            end;
+        false ->
+            case TKey < RTKey of
+                true  -> merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
+                false -> merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc])
+            end
+    end.
+
+%% @doc Perform all operations on the TLog and generate list of results.
+-spec do_reqs_on_tlog(tx_tlog:tlog(), [request_on_key()]) ->
+                             {tx_tlog:tlog(), results()}.
+do_reqs_on_tlog(TLog, ReqList) ->
+    do_reqs_on_tlog_iter(TLog, ReqList, []).
+
+%% @doc Helper to perform all operations on the TLog and generate list
+%%      of results.
+-spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], results()) ->
+                                  {tx_tlog:tlog(), results()}.
+do_reqs_on_tlog_iter(TLog, [], Acc) -> {TLog, lists:reverse(Acc)};
+do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
+    Key = req_get_key(Req),
+    Entry = lists:keyfind(Key, 2, TLog),
+    {NewTLogEntry, ResultEntry} =
+        case Req of
+            %% native functions first:
+            {rdht_tx_read, Key}         -> tlog_read(Entry, Key);
+            {rdht_tx_write, Key, Value} -> tlog_write(Entry, Key, Value);
+            %% non-native functions:
+            {set_change, Key, ToAdd, ToDel} -> tlog_set_change(Entry, Key, ToAdd, ToDel);
+            {number_add, Key, X}          -> tlog_number_add(Entry, Key, X);
+            {test_and_set, Key, Old, New} -> tlog_test_and_set(Entry, Key, Old, New)
         end,
-    do_translogops(TransLogOpsTail, {NewTLog, [Result | OldResults]}).
+    NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
+    do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc]).
+
+%% @doc Get a result entry for a read from the given TLog entry.
+-spec tlog_read(tx_tlog:tlog_entry(), client_key()) ->
+                       {tx_tlog:tlog_entry(), result_entry_read()}.
+tlog_read(Entry, _Key) ->
+    Res = case tx_tlog:get_entry_status(Entry) of
+              {fail, Reason} -> {fail, Reason};
+              value -> {ok, tx_tlog:get_entry_value(Entry)};
+              not_found -> {fail, not_found}
+          end,
+    {Entry, decode_result(Res)}.
+
+%% @doc Get a result entry for a write from the given TLog entry.
+%%      Update the TLog entry accordingly.
+-spec tlog_write(tx_tlog:tlog_entry(), client_key(), client_value()) ->
+                       {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_write(Entry, _Key, Value) ->
+    case tx_tlog:get_entry_status(Entry) of
+        {fail, Reason} ->
+            {Entry, {fail, Reason}};
+        value ->
+            case tx_tlog:get_entry_operation(Entry) of
+                rdht_tx_write ->
+                    {tx_tlog:set_entry_value(Entry, Value), {ok}};
+                rdht_tx_read ->
+                    E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
+                    E2 = tx_tlog:set_entry_value(E1, Value),
+                    {E2, {ok}}
+            end;
+        not_found ->
+            E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
+            E2 = tx_tlog:set_entry_value(E1, Value),
+            E3 = tx_tlog:set_entry_status(E2, value),
+            {E3, {ok}}
+    end.
+
+%% @doc Simulate a change on a set via read and write requests.
+%%      Update the TLog entry accordingly.
+-spec tlog_set_change(tx_tlog:tlog_entry(), client_key(),
+                      client_value(), client_value()) ->
+                       {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_set_change(Entry, Key, ToAdd, ToDel) ->
+    case (not erlang:is_list(ToAdd)) orelse
+        (not erlang:is_list(ToDel)) of
+        true -> %% input type error
+            Error = {fail, not_a_list},
+            {tx_tlog:set_entry_status(Entry, Error), Error};
+        false ->
+            {_, Res0} = tlog_read(Entry, Key),
+            case Res0 of
+                {ok, OldValue} when erlang:is_list(OldValue) ->
+                    %% types ok
+                    case ToAdd =:= [] andalso ToDel =:= [] of
+                        true -> {Entry, {ok}}; % no op
+                        _ ->
+                            NewValue1 = lists:append(ToAdd, OldValue),
+                            NewValue2 = util:minus(NewValue1, ToDel),
+                            tlog_write(Entry, Key, encode_value(NewValue2))
+                    end;
+                {fail, not_found} -> %% key creation
+                    NewValue2 = util:minus(ToAdd, ToDel),
+                    tlog_write(Entry, Key, encode_value(NewValue2));
+                {ok, _} -> %% value is not a list
+                    Error = {fail, not_a_list},
+                    {tx_tlog:set_entry_status(Entry, Error), Error};
+                X when erlang:is_tuple(X) -> %% other previous error
+                    {Entry, X}
+            end
+    end.
+
+-spec tlog_number_add(tx_tlog:tlog_entry(), client_key(),
+                      client_value()) ->
+                             {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_number_add(Entry, Key, X) ->
+    case (not erlang:is_number(X)) of
+        true -> %% input type error
+            Error = {fail, not_a_number},
+            {tx_tlog:set_entry_status(Entry, Error), Error};
+        false ->
+            {_, Res0} = tlog_read(Entry, Key),
+            case Res0 of
+                {ok, OldValue} when erlang:is_number(OldValue) ->
+                    %% types ok
+                    case X == 0 of %% also accepts 0.0
+                        true -> {Entry, {ok}}; % no op
+                        _ ->
+                            NewValue = OldValue + X,
+                            tlog_write(Entry, Key, encode_value(NewValue))
+                    end;
+                {fail, not_found} -> %% key creation
+                    tlog_write(Entry, Key, X);
+                {ok, _} ->
+                    Error = {fail, not_a_number},
+                    {tx_tlog:set_entry_status(Entry, Error), Error};
+                E when erlang:is_tuple(E) -> %% other previous error
+                    {Entry, E}
+            end
+    end.
+
+-spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
+                        client_value(), client_value()) ->
+                               {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_test_and_set(Entry, Key, Old, New) ->
+    {_, Res0} = tlog_read(Entry, Key),
+    case Res0 of
+        {ok, Old} ->
+            tlog_write(Entry, Key, encode_value(New));
+        {ok, RealOldValue} ->
+            Error = {fail, {key_changed, RealOldValue}},
+            {tx_tlog:set_entry_status(Entry, Error), Error};
+        X when erlang:is_tuple(X) -> %% other previous error
+            {Entry, X}
+    end.
+
+%% @doc Encode the given client value to its internal representation which is
+%%      compressed for all values except atom, boolean, number or binary.
+-spec encode_value(client_value()) -> ?DB:value().
+encode_value(Value) when
+      is_atom(Value) orelse
+      is_boolean(Value) orelse
+      is_number(Value) ->
+    Value;
+encode_value(Value) when
+      is_binary(Value) ->
+    %% do not compress a binary
+    erlang:term_to_binary(Value, [{minor_version, 1}]);
+encode_value(Value) ->
+    erlang:term_to_binary(Value, [{compressed, 6}, {minor_version, 1}]).
+
+%% @doc Decodes the given internal representation of a client value.
+-spec decode_value(?DB:value()) -> client_value().
+decode_value(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
+decode_value(Value)                       -> Value.
+
+-spec decode_result(result_entry()) -> api_tx:result().
+decode_result({ok, Value}) -> {ok, decode_value(Value)};
+decode_result(X)           -> X.
 
 %% commit phase
 -spec commit(tx_tlog:tlog()) ->  result_entry_commit().
@@ -277,8 +467,7 @@ commit(TLog) ->
                 end
     end.
 
--spec receive_answer() -> {tx_tlog:tx_op(), req_id(),
-                           tx_tlog:tlog_entry(), result_entry()}.
+-spec receive_answer() -> {tx_tlog:tx_op(), req_id(), tx_tlog:tlog_entry()}.
 receive_answer() ->
     receive
         {tx_tm_rtm_commit_reply, _, _} ->
@@ -287,11 +476,13 @@ receive_answer() ->
         {tx_timeout, _} ->
             %% probably an outdated commit reply: drop it.
             receive_answer();
-        {_Op, _RdhtId, _RdhtTlog, _RdhtResult} = Reply -> Reply
+        %% @todo: change the protocol to omit the sending of the
+        %% result entry
+        {Op, RdhtId, RdhtTlog, _RdhtResult} -> {Op, RdhtId, RdhtTlog}
     end.
 
-%%% delete
-
+req_get_op(Request) -> element(1, Request).
+req_get_key(Request) -> element(2, Request).
 
 %% @doc Checks whether used config parameters exist and are valid.
 -spec check_config() -> boolean().
