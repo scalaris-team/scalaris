@@ -575,7 +575,12 @@ wait_for_bp_leave(Message, State, ComponentState, _BP_Active = true) ->
                               '$gen_component' =:= element(1, BPMsg),
                               bp =:= element(2, BPMsg) ->
                             ?TRACE_BP("got bp op by receive ~p.~n", [BPMsg]),
-                            {[BPMsg], false}
+                            {[BPMsg], false};
+                        GetCompStateMsg when
+                              is_tuple(GetCompStateMsg),
+                              '$gen_component' =:= element(1, GetCompStateMsg),
+                              get_component_state =:= element(2, GetCompStateMsg) ->
+                            {[GetCompStateMsg], false}
                     end;
                 _ ->
                     ?TRACE_BP("~p process queued bp op ~p.~n", [self(), hd(HB_BP_Ops)]),
@@ -627,7 +632,11 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
                     {[_H|_T], false} -> gc_state_bp_hold_back(ComponentState, BPMsg);
                     _ -> gc_state_bp_del(ComponentState, BPName)
                 end,
-            wait_for_bp_leave(Message, State, NextCompState, true)
+            wait_for_bp_leave(Message, State, NextCompState, true);
+        {'$gen_component', get_component_state, Pid} ->
+            comm:send_local(
+              Pid, {'$gen_component', get_component_state_response, State}),
+            wait_for_bp_leave(Message, State, ComponentState, true)
     end.
 
 -spec handle_unknown_event(Message::tuple(), any(), component_state(),
