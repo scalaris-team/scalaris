@@ -338,62 +338,59 @@ tlog_write(Entry, _Key, Value) ->
 -spec tlog_set_change(tx_tlog:tlog_entry(), client_key(),
                       client_value(), client_value()) ->
                        {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_set_change(Entry, _Key, ToAdd, ToDel) when
+      (not erlang:is_list(ToAdd)) orelse
+      (not erlang:is_list(ToDel)) ->
+    %% input type error
+    Error = {fail, not_a_list},
+    {tx_tlog:set_entry_status(Entry, Error), Error};
 tlog_set_change(Entry, Key, ToAdd, ToDel) ->
-    case (not erlang:is_list(ToAdd)) orelse
-        (not erlang:is_list(ToDel)) of
-        true -> %% input type error
+    {_, Res0} = tlog_read(Entry, Key),
+    case Res0 of
+        {ok, OldValue} when erlang:is_list(OldValue) ->
+            %% types ok
+            case ToAdd =:= [] andalso ToDel =:= [] of
+                true -> {Entry, {ok}}; % no op
+                _ ->
+                    NewValue1 = lists:append(ToAdd, OldValue),
+                    NewValue2 = util:minus(NewValue1, ToDel),
+                    tlog_write(Entry, Key, encode_value(NewValue2))
+            end;
+        {fail, not_found} -> %% key creation
+            NewValue2 = util:minus(ToAdd, ToDel),
+            tlog_write(Entry, Key, encode_value(NewValue2));
+        {ok, _} -> %% value is not a list
             Error = {fail, not_a_list},
             {tx_tlog:set_entry_status(Entry, Error), Error};
-        false ->
-            {_, Res0} = tlog_read(Entry, Key),
-            case Res0 of
-                {ok, OldValue} when erlang:is_list(OldValue) ->
-                    %% types ok
-                    case ToAdd =:= [] andalso ToDel =:= [] of
-                        true -> {Entry, {ok}}; % no op
-                        _ ->
-                            NewValue1 = lists:append(ToAdd, OldValue),
-                            NewValue2 = util:minus(NewValue1, ToDel),
-                            tlog_write(Entry, Key, encode_value(NewValue2))
-                    end;
-                {fail, not_found} -> %% key creation
-                    NewValue2 = util:minus(ToAdd, ToDel),
-                    tlog_write(Entry, Key, encode_value(NewValue2));
-                {ok, _} -> %% value is not a list
-                    Error = {fail, not_a_list},
-                    {tx_tlog:set_entry_status(Entry, Error), Error};
-                X when erlang:is_tuple(X) -> %% other previous error
-                    {Entry, X}
-            end
+        X when erlang:is_tuple(X) -> %% other previous error
+            {Entry, X}
     end.
 
 -spec tlog_number_add(tx_tlog:tlog_entry(), client_key(),
                       client_value()) ->
                              {tx_tlog:tlog_entry(), result_entry_write()}.
+tlog_number_add(Entry, Key, X)
+  when (not erlang:is_number(X)) ->
+    Error = {fail, not_a_number},
+    {tx_tlog:set_entry_status(Entry, Error), Error};
 tlog_number_add(Entry, Key, X) ->
-    case (not erlang:is_number(X)) of
-        true -> %% input type error
+    {_, Res0} = tlog_read(Entry, Key),
+    case Res0 of
+        {ok, OldValue} when erlang:is_number(OldValue) ->
+            %% types ok
+            case X == 0 of %% also accepts 0.0
+                true -> {Entry, {ok}}; % no op
+                _ ->
+                    NewValue = OldValue + X,
+                    tlog_write(Entry, Key, encode_value(NewValue))
+            end;
+        {fail, not_found} -> %% key creation
+            tlog_write(Entry, Key, X);
+        {ok, _} ->
             Error = {fail, not_a_number},
             {tx_tlog:set_entry_status(Entry, Error), Error};
-        false ->
-            {_, Res0} = tlog_read(Entry, Key),
-            case Res0 of
-                {ok, OldValue} when erlang:is_number(OldValue) ->
-                    %% types ok
-                    case X == 0 of %% also accepts 0.0
-                        true -> {Entry, {ok}}; % no op
-                        _ ->
-                            NewValue = OldValue + X,
-                            tlog_write(Entry, Key, encode_value(NewValue))
-                    end;
-                {fail, not_found} -> %% key creation
-                    tlog_write(Entry, Key, X);
-                {ok, _} ->
-                    Error = {fail, not_a_number},
-                    {tx_tlog:set_entry_status(Entry, Error), Error};
-                E when erlang:is_tuple(E) -> %% other previous error
-                    {Entry, E}
-            end
+        E when erlang:is_tuple(E) -> %% other previous error
+            {Entry, E}
     end.
 
 -spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
