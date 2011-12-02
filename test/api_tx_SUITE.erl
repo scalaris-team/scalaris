@@ -383,7 +383,7 @@ write_test(Config) ->
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
 prop_encode_decode(Value) ->
-    Value =:= rdht_tx0:decode_value(rdht_tx0:encode_value(Value)).
+    Value =:= rdht_tx:decode_value(rdht_tx:encode_value(Value)).
 
 tester_encode_decode(_Config) ->
     tester:test(?MODULE, prop_encode_decode, 1, 10000).
