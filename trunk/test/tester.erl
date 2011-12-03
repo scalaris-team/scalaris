@@ -71,7 +71,7 @@ test_log(Module, Func, Arity, Iterations) ->
         error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n", [Module, Func, {exception, {Reason2, erlang:get_stacktrace()}}])
     end,
     io:format(""),
-    run(Module, Func, Arity, Iterations, ParseState),
+    _ = run(Module, Func, Arity, Iterations, ParseState),
     ok.
 
 % @doc options are white_list and seed

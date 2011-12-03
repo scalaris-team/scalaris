@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 
 -behaviour(tx_op_beh).
--export([work_phase/2, work_phase/3,
+-export([work_phase/3,
          validate_prefilter/1, validate/2,
          commit/3, abort/3]).
 
@@ -47,8 +47,8 @@
 -type req_id() :: {rdht_tx:req_id(), pid(), any()}.
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
-msg_reply(Id, TLogEntry, ResultEntry) ->
-    {rdht_tx_write_reply, Id, TLogEntry, ResultEntry}.
+msg_reply(Id, TLogEntry) ->
+    {rdht_tx_write_reply, Id, TLogEntry}.
 
 -spec tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
 tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
@@ -56,14 +56,6 @@ tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
 tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
 -spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
 tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
-
--spec work_phase(tx_tlog:tlog_entry(), {non_neg_integer(),
-                                        rdht_tx:request()}) ->
-                        {tx_tlog:tlog_entry(),
-                         {pos_integer(), rdht_tx:result_entry()}}.
-work_phase(TLogEntry, {Num, Request}) ->
-    {NewTLogEntry, Result} = make_tlog_result_entry(TLogEntry, Request),
-    {NewTLogEntry, {Num, Result}}.
 
 -spec work_phase(pid(), rdht_tx:req_id(), rdht_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
@@ -179,19 +171,17 @@ init([]) ->
 %% reply triggered by rdht_tx_write:work_phase/3
 %% ClientPid and WriteValue could also be stored in local process state via ets
 -spec on(comm:message(), null) -> null.
-on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry, _ResultEntry},
-   State) ->
+on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     Request = {?MODULE, Key, WriteValue},
-    {NewTLogEntry, NewResultEntry} =
-        make_tlog_result_entry(TLogEntry, Request),
-    Msg = msg_reply(Id, NewTLogEntry, NewResultEntry),
+    NewTLogEntry = update_tlog_entry(TLogEntry, Request),
+    Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
     State.
 
--spec make_tlog_result_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
-        {tx_tlog:tlog_entry(), rdht_tx:result_entry()}.
-make_tlog_result_entry(TLogEntry, Request) ->
+-spec update_tlog_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
+                               tx_tlog:tlog_entry().
+update_tlog_entry(TLogEntry, Request) ->
     Module = tx_tlog:get_entry_operation(TLogEntry),
     Key = tx_tlog:get_entry_key(TLogEntry),
     Status = apply(Module, tlogentry_get_status, [TLogEntry]),
@@ -201,15 +191,12 @@ make_tlog_result_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         value ->
-            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
-            {ok}};
+            tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version);
         not_found ->
-            {tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version),
-             {ok}};
+            tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version);
         {fail, timeout} ->
-            {tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
-                               WriteValue, Version),
-             {fail, timeout}}
+            tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
+                               WriteValue, Version)
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.

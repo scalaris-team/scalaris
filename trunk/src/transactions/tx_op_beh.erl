@@ -17,7 +17,7 @@
 %%      The behaviour of an operation in a transaction.
 %% @version $Id$
 -module(tx_op_beh).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
@@ -30,11 +30,8 @@ behaviour_info(callbacks) ->
     [
      %% do the work phase *asynchronously*, replies to local client with a msg
      %% work_phase(ClientPid, Id, Request) ->
-     %%   msg {work_phase_reply, Id, TransLogEntry}
+     %%   msg {work_phase_reply, Id, TLogEntry}
      {work_phase, 3},
-     %% do the work phase *synchronously* based on an existing translog entry
-     %% work_phase(TransLog, Request) -> NewTransLogEntry
-     {work_phase, 2},
      %% May make several ones from a single TransLog item (item replication)
      %% validate_prefilter(TransLogEntry) ->
      %%   [TransLogEntries] (replicas)
