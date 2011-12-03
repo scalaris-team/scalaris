@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 -behaviour(tx_op_beh).
--export([work_phase/2, work_phase/3,
+-export([work_phase/3,
          validate_prefilter/1, validate/2,
          commit/3, abort/3]).
 
@@ -41,8 +41,8 @@
 -export([check_config/0]).
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
-msg_reply(Id, TLogEntry, ResultEntry) ->
-    {rdht_tx_read_reply, Id, TLogEntry, ResultEntry}.
+msg_reply(Id, TLogEntry) ->
+    {rdht_tx_read_reply, Id, TLogEntry}.
 
 -spec tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
 tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
@@ -50,27 +50,6 @@ tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
 tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
 -spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
 tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
-
--spec work_phase(tx_tlog:tlog_entry(),
-                 {non_neg_integer(),
-                  rdht_tx:request()}) ->
-                        {tx_tlog:tlog_entry(),
-                         {pos_integer(), rdht_tx:result_entry()}}.
-work_phase(TLogEntry, {Num, Request}) ->
-    ?TRACE("rdht_tx_read:work_phase~n", []),
-    %% PRE no failed entries in TLog
-    Module = tx_tlog:get_entry_operation(TLogEntry),
-    Status = apply(Module, tlogentry_get_status, [TLogEntry]),
-    Value = apply(Module, tlogentry_get_value, [TLogEntry]),
-    Version = apply(Module, tlogentry_get_version, [TLogEntry]),
-    NewTLogEntry =
-        tx_tlog:new_entry(?MODULE, element(2, Request), Status, Value, Version),
-    Result =
-        case Status of
-            value -> {Num, {ok, Value}};
-            not_found -> {Num, {fail, Status}}
-        end,
-    {NewTLogEntry, Result}.
 
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                  rdht_tx:request()) -> ok.
@@ -261,8 +240,7 @@ timeout_inform(Entry) ->
 -spec inform_client(pid(), rdht_tx_read_state:read_state()) -> ok.
 inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
-    Msg = msg_reply(Id, make_tlog_entry(Entry),
-                    make_result_entry(Entry)),
+    Msg = msg_reply(Id, make_tlog_entry(Entry)),
     comm:send_local(Client, Msg), ok.
 
 -spec make_tlog_entry(rdht_tx_read_state:read_state()) ->
@@ -272,14 +250,6 @@ make_tlog_entry(Entry) ->
     Key = rdht_tx_read_state:get_key(Entry),
     Status = rdht_tx_read_state:get_decided(Entry),
     tx_tlog:new_entry(?MODULE, Key, Status, Val, Vers).
-
-make_result_entry(Entry) ->
-    {Val, _Vers} = rdht_tx_read_state:get_result(Entry),
-    case rdht_tx_read_state:get_decided(Entry) of
-        value -> {ok, Val};
-        not_found -> {fail, not_found};
-        {fail, timeout} -> {fail, timeout}
-    end.
 
 delete_if_all_replied(Entry, Reps, Table) ->
     Id = rdht_tx_read_state:get_id(Entry),

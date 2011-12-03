@@ -474,9 +474,7 @@ receive_answer() ->
         {tx_timeout, _} ->
             %% probably an outdated commit reply: drop it.
             receive_answer();
-        %% @todo: change the protocol to omit the sending of the
-        %% result entry
-        {Op, RdhtId, RdhtTlog, _RdhtResult} -> {Op, RdhtId, RdhtTlog}
+        {Op, RdhtId, RdhtTlog} -> {Op, RdhtId, RdhtTlog}
     end.
 
 req_get_op(Request) -> element(1, Request).
