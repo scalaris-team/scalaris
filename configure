@@ -588,16 +588,32 @@ JAVAFUNCTIONS
 DIALYZER_FLAGS
 EMAKEFILECOMPILECOMPAT
 EMAKEFILEDEFINES
+ERLANG_TOKE_FLAGS
+ERLANG_LIB_VER_toke
+ERLANG_LIB_DIR_toke
 RUN_TEST
 ERLANG_LIB_VER_edoc
 ERLANG_LIB_DIR_edoc
 ERLANG_LIB_VER_common_test
 ERLANG_LIB_DIR_common_test
+ERLANG_LIB_VER_xmerl
+ERLANG_LIB_DIR_xmerl
+ERLANG_LIB_VER_ssl
+ERLANG_LIB_DIR_ssl
+ERLANG_LIB_VER_inets
+ERLANG_LIB_DIR_inets
 ERLANG_LIB_VER_tools
 ERLANG_LIB_DIR_tools
-ERLANG_TOKE_FLAGS
-ERLANG_LIB_VER_toke
-ERLANG_LIB_DIR_toke
+ERLANG_LIB_VER_crypto
+ERLANG_LIB_DIR_crypto
+ERLANG_LIB_VER_compiler
+ERLANG_LIB_DIR_compiler
+ERLANG_LIB_VER_stdlib
+ERLANG_LIB_DIR_stdlib
+ERLANG_LIB_VER_kernel
+ERLANG_LIB_DIR_kernel
+ERLANG_LIB_VER_erts
+ERLANG_LIB_DIR_erts
 EPMD
 ERLANG_ERTS_VER
 ERLANG_LIB_DIR
@@ -2295,16 +2311,16 @@ fi
 
 
 
-ERLANG_TOKE_FLAGS=
-if test "x$TOKEPREFIX" != xno; then :
-
-            ERLANG_TOKE_MESSAGE=
-            if test "x$TOKEPREFIX" != x; then :
-  export ERL_LIBS="$TOKEPREFIX"
+ERLANG_NATIVE_FLAGS=
+if test "x$COMPILE_NATIVE" != xno; then :
+  ERLANG_NATIVE_FLAGS=", native"
 fi
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library subdirectory" >&5
-$as_echo_n "checking for Erlang/OTP 'toke' library subdirectory... " >&6; }
-if ${ac_cv_erlang_lib_dir_toke+:} false; then :
+
+# required libs:
+ERLANG_UNAVAILABLE_LIBS=
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erts' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'erts' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_erts+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_ext=erl
@@ -2321,7 +2337,7 @@ else
 -export([start/0]).
 
 start() ->
-	    ReturnValue = case code:lib_dir("toke") of
+	    ReturnValue = case code:lib_dir("erts") of
 	    {error, bad_name} ->
 		file:write_file("conftest.out", "not found\n"),
 		1;
@@ -2334,7 +2350,7 @@ start() ->
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  ac_cv_erlang_lib_dir_toke=`cat conftest.out`
+  ac_cv_erlang_lib_dir_erts=`cat conftest.out`
 	 rm -f conftest.out
 else
   if test ! -f conftest.out; then
@@ -2343,7 +2359,7 @@ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "test Erlang program execution failed
 See \`config.log' for more details" "$LINENO" 5; }
 	 else
-	     ac_cv_erlang_lib_dir_toke="not found"
+	     ac_cv_erlang_lib_dir_erts="not found"
 	     rm -f conftest.out
 	 fi
 fi
@@ -2356,86 +2372,341 @@ ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
 ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
 
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_toke" >&5
-$as_echo "$ac_cv_erlang_lib_dir_toke" >&6; }
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library version" >&5
-$as_echo_n "checking for Erlang/OTP 'toke' library version... " >&6; }
-if ${ac_cv_erlang_lib_ver_toke+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_erts" >&5
+$as_echo "$ac_cv_erlang_lib_dir_erts" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'erts' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'erts' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_erts+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
-  ac_cv_erlang_lib_ver_toke="not found"
+  if test "$ac_cv_erlang_lib_dir_erts" = "not found"; then :
+  ac_cv_erlang_lib_ver_erts="not found"
 else
-  ac_cv_erlang_lib_ver_toke=`$as_echo "$ac_cv_erlang_lib_dir_toke" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+  ac_cv_erlang_lib_ver_erts=`$as_echo "$ac_cv_erlang_lib_dir_erts" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
 fi
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_toke" >&5
-$as_echo "$ac_cv_erlang_lib_ver_toke" >&6; }
-ERLANG_LIB_DIR_toke=$ac_cv_erlang_lib_dir_toke
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_erts" >&5
+$as_echo "$ac_cv_erlang_lib_ver_erts" >&6; }
+ERLANG_LIB_DIR_erts=$ac_cv_erlang_lib_dir_erts
 
-ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
+ERLANG_LIB_VER_erts=$ac_cv_erlang_lib_ver_erts
 
-if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
-  HAVETOKE=""
-               HAVETOKE_DIALYZER=""
-               ERLANG_TOKE_MESSAGE="toke erlang library not found"
+if test "$ac_cv_erlang_lib_dir_erts" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS erts"
+fi
 
-else
-  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so" >&5
-$as_echo_n "checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so... " >&6; }
-if eval \${$as_ac_File+:} false; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'kernel' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'kernel' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_kernel+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$ERLANG_LIB_DIR_toke/priv/libtoke.so"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  HAVETOKE=", {d, have_toke}"
-                 HAVETOKE_DIALYZER="-Dhave_toke"
-                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
-
-else
-  HAVETOKE=""
-                 HAVETOKE_DIALYZER=""
-                 ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
-
-fi
-
-
-fi
-
-            if test "x$TOKEPREFIX" != x; then :
-  export ERL_LIBS=""
-fi
-            if test "x$ERLANG_TOKE_MESSAGE" != x; then :
-  if test "x$ENABLE_TOKE" != xyes; then :
-  ERLANG_TOKE_MESSAGE="$ERLANG_TOKE_MESSAGE, disabling toke support..."
-                 { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_TOKE_MESSAGE" >&5
-$as_echo "$as_me: $ERLANG_TOKE_MESSAGE" >&6;}
-else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "$ERLANG_TOKE_MESSAGE
+as_fn_error $? "cannot run test program while cross compiling
 See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("kernel") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_kernel=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_kernel="not found"
+	     rm -f conftest.out
+	 fi
 fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_kernel" >&5
+$as_echo "$ac_cv_erlang_lib_dir_kernel" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'kernel' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'kernel' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_kernel+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_kernel" = "not found"; then :
+  ac_cv_erlang_lib_ver_kernel="not found"
+else
+  ac_cv_erlang_lib_ver_kernel=`$as_echo "$ac_cv_erlang_lib_dir_kernel" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_kernel" >&5
+$as_echo "$ac_cv_erlang_lib_ver_kernel" >&6; }
+ERLANG_LIB_DIR_kernel=$ac_cv_erlang_lib_dir_kernel
+
+ERLANG_LIB_VER_kernel=$ac_cv_erlang_lib_ver_kernel
+
+if test "$ac_cv_erlang_lib_dir_kernel" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS kernel"
 fi
 
 
-ERLANG_NATIVE_FLAGS=
-if test "x$COMPILE_NATIVE" != xno; then :
-  ERLANG_NATIVE_FLAGS=", native"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'stdlib' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'stdlib' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_stdlib+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("stdlib") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_stdlib=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_stdlib="not found"
+	     rm -f conftest.out
+	 fi
 fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_stdlib" >&5
+$as_echo "$ac_cv_erlang_lib_dir_stdlib" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'stdlib' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'stdlib' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_stdlib+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_stdlib" = "not found"; then :
+  ac_cv_erlang_lib_ver_stdlib="not found"
+else
+  ac_cv_erlang_lib_ver_stdlib=`$as_echo "$ac_cv_erlang_lib_dir_stdlib" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_stdlib" >&5
+$as_echo "$ac_cv_erlang_lib_ver_stdlib" >&6; }
+ERLANG_LIB_DIR_stdlib=$ac_cv_erlang_lib_dir_stdlib
+
+ERLANG_LIB_VER_stdlib=$ac_cv_erlang_lib_ver_stdlib
+
+if test "$ac_cv_erlang_lib_dir_stdlib" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS stdlib"
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'compiler' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'compiler' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_compiler+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("compiler") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_compiler=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_compiler="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_compiler" >&5
+$as_echo "$ac_cv_erlang_lib_dir_compiler" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'compiler' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'compiler' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_compiler+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_compiler" = "not found"; then :
+  ac_cv_erlang_lib_ver_compiler="not found"
+else
+  ac_cv_erlang_lib_ver_compiler=`$as_echo "$ac_cv_erlang_lib_dir_compiler" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_compiler" >&5
+$as_echo "$ac_cv_erlang_lib_ver_compiler" >&6; }
+ERLANG_LIB_DIR_compiler=$ac_cv_erlang_lib_dir_compiler
+
+ERLANG_LIB_VER_compiler=$ac_cv_erlang_lib_ver_compiler
+
+if test "$ac_cv_erlang_lib_dir_compiler" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS compiler"
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'crypto' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'crypto' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_crypto+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("crypto") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_crypto=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_crypto="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_crypto" >&5
+$as_echo "$ac_cv_erlang_lib_dir_crypto" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'crypto' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'crypto' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_crypto+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_crypto" = "not found"; then :
+  ac_cv_erlang_lib_ver_crypto="not found"
+else
+  ac_cv_erlang_lib_ver_crypto=`$as_echo "$ac_cv_erlang_lib_dir_crypto" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_crypto" >&5
+$as_echo "$ac_cv_erlang_lib_ver_crypto" >&6; }
+ERLANG_LIB_DIR_crypto=$ac_cv_erlang_lib_dir_crypto
+
+ERLANG_LIB_VER_crypto=$ac_cv_erlang_lib_ver_crypto
+
+if test "$ac_cv_erlang_lib_dir_crypto" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS crypto"
+fi
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'tools' library subdirectory" >&5
 $as_echo_n "checking for Erlang/OTP 'tools' library subdirectory... " >&6; }
@@ -2511,13 +2782,252 @@ ERLANG_LIB_DIR_tools=$ac_cv_erlang_lib_dir_tools
 ERLANG_LIB_VER_tools=$ac_cv_erlang_lib_ver_tools
 
 if test "$ac_cv_erlang_lib_dir_tools" = "not found"; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "erlang-tools not found - you won't be able compile the erlang sources
-See \`config.log' for more details" "$LINENO" 5; }
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS tools"
 fi
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'inets' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'inets' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_inets+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("inets") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_inets=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_inets="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_inets" >&5
+$as_echo "$ac_cv_erlang_lib_dir_inets" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'inets' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'inets' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_inets+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_inets" = "not found"; then :
+  ac_cv_erlang_lib_ver_inets="not found"
+else
+  ac_cv_erlang_lib_ver_inets=`$as_echo "$ac_cv_erlang_lib_dir_inets" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_inets" >&5
+$as_echo "$ac_cv_erlang_lib_ver_inets" >&6; }
+ERLANG_LIB_DIR_inets=$ac_cv_erlang_lib_dir_inets
+
+ERLANG_LIB_VER_inets=$ac_cv_erlang_lib_ver_inets
+
+if test "$ac_cv_erlang_lib_dir_inets" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS inets"
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'ssl' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'ssl' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_ssl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("ssl") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_ssl=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_ssl="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_ssl" >&5
+$as_echo "$ac_cv_erlang_lib_dir_ssl" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'ssl' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'ssl' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_ssl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_ssl" = "not found"; then :
+  ac_cv_erlang_lib_ver_ssl="not found"
+else
+  ac_cv_erlang_lib_ver_ssl=`$as_echo "$ac_cv_erlang_lib_dir_ssl" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_ssl" >&5
+$as_echo "$ac_cv_erlang_lib_ver_ssl" >&6; }
+ERLANG_LIB_DIR_ssl=$ac_cv_erlang_lib_dir_ssl
+
+ERLANG_LIB_VER_ssl=$ac_cv_erlang_lib_ver_ssl
+
+if test "$ac_cv_erlang_lib_dir_ssl" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS ssl"
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'xmerl' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'xmerl' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_xmerl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("xmerl") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_xmerl=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_xmerl="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_xmerl" >&5
+$as_echo "$ac_cv_erlang_lib_dir_xmerl" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'xmerl' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'xmerl' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_xmerl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_xmerl" = "not found"; then :
+  ac_cv_erlang_lib_ver_xmerl="not found"
+else
+  ac_cv_erlang_lib_ver_xmerl=`$as_echo "$ac_cv_erlang_lib_dir_xmerl" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_xmerl" >&5
+$as_echo "$ac_cv_erlang_lib_ver_xmerl" >&6; }
+ERLANG_LIB_DIR_xmerl=$ac_cv_erlang_lib_dir_xmerl
+
+ERLANG_LIB_VER_xmerl=$ac_cv_erlang_lib_ver_xmerl
+
+if test "$ac_cv_erlang_lib_dir_xmerl" = "not found"; then :
+  ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS xmerl"
+fi
+
+
+if test "x$ERLANG_UNAVAILABLE_LIBS" != x; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "$ERLANG_UNAVAILABLE_LIBS not found - you won't be able compile the erlang sources
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+# libs for optional build tasks:
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'common_test' library subdirectory" >&5
 $as_echo_n "checking for Erlang/OTP 'common_test' library subdirectory... " >&6; }
 if ${ac_cv_erlang_lib_dir_common_test+:} false; then :
@@ -2762,6 +3272,143 @@ fi
                   { $as_echo "$as_me:${as_lineno-$LINENO}: run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests" >&5
 $as_echo "$as_me: run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests" >&6;}
                fi
+fi
+
+fi
+
+
+ERLANG_TOKE_FLAGS=
+if test "x$TOKEPREFIX" != xno; then :
+
+            ERLANG_TOKE_MESSAGE=
+            if test "x$TOKEPREFIX" != x; then :
+  export ERL_LIBS="$TOKEPREFIX"
+fi
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'toke' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_toke+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("toke") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_toke=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_toke="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_toke" >&5
+$as_echo "$ac_cv_erlang_lib_dir_toke" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'toke' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'toke' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_toke+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
+  ac_cv_erlang_lib_ver_toke="not found"
+else
+  ac_cv_erlang_lib_ver_toke=`$as_echo "$ac_cv_erlang_lib_dir_toke" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_toke" >&5
+$as_echo "$ac_cv_erlang_lib_ver_toke" >&6; }
+ERLANG_LIB_DIR_toke=$ac_cv_erlang_lib_dir_toke
+
+ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
+
+if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
+  HAVETOKE=""
+               HAVETOKE_DIALYZER=""
+               ERLANG_TOKE_MESSAGE="toke erlang library not found"
+
+else
+  as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so" >&5
+$as_echo_n "checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$ERLANG_LIB_DIR_toke/priv/libtoke.so"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  HAVETOKE=", {d, have_toke}"
+                 HAVETOKE_DIALYZER="-Dhave_toke"
+                 ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
+
+else
+  HAVETOKE=""
+                 HAVETOKE_DIALYZER=""
+                 ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
+
+fi
+
+
+fi
+
+            if test "x$TOKEPREFIX" != x; then :
+  export ERL_LIBS=""
+fi
+            if test "x$ERLANG_TOKE_MESSAGE" != x; then :
+  if test "x$ENABLE_TOKE" != xyes; then :
+  ERLANG_TOKE_MESSAGE="$ERLANG_TOKE_MESSAGE, disabling toke support..."
+                 { $as_echo "$as_me:${as_lineno-$LINENO}: $ERLANG_TOKE_MESSAGE" >&5
+$as_echo "$as_me: $ERLANG_TOKE_MESSAGE" >&6;}
+else
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "$ERLANG_TOKE_MESSAGE
+See \`config.log' for more details" "$LINENO" 5; }
+fi
 fi
 
 fi

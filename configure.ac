@@ -94,6 +94,45 @@ AC_SUBST([ERLANG_ERTS_VER], [$erlang_cv_erts_ver])
 
 AC_PATH_PROG(EPMD, epmd, "/bin/false", "$PATH:$ERLANG_ROOT_DIR/bin:$ERLANG_ROOT_DIR/erts-$ERLANG_ERTS_VER/bin")
 
+ERLANG_NATIVE_FLAGS=
+AS_IF([test "x$COMPILE_NATIVE" != xno], [ERLANG_NATIVE_FLAGS=", native"])
+
+# required libs:
+ERLANG_UNAVAILABLE_LIBS=
+AC_ERLANG_CHECK_LIB(erts, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS erts")
+
+AC_ERLANG_CHECK_LIB(kernel, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS kernel")
+
+AC_ERLANG_CHECK_LIB(stdlib, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS stdlib")
+
+AC_ERLANG_CHECK_LIB(compiler, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS compiler")
+
+AC_ERLANG_CHECK_LIB(crypto, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS crypto")
+
+AC_ERLANG_CHECK_LIB(tools, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS tools")
+
+AC_ERLANG_CHECK_LIB(inets, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS inets")
+
+AC_ERLANG_CHECK_LIB(ssl, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS ssl")
+
+AC_ERLANG_CHECK_LIB(xmerl, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS xmerl")
+
+AS_IF([test "x$ERLANG_UNAVAILABLE_LIBS" != x], AC_MSG_FAILURE([$ERLANG_UNAVAILABLE_LIBS not found - you won't be able compile the erlang sources]))
+
+# libs for optional build tasks:
+AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found - you won't be able to run the unit tests without common_test]))
+
+AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be able to create the documentation or run 'make install']))
+
+AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
+              [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
+              [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
+              [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/run_test])],
+              [AC_PATH_PROG([RUN_TEST],[run_test])
+               if test -z $ac_cv_path_RUN_TEST ; then
+                  AC_MSG_NOTICE([run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
+               fi])])
+
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
             [
@@ -122,24 +161,6 @@ AS_IF([test "x$TOKEPREFIX" != xno],
                 AC_MSG_FAILURE($ERLANG_TOKE_MESSAGE))])
             ])
 AC_SUBST([ERLANG_TOKE_FLAGS])
-
-ERLANG_NATIVE_FLAGS=
-AS_IF([test "x$COMPILE_NATIVE" != xno], [ERLANG_NATIVE_FLAGS=", native"])
-
-AC_ERLANG_CHECK_LIB(tools, , AC_MSG_FAILURE([erlang-tools not found - you won't be able compile the erlang sources]))
-
-AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found - you won't be able to run the unit tests without common_test]))
-
-AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be able to create the documentation or run 'make install']))
-
-AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
-              [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
-              [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
-              [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/run_test])],
-              [AC_PATH_PROG([RUN_TEST],[run_test])
-               if test -z $ac_cv_path_RUN_TEST ; then
-                  AC_MSG_NOTICE([run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
-               fi])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
