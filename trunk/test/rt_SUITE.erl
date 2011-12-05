@@ -52,7 +52,7 @@ prop_client_key_to_binary(Key1, Key2) ->
     ?implies(Key1 =/= Key2, Bin1 =/= Bin2).
     
 tester_client_key_to_binary(_Config) ->
-    tester:test(?MODULE, prop_client_key_to_binary, 2, 50000).
+    tester:test(?MODULE, prop_client_key_to_binary, 2, 50000, [multi_threaded]).
 
 -spec prop_hash_key(Key::client_key()) -> true.
 prop_hash_key(Key) ->
@@ -61,7 +61,7 @@ prop_hash_key(Key) ->
     true.
     
 tester_hash_key(_Config) ->
-    tester:test(?MODULE, prop_hash_key, 1, 100000).
+    tester:test(?MODULE, prop_hash_key, 1, 100000, [multi_threaded]).
 
 number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
@@ -155,7 +155,7 @@ prop_get_split_key_half(Begin, End_) ->
     call_helper_fun(check_split_key_half, [Begin, End, SplitKey]).
 
 tester_get_split_key_half(_Config) ->
-    tester:test(?MODULE, prop_get_split_key_half, 2, 10000).
+    tester:test(?MODULE, prop_get_split_key_half, 2, 10000, [multi_threaded]).
 
 -spec prop_get_split_key(Begin::?RT:key(), End::?RT:key() | plus_infinity, SplitFracA::1..100, SplitFracB::0..100) -> true.
 prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
@@ -190,7 +190,7 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
     true.
 
 tester_get_split_key(_Config) ->
-    tester:test(?MODULE, prop_get_split_key, 4, 10000).
+    tester:test(?MODULE, prop_get_split_key, 4, 10000, [multi_threaded]).
 
 additional_tests(Config) ->
     call_helper_fun(additional_tests, [Config]).
