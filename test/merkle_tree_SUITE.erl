@@ -108,7 +108,7 @@ prop_branch_bucket(L, R, Branch, Bucket) ->
     true.
 
 tester_branch_bucket(_) ->
-    tester:test(?MODULE, prop_branch_bucket, 4, 10).
+    tester:test(?MODULE, prop_branch_bucket, 4, 10, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -132,7 +132,7 @@ prop_tree_hash(L, R, ToAdd) ->
     true.
 
 tester_tree_hash(_) ->
-    tester:test(?MODULE, prop_tree_hash, 3, 10).
+    tester:test(?MODULE, prop_tree_hash, 3, 10, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -152,7 +152,7 @@ prop_insert(L, R, ToAdd) ->
     true.
 
 tester_insert(_) ->
-    tester:test(?MODULE, prop_insert, 3, 2).
+    tester:test(?MODULE, prop_insert, 3, 2, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -167,7 +167,7 @@ prop_size(L, R, ToAdd) ->
     true.
     
 tester_size(_) ->
-  tester:test(?MODULE, prop_size, 3, 10).
+  tester:test(?MODULE, prop_size, 3, 10, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -186,7 +186,7 @@ prop_iter(L, R, ToAdd) ->
 
 tester_iter(_Config) ->
     %prop_iter(0, 10000001, 10000).
-    tester:test(?MODULE, prop_iter, 3, 5).
+    tester:test(?MODULE, prop_iter, 3, 5, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -201,7 +201,7 @@ prop_store_to_dot(L, R, ToAdd) ->
     true.
 
 tester_store_to_dot(_) ->
-  tester:test(?MODULE, prop_store_to_dot, 3, 2).
+  tester:test(?MODULE, prop_store_to_dot, 3, 2, [multi_threaded]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper
