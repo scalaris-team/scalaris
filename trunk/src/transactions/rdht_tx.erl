@@ -355,11 +355,11 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
                 true -> {Entry, {ok}}; % no op
                 _ ->
                     NewValue1 = lists:append(ToAdd, OldValue),
-                    NewValue2 = util:minus(NewValue1, ToDel),
+                    NewValue2 = util:minus_list(NewValue1, ToDel),
                     tlog_write(Entry, Key, encode_value(NewValue2))
             end;
         {fail, not_found} -> %% key creation
-            NewValue2 = util:minus(ToAdd, ToDel),
+            NewValue2 = util:minus_list(ToAdd, ToDel),
             tlog_write(Entry, Key, encode_value(NewValue2));
         {ok, _} -> %% value is not a list
             Error = {fail, not_a_list},
