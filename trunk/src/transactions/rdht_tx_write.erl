@@ -191,12 +191,12 @@ update_tlog_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         value ->
-            tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version);
+            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
         not_found ->
-            tx_tlog:new_entry(?MODULE, Key, value, WriteValue, Version);
+            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
         {fail, timeout} ->
-            tx_tlog:new_entry(?MODULE, Key, {fail, timeout},
-                               WriteValue, Version)
+            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
+                               WriteValue)
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.

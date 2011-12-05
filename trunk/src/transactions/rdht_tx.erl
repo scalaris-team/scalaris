@@ -14,6 +14,7 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
+%% @author Nico Kruber <kruber@zib.de>
 %% @doc    API for transactions on replicated DHT items.
 %% @version $Id$
 -module(rdht_tx).
