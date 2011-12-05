@@ -23,9 +23,6 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.ericsson.otp.erlang.OtpErlangObject;
-import com.ericsson.otp.erlang.OtpErlangString;
-
 import de.zib.scalaris.Transaction.RequestList;
 import de.zib.scalaris.Transaction.ResultList;
 
@@ -256,13 +253,11 @@ public class TransactionTest {
         final String key = "_WriteString_notFound";
         final Transaction t = new Transaction();
         try {
-            boolean notFound = false;
             try {
                 t.read(testTime + key);
+                assertTrue(false);
             } catch (final NotFoundException e) {
-                notFound = true;
             }
-            assertTrue(notFound);
             t.write(testTime + key, testData[0]);
 
             assertEquals(testData[0], t.read(testTime + key).stringValue());
@@ -300,6 +295,20 @@ public class TransactionTest {
                 final String actual = t.read(testTime + key + i).stringValue();
                 assertEquals(testData[i], actual);
             }
+
+            // try to read the data with another transaction (keys should not exist):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < testData.length; ++i) {
+                    try {
+                        t2.read(testTime + key + i).stringValue();
+                        // a key changed exception must be thrown
+                        assertTrue(false);
+                    } catch (final NotFoundException e) {
+                        t2.abort();
+                    }
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             t.commit();
@@ -340,6 +349,18 @@ public class TransactionTest {
             // now try to read the data:
             final String actual1 = t.read(testTime + key).stringValue();
             assertEquals(testData[testData.length - 1], actual1);
+
+            // try to read the data with another transaction (keys should not exist):
+            do {
+                final Transaction t2 = new Transaction();
+                try {
+                    t2.read(testTime + key).stringValue();
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final NotFoundException e) {
+                    t2.abort();
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             t.commit();
@@ -383,9 +404,22 @@ public class TransactionTest {
                 final ArrayList<String> expected = new ArrayList<String>();
                 expected.add(testData[i]);
                 expected.add(testData[i + 1]);
-
                 assertEquals(expected, actual);
             }
+
+            // try to read the data with another transaction (keys should not exist):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    try {
+                        t2.read(testTime + key + i).stringListValue();
+                        // a key changed exception must be thrown
+                        assertTrue(false);
+                    } catch (final NotFoundException e) {
+                        t2.abort();
+                    }
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             t.commit();
@@ -433,6 +467,18 @@ public class TransactionTest {
             // now try to read the data:
             final List<String> actual1 = t.read(testTime + key).stringListValue();
             assertEquals(list, actual1);
+
+            // try to read the data with another transaction (keys should not exist):
+            do {
+                final Transaction t2 = new Transaction();
+                try {
+                    t2.read(testTime + key).stringValue();
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final NotFoundException e) {
+                    t2.abort();
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             t.commit();
@@ -502,7 +548,7 @@ public class TransactionTest {
 
     /**
      * Test method for
-     * {@link Transaction#testAndSet(String, Object, List)},
+     * {@link Transaction#testAndSet(String, List, List)},
      * {@link Transaction#read(String)}
      * and {@link Transaction#write(String, List)}.
      * Writes an erlang list and tries to overwrite it using test_and_set
@@ -553,6 +599,19 @@ public class TransactionTest {
                 assertEquals(expected, actual);
             }
 
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    final List<String> actual = t2.read(testTime + key + i).stringListValue();
+                    final ArrayList<String> expected = new ArrayList<String>();
+                    expected.add(testData[i]);
+                    expected.add(testData[i + 1]);
+                    assertEquals(expected, actual);
+                    t2.commit();
+                }
+            } while (false);
+
             // commit the transaction and try to read the data with a new one:
             t.commit();
             t = new Transaction();
@@ -571,7 +630,7 @@ public class TransactionTest {
 
     /**
      * Test method for
-     * {@link Transaction#testAndSet(String, Object, List)},
+     * {@link Transaction#testAndSet(String, Object, Object)},
      * {@link Transaction#read(String)}
      * and {@link Transaction#write(String, List)}.
      * Writes an erlang list and tries to overwrite it using test_and_set
@@ -625,6 +684,19 @@ public class TransactionTest {
                 } catch (final UnknownException e) {
                 }
             }
+
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    final List<String> actual = t2.read(testTime + key + i).stringListValue();
+                    final ArrayList<String> expected = new ArrayList<String>();
+                    expected.add(testData[i]);
+                    expected.add(testData[i + 1]);
+                    assertEquals(expected, actual);
+                    t2.commit();
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             try {
@@ -700,6 +772,14 @@ public class TransactionTest {
             final List<String> actual1 = t.read(testTime + key).stringListValue();
             assertEquals(expected, actual1);
 
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                final List<String> actual = t2.read(testTime + key).stringListValue();
+                assertEquals(list, actual);
+                t2.commit();
+            } while (false);
+
             // commit the transaction and try to read the data with a new one:
             t.commit();
             t = new Transaction();
@@ -712,9 +792,9 @@ public class TransactionTest {
 
     /**
      * Test method for
-     * {@link Transaction#testAndSet(String, OtpErlangObject, OtpErlangObject)},
-     * {@link Transaction#read(OtpErlangString)} and
-     * {@link Transaction#write(OtpErlangString, OtpErlangObject)}.
+     * {@link Transaction#testAndSet(String, Object, Object)},
+     * {@link Transaction#read(String)} and
+     * {@link Transaction#write(String, List)}.
      * Writes a list and tries to overwrite it using test_and_set knowing the
      * wrong old value and using a single key for all the values. Tries to read
      * the data afterwards.
@@ -763,6 +843,14 @@ public class TransactionTest {
                 assertTrue(false);
             } catch (final UnknownException e) {
             }
+
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                final List<String> actual = t2.read(testTime + key).stringListValue();
+                assertEquals(list, actual);
+                t2.commit();
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             try {
@@ -848,9 +936,9 @@ public class TransactionTest {
      * @since 3.9
      */
     @Test
-    public void testTestAndSetString1() throws ConnectionException,
+    public void testTestAndSetString1a() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        final String key = "_TestAndSetString1";
+        final String key = "_TestAndSetString1a";
         Transaction t = new Transaction();
 
         try {
@@ -871,6 +959,17 @@ public class TransactionTest {
                 final String expected = testData[i + 1];
                 assertEquals(expected, actual);
             }
+
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    final String actual = t2.read(testTime + key + i).stringValue();
+                    final String expected = testData[i];
+                    assertEquals(expected, actual);
+                    t2.commit();
+                }
+            } while (false);
 
             // commit the transaction and try to read the data with a new one:
             t.commit();
@@ -903,9 +1002,9 @@ public class TransactionTest {
      * @since 3.9
      */
     @Test
-    public void testTestAndSetString2() throws ConnectionException,
+    public void testTestAndSetString1b() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        final String key = "_TestAndSetString2";
+        final String key = "_TestAndSetString1b";
         Transaction t = new Transaction();
 
         try {
@@ -936,6 +1035,17 @@ public class TransactionTest {
                 }
             }
 
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    final String actual = t2.read(testTime + key + i).stringValue();
+                    final String expected = testData[i];
+                    assertEquals(expected, actual);
+                    t2.commit();
+                }
+            } while (false);
+
             // commit the transaction and try to read the data with a new one:
             try {
                 t.commit();
@@ -951,6 +1061,138 @@ public class TransactionTest {
                 assertEquals(expected, actual);
                 t.abort(); // do not accumulate state in tlog
             }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, String, String)},
+     * {@link Transaction#read(String)} and
+     * {@link Transaction#write(String, String)}. Writes a string and tries
+     * to overwrite it using test_and_set knowing the correct old value and
+     * using a single key for all the values. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetString2a() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetString2a";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            t.write(testTime + key, testData[0]);
+            t.commit();
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 1; i < (testData.length - 1); ++i) {
+                final String old_value = testData[i - 1];
+                final String new_value = testData[i];
+                t.testAndSet(testTime + key, old_value, new_value);
+            }
+
+            final String expected = testData[testData.length - 2];
+
+            // now try to read the data:
+            final String actual1 = t.read(testTime + key).stringValue();
+            assertEquals(expected, actual1);
+
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                final String actual = t2.read(testTime + key).stringValue();
+                assertEquals(testData[0], actual);
+                t2.commit();
+            } while (false);
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            final String actual2 = t.read(testTime + key).stringValue();
+            assertEquals(expected, actual2);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, Object, Object)},
+     * {@link Transaction#read(String)} and
+     * {@link Transaction#write(String, String)}.
+     * Writes a string and tries to overwrite it using test_and_set knowing the
+     * wrong old value and using a single key for all the values. Tries to read
+     * the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetString2b() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_TestAndSetString2b";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            final String expected = testData[0];
+            t.write(testTime + key, expected);
+            t.commit();
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); ++i) {
+                final int new_value = 1;
+                try {
+                    t.testAndSet(testTime + key, "fail", new_value);
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final KeyChangedException e) {
+                    assertEquals(expected, e.getOldValue().stringValue());
+                }
+            }
+
+            // now try to read the data:
+            try {
+                t.read(testTime + key).stringListValue();
+                // an UnknownException must be thrown
+                assertTrue(false);
+            } catch (final UnknownException e) {
+            }
+
+            // try to read the data with another transaction (verify old value is read):
+            do {
+                final Transaction t2 = new Transaction();
+                final String actual = t2.read(testTime + key).stringValue();
+                assertEquals(expected, actual);
+                t2.commit();
+            } while (false);
+
+            // commit the transaction and try to read the data with a new one:
+            try {
+                t.commit();
+                // an AbortException must be thrown
+                assertTrue(false);
+            } catch (final AbortException e) {
+                t.abort();
+            }
+            t = new Transaction();
+            final String actual2 = t.read(testTime + key).stringValue();
+            assertEquals(expected, actual2);
         } finally {
             t.closeConnection();
         }
