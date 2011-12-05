@@ -23,7 +23,6 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
@@ -610,11 +609,10 @@ public class TransactionTest {
                     // a key changed exception must be thrown
                     assertTrue(false);
                 } catch (final KeyChangedException e) {
-                    final OtpErlangObject[] data = new OtpErlangObject[] {
-                            new OtpErlangString(testData[i]),
-                            new OtpErlangString(testData[i + 1]) };
-                    final OtpErlangList expected = new OtpErlangList(data);
-                    assertEquals(expected, e.getOldValue());
+                    final ArrayList<String> expected = new ArrayList<String>();
+                    expected.add(testData[i]);
+                    expected.add(testData[i + 1]);
+                    assertEquals(expected, e.getOldValue().stringListValue());
                 }
             }
 
@@ -751,11 +749,10 @@ public class TransactionTest {
                     // a key changed exception must be thrown
                     assertTrue(false);
                 } catch (final KeyChangedException e) {
-                    final OtpErlangObject[] data = new OtpErlangObject[] {
-                            new OtpErlangString(testData[0]),
-                            new OtpErlangString(testData[1]) };
-                    final OtpErlangList expected = new OtpErlangList(data);
-                    assertEquals(expected, e.getOldValue());
+                    final ArrayList<String> expected = new ArrayList<String>();
+                    expected.add(testData[0]);
+                    expected.add(testData[1]);
+                    assertEquals(expected, e.getOldValue().stringListValue());
                 }
             }
 
@@ -925,8 +922,7 @@ public class TransactionTest {
                     // a key changed exception must be thrown
                     assertTrue(false);
                 } catch (final KeyChangedException e) {
-                    final OtpErlangString expected = new OtpErlangString(testData[i]);
-                    assertEquals(expected, e.getOldValue());
+                    assertEquals(testData[i], e.getOldValue().stringValue());
                 }
             }
 

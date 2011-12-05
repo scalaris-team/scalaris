@@ -248,7 +248,7 @@ final class CommonErlangObjects {
                     if (reason_tpl.elementAt(0).equals(
                             CommonErlangObjects.keyChangedAtom)
                             && (reason_tpl.arity() == 2)) {
-                        throw new KeyChangedException(reason_tpl.elementAt(1));
+                        throw new KeyChangedException(new ErlangValue(reason_tpl.elementAt(1)));
                     }
                 }
             }
