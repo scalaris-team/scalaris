@@ -16,7 +16,6 @@
 package de.zib.scalaris;
 
 import com.ericsson.otp.erlang.OtpErlangException;
-import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
  * Exception that is thrown if a test_and_set operation on a scalaris ring
@@ -37,7 +36,7 @@ public class KeyChangedException extends OtpErlangException {
     /**
      * The value stored in scalaris.
      */
-    private final OtpErlangObject oldValue;
+    private final ErlangValue oldValue;
 
     /**
      * Creates the exception with the given old value.
@@ -45,7 +44,7 @@ public class KeyChangedException extends OtpErlangException {
      * @param old_value
      *            the old value stored in scalaris
      */
-    public KeyChangedException(final OtpErlangObject old_value) {
+    public KeyChangedException(final ErlangValue old_value) {
         super();
         this.oldValue = old_value;
     }
@@ -59,7 +58,7 @@ public class KeyChangedException extends OtpErlangException {
      * @param old_value
      *            the old value stored in scalaris
      */
-    public KeyChangedException(final Throwable e, final OtpErlangObject old_value) {
+    public KeyChangedException(final Throwable e, final ErlangValue old_value) {
         super(e.getMessage());
         this.oldValue = old_value;
         setStackTrace(e.getStackTrace());
@@ -70,7 +69,7 @@ public class KeyChangedException extends OtpErlangException {
      *
      * @return the value
      */
-    public OtpErlangObject getOldValue() {
+    public ErlangValue getOldValue() {
         return oldValue;
     }
 }
