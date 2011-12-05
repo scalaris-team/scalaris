@@ -23,10 +23,10 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
+
 
 import de.zib.scalaris.TransactionSingleOp.RequestList;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
@@ -125,26 +125,6 @@ public class TransactionSingleOpTest {
     }
 
     /**
-     * Test method for {@link TransactionSingleOp#read(OtpErlangString)}.
-     *
-     * @throws NotFoundException
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     */
-    @Test(expected=NotFoundException.class)
-    public void testReadOtp_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        final String key = "_ReadOtp_NotFound";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-        try {
-            conn.read(new OtpErlangString(testTime + key));
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
      * Test method for {@link TransactionSingleOp#read(String)} with a closed connection.
      *
      * @throws NotFoundException
@@ -159,135 +139,6 @@ public class TransactionSingleOpTest {
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         conn.read(testTime + key);
-    }
-
-    /**
-     * Test method for {@link TransactionSingleOp#read(OtpErlangString)} with a
-     * closed connection.
-     *
-     * @throws NotFoundException
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testReadOtp_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        final String key = "_ReadOtp_NotConnected";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-        conn.closeConnection();
-        conn.read(new OtpErlangString(testTime + key));
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)} with a
-     * closed connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testWriteOtpList_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        final String key = "_WriteOtpList_NotConnected";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-        conn.closeConnection();
-        final OtpErlangObject[] data = new OtpErlangObject[] {
-                new OtpErlangString(testData[0]),
-                new OtpErlangString(testData[1]) };
-        conn.write(
-                new OtpErlangString(testTime + key),
-                new OtpErlangList(data) );
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
-     * and {@link TransactionSingleOp#read(OtpErlangString)}.
-     * Writes erlang lists and uses a distinct key for each value. Tries to read the data afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testWriteOtpList1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        final String key = "_WriteOtpList1_";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-
-        try {
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                conn.write(
-                        new OtpErlangString(testTime + key + i),
-                        new OtpErlangList(data) );
-            }
-
-            // now try to read the data:
-
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                final OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i)).value();
-                final OtpErlangList expected = new OtpErlangList(data);
-
-                assertEquals(expected, actual);
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}
-     * and {@link TransactionSingleOp#read(OtpErlangString)}.
-     * Writes erlang lists and uses a single key for all the values. Tries to read the data afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testWriteOtpList2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        final String key = "_WriteOtpList2";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-
-        try {
-            OtpErlangObject[] data = new OtpErlangObject[0];
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                conn.write(
-                        new OtpErlangString(testTime + key),
-                        new OtpErlangList(data));
-            }
-
-            // now try to read the data:
-
-            final OtpErlangObject actual = conn.read(
-                    new OtpErlangString(testTime + key)).value();
-            final OtpErlangList expected = new OtpErlangList(data);
-
-            assertEquals(expected, actual);
-        } finally {
-            conn.closeConnection();
-        }
     }
 
     /**
@@ -478,197 +329,6 @@ public class TransactionSingleOpTest {
 
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}
-     * with a closed connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     * @throws KeyChangedException
-     *
-     * @since 2.7
-     */
-    @Test(expected=ConnectionException.class)
-    public void testTestAndSetOtpList_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        final String key = "_TestAndSetOtpList_NotConnected";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-        conn.closeConnection();
-        final OtpErlangObject[] data = new OtpErlangObject[] {
-                new OtpErlangString(testData[0]),
-                new OtpErlangString(testData[1]) };
-        conn.testAndSet(
-                new OtpErlangString(testTime + key),
-                new OtpErlangAtom("fail"),
-                new OtpErlangList(data) );
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}.
-     * Tries test_and_set with a non-existing key.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     * @throws KeyChangedException
-     *
-     * @since 2.7
-     */
-    @Test(expected=NotFoundException.class)
-    public void testTestAndSetOtpList_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        final String key = "_TestAndSetOtpList_NotFound";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-
-        try {
-            final OtpErlangObject[] data = new OtpErlangObject[] {
-                    new OtpErlangString(testData[0]),
-                    new OtpErlangString(testData[1]) };
-            conn.testAndSet(
-                    new OtpErlangString(testTime + key),
-                    new OtpErlangAtom("fail"),
-                    new OtpErlangList(data) );
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#read(OtpErlangString)}
-     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
-     * Writes an erlang list and tries to overwrite it using test_and_set
-     * knowing the correct old value. Tries to read the data afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     * @throws KeyChangedException
-     *
-     * @since 2.7
-     */
-    @Test
-    public void testTestAndSetOtpList1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
-        final String key = "_TestAndSetOtpList1";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-
-        try {
-            // first write all values:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                conn.write(
-                        new OtpErlangString(testTime + key + i),
-                        new OtpErlangList(data));
-            }
-
-            // now try to overwrite them using test_and_set:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] old_data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                final OtpErlangObject[] new_data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i + 1]),
-                        new OtpErlangString(testData[i]) };
-                conn.testAndSet(
-                        new OtpErlangString(testTime + key + i),
-                        new OtpErlangList(old_data),
-                        new OtpErlangList(new_data));
-            }
-
-            // now try to read the data:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i + 1]),
-                        new OtpErlangString(testData[i]) };
-                final OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i)).value();
-                final OtpErlangList expected = new OtpErlangList(data);
-                assertEquals(expected, actual);
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link TransactionSingleOp#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#read(OtpErlangString)}
-     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
-     * Writes an erlang list and tries to overwrite it using test_and_set
-     * knowing the wrong old value. Tries to read the data afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     *
-     * @since 2.7
-     */
-    @Test
-    public void testTestAndSetOtpList2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        final String key = "_TestAndSetOtpList2";
-        final TransactionSingleOp conn = new TransactionSingleOp();
-
-        try {
-            // first write all values:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                conn.write(
-                        new OtpErlangString(testTime + key + i),
-                        new OtpErlangList(data));
-            }
-
-            // now try to overwrite them using test_and_set:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject new_value = CommonErlangObjects.failAtom;
-                try {
-                    conn.testAndSet(
-                            new OtpErlangString(testTime + key + i),
-                            new OtpErlangString("fail"), new_value);
-                    // a key changed exception must be thrown
-                    assertTrue(false);
-                } catch (final KeyChangedException e) {
-                    final OtpErlangObject[] data = new OtpErlangObject[] {
-                            new OtpErlangString(testData[i]),
-                            new OtpErlangString(testData[i + 1]) };
-                    final OtpErlangList expected = new OtpErlangList(data);
-                    assertEquals(expected, e.getOldValue());
-                }
-            }
-
-            // now try to read the data:
-            for (int i = 0; i < (testData.length - 1); i += 2) {
-                final OtpErlangObject[] data = new OtpErlangObject[] {
-                        new OtpErlangString(testData[i]),
-                        new OtpErlangString(testData[i + 1]) };
-                final OtpErlangObject actual = conn.read(
-                        new OtpErlangString(testTime + key + i)).value();
-                final OtpErlangList expected = new OtpErlangList(data);
-                assertEquals(expected, actual);
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
      * {@link TransactionSingleOp#testAndSet(String, String, List)}
      * with a closed connection.
      *
@@ -781,9 +441,9 @@ public class TransactionSingleOpTest {
 
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSet(String, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#read(OtpErlangString)}
-     * and {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
+     * {@link TransactionSingleOp#testAndSet(String, Object, List)},
+     * {@link TransactionSingleOp#read(String)}
+     * and {@link TransactionSingleOp#write(String, List)}.
      * Writes a list and tries to overwrite it using test_and_set
      * knowing the wrong old value. Tries to read the data afterwards.
      *
@@ -893,9 +553,9 @@ public class TransactionSingleOpTest {
 
     /**
      * Test method for
-     * {@link TransactionSingleOp#testAndSet(String, OtpErlangObject, OtpErlangObject)},
-     * {@link TransactionSingleOp#read(OtpErlangString)} and
-     * {@link TransactionSingleOp#write(OtpErlangString, OtpErlangObject)}.
+     * {@link TransactionSingleOp#testAndSet(String, Object, List)},
+     * {@link TransactionSingleOp#read(String)} and
+     * {@link TransactionSingleOp#write(String, List)}.
      * Writes a list and tries to overwrite it using test_and_set knowing the
      * wrong old value and using a single key for all the values. Tries to read
      * the data afterwards.

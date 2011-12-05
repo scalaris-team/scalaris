@@ -42,9 +42,6 @@ import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.Test;
 
-import com.ericsson.otp.erlang.OtpErlangList;
-import com.ericsson.otp.erlang.OtpErlangString;
-
 /**
  * Unit test for the {@link PubSub} class.
  *
@@ -94,7 +91,7 @@ public class PubSubTest {
      */
     @Test
     public void testPubSub1() throws ConnectionException {
-        PubSub conn = new PubSub();
+        final PubSub conn = new PubSub();
         conn.closeConnection();
     }
 
@@ -105,7 +102,7 @@ public class PubSubTest {
      */
     @Test
     public void testPubSub2() throws ConnectionException {
-        PubSub conn = new PubSub(ConnectionFactory.getInstance().createConnection("test"));
+        final PubSub conn = new PubSub(ConnectionFactory.getInstance().createConnection("test"));
         conn.closeConnection();
     }
 
@@ -118,84 +115,9 @@ public class PubSubTest {
      */
     @Test
     public void testDoubleClose() throws ConnectionException {
-        TransactionSingleOp conn = new TransactionSingleOp();
+        final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
         conn.closeConnection();
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#publish(OtpErlangString, OtpErlangString)} with a closed
-     * connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testPublishOtp_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        String topic = "_PublishOtp_NotConnected";
-        PubSub conn = new PubSub();
-        conn.closeConnection();
-        conn.publish(
-                new OtpErlangString(testTime + topic),
-                new OtpErlangString(testData[0]));
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#publish(OtpErlangString, OtpErlangString)}.
-     * Publishes some topics and uses a distinct key for each value.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     */
-    @Test
-    public void testPublishOtp1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        String topic = "_PublishOtp1_";
-        PubSub conn = new PubSub();
-
-        try {
-            for (int i = 0; i < testData.length; ++i) {
-                conn.publish(
-                        new OtpErlangString(testTime + topic + i),
-                        new OtpErlangString(testData[i]));
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#publish(OtpErlangString, OtpErlangString)}.
-     * Publishes some topics and uses a single key for all the values.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     */
-    @Test
-    public void testPublishOtp2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        String topic = "_PublishOtp2";
-        PubSub conn = new PubSub();
-
-        try {
-            for (int i = 0; i < testData.length; ++i) {
-                conn.publish(
-                        new OtpErlangString(testTime + topic),
-                        new OtpErlangString(testData[i]) );
-            }
-        } finally {
-            conn.closeConnection();
-        }
     }
 
     /**
@@ -210,8 +132,8 @@ public class PubSubTest {
     @Test(expected=ConnectionException.class)
     public void testPublish_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException {
-        String topic = "_Publish_NotConnected";
-        PubSub conn = new PubSub();
+        final String topic = "_Publish_NotConnected";
+        final PubSub conn = new PubSub();
         conn.closeConnection();
         conn.publish(testTime + topic, testData[0]);
     }
@@ -229,8 +151,8 @@ public class PubSubTest {
     @Test
     public void testPublish1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException {
-        String topic = "_Publish1_";
-        PubSub conn = new PubSub();
+        final String topic = "_Publish1_";
+        final PubSub conn = new PubSub();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -256,8 +178,8 @@ public class PubSubTest {
     @Test
     public void testPublish2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException {
-        String topic = "_Publish2";
-        PubSub conn = new PubSub();
+        final String topic = "_Publish2";
+        final PubSub conn = new PubSub();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -274,49 +196,6 @@ public class PubSubTest {
 
     /**
      * Test method for
-     * {@link PubSub#getSubscribers(OtpErlangString)} with a closed
-     * connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testGetSubscribersOtp_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        String topic = "_GetSubscribersOtp_NotConnected";
-        PubSub conn = new PubSub();
-        conn.closeConnection();
-        conn.getSubscribers(new OtpErlangString(testTime + topic));
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Tries to get a subscriber list from an empty topic.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     */
-    @Test
-    public void testGetSubscribersOtp_NotExistingTopic() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
-        String topic = "_GetSubscribersOtp_NotExistingTopic";
-        PubSub conn = new PubSub();
-
-        try {
-            OtpErlangList subscribers = (OtpErlangList) conn.getSubscribers(new OtpErlangString(testTime + topic)).value();
-            assertTrue(subscribers.arity() == 0);
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
      * {@link PubSub#getSubscribers(String)} with a closed
      * connection.
      *
@@ -328,8 +207,8 @@ public class PubSubTest {
     @Test(expected=ConnectionException.class)
     public void testGetSubscribers_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException {
-        String topic = "_GetSubscribers_NotConnected";
-        PubSub conn = new PubSub();
+        final String topic = "_GetSubscribers_NotConnected";
+        final PubSub conn = new PubSub();
         conn.closeConnection();
         conn.getSubscribers(testTime + topic);
     }
@@ -347,11 +226,11 @@ public class PubSubTest {
     @Test
     public void testGetSubscribers_NotExistingTopic() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException {
-        String topic = "_GetSubscribers_NotExistingTopic";
-        PubSub conn = new PubSub();
+        final String topic = "_GetSubscribers_NotExistingTopic";
+        final PubSub conn = new PubSub();
 
         try {
-            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
+            final List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             assertTrue(subscribers.isEmpty());
         } finally {
             conn.closeConnection();
@@ -370,26 +249,7 @@ public class PubSubTest {
      *            subscriber to search for
      * @return true if the subscriber was found in the list
      */
-    private boolean checkSubscribers(OtpErlangList list, String subscriber) {
-        for (int i = 0; i < list.arity(); ++i) {
-            if (((OtpErlangString) list.elementAt(i)).stringValue().equals(
-                    subscriber)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * checks if the given subscriber exists in the given list
-     *
-     * @param list
-     *            list of subscribers
-     * @param subscriber
-     *            subscriber to search for
-     * @return true if the subscriber was found in the list
-     */
-    private boolean checkSubscribers(List<String> list, String subscriber) {
+    private boolean checkSubscribers(final List<String> list, final String subscriber) {
         return list.contains(subscriber);
     }
 
@@ -401,140 +261,14 @@ public class PubSubTest {
      * @param expectedElements
      * @return
      */
-    private String getDiffElement(OtpErlangList list, String[] expectedElements) {
-        Vector<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
-        for (int i = 0; i < list.arity(); ++i) {
-            String element = ((OtpErlangString)list.elementAt(i)).stringValue();
-            if (!expectedElements2.contains(element)) {
-                return element;
-            }
-            expectedElements2.remove(element);
-        }
-        return null;
-    }
-
-    /**
-     * checks if there are more elements in {@code list} than in
-     * {@code expectedElements} and returns one of those elements
-     *
-     * @param list
-     * @param expectedElements
-     * @return
-     */
-    private String getDiffElement(List<String> list, String[] expectedElements) {
-        List<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
+    private String getDiffElement(final List<String> list, final String[] expectedElements) {
+        final List<String> expectedElements2 = new Vector<String>(Arrays.asList(expectedElements));
         list.removeAll(expectedElements2);
 
         if (list.size() > 0) {
             return list.get(0);
         } else {
             return null;
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} with a
-     * closed connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testSubscribeOtp_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_SubscribeOtp_NotConnected";
-        PubSub conn = new PubSub();
-        conn.closeConnection();
-        conn.subscribe(
-                new OtpErlangString(testTime + topic),
-                new OtpErlangString(testData[0]) );
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testSubscribeOtp1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_SubscribeOtp1_";
-        PubSub conn = new PubSub();
-
-        try {
-            for (int i = 0; i < testData.length; ++i) {
-                conn.subscribe(
-                        new OtpErlangString(testTime + topic + i),
-                        new OtpErlangString(testData[i]) );
-            }
-
-            // check if the subscribers were successfully saved:
-            for (int i = 0; i < testData.length; ++i) {
-                String topic1 = topic + i;
-                OtpErlangList subscribers = (OtpErlangList) conn
-                        .getSubscribers(new OtpErlangString(testTime
-                                + topic1)).value();
-                assertTrue("Subscriber \"" + testData[i]
-                        + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
-                        subscribers, testData[i]));
-
-                assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [\"" + testData[i] + "\"], but is: "
-                        + subscribers.toString(), 1, subscribers.arity());
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testSubscribeOtp2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_SubscribeOtp2";
-        PubSub conn = new PubSub();
-
-        try {
-            for (int i = 0; i < testData.length; ++i) {
-                conn.subscribe(
-                        new OtpErlangString(testTime + topic),
-                        new OtpErlangString(testData[i]) );
-            }
-
-            // check if the subscribers were successfully saved:
-            OtpErlangList subscribers = (OtpErlangList) conn
-                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("Subscriber \"" + testData[i]
-                        + "\" does not exist for topic \"" + topic + "\"", checkSubscribers(
-                        subscribers, testData[i]));
-            }
-
-            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, testData));
-        } finally {
-            conn.closeConnection();
         }
     }
 
@@ -551,8 +285,8 @@ public class PubSubTest {
     @Test(expected=ConnectionException.class)
     public void testSubscribe_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_Subscribe_NotConnected";
-        PubSub conn = new PubSub();
+        final String topic = "_Subscribe_NotConnected";
+        final PubSub conn = new PubSub();
         conn.closeConnection();
         conn.subscribe(testTime + topic, testData[0]);
     }
@@ -572,8 +306,8 @@ public class PubSubTest {
     @Test
     public void testSubscribe1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_Subscribe1_";
-        PubSub conn = new PubSub();
+        final String topic = "_Subscribe1_";
+        final PubSub conn = new PubSub();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -582,8 +316,8 @@ public class PubSubTest {
 
             // check if the subscribers were successfully saved:
             for (int i = 0; i < testData.length; ++i) {
-                String topic1 = topic + i;
-                List<String> subscribers = conn.getSubscribers(testTime
+                final String topic1 = topic + i;
+                final List<String> subscribers = conn.getSubscribers(testTime
                         + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
                         + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
@@ -613,8 +347,8 @@ public class PubSubTest {
     @Test
     public void testSubscribe2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_Subscribe2";
-        PubSub conn = new PubSub();
+        final String topic = "_Subscribe2";
+        final PubSub conn = new PubSub();
 
         try {
             for (int i = 0; i < testData.length; ++i) {
@@ -624,7 +358,7 @@ public class PubSubTest {
             }
 
             // check if the subscribers were successfully saved:
-            List<String> subscribers = conn
+            final List<String> subscribers = conn
                     .getSubscribers(testTime + topic).stringListValue();
             for (int i = 0; i < testData.length; ++i) {
                 assertTrue("Subscriber " + testData[i]
@@ -642,250 +376,6 @@ public class PubSubTest {
     // unsubscribe() test methods begin
 
     /**
-     * Test method for
-     * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} with a
-     * closed connection.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test(expected=ConnectionException.class)
-    public void testUnsubscribeOtp_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_UnsubscribeOtp_NotConnected";
-        PubSub conn = new PubSub();
-        conn.closeConnection();
-        conn.unsubscribe(
-                new OtpErlangString(testTime + topic),
-                new OtpErlangString(testData[0]) );
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Tries to unsubscribe an URL from a non-existing topic and tries to get
-     * the subscriber list afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test(expected=NotFoundException.class)
-    public void testUnsubscribeOtp_NotExistingTopic() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_UnsubscribeOtp_NotExistingTopic";
-        PubSub conn = new PubSub();
-
-        try {
-            // unsubscribe test "url":
-            conn.unsubscribe(
-                    new OtpErlangString(testTime + topic),
-                    new OtpErlangString(testData[0]) );
-
-            // check whether the unsubscribed urls were unsubscribed:
-            OtpErlangList subscribers = (OtpErlangList) conn
-                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
-            assertFalse("Subscriber \"" + testData[0]
-                    + "\" should have been unsubscribed from topic \"" + topic
-                    + "\"", checkSubscribers(subscribers, testData[0]));
-
-            assertEquals("Subscribers of topic (" + topic
-                    + ") should only be [], but is: "
-                    + subscribers.toString(), 0, subscribers.arity());
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Tries to unsubscribe an unsubscribed URL from an existing topic and compares
-     * the subscriber list afterwards.
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test(expected=NotFoundException.class)
-    public void testUnsubscribeOtp_NotExistingUrl()
-            throws ConnectionException, TimeoutException, UnknownException,
-            NotFoundException, AbortException {
-        String topic = "_UnsubscribeOtp_NotExistingUrl";
-        PubSub conn = new PubSub();
-
-        try {
-            // first subscribe test "urls"...
-            conn.unsubscribe(new OtpErlangString(testTime + topic),
-                    new OtpErlangString(testData[0]));
-            conn.unsubscribe(new OtpErlangString(testTime + topic),
-                    new OtpErlangString(testData[1]));
-
-            // then unsubscribe another "url":
-            conn.unsubscribe(new OtpErlangString(testTime + topic),
-                    new OtpErlangString(testData[2]));
-
-            OtpErlangList subscribers = (OtpErlangList) conn
-                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
-
-            // check whether the subscribers were successfully saved:
-            assertTrue("Subscriber \"" + testData[0]
-                    + "\" does not exist for topic \"" + topic + "\"",
-                    checkSubscribers(subscribers, testData[0]));
-
-            assertTrue("Subscriber \"" + testData[1]
-                    + "\" does not exist for topic \"" + topic + "\"",
-                    checkSubscribers(subscribers, testData[1]));
-
-            // check whether the unsubscribed urls were unsubscribed:
-            assertFalse("Subscriber \"" + testData[2]
-                    + "\" should have been unsubscribed from topic \"" + topic
-                    + "\"", checkSubscribers(subscribers, testData[2]));
-
-            assertEquals("Subscribers of topic (" + topic + ") should only be [\""
-                    + testData[0] + "\", \"" + testData[1] + "\"], but is: "
-                    + subscribers.toString(), 2, subscribers.arity());
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)},
-     * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
-     * Unsubscribes every second subscribed URL.
-     *
-     * @see #testSubscribeOtp1()
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testUnsubscribeOtp1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_UnsubscribeOtp1_";
-        PubSub conn = new PubSub();
-
-        try {
-            // first subscribe all test "urls"...
-            for (int i = 0; i < testData.length; ++i) {
-                conn.subscribe(
-                        new OtpErlangString(testTime + topic + i),
-                        new OtpErlangString(testData[i]) );
-            }
-            // ... then unsubscribe every second url:
-            for (int i = 0; i < testData.length; i += 2) {
-                conn.unsubscribe(
-                        new OtpErlangString(testTime + topic + i),
-                        new OtpErlangString(testData[i]) );
-            }
-
-            // check whether the subscribers were successfully saved:
-            for (int i = 1; i < testData.length; i += 2) {
-                String topic1 = topic + i;
-                OtpErlangList subscribers = (OtpErlangList) conn
-                        .getSubscribers(new OtpErlangString(testTime + topic1)).value();
-                assertTrue("Subscriber \"" + testData[i]
-                        + "\" does not exist for topic \"" + topic1 + "\"",
-                        checkSubscribers(subscribers, testData[i]));
-
-                assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [\"" + testData[i] + "\"], but is: "
-                        + subscribers.toString(), 1, subscribers.arity());
-            }
-            // check whether the unsubscribed urls were unsubscribed:
-            for (int i = 0; i < testData.length; i += 2) {
-                String topic1 = topic + i;
-                OtpErlangList subscribers = (OtpErlangList) conn
-                        .getSubscribers(new OtpErlangString(testTime + topic1)).value();
-                assertFalse("Subscriber \"" + testData[i]
-                        + "\" should have been unsubscribed from topic \"" + topic1
-                        + "\"", checkSubscribers(subscribers, testData[i]));
-
-                assertEquals("Subscribers of topic (" + topic1
-                        + ") should only be [], but is: "
-                        + subscribers.toString(), 0, subscribers.arity());
-            }
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
-     * Test method for
-     * {@link PubSub#subscribe(OtpErlangString, OtpErlangString)},
-     * {@link PubSub#unsubscribe(OtpErlangString, OtpErlangString)} and
-     * {@link PubSub#getSubscribers(OtpErlangString)}.
-     * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
-     * Unsubscribes every second subscribed URL.
-     *
-     * @see #testSubscribeOtp2()
-     *
-     * @throws UnknownException
-     * @throws TimeoutException
-     * @throws ConnectionException
-     * @throws NotFoundException
-     * @throws AbortException
-     */
-    @Test
-    public void testUnsubscribeOtp2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_UnubscribeOtp2";
-        PubSub conn = new PubSub();
-
-        try {
-            // first subscribe all test "urls"...
-            for (int i = 0; i < testData.length; ++i) {
-                conn.subscribe(
-                        new OtpErlangString(testTime + topic),
-                        new OtpErlangString(testData[i]) );
-            }
-            // ... then unsubscribe every second url:
-            for (int i = 0; i < testData.length; i += 2) {
-                conn.unsubscribe(
-                        new OtpErlangString(testTime + topic),
-                        new OtpErlangString(testData[i]) );
-            }
-
-            // check if the subscribers were successfully saved:
-            OtpErlangList subscribers = (OtpErlangList) conn
-                    .getSubscribers(new OtpErlangString(testTime + topic)).value();
-            String[] subscribers_expected = new String[testData.length / 2];
-            for (int i = 1; i < testData.length; i += 2) {
-                subscribers_expected[i / 2] = testData[i];
-                assertTrue("Subscriber \"" + testData[i]
-                        + "\" does not exist for topic \"" + topic + "\"",
-                        checkSubscribers(subscribers, testData[i]));
-            }
-            // check whether the unsubscribed urls were unsubscribed:
-            for (int i = 0; i < testData.length; i += 2) {
-                assertFalse("Subscriber \"" + testData[i]
-                        + "\" should have been unsubscribed from topic \"" + topic
-                        + "\"", checkSubscribers(subscribers, testData[i]));
-            }
-
-            assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, subscribers_expected));
-        } finally {
-            conn.closeConnection();
-        }
-    }
-
-    /**
      * Test method for {@link PubSub#unsubscribe(String, String)} with a
      * closed connection.
      *
@@ -898,8 +388,8 @@ public class PubSubTest {
     @Test(expected=ConnectionException.class)
     public void testUnsubscribe_NotConnected() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_Unsubscribe_NotConnected";
-        PubSub conn = new PubSub();
+        final String topic = "_Unsubscribe_NotConnected";
+        final PubSub conn = new PubSub();
         conn.closeConnection();
         conn.unsubscribe(testTime + topic, testData[0]);
     }
@@ -911,8 +401,6 @@ public class PubSubTest {
      * Tries to unsubscribe an URL from a non-existing topic and tries to get
      * the subscriber list afterwards.
      *
-     * @see #testUnsubscribeOtp_NotExistingTopic()
-     *
      * @throws UnknownException
      * @throws TimeoutException
      * @throws ConnectionException
@@ -922,15 +410,15 @@ public class PubSubTest {
     @Test(expected=NotFoundException.class)
     public void testUnsubscribe_NotExistingTopic() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_Unsubscribe_NotExistingTopic";
-        PubSub conn = new PubSub();
+        final String topic = "_Unsubscribe_NotExistingTopic";
+        final PubSub conn = new PubSub();
 
         try {
             // unsubscribe test "url":
             conn.unsubscribe(testTime + topic, testData[0]);
 
             // check whether the unsubscribed urls were unsubscribed:
-            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
+            final List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             assertFalse("Subscriber \"" + testData[0]
                     + "\" should have been unsubscribed from topic \"" + topic
                     + "\"", checkSubscribers(subscribers, testData[0]));
@@ -951,8 +439,6 @@ public class PubSubTest {
      * Tries to unsubscribe an unsubscribed URL from an existing topic and compares
      * the subscriber list afterwards.
      *
-     * @see #testUnsubscribeOtp_NotExistingUrl()
-     *
      * @throws UnknownException
      * @throws TimeoutException
      * @throws ConnectionException
@@ -963,8 +449,8 @@ public class PubSubTest {
     public void testUnsubscribe_NotExistingUrl()
             throws ConnectionException, TimeoutException, UnknownException,
             NotFoundException, AbortException {
-        String topic = "_Unsubscribe_NotExistingUrl";
-        PubSub conn = new PubSub();
+        final String topic = "_Unsubscribe_NotExistingUrl";
+        final PubSub conn = new PubSub();
 
         try {
             // first subscribe test "urls"...
@@ -976,7 +462,7 @@ public class PubSubTest {
 
 
             // check whether the subscribers were successfully saved:
-            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
+            final List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
             assertTrue("Subscriber \"" + testData[0]
                     + "\" does not exist for topic \"" + topic + "\"",
                     checkSubscribers(subscribers, testData[0]));
@@ -1017,8 +503,8 @@ public class PubSubTest {
     @Test
     public void testUnsubscribe1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_UnsubscribeString1_";
-        PubSub conn = new PubSub();
+        final String topic = "_UnsubscribeString1_";
+        final PubSub conn = new PubSub();
 
         try {
             // first subscribe all test "urls"...
@@ -1036,8 +522,8 @@ public class PubSubTest {
 
             // check whether the subscribers were successfully saved:
             for (int i = 1; i < testData.length; i += 2) {
-                String topic1 = topic + i;
-                List<String> subscribers = conn.getSubscribers(testTime + topic1).stringListValue();
+                final String topic1 = topic + i;
+                final List<String> subscribers = conn.getSubscribers(testTime + topic1).stringListValue();
                 assertTrue("Subscriber \"" + testData[i]
                           + "\" does not exist for topic \"" + topic1 + "\"", checkSubscribers(
                           subscribers, testData[i]));
@@ -1048,8 +534,8 @@ public class PubSubTest {
             }
             // check whether the unsubscribed urls were unsubscribed:
             for (int i = 0; i < testData.length; i += 2) {
-                String topic1 = topic + i;
-                List<String> subscribers = conn.getSubscribers(testTime
+                final String topic1 = topic + i;
+                final List<String> subscribers = conn.getSubscribers(testTime
                         + topic1).stringListValue();
                 assertFalse("Subscriber \"" + testData[i]
                         + "\" should have been unsubscribed from topic \"" + topic1 + "\"", checkSubscribers(
@@ -1083,8 +569,8 @@ public class PubSubTest {
     @Test
     public void testUnsubscribe2() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
-        String topic = "_SingleUnubscribeString2";
-        PubSub conn = new PubSub();
+        final String topic = "_SingleUnubscribeString2";
+        final PubSub conn = new PubSub();
 
         try {
             // first subscribe all test "urls"...
@@ -1101,8 +587,8 @@ public class PubSubTest {
             }
 
             // check if the subscribers were successfully saved:
-            List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
-            String[] subscribers_expected = new String[testData.length / 2];
+            final List<String> subscribers = conn.getSubscribers(testTime + topic).stringListValue();
+            final String[] subscribers_expected = new String[testData.length / 2];
             for (int i = 1; i < testData.length; i += 2) {
                 subscribers_expected[i / 2] = testData[i];
                 assertTrue("Subscriber \"" + testData[i]
@@ -1130,8 +616,8 @@ public class PubSubTest {
     private static Server newSubscriptionServer()
             throws Exception {
         do {
-            Server server = new Server();
-            SelectChannelConnector connector = new SelectChannelConnector();
+            final Server server = new Server();
+            final SelectChannelConnector connector = new SelectChannelConnector();
             connector.setHost("127.0.0.1");
             server.addConnector(connector);
             server.setHandler(new SubscriptionHandler());
@@ -1140,18 +626,18 @@ public class PubSubTest {
         } while (true);
     }
 
-    private void checkNotifications(Map<String, Vector<String>> notifications, Map<String, Vector<String>> expected) {
-        for (Entry<String, Vector<String>> expected_element : expected.entrySet()) {
-            String topic = expected_element.getKey();
-            Vector<String> notifications_topic = notifications.get(topic);
-            for (String content : expected_element.getValue()) {
+    private void checkNotifications(final Map<String, Vector<String>> notifications, final Map<String, Vector<String>> expected) {
+        for (final Entry<String, Vector<String>> expected_element : expected.entrySet()) {
+            final String topic = expected_element.getKey();
+            final Vector<String> notifications_topic = notifications.get(topic);
+            for (final String content : expected_element.getValue()) {
                 assertTrue("subscription (" + topic + ", " + content
                         + ") not received by server)",
-                        notifications_topic != null
+                        (notifications_topic != null)
                                 && notifications_topic.contains(content));
                 notifications_topic.remove(content);
             }
-            if (notifications_topic != null && notifications_topic.size() > 0) {
+            if ((notifications_topic != null) && (notifications_topic.size() > 0)) {
                 fail("Received element (" + topic + ", "
                         + notifications_topic.get(0)
                         + ") which is not part of the subscription.");
@@ -1161,7 +647,7 @@ public class PubSubTest {
 
         // is there another (unexpected) topic we received content for?
         if (notifications.size() > 0) {
-            for (Entry<String, Vector<String>> element : notifications.entrySet()) {
+            for (final Entry<String, Vector<String>> element : notifications.entrySet()) {
                 if (element.getValue().size() > 0) {
                     fail("Received notification for topic (" + element.getKey() + ", "
                             + element.getValue().get(0)
@@ -1179,10 +665,10 @@ public class PubSubTest {
      */
     @Test
     public void testSubscription1() throws Exception {
-        String topic = testTime + "_Subscription1";
-        PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer();
-        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        final String topic = testTime + "_Subscription1";
+        final PubSub conn = new PubSub();
+        final Server server1 = newSubscriptionServer();
+        final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic, new Vector<String>());
 
         try {
@@ -1194,11 +680,11 @@ public class PubSubTest {
             }
 
             // wait max 'notifications_timeout' seconds for notifications:
-            Map<String, Vector<String>> notifications_server1 =
+            final Map<String, Vector<String>> notifications_server1 =
                 ((SubscriptionHandler) server1.getHandler()).notifications;
-            for (int i = 0; i < notifications_timeout
-                    && (notifications_server1.get(topic) == null ||
-                        notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size()); ++i) {
+            for (int i = 0; (i < notifications_timeout)
+                    && ((notifications_server1.get(topic) == null) ||
+                        (notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
@@ -1220,16 +706,16 @@ public class PubSubTest {
      */
     @Test
     public void testSubscription2() throws Exception {
-        String topic = testTime + "_Subscription2";
-        PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer();
-        Server server2 = newSubscriptionServer();
-        Server server3 = newSubscriptionServer();
-        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        final String topic = testTime + "_Subscription2";
+        final PubSub conn = new PubSub();
+        final Server server1 = newSubscriptionServer();
+        final Server server2 = newSubscriptionServer();
+        final Server server3 = newSubscriptionServer();
+        final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic, new Vector<String>());
-        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
         notifications_server2_expected.put(topic, new Vector<String>());
-        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
         notifications_server3_expected.put(topic, new Vector<String>());
 
         try {
@@ -1245,19 +731,19 @@ public class PubSubTest {
             }
 
             // wait max 'notifications_timeout' seconds for notifications:
-            Map<String, Vector<String>> notifications_server1 =
+            final Map<String, Vector<String>> notifications_server1 =
                 ((SubscriptionHandler) server1.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server2 =
+            final Map<String, Vector<String>> notifications_server2 =
                 ((SubscriptionHandler) server2.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server3 =
+            final Map<String, Vector<String>> notifications_server3 =
                 ((SubscriptionHandler) server3.getHandler()).notifications;
-            for (int i = 0; i < notifications_timeout
-                    && (notifications_server1.get(topic) == null ||
-                        notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size()||
-                        notifications_server2.get(topic) == null ||
-                        notifications_server2.get(topic).size() < notifications_server2_expected.get(topic).size() ||
-                        notifications_server3.get(topic) == null ||
-                        notifications_server3.get(topic).size() < notifications_server3_expected.get(topic).size()); ++i) {
+            for (int i = 0; (i < notifications_timeout)
+                    && ((notifications_server1.get(topic) == null) ||
+                        (notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size())||
+                        (notifications_server2.get(topic) == null) ||
+                        (notifications_server2.get(topic).size() < notifications_server2_expected.get(topic).size()) ||
+                        (notifications_server3.get(topic) == null) ||
+                        (notifications_server3.get(topic).size() < notifications_server3_expected.get(topic).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
@@ -1286,18 +772,18 @@ public class PubSubTest {
      */
     @Test
     public void testSubscription3() throws Exception {
-        String topic1 = testTime + "_Subscription3_1";
-        String topic2 = testTime + "_Subscription3_2";
-        String topic3 = testTime + "_Subscription3_3";
-        PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer();
-        Server server2 = newSubscriptionServer();
-        Server server3 = newSubscriptionServer();
-        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        final String topic1 = testTime + "_Subscription3_1";
+        final String topic2 = testTime + "_Subscription3_2";
+        final String topic3 = testTime + "_Subscription3_3";
+        final PubSub conn = new PubSub();
+        final Server server1 = newSubscriptionServer();
+        final Server server2 = newSubscriptionServer();
+        final Server server3 = newSubscriptionServer();
+        final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic1, new Vector<String>());
-        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
         notifications_server2_expected.put(topic2, new Vector<String>());
-        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
         notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
@@ -1306,34 +792,34 @@ public class PubSubTest {
             conn.subscribe(topic3, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
 
             for (int i = 0; i < testData.length; ++i) {
-                if (i % 2 == 0) {
+                if ((i % 2) == 0) {
                     conn.publish(topic1, testData[i]);
                     notifications_server1_expected.get(topic1).add(testData[i]);
                 }
-                if (i % 3 == 0) {
+                if ((i % 3) == 0) {
                     conn.publish(topic2, testData[i]);
                     notifications_server2_expected.get(topic2).add(testData[i]);
                 }
-                if (i % 5 == 0) {
+                if ((i % 5) == 0) {
                     conn.publish(topic3, testData[i]);
                     notifications_server3_expected.get(topic3).add(testData[i]);
                 }
             }
 
             // wait max 'notifications_timeout' seconds for notifications:
-            Map<String, Vector<String>> notifications_server1 =
+            final Map<String, Vector<String>> notifications_server1 =
                 ((SubscriptionHandler) server1.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server2 =
+            final Map<String, Vector<String>> notifications_server2 =
                 ((SubscriptionHandler) server2.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server3 =
+            final Map<String, Vector<String>> notifications_server3 =
                 ((SubscriptionHandler) server3.getHandler()).notifications;
-            for (int i = 0; i < notifications_timeout
-                    && (notifications_server1.get(topic1) == null ||
-                        notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size() ||
-                        notifications_server2.get(topic2) == null ||
-                        notifications_server2.get(topic2).size() < notifications_server2_expected.get(topic2).size() ||
-                        notifications_server3.get(topic3) == null ||
-                        notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size()); ++i) {
+            for (int i = 0; (i < notifications_timeout)
+                    && ((notifications_server1.get(topic1) == null) ||
+                        (notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size()) ||
+                        (notifications_server2.get(topic2) == null) ||
+                        (notifications_server2.get(topic2).size() < notifications_server2_expected.get(topic2).size()) ||
+                        (notifications_server3.get(topic3) == null) ||
+                        (notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
@@ -1362,18 +848,18 @@ public class PubSubTest {
      */
     @Test
     public void testSubscription4() throws Exception {
-        String topic1 = testTime + "_Subscription4_1";
-        String topic2 = testTime + "_Subscription4_2";
-        String topic3 = testTime + "_Subscription4_3";
-        PubSub conn = new PubSub();
-        Server server1 = newSubscriptionServer();
-        Server server2 = newSubscriptionServer();
-        Server server3 = newSubscriptionServer();
-        Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
+        final String topic1 = testTime + "_Subscription4_1";
+        final String topic2 = testTime + "_Subscription4_2";
+        final String topic3 = testTime + "_Subscription4_3";
+        final PubSub conn = new PubSub();
+        final Server server1 = newSubscriptionServer();
+        final Server server2 = newSubscriptionServer();
+        final Server server3 = newSubscriptionServer();
+        final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic1, new Vector<String>());
-        Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
         notifications_server2_expected.put(topic2, new Vector<String>());
-        Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
+        final Map<String, Vector<String>> notifications_server3_expected = new HashMap<String, Vector<String>>();
         notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
@@ -1383,35 +869,35 @@ public class PubSubTest {
             conn.unsubscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
 
             for (int i = 0; i < testData.length; ++i) {
-                if (i % 2 == 0) {
+                if ((i % 2) == 0) {
                     conn.publish(topic1, testData[i]);
                     notifications_server1_expected.get(topic1).add(testData[i]);
                 }
-                if (i % 3 == 0) {
+                if ((i % 3) == 0) {
                     conn.publish(topic2, testData[i]);
                     // note: topic2 is unsubscribed
 //                    notifications_server2_expected.get(topic2).add(testData[i]);
                 }
-                if (i % 5 == 0) {
+                if ((i % 5) == 0) {
                     conn.publish(topic3, testData[i]);
                     notifications_server3_expected.get(topic3).add(testData[i]);
                 }
             }
 
             // wait max 'notifications_timeout' seconds for notifications:
-            Map<String, Vector<String>> notifications_server1 =
+            final Map<String, Vector<String>> notifications_server1 =
                 ((SubscriptionHandler) server1.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server2 =
+            final Map<String, Vector<String>> notifications_server2 =
                 ((SubscriptionHandler) server2.getHandler()).notifications;
-            Map<String, Vector<String>> notifications_server3 =
+            final Map<String, Vector<String>> notifications_server3 =
                 ((SubscriptionHandler) server3.getHandler()).notifications;
-            for (int i = 0; i < notifications_timeout
-                    && (notifications_server1.get(topic1) == null ||
-                        notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size() ||
-//                        notifications_server3.get(topic2) == null ||
+            for (int i = 0; (i < notifications_timeout)
+                    && ((notifications_server1.get(topic1) == null) ||
+                        (notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size()) ||
+(//                        notifications_server3.get(topic2) == null ||
 //                        notifications_server3.get(topic2).size() < notifications_server2_expected.get(topic2).size() ||
-                        notifications_server3.get(topic3) == null ||
-                        notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size()); ++i) {
+notifications_server3.get(topic3) == null) ||
+                        (notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
@@ -1437,21 +923,22 @@ public class PubSubTest {
         public SubscriptionHandler() {
         }
 
-        private String[] getParametersFromJSON(Reader reader)
+        private String[] getParametersFromJSON(final Reader reader)
                 throws IOException {
             String[] result;
             /**
              * {"method":"notify","params":["1209386211287_SubscribeTest","content"],"id":482975}
              */
 
-            Object json = JSON.parse(reader);
+            final Object json = JSON.parse(reader);
             if (json instanceof Map<?, ?>) {
                 @SuppressWarnings("unchecked")
+                final
                 Map<String, Object> json_object = (Map<String, Object>) json;
                 result = new String[json_object.size()];
 
                 if (json_object.get("method").equals("notify")) {
-                    Object[] params = (Object[]) json_object.get("params");
+                    final Object[] params = (Object[]) json_object.get("params");
                     for (int i = 0; i < params.length; i++) {
                         result[i] = (String) params[i];
                     }
@@ -1462,17 +949,17 @@ public class PubSubTest {
             }
         }
 
-        public void handle(String target, Request baseRequest,
-                HttpServletRequest request, HttpServletResponse response)
+        public void handle(final String target, final Request baseRequest,
+                final HttpServletRequest request, final HttpServletResponse response)
                 throws IOException, ServletException {
             response.setContentType("text/html");
             response.setStatus(HttpServletResponse.SC_OK);
-            PrintWriter out = response.getWriter();
+            final PrintWriter out = response.getWriter();
 
-            String[] params = getParametersFromJSON(request.getReader());
+            final String[] params = getParametersFromJSON(request.getReader());
             if (params.length >= 2) {
-                String topic = params[0];
-                String content = params[1];
+                final String topic = params[0];
+                final String content = params[1];
 
                 synchronized (this) {
                     Vector<String> l = notifications.get(topic);
