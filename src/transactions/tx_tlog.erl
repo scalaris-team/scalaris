@@ -54,9 +54,9 @@
 -type tlog_entry() ::
           { tx_op(),                  %% operation
             tlog_key, %% key | hashed and replicated key
+            integer(),                %% version
             tx_status(),              %% status
-            any(),                    %% value
-            integer()                 %% version
+            any()                     %% value
           }.
 -type tlog() :: [tlog_entry()].
 
@@ -73,7 +73,7 @@ add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 add_or_update_status_by_key(TLog, Key, Status) ->
     case lists:keyfind(Key, 2, TLog) of
         false ->
-            Entry = new_entry(rdht_tx_write, Key, Status, 0, 0),
+            Entry = new_entry(rdht_tx_write, Key, _Vers = 0, Status, _Val = 0),
             add_entry(TLog, Entry);
         Entry ->
             NewEntry = set_entry_status(Entry, Status),
@@ -103,10 +103,10 @@ is_sane_for_commit(TLog) ->
 
 
 %% Operations on Elements of TransLogs (public)
--spec new_entry(tx_op(), client_key() | ?RT:key(), tx_status(), any(), integer()) -> tlog_entry().
-new_entry(Op, Key, Status, Val, Vers) ->
-%    #tlog_entry{op = Op, key = Key, status = Status, val = Val, vers = Vers}.
-    {Op, Key, Status, Val, Vers}.
+-spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),
+                tx_status(), any()) -> tlog_entry().
+new_entry(Op, Key, Vers, Status, Val) ->
+    {Op, Key, Vers, Status, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
@@ -120,17 +120,18 @@ get_entry_key(Element)       -> element(2, Element).
 -spec set_entry_key(tlog_entry(), client_key() | ?RT:key()) -> tlog_entry().
 set_entry_key(Entry, Val)    -> setelement(2, Entry, Val).
 
+-spec get_entry_version(tlog_entry()) -> integer().
+get_entry_version(Element)   -> element(3, Element).
+
 -spec get_entry_status(tlog_entry()) -> tx_status().
-get_entry_status(Element)    -> element(3, Element).
+get_entry_status(Element)    -> element(4, Element).
 
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
-set_entry_status(Element, Val)    -> setelement(3, Element, Val).
+set_entry_status(Element, Val)    -> setelement(4, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
-get_entry_value(Element)     -> element(4, Element).
+get_entry_value(Element)     -> element(5, Element).
 
 -spec set_entry_value(tlog_entry(), any()) -> tlog_entry().
-set_entry_value(Element, Val)     -> setelement(4, Element, Val).
+set_entry_value(Element, Val)     -> setelement(5, Element, Val).
 
--spec get_entry_version(tlog_entry()) -> integer().
-get_entry_version(Element)   -> element(5, Element).
