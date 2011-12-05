@@ -15,7 +15,11 @@
  */
 package de.zib.scalaris;
 
+import java.util.List;
+
+import com.ericsson.otp.erlang.OtpErlangDouble;
 import com.ericsson.otp.erlang.OtpErlangList;
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
@@ -99,7 +103,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
  * state. The number of automatic retries is adjustable (default: 3).
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.5
+ * @version 3.9
  * @since 2.0
  */
 public class TransactionSingleOp {
@@ -242,7 +246,7 @@ public class TransactionSingleOp {
 
         /**
          * Processes the result at the given position which originated from
-         * a set_change request.
+         * a add_del_on_list request.
          *
          * @param pos
          *            the position in the result list (starting at 0)
@@ -256,17 +260,17 @@ public class TransactionSingleOp {
          * @throws UnknownException
          *             if any other error occurs
          *
-         * @since 3.8
+         * @since 3.9
          */
-        public void processSetChangeAt(final int pos) throws TimeoutException,
+        public void processAddDelOnList(final int pos) throws TimeoutException,
                 NotAListException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
-            CommonErlangObjects.processResult_setChange(results.elementAt(pos));
+            CommonErlangObjects.processResult_addDelOnList(results.elementAt(pos));
         }
 
         /**
          * Processes the result at the given position which originated from
-         * a number_add request.
+         * an add_on_nr request.
          *
          * @param pos
          *            the position in the result list (starting at 0)
@@ -280,17 +284,17 @@ public class TransactionSingleOp {
          * @throws UnknownException
          *             if any other error occurs
          *
-         * @since 3.8
+         * @since 3.9
          */
-        public void processNumberAddAt(final int pos) throws TimeoutException,
+        public void processAddOnNrAt(final int pos) throws TimeoutException,
                 NotANumberException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
-            CommonErlangObjects.processResult_numberAdd(results.elementAt(pos));
+            CommonErlangObjects.processResult_addOnNr(results.elementAt(pos));
         }
 
         /**
          * Processes the result at the given position which originated from
-         * a number_add request.
+         * a test_and_set request.
          *
          * @param pos
          *            the position in the result list (starting at 0)
@@ -352,10 +356,6 @@ public class TransactionSingleOp {
         }
     }
 
-    // /////////////////////////////
-    // read methods
-    // /////////////////////////////
-
     /**
      * Gets the value stored under the given <tt>key</tt>.
      *
@@ -411,10 +411,6 @@ public class TransactionSingleOp {
             TimeoutException, NotFoundException, UnknownException {
         return read(new OtpErlangString(key));
     }
-
-    // /////////////////////////////
-    // write methods
-    // /////////////////////////////
 
     /**
      * Stores the given <tt>key</tt>/<tt>value</tt> pair.
@@ -475,19 +471,234 @@ public class TransactionSingleOp {
         write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }
 
-    // /////////////////////////////
-    // test and set
-    // /////////////////////////////
+    /**
+     * Changes the list stored at the given key, i.e. removes and/or adds some
+     * items.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            a list of values to add to a list
+     * @param toRemove
+     *            a list of values to remove from a list
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotAListException
+     *             if the previously stored value was no list
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addDelOnList(OtpErlangObject, OtpErlangList, OtpErlangList)
+     * @since 3.9
+     */
+    public void addDelOnList(final OtpErlangObject key,
+            final OtpErlangList toAdd, final OtpErlangList toRemove)
+            throws ConnectionException, TimeoutException, NotAListException,
+            AbortException, UnknownException {
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "add_del_on_list",
+                new OtpErlangObject[] { key, toAdd, toRemove });
+        CommonErlangObjects.checkResult_failAbort(received_raw);
+        CommonErlangObjects.processResult_addDelOnList(received_raw);
+    }
 
     /**
-     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
-     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
+     * Changes the list stored at the given key, i.e. removes and/or adds some
+     * items.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            a list of values to add to a list
+     * @param toRemove
+     *            a list of values to remove from a list
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotAListException
+     *             if the previously stored value was no list
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addDelOnList(OtpErlangObject, OtpErlangList, OtpErlangList)
+     * @since 3.9
+     */
+    public <T> void addDelOnList(final String key, final List<T> toAdd,
+            final List<T> toRemove) throws ConnectionException,
+            TimeoutException, NotAListException, AbortException,
+            UnknownException {
+         OtpErlangList toAddErl;
+         OtpErlangList toRemoveErl;
+         try {
+             toAddErl = (OtpErlangList) ErlangValue.convertToErlang(toAdd);
+             toRemoveErl = (OtpErlangList) ErlangValue.convertToErlang(toRemove);
+         } catch (final ClassCastException e) {
+             // one of the parameters was no list
+             // note: a ClassCastException inside ErlangValue.convertToErlang is
+             // converted to an UnknownException
+             throw new NotAListException(e);
+         }
+         addDelOnList(new OtpErlangString(key), toAddErl, toRemoveErl);
+    }
+
+    /**
+     * Changes the number stored at the given key, i.e. adds some value.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key (may also be
+     *            negative)
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotANumberException
+     *             if the previously stored value was no number
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addOnNr_(OtpErlangObject, OtpErlangObject)
+     * @since 3.9
+     */
+    public void addOnNr(final OtpErlangObject key, final OtpErlangLong toAdd)
+            throws ConnectionException, TimeoutException, NotANumberException,
+            AbortException, UnknownException {
+        addOnNr_(key, toAdd);
+    }
+
+    /**
+     * Changes the number stored at the given key, i.e. adds some value.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key (may also be
+     *            negative)
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotANumberException
+     *             if the previously stored value was no number
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addOnNr_(OtpErlangObject, OtpErlangObject)
+     * @since 3.9
+     */
+    public void addOnNr(final OtpErlangObject key, final OtpErlangDouble toAdd)
+            throws ConnectionException, TimeoutException, NotANumberException,
+            AbortException, UnknownException {
+        addOnNr_(key, toAdd);
+    }
+
+    /**
+     * Changes the number stored at the given key, i.e. adds some value.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key (may also be
+     *            negative)
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotANumberException
+     *             if the previously stored value was no number
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addOnNr(OtpErlangObject, OtpErlangLong)
+     * @see #addOnNr(OtpErlangObject, OtpErlangDouble)
+     * @since 3.9
+     */
+    protected void addOnNr_(final OtpErlangObject key,
+            final OtpErlangObject toAdd) throws ConnectionException,
+            TimeoutException, NotANumberException, AbortException,
+            UnknownException {
+        final OtpErlangObject received_raw = connection.doRPC("api_tx", "add_on_nr",
+                new OtpErlangObject[] { key, toAdd });
+        CommonErlangObjects.checkResult_failAbort(received_raw);
+        CommonErlangObjects.processResult_addOnNr(received_raw);
+    }
+
+    /**
+     * Changes the number stored at the given key, i.e. adds some value.
+     *
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key (may also be
+     *            negative)
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws NotANumberException
+     *             if the previously stored value was no number
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #addOnNr(OtpErlangObject, OtpErlangLong)
+     * @see #addOnNr(OtpErlangObject, OtpErlangDouble)
+     * @since 3.9
+     */
+    public <T> void addOnNr(final String key, final T toAdd)
+            throws ConnectionException, TimeoutException, NotANumberException,
+            AbortException, UnknownException {
+        final OtpErlangObject toAddErl = ErlangValue.convertToErlang(toAdd);
+        if (toAddErl instanceof OtpErlangLong) {
+            addOnNr(new OtpErlangString(key), (OtpErlangLong) toAddErl);
+        } else if (toAddErl instanceof OtpErlangDouble) {
+            addOnNr(new OtpErlangString(key), (OtpErlangDouble) toAddErl);
+        } else {
+            throw new NotANumberException(toAddErl);
+        }
+    }
+
+    /**
+     * Stores the given <tt>key</tt>/<tt>newValue</tt> pair if the old value
+     * at <tt>key</tt> is <tt>oldValue</tt> (atomic test_and_set).
      *
      * @param key
      *            the key to store the value for
-     * @param old_value
+     * @param oldValue
      *            the old value to check
-     * @param new_value
+     * @param newValue
      *            the value to store
      *
      * @throws ConnectionException
@@ -508,18 +719,18 @@ public class TransactionSingleOp {
      * @since 2.9
      */
     public void testAndSet(final OtpErlangString key,
-            final OtpErlangObject old_value, final OtpErlangObject new_value)
+            final OtpErlangObject oldValue, final OtpErlangObject newValue)
             throws ConnectionException, TimeoutException, AbortException,
             NotFoundException, KeyChangedException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_tx", "test_and_set",
-                new OtpErlangObject[] { key, old_value, new_value });
+                new OtpErlangObject[] { key, oldValue, newValue });
         CommonErlangObjects.checkResult_failAbort(received_raw);
         CommonErlangObjects.processResult_testAndSet(received_raw);
     }
 
     /**
-     * Stores the given <tt>key</tt>/<tt>new_value</tt> pair if the old value
-     * at <tt>key</tt> is <tt>old_value</tt> (atomic test_and_set).
+     * Stores the given <tt>key</tt>/<tt>newValue</tt> pair if the old value
+     * at <tt>key</tt> is <tt>oldValue</tt> (atomic test_and_set).
      *
      * @param <OldT>
      *            the type of the stored (old) value.
@@ -529,9 +740,9 @@ public class TransactionSingleOp {
      *            See {@link ErlangValue} for a list of supported types.
      * @param key
      *            the key to store the value for
-     * @param old_value
+     * @param oldValue
      *            the old value to check
-     * @param new_value
+     * @param newValue
      *            the value to store
      *
      * @throws ConnectionException
@@ -552,12 +763,13 @@ public class TransactionSingleOp {
      * @see #testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)
      * @since 2.9
      */
-    public <OldT, NewT> void testAndSet(final String key, final OldT old_value, final NewT new_value)
-            throws ConnectionException, TimeoutException, AbortException,
-            NotFoundException, KeyChangedException, UnknownException {
+    public <OldT, NewT> void testAndSet(final String key, final OldT oldValue,
+            final NewT newValue) throws ConnectionException, TimeoutException,
+            AbortException, NotFoundException, KeyChangedException,
+            UnknownException {
         testAndSet(new OtpErlangString(key),
-                ErlangValue.convertToErlang(old_value),
-                ErlangValue.convertToErlang(new_value));
+                ErlangValue.convertToErlang(oldValue),
+                ErlangValue.convertToErlang(newValue));
     }
 
     /**

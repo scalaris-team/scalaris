@@ -32,11 +32,11 @@
 %% Perform a chain of operations (passing a transaction log) and
 %% finally commit the transaction.
 -export([new_tlog/0, req_list/1, req_list/2,
-         read/2, write/3, set_change/4, number_add/3, test_and_set/4, commit/1]).
+         read/2, write/3, add_del_on_list/4, add_on_nr/3, test_and_set/4, commit/1]).
 
 %% Perform single operation transactions.
 -export([req_list_commit_each/1,
-         read/1, write/2, set_change/3, number_add/2, test_and_set/3]).
+         read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3]).
 
 -ifdef(with_export_type_support).
 -export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0,
@@ -50,8 +50,8 @@
 -type request_on_key() ::
           {read, client_key()}
         | {write, client_key(), client_value()}
-        | {set_change, client_key(), ToAdd::[client_value()], ToRemove::[client_value()]}
-        | {number_add, client_key(), number()}
+        | {add_del_on_list, client_key(), ToAdd::[client_value()], ToRemove::[client_value()]}
+        | {add_on_nr, client_key(), number()}
         | {test_and_set, client_key(), Old::client_value(), New::client_value()}.
 -type request() :: request_on_key() | {commit}.
 -type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
@@ -102,18 +102,18 @@ write(TLog, Key, Value) ->
     {NewTLog, [Result]} = req_list(TLog, [{write, Key, Value}]),
     {NewTLog, Result}.
 
-%% @doc Perform a set_change operation inside a transaction.
--spec set_change(tx_tlog:tlog(), client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
+%% @doc Perform a add_del_on_list operation inside a transaction.
+-spec add_del_on_list(tx_tlog:tlog(), client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
            -> {tx_tlog:tlog(), listop_result()}.
-set_change(TLog, Key, ToAdd, ToRemove) ->
-    {NewTLog, [Result]} = req_list(TLog, [{set_change, Key, ToAdd, ToRemove}]),
+add_del_on_list(TLog, Key, ToAdd, ToRemove) ->
+    {NewTLog, [Result]} = req_list(TLog, [{add_del_on_list, Key, ToAdd, ToRemove}]),
     {NewTLog, Result}.
 
-%% @doc Perform a set_change operation inside a transaction.
--spec number_add(tx_tlog:tlog(), client_key(), ToAdd::number())
+%% @doc Perform a add_del_on_list operation inside a transaction.
+-spec add_on_nr(tx_tlog:tlog(), client_key(), ToAdd::number())
            -> {tx_tlog:tlog(), numberop_result()}.
-number_add(TLog, Key, ToAdd) ->
-    {NewTLog, [Result]} = req_list(TLog, [{number_add, Key, ToAdd}]),
+add_on_nr(TLog, Key, ToAdd) ->
+    {NewTLog, [Result]} = req_list(TLog, [{add_on_nr, Key, ToAdd}]),
     {NewTLog, Result}.
 
 %% @doc Atomically compare and set a value for a key inside a transaction.
@@ -145,22 +145,22 @@ write(Key, Value) ->
     {_TLog, [_Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
     Res2.
 
-%% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
--spec set_change(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
+%% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
+-spec add_del_on_list(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
            -> listop_result() | {fail, abort}.
-set_change(Key, ToAdd, ToRemove) ->
-    ReqList = [{set_change, Key, ToAdd, ToRemove}, {commit}],
+add_del_on_list(Key, ToAdd, ToRemove) ->
+    ReqList = [{add_del_on_list, Key, ToAdd, ToRemove}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
     case Res1 of
         X when erlang:is_tuple(X) andalso erlang:element(1, X) =:= fail -> X;
         _ -> Res2
     end.
 
-%% @doc Atomically perform a set_change operation and a commit (not as part of a transaction).
--spec number_add(client_key(), ToAdd::number())
+%% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
+-spec add_on_nr(client_key(), ToAdd::number())
            -> numberop_result() | {fail, abort}.
-number_add(Key, ToAdd) ->
-    ReqList = [{number_add, Key, ToAdd}, {commit}],
+add_on_nr(Key, ToAdd) ->
+    ReqList = [{add_on_nr, Key, ToAdd}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
     case Res1 of
         X when erlang:is_tuple(X) andalso erlang:element(1, X) =:= fail -> X;
@@ -185,8 +185,8 @@ req_list_commit_each(ReqList) ->
     [ case Req of
           {read, Key} -> read(Key);
           {write, Key, Value} -> write(Key, Value);
-          {set_change, Key, ToAdd, ToRemove} -> set_change(Key, ToAdd, ToRemove);
-          {number_add, Key, ToAdd} -> number_add(Key, ToAdd);
+          {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
+          {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
           {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
           _ -> {fail, abort}
       end || Req <- ReqList].

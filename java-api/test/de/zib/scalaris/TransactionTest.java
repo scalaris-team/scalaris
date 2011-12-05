@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
@@ -35,7 +36,7 @@ import de.zib.scalaris.Transaction.ResultList;
  * Unit test for the {@link Transaction} class.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 2.0
+ * @version 3.9
  * @since 2.0
  */
 public class TransactionTest {
@@ -325,9 +326,13 @@ public class TransactionTest {
      * @throws UnknownException
      * @throws TimeoutException
      * @throws AbortException
+     *
+     * @since 3.9
      */
     @Test
-    public void testWriteString() throws ConnectionException, TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testWriteString1() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException,
+            AbortException {
         final String key = "_testWriteString1_";
         Transaction t = new Transaction();
         try {
@@ -354,6 +359,44 @@ public class TransactionTest {
     }
 
     /**
+     * Test method for {@link Transaction#write(String, Object)} and
+     * {@link Transaction#read(String)}. Writes strings and uses a single key
+     * for all the values. Tries to read the data afterwards.
+     *
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testWriteString2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException,
+            AbortException {
+        final String key = "_testWriteString2_";
+        Transaction t = new Transaction();
+        try {
+            for (int i = 0; i < testData.length; ++i) {
+                t.write(testTime + key, testData[i]);
+            }
+
+            // now try to read the data:
+            final String actual1 = t.read(testTime + key).stringValue();
+            assertEquals(testData[testData.length - 1], actual1);
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            final String actual2 = t.read(testTime + key).stringValue();
+            assertEquals(testData[testData.length - 1], actual2);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
      * Test method for {@link Transaction#write(String, List)} and
      * {@link Transaction#read(String)}. Writes lists and uses a single key for
      * all the values. Tries to read the data afterwards.
@@ -363,9 +406,11 @@ public class TransactionTest {
      * @throws TimeoutException
      * @throws ConnectionException
      * @throws AbortException
+     *
+     * @since 3.9
      */
     @Test
-    public void testWriteList() throws ConnectionException,
+    public void testWriteList1() throws ConnectionException,
             TimeoutException, UnknownException, NotFoundException, AbortException {
         final String key = "_testWriteList1_";
         Transaction t = new Transaction();
@@ -398,6 +443,47 @@ public class TransactionTest {
 
                 assertEquals(expected, actual);
             }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link Transaction#write(String, List)} and
+     * {@link Transaction#read(String)}. Writes lists and uses a single
+     * key for all the values. Tries to read the data afterwards.
+     *
+     * @throws NotFoundException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testWriteList2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_testWriteList1_";
+        Transaction t = new Transaction();
+        try {
+            final ArrayList<String> list = new ArrayList<String>();
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                list.clear();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                t.write(testTime + key, list);
+            }
+
+            // now try to read the data:
+            final List<String> actual1 = t.read(testTime + key).stringListValue();
+            assertEquals(list, actual1);
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            final List<String> actual2 = t.read(testTime + key).stringListValue();
+            assertEquals(list, actual2);
         } finally {
             t.closeConnection();
         }
@@ -510,6 +596,724 @@ public class TransactionTest {
                 final OtpErlangList expected = new OtpErlangList(data);
 
                 assertEquals(expected, actual);
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}
+     * with a closed connection.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=ConnectionException.class)
+    public void testTestAndSetOtpList_NotConnected() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetOtpList_NotConnected";
+        final Transaction t = new Transaction();
+        t.closeConnection();
+        final OtpErlangObject[] data = new OtpErlangObject[] {
+                new OtpErlangString(testData[0]),
+                new OtpErlangString(testData[1]) };
+        t.testAndSet(
+                new OtpErlangString(testTime + key),
+                new OtpErlangAtom("fail"),
+                new OtpErlangList(data) );
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)}.
+     * Tries test_and_set with a non-existing key.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=NotFoundException.class)
+    public void testTestAndSetOtpList_NotFound() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetOtpList_NotFound";
+        final Transaction t = new Transaction();
+
+        try {
+            final OtpErlangObject[] data = new OtpErlangObject[] {
+                    new OtpErlangString(testData[0]),
+                    new OtpErlangString(testData[1]) };
+            t.testAndSet(
+                    new OtpErlangString(testTime + key),
+                    new OtpErlangAtom("fail"),
+                    new OtpErlangList(data) );
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
+     * {@link Transaction#read(OtpErlangString)}
+     * and {@link Transaction#write(OtpErlangString, OtpErlangObject)}.
+     * Writes an erlang list and tries to overwrite it using test_and_set
+     * knowing the correct old value. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetOtpList1() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetOtpList1";
+        final Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject[] data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i]),
+                        new OtpErlangString(testData[i + 1]) };
+                t.write(
+                        new OtpErlangString(testTime + key + i),
+                        new OtpErlangList(data));
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject[] old_data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i]),
+                        new OtpErlangString(testData[i + 1]) };
+                final OtpErlangObject[] new_data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i + 1]),
+                        new OtpErlangString(testData[i]) };
+                t.testAndSet(
+                        new OtpErlangString(testTime + key + i),
+                        new OtpErlangList(old_data),
+                        new OtpErlangList(new_data));
+                t.commit();
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject[] data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i + 1]),
+                        new OtpErlangString(testData[i]) };
+                final OtpErlangObject actual = t.read(
+                        new OtpErlangString(testTime + key + i)).value();
+                final OtpErlangList expected = new OtpErlangList(data);
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(OtpErlangString, OtpErlangObject, OtpErlangObject)},
+     * {@link Transaction#read(OtpErlangString)}
+     * and {@link Transaction#write(OtpErlangString, OtpErlangObject)}.
+     * Writes an erlang list and tries to overwrite it using test_and_set
+     * knowing the wrong old value. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetOtpList2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_TestAndSetOtpList2";
+        final Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject[] data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i]),
+                        new OtpErlangString(testData[i + 1]) };
+                t.write(
+                        new OtpErlangString(testTime + key + i),
+                        new OtpErlangList(data));
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject new_value = CommonErlangObjects.failAtom;
+                try {
+                    t.testAndSet(
+                            new OtpErlangString(testTime + key + i),
+                            new OtpErlangString("fail"), new_value);
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final KeyChangedException e) {
+                    final OtpErlangObject[] data = new OtpErlangObject[] {
+                            new OtpErlangString(testData[i]),
+                            new OtpErlangString(testData[i + 1]) };
+                    final OtpErlangList expected = new OtpErlangList(data);
+                    assertEquals(expected, e.getOldValue());
+                }
+                try {
+                    t.commit();
+                    // an AbortException must be thrown
+                    assertTrue(false);
+                } catch (final AbortException e) {
+                    t.abort();
+                }
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final OtpErlangObject[] data = new OtpErlangObject[] {
+                        new OtpErlangString(testData[i]),
+                        new OtpErlangString(testData[i + 1]) };
+                final OtpErlangObject actual = t.read(
+                        new OtpErlangString(testTime + key + i)).value();
+                final OtpErlangList expected = new OtpErlangList(data);
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, Object, List)}
+     * with a closed connection.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=ConnectionException.class)
+    public void testTestAndSetList_NotConnected() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetList_NotConnected";
+        final Transaction t = new Transaction();
+        t.closeConnection();
+        final ArrayList<String> list = new ArrayList<String>();
+        list.add(testData[0]);
+        list.add(testData[1]);
+        t.testAndSet(testTime + key, "fail", list);
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, Object, List)}
+     * Tries test_and_set with a non-existing key.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=NotFoundException.class)
+    public void testTestAndSetList_NotFound() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetList_NotFound";
+        final Transaction t = new Transaction();
+
+        try {
+            final ArrayList<String> list = new ArrayList<String>();
+            list.add(testData[0]);
+            list.add(testData[1]);
+            t.testAndSet(testTime + key, "fail", list);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, Object, List)},
+     * {@link Transaction#read(String)}
+     * and {@link Transaction#write(String, List)}.
+     * Writes an erlang list and tries to overwrite it using test_and_set
+     * knowing the correct old value. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetList1a() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetList1a";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final ArrayList<String> list = new ArrayList<String>();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                t.write(testTime + key + i, list);
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final ArrayList<String> old_list = new ArrayList<String>();
+                old_list.add(testData[i]);
+                old_list.add(testData[i + 1]);
+                final ArrayList<String> new_list = new ArrayList<String>();
+                new_list.add(testData[i + 1]);
+                new_list.add(testData[i]);
+                t.testAndSet(testTime + key + i, old_list, new_list);
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final List<String> actual = t.read(testTime + key + i).stringListValue();
+                final ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i + 1]);
+                expected.add(testData[i]);
+                assertEquals(expected, actual);
+            }
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final List<String> actual = t.read(testTime + key + i).stringListValue();
+                final ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i + 1]);
+                expected.add(testData[i]);
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, Object, List)},
+     * {@link Transaction#read(String)}
+     * and {@link Transaction#write(String, List)}.
+     * Writes an erlang list and tries to overwrite it using test_and_set
+     * knowing the wrong old value. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetList1b() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_TestAndSetList1b";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final ArrayList<String> list = new ArrayList<String>();
+                list.add(testData[i]);
+                list.add(testData[i + 1]);
+                t.write(testTime + key + i, list);
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final int new_value = 1;
+                try {
+                    t.testAndSet(testTime + key + i, "fail", new_value);
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final KeyChangedException e) {
+                    final OtpErlangObject[] data = new OtpErlangObject[] {
+                            new OtpErlangString(testData[i]),
+                            new OtpErlangString(testData[i + 1]) };
+                    final OtpErlangList expected = new OtpErlangList(data);
+                    assertEquals(expected, e.getOldValue());
+                }
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                try {
+                    t.read(testTime + key + i).stringListValue();
+                    // an UnknownException must be thrown
+                    assertTrue(false);
+                } catch (final UnknownException e) {
+                }
+            }
+
+            // commit the transaction and try to read the data with a new one:
+            try {
+                t.commit();
+                // an AbortException must be thrown
+                assertTrue(false);
+            } catch (final AbortException e) {
+                t.abort();
+            }
+            t = new Transaction();
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final List<String> actual = t.read(testTime + key + i).stringListValue();
+                final ArrayList<String> expected = new ArrayList<String>();
+                expected.add(testData[i]);
+                expected.add(testData[i + 1]);
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, List, List)},
+     * {@link Transaction#read(String)} and
+     * {@link Transaction#write(String, List)}. Writes a list and tries
+     * to overwrite it using test_and_set knowing the correct old value and
+     * using a single key for all the values. Tries to read the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetList2a() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetList2a";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            final ArrayList<String> list = new ArrayList<String>();
+            list.add(testData[0]);
+            list.add(testData[1]);
+            t.write(testTime + key, list);
+            t.commit();
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 1; i < (testData.length - 1); ++i) {
+                final ArrayList<String> old_list = new ArrayList<String>();
+                old_list.add(testData[i - 1]);
+                old_list.add(testData[i]);
+                final ArrayList<String> new_list = new ArrayList<String>();
+                new_list.add(testData[i]);
+                new_list.add(testData[i + 1]);
+                t.testAndSet(testTime + key, old_list, new_list);
+            }
+
+            final ArrayList<String> expected = new ArrayList<String>();
+            expected.add(testData[testData.length - 2]);
+            expected.add(testData[testData.length - 1]);
+
+            // now try to read the data:
+            final List<String> actual1 = t.read(testTime + key).stringListValue();
+            assertEquals(expected, actual1);
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            final List<String> actual2 = t.read(testTime + key).stringListValue();
+            assertEquals(expected, actual2);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, OtpErlangObject, OtpErlangObject)},
+     * {@link Transaction#read(OtpErlangString)} and
+     * {@link Transaction#write(OtpErlangString, OtpErlangObject)}.
+     * Writes a list and tries to overwrite it using test_and_set knowing the
+     * wrong old value and using a single key for all the values. Tries to read
+     * the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetList2b() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_TestAndSetList2b";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            final ArrayList<String> list = new ArrayList<String>();
+            list.add(testData[0]);
+            list.add(testData[1]);
+            t.write(testTime + key, list);
+            t.commit();
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); ++i) {
+                final int new_value = 1;
+                try {
+                    t.testAndSet(testTime + key, "fail", new_value);
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final KeyChangedException e) {
+                    final OtpErlangObject[] data = new OtpErlangObject[] {
+                            new OtpErlangString(testData[0]),
+                            new OtpErlangString(testData[1]) };
+                    final OtpErlangList expected = new OtpErlangList(data);
+                    assertEquals(expected, e.getOldValue());
+                }
+            }
+
+            // now try to read the data:
+            try {
+                t.read(testTime + key).stringListValue();
+                // an UnknownException must be thrown
+                assertTrue(false);
+            } catch (final UnknownException e) {
+            }
+
+            // commit the transaction and try to read the data with a new one:
+            try {
+                t.commit();
+                // an AbortException must be thrown
+                assertTrue(false);
+            } catch (final AbortException e) {
+                t.abort();
+            }
+            t = new Transaction();
+            final List<String> actual2 = t.read(testTime + key).stringListValue();
+            assertEquals(list, actual2);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, String, String)}
+     * with a closed connection.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=ConnectionException.class)
+    public void testTestAndSetString_NotConnected() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetString_NotConnected";
+        final Transaction t = new Transaction();
+        t.closeConnection();
+        t.testAndSet(testTime + key, testData[0], testData[1]);
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, String, String)}.
+     * Tries test_and_set with a non-existing key.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test(expected=NotFoundException.class)
+    public void testTestAndSetString_NotFound() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetString_NotFound";
+        final Transaction t = new Transaction();
+
+        try {
+            t.testAndSet(testTime + key, testData[0], testData[1]);
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, String, String)},
+     * {@link Transaction#read(String)}
+     * and {@link Transaction#write(String, Object)}.
+     * Writes a string and tries to overwrite it using test_and_set
+     * knowing the correct old value. Tries to read the string afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws KeyChangedException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetString1() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+        final String key = "_TestAndSetString1";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                t.write(testTime + key + i, testData[i]);
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                t.testAndSet(testTime + key + i, testData[i], testData[i + 1]);
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final String actual = t.read(testTime + key + i).stringValue();
+                final String expected = testData[i + 1];
+                assertEquals(expected, actual);
+            }
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final String actual = t.read(testTime + key + i).stringValue();
+                final String expected = testData[i + 1];
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
+            }
+        } finally {
+            t.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for
+     * {@link Transaction#testAndSet(String, String, String)},
+     * {@link Transaction#read(String)}
+     * and {@link Transaction#write(String, Object)}.
+     * Writes a string and tries to overwrite it using test_and_set
+     * knowing the wrong old value. Tries to read the string afterwards.
+     *
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     *
+     * @since 3.9
+     */
+    @Test
+    public void testTestAndSetString2() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException, AbortException {
+        final String key = "_TestAndSetString2";
+        Transaction t = new Transaction();
+
+        try {
+            // first write all values:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                t.write(testTime + key + i, testData[i]);
+                t.commit();
+            }
+
+            // now try to overwrite them using test_and_set:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                try {
+                    t.testAndSet(testTime + key + i, testData[i + 1], "fail");
+                    // a key changed exception must be thrown
+                    assertTrue(false);
+                } catch (final KeyChangedException e) {
+                    final OtpErlangString expected = new OtpErlangString(testData[i]);
+                    assertEquals(expected, e.getOldValue());
+                }
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                try {
+                    t.read(testTime + key + i).stringValue();
+                    // an UnknownException must be thrown
+                    assertTrue(false);
+                } catch (final UnknownException e) {
+                }
+            }
+
+            // commit the transaction and try to read the data with a new one:
+            try {
+                t.commit();
+                // an AbortException must be thrown
+                assertTrue(false);
+            } catch (final AbortException e) {
+                t.abort();
+            }
+            t = new Transaction();
+            for (int i = 0; i < (testData.length - 1); i += 2) {
+                final String actual = t.read(testTime + key + i).stringValue();
+                final String expected = testData[i];
+                assertEquals(expected, actual);
+                t.abort(); // do not accumulate state in tlog
             }
         } finally {
             t.closeConnection();

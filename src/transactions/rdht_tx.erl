@@ -44,8 +44,8 @@
         {rdht_tx_read,  client_key()}
       | {rdht_tx_write, client_key(), client_value()}
       | {test_and_set,  client_key(), client_value(), client_value()}
-      | {set_change,    client_key(), client_value(), client_value()}
-      | {number_add,    client_key(), client_value()}.
+      | {add_del_on_list,    client_key(), client_value(), client_value()}
+      | {add_on_nr,    client_key(), client_value()}.
 
 -type request() :: request_on_key() | {commit}.
 
@@ -205,8 +205,8 @@ initiate_rdht_ops(ReqList) ->
                          rdht_tx_read -> rdht_tx_read;
                          rdht_tx_write -> rdht_tx_write;
                          test_and_set -> rdht_tx_read;
-                         set_change -> rdht_tx_read;
-                         number_add -> rdht_tx_read
+                         add_del_on_list -> rdht_tx_read;
+                         add_on_nr -> rdht_tx_read
                      end,
           apply(OpModule, work_phase, [self(), NewReqId, Entry]),
           {NewReqId, Entry}
@@ -293,8 +293,8 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
             {rdht_tx_read, Key}         -> tlog_read(Entry, Key);
             {rdht_tx_write, Key, Value} -> tlog_write(Entry, Key, Value);
             %% non-native functions:
-            {set_change, Key, ToAdd, ToDel} -> tlog_set_change(Entry, Key, ToAdd, ToDel);
-            {number_add, Key, X}          -> tlog_number_add(Entry, Key, X);
+            {add_del_on_list, Key, ToAdd, ToDel} -> tlog_add_del_on_list(Entry, Key, ToAdd, ToDel);
+            {add_on_nr, Key, X}          -> tlog_add_on_nr(Entry, Key, X);
             {test_and_set, Key, Old, New} -> tlog_test_and_set(Entry, Key, Old, New)
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
@@ -337,16 +337,16 @@ tlog_write(Entry, _Key, Value) ->
 
 %% @doc Simulate a change on a set via read and write requests.
 %%      Update the TLog entry accordingly.
--spec tlog_set_change(tx_tlog:tlog_entry(), client_key(),
+-spec tlog_add_del_on_list(tx_tlog:tlog_entry(), client_key(),
                       client_value(), client_value()) ->
                        {tx_tlog:tlog_entry(), result_entry_write()}.
-tlog_set_change(Entry, _Key, ToAdd, ToDel) when
+tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->
     %% input type error
     Error = {fail, not_a_list},
     {tx_tlog:set_entry_status(Entry, Error), Error};
-tlog_set_change(Entry, Key, ToAdd, ToDel) ->
+tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
         {ok, OldValue} when erlang:is_list(OldValue) ->
@@ -368,14 +368,14 @@ tlog_set_change(Entry, Key, ToAdd, ToDel) ->
             {Entry, X}
     end.
 
--spec tlog_number_add(tx_tlog:tlog_entry(), client_key(),
+-spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
                       client_value()) ->
                              {tx_tlog:tlog_entry(), result_entry_write()}.
-tlog_number_add(Entry, _Key, X)
+tlog_add_on_nr(Entry, _Key, X)
   when (not erlang:is_number(X)) ->
     Error = {fail, not_a_number},
     {tx_tlog:set_entry_status(Entry, Error), Error};
-tlog_number_add(Entry, Key, X) ->
+tlog_add_on_nr(Entry, Key, X) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
         {ok, OldValue} when erlang:is_number(OldValue) ->
