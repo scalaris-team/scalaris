@@ -31,9 +31,9 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 final class CommonErlangObjects {
     static final OtpErlangAtom readAtom = new OtpErlangAtom("read");
     static final OtpErlangAtom writeAtom = new OtpErlangAtom("write");
-    static final OtpErlangAtom setChangeAtom = new OtpErlangAtom("set_change");
+    static final OtpErlangAtom addDelOnListAtom = new OtpErlangAtom("add_del_on_list");
     static final OtpErlangAtom testAndSetAtom = new OtpErlangAtom("test_and_set");
-    static final OtpErlangAtom numberAddAtom = new OtpErlangAtom("number_add");
+    static final OtpErlangAtom addOnNrAtom = new OtpErlangAtom("add_on_nr");
     static final OtpErlangAtom okAtom = new OtpErlangAtom("ok");
     static final OtpErlangAtom failAtom = new OtpErlangAtom("fail");
     static final OtpErlangAtom abortAtom = new OtpErlangAtom("abort");
@@ -132,7 +132,7 @@ final class CommonErlangObjects {
 
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
-     * a result from a set_change operation.
+     * a result from a add_del_on_list operation.
      *
      * @param received_raw
      *             the object to process
@@ -146,7 +146,7 @@ final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void processResult_setChange(final OtpErlangObject received_raw) throws TimeoutException, NotAListException, UnknownException {
+    static final void processResult_addDelOnList(final OtpErlangObject received_raw) throws TimeoutException, NotAListException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout} | {fail, not_a_list}.
@@ -172,7 +172,7 @@ final class CommonErlangObjects {
 
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
-     * a result from a number_add operation.
+     * a result from an add_on_nr operation.
      *
      * @param received_raw
      *             the object to process
@@ -186,7 +186,7 @@ final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void processResult_numberAdd(final OtpErlangObject received_raw) throws TimeoutException, NotANumberException, UnknownException {
+    static final void processResult_addOnNr(final OtpErlangObject received_raw) throws TimeoutException, NotANumberException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout} | {fail, not_a_number}.

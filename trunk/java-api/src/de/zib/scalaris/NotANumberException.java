@@ -19,7 +19,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown if a set_change operation on a scalaris ring
+ * Exception that is thrown if a add_del_on_list operation on a scalaris ring
  * fails because the participating values are not numbers.
  *
  * @author Nico Kruber, kruber@zib.de

@@ -30,7 +30,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * Generic request list.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.8
+ * @version 3.9
  * @since 3.5
  */
 public abstract class RequestList {
@@ -55,7 +55,8 @@ public abstract class RequestList {
     /**
      * Adds a read operation to the list of requests.
      *
-     * @param key the key to read
+     * @param key
+     *            the key to read
      *
      * @return this {@link RequestList} object
      *
@@ -77,7 +78,8 @@ public abstract class RequestList {
     /**
      * Adds a read operation to the list of requests.
      *
-     * @param key  the key to read
+     * @param key
+     *            the key to read
      *
      * @return this {@link RequestList} object
      *
@@ -93,8 +95,10 @@ public abstract class RequestList {
     /**
      * Adds a write operation to the list of requests.
      *
-     * @param key    the key to write the value to
-     * @param value  the value to write
+     * @param key
+     *            the key to write the value to
+     * @param value
+     *            the value to write
      *
      * @return this {@link RequestList} object
      *
@@ -116,9 +120,12 @@ public abstract class RequestList {
     /**
      * Adds a write operation to the list of requests.
      *
-     * @param <T>    type of the value to write
-     * @param key    the key to write the value to
-     * @param value  the value to write
+     * @param <T>
+     *            type of the value to write
+     * @param key
+     *            the key to write the value to
+     * @param value
+     *            the value to write
      *
      * @return this {@link RequestList} object
      *
@@ -132,11 +139,14 @@ public abstract class RequestList {
     }
 
     /**
-     * Adds a set_change operation to the list of requests.
+     * Adds a add_del_on_list operation to the list of requests.
      *
-     * @param key       the key to write the value to
-     * @param toAdd     a list of values to add to a list
-     * @param toRemove  a list of values to remove from a list
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            a list of values to add to a list
+     * @param toRemove
+     *            a list of values to remove from a list
      *
      * @return this {@link RequestList} object
      *
@@ -144,26 +154,30 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public RequestList addSetChange(final OtpErlangObject key, final OtpErlangList toAdd, final OtpErlangList toRemove)
+    public RequestList addAddDelOnList(final OtpErlangObject key, final OtpErlangList toAdd, final OtpErlangList toRemove)
             throws UnsupportedOperationException {
         if (isCommit) {
             throw new UnsupportedOperationException("No further request supported after a commit!");
         }
         final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.setChangeAtom, key, toAdd, toRemove });
+                CommonErlangObjects.addDelOnListAtom, key, toAdd, toRemove });
         requests.add(req);
         return this;
     }
 
     /**
-     * Adds a set_change operation to the list of requests.
+     * Adds a add_del_on_list operation to the list of requests.
      *
-     * @param <T>       type of the value to write
-     * @param key       the key to write the value to
-     * @param toAdd     a list of values to add to a list
-     * @param toRemove  a list of values to remove from a list
+     * @param <T>
+     *            type of the value to write
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            a list of values to add to a list
+     * @param toRemove
+     *            a list of values to remove from a list
      *
      * @return this {@link RequestList} object
      *
@@ -171,20 +185,22 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public <T> RequestList addSetChange(final String key, final List<T> toAdd, final List<T> toRemove)
+    public <T> RequestList addAddDelOnList(final String key, final List<T> toAdd, final List<T> toRemove)
             throws UnsupportedOperationException {
-        return addSetChange(new OtpErlangString(key),
+        return addAddDelOnList(new OtpErlangString(key),
                 (OtpErlangList) ErlangValue.convertToErlang(toAdd),
                 (OtpErlangList) ErlangValue.convertToErlang(toRemove));
     }
 
     /**
-     * Adds a number_add operation to the list of requests.
+     * Adds an add_on_nr operation to the list of requests.
      *
-     * @param key       the key to write the value to
-     * @param toAdd     the number to add to the number stored at key
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key
      *
      * @return this {@link RequestList} object
      *
@@ -192,18 +208,20 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public RequestList addNumberAdd(final OtpErlangObject key, final OtpErlangLong toAdd)
+    public RequestList addAddOnNr(final OtpErlangObject key, final OtpErlangLong toAdd)
             throws UnsupportedOperationException {
-        return addNumberAdd_(key, toAdd);
+        return addAddOnNr_(key, toAdd);
     }
 
     /**
-     * Adds a number_add operation to the list of requests.
+     * Adds an add_on_nr operation to the list of requests.
      *
-     * @param key       the key to write the value to
-     * @param toAdd     the number to add to the number stored at key
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key
      *
      * @return this {@link RequestList} object
      *
@@ -211,18 +229,20 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public RequestList addNumberAdd(final OtpErlangObject key, final OtpErlangDouble toAdd)
+    public RequestList addAddOnNr(final OtpErlangObject key, final OtpErlangDouble toAdd)
             throws UnsupportedOperationException {
-        return addNumberAdd_(key, toAdd);
+        return addAddOnNr_(key, toAdd);
     }
 
     /**
-     * Adds a number_add operation to the list of requests.
+     * Adds an add_on_nr operation to the list of requests.
      *
-     * @param key       the key to write the value to
-     * @param toAdd     the number to add to the number stored at key
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key
      *
      * @return this {@link RequestList} object
      *
@@ -230,28 +250,31 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    private RequestList addNumberAdd_(final OtpErlangObject key, final OtpErlangObject toAdd)
+    protected RequestList addAddOnNr_(final OtpErlangObject key, final OtpErlangObject toAdd)
             throws UnsupportedOperationException {
         if (isCommit) {
             throw new UnsupportedOperationException("No further request supported after a commit!");
         }
         final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.numberAddAtom, key, toAdd });
+                CommonErlangObjects.addOnNrAtom, key, toAdd });
         requests.add(req);
         return this;
     }
 
     /**
-     * Adds a number_add operation to the list of requests.
+     * Adds an add_on_nr operation to the list of requests.
      *
-     * @param <T>    type of the value to write; WARNING: the actual supported
-     *               types only include {@link Integer}, {@link Long},
-     *               {@link BigInteger} and {@link Double} - see
-     *               {@link ErlangValue#convertToErlang(Object)}.
-     * @param key    the key to write the value to
-     * @param toAdd  the number to add to the number stored at key
+     * @param <T>
+     *            type of the value to write; WARNING: the actual supported
+     *            types only include {@link Integer}, {@link Long},
+     *            {@link BigInteger} and {@link Double} - see
+     *            {@link ErlangValue#convertToErlang(Object)}.
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key
      *
      * @return this {@link RequestList} object
      *
@@ -259,19 +282,21 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public <T extends Number> RequestList addNumberAdd(final String key, final T toAdd)
+    public <T extends Number> RequestList addAddOnNr(final String key, final T toAdd)
             throws UnsupportedOperationException {
-        return addNumberAdd_(new OtpErlangString(key),
+        return addAddOnNr_(new OtpErlangString(key),
                 ErlangValue.convertToErlang(toAdd));
     }
 
     /**
-     * Adds a number_add operation to the list of requests.
+     * Adds an add_on_nr operation to the list of requests.
      *
-     * @param key       the key to write the value to
-     * @param toAdd     the number to add to the number stored at key
+     * @param key
+     *            the key to write the value to
+     * @param toAdd
+     *            the number to add to the number stored at key
      *
      * @return this {@link RequestList} object
      *
@@ -279,11 +304,11 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      *
-     * @since 3.8
+     * @since 3.9
      */
-    public RequestList addNumberAdd(final String key, final Double toAdd)
+    public RequestList addAddOnNr(final String key, final Double toAdd)
             throws UnsupportedOperationException {
-        return addNumberAdd(new OtpErlangString(key),
+        return addAddOnNr(new OtpErlangString(key),
                 (OtpErlangDouble) ErlangValue.convertToErlang(toAdd));
     }
 
@@ -291,9 +316,12 @@ public abstract class RequestList {
      * Adds a test_and_set operation to the list of requests (<tt>newValue</tt>
      * is only written if the currently stored value is <tt>oldValue</tt>).
      *
-     * @param key       the key to write the value to
-     * @param oldValue  the old value to verify
-     * @param newValue  the new value to write of oldValue is correct
+     * @param key
+     *            the key to write the value to
+     * @param oldValue
+     *            the old value to verify
+     * @param newValue
+     *            the new value to write of oldValue is correct
      *
      * @return this {@link RequestList} object
      *
@@ -318,11 +346,18 @@ public abstract class RequestList {
      * Adds a test_and_set operation to the list of requests (<tt>newValue</tt>
      * is only written if the currently stored value is <tt>oldValue</tt>).
      *
-     * @param <T>       type of the old value
-     * @param <U>       type of the new value to write
-     * @param key       the key to write the value to
-     * @param oldValue  the old value to verify
-     * @param newValue  the new value to write of oldValue is correct
+     * @param <OldT>
+     *            the type of the stored (old) value. See {@link ErlangValue}
+     *            for a list of supported types.
+     * @param <NewT>
+     *            the type of the (new) value to store. See {@link ErlangValue}
+     *            for a list of supported types.
+     * @param key
+     *            the key to write the value to
+     * @param oldValue
+     *            the old value to verify
+     * @param newValue
+     *            the new value to write of oldValue is correct
      *
      * @return this {@link RequestList} object
      *
@@ -332,7 +367,7 @@ public abstract class RequestList {
      *
      * @since 3.8
      */
-    public <T, U> RequestList addTestAndSet(final String key, final T oldValue, final U newValue)
+    public <OldT, NewT> RequestList addTestAndSet(final String key, final OldT oldValue, final NewT newValue)
             throws UnsupportedOperationException {
         return addTestAndSet(new OtpErlangString(key),
                 ErlangValue.convertToErlang(oldValue),

@@ -44,12 +44,12 @@ all()   -> [new_tlog_0,
             tester_read_not_existing,
             tester_write_read_not_existing,
             tester_write_read,
-            tester_set_change_not_existing,
-            tester_set_change,
-            tester_set_change_maybe_invalid,
-            tester_number_add_not_existing,
-            tester_number_add,
-            tester_number_add_maybe_invalid,
+            tester_add_del_on_list_not_existing,
+            tester_add_del_on_list,
+            tester_add_del_on_list_maybe_invalid,
+            tester_add_on_nr_not_existing,
+            tester_add_on_nr,
+            tester_add_on_nr_maybe_invalid,
             tester_test_and_set_not_existing,
             tester_test_and_set
            ].
@@ -428,70 +428,70 @@ prop_write_read(Key, Value1, Value2) ->
 tester_write_read(_Config) ->
     tester:test(?MODULE, prop_write_read, 3, 10000).
 
--spec prop_set_change_not_existing(Key::client_key(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
-prop_set_change_not_existing(Key, ToAdd, ToRemove) ->
+-spec prop_add_del_on_list_not_existing(Key::client_key(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
+prop_add_del_on_list_not_existing(Key, ToAdd, ToRemove) ->
     OldValue = case api_tx:read(Key) of
                    {ok, Value} -> Value;
                    _ -> []
                end,
-    prop_set_change2(Key, OldValue, ToAdd, ToRemove).
+    prop_add_del_on_list2(Key, OldValue, ToAdd, ToRemove).
 
-tester_set_change_not_existing(_Config) ->
-    tester:test(?MODULE, prop_set_change_not_existing, 3, 10000).
+tester_add_del_on_list_not_existing(_Config) ->
+    tester:test(?MODULE, prop_add_del_on_list_not_existing, 3, 10000).
 
--spec prop_set_change(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
-prop_set_change(Key, Initial, ToAdd, ToRemove) ->
+-spec prop_add_del_on_list(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
+prop_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_set_change2(Key, Initial, ToAdd, ToRemove).
+    prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove).
 
--spec prop_set_change2(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
-prop_set_change2(Key, Initial, ToAdd, ToRemove) ->
+-spec prop_add_del_on_list2(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
+prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove) ->
     if (not erlang:is_list(Initial)) orelse
            (not erlang:is_list(ToAdd)) orelse
            (not erlang:is_list(ToRemove)) ->
-           ?equals(api_tx:set_change(Key, ToAdd, ToRemove), {fail, not_a_list});
+           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {fail, not_a_list});
        true ->
-           ?equals(api_tx:set_change(Key, ToAdd, ToRemove), {ok}),
+           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {ok}),
            {ok, List} = api_tx:read(Key),
            SortedList = lists:sort(fun util:'=:<'/2, List),
            ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus(lists:append(Initial, ToAdd), ToRemove)))
     end,
     true.
 
-tester_set_change(_Config) ->
-    tester:test(?MODULE, prop_set_change, 4, 10000).
+tester_add_del_on_list(_Config) ->
+    tester:test(?MODULE, prop_add_del_on_list, 4, 10000).
 
--spec prop_set_change_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
-prop_set_change_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
+-spec prop_add_del_on_list_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
+prop_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_set_change2(Key, Initial, ToAdd, ToRemove).
+    prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove).
 
-tester_set_change_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_set_change_maybe_invalid, 4, 10000).
+tester_add_del_on_list_maybe_invalid(_Config) ->
+    tester:test(?MODULE, prop_add_del_on_list_maybe_invalid, 4, 10000).
 
--spec prop_number_add_not_existing(Key::client_key(), ToAdd::number()) -> true | no_return().
-prop_number_add_not_existing(Key, ToAdd) ->
+-spec prop_add_on_nr_not_existing(Key::client_key(), ToAdd::number()) -> true | no_return().
+prop_add_on_nr_not_existing(Key, ToAdd) ->
     {Existing, OldValue} = case api_tx:read(Key) of
                                {ok, Value} -> {true, Value};
                                _ -> {false, 0}
                            end,
-    prop_number_add2(Key, Existing, OldValue, ToAdd).
+    prop_add_on_nr2(Key, Existing, OldValue, ToAdd).
 
-tester_number_add_not_existing(_Config) ->
-    tester:test(?MODULE, prop_number_add_not_existing, 2, 10000).
+tester_add_on_nr_not_existing(_Config) ->
+    tester:test(?MODULE, prop_add_on_nr_not_existing, 2, 10000).
 
--spec prop_number_add(Key::client_key(), Initial::client_value(), ToAdd::number()) -> true | no_return().
-prop_number_add(Key, Initial, ToAdd) ->
+-spec prop_add_on_nr(Key::client_key(), Initial::client_value(), ToAdd::number()) -> true | no_return().
+prop_add_on_nr(Key, Initial, ToAdd) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_number_add2(Key, true, Initial, ToAdd).
+    prop_add_on_nr2(Key, true, Initial, ToAdd).
 
--spec prop_number_add2(Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
-prop_number_add2(Key, Existing, Initial, ToAdd) ->
+-spec prop_add_on_nr2(Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
+prop_add_on_nr2(Key, Existing, Initial, ToAdd) ->
     if (not erlang:is_number(Initial)) orelse
            (not erlang:is_number(ToAdd)) ->
-           ?equals(api_tx:number_add(Key, ToAdd), {fail, not_a_number});
+           ?equals(api_tx:add_on_nr(Key, ToAdd), {fail, not_a_number});
        true ->
-           ?equals(api_tx:number_add(Key, ToAdd), {ok}),
+           ?equals(api_tx:add_on_nr(Key, ToAdd), {ok}),
            {ok, Number} = api_tx:read(Key),
            case Existing of
                false -> ?equals(Number, ToAdd);
@@ -502,16 +502,16 @@ prop_number_add2(Key, Existing, Initial, ToAdd) ->
     end,
     true.
 
-tester_number_add(_Config) ->
-    tester:test(?MODULE, prop_number_add, 3, 10000).
+tester_add_on_nr(_Config) ->
+    tester:test(?MODULE, prop_add_on_nr, 3, 10000).
 
--spec prop_number_add_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
-prop_number_add_maybe_invalid(Key, Initial, ToAdd) ->
+-spec prop_add_on_nr_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
+prop_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_number_add2(Key, true, Initial, ToAdd).
+    prop_add_on_nr2(Key, true, Initial, ToAdd).
 
-tester_number_add_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_number_add_maybe_invalid, 3, 10000).
+tester_add_on_nr_maybe_invalid(_Config) ->
+    tester:test(?MODULE, prop_add_on_nr_maybe_invalid, 3, 10000).
 
 -spec prop_test_and_set_not_existing(Key::client_key(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
 prop_test_and_set_not_existing(Key, OldValue, NewValue) ->
