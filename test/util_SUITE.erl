@@ -27,7 +27,9 @@
 all() ->
     [min_max, largest_smaller_than, gb_trees_foldl,
      s_repeat_test, s_repeatAndCollect_test, s_repeatAndAccumulate_test,
-     p_repeat_test, p_repeatAndCollect_test, p_repeatAndAccumulate_test].
+     p_repeat_test, p_repeatAndCollect_test, p_repeatAndAccumulate_test,
+     tester_minus_all, tester_minus_all_sort,
+     tester_minus_first, tester_minus_first_sort].
 
 suite() ->
     [
@@ -137,3 +139,82 @@ p_repeatAndAccumulate_test(_) ->
                                         1000),     
     ?equals(Result2, 1000 + Times*Times*Times),    
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% util:minus_all/2 and util:minus_first/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Checks that all intended items are deleted using util:minus_all/2.
+%%      Note: this is kindof redundant to prop_minus_all_sort/2 but a cleaner
+%%      approach avoiding a re-implementation of util:minus_all/2.
+-spec prop_minus_all(List::[T], Excluded::[T]) -> boolean().
+prop_minus_all(List, Excluded) ->
+    Result = util:minus_all(List, Excluded),
+    _ = [begin
+             case lists:member(L, Excluded) of
+                 true  -> ?equals_w_note([R || R <- Result, R =:= L], [], io_lib:format("~.0p should have been deleted", [L]));
+                 false -> ?equals_w_note([R || R <- Result, R =:= L], [R || R <- List, R =:= L], io_lib:format("Number of ~.0p should remain the same", [L]))
+             end
+         end || L <- List],
+    true.
+
+%% @doc Checks that the order of items stays the same using util:minus_all/2.
+-spec prop_minus_all_sort(List::[T], Excluded::[T]) -> boolean().
+prop_minus_all_sort(List, Excluded) ->
+    Result = util:minus_all(List, Excluded),
+    prop_minus_all_sort_helper(Result, List, Excluded).
+
+-spec prop_minus_all_sort_helper(Result::[T], List::[T], Excluded::[T]) -> boolean().
+prop_minus_all_sort_helper([], [], _) ->
+    true;
+prop_minus_all_sort_helper([_|_], [], _) ->
+    false;
+prop_minus_all_sort_helper([], [_|_], _) ->
+    true;
+prop_minus_all_sort_helper([RH | RT] = R, [LH | LT], Excluded) ->
+    case lists:member(LH, Excluded) of
+        true                 -> prop_minus_all_sort_helper(R, LT, Excluded);
+        false when LH =:= RH -> prop_minus_all_sort_helper(RT, LT, Excluded);
+        false                -> false
+    end.
+
+tester_minus_all(_Config) ->
+    tester:test(?MODULE, prop_minus_all, 2, 5000, [multi_threaded]).
+
+tester_minus_all_sort(_Config) ->
+    tester:test(?MODULE, prop_minus_all_sort, 2, 5000, [multi_threaded]).
+
+%% @doc Checks that all intended items are deleted once using util:minus_first/2.
+%%      Note: this is kindof redundant to prop_minus_first_sort/2 but a cleaner
+%%      approach avoiding a re-implementation of util:minus_first/2.
+-spec prop_minus_first(List::[T], Excluded::[T]) -> boolean().
+prop_minus_first(List, Excluded) ->
+    ?equals(util:minus_first(List, Excluded), lists:foldl(fun lists:delete/2, List, Excluded)),
+    true.
+
+%% @doc Checks that the order of items stays the same using util:minus_first/2.
+-spec prop_minus_first_sort(List::[T], Excluded::[T]) -> boolean().
+prop_minus_first_sort(List, Excluded) ->
+    Result = util:minus_first(List, Excluded),
+    prop_minus_first_sort_helper(Result, List, Excluded).
+
+-spec prop_minus_first_sort_helper(Result::[T], List::[T], Excluded::[T]) -> boolean().
+prop_minus_first_sort_helper([], [], _) ->
+    true;
+prop_minus_first_sort_helper([_|_], [], _) ->
+    false;
+prop_minus_first_sort_helper([], [_|_], _) ->
+    true;
+prop_minus_first_sort_helper([RH | RT] = R, [LH | LT], Excluded) ->
+    case lists:member(LH, Excluded) of
+        true                 -> prop_minus_first_sort_helper(R, LT, lists:delete(LH, Excluded));
+        false when LH =:= RH -> prop_minus_first_sort_helper(RT, LT, Excluded);
+        false                -> false
+    end.
+
+tester_minus_first(_Config) ->
+    tester:test(?MODULE, prop_minus_first, 2, 5000, [multi_threaded]).
+
+tester_minus_first_sort(_Config) ->
+    tester:test(?MODULE, prop_minus_first_sort, 2, 5000, [multi_threaded]).

@@ -454,7 +454,7 @@ prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove) ->
            ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {ok}),
            {ok, List} = api_tx:read(Key),
            SortedList = lists:sort(fun util:'=:<'/2, List),
-           ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_list(lists:append(Initial, ToAdd), ToRemove)))
+           ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_first(lists:append(Initial, ToAdd), ToRemove)))
     end,
     true.
 
