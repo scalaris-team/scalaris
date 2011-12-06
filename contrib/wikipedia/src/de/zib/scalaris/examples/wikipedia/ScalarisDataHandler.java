@@ -748,38 +748,44 @@ public class ScalarisDataHandler {
         final Set<String> newCats = wikiModel.getCategories().keySet();
         final Set<String> newTpls = wikiModel.getTemplates();
         final Set<String> newLnks = wikiModel.getLinks();
-        Difference catDiff = new Difference(oldCats, newCats);
-        Difference tplDiff = new Difference(oldTpls, newTpls);
-        Difference lnkDiff = new Difference(oldLnks, newLnks);
+        Difference catDiff = new Difference(oldCats, newCats,
+                new Difference.GetPageListAndCountKey() {
+                    @Override
+                    public String getPageListKey(String name) {
+                        return getCatPageListKey(
+                                wikiModel.getCategoryNamespace() + ":" + name,
+                                nsObject);
+                    }
+
+                    @Override
+                    public String getPageCountKey(String name) {
+                        return getCatPageCountKey(
+                                wikiModel.getCategoryNamespace() + ":" + name,
+                                nsObject);
+                    }
+                });
+        Difference tplDiff = new Difference(oldTpls, newTpls,
+                new Difference.GetPageListKey() {
+                    @Override
+                    public String getPageListKey(String name) {
+                        return getTplPageListKey(
+                                wikiModel.getTemplateNamespace() + ":" + name,
+                                nsObject);
+                    }
+                });
+        Difference lnkDiff = new Difference(oldLnks, newLnks,
+                new Difference.GetPageListKey() {
+                    @Override
+                    public String getPageListKey(String name) {
+                        return getBackLinksPageListKey(name, nsObject);
+                    }
+                });
 
         // write differences (categories, templates, backlinks)
-        Difference.GetPageListKey catPageKeygen = new Difference.GetPageListAndCountKey() {
-            @Override
-            public String getPageListKey(String name) {
-                return getCatPageListKey(wikiModel.getCategoryNamespace() + ":" + name, nsObject);
-            }
-
-            @Override
-            public String getPageCountKey(String name) {
-                return getCatPageCountKey(wikiModel.getCategoryNamespace() + ":" + name, nsObject);
-            }
-        };
-        Difference.GetPageListKey tplPageKeygen = new Difference.GetPageListKey() {
-            @Override
-            public String getPageListKey(String name) {
-                return getTplPageListKey(wikiModel.getTemplateNamespace() + ":" + name, nsObject);
-            }
-        };
-        Difference.GetPageListKey lnkPageKeygen = new Difference.GetPageListKey() {
-            @Override
-            public String getPageListKey(String name) {
-                return getBackLinksPageListKey(name, nsObject);
-            }
-        };
         requests = new Transaction.RequestList();
-        int catPageReads = catDiff.updatePageLists_prepare_read(requests, catPageKeygen, title);
-        int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, tplPageKeygen, title);
-        lnkDiff.updatePageLists_prepare_read(requests, lnkPageKeygen, title);
+        int catPageReads = catDiff.updatePageLists_prepare_read(requests, title);
+        int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, title);
+        lnkDiff.updatePageLists_prepare_read(requests, title);
         results = null;
         try {
             results = scalaris_tx.req_list(requests);
@@ -794,7 +800,7 @@ public class ScalarisDataHandler {
         requests = new Transaction.RequestList();
         SaveResult pageListResult;
         pageListResult = catDiff.updatePageLists_prepare_write(results,
-                requests, catPageKeygen, title, 0);
+                requests, title, 0);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -802,7 +808,7 @@ public class ScalarisDataHandler {
                             - timeAtStart);
         }
         pageListResult = tplDiff.updatePageLists_prepare_write(results,
-                requests, tplPageKeygen, title, catPageReads);
+                requests, title, catPageReads);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -810,7 +816,7 @@ public class ScalarisDataHandler {
                             - timeAtStart);
         }
         pageListResult = lnkDiff.updatePageLists_prepare_write(results,
-                requests, lnkPageKeygen, title, catPageReads + tplPageReads);
+                requests, title, catPageReads + tplPageReads);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -828,24 +834,23 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
-        pageListResult = catDiff.updatePageLists_check_writes(results,
-                catPageKeygen, title, 0);
+        pageListResult = catDiff.updatePageLists_check_writes(results, title, 0);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
-        pageListResult = tplDiff.updatePageLists_check_writes(results,
-                tplPageKeygen, title, catPageReads);
+        pageListResult = tplDiff.updatePageLists_check_writes(results, title,
+                catPageReads);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
-        pageListResult = lnkDiff.updatePageLists_check_writes(results,
-                lnkPageKeygen, title, catPageReads + tplPageReads);
+        pageListResult = lnkDiff.updatePageLists_check_writes(results, title,
+                catPageReads + tplPageReads);
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -977,14 +982,27 @@ public class ScalarisDataHandler {
         public Set<String> onlyNew;
         @SuppressWarnings("unchecked")
         private Set<String>[] changes = new Set[2];
+        private GetPageListKey keyGen;
         
-        public Difference(Set<String> oldSet, Set<String> newSet) {
+        /**
+         * Creates a new object calculating differences of two sets.
+         * 
+         * @param oldSet
+         *            the old set
+         * @param newSet
+         *            the new set
+         * @param keyGen
+         *            object creating the Scalaris key for the page lists (based
+         *            on a set entry)
+         */
+        public Difference(Set<String> oldSet, Set<String> newSet, GetPageListKey keyGen) {
             this.onlyOld = new HashSet<String>(oldSet);
             this.onlyNew = new HashSet<String>(newSet);
-            onlyOld.removeAll(newSet);
-            onlyNew.removeAll(oldSet);
-            changes[0] = onlyOld;
-            changes[1] = onlyNew;
+            this.onlyOld.removeAll(newSet);
+            this.onlyNew.removeAll(oldSet);
+            this.changes[0] = this.onlyOld;
+            this.changes[1] = this.onlyNew;
+            this.keyGen = keyGen;
         }
         
         static public interface GetPageListKey {
@@ -1011,21 +1029,17 @@ public class ScalarisDataHandler {
         
         /**
          * Adds read operations to the given request list as required by
-         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}.
+         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, String, int)}.
          * 
          * @param readRequests
          *            list of requests, i.e. operations for Scalaris
-         * @param keyGen
-         *            object creating the Scalaris key for the page lists (based
-         *            on a set entry)
          * @param title
          *            (normalised) page name to update
          * 
          * @return the number of added requests, i.e. operations
          */
         public int updatePageLists_prepare_read(
-                Transaction.RequestList readRequests, GetPageListKey keyGen,
-                String title) {
+                Transaction.RequestList readRequests, String title) {
             int ops = 0;
             // read old and new page lists
             for (Set<String> curList : changes) {
@@ -1045,17 +1059,14 @@ public class ScalarisDataHandler {
         /**
          * Removes <tt>title</tt> from the list of pages in the old set and adds
          * it to the new ones. Evaluates reads from
-         * {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, GetPageListKey, String)}
+         * {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, String)}
          * and adds writes to the given request list.
          * 
          * @param readResults
          *            results of previous read operations by
-         *            {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, GetPageListKey, String)}
+         *            {@link #updatePageLists_prepare_read(de.zib.scalaris.Transaction.RequestList, String)}
          * @param writeRequests
          *            list of requests, i.e. operations for Scalaris
-         * @param keyGen
-         *            object creating the Scalaris key for the page lists (based
-         *            on a set entry)
          * @param title
          *            (normalised) page name to update
          * @param firstOp
@@ -1065,8 +1076,7 @@ public class ScalarisDataHandler {
          */
         public SaveResult updatePageLists_prepare_write(
                 Transaction.ResultList readResults,
-                Transaction.RequestList writeRequests, GetPageListKey keyGen,
-                String title, int firstOp) {
+                Transaction.RequestList writeRequests, String title, int firstOp) {
             final long timeAtStart = System.currentTimeMillis();
             String scalaris_key;
             // beware: keep order of operations in sync with readPageLists_prepare!
@@ -1134,15 +1144,12 @@ public class ScalarisDataHandler {
         
         /**
          * Checks whether all writes from
-         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}
+         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, String, int)}
          * were successful.
          * 
          * @param writeResults
          *            results of previous write operations by
-         *            {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, GetPageListKey, String, int)}
-         * @param keyGen
-         *            object creating the Scalaris key for the page lists (based
-         *            on a set entry)
+         *            {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, String, int)}
          * @param title
          *            (normalised) page name to update
          * @param firstOp
@@ -1151,7 +1158,7 @@ public class ScalarisDataHandler {
          * @return the result of the operation
          */
         public SaveResult updatePageLists_check_writes(
-                Transaction.ResultList writeResults, GetPageListKey keyGen, String title, int firstOp) {
+                Transaction.ResultList writeResults, String title, int firstOp) {
             final long timeAtStart = System.currentTimeMillis();
             // beware: keep order of operations in sync with readPageLists_prepare!
             // evaluate results changing the old and new page lists
