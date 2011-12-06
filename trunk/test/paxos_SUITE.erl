@@ -277,15 +277,15 @@ step_until_decide(Processes, PaxId, SumSteps) ->
         [] ->
             ct:pal("No runnable processes of ~p~n", [length(Processes)]),
             timer:sleep(5), step_until_decide(Processes, PaxId, SumSteps);
-        _ -> ok
-    end,
-    Num = random:uniform(length(Runnable)),
-    _ = gen_component:bp_step(comm:make_local(lists:nth(Num, Runnable))),
-    receive
-        {learner_decide, cpaxidrndinterl, _, _Res} = _Any ->
-            %% io:format("Received ~p~n", [_Any]),
-            SumSteps
-    after 0 -> step_until_decide(Processes, PaxId, SumSteps + 1)
+        _ ->
+            Num = random:uniform(length(Runnable)),
+            _ = gen_component:bp_step(comm:make_local(lists:nth(Num, Runnable))),
+            receive
+                {learner_decide, cpaxidrndinterl, _, _Res} = _Any ->
+                    %% io:format("Received ~p~n", [_Any]),
+                    SumSteps
+            after 0 -> step_until_decide(Processes, PaxId, SumSteps + 1)
+            end
     end.
 %% userdevguide-end paxos_SUITE:random_interleaving_test
 
