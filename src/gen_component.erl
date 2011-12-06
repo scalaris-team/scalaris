@@ -29,8 +29,9 @@
 %-define(TRACE_BP(X,Y), ct:pal(X,Y)).
 -define(TRACE_BP(X,Y), ok).
 %% userdevguide-begin gen_component:trace_bp_steps
-%-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)). %% output on console
-%-define(TRACE_BP_STEPS(X,Y), ct:pal(X,Y)).    %% output even if called by unittest
+%-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)).     %% output on console
+%-define(TRACE_BP_STEPS(X,Y), ct:pal(X,Y)).        %% output even if called by unittest
+%-define(TRACE_BP_STEPS(X,Y), io:format(user,X,Y)). %% clean output even if called by unittest
 -define(TRACE_BP_STEPS(X,Y), ok).
 %% userdevguide-end gen_component:trace_bp_steps
 
@@ -210,8 +211,9 @@ bp_step(Pid) ->
     Pid !  {'$gen_component', bp, breakpoint, step, self()},
     receive {'$gen_component', bp, breakpoint, step_done,
              _GCPid, Module, On, Message} ->
-            ?TRACE_BP_STEPS("~p ~p:~p/2 handled message ~w~n",
-                            [_GCPid, Module, On, Message]),
+            ?TRACE_BP_STEPS("    Handler: ~p:~p/2~n"
+                            "*** Handling done.~n",
+                            [Module, On]),
             {Module, On, Message}
     end.
 
@@ -428,6 +430,23 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                         false ->
                             case lists:keyfind(post_op, 1, Commands) of
                                 {post_op, Msg1} ->
+                                    {_Opts, _Slowest, BPState} = TmpComponentState,
+                                    case bp_state_get_bpactive(BPState) of
+                                        true ->
+                                            ?TRACE_BP_STEPS("~n"
+                                                            "*** Trigger post-op...~n"
+                                                            "    Process: ~p (~p)~n"
+                                                            "    Handler: ~p:~p/2~n"
+                                                            "    Message: ~.0p~n",
+                                                            [self(), pid_groups:group_and_name_of(self()),
+                                                             Module, On,
+                                                             Msg1]),
+                                            self() ! {'$gen_component',
+                                                      bp, breakpoint, step,
+                                                      bp_state_get_bpstepper(BPState)},
+                                            ok;
+                                        false -> ok
+                                    end,
                                     loop(Module, On, Msg1, NewState, TmpComponentState);
                                 false ->
                                     % let's fail since the Config list was either
@@ -600,6 +619,12 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
         {'$gen_component', bp, breakpoint, step, StepperPid} ->
             TmpBPState = bp_state_set_bpstepped(BPState, true),
             NewBPState = bp_state_set_bpstepper(TmpBPState, StepperPid),
+            ?TRACE_BP_STEPS("~n"
+                            "*** Start handling message...~n"
+                            "    Process: ~p (~p)~n"
+                            "    Message: ~.0p~n",
+                            [self(), pid_groups:group_and_name_of(self()),
+                             Message]),
             {Options, Slowest, NewBPState};
         {'$gen_component', bp, breakpoint, cont} ->
             T1BPState = bp_state_set_bpactive(BPState, false),
