@@ -32,7 +32,7 @@
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          first_matching/2,
          get_stacktrace/0, dump/0, dump2/0, dump3/0,
-         minus/2, minus_list/2,
+         minus_all/2, minus_first/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -346,37 +346,37 @@ dumpX(Keys, ValueFun) ->
                 Data =/= undefined],
     lists:reverse(lists:keysort(2, Info)).
 
-%% @doc minus(M,N) : { x | x in M and x notin N}
--spec minus(List::[T], Excluded::[T]) -> [T].
-minus([], _ExcludeList) ->
+%% @doc minus_all(M,N) : { x | x in M and x notin N}
+-spec minus_all(List::[T], Excluded::[T]) -> [T].
+minus_all([], _ExcludeList) ->
     [];
-minus([_|_] = L, [Excluded]) ->
+minus_all([_|_] = L, [Excluded]) ->
     [E || E <- L, E =/= Excluded];
-minus([_|_] = L, ExcludeList) ->
-    ExcludeSet = ordsets:from_list(ExcludeList),
-    [E || E <- L, not ordsets:is_element(E, ExcludeSet)].
+minus_all([_|_] = L, ExcludeList) ->
+    ExcludeSet = sets:from_list(ExcludeList),
+    [E || E <- L, not sets:is_element(E, ExcludeSet)].
 
 %% @doc Deletes the first occurrence of each element in Excluded from List.
 %%      Similar to lists:foldl(fun lists:delete/2, NewValue1, ToDel) but more
 %%      performant for out case.
--spec minus_list(List::[T], Excluded::[T]) -> [T].
-minus_list([], _ExcludeList) ->
+-spec minus_first(List::[T], Excluded::[T]) -> [T].
+minus_first([], _ExcludeList) ->
     [];
-minus_list([_|_] = L, [Excluded]) ->
+minus_first([_|_] = L, [Excluded]) ->
     lists:delete(Excluded, L);
-minus_list([_|_] = L, ExcludeList) ->
-    minus_list2(L, ExcludeList, []).
+minus_first([_|_] = L, ExcludeList) ->
+    minus_first2(L, ExcludeList, []).
 
 %% @doc Removes every item in Excluded only once from List.
--spec minus_list2(List::[T], Excluded::[T], Result::[T]) -> [T].
-minus_list2([], _Excluded, Result) ->
+-spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T].
+minus_first2([], _Excluded, Result) ->
     lists:reverse(Result);
-minus_list2(L, [], Result) ->
+minus_first2(L, [], Result) ->
     lists:reverse(Result, L);
-minus_list2([H | T], Excluded, Result) ->
+minus_first2([H | T], Excluded, Result) ->
     case delete_if_exists(Excluded, H, []) of
-        {true,  Excluded2} -> minus_list2(T, Excluded2, Result);
-        {false, Excluded2} -> minus_list2(T, Excluded2, [H | Result])
+        {true,  Excluded2} -> minus_first2(T, Excluded2, Result);
+        {false, Excluded2} -> minus_first2(T, Excluded2, [H | Result])
     end.
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
