@@ -742,6 +742,13 @@ public class ScalarisDataHandler {
         // get new categories and templates
         wikiModel.setUp();
         wikiModel.render(null, newRev.unpackedText());
+        if (wikiModel.getRedirectLink() != null) {
+            newPage.setRedirect(true);
+        }
+        if (restrictions != null) {
+            newPage.setRestrictions(restrictions);
+        }
+        
         // note: do not tear down the wiki model - the following statements
         // still need it and it will be removed at the end of the method anyway
         // note: no need to normalise the pages, we will do so during the write/read key generation
@@ -782,10 +789,28 @@ public class ScalarisDataHandler {
                 });
 
         // write differences (categories, templates, backlinks)
+        // new page? -> add to page/article lists
+        List<Integer> pageListWrites = new ArrayList<Integer>(2);
+        List<String> pageListKeys = new LinkedList<String>();
+        if (oldRevId == -1) {
+            pageListKeys.add(getPageListKey());
+            pageListKeys.add(getPageCountKey());
+            if (wikiModel.getNamespace(title0).isEmpty()) {
+                pageListKeys.add(getArticleListKey());
+                pageListKeys.add(getArticleCountKey());
+            }
+        }
+        //  PAGE LISTS UPDATE, step 1: read old lists
         requests = new Transaction.RequestList();
         int catPageReads = catDiff.updatePageLists_prepare_read(requests, title);
         int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, title);
-        lnkDiff.updatePageLists_prepare_read(requests, title);
+        int lnkPageReads = lnkDiff.updatePageLists_prepare_read(requests, title);
+        for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
+            String pageList_key = (String) it.next();
+            @SuppressWarnings("unused")
+            String pageCount_key = (String) it.next();
+            updatePageList_prepare_read(requests, pageList_key);
+        }
         results = null;
         try {
             results = scalaris_tx.req_list(requests);
@@ -797,6 +822,7 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        //  PAGE LISTS UPDATE, step 2: prepare writes of new lists
         requests = new Transaction.RequestList();
         SaveResult pageListResult;
         pageListResult = catDiff.updatePageLists_prepare_write(results,
@@ -823,13 +849,35 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        final List<String> newPages = Arrays.asList(title);
+        for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
+            String pageList_key = (String) it.next();
+            String pageCount_key = (String) it.next();
+            
+            pageListResult = updatePageList_prepare_write(results, requests,
+                    pageList_key, pageCount_key, new LinkedList<String>(),
+                    newPages, catPageReads + tplPageReads + lnkPageReads);
+            if (!pageListResult.success) {
+                return new SavePageResult(false, pageListResult.message,
+                        pageListResult.connect_failed, oldPage, newPage,
+                        newShortRevs, pageEdits, System.currentTimeMillis()
+                                - timeAtStart);
+            }
+            pageListWrites.add((Integer) pageListResult.info);
+        }
+        // smuggle in the final write requests to save a round-trip to Scalaris:
+        requests.addWrite(getPageKey(title0, nsObject), newPage)
+                .addWrite(getRevKey(title0, newRev.getId(), nsObject), newRev)
+                .addWrite(getRevListKey(title0, nsObject), newShortRevs)
+                .addCommit();
+        //  PAGE LISTS UPDATE, step 3: execute and evaluate writes of new lists
         results = null;
         try {
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
             return new SavePageResult(false,
-                    "unknown exception writing page lists for page \"" + title0
-                            + "\" to Scalaris: " + e.getMessage(),
+                    "unknown exception writing page or page lists for page \""
+                            + title0 + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
@@ -857,99 +905,36 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        int curOp = catPageReads + tplPageReads + lnkPageReads;
+        int pageList = 0;
+        for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
+            String pageList_key = (String) it.next();
+            String pageCount_key = (String) it.next();
 
-        if (wikiModel.getRedirectLink() != null) {
-            newPage.setRedirect(true);
-        }
-        
-        if (restrictions != null) {
-            newPage.setRestrictions(restrictions);
-        }
-        
-        requests = new Transaction.RequestList();
-        // new page? -> add to page/article lists
-        List<Integer> pageListWrites = new ArrayList<Integer>(2);
-        List<String> pageListKeys = new LinkedList<String>();
-        if (oldRevId == -1) {
-            pageListKeys.add(getPageListKey());
-            pageListKeys.add(getPageCountKey());
-            if (wikiModel.getNamespace(title0).isEmpty()) {
-                pageListKeys.add(getArticleListKey());
-                pageListKeys.add(getArticleCountKey());
-            }
-            
-            for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
-                String pageList_key = (String) it.next();
-                @SuppressWarnings("unused")
-                String pageCount_key = (String) it.next();
-                
-                updatePageList_prepare_read(requests, pageList_key);
-            }
-            try {
-                results = scalaris_tx.req_list(requests);
-            } catch (Exception e) {
-                return new SavePageResult(false,
-                        "unknown exception reading page lists for page \""
-                                + title0 + "\" to Scalaris: " + e.getMessage(),
-                        e instanceof ConnectionException, oldPage, newPage,
+            pageListResult = updatePageList_check_writes(results,
+                    pageList_key, pageCount_key, 0,
+                    pageListWrites.get(pageList));
+            if (!pageListResult.success) {
+                return new SavePageResult(false, pageListResult.message,
+                        pageListResult.connect_failed, oldPage, newPage,
                         newShortRevs, pageEdits, System.currentTimeMillis()
-                                - timeAtStart);
+                        - timeAtStart);
             }
-
-            requests = new Transaction.RequestList();
-            final List<String> newPages = Arrays.asList(title);
-            for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
-                String pageList_key = (String) it.next();
-                String pageCount_key = (String) it.next();
-                
-                pageListResult = updatePageList_prepare_write(results,
-                        requests, pageList_key, pageCount_key,
-                        new LinkedList<String>(), newPages, 0);
-                if (!pageListResult.success) {
-                    return new SavePageResult(false, pageListResult.message,
-                            pageListResult.connect_failed, oldPage, newPage,
-                            newShortRevs, pageEdits, System.currentTimeMillis()
-                                    - timeAtStart);
-                }
-                pageListWrites.add((Integer) pageListResult.info);
-            }
+            ++curOp;
+            ++pageList;
         }
-        
-        requests.addWrite(getPageKey(title0, nsObject), newPage)
-                .addWrite(getRevKey(title0, newRev.getId(), nsObject), newRev)
-                .addWrite(getRevListKey(title0, nsObject), newShortRevs).addCommit();
-        try {
-            results = scalaris_tx.req_list(requests);
 
-            int curOp = 0;
-            int pageList = 0;
-            for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
-                String pageList_key = (String) it.next();
-                String pageCount_key = (String) it.next();
-                
-                pageListResult = updatePageList_check_writes(results,
-                        pageList_key, pageCount_key, 0,
-                        pageListWrites.get(pageList));
-                if (!pageListResult.success) {
-                    return new SavePageResult(false, pageListResult.message,
-                            pageListResult.connect_failed, oldPage, newPage,
-                            newShortRevs, pageEdits, System.currentTimeMillis()
-                                    - timeAtStart);
-                }
-                ++curOp;
-                ++pageList;
-            }
-            
+        try {
             results.processWriteAt(curOp++);
             results.processWriteAt(curOp++);
             results.processWriteAt(curOp++);
         } catch (Exception e) {
             return new SavePageResult(false,
                     "unknown exception writing page \"" + title0
-                            + "\" to Scalaris: " + e.getMessage(),
+                    + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, System.currentTimeMillis()
-                            - timeAtStart);
+                    - timeAtStart);
         }
         
         // increase number of page edits (for statistics)
