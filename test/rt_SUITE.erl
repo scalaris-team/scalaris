@@ -52,7 +52,7 @@ prop_client_key_to_binary(Key1, Key2) ->
     ?implies(Key1 =/= Key2, Bin1 =/= Bin2).
     
 tester_client_key_to_binary(_Config) ->
-    tester:test(?MODULE, prop_client_key_to_binary, 2, 50000, [multi_threaded]).
+    tester:test(?MODULE, prop_client_key_to_binary, 2, 50000, [{threads, 2}]).
 
 -spec prop_hash_key(Key::client_key()) -> true.
 prop_hash_key(Key) ->
@@ -61,7 +61,7 @@ prop_hash_key(Key) ->
     true.
     
 tester_hash_key(_Config) ->
-    tester:test(?MODULE, prop_hash_key, 1, 100000, [multi_threaded]).
+    tester:test(?MODULE, prop_hash_key, 1, 100000, [{threads, 2}]).
 
 number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
