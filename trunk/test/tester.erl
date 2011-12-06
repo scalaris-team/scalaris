@@ -31,7 +31,8 @@
 -include("tester.hrl").
 -include("unittest.hrl").
 
--type test_options() :: [multi_threaded].
+-type test_option() :: multi_threaded | {threads, pos_integer()}.
+-type test_options() :: [test_option()].
 
 -spec test/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test(Module, Func, Arity, Iterations) ->
@@ -49,13 +50,11 @@ test(Module, Func, Arity, Iterations, Options) ->
         exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n", [Module, Func, {exception, Reason2}]);
         error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n", [Module, Func, {exception, {Reason2, erlang:get_stacktrace()}}])
     end,
-    case proplists:get_bool(multi_threaded, Options) of
-        true ->
-            run_test(Module, Func, Arity, Iterations, ParseState,
-                     erlang:system_info(schedulers));
-        false ->
-            run_test(Module, Func, Arity, Iterations, ParseState, 1)
-    end,
+    Threads = proplists:get_value(threads, Options, case proplists:get_bool(multi_threaded, Options) of
+                                                       true -> erlang:system_info(schedulers);
+                                                       false -> 1
+                                                    end),
+    run_test(Module, Func, Arity, Iterations, ParseState, Threads),
     ok.
 
 -spec test_log/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
