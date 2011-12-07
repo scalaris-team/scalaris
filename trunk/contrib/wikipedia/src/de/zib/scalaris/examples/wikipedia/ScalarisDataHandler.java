@@ -776,15 +776,13 @@ public class ScalarisDataHandler {
         // new page? -> add to page/article lists
         SavePageResult result;
         if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-            result = savePage2NewOps(title0, newRev, prevRevId, nsObject,
-                    timeAtStart, oldPage, newPage, newShortRevs, pageEdits,
-                    title, scalaris_tx, oldRevId, wikiModel, catDiff, tplDiff,
-                    lnkDiff);
+            result = savePage2NewOps(title0, newRev, nsObject, timeAtStart,
+                    oldPage, newPage, newShortRevs, pageEdits, title,
+                    scalaris_tx, oldRevId, wikiModel, catDiff, tplDiff, lnkDiff);
         } else {
-            result = savePage2(title0, newRev, prevRevId, nsObject,
-                    timeAtStart, oldPage, newPage, newShortRevs, pageEdits,
-                    title, scalaris_tx, oldRevId, wikiModel, catDiff, tplDiff,
-                    lnkDiff);
+            result = savePage2(title0, newRev, nsObject, timeAtStart, oldPage,
+                    newPage, newShortRevs, pageEdits, title, scalaris_tx,
+                    oldRevId, wikiModel, catDiff, tplDiff, lnkDiff);
         }
         if (result != null) {
             return result;
@@ -821,11 +819,12 @@ public class ScalarisDataHandler {
      * @param tplDiff
      * @param lnkDiff
      */
-    private static SavePageResult savePage2(final String title0, final Revision newRev,
-            final int prevRevId, final MyNamespace nsObject, long timeAtStart,
-            Page oldPage, Page newPage, List<ShortRevision> newShortRevs,
-            BigInteger pageEdits, String title, Transaction scalaris_tx,
-            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
+    private static SavePageResult savePage2(final String title0,
+            final Revision newRev, final MyNamespace nsObject,
+            long timeAtStart, Page oldPage, Page newPage,
+            List<ShortRevision> newShortRevs, BigInteger pageEdits,
+            String title, Transaction scalaris_tx, int oldRevId,
+            final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
@@ -871,7 +870,7 @@ public class ScalarisDataHandler {
         try {
             newShortRevs = results.processReadAt(curOp++).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
-            if (prevRevId == -1) { // new page?
+            if (oldRevId == -1) { // new page?
                 newShortRevs = new LinkedList<ShortRevision>();
             } else {
 //              e.printStackTrace();
@@ -1045,11 +1044,12 @@ public class ScalarisDataHandler {
      * @param tplDiff
      * @param lnkDiff
      */
-    private static SavePageResult savePage2NewOps(final String title0, final Revision newRev,
-            final int prevRevId, final MyNamespace nsObject, long timeAtStart,
-            Page oldPage, Page newPage, List<ShortRevision> newShortRevs,
-            BigInteger pageEdits, String title, Transaction scalaris_tx,
-            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
+    private static SavePageResult savePage2NewOps(final String title0,
+            final Revision newRev, final MyNamespace nsObject,
+            long timeAtStart, Page oldPage, Page newPage,
+            List<ShortRevision> newShortRevs, BigInteger pageEdits,
+            String title, Transaction scalaris_tx, int oldRevId,
+            final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
