@@ -80,8 +80,13 @@ new(ItemId) ->
          -> tx_item_state().
 new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
-    Module = tx_tlog:get_entry_operation(TLogEntry),
-    RTLogEntries = apply(Module, validate_prefilter, [TLogEntry]),
+    RTLogEntries =
+        case tx_tlog:get_entry_operation(TLogEntry) of
+            rdht_tx_read ->
+                rdht_tx_read:validate_prefilter(TLogEntry);
+            rdht_tx_write ->
+                rdht_tx_write:validate_prefilter(TLogEntry)
+        end,
 %%    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
     PaxosIds = [ {util:get_global_uid()} || _ <- RTLogEntries ],
     TPs = [ unknown || _ <- PaxosIds ],

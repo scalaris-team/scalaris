@@ -184,8 +184,8 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
 update_tlog_entry(TLogEntry, Request) ->
     Module = tx_tlog:get_entry_operation(TLogEntry),
     Key = tx_tlog:get_entry_key(TLogEntry),
-    Status = apply(Module, tlogentry_get_status, [TLogEntry]),
-    Version = apply(Module, tlogentry_get_version, [TLogEntry]),
+    Status = tx_tlog:get_entry_status(TLogEntry),
+    Version = tx_tlog:get_entry_version(TLogEntry),
     WriteValue = element(3, Request),
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.

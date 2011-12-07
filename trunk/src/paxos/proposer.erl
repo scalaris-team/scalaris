@@ -128,7 +128,7 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
             log:log(error, "Duplicate proposer:initialize for paxos id ~p"
                            "Just triggering instead~n", [PaxosID])
     end,
-    on({proposer_trigger, PaxosID, InitialRound}, State);
+    gen_component:post_op(State, {proposer_trigger, PaxosID, InitialRound});
 
 % trigger new proposer round
 on({proposer_trigger, PaxosID}, ETSTableName = State) ->
@@ -139,7 +139,9 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
             TmpState = proposer_state:reset_state(StateForID),
             NewState = proposer_state:inc_round(TmpState),
             pdb:set(NewState, ETSTableName),
-            on({proposer_trigger, PaxosID, proposer_state:get_round(NewState)}, State)
+            gen_component:post_op(State,
+                                  {proposer_trigger, PaxosID,
+                                   proposer_state:get_round(NewState)})
     end;
 
 %% trigger for given round is needed for initial round without auto-increment
