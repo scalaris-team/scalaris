@@ -124,7 +124,7 @@ test_new0() ->
     node_details_equals(NodeDetails, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, [], []).
 
 tester_new0(Config) ->
-    tester:test(node_details_SUITE, test_new0, 0, 10, [multi_threaded]),
+    tester:test(node_details_SUITE, test_new0, 0, 10, [{threads, 2}]),
     Config.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -138,7 +138,7 @@ test_new7(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
     node_details_equals(NodeDetails, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, Memory, [my_range, message_log], []).
 
 tester_new7(Config) ->
-    tester:test(node_details_SUITE, test_new7, 7, 10, [multi_threaded]),
+    tester:test(node_details_SUITE, test_new7, 7, 10, [{threads, 2}]),
     Config.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -269,45 +269,45 @@ test_set_get_memory(MemoryTest) ->
     node_details_equals(NodeDetails2_new, hd(PredList), PredList, Node, unknown, hd(SuccList), SuccList, Load, Hostname, RTSize, unknown, MemoryTest, [my_range, message_log], []).
 
 tester_set_get_pred(Config) ->
-    tester:test(node_details_SUITE, test_set_get_pred, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_pred, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_predlist(Config) ->
-    tester:test(node_details_SUITE, test_set_get_predlist, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_predlist, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_node(Config) ->
-    tester:test(node_details_SUITE, test_set_get_node, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_node, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_my_range(Config) ->
-    tester:test(node_details_SUITE, test_set_get_my_range, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_my_range, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_succ(Config) ->
-    tester:test(node_details_SUITE, test_set_get_succ, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_succ, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_succlist(Config) ->
-    tester:test(node_details_SUITE, test_set_get_succlist, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_succlist, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_load(Config) ->
-    tester:test(node_details_SUITE, test_set_get_load, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_load, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_hostname(Config) ->
-    tester:test(node_details_SUITE, test_set_get_hostname, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_hostname, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_rt_size(Config) ->
-    tester:test(node_details_SUITE, test_set_get_rt_size, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_rt_size, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_message_log(Config) ->
-    tester:test(node_details_SUITE, test_set_get_message_log, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_message_log, 1, 1000, [{threads, 2}]),
     Config.
 
 tester_set_get_memory(Config) ->
-    tester:test(node_details_SUITE, test_set_get_memory, 1, 1000, [multi_threaded]),
+    tester:test(node_details_SUITE, test_set_get_memory, 1, 1000, [{threads, 2}]),
     Config.

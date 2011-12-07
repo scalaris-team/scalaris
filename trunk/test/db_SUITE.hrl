@@ -256,7 +256,7 @@ prop_new(Key) ->
     true.
 
 tester_new(_Config) ->
-    tester:test(?MODULE, prop_new, 1, rw_suite_runs(10), [multi_threaded]).
+    tester:test(?MODULE, prop_new, 1, rw_suite_runs(10), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -283,7 +283,7 @@ prop_set_entry(DBEntry) ->
     true.
 
 tester_set_entry(_Config) ->
-    tester:test(?MODULE, prop_set_entry, 1, rw_suite_runs(10), [multi_threaded]).
+    tester:test(?MODULE, prop_set_entry, 1, rw_suite_runs(10), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -319,7 +319,7 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     true.
 
 tester_update_entry(_Config) ->
-    tester:test(?MODULE, prop_update_entry, 5, rw_suite_runs(10), [multi_threaded]).
+    tester:test(?MODULE, prop_update_entry, 5, rw_suite_runs(10), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -366,10 +366,10 @@ prop_delete_entry2(DBEntry1, DBEntry2) ->
     true.
 
 tester_delete_entry1(_Config) ->
-    tester:test(?MODULE, prop_delete_entry1, 1, rw_suite_runs(10), [multi_threaded]).
+    tester:test(?MODULE, prop_delete_entry1, 1, rw_suite_runs(10), [{threads, 2}]).
 
 tester_delete_entry2(_Config) ->
-    tester:test(?MODULE, prop_delete_entry2, 2, rw_suite_runs(10), [multi_threaded]).
+    tester:test(?MODULE, prop_delete_entry2, 2, rw_suite_runs(10), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -391,7 +391,7 @@ prop_write(Key, Value, Version, Key2) ->
     true.
 
 tester_write(_Config) ->
-    tester:test(?MODULE, prop_write, 4, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_write, 4, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -444,7 +444,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     true.
 
 tester_delete(_Config) ->
-    tester:test(?MODULE, prop_delete, 6, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_delete, 6, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -468,7 +468,7 @@ prop_add_data(Data) ->
     true.
 
 tester_add_data(_Config) ->
-    tester:test(?MODULE, prop_add_data, 1, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_add_data, 1, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -501,7 +501,7 @@ prop_get_entries3_1(Data, Range_) ->
     true.
 
 tester_get_entries3_1(_Config) ->
-    tester:test(?MODULE, prop_get_entries3_1, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_get_entries3_1, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -536,7 +536,7 @@ prop_get_entries3_2(Data, Range_) ->
     true.
 
 tester_get_entries3_2(_Config) ->
-    tester:test(?MODULE, prop_get_entries3_2, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_get_entries3_2, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -566,7 +566,7 @@ prop_get_entries2(Data, Range_) ->
     true.
 
 tester_get_entries2(_Config) ->
-    tester:test(?MODULE, prop_get_entries2, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_get_entries2, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -598,7 +598,7 @@ prop_get_load2(Data, LoadInterval_) ->
     true.
 
 tester_get_load2(_Config) ->
-    tester:test(?MODULE, prop_get_load2, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_get_load2, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -633,7 +633,7 @@ prop_split_data(Data, Range_) ->
     true.
 
 tester_split_data(_Config) ->
-    tester:test(?MODULE, prop_split_data, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_split_data, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -690,7 +690,7 @@ prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
     true.
 
 tester_update_entries(_Config) ->
-    tester:test(?MODULE, prop_update_entries, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_update_entries, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -741,10 +741,10 @@ prop_delete_entries2(Data, Range_) ->
     true.
 
 tester_delete_entries1(_Config) ->
-    tester:test(?MODULE, prop_delete_entries1, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_delete_entries1, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_delete_entries2(_Config) ->
-    tester:test(?MODULE, prop_delete_entries2, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_delete_entries2, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -1291,75 +1291,75 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
     true.
 
 tester_changed_keys_get_entry(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_entry, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_entry, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_set_entry(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_set_entry, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_set_entry, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_update_entry(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_update_entry, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_update_entry, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete_entry(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_delete_entry, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_delete_entry, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_read(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_read, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_read, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_write(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_write, 5, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_write, 5, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_delete, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_delete, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_get_entries2(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_entries2, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_entries2, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_get_entries4(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_entries4, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_entries4, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_get_chunk3(_Config) ->
     prop_get_chunk3([0, 4, 31], '[', 0, 4, ']', 2),
     prop_get_chunk3([1, 5, 127, 13], '[', 3, 2, ']', 4),
-    tester:test(?MODULE, prop_get_chunk3, 6, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_get_chunk3, 6, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_delete_chunk3(_Config) ->
-    tester:test(?MODULE, prop_delete_chunk3, 6, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_delete_chunk3, 6, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete_entries1(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_delete_entries1, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_delete_entries1, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete_entries2(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_delete_entries2, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_delete_entries2, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_get_load(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_load, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_load, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_get_load2(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_load2, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_load2, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_split_data1(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_split_data1, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_split_data1, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_split_data2(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_split_data2, 3, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_split_data2, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_get_data(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_get_data, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_get_data, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_add_data(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_add_data, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_add_data, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_check_db(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_check_db, 2, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_check_db, 2, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_mult_interval(_Config) ->
-    tester:test(?MODULE, prop_changed_keys_mult_interval, 5, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_changed_keys_mult_interval, 5, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_stop_record_changes(_Config) ->
-    tester:test(?MODULE, prop_stop_record_changes, 5, rw_suite_runs(1000), [multi_threaded]).
+    tester:test(?MODULE, prop_stop_record_changes, 5, rw_suite_runs(1000), [{threads, 2}]).
 
 
 % helper functions:

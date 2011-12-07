@@ -180,10 +180,10 @@ prop_minus_all_sort_helper([RH | RT] = R, [LH | LT], Excluded) ->
     end.
 
 tester_minus_all(_Config) ->
-    tester:test(?MODULE, prop_minus_all, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_all, 2, 5000, [{threads, 2}]).
 
 tester_minus_all_sort(_Config) ->
-    tester:test(?MODULE, prop_minus_all_sort, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_all_sort, 2, 5000, [{threads, 2}]).
 
 %% @doc Checks that all intended items are deleted once using util:minus_first/2.
 %%      Note: this is kindof redundant to prop_minus_first_sort/2 but a cleaner
@@ -214,7 +214,7 @@ prop_minus_first_sort_helper([RH | RT] = R, [LH | LT], Excluded) ->
     end.
 
 tester_minus_first(_Config) ->
-    tester:test(?MODULE, prop_minus_first, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_first, 2, 5000, [{threads, 2}]).
 
 tester_minus_first_sort(_Config) ->
-    tester:test(?MODULE, prop_minus_first_sort, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_first_sort, 2, 5000, [{threads, 2}]).

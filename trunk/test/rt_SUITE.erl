@@ -155,7 +155,7 @@ prop_get_split_key_half(Begin, End_) ->
     call_helper_fun(check_split_key_half, [Begin, End, SplitKey]).
 
 tester_get_split_key_half(_Config) ->
-    tester:test(?MODULE, prop_get_split_key_half, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_get_split_key_half, 2, 10000, [{threads, 2}]).
 
 -spec prop_get_split_key(Begin::?RT:key(), End::?RT:key() | plus_infinity, SplitFracA::1..100, SplitFracB::0..100) -> true.
 prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
@@ -190,7 +190,7 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
     true.
 
 tester_get_split_key(_Config) ->
-    tester:test(?MODULE, prop_get_split_key, 4, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_get_split_key, 4, 10000, [{threads, 2}]).
 
 additional_tests(Config) ->
     call_helper_fun(additional_tests, [Config]).

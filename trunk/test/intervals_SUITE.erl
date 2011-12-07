@@ -144,13 +144,13 @@ prop_empty(X) ->
     true.
 
 tester_empty_well_formed(_Config) ->
-    tester:test(?MODULE, prop_empty_well_formed, 0, 1, [multi_threaded]).
+    tester:test(?MODULE, prop_empty_well_formed, 0, 1, [{threads, 2}]).
 
 tester_empty_continuous(_Config) ->
-    tester:test(?MODULE, prop_empty_continuous, 0, 1, [multi_threaded]).
+    tester:test(?MODULE, prop_empty_continuous, 0, 1, [{threads, 2}]).
 
 tester_empty(_Config) ->
-    tester:test(?MODULE, prop_empty, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_empty, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -172,13 +172,13 @@ prop_all(X) ->
     true.
 
 tester_all_well_formed(_Config) ->
-    tester:test(?MODULE, prop_all_well_formed, 0, 1, [multi_threaded]).
+    tester:test(?MODULE, prop_all_well_formed, 0, 1, [{threads, 2}]).
 
 tester_all_continuous(_Config) ->
-    tester:test(?MODULE, prop_all_continuous, 0, 1, [multi_threaded]).
+    tester:test(?MODULE, prop_all_continuous, 0, 1, [{threads, 2}]).
 
 tester_all(_Config) ->
-    tester:test(?MODULE, prop_all, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_all, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -206,16 +206,16 @@ prop_new1(X) ->
     true.
 
 tester_new1_well_formed(_Config) ->
-    tester:test(?MODULE, prop_new1_well_formed, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new1_well_formed, 1, 5000, [{threads, 2}]).
 
 tester_new1_continuous(_Config) ->
-    tester:test(?MODULE, prop_new1_continuous, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new1_continuous, 1, 5000, [{threads, 2}]).
 
 tester_new1_bounds(_Config) ->
-    tester:test(?MODULE, prop_new1_bounds, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new1_bounds, 1, 5000, [{threads, 2}]).
 
 tester_new1(_Config) ->
-    tester:test(?MODULE, prop_new1, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new1, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -251,16 +251,16 @@ prop_new2(X, Y) ->
     true.
 
 tester_new2_well_formed(_Config) ->
-    tester:test(?MODULE, prop_new2_well_formed, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new2_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_new2_continuous(_Config) ->
-    tester:test(?MODULE, prop_new2_continuous, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new2_continuous, 2, 5000, [{threads, 2}]).
 
 tester_new2_bounds(_Config) ->
-    tester:test(?MODULE, prop_new2_bounds, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new2_bounds, 2, 5000, [{threads, 2}]).
 
 tester_new2(_Config) ->
-    tester:test(?MODULE, prop_new2, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new2, 2, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -319,16 +319,16 @@ prop_new4(XBr, X, Y, YBr) ->
     true.
 
 tester_new4_well_formed(_Config) ->
-    tester:test(?MODULE, prop_new4_well_formed, 4, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new4_well_formed, 4, 5000, [{threads, 2}]).
 
 tester_new4_continuous(_Config) ->
-    tester:test(?MODULE, prop_new4_continuous, 4, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new4_continuous, 4, 5000, [{threads, 2}]).
 
 tester_new4_bounds(_Config) ->
-    tester:test(?MODULE, prop_new4_bounds, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new4_bounds, 3, 5000, [{threads, 2}]).
 
 tester_new4(_Config) ->
-    tester:test(?MODULE, prop_new4, 4, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_new4, 4, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -347,10 +347,10 @@ prop_from_elements1(X) ->
     true.
 
 tester_from_elements1_well_formed(_Config) ->
-    tester:test(?MODULE, prop_from_elements1_well_formed, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_from_elements1_well_formed, 1, 5000, [{threads, 2}]).
 
 tester_from_elements1(_Config) ->
-    tester:test(?MODULE, prop_from_elements1, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_from_elements1, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -367,10 +367,10 @@ prop_normalize(I, X) ->
              intervals:in(X, I) =:= intervals:in(X, intervals:normalize(I))).
 
 tester_normalize_well_formed(_Config) ->
-    tester:test(?MODULE, prop_normalize_well_formed, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_normalize_well_formed, 1, 5000, [{threads, 2}]).
 
 tester_normalize(_Config) ->
-    tester:test(?MODULE, prop_normalize, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_normalize, 2, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -405,16 +405,16 @@ prop_not_intersection2(A_, B_, X) ->
              not intervals:in(X, intervals:intersection(A, B))).
 
 tester_intersection_well_formed(_Config) ->
-    tester:test(?MODULE, prop_intersection_well_formed, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_intersection_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_intersection(_Config) ->
-    tester:test(?MODULE, prop_intersection, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_intersection, 3, 5000, [{threads, 2}]).
 
 tester_not_intersection(_Config) ->
-    tester:test(?MODULE, prop_not_intersection, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_not_intersection, 3, 5000, [{threads, 2}]).
 
 tester_not_intersection2(_Config) ->
-    tester:test(?MODULE, prop_not_intersection2, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_not_intersection2, 3, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -480,16 +480,16 @@ prop_union_continuous(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     end.
 
 tester_union_well_formed(_Config) ->
-    tester:test(?MODULE, prop_union_well_formed, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_union_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_union(_Config) ->
-    tester:test(?MODULE, prop_union, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_union, 3, 5000, [{threads, 2}]).
 
 tester_not_union(_Config) ->
-    tester:test(?MODULE, prop_not_union, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_not_union, 3, 5000, [{threads, 2}]).
 
 tester_union_continuous(_Config) ->
-    tester:test(?MODULE, prop_union_continuous, 8, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_union_continuous, 8, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -527,7 +527,7 @@ prop_is_adjacent(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     IsAdjacent =:= intervals:is_adjacent(A, B).
 
 tester_is_adjacent_union(_Config) ->
-    tester:test(?MODULE, prop_is_adjacent_union, 8, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_is_adjacent_union, 8, 5000, [{threads, 2}]).
 
 -spec prop_is_adjacent_union(A0Br::intervals:left_bracket(), A0::intervals:key(), A1::intervals:key(), A1Br::intervals:right_bracket(),
                              B0Br::intervals:left_bracket(), B0::intervals:key(), B1::intervals:key(), B1Br::intervals:right_bracket()) -> boolean().
@@ -537,7 +537,7 @@ prop_is_adjacent_union(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     ?implies(intervals:is_adjacent(A, B), intervals:is_continuous(intervals:union(A, B))).
 
 tester_is_adjacent(_Config) ->
-    tester:test(?MODULE, prop_is_adjacent, 8, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_is_adjacent, 8, 5000, [{threads, 2}]).
 
 -spec(prop_is_left_right_of/8 :: (A0Br::intervals:left_bracket(), A0::intervals:key(),
                                   A1::intervals:key(), A1Br::intervals:right_bracket(),
@@ -552,7 +552,7 @@ prop_is_left_right_of(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     true.
 
 tester_is_left_right_of(_Config) ->
-    tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000, [multi_threaded]).
+    tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000, [{threads, 2}]).
 
 is_left_right_of(_Config) ->
     MiddleKey = ?RT:hash_key("17"),
@@ -576,7 +576,7 @@ prop_is_subset(X_, Y_) ->
     intervals:is_subset(X, Y) =:= intervals:is_subset(X, intervals:intersection(X, Y)).
 
 tester_is_subset(_Config) ->
-    tester:test(?MODULE, prop_is_subset, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_is_subset, 2, 5000, [{threads, 2}]).
 
 -spec prop_is_subset2(intervals:interval(), intervals:interval()) -> boolean().
 prop_is_subset2(_X, _Y) ->
@@ -587,7 +587,7 @@ prop_is_subset2(_X, _Y) ->
     intervals:is_subset(Z, X) andalso intervals:is_subset(Z, Y).
 
 tester_is_subset2(_Config) ->
-    tester:test(?MODULE, prop_is_subset2, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_is_subset2, 2, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -645,22 +645,22 @@ prop_not_minus2(A_, B_, X) ->
              not intervals:in(X, intervals:minus(A, B))).
 
 tester_minus_well_formed(_Config) ->
-    tester:test(?MODULE, prop_minus_well_formed, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_minus(_Config) ->
-    tester:test(?MODULE, prop_minus, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus, 3, 5000, [{threads, 2}]).
 
 tester_minus2(_Config) ->
-    tester:test(?MODULE, prop_minus2, 4, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus2, 4, 5000, [{threads, 2}]).
 
 tester_minus3(_Config) ->
-    tester:test(?MODULE, prop_minus3, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus3, 1, 5000, [{threads, 2}]).
 
 tester_not_minus(_Config) ->
-    tester:test(?MODULE, prop_not_minus, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_not_minus, 3, 5000, [{threads, 2}]).
 
 tester_not_minus2(_Config) ->
-    tester:test(?MODULE, prop_not_minus2, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_not_minus2, 3, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -678,7 +678,7 @@ prop_get_bounds(I_) ->
              end).
 
 tester_get_bounds(_Config) ->
-    tester:test(?MODULE, prop_get_bounds, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_get_bounds, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -693,7 +693,7 @@ prop_get_elements(I_) ->
     true.
 
 tester_get_elements(_Config) ->
-    tester:test(?MODULE, prop_get_elements, 1, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_get_elements, 1, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -730,13 +730,13 @@ prop_split(X, Y, Parts) ->
     true.
 
 tester_split_is_continuous(_Config) ->
-    tester:test(?MODULE, prop_split_is_continuous, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_split_is_continuous, 3, 5000, [{threads, 2}]).
 
 tester_split_is_well_formed(_Config) ->
-    tester:test(?MODULE, prop_split_is_well_formed, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_split_is_well_formed, 3, 5000, [{threads, 2}]).
 
 tester_split(_Config) ->
-    tester:test(?MODULE, prop_split, 3, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_split, 3, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -769,13 +769,13 @@ prop_mk_from_node_ids(X, Y) ->
     true.
 
 tester_mk_from_node_ids_well_formed(_Config) ->
-    tester:test(?MODULE, prop_mk_from_node_ids_well_formed, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_mk_from_node_ids_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_mk_from_node_ids_continuous(_Config) ->
-    tester:test(?MODULE, prop_mk_from_node_ids_continuous, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_mk_from_node_ids_continuous, 2, 5000, [{threads, 2}]).
 
 tester_mk_from_node_ids(_Config) ->
-    tester:test(?MODULE, prop_mk_from_node_ids, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_mk_from_node_ids, 2, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -789,7 +789,7 @@ prop_mk_from_nodes(X, Y) ->
         node:mk_interval_between_ids(node:id(X), node:id(Y)).
 
 tester_mk_from_nodes(_Config) ->
-    tester:test(?MODULE, prop_mk_from_nodes, 2, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_mk_from_nodes, 2, 5000, [{threads, 2}]).
 
 % helpers:
 
