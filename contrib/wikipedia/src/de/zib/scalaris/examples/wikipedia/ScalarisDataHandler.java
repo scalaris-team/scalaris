@@ -766,8 +766,8 @@ public class ScalarisDataHandler {
 
         // write differences (categories, templates, backlinks)
         // new page? -> add to page/article lists
-        List<Integer> pageListWrites = new ArrayList<Integer>(2);
-        List<String> pageListKeys = new LinkedList<String>();
+        final List<Integer> pageListWrites = new ArrayList<Integer>(2);
+        final List<String> pageListKeys = new LinkedList<String>();
         if (oldRevId == -1) {
             pageListKeys.add(getPageListKey());
             pageListKeys.add(getPageCountKey());
@@ -781,9 +781,9 @@ public class ScalarisDataHandler {
         String revListKey = getRevListKey(title0, nsObject);
         int curOp;
         requests.addRead(revListKey);
-        int catPageReads = catDiff.updatePageLists_prepare_read(requests, title);
-        int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, title);
-        int lnkPageReads = lnkDiff.updatePageLists_prepare_read(requests, title);
+        final int catPageReads = catDiff.updatePageLists_prepare_read(requests, title);
+        final int tplPageReads = tplDiff.updatePageLists_prepare_read(requests, title);
+        final int lnkPageReads = lnkDiff.updatePageLists_prepare_read(requests, title);
         for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
             String pageList_key = (String) it.next();
             // note: do not need to retrieve page list count (we can calculate it on our own)
@@ -837,6 +837,7 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        final int catPageWrites = (Integer) pageListResult.info;
         pageListResult = tplDiff.updatePageLists_prepare_write(results,
                 requests, title, curOp);
         curOp += tplPageReads;
@@ -846,6 +847,7 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        final int tplPageWrites = (Integer) pageListResult.info;
         pageListResult = lnkDiff.updatePageLists_prepare_write(results,
                 requests, title, curOp);
         curOp += lnkPageReads;
@@ -855,6 +857,7 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, System.currentTimeMillis()
                             - timeAtStart);
         }
+        final int lnkPageWrites = (Integer) pageListResult.info;
         final List<String> newPages = Arrays.asList(title);
         for (Iterator<String> it = pageListKeys.iterator(); it.hasNext();) {
             String pageList_key = (String) it.next();
@@ -901,7 +904,7 @@ public class ScalarisDataHandler {
                     - timeAtStart);
         }
         pageListResult = catDiff.updatePageLists_check_writes(results, title, curOp);
-        curOp += catPageReads;
+        curOp += catPageWrites;
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -909,7 +912,7 @@ public class ScalarisDataHandler {
                             - timeAtStart);
         }
         pageListResult = tplDiff.updatePageLists_check_writes(results, title, curOp);
-        curOp += tplPageReads;
+        curOp += tplPageWrites;
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -917,7 +920,7 @@ public class ScalarisDataHandler {
                             - timeAtStart);
         }
         pageListResult = lnkDiff.updatePageLists_check_writes(results, title, curOp);
-        curOp += lnkPageReads;
+        curOp += lnkPageWrites;
         if (!pageListResult.success) {
             return new SavePageResult(false, pageListResult.message,
                     pageListResult.connect_failed, oldPage, newPage,
@@ -1048,11 +1051,6 @@ public class ScalarisDataHandler {
                 for (String name: curList) {
                     readRequests.addRead(keyGen.getPageListKey(name));
                     ++ops;
-                    if (keyGen instanceof GetPageListAndCountKey) {
-                        GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
-                        readRequests.addRead(keyCountGen.getPageCountKey(name));
-                        ++ops;
-                    }
                 }
             }
             return ops;
@@ -1080,6 +1078,7 @@ public class ScalarisDataHandler {
                 Transaction.ResultList readResults,
                 Transaction.RequestList writeRequests, String title, int firstOp) {
             final long timeAtStart = System.currentTimeMillis();
+            int writeOps = 0;
             String scalaris_key;
             // beware: keep order of operations in sync with readPageLists_prepare!
             // remove from old page list
@@ -1088,10 +1087,10 @@ public class ScalarisDataHandler {
 //                System.out.println(scalaris_key + " -= " + title);
                 List<String> pageList;
                 try {
-                    pageList = readResults.processReadAt(firstOp).stringListValue();
-                    ++firstOp;
+                    pageList = readResults.processReadAt(firstOp++).stringListValue();
                     pageList.remove(title);
                     writeRequests.addWrite(scalaris_key, pageList);
+                    ++writeOps;
 //                } catch (NotFoundException e) {
 //                    // this is NOT ok
                 } catch (Exception e) {
@@ -1103,9 +1102,9 @@ public class ScalarisDataHandler {
                             System.currentTimeMillis() - timeAtStart);
                 }
                 if (keyGen instanceof GetPageListAndCountKey) {
-                    ++firstOp;
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
                     writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
+                    ++writeOps;
                 }
             }
             // add to new page list
@@ -1114,8 +1113,7 @@ public class ScalarisDataHandler {
 //              System.out.println(scalaris_key + " += " + title);
                 List<String> pageList;
                 try {
-                    pageList = readResults.processReadAt(firstOp).stringListValue();
-                    ++firstOp;
+                    pageList = readResults.processReadAt(firstOp++).stringListValue();
                 } catch (NotFoundException e) {
                     // this is ok
                     pageList = new LinkedList<String>();
@@ -1128,6 +1126,7 @@ public class ScalarisDataHandler {
                 pageList.add(title);
                 try {
                     writeRequests.addWrite(scalaris_key, pageList);
+                    ++writeOps;
                 } catch (Exception e) {
                     return new SaveResult(false, "unknown exception adding \""
                             + title + "\" to \"" + scalaris_key
@@ -1136,12 +1135,14 @@ public class ScalarisDataHandler {
                             System.currentTimeMillis() - timeAtStart);
                 }
                 if (keyGen instanceof GetPageListAndCountKey) {
-                    ++firstOp;
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
                     writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
+                    ++writeOps;
                 }
             }
-            return new SaveResult(System.currentTimeMillis() - timeAtStart);
+            final SaveResult result = new SaveResult(System.currentTimeMillis() - timeAtStart);
+            result.info = writeOps;
+            return result;
         }
         
         /**
@@ -1266,7 +1267,7 @@ public class ScalarisDataHandler {
                 ++writeOps;
             }
         }
-        SaveResult res = new SaveResult(System.currentTimeMillis() - timeAtStart);
+        final SaveResult res = new SaveResult(System.currentTimeMillis() - timeAtStart);
         res.info = writeOps;
         return res;
     }
