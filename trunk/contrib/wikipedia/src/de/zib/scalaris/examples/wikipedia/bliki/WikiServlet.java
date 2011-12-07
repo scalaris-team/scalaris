@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.Servlet;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -50,6 +51,7 @@ import org.apache.commons.lang.StringEscapeUtils;
 
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
+import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.PageListResult;
 import de.zib.scalaris.examples.wikipedia.RandomTitleResult;
@@ -124,6 +126,19 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     public WikiServlet() {
         super();
+    }
+
+    /**
+     * Servlet initialisation: creates the connection to the erlang node and
+     * imports site information.
+     */
+    @Override
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+        String WIKI_USE_NEW_SCALARIS_OPS = config.getInitParameter("WIKI_USE_NEW_SCALARIS_OPS");
+        if (WIKI_USE_NEW_SCALARIS_OPS != null) {
+            Options.WIKI_USE_NEW_SCALARIS_OPS = Boolean.parseBoolean(WIKI_USE_NEW_SCALARIS_OPS);
+        }
     }
     
     /**
