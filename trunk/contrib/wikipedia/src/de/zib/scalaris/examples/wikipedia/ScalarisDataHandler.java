@@ -627,7 +627,7 @@ public class ScalarisDataHandler {
     public static SavePageResult savePage(final Connection connection, final String title0,
             final Revision newRev, final int prevRevId, final Map<String, String> restrictions,
             final SiteInfo siteinfo, final String username, final MyNamespace nsObject) {
-        final long timeAtStart = System.currentTimeMillis();
+        long timeAtStart = System.currentTimeMillis();
         Page oldPage = null;
         Page newPage = null;
         List<ShortRevision> newShortRevs = null;
@@ -704,7 +704,9 @@ public class ScalarisDataHandler {
         if (oldRevId != -1 && oldPage != null && oldPage.getCurRev() != null) {
             // get a list of previous categories and templates:
             wikiModel.setUp();
+            final long timeAtRenderStart = System.currentTimeMillis();
             wikiModel.render(null, oldPage.getCurRev().unpackedText());
+            timeAtStart -= (System.currentTimeMillis() - timeAtRenderStart);
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
             oldTpls = wikiModel.getTemplates();
@@ -717,7 +719,11 @@ public class ScalarisDataHandler {
         }
         // get new categories and templates
         wikiModel.setUp();
-        wikiModel.render(null, newRev.unpackedText());
+        do {
+            final long timeAtRenderStart = System.currentTimeMillis();
+            wikiModel.render(null, newRev.unpackedText());
+            timeAtStart -= (System.currentTimeMillis() - timeAtRenderStart);
+        } while (false);
         if (wikiModel.getRedirectLink() != null) {
             newPage.setRedirect(true);
         }
