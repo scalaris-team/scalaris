@@ -1124,16 +1124,8 @@ public class ScalarisDataHandler {
                             System.currentTimeMillis() - timeAtStart);
                 }
                 pageList.add(title);
-                try {
-                    writeRequests.addWrite(scalaris_key, pageList);
-                    ++writeOps;
-                } catch (Exception e) {
-                    return new SaveResult(false, "unknown exception adding \""
-                            + title + "\" to \"" + scalaris_key
-                            + "\" in Scalaris: " + e.getMessage(),
-                            e instanceof ConnectionException,
-                            System.currentTimeMillis() - timeAtStart);
-                }
+                writeRequests.addWrite(scalaris_key, pageList);
+                ++writeOps;
                 if (keyGen instanceof GetPageListAndCountKey) {
                     GetPageListAndCountKey keyCountGen = (GetPageListAndCountKey) keyGen;
                     writeRequests.addWrite(keyCountGen.getPageCountKey(name), pageList.size());
