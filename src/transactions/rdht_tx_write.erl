@@ -182,7 +182,6 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
 -spec update_tlog_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
                                tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, Request) ->
-    Module = tx_tlog:get_entry_operation(TLogEntry),
     Key = tx_tlog:get_entry_key(TLogEntry),
     Status = tx_tlog:get_entry_status(TLogEntry),
     Version = tx_tlog:get_entry_version(TLogEntry),
