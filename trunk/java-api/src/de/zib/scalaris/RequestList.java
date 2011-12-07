@@ -189,9 +189,9 @@ public abstract class RequestList {
      */
     public <T> RequestList addAddDelOnList(final String key, final List<T> toAdd, final List<T> toRemove)
             throws UnsupportedOperationException {
-        return addAddDelOnList(new OtpErlangString(key),
-                (OtpErlangList) ErlangValue.convertToErlang(toAdd),
-                (OtpErlangList) ErlangValue.convertToErlang(toRemove));
+        final OtpErlangList toAddErl = (toAdd == null) ? new OtpErlangList() : (OtpErlangList) ErlangValue.convertToErlang(toAdd);
+        final OtpErlangList toRemoveErl = (toRemove == null) ? new OtpErlangList() : (OtpErlangList) ErlangValue.convertToErlang(toRemove);
+        return addAddDelOnList(new OtpErlangString(key), toAddErl, toRemoveErl);
     }
 
     /**
