@@ -58,10 +58,12 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
         case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
             true ->
                 {TmpDB, Proposal} =
-                    apply(tx_tlog:get_entry_operation(RTLogEntry),
-                          validate,
-                          [DB, RTLogEntry]),
-
+                    case tx_tlog:get_entry_operation(RTLogEntry) of
+                        rdht_tx_read ->
+                            rdht_tx_read:validate(DB, RTLogEntry);
+                        rdht_tx_write ->
+                            rdht_tx_write:validate(DB, RTLogEntry)
+                    end,
                 %% remember own proposal for lock release
                 TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
                 pdb:set({PaxId, Proposal}, TP_DB),
@@ -138,8 +140,17 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
     Key = tx_tlog:get_entry_key(RTLogEntry),
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
-            Res = apply(tx_tlog:get_entry_operation(RTLogEntry), Result,
-                        [DB, RTLogEntry, OwnProposal]),
+            Res =
+                case {tx_tlog:get_entry_operation(RTLogEntry), Result} of
+                    {rdht_tx_read, abort} ->
+                        rdht_tx_read:abort(DB, RTLogEntry, OwnProposal);
+                    {rdht_tx_read, commit} ->
+                        rdht_tx_read:commit(DB, RTLogEntry, OwnProposal);
+                    {rdht_tx_write, abort} ->
+                        rdht_tx_write:abort(DB, RTLogEntry, OwnProposal);
+                    {rdht_tx_write, commit} ->
+                        rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
+                end,
             comm:send(TM, {tp_committed, TMItemId}),
             Res;
         false ->

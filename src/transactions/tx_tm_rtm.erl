@@ -252,7 +252,7 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             ok; %% can that happen? Yes. We should delete it?!
         ok ->
             %% This tx is a bit slow. Start fds on the participants
-            %% and then take over on crash messages.  when not enough
+            %% and then take over on crash messages.  When not enough
             %% tps have registered? propose yourself.
 
             %% TODO: instead of direct takeover, fd:subscribe to the
@@ -540,6 +540,10 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
     ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, state_get_role(State)]),
     %% after timeout take over and initiate new paxos round as proposer
     {ErrCodeTx, TxState} = get_tx_entry(Tid, State),
+%%    ct:pal("propose yourself (~.0p/~.0p) for: ~.0p ~.0p~n",
+%%           [self(),
+%%            pid_groups:group_and_name_of(self()),
+%%            Tid, {ErrCodeTx, TxState}]),
     _ =
     case ErrCodeTx of
         new -> ok; %% takeover is not necessary. Was finished successfully.
@@ -564,6 +568,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                   case tx_item_state:get_decided(ItemState) of
                       false ->
                           GLLearner = state_get_gllearner(State),
+%%                          ct:pal("initiating proposer~n"),
                           [ begin
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
                                                       comm:this(), ItemId),
@@ -582,6 +587,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                             || {PaxId, _RTLog, _TP}
                                    <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ];
                       _Decision -> % already decided to prepared / abort
+                          ct:pal("Already decided~n"),
                           ok
                   end
               end || ItemId <- TxItemIDs ]
@@ -608,14 +614,19 @@ on({crash, Pid}, State) ->
                 || RTM <- RTMs ],
     %% scan over all running transactions and delete this Pid
     %% if necessary, takeover the tx and try deciding with abort
-    NewState = lists:foldl(
-                 fun(X,StateIter) ->
-                         case tx_state:is_tx_state(X) of
-                             true -> ct:pal("propose yourself for: ~p~n", [tx_state:get_tid(X)]),
-                                     on({tx_tm_rtm_propose_yourself, tx_state:get_tid(X)}, StateIter);
-                             false -> StateIter
-                         end
-                end, State, pdb:tab2list(state_get_tablename(State))),
+    NewState = State,
+%%     NewState = lists:foldl(
+%%                  fun(X,StateIter) ->
+%%                          case tx_state:is_tx_state(X) of
+%%                              true ->
+%%                                  ct:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
+%%                                         [self(),
+%%                                          pid_groups:group_and_name_of(self()),
+%%                                          tx_state:get_tid(X)]),
+%%                                  on({tx_tm_rtm_propose_yourself, tx_state:get_tid(X)}, StateIter);
+%%                              false -> StateIter
+%%                          end
+%%                 end, State, pdb:tab2list(state_get_tablename(State))),
 
     %% no longer use this RTM
     ValidRTMs = [ X || X <- NewRTMs, unknown =/= get_rtmpid(X) ],

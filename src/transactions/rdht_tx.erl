@@ -208,7 +208,12 @@ initiate_rdht_ops(ReqList) ->
                          add_del_on_list -> rdht_tx_read;
                          add_on_nr -> rdht_tx_read
                      end,
-          apply(OpModule, work_phase, [self(), NewReqId, Entry]),
+          case OpModule of
+              rdht_tx_read ->
+                  rdht_tx_read:work_phase(self(), NewReqId, Entry);
+              rdht_tx_write ->
+                  rdht_tx_write:work_phase(self(), NewReqId, Entry)
+          end,
           {NewReqId, Entry}
       end || Entry <- ReqList ].
 
@@ -417,7 +422,7 @@ encode_value(Value) when
       is_atom(Value) orelse
       is_boolean(Value) orelse
       is_number(Value) ->
-    Value;
+    Value; %%  {nav}
 encode_value(Value) when
       is_binary(Value) ->
     %% do not compress a binary
