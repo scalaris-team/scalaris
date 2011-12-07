@@ -107,7 +107,7 @@ Iterator<String> iter = pageBean.getSubCategories().iterator();
 <% /*
 	  <span class="CategoryTreeEmptyBullet">[<b>×</b>] </span>
 */ %>
-	  <a class="CategoryTreeLabel  CategoryTreeLabelNs14 CategoryTreeLabelCategory" href="wiki?title=Category:<%=subCat%>"><%=subCat%></a>
+	  <a class="CategoryTreeLabel  CategoryTreeLabelNs14 CategoryTreeLabelCategory" href="wiki?title=<%= pageBean.getWikiNamespace().getCategory() %>:<%=subCat%>"><%=subCat%></a>
 <% /* 
 	  <span title="contains 0 subcategories, 1745 pages, and 0 files">(0)</span>
 */ %>
@@ -171,8 +171,9 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
                 <a href="wiki?title=Special:Categories" title="Special:Categories">Categories</a>:
 <%
 	for (Iterator<String> iterator = pageBean.getCategories().iterator(); iterator.hasNext();) {
-	    String category = iterator.next();
-	    out.print("<span dir=\"" + pageBean.getWikiLangDir() + "\"><a href=\"wiki?title=Category:" + category + "\" title=\"Category:" + category + "\">" + category + "</a></span>");
+	    final String category = iterator.next();
+	    final String fullCatName = pageBean.getWikiNamespace().getCategory() + ":" + category;
+	    out.print("<span dir=\"" + pageBean.getWikiLangDir() + "\"><a href=\"wiki?title=" + fullCatName + "\" title=\"" + fullCatName + "\">" + category + "</a></span>");
 	    
 	    if (iterator.hasNext()) {
 	        out.print(" | ");
