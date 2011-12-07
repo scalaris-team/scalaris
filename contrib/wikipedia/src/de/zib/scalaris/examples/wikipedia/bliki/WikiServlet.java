@@ -96,11 +96,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * URL for page links
      */
-    public static final String linkBaseURL = WikiServlet.wikiBaseURL + "?title=${title}";
+    public static final String linkBaseURL = wikiBaseURL + "?title=${title}";
     /**
      * URL for image links
      */
-    public static final String imageBaseURL = WikiServlet.wikiBaseURL + "?get_image=${image}";
+    public static final String imageBaseURL = wikiBaseURL + "?get_image=${image}";
 
     protected static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     protected static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
@@ -484,9 +484,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws ServletException, IOException {
         // get renderer
-        int render = WikiServlet.getParam_renderer(request);
+        int render = getParam_renderer(request);
         // get revision id to load:
-        int req_oldid = WikiServlet.getParam_oldid(request);
+        int req_oldid = getParam_oldid(request);
 
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
         page.addStat(title, result.time);
@@ -649,7 +649,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
         }
 
-        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setNotice(getParam_notice(request));
+        final int pageSaveTime = parseInt(getParam(request, "save_time"), -1);
+        if (pageSaveTime >= 0) {
+            page.addStat("saving " + title, pageSaveTime);
+        }
         page.setError(getParam_error(request));
         page.setTitle(title);
         page.setVersion(revision.getId());
@@ -682,7 +686,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws ServletException, IOException {
         // get renderer
-        int render = WikiServlet.getParam_renderer(request);
+        int render = getParam_renderer(request);
         String notExistingTitle = "MediaWiki:Noarticletext";
 
         RevisionResult result = getRevision(connection, notExistingTitle, namespace);
@@ -703,7 +707,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         // re-set version (we are only showing this page due to a non-existing page)
         page.setVersion(-1);
         page.setNotAvailable(true);
-        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setNotice(getParam_notice(request));
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
@@ -746,7 +750,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         
         if (result.success) {
-            page.setNotice(WikiServlet.getParam_notice(request));
+            page.setNotice(getParam_notice(request));
             page.setRevisions(result.revisions);
             if (!result.page.checkEditAllowed("")) {
                 page.setEditRestricted(true);
@@ -796,7 +800,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (result.success) {
             final TreeSet<String> pageList = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
             MyWikiModel.denormalisePageTitles(result.pages, namespace, pageList);
-            page.setNotice(WikiServlet.getParam_notice(request));
+            page.setNotice(getParam_notice(request));
             String nsPrefix = namespace.getNamespaceByNumber(page.getNamespaceId());
             if (!nsPrefix.isEmpty()) {
                 nsPrefix += ":";
@@ -1098,7 +1102,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void showEmptyPage(HttpServletRequest request,
             HttpServletResponse response, WikiPageBeanBase page)
             throws ServletException, IOException {
-        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setNotice(getParam_notice(request));
         page.setError(getParam_error(request));
         request.setAttribute("pageBean", new WikiPageBean(page));
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
@@ -1140,7 +1144,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, Connection connection,
             WikiPageEditBean page) throws ServletException, IOException {
         // get revision id to load:
-        int req_oldid = WikiServlet.getParam_oldid(request);
+        int req_oldid = getParam_oldid(request);
 
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
         page.addStat(title, result.time);
@@ -1175,7 +1179,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
 
         // set the textarea's contents:
-        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setNotice(getParam_notice(request));
         page.setError(getParam_error(request));
         page.setTitle(title);
         page.setWikiTitle(siteinfo.getSitename());
@@ -1224,7 +1228,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             newRev.setUnpackedText(content);
 
             SavePageResult result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "", namespace);
-            page.addStat("saving " + title, result.time); // TODO: change title?
+            page.addStat("saving " + title, result.time);
             for (WikiEventHandler handler: eventHandlers) {
                 handler.onPageSaved(result);
             }
@@ -1232,7 +1236,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 // successfully saved -> show page with a notice of the successful operation
                 // do not include the UTF-8-title directly into encodeRedirectURL since that's not 
                 // encoding umlauts (maybe other special chars as well) correctly, e.g. ä -> %E4 instead of %C3%A4
-                response.sendRedirect(response.encodeRedirectURL("?title=" + URLEncoder.encode(title, "UTF-8") + "&notice=successfully saved page"));
+                StringBuilder redirectUrl = new StringBuilder(256);
+                redirectUrl.append("?title=");
+                redirectUrl.append(URLEncoder.encode(title, "UTF-8"));
+                redirectUrl.append("&notice=successfully saved page");
+                redirectUrl.append("&save_time=" + result.time);
+                response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {
                 // set error message and show the edit page again (see below)
@@ -1247,7 +1256,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         // preview+edit page
 
-        page.setNotice(WikiServlet.getParam_notice(request));
+        page.setNotice(getParam_notice(request));
         // set the textarea's contents:
         page.setPage(StringEscapeUtils.escapeHtml(content));
 
