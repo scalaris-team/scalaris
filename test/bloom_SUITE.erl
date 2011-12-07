@@ -69,7 +69,7 @@ prop_add(X, Y) ->
     true.
 
 tester_add(_) ->
-    tester:test(?MODULE, prop_add, 2, 100, [multi_threaded]).
+    tester:test(?MODULE, prop_add, 2, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -81,7 +81,7 @@ prop_add_list(Items) ->
     true.
 
 tester_add_list(_) ->
-    tester:test(?MODULE, prop_add_list, 1, 100, [multi_threaded]).
+    tester:test(?MODULE, prop_add_list, 1, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -98,7 +98,7 @@ prop_join(List1, List2) ->
     true.
 
 tester_join(_) ->
-    tester:test(?MODULE, prop_join, 2, 100, [multi_threaded]).
+    tester:test(?MODULE, prop_join, 2, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -110,7 +110,7 @@ prop_equals(List) ->
     true.
 
 tester_equals(_) ->
-    tester:test(?MODULE, prop_equals, 1, 100, [multi_threaded]).
+    tester:test(?MODULE, prop_equals, 1, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -134,7 +134,7 @@ prop_fpr(ElementCount) ->
     true.
 
 tester_fpr(_) ->
-    tester:test(?MODULE, prop_fpr, 1, 1, [multi_threaded]).
+    tester:test(?MODULE, prop_fpr, 1, 1, [{threads, 2}]).
 
 %% @doc measures false positives by adding 1..MaxElements into a new BF
 %%      and checking number of found items which are not in the BF

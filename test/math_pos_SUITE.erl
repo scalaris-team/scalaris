@@ -146,7 +146,7 @@ prop_make_same_length(A, B, Pos) ->
 
 -spec tester_make_same_length(Config::[tuple()]) -> ok.
 tester_make_same_length(_Config) ->
-    tester:test(?MODULE, prop_make_same_length, 3, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_make_same_length, 3, 10000, [{threads, 2}]).
 
 %% plus
 
@@ -175,9 +175,9 @@ prop_plus_valid3(A_, B_) ->
 
 -spec tester_plus_valid(Config::[tuple()]) -> ok.
 tester_plus_valid(_Config) ->
-    tester:test(?MODULE, prop_plus_valid1, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_plus_valid2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_plus_valid3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_plus_valid1, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_plus_valid2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_plus_valid3, 2, 10000, [{threads, 2}]).
 
 -spec prop_plus_symm_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_plus_symm_base(A_, B_, Pos, Base) ->
@@ -198,9 +198,9 @@ prop_plus_symm3(A_, B_) ->
 
 -spec tester_plus_symm(Config::[tuple()]) -> ok.
 tester_plus_symm(_Config) ->
-    tester:test(?MODULE, prop_plus_symm1, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_plus_symm2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_plus_symm3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_plus_symm1, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_plus_symm2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_plus_symm3, 2, 10000, [{threads, 2}]).
 
 %% minus
 
@@ -229,10 +229,10 @@ prop_minus_valid3(A_, B_) ->
 
 -spec tester_minus_valid(Config::[tuple()]) -> ok.
 tester_minus_valid(_Config) ->
-    tester:test(?MODULE, prop_minus_valid1, 2, 10000, [multi_threaded]),
+    tester:test(?MODULE, prop_minus_valid1, 2, 10000, [{threads, 2}]),
     prop_minus_valid2([557056,0,0,0,0,1], [557055,1114111,1114111,1114111,1114111,1114111]),
-    tester:test(?MODULE, prop_minus_valid2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_minus_valid3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus_valid2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_minus_valid3, 2, 10000, [{threads, 2}]).
 
 -spec prop_minus_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_minus_base(A_, B_, Pos, Base) ->
@@ -254,9 +254,9 @@ prop_minus3(A_, B_) ->
 
 -spec tester_minus(Config::[tuple()]) -> ok.
 tester_minus(_Config) ->
-    tester:test(?MODULE, prop_minus1, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_minus2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_minus3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_minus1, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_minus2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_minus3, 2, 10000, [{threads, 2}]).
 
 %% divide
 
@@ -284,9 +284,9 @@ prop_divide_valid3(A, Div) ->
 
 -spec prop_divide_valid(Config::[tuple()]) -> ok.
 prop_divide_valid(_Config) ->
-    tester:test(?MODULE, prop_divide_valid1, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_divide_valid2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_divide_valid3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_divide_valid1, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_divide_valid2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_divide_valid3, 2, 10000, [{threads, 2}]).
 
 %% multiply
 
@@ -314,6 +314,6 @@ prop_multiply_valid3(A, Fac) ->
 
 -spec prop_multiply_valid(Config::[tuple()]) -> ok.
 prop_multiply_valid(_Config) ->
-    tester:test(?MODULE, prop_multiply_valid1, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_multiply_valid2, 2, 10000, [multi_threaded]),
-    tester:test(?MODULE, prop_multiply_valid3, 2, 10000, [multi_threaded]).
+    tester:test(?MODULE, prop_multiply_valid1, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_multiply_valid2, 2, 10000, [{threads, 2}]),
+    tester:test(?MODULE, prop_multiply_valid3, 2, 10000, [{threads, 2}]).

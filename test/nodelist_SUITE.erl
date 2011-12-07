@@ -2644,7 +2644,7 @@ prop_largest_smaller_than2_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
     true.
 
 tester_largest_smaller_than2(_Config) ->
-    tester:test(?MODULE, prop_largest_smaller_than2, 5, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_largest_smaller_than2, 5, 5000, [{threads, 2}]).
 
 largest_smaller_than2(_Config) ->
     % some tests that previously failed:
@@ -2708,7 +2708,7 @@ prop_largest_smaller_than3_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
     true.
 
 tester_largest_smaller_than3(_Config) ->
-    tester:test(?MODULE, prop_largest_smaller_than3, 5, 5000, [multi_threaded]).
+    tester:test(?MODULE, prop_largest_smaller_than3, 5, 5000, [{threads, 2}]).
 
 largest_smaller_than3(_Config) ->
     % some tests that previously failed:
