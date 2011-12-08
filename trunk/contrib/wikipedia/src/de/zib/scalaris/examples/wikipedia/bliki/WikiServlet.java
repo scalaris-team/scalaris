@@ -1292,7 +1292,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("?title=");
                 redirectUrl.append(URLEncoder.encode(title, "UTF-8"));
                 redirectUrl.append("&notice=successfully%20saved%20page");
-                redirectUrl.append("&save_times=" + StringUtils.join(page.getStats().get(saveStatTitle), ','));
+                redirectUrl.append("&save_times=" + StringUtils.join(page.getStats().get(saveStatTitle), "%2C"));
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {
