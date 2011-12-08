@@ -26,7 +26,7 @@ public class Options {
      * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)} for page
      * list updates.
      */
-    public static boolean WIKI_USE_NEW_SCALARIS_OPS = false;
+    public static boolean WIKI_USE_NEW_SCALARIS_OPS = true;
     
     /**
      * Whether to support back-links ("what links here?") or not.
