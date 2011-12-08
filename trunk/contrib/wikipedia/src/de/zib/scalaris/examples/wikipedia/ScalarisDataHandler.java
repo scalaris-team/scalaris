@@ -1767,28 +1767,42 @@ public class ScalarisDataHandler {
      */
     public static SaveResult updatePageList(Transaction scalaris_tx,
             String pageList_key, String pageCount_key,
-            Collection<String> entriesToRemove, Collection<String> entriesToAdd) {
+            List<String> entriesToRemove, List<String> entriesToAdd) {
         final long timeAtStart = System.currentTimeMillis();
         Transaction.RequestList requests;
         Transaction.ResultList results;
 
         try {
             requests = new Transaction.RequestList();
-            updatePageList_prepare_read(requests, pageList_key);
-            results = scalaris_tx.req_list(requests);
+            SaveResult result;
+            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
+                result = updatePageList_prepare_appends(requests,
+                        pageList_key, pageCount_key, entriesToRemove,
+                        entriesToAdd);
+                requests.addCommit();
+                results = scalaris_tx.req_list(requests);
+                if (!result.success) {
+                    return result;
+                }
+                result = updatePageList_check_appends(results, pageList_key,
+                        pageCount_key, 0, (Integer) result.info);
+            } else {
+                updatePageList_prepare_read(requests, pageList_key);
+                results = scalaris_tx.req_list(requests);
 
-            requests = new Transaction.RequestList();
-            SaveResult result = updatePageList_prepare_write(results, requests,
-                    pageList_key, pageCount_key, entriesToRemove, entriesToAdd,
-                    0);
-            if (!result.success) {
-                return result;
+                requests = new Transaction.RequestList();
+                result = updatePageList_prepare_write(results, requests,
+                        pageList_key, pageCount_key, entriesToRemove, entriesToAdd,
+                        0);
+                if (!result.success) {
+                    return result;
+                }
+                requests.addCommit();
+                results = scalaris_tx.req_list(requests);
+
+                result = updatePageList_check_writes(results, pageList_key,
+                        pageCount_key, 0, (Integer) result.info);
             }
-            requests.addCommit();
-            results = scalaris_tx.req_list(requests);
-
-            result = updatePageList_check_writes(results, pageList_key,
-                    pageCount_key, 0, (Integer) result.info);
             if (!result.success) {
                 return result;
             }
