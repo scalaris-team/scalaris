@@ -297,7 +297,9 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
     <h5 tabindex="2">Toolbox</h5>
     <div style="display: block;" class="body">
         <ul>
+          <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %>
                     <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=${ pageBean.title }" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
+          <% } %>
           <% if (!pageBean.isNotAvailable()) { %>
 <% /*               <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>*/ %>
           <% } %>

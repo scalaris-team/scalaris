@@ -11,6 +11,10 @@
 			<param-name>WIKI_USE_NEW_SCALARIS_OPS</param-name>
 			<param-value>true</param-value>
 		</init-param>
+		<init-param>
+			<param-name>WIKI_USE_BACKLINKS</param-name>
+			<param-value>true</param-value>
+		</init-param>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>WikiServletScalaris</servlet-name>
