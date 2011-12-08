@@ -36,6 +36,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() -> [
+          performance,
           tester_new,
           tester_lookup
          ].
@@ -52,6 +53,35 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     crypto:stop(),
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+performance(_) ->
+    
+    ToAdd = 2000,
+    ExecTimes = 100,
+    
+    I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
+    {TreeTime, Tree} = 
+        util:tc(fun() -> 
+                        merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform) 
+                end, []),
+    
+    %measure build times
+    BT = measure_util:time_avg(
+           fun() -> 
+                   art:new(Tree) 
+           end,
+           [], ExecTimes, false),    
+    %Output
+    ct:pal("ART Performance
+            ------------------------
+            PARAMETER: AddedItems=~p ; ExecTimes=~p
+            TreeTime (ms)= ~p
+            ARTBuildTime (ms)= ~p", 
+           [ToAdd, ExecTimes, TreeTime / 1000,
+            measure_util:print_result(BT, ms)]),
+    true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

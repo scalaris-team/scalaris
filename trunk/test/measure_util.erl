@@ -33,6 +33,8 @@
                             Avg::non_neg_integer()
                            }.
 
+-type time_unit() :: us | ms | s.
+
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
 %      Result = {MinTime, MaxTime, MedianTime, AverageTime}
@@ -52,19 +54,18 @@ time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg}.
 
--spec print_result(measure_result(), us|ms|s) -> [{atom(), any()}].
-print_result({Min, Max, Med, Avg}, us) ->
-    [{min, Min},
-     {max, Max},
-     {med, Med},
-     {avg, Avg}];
-print_result({Min, Max, Med, Avg}, ms) ->
-    [{min, Min / 1000},
-     {max, Max / 1000},
-     {med, Med / 1000},
-     {avg, Avg / 1000}];
-print_result({Min, Max, Med, Avg}, s) ->
-    [{min, Min / 100000},
-     {max, Max / 100000},
-     {med, Med / 100000},
-     {avg, Avg / 100000}].
+-spec print_result(measure_result(), time_unit()) -> [{atom(), any()}].
+print_result({Min, Max, Med, Avg}, Unit) ->
+    [{unit, Unit},
+     {min, value_to_unit(Min, Unit)},
+     {max, value_to_unit(Max, Unit)},
+     {med, value_to_unit(Med, Unit)},
+     {avg, value_to_unit(Avg, Unit)}].
+
+-spec value_to_unit(non_neg_integer(), time_unit()) -> float().
+value_to_unit(Val, Unit) ->
+    case Unit of
+        us -> Val;
+        ms -> Val / 1000;
+        s -> Val / 100000
+    end.
