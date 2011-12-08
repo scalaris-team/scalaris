@@ -40,7 +40,7 @@ all() -> [
           tester_equals,
           tester_fpr,
           %fprof,
-          time_measurement
+          performance
          ].
 
 suite() ->
@@ -156,35 +156,37 @@ measure_fp(DestFpr, MaxElements) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-time_measurement(_) ->
+performance(_) ->
     %parameter
     ExecTimes = 100,
-    BFSize = 1000, % req: mod 2 = 0
+    ToAdd = 2000, % req: mod 2 = 0
 
     %measure Build times
-    {BTMin, BTMax, BTMed, BTAvg} =
-        measure_util:time_avg(fun() -> for_to_ex(1, round(BFSize / 2),
+    BuildTime =
+        measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
                                                  fun(I) -> I end,
                                                  fun(I, B) -> ?BLOOM:add(B, I) end,
-                                                 newBloom(BFSize, 0.1))
+                                                 newBloom(ToAdd, 0.1))
                               end,
                               [], ExecTimes, false),
     %measure join time
     BF1 = for_to_ex(1,
-                    round(BFSize / 2),
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
-    BF2 = for_to_ex(round(BFSize / 2) + 1,
-                    BFSize,
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(BFSize, 0.1)),
-    {JTMin, JTMax, JTMed, JTAvg} =
+                    round(ToAdd / 2),
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(ToAdd, 0.1)),
+    BF2 = for_to_ex(round(ToAdd / 2) + 1,
+                    ToAdd,
+                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(ToAdd, 0.1)),
+    JoinTime =
         measure_util:time_avg(fun() -> ?BLOOM:join(BF1, BF2) end, [], ExecTimes, false),
 
     %print results
-    ct:pal("EXECUTION TIMES in microseconds~n"
-           "PARAMETER - ExecTimes=[~w] - BFSize=[~w]~n"
-           "BuildTimes - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]~n"
-           "JoinTimes  - Min=[~w] Max=[~w] Med=[~w] Avg=[~w]",
-           [ExecTimes, BFSize, BTMin, BTMax, BTMed, BTAvg, JTMin, JTMax, JTMed, JTAvg]),
+    ct:pal("EXECUTION TIMES in microseconds
+           PARAMETER: AddedItems=~p ; ExecTimes=~p
+           BuildTimes: ~p
+           JoinTimes : ~p",
+           [ToAdd, ExecTimes, 
+            measure_util:print_result(BuildTime, ms), 
+            measure_util:print_result(JoinTime, us)]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
