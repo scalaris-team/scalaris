@@ -123,7 +123,7 @@ bench: compile
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "ebench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
-	@$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)."; \
+	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)."; \
 	./bin/scalarisctl -n "ebench_boot" stop ; \
 	./bin/scalarisctl -n "ebench_node1" stop ; \
 	./bin/scalarisctl -n "ebench_node2" stop ; \
