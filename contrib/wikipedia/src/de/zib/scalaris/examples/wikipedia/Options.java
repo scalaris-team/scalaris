@@ -33,4 +33,20 @@ public class Options {
      */
     public static boolean WIKI_USE_BACKLINKS = true;
     
+    /**
+     * How often to re-try a "sage page" operation in case of failures, e.g.
+     * concurrent edits.
+     * 
+     * @see #WIKI_SAVEPAGE_RETRY_DELAY
+     */
+    public static int WIKI_SAVEPAGE_RETRIES = 0;
+    
+    /**
+     * How long to wait after a failed "sage page" operation before trying
+     * again (in milliseconds).
+     * 
+     * @see #WIKI_SAVEPAGE_RETRIES
+     */
+    public static int WIKI_SAVEPAGE_RETRY_DELAY = 10;
+    
 }
