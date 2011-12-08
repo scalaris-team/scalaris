@@ -38,7 +38,6 @@ import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.bliki.MyScalarisWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -299,9 +298,10 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()),
                 page, stWrite));
 
+        // note: do not normalise page titles (this will be done later)
         newPages.add(page.getTitle());
         // simple article filter: only pages in main namespace:
-        if (MyScalarisWikiModel.getNamespace(page.getTitle(), wikiModel.getNamespace()).isEmpty()) {
+        if (wikiModel.getNamespace(page.getTitle()).isEmpty()) {
             newArticles.add(page.getTitle());
         }
         // export page/article list whenever the number of new pages is more
@@ -510,7 +510,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             this.newPages = new ArrayList<String>(newPages.size());
             wikiModel.normalisePageTitles(newPages, this.newPages);
             this.newArticles = new ArrayList<String>(newArticles.size());
-            wikiModel.normalisePageTitles(newPages, this.newArticles);
+            wikiModel.normalisePageTitles(newArticles, this.newArticles);
         }
         
         @Override
