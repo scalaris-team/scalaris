@@ -16,7 +16,6 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.api.Connector;
-import info.bliki.api.Page;
 import info.bliki.api.User;
 
 import java.io.IOException;
@@ -48,6 +47,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
 
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
@@ -60,6 +60,7 @@ import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
+import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDump;
@@ -135,13 +136,21 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        String WIKI_USE_NEW_SCALARIS_OPS = config.getInitParameter("WIKI_USE_NEW_SCALARIS_OPS");
+        final String WIKI_USE_NEW_SCALARIS_OPS = config.getInitParameter("WIKI_USE_NEW_SCALARIS_OPS");
         if (WIKI_USE_NEW_SCALARIS_OPS != null) {
             Options.WIKI_USE_NEW_SCALARIS_OPS = Boolean.parseBoolean(WIKI_USE_NEW_SCALARIS_OPS);
         }
-        String WIKI_USE_BACKLINKS = config.getInitParameter("WIKI_USE_BACKLINKS");
+        final String WIKI_USE_BACKLINKS = config.getInitParameter("WIKI_USE_BACKLINKS");
         if (WIKI_USE_BACKLINKS != null) {
             Options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
+        }
+        final String WIKI_SAVEPAGE_RETRIES = config.getInitParameter("WIKI_SAVEPAGE_RETRIES");
+        if (WIKI_SAVEPAGE_RETRIES != null) {
+            Options.WIKI_SAVEPAGE_RETRIES = parseInt(WIKI_SAVEPAGE_RETRIES, Options.WIKI_SAVEPAGE_RETRIES);
+        }
+        final String WIKI_SAVEPAGE_RETRY_DELAY = config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY");
+        if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
+            Options.WIKI_SAVEPAGE_RETRY_DELAY = parseInt(WIKI_SAVEPAGE_RETRY_DELAY, Options.WIKI_SAVEPAGE_RETRY_DELAY);
         }
     }
     
@@ -669,9 +678,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
 
         page.setNotice(getParam_notice(request));
-        final int pageSaveTime = parseInt(getParam(request, "save_time"), -1);
-        if (pageSaveTime >= 0) {
-            page.addStat("saving " + title, pageSaveTime);
+        final String[] pageSaveTimes = getParam(request, "save_times").split(",");
+        for (String pageSaveTime : pageSaveTimes) {
+            final int pageSaveTimeInt = parseInt(pageSaveTime, -1);
+            if (pageSaveTimeInt >= 0) {
+                page.addStat("saving " + title, pageSaveTimeInt);
+            }
         }
         page.setError(getParam_error(request));
         page.setTitle(title);
@@ -1240,6 +1252,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         // save page or preview+edit page?
         if (request.getParameter("wpSave") != null) {
+            final String saveStatTitle = "saving " + title;
             // save page
             Contributor contributor = new Contributor();
             contributor.setIp(request.getRemoteAddr());
@@ -1248,8 +1261,26 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary);
             newRev.setUnpackedText(content);
 
-            SavePageResult result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "", namespace);
-            page.addStat("saving " + title, result.time);
+            SavePageResult result;
+            int retries = 0;
+            while (true) {
+                result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "", namespace);
+                page.addStat(saveStatTitle, result.time);
+                if (!result.success && retries < Options.WIKI_SAVEPAGE_RETRIES) {
+                    // check for conflicting edit on same page, do not retry in this case
+                    final Page oldPage = result.oldPage;
+                    if (oldPage != null && oldPage.getCurRev().getId() != oldVersion) {
+                        break;
+                    }
+                    try {
+                        Thread.sleep(Options.WIKI_SAVEPAGE_RETRY_DELAY);
+                    } catch (InterruptedException e) {
+                    }
+                    ++retries;
+                } else {
+                    break;
+                }
+            }
             for (WikiEventHandler handler: eventHandlers) {
                 handler.onPageSaved(result);
             }
@@ -1261,7 +1292,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("?title=");
                 redirectUrl.append(URLEncoder.encode(title, "UTF-8"));
                 redirectUrl.append("&notice=successfully saved page");
-                redirectUrl.append("&save_time=" + result.time);
+                redirectUrl.append("&save_times=" + StringUtils.join(page.getStats().get(saveStatTitle), ','));
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {
@@ -1359,9 +1390,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         user = connector.login(user);
 
         // set image width thumb size to 200px
-        List<Page> pages = user.queryImageinfo(new String[] { image }, 200);
+        List<info.bliki.api.Page> pages = user.queryImageinfo(new String[] { image }, 200);
         if (pages.size() == 1) {
-            Page imagePage = pages.get(0);
+            info.bliki.api.Page imagePage = pages.get(0);
 //            System.out.println("IMG-THUMB-URL: " + imagePage.getImageThumbUrl());
 //            System.out.println("IMG-URL: " + imagePage.getImageUrl());
 
