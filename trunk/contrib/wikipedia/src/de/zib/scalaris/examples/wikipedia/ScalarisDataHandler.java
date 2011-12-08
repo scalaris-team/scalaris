@@ -422,8 +422,12 @@ public class ScalarisDataHandler {
      */
     public static PageListResult getPagesLinkingTo(Connection connection,
             String title, final MyNamespace nsObject) {
-        return getPageList2(connection,
-                getBackLinksPageListKey(title, nsObject), false);
+        if (Options.WIKI_USE_BACKLINKS) {
+            return getPageList2(connection,
+                    getBackLinksPageListKey(title, nsObject), false);
+        } else {
+            return new PageListResult(new LinkedList<String>(), 0);
+        }
     }
 
     /**
@@ -712,7 +716,12 @@ public class ScalarisDataHandler {
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
             oldTpls = wikiModel.getTemplates();
-            oldLnks = wikiModel.getLinks();
+            if (Options.WIKI_USE_BACKLINKS) {
+                oldLnks = wikiModel.getLinks();
+            } else {
+                // use empty link lists to turn back-links off
+                oldLnks = new HashSet<String>();
+            }
             wikiModel.tearDown();
         } else {
             oldCats = new HashSet<String>();
@@ -737,8 +746,6 @@ public class ScalarisDataHandler {
         // still need it and it will be removed at the end of the method anyway
         // note: no need to normalise the pages, we will do so during the write/read key generation
         final Set<String> newCats = wikiModel.getCategories().keySet();
-        final Set<String> newTpls = wikiModel.getTemplates();
-        final Set<String> newLnks = wikiModel.getLinks();
         Difference catDiff = new Difference(oldCats, newCats,
                 new Difference.GetPageListAndCountKey() {
                     @Override
@@ -755,6 +762,7 @@ public class ScalarisDataHandler {
                                 nsObject);
                     }
                 });
+        final Set<String> newTpls = wikiModel.getTemplates();
         Difference tplDiff = new Difference(oldTpls, newTpls,
                 new Difference.GetPageListKey() {
                     @Override
@@ -764,6 +772,8 @@ public class ScalarisDataHandler {
                                 nsObject);
                     }
                 });
+        // use empty link lists to turn back-links off
+        final Set<String> newLnks = Options.WIKI_USE_BACKLINKS ? wikiModel.getLinks() : new HashSet<String>();
         Difference lnkDiff = new Difference(oldLnks, newLnks,
                 new Difference.GetPageListKey() {
                     @Override

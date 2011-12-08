@@ -139,6 +139,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (WIKI_USE_NEW_SCALARIS_OPS != null) {
             Options.WIKI_USE_NEW_SCALARIS_OPS = Boolean.parseBoolean(WIKI_USE_NEW_SCALARIS_OPS);
         }
+        String WIKI_USE_BACKLINKS = config.getInitParameter("WIKI_USE_BACKLINKS");
+        if (WIKI_USE_BACKLINKS != null) {
+            Options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
+        }
     }
     
     /**
@@ -906,7 +910,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         specialPages.put("Redirecting special pages", curSpecialPages);
         // Page tools
         curSpecialPages = new LinkedHashMap<String, String>();
-        curSpecialPages.put("Special:WhatLinksHere", "What links here");
+        if (Options.WIKI_USE_BACKLINKS) {
+            curSpecialPages.put("Special:WhatLinksHere", "What links here");
+        }
         specialPages.put("Page tools", curSpecialPages);
 
         StringBuilder content = new StringBuilder();

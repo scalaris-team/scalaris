@@ -24,8 +24,13 @@ public class Options {
      * Use the
      * {@link de.zib.scalaris.Transaction#addDelOnList(String, java.util.List, java.util.List)}
      * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)} for page
-     * lists.
+     * list updates.
      */
     public static boolean WIKI_USE_NEW_SCALARIS_OPS = false;
+    
+    /**
+     * Whether to support back-links ("what links here?") or not.
+     */
+    public static boolean WIKI_USE_BACKLINKS = true;
     
 }
