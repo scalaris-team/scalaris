@@ -1291,7 +1291,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 StringBuilder redirectUrl = new StringBuilder(256);
                 redirectUrl.append("?title=");
                 redirectUrl.append(URLEncoder.encode(title, "UTF-8"));
-                redirectUrl.append("&notice=successfully saved page");
+                redirectUrl.append("&notice=successfully%20saved%20page");
                 redirectUrl.append("&save_times=" + StringUtils.join(page.getStats().get(saveStatTitle), ','));
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
