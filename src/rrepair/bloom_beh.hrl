@@ -73,10 +73,11 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 %       k=Number of hash functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc  Calculates optimal number of hash functions - 
+% @doc  Calculates optimal number of hash functions for
+%       an M-bit large BloomFilter with a maximum of N Elements.
 %       prefers smaller values (truncates decimals)
 -spec calc_HF_num(integer(), integer()) -> pos_integer().
-calc_HF_num(M, N) when N =:= 0 -> 1;
+calc_HF_num(_, N) when N == 0 -> 1;
 calc_HF_num(M, N) when N > 0 ->
     Result = ln(2) * (M / N),
     if 
@@ -90,9 +91,9 @@ calc_HF_numEx(N, FPR) ->
     calc_HF_num(M, N).
 
 % @doc  Calculates leasts bit size of a bloom filter
-%       with a bounded false-positive rate up to MaxElements.
+%       with a bounded false-positive rate FPR up to N-Elements.
 -spec calc_least_size(integer(), float()) -> integer().
-calc_least_size(N, FPR) when N =:= 0 -> 1;
+calc_least_size(N, _) when N == 0 -> 1;
 calc_least_size(N, FPR) when N > 0 -> 
     erlang:round((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
