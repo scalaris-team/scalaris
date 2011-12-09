@@ -1643,7 +1643,8 @@ are supported:
   \item \code{gauge}: only stores the newest value of a time slot, e.g. for thermometers,
   \item \code{counter}: sums up all values inside a time slot,
   \item \code{timing}: records time spans and stores values to easily calculate e.g. the sum, the
-  standard deviation, the number of events, the min and max as well as a more detailed
+  standard deviation, the number of events, the min and max,
+  \item \code{timing_with_hist}: similar to \code{timing} but also records a more detailed
   (approximated) histogram of the data,
   \item \code{event}: records each event (including its time stamp) inside a time slot in a list
   (this should be rarely used as the amount of data stored may be very big).
