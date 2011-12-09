@@ -46,42 +46,42 @@ end_per_suite(Config) ->
 simple_create(_Config) ->
     Adds = [{20, 5}, {25, 6}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,20}, {0,0,30}, 6}]),
     ok.
 
 fill_test(_Config) ->
     Adds = [{20, 1}, {30, 2}, {40, 3}, {60, 5}],
     DB0 = rrd:create(10, 3, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,60}, {0,0,70}, 5}, {{0,0,40}, {0,0,50}, 3}]),
     ok.
 
 create_gauge(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 6}]),
     ok.
 
 create_counter(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, counter, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
     ok.
 
 create_event(_Config) ->
     Adds = [{20, "20"}, {25, "25"}, {30, "30"}, {42, "42"}],
     DB0 = rrd:create(10, 10, event, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1), [{{0,0,40}, {0,0,50}, [{42, "42"}]}, {{0,0,30}, {0,0,40}, [{30, "30"}]}, {{0,0,20}, {0,0,30}, [{20, "20"}, {25, "25"}]}]),
     ok.
 
 create_timing(_Config) ->
     Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1),
             [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[]}}},
              {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[]}}},
@@ -96,7 +96,7 @@ timestamp(_Config) ->
 add_nonexisting_timeslots(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, counter, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     DB2 = rrd:add_nonexisting_timeslots(DB0, DB1),
     ?equals(rrd:dump(DB2), [{{0,0,40}, {0,0,50}, 2}, {{0,0,30}, {0,0,40}, 1}, {{0,0,20}, {0,0,30}, 11}]),
     
@@ -114,7 +114,7 @@ add_nonexisting_timeslots(_Config) ->
 reduce_timeslots(_Config) ->
     Adds = [{20, 5}, {25, 6}, {30, 1}, {42, 2}],
     DB0 = rrd:create(10, 10, counter, {0,0,0}),
-    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    DB1 = lists:foldl(fun ?MODULE:apply/2, DB0, Adds),
     DB2 = rrd:reduce_timeslots(1, DB1),
     ?equals(rrd:dump(DB2), [{{0,0,40}, {0,0,50}, 2}]),
 
@@ -131,3 +131,10 @@ reduce_timeslots(_Config) ->
 
 apply({Time, Value}, DB) ->
     rrd:add(Time, Value, DB).
+
+%% @doc Performance evaluating of rrd:add_now/2 with a timing type.
+%%      Useful for profiling, e.g. with fprof.
+timing_perf() ->
+    Init = rrd:create(60 * 1000000, 1, {timing, count}),
+    _ = lists:foldl(fun(_, Old) -> rrd:add_now(1, Old) end, Init, lists:seq(1, 10000)),
+    ok.

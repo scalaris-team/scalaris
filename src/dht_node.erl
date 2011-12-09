@@ -215,7 +215,7 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
                 true ->
                     monitor:proc_set_value(
                       ?MODULE, "lookup_hops",
-                      fun(Old) -> monitor_lookup_update_fun(Old, Hops) end),
+                      fun(Old) -> rrd:add_now(Hops, Old) end),
                     gen_component:post_op(State, Msg);
                 false ->
                     % it is possible that we received the message due to a
@@ -513,6 +513,9 @@ on({zombie, Node}, State) ->
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
+    % 1m monitoring interval, only keep newest
+    monitor:proc_set_value(
+      ?MODULE, "lookup_hops", rrd:create(60 * 1000000, 1, {timing, count})),
     % get my ID (if set, otherwise chose a random ID):
     Id = case lists:keyfind({dht_node, id}, 1, Options) of
              {{dht_node, id}, IdX} -> IdX;
@@ -558,12 +561,3 @@ is_alive_fully_joined(State) ->
         (SlidePred =:= null orelse not slide_op:is_join(SlidePred, 'rcv'))
     catch _:_ -> false
     end.
-
--spec monitor_lookup_update_fun(Old::rrd:rrd() | undefined, Hops::non_neg_integer()) -> New::rrd:rrd().
-monitor_lookup_update_fun(Old, Hops) ->
-    Old2 = case Old of
-               % 1m monitoring interval, only keep newest
-               undefined -> rrd:create(60 * 1000000, 1, {timing, count});
-               _ -> Old
-           end,
-    rrd:add_now(Hops, Old2).

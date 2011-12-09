@@ -60,16 +60,8 @@ run_bench() ->
     Key2 = randoms:getRandomId(),
     ReqList = [{read, Key1}, {read, Key2}, {commit}],
     {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
-    monitor:proc_set_value(
-      ?MODULE, "read_read",
-      fun(Old) ->
-              Old2 = case Old of
-                         % 1m monitoring interval, only keep newest
-                         undefined -> rrd:create(60 * 1000000, 1, {timing, ms});
-                         _ -> Old
-                     end,
-              rrd:add_now(TimeInUs / 1000, Old2)
-      end).
+    monitor:proc_set_value(?MODULE, "read_read",
+                           fun(Old) -> rrd:add_now(TimeInUs / 1000, Old) end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
@@ -229,11 +221,14 @@ init(null) ->
              msg_delay:send_local(FirstDelay, self(), {bench}),
              msg_delay:send_local(get_gather_interval(), self(), {propagate})
     end,
+    % 1m monitoring interval, only keep newest
+    monitor:proc_set_value(
+      ?MODULE, "read_read", rrd:create(60 * 1000000, 1, {timing_with_hist, ms})),
     Now = os:timestamp(),
     State = #state{id = util:get_global_uid(),
-                   perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing, ms}, Now),
+                   perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
-                   perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now)},
+                   perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now)},
     {State, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

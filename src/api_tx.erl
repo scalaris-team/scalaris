@@ -81,7 +81,7 @@ req_list(TLog, ReqList) ->
       fun(Old) ->
               Old2 = case Old of
                          % 10s monitoring interval, only keep newest in the client process
-                         undefined -> rrd:create(10 * 1000000, 1, {timing, ms});
+                         undefined -> rrd:create(10 * 1000000, 1, {timing_with_hist, ms});
                          _ -> Old
                      end,
               rrd:add_now(TimeInUs / 1000, Old2)

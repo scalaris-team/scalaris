@@ -45,13 +45,16 @@
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
 % event: record every event (incl. timestamp) in a time slot,
-% timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x), histogram(x)}
--type timeseries_type() :: gauge | counter | event | {timing, us | ms | s | count}.
+% timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x)}
+% timing_with_hist: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x), histogram(x)}
+-type timeseries_type() :: gauge | counter | event | {timing | timing_with_hist, us | ms | s | count}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: util:time().
 -type internal_time() :: non_neg_integer().
 -type timespan() :: pos_integer().
 -type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).
+
+-type timing_type(T) :: {Sum::T, Sum2::T, Count::pos_integer(), Min::T, Max::T, Hist::histogram:histogram()}.
 
 -record(rrd, {slot_length   = ?required(rrd, slot_length)   :: timespan(),
               count         = ?required(rrd, count)         :: pos_integer(),
@@ -135,13 +138,19 @@ counter_update_fun(_Time, Old, New) -> Old + New.
 event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
 
--type timing_type(T) :: {Sum::T, Sum2::T, Count::pos_integer(), Min::T, Max::T, Hist::histogram:histogram()}.
 -spec timing_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
         -> timing_type(T) when is_subtype(T, number()).
 timing_update_fun(_Time, undefined, New) ->
+    {New, New*New, 1, New, New, histogram:create(0)};
+timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
+    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New), Hist}.
+
+-spec timing_with_hist_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
+        -> timing_type(T) when is_subtype(T, number()).
+timing_with_hist_update_fun(_Time, undefined, New) ->
     Hist = histogram:create(get_timing_hist_size()),
     {New, New*New, 1, New, New, histogram:add(New, Hist)};
-timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
+timing_with_hist_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
     {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New),
      histogram:add(New, Hist)}.
 
@@ -163,7 +172,9 @@ add(Time, Value, DB) ->
         event ->
             add_with(Time, Value, DB, fun event_update_fun/3);
         {timing, _} ->
-            add_with(Time, Value, DB, fun timing_update_fun/3)
+            add_with(Time, Value, DB, fun timing_update_fun/3);
+        {timing_with_hist, _} ->
+            add_with(Time, Value, DB, fun timing_with_hist_update_fun/3)
     end.
 
 % @doc Advances the stored timeslots (if necessary) to the given time.

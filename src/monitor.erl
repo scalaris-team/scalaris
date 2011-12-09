@@ -255,7 +255,7 @@ web_debug_info_dump_fun(DB, From_, To_, Value) ->
     Diff_in_s = timer:now_diff(To_, From_) div 1000000,
     ValueStr =
         case rrd:get_type(DB) of
-            {timing, Unit} ->
+            {Type, Unit} when Type =:= timing orelse Type =:= timing_with_hist ->
                 {Sum, Sum2, Count, Min, Max, Hist} = Value,
                 AvgPerS = Count / Diff_in_s,
                 Avg = Sum / Count, Avg2 = Sum2 / Count,
