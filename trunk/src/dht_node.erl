@@ -43,6 +43,8 @@
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
+      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),  
+            ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer()} |
       {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
       % DB subscriptions:
       {db_set_subscription, SubscrTuple::?DB:subscr_t()} |
@@ -271,6 +273,11 @@ on({get_key, Source_PID, SourceId, HashedKey}, State) ->
 
 on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
     Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, MaxChunkSize),
+    comm:send_local(Source_PID, {get_chunk_response, Chunk}),
+    State;
+
+on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) ->
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, FilterFun, ValueFun, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
