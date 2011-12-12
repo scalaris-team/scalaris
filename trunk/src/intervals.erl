@@ -299,8 +299,7 @@ is_well_formed_simple({interval, _LeftBr, _X, ?MINUS_INFINITY, ')'}) ->
 is_well_formed_simple({interval, _LeftBr, _X, ?PLUS_INFINITY, ')'}) ->
     true;
 is_well_formed_simple({interval, _LeftBr, X, Y, _RightBr}) ->
-    % same as: X=/=Y andalso not wraps_around(Interval)
-    not greater_equals_than(X, Y);
+    X < Y;
 is_well_formed_simple(all) -> true;
 is_well_formed_simple(_) -> false.
 
@@ -314,15 +313,15 @@ is_well_formed_simple(_) -> false.
 interval_sort(all, _Interval2) ->
     true;
 interval_sort({element, A}, {element, B}) ->
-    greater_equals_than(B, A);
+    B >= A;
 interval_sort({element, A}, {interval, _B0Br, B0, _B1, _B1Br}) ->
-    greater_equals_than(B0, A);
+    B0 >= A;
 interval_sort({interval, _A0Br, A0, _A1, _A1Br}, {element, B}) ->
-    greater_than(B, A0);
+    B > A0;
 interval_sort({interval, A0Br, A0, _A1, _A1Br} = A, {interval, B0Br, B0, _B1, _B1Br} = B) ->
     % beware of not accidentally making two intervals equal, which is defined
     % as A==B <=> interval_sort(A, B) andalso interval_sort(B, A)
-    greater_than(B0, A0) orelse
+    B0 > A0 orelse
         (A0 =:= B0 andalso A0Br =:= '[' andalso B0Br =:= '(') orelse
         (A0 =:= B0 andalso (not (A0Br =:= '(' andalso B0Br =:= '[')) andalso A =< B);
 interval_sort(_Interval1, _Interval2) ->
@@ -587,22 +586,14 @@ wraps_around(_LeftBr, _First, _Last, _RightBr) ->
 % @doc Begin &lt;= X &lt;= End
 % precondition Begin &lt;= End
 -spec is_between(BeginBr::left_bracket(), Begin::key(), X::key(), End::key(), EndBr::right_bracket()) -> boolean().
-is_between('[', Begin, X, End, ']') ->
-    greater_equals_than(X, Begin) andalso greater_equals_than(End, X);
 is_between('[', Begin, X, End, ')') ->
-    greater_equals_than(X, Begin) andalso greater_than(End, X);
+    X >= Begin andalso End > X;
+is_between('[', Begin, X, End, ']') ->
+    X >= Begin andalso End >= X;
 is_between('(', Begin, X, End, ']') ->
-    greater_than(X, Begin) andalso greater_equals_than(End, X);
+    X > Begin andalso End >= X;
 is_between('(', Begin, X, End, ')') ->
-    greater_than(X, Begin) andalso greater_than(End, X).
-
-%% @doc A &gt; B
--spec greater_than(A::key(), B::key()) -> boolean().
-greater_than(X, Y) -> X > Y.
-
-%% @doc A &gt;= B
--spec greater_equals_than(A::key(), B::key()) -> boolean().
-greater_equals_than(A, B) -> (A =:= B) orelse greater_than(A, B).
+    X > Begin andalso End > X.
 
 %% @doc X and Y are adjacent and Y follows X
 -spec is_left_of(interval(), interval()) -> boolean().
