@@ -62,7 +62,8 @@
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 bulkowner_reply_timer   = null :: null | reference(),
-                bulkowner_reply_ids     = []   :: [util:global_uid()]
+                bulkowner_reply_ids     = []   :: [util:global_uid()],
+                monitor_proc            = ?required(state, monitor_proc) :: pid()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -74,7 +75,8 @@ new(RT, RMState, DB) ->
            join_time = now(),
            db = DB,
            tx_tp_db = tx_tp:init(),
-           proposer = pid_groups:get_my(paxos_proposer)
+           proposer = pid_groups:get_my(paxos_proposer),
+           monitor_proc = pid_groups:get_my(dht_node_monitor)
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -129,11 +131,12 @@ new(RT, RMState, DB) ->
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
-         (state(), rm_state) -> rm_loop:state().
+         (state(), rm_state) -> rm_loop:state();
+         (state(), monitor_proc) -> pid().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange}, Key) ->
+           db_range=DBRange, monitor_proc=MonitorProc}, Key) ->
     case Key of
         rt         -> RT;
         rt_size    -> ?RT:get_size(RT);
@@ -166,7 +169,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         slide_succ -> SlideSucc;
         msg_fwd    -> lists:append([slide_op:get_msg_fwd(SlidePred),
                                     slide_op:get_msg_fwd(SlideSucc)]);
-        rm_state   -> RMState
+        rm_state   -> RMState;
+        monitor_proc -> MonitorProc
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
