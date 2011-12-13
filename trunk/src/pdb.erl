@@ -30,52 +30,69 @@
 -export([new/2, get/2, set/2, delete/2, tab2list/1]).
 -include("scalaris.hrl").
 
-%% put/get variant
+-ifdef(PDB_ERL).
 -type tableid() :: atom().
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+-type tableid() :: tid() | atom().
+-endif.
 -spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
                               public | protected | private |
                               named_table | {keypos, integer()} |
                               {heir, pid(), term()} | {heir,none} |
                               {write_concurrency, boolean()}]) -> tableid().
+-ifdef(PDB_ERL).
 new(TableName, _Params) ->
     TableName.
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+new(TableName, Params) ->
+    ets:new(TableName, Params).
+-endif.
 
 -spec get(term(), tableid()) -> tuple() | undefined.
+-ifdef(PDB_ERL).
 get(Key, _TableName) ->
     erlang:get(Key).
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+get(Key, TableName) ->
+    case ets:lookup(TableName, Key) of
+        [] -> undefined;
+        [Entry] -> Entry
+    end.
+-endif.
 
 -spec set(tuple(), tableid()) -> ok.
+-ifdef(PDB_ERL).
 set(NewTuple, _TableName) ->
     erlang:put(element(1, NewTuple), NewTuple),
     ok.
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+set(NewTuple, TableName) ->
+    ets:insert(TableName, NewTuple),
+    ok.
+-endif.
 
 -spec delete(term(), tableid()) -> ok.
+-ifdef(PDB_ERL).
 delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+delete(Key, TableName) ->
+    ets:delete(TableName, Key),
+    ok.
+-endif.
 
 -spec tab2list(tableid()) -> [term()].
+-ifdef(PDB_ERL).
 tab2list(_TableName) ->
     [ X || {_,X} <- erlang:get()].
-
-%% %% ets variant (only for debugging! has performance issues with msg_delay)
-%% -type tableid() :: tid() | atom().
-%% new(TableName, Params) ->
-%%     Name = ets:new(TableName, Params).
-%%
-%% get(Key, TableName) ->
-%%     case ets:lookup(TableName, Key) of
-%%         [] -> undefined;
-%%         [Entry] -> Entry
-%%     end.
-%%
-%% set(NewTuple, TableName) ->
-%%     ets:insert(TableName, NewTuple),
-%%     ok.
-%%
-%% delete(Key, TableName) ->
-%%     ets:delete(TableName, Key),
-%%     ok.
-%%
-%% tab2list(TableName) ->
-%%   ets:tab2list(TableName).
+-endif.
+-ifdef(PDB_ETS). %% @hidden
+tab2list(TableName) ->
+  ets:tab2list(TableName).
+-endif.
