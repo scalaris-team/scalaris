@@ -35,6 +35,9 @@
 % functions sending monitoring values directly to the monitor process
 -export([monitor_set_value/3, client_monitor_set_value/3]).
 
+% reporting to the monitor for manually-maintained rrd records
+-export([check_report/4]).
+
 -export([get_rrds/2]).
 
 -type key() :: string().

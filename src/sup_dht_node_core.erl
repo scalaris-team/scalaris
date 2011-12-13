@@ -49,12 +49,16 @@ init({DHTNodeGroup, Options}) ->
     DHTNodeModule = config:read(dht_node),
     DHTNode = util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
+    DHTNodeMonitor = util:sup_worker_desc(
+                       dht_node_monitor, dht_node_monitor, start_link,
+                       [DHTNodeGroup, Options]),
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [DHTNodeGroup]),
     {ok, {{one_for_all, 10, 1},
           [
            PaxosProcesses,
+           DHTNodeMonitor,
            DHTNode,
            TX
           ]}}.

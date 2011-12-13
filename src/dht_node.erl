@@ -215,9 +215,8 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
         []    ->
             case dht_node_state:is_db_responsible(Key, State) of
                 true ->
-                    monitor:proc_set_value(
-                      ?MODULE, "lookup_hops",
-                      fun(Old) -> rrd:add_now(Hops, Old) end),
+                    comm:send_local(dht_node_state:get(State, monitor_proc),
+                                    {lookup_hops, Hops}),
                     gen_component:post_op(State, Msg);
                 false ->
                     % it is possible that we received the message due to a
@@ -520,9 +519,6 @@ on({zombie, Node}, State) ->
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
-    % 1m monitoring interval, only keep newest
-    monitor:proc_set_value(
-      ?MODULE, "lookup_hops", rrd:create(60 * 1000000, 1, {timing, count})),
     % get my ID (if set, otherwise chose a random ID):
     Id = case lists:keyfind({dht_node, id}, 1, Options) of
              {{dht_node, id}, IdX} -> IdX;
