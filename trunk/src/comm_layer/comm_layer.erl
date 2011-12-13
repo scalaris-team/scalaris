@@ -37,11 +37,11 @@
 %% @doc send message via tcp, if target is not in same Erlang VM.
 -spec send(process_id(), comm:message(), comm:send_options()) -> ok.
 send(Target, Message, Options) ->
-    IsLocal = is_local(Target),
-    case is_valid(Target) of
-        true when IsLocal ->
+    % integrated checks is_valid/1, is_local/1 and make_local/1
+    {MyIP, MyPort} = comm_server:get_local_address_port(),
+    case Target of
+        {MyIP, MyPort, LocalTarget} ->
             ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
-            LocalTarget = make_local(Target),
             PID = case is_pid(LocalTarget) of
                       true -> LocalTarget;
                       false -> whereis(LocalTarget)
@@ -68,7 +68,7 @@ send(Target, Message, Options) ->
                     end
             end,
             ok;
-        true ->
+        {{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} ->
             comm_server:send(Target, Message, Options);
         _ ->
             log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
