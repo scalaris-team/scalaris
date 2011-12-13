@@ -1,29 +1,28 @@
 # norootforbuild
 
-%define pkg_version 1
-Name:           scalaris-one-svn
+%define pkg_version 2328
+Name:           scalaris-svn-one
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
 License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
-Source0:        %{name}-%{version}.tar.gz
+Source0:        scalaris-svn-%{version}.tar.gz
 #Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ruby >= 1.8
-%if 0%{?mandriva_version} || 0%{?mdkversion}
+
 Requires:   ruby >= 1.8
-%else
-Requires:   ruby(abi) >= 1.8
-%endif
-Requires:   rubygems
-Requires:   rubygem-json >= 1.4.0
-Requires:   rubygem-sequel
-Requires:   rubygem-sqlite3
-Requires:   rubygem-json
-Requires:   rubygem-sinatra
-Requires:   rubygem-nokogiri
+BuildRequires: rubygems
+Requires:      rubygems
+Requires:      rubygem-json >= 1.4.0
+Requires:      rubygem-sequel
+Requires:      rubygem-sqlite3
+Requires:      rubygem-json
+Requires:      rubygem-sinatra
+Requires:      rubygem-nokogiri
+Requires:      rubygem-oca
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -64,39 +63,39 @@ overlay with a non-blocking Paxos commit protocol for transaction
 processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
-%package -n scalaris-one-manager-svn
+%package -n scalaris-svn-one-manager
 Conflicts:  scalaris-one-manager
+Conflicts:  scalaris-one-frontend scalaris-svn-one-frontend
 Summary:    Manager for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
-Requires:   jre >= 1.6.0
+Requires:   scalaris-svn
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-one-manager-svn
+%description -n scalaris-svn-one-manager
 Manager for scalaris on Opennebula
 
-%package -n scalaris-one-frontend-svn
+%package -n scalaris-svn-one-frontend
 Conflicts:  scalaris-one-frontend
+Conflicts:  scalaris-svn-one-manager scalaris-one-manager
 Summary:    Frontend for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
-Requires:   jre >= 1.6.0
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-one-frontend-svn
+%description -n scalaris-svn-one-frontend
 Frontend for scalaris on Opennebula
 
-%package -n scalaris-one-client-svn
+%package -n scalaris-svn-one-client
 Conflicts:  scalaris-one-client
 Summary:    Client for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
-Requires:   jre >= 1.6.0
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else
@@ -107,7 +106,7 @@ BuildArch:  noarch
 Client for scalaris on Opennebula
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n scalaris-svn-%{version}
 
 %build
 ./configure --prefix=%{_prefix} \
@@ -138,6 +137,13 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -n scalaris-svn-one-manager
 %defattr(-,root,root)
+%dir %{_sysconfdir}/scalaris
+%dir %{_prefix}/lib/scalaris
+%dir %{_prefix}/lib/scalaris/contrib
+%dir %{_prefix}/lib/scalaris/contrib/opennebula
+%{_sysconfdir}/init.d/scalaris-contrail
+%{_sysconfdir}/init.d/vmcontext
+%{_sysconfdir}/scalaris/init-contrail.sh
 %{_prefix}/lib/scalaris/contrib/opennebula/start-manager.sh
 %{_prefix}/lib/scalaris/contrib/opennebula/manager.rb
 %{_prefix}/lib/scalaris/contrib/opennebula/database.rb
@@ -147,9 +153,16 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris/contrib/opennebula/scalarishelper.rb
 %{_prefix}/lib/scalaris/contrib/opennebula/*.erb
 %{_prefix}/lib/scalaris/contrib/opennebula/sc_views
+%{_prefix}/lib/scalaris/contrib/opennebula/ts_manager.rb
+%{_prefix}/lib/scalaris/contrib/opennebula/ts_frontend.rb
+
+## remove ts_*.rb !!!
 
 %files -n scalaris-svn-one-frontend
 %defattr(-,root,root)
+%dir %{_prefix}/lib/scalaris
+%dir %{_prefix}/lib/scalaris/contrib
+%dir %{_prefix}/lib/scalaris/contrib/opennebula
 %{_prefix}/lib/scalaris/contrib/opennebula/frontend.rb
 %{_prefix}/lib/scalaris/contrib/opennebula/database.rb
 %{_prefix}/lib/scalaris/contrib/opennebula/hadoophelper.rb
@@ -161,6 +174,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -n scalaris-svn-one-client
 %defattr(-,root,root)
+%dir %{_prefix}/lib/scalaris
+%dir %{_prefix}/lib/scalaris/contrib
+%dir %{_prefix}/lib/scalaris/contrib/opennebula
 %{_prefix}/lib/scalaris/contrib/opennebula/cli.rb
 
 %changelog
