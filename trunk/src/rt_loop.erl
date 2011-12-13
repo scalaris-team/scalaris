@@ -29,7 +29,7 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
          get_base_interval/0, check_config/0,
-         get_id/1, get_pred/1, get_succ/1, get_neighb/1, get_rt/1, set_rt/2,
+         get_neighb/1, get_rt/1, set_rt/2,
          rm_send_update/4]).
 
 -ifdef(with_export_type_support).
@@ -195,18 +195,6 @@ on_active(Message, State) ->
                 TriggerState::trigger:state()) -> state_active().
 new_state(Neighbors, RT, TriggerState) ->
     {Neighbors, RT, TriggerState}.
-
--spec get_id(State::state_active()) -> ?RT:key().
-get_id({Neighbors, _RT, _TriggerState}) ->
-    nodelist:nodeid(Neighbors).
-
--spec get_pred(State::state_active()) -> node:node_type().
-get_pred({Neighbors, _RT, _TriggerState}) ->
-    nodelist:pred(Neighbors).
-
--spec get_succ(State::state_active()) -> node:node_type().
-get_succ({Neighbors, _RT, _TriggerState}) ->
-    nodelist:succ(Neighbors).
 
 -spec get_neighb(State::state_active()) -> nodelist:neighborhood().
 get_neighb({Neighbors, _RT, _TriggerState}) ->
