@@ -42,12 +42,12 @@
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
     {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
-    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
-    {{get_rrds_response, [{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]}} |
+    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
+    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}]}} |
     {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
-    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}]}} |
+    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}]}} |
     {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
-    {get_rrds, [{Process::atom(), Key::string()},...], SourcePid::comm:mypid()}.
+    {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -60,7 +60,7 @@ run_bench() ->
     Key2 = randoms:getRandomId(),
     ReqList = [{read, Key1}, {read, Key2}, {commit}],
     {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
-    monitor:proc_set_value(?MODULE, "read_read",
+    monitor:proc_set_value(?MODULE, 'read_read',
                            fun(Old) -> rrd:add_now(TimeInUs / 1000, Old) end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
@@ -99,7 +99,7 @@ on({bulkowner_deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, St
     ?TRACE1(_Msg, State),
     This = comm:this_with_cookie({SourcePid, Id, Range, Parents}),
     comm:send_local(pid_groups:get_my(monitor),
-                    {get_rrds, [{?MODULE, "read_read"}, {dht_node, "lookup_hops"}], This}),
+                    {get_rrds, [{?MODULE, 'read_read'}, {dht_node, 'lookup_hops'}], This}),
     State;
 
 on({{get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
@@ -107,7 +107,7 @@ on({{get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
     MyMonData = process_rrds(DBs),
     This = comm:this_with_cookie({SourcePid, Id, Range, Parents, MyMonData}),
     comm:send_local(pid_groups:pid_of("clients_group", monitor),
-                    {get_rrds, [{api_tx, "req_list"}], This}),
+                    {get_rrds, [{api_tx, 'req_list'}], This}),
     State;
 
 on({{get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Msg, State) ->
@@ -128,20 +128,20 @@ on({bulkowner_gather, Id, Target, Msgs, Parents}, State) ->
                      lists:foldl(
                        fun(Data2, {PerfRR2, PerfLH2, PerfTX2}) ->
                                case Data2 of
-                                   {?MODULE, "read_read", PerfRR3} ->
+                                   {?MODULE, 'read_read', PerfRR3} ->
                                        {timing_update_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
-                                   {dht_node, "lookup_hops", PerfLH3} ->
+                                   {dht_node, 'lookup_hops', PerfLH3} ->
                                        {PerfRR2, timing_update_fun(0, PerfLH2, PerfLH3), PerfTX2};
-                                   {api_tx, "req_list", PerfTX3} ->
+                                   {api_tx, 'req_list', PerfTX3} ->
                                        {PerfRR2, PerfLH2, timing_update_fun(0, PerfTX2, PerfTX3)}
                                end
                        end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
              end, {undefined, undefined, undefined}, Msgs),
     
     Msg = {send_to_group_member, monitor_perf,
-           {gather_stats_response, [{?MODULE, "read_read", PerfRR},
-                                    {dht_node, "lookup_hops", PerfLH},
-                                    {api_tx, "req_list", PerfTX}]}},
+           {gather_stats_response, [{?MODULE, 'read_read', PerfRR},
+                                    {dht_node, 'lookup_hops', PerfLH},
+                                    {api_tx, 'req_list', PerfTX}]}},
     bulkowner:send_reply(Id, Target, Msg, Parents, pid_groups:get_my(dht_node)),
     State;
 
@@ -152,15 +152,15 @@ on({bulkowner_reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Lead
         lists:foldl(
           fun(Data, A) ->
                   case Data of
-                      {?MODULE, "read_read", PerfRR} ->
+                      {?MODULE, 'read_read', PerfRR} ->
                           DB = A#state.perf_rr,
                           T = rrd:get_current_time(DB),
                           A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun timing_update_fun/3)};
-                      {dht_node, "lookup_hops", PerfLH} ->
+                      {dht_node, 'lookup_hops', PerfLH} ->
                           DB = A#state.perf_lh,
                           T = rrd:get_current_time(DB),
                           A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)};
-                      {api_tx, "req_list", PerfTX} ->
+                      {api_tx, 'req_list', PerfTX} ->
                           DB = A#state.perf_tx,
                           T = rrd:get_current_time(DB),
                           A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun timing_update_fun/3)}
@@ -180,11 +180,11 @@ on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
     MyData = lists:flatten(
                [begin
                     Value = case FullKey of
-                                {?MODULE, "read_read"} ->
+                                {?MODULE, 'read_read'} ->
                                     AllNodes#state.perf_rr;
-                                {dht_node, "lookup_hops"} ->
+                                {dht_node, 'lookup_hops'} ->
                                     AllNodes#state.perf_lh;
-                                {api_tx, "req_list"} ->
+                                {api_tx, 'req_list'} ->
                                     AllNodes#state.perf_tx;
                                 _ -> undefined
                             end,
@@ -223,7 +223,7 @@ init(null) ->
     end,
     % 1m monitoring interval, only keep newest
     monitor:proc_set_value(
-      ?MODULE, "read_read", rrd:create(60 * 1000000, 1, {timing_with_hist, ms})),
+      ?MODULE, 'read_read', rrd:create(60 * 1000000, 1, {timing_with_hist, ms})),
     Now = os:timestamp(),
     State = #state{id = util:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
@@ -298,8 +298,8 @@ integrate_value(OtherDB, MyDB) ->
 is_leader(MyRange) ->
     intervals:in(?RT:hash_key("0"), MyRange).
 
--spec process_rrds(DBs::[{Process::atom(), Key::string(), DB::rrd:rrd() | undefined}]) ->
-          [{Process::atom(), Key::string(), Data::rrd:timing_type(number())}].
+-spec process_rrds(DBs::[{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]) ->
+          [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}].
 process_rrds(DBs) ->
     lists:flatten(
       [begin

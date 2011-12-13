@@ -36,9 +36,9 @@ get_node_info() ->
 get_node_performance() ->
     Monitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, "req_list"}]) of
+        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}]) of
             []                           -> {[], [], [], [], [], [], []};
-            [{api_tx, "req_list", Data}] -> Data
+            [{api_tx, 'req_list', Data}] -> Data
         end,
     [{latency_avg, AvgMsD},
      {latency_stddev, StddevMsD}].
@@ -53,9 +53,9 @@ get_service_info() ->
 get_service_performance() ->
     Monitor = pid_groups:find_a(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, "req_list"}]) of
+        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}]) of
             []                           -> {[], [], [], [], [], [], []};
-            [{api_tx, "req_list", Data}] -> Data
+            [{api_tx, 'req_list', Data}] -> Data
         end,
     [{latency_avg, AvgMsD},
      {latency_stddev, StddevMsD}].

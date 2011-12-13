@@ -1620,6 +1620,7 @@ troubleshooting, please refer to our FAQs at
 
 \section{Monitoring Statistics (\texttt{monitor}, \texttt{rrd})}
 \erlmoduleindex{monitor}
+\svnrev{r2546}
 
 The \erlmodule{monitor} module offers several methods to gather meaningful
 statistics using the \code{rrd()} data type defined in \erlmodule{rrd}.
@@ -1654,13 +1655,17 @@ The \erlmodule{monitor} offers functions to conveniently store and retrieve
 such values. It is also started as a process in each \code{dht_node} and
 \code{basic_services} group as well as inside each \code{clients_group}.
 This process ultimately stores the whole rrd() structure
-There are two paradigms how values can be stored:
+There are three paradigms how values can be stored:
 \begin{enumerate}
   \item Values are gathered in the process that is generating the values.
         Inside this process, the \code{rrd()} is stored in the erlang
         dictionary.
         Whenever a new time slot is started, the values will be
         reported to the monitor process of the gathering process' group.
+  \item Values are gathered in the process that is generating the values.
+        Inside this process, the \code{rrd()} is handled manually.
+        After changing the \code{rrd()}, a manual check for reporting needs to
+        be issued using \erlfun{monitor}{check\_report}{/4}.
   \item Values are immediately send to the monitor process where it undergoes
         the same procedures until it is finally stored and available to other
         processes. This is especially useful if the process generating the
@@ -1674,11 +1679,11 @@ uses a \code{counter} data type:
 
 \begin{lstlisting}
 % initialise the monitor with an empty rrd() using a 60s monitoring interval
-monitor:proc_set_value(?MODULE, "shuffle", rrd:create(60 * 1000000, 3, counter)),
+monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)),
 % update the value by adding one
-monitor:proc_set_value(?MODULE, "shuffle", fun(Old) -> rrd:add_now(1, Old) end),
+monitor:proc_set_value(?MODULE, 'shuffle', fun(Old) -> rrd:add_now(1, Old) end),
 % check regularly whether to report the data to the monitor:
-monitor:proc_check_timeslot(?MODULE, "shuffle")
+monitor:proc_check_timeslot(?MODULE, 'shuffle')
 \end{lstlisting}
 
 The first two parameters of \erlfun{monitor}{proc\_set\_value}{/3} define the
@@ -1693,7 +1698,7 @@ This is how forwarding works (taken from \erlmodule{api\_tx}):
 
 \begin{lstlisting}
 monitor:client_monitor_set_value(
-  ?MODULE, "req_list",
+  ?MODULE, 'req_list',
   fun(Old) ->
     Old2 = case Old of
              % 10s monitoring interval, only keep newest in the client process

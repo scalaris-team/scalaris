@@ -40,7 +40,11 @@
 
 -export([get_rrds/2]).
 
--type key() :: string().
+-ifdef(with_export_type_support).
+-export_type([key/0]).
+-endif.
+
+-type key() :: atom().
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.
 

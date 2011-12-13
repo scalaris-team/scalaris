@@ -218,7 +218,7 @@ is_valid({failed, _}) ->
 
 %%%-----------------------------Monitor-------------------------------
 
--spec getMonitorData(Monitor::pid(), [{Process::atom(), Key::string()}]) -> [{Process::atom(), Key::string(), rrd:rrd()}].
+-spec getMonitorData(Monitor::pid(), [{Process::atom(), Key::monitor:key()}]) -> [{Process::atom(), Key::monitor:key(), rrd:rrd()}].
 getMonitorData(Monitor, Keys) ->
     comm:send_local(Monitor, {get_rrds, Keys, comm:this()}),
     receive
@@ -256,8 +256,8 @@ get_utc_local_diff_s() ->
     Local_s - UTC_s.
 
 -type time_list(Value) :: [[Time1_Value2::float() | Value]].
--spec getMonitorStats(Monitor::pid(), [{Process::atom(), Key::string()}])
-        -> [{Process::atom(), Key::string(),
+-spec getMonitorStats(Monitor::pid(), [{Process::atom(), Key::monitor:key()}])
+        -> [{Process::atom(), Key::monitor:key(),
              {CountD::time_list(non_neg_integer()),
               CountPerSD::time_list(float()), AvgD::time_list(float()),
               MinD::time_list(float()), MaxD::time_list(float()),
