@@ -77,7 +77,7 @@ req_list(ReqList) ->
 req_list(TLog, ReqList) ->
     {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/2, [TLog, ReqList]),
     monitor:client_monitor_set_value(
-      ?MODULE, "req_list",
+      ?MODULE, 'req_list',
       fun(Old) ->
               Old2 = case Old of
                          % 10s monitoring interval, only keep newest in the client process

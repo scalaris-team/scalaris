@@ -33,7 +33,7 @@
 -spec on(message(), state()) -> state().
 on({lookup_hops, Hops}, {OldLookupHops}) ->
     NewLookupHops = rrd:add_now(Hops, OldLookupHops),
-    monitor:check_report(dht_node, "lookup_hops", OldLookupHops, NewLookupHops),
+    monitor:check_report(dht_node, 'lookup_hops', OldLookupHops, NewLookupHops),
     {NewLookupHops}.
 
 %% @doc initialisation

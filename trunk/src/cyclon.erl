@@ -169,7 +169,7 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     request_node_details([node, pred, succ]),
     TriggerState2 = trigger:now(TriggerState),
     msg_queue:send(QueuedMessages),
-    monitor:proc_set_value(?MODULE, "shuffle", rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
+    monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
     gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2},
                                  on_active);
 
@@ -207,7 +207,7 @@ on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState} = State)  ->
     NewCache =
         case check_state(State) of
             fail -> Cache;
-            _    -> monitor:proc_set_value(?MODULE, "shuffle",
+            _    -> monitor:proc_set_value(?MODULE, 'shuffle',
                                            fun(Old) -> rrd:add_now(1, Old) end),
                     enhanced_shuffle(Cache, Node)
         end,

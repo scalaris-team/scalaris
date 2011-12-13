@@ -123,7 +123,7 @@ fetch_rrd_metrics() ->
     case pid_groups:pid_of("clients_group", monitor) of
         failed -> [];
         ClientMonitor ->
-            case monitor:get_rrds(ClientMonitor, [{api_tx, "req_list"}]) of
+            case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
                 [] -> [];
                 [{_, _, RRD}] ->
                     case RRD of
