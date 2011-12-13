@@ -152,14 +152,10 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node       -> nodelist:node(rm_loop:get_neighbors(RMState));
         node_id    -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         my_range   -> Neighbors = rm_loop:get_neighbors(RMState),
-                      node:mk_interval_between_nodes(
-                        nodelist:pred(Neighbors),
-                        nodelist:node(Neighbors));
+                      nodelist:node_range(Neighbors);
         db_range   -> DBRange;
         succ_range -> Neighbors = rm_loop:get_neighbors(RMState),
-                      node:mk_interval_between_nodes(
-                        nodelist:node(Neighbors),
-                        nodelist:succ(Neighbors));
+                      nodelist:succ_range(Neighbors);
         join_time  -> JoinTime;
         db         -> DB;
         tx_tp_db   -> TxTpDb;
@@ -189,9 +185,7 @@ is_responsible(Key, #state{rm_state=RMState}) ->
         true -> false;
         _ ->
             Neighbors = rm_loop:get_neighbors(RMState),
-            intervals:in(Key,
-                         node:mk_interval_between_nodes(
-                           nodelist:pred(Neighbors), nodelist:node(Neighbors)))
+            intervals:in(Key, nodelist:node_range(Neighbors))
     end.
 
 %% @doc Checks whether the node is responsible for the given key either by its

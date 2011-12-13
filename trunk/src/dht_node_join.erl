@@ -886,7 +886,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     cyclon:activate(),
     vivaldi:activate(),
     dc_clustering:activate(),
-    gossip:activate(node:mk_interval_between_nodes(Pred, Me)),
+    gossip:activate(nodelist:node_range(Neighbors)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),

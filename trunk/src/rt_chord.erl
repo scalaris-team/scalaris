@@ -149,17 +149,19 @@ dump(RT) ->
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
--spec stabilize(MyId::key() | key_t(), Succ::node:node_type(), OldRT::rt(),
+-spec stabilize(Neighbors::nodelist:neighborhood(), OldRT::rt(),
                 Index::index(), Node::node:node_type()) -> NewRT::rt().
-stabilize(Id, Succ, RT, Index, Node) ->
+stabilize(Neighbors, RT, Index, Node) ->
+    MyId = nodelist:nodeid(Neighbors),
+    Succ = nodelist:succ(Neighbors),
     case (node:id(Succ) =/= node:id(Node))   % reached succ?
         andalso (not intervals:in(           % there should be nothing shorter
                    node:id(Node),            %   than succ
-                   node:mk_interval_between_ids(Id, node:id(Succ)))) of
+                   nodelist:succ_range(Neighbors))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
-            NextKey = calculateKey(Id, next_index(Index)),
-            CurrentKey = calculateKey(Id, Index),
+            NextKey = calculateKey(MyId, next_index(Index)),
+            CurrentKey = calculateKey(MyId, Index),
             case CurrentKey =/= NextKey of
                 true ->
                     Msg = {rt_get_node, comm:this(), next_index(Index)},
@@ -232,9 +234,8 @@ handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
     State;
 handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     OldRT = rt_loop:get_rt(State),
-    Id = rt_loop:get_id(State),
-    Succ = rt_loop:get_succ(State),
-    NewRT = stabilize(Id, Succ, OldRT, Index, Node),
+    Neighbors = rt_loop:get_neighb(State),
+    NewRT = stabilize(Neighbors, OldRT, Index, Node),
     check(OldRT, NewRT, rt_loop:get_neighb(State), true),
     rt_loop:set_rt(State, NewRT);
 handle_custom_message(_Message, _State) ->
