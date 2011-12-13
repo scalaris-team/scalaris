@@ -138,35 +138,39 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc}, Key) ->
     case Key of
-        rt         -> RT;
-        rt_size    -> ?RT:get_size(RT);
-        neighbors  -> rm_loop:get_neighbors(RMState);
-        succlist   -> nodelist:succs(rm_loop:get_neighbors(RMState));
-        succ       -> nodelist:succ(rm_loop:get_neighbors(RMState));
-        succ_id    -> node:id(nodelist:succ(rm_loop:get_neighbors(RMState)));
-        succ_pid   -> node:pidX(nodelist:succ(rm_loop:get_neighbors(RMState)));
-        predlist   -> nodelist:preds(rm_loop:get_neighbors(RMState));
-        pred       -> nodelist:pred(rm_loop:get_neighbors(RMState));
-        pred_id    -> node:id(nodelist:pred(rm_loop:get_neighbors(RMState)));
-        pred_pid   -> node:pidX(nodelist:pred(rm_loop:get_neighbors(RMState)));
-        node       -> nodelist:node(rm_loop:get_neighbors(RMState));
-        node_id    -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
-        my_range   -> Neighbors = rm_loop:get_neighbors(RMState),
+        rt           -> RT;
+        rt_size      -> ?RT:get_size(RT);
+        neighbors    -> rm_loop:get_neighbors(RMState);
+        my_range     -> Neighbors = rm_loop:get_neighbors(RMState),
                       nodelist:node_range(Neighbors);
-        db_range   -> DBRange;
-        succ_range -> Neighbors = rm_loop:get_neighbors(RMState),
+        db_range     -> DBRange;
+        succ_range   -> Neighbors = rm_loop:get_neighbors(RMState),
                       nodelist:succ_range(Neighbors);
-        join_time  -> JoinTime;
-        db         -> DB;
-        tx_tp_db   -> TxTpDb;
-        proposer   -> Proposer;
-        load       -> ?DB:get_load(DB);
-        slide_pred -> SlidePred;
-        slide_succ -> SlideSucc;
-        msg_fwd    -> lists:append([slide_op:get_msg_fwd(SlidePred),
-                                    slide_op:get_msg_fwd(SlideSucc)]);
-        rm_state   -> RMState;
-        monitor_proc -> MonitorProc
+        msg_fwd      -> MsgFwdPred = slide_op:get_msg_fwd(SlidePred),
+                      MsgFwdSucc = slide_op:get_msg_fwd(SlideSucc),
+                      if MsgFwdPred =:= [] -> MsgFwdSucc;
+                         MsgFwdSucc =:= [] -> MsgFwdPred;
+                         true -> lists:append(MsgFwdPred, MsgFwdSucc)
+                      end;
+        db           -> DB;
+        tx_tp_db     -> TxTpDb;
+        proposer     -> Proposer;
+        slide_pred   -> SlidePred;
+        slide_succ   -> SlideSucc;
+        rm_state     -> RMState;
+        monitor_proc -> MonitorProc;
+        succlist     -> nodelist:succs(rm_loop:get_neighbors(RMState));
+        succ         -> nodelist:succ(rm_loop:get_neighbors(RMState));
+        succ_id      -> node:id(nodelist:succ(rm_loop:get_neighbors(RMState)));
+        succ_pid     -> node:pidX(nodelist:succ(rm_loop:get_neighbors(RMState)));
+        predlist     -> nodelist:preds(rm_loop:get_neighbors(RMState));
+        pred         -> nodelist:pred(rm_loop:get_neighbors(RMState));
+        pred_id      -> node:id(nodelist:pred(rm_loop:get_neighbors(RMState)));
+        pred_pid     -> node:pidX(nodelist:pred(rm_loop:get_neighbors(RMState)));
+        node         -> nodelist:node(rm_loop:get_neighbors(RMState));
+        node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
+        join_time    -> JoinTime;
+        load         -> ?DB:get_load(DB)
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
