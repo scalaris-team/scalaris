@@ -359,7 +359,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                     [self(), Module, On]),
             ok;
         GenComponentMessage
-          when is_tuple(GenComponentMessage),
+          when is_tuple(GenComponentMessage) andalso
                '$gen_component' =:= element(1, GenComponentMessage) ->
             NewComponentState =
                 handle_gen_component_message(GenComponentMessage, Module, On,
@@ -731,14 +731,14 @@ bp_state_hold_back(BPState, Message) ->
                   -> component_state().
 bp_step_done(Module, On, Message, ComponentState) ->
     {Options, Slowest, BPState} = ComponentState,
-    case {bp_state_get_bpactive(BPState),
-          bp_state_get_bpstepped(BPState)} of
-        {true, true} ->
+    case bp_state_get_bpactive(BPState) andalso
+          bp_state_get_bpstepped(BPState) of
+        true ->
             comm:send_local(bp_state_get_bpstepper(BPState),
                             {'$gen_component', bp, breakpoint, step_done,
                              self(), Module, On, Message}),
             TmpBPState = bp_state_set_bpstepped(BPState, false),
             NextBPState = bp_state_set_bpstepper(TmpBPState, unknown),
             {Options, Slowest, NextBPState};
-        _ -> {Options, Slowest, BPState}
+        _ -> ComponentState
     end.
