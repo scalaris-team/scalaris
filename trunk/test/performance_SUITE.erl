@@ -100,18 +100,18 @@ empty(_Config) ->
 
 ets_ordset_lookup1(_Config) ->
     _ = ets:new(ets_ordset_lookup1, [ordered_set, private, named_table]),
-    ets:insert(ets_ordset_lookup1, {123456, "foo"}),
+    ets:insert(ets_ordset_lookup1, {"performance", "abc"}),
     iter(count(), fun() ->
-                          ets:lookup(ets_ordset_lookup1, 123456)
+                          ets:lookup(ets_ordset_lookup1, "performance")
                   end, "ets(ordered_set):lookup"),
     ets:delete(ets_ordset_lookup1),
     ok.
 
 ets_ordset_lookup2(_Config) ->
     Table = ets:new(ets_ordset_lookup2, [ordered_set, private]),
-    ets:insert(Table, {123456, "foo"}),
+    ets:insert(Table, {"performance", "abc"}),
     iter(count(), fun() ->
-                          ets:lookup(Table, 123456)
+                          ets:lookup(Table, "performance")
                   end, "ets(ordered_set_unnamed):lookup"),
     ets:delete(Table),
     ok.
@@ -119,7 +119,7 @@ ets_ordset_lookup2(_Config) ->
 ets_ordset_insert1(_Config) ->
     _ = ets:new(ets_ordset_insert1, [ordered_set, private, named_table]),
     iter(count(), fun() ->
-                          ets:insert(ets_ordset_insert1, {performance, "abc"})
+                          ets:insert(ets_ordset_insert1, {"performance", "abc"})
                   end, "ets(ordered_set):insert"),
     ets:delete(ets_ordset_insert1),
     ok.
@@ -127,36 +127,36 @@ ets_ordset_insert1(_Config) ->
 ets_ordset_insert2(_Config) ->
     Table = ets:new(ets_ordset_insert2, [ordered_set, private, named_table]),
     iter(count(), fun() ->
-                          ets:insert(Table, {performance, "abc"})
+                          ets:insert(Table, {"performance", "abc"})
                   end, "ets(ordered_set_unnamed):insert"),
     ets:delete(Table),
     ok.
 
 erlang_get(_Config) ->
-    erlang:put(performance, "foo"),
+    erlang:put("performance", "abc"),
     iter(count(), fun() ->
-                          erlang:get(performance)
+                          erlang:get("performance")
                   end, "erlang:get"),
     ok.
 
 erlang_put(_Config) ->
     iter(count(), fun() ->
-                          erlang:put(performance, "abc")
+                          erlang:put("performance", "abc")
                   end, "erlang:put"),
     ok.
 
 pdb_get(_Config) ->
     pdb:new(pdb_get, [ordered_set, private, named_table]),
-    pdb:set({performance, "foo"}, pdb_get),
+    pdb:set({"performance", "abc"}, pdb_get),
     iter(count(), fun() ->
-                          pdb:get(performance, pdb_get)
+                          pdb:get("performance", pdb_get)
                   end, "pdb:get"),
     ok.
 
 pdb_set(_Config) ->
     pdb:new(pdb_set, [ordered_set, private, named_table]),
     iter(count(), fun() ->
-                          pdb:set({performance, "abc"}, pdb_set)
+                          pdb:set({"performance", "abc"}, pdb_set)
                   end, "pdb:set"),
     ok.
 
