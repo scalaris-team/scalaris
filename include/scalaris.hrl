@@ -86,6 +86,10 @@
 -define(REP_BLOOM, bloom). % bloom filter implemenation selection 
 -define(REP_HFS, hfs_lhsp_md5). %HashFunctionSet selection for usage by bloom filter
 
+% Back-end of the pdb module
+-define(PDB_ERL, true). % erlang put and get (process dictionary)
+%-define(PDB_ETS, true). % may have performance issues with msg_delay
+
 % for debugging:
 % allows the retrieval of the current function and line number a process is in
 % (process dictionary, key test_server_loc)
