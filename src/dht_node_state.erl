@@ -185,12 +185,7 @@ has_left(#state{rm_state=RMState}) ->
 %%      the next call.
 -spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
 is_responsible(Key, #state{rm_state=RMState}) ->
-    case rm_loop:has_left(RMState) of
-        true -> false;
-        _ ->
-            Neighbors = rm_loop:get_neighbors(RMState),
-            intervals:in(Key, nodelist:node_range(Neighbors))
-    end.
+    rm_loop:is_responsible(Key, RMState).
 
 %% @doc Checks whether the node is responsible for the given key either by its
 %%      current range or for a range the node is temporarily responsible for
@@ -199,7 +194,9 @@ is_responsible(Key, #state{rm_state=RMState}) ->
 %%      Beware of race conditions sing the neighborhood may have changed at
 %%      the next call.
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_db_responsible(Key, State = #state{db_range=DBRange}) ->
+is_db_responsible(Key, State = #state{db_range=[]}) ->
+    is_responsible(Key, State);
+is_db_responsible(Key, State = #state{db_range=DBRange=[_|_]}) ->
     is_responsible(Key, State) orelse
         lists:any(fun({Interval, _Id}) ->
                           intervals:in(Key, Interval)

@@ -37,7 +37,7 @@
 
 -export([init/3, on/2,
          leave/0, update_id/1,
-         get_neighbors/1, has_left/1,
+         get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
          notify_slide_finished/1,
          % received at dht_node, (also) handled here:
@@ -102,6 +102,14 @@ get_neighbors({RM_State, _HasLeft, _SubscrTable}) ->
 %%      ID).
 -spec has_left(state()) -> boolean().
 has_left({_RM_State, HasLeft, _SubscrTable}) -> HasLeft.
+
+%% @doc Convenience method checking whether the current node is responsible
+%%      for the given key, i.e. has not left and Key is in range.
+%%      Improves performance over two calls in dht_node_state/is_responsible/2.
+-spec is_responsible(Key::intervals:key(), state()) -> boolean().
+is_responsible(Key, {RM_State, HasLeft, _SubscrTable}) ->
+    not HasLeft andalso
+        intervals:in(Key, nodelist:node_range(?RM:get_neighbors(RM_State))).
 
 
 %% @doc Notifies the successor and predecessor that the current dht_node is
