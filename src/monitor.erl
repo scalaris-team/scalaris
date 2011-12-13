@@ -48,7 +48,7 @@
 -type internal_key() :: {'$monitor$', Process::atom(), Key::string()}.
 -type table_index() :: {Process::atom(), Key::key()}.
 
--type state() :: Table::tid() | atom().
+-type state() :: {Table::tid() | atom(), ApiTxReqList::rrd:rrd()}.
 -type message() ::
     {report_rrd, Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()} |
     {report_single, Process::atom(), Key::key(),
@@ -192,7 +192,7 @@ get_rrds(MonitorPid, Keys) ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
+on({report_rrd, Process, Key, OldValue, _NewValue}, {Table, _ApiTxReqList} = State) ->
     % note: reporting is always done when a new time slot is created
     % -> use the values from the old value
     TableIndex = {Process, Key},
@@ -207,31 +207,36 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, Table) ->
              end,
     NewData = rrd:add_nonexisting_timeslots(MyData, OldValue),
     ets:insert(Table, {TableIndex, NewData}),
-    Table;
+    State;
 
-on({report_single, Process, Key, NewValue_or_UpdateFun}, Table) ->
+on({report_single, api_tx, 'req_list', TimeInMs}, {Table, OldApiTxReqList}) when is_number(TimeInMs) ->
+    NewApiTxReqList = rrd:add_now(TimeInMs, OldApiTxReqList),
+    check_report(api_tx, 'req_list', OldApiTxReqList, NewApiTxReqList),
+    {Table, NewApiTxReqList};
+
+on({report_single, Process, Key, NewValue_or_UpdateFun}, State) ->
     proc_set_value(Process, Key, NewValue_or_UpdateFun),
-    Table;
+    State;
 
-on({check_timeslots}, Table) ->
+on({check_timeslots}, State) ->
     proc_check_all_timeslot(),
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
-    Table;
+    State;
 
-on({get_rrds, TableIndexes, SourcePid}, Table) ->
+on({get_rrds, TableIndexes, SourcePid}, {Table, _ApiTxReqList} = State) ->
     MyData = [{Process, Key, get_rrd(Table, TableIndex)}
              || {Process, Key} = TableIndex <- TableIndexes],
     comm:send(SourcePid, {get_rrds_response, MyData}),
-    Table;
+    State;
 
-on({web_debug_info, Requestor}, Table) ->
+on({web_debug_info, Requestor}, {Table, _ApiTxReqList} = State) ->
     Keys = get_all_keys(Table),
     GroupedLast5 = [begin
                         KeyData5 = get_last_n(Table, Key, 5),
                         web_debug_info_merge_values(Key, KeyData5)
                     end || Key <- Keys],
     comm:send_local(Requestor, {web_debug_info_reply, [{"last 5 records per key:", ""} | GroupedLast5]}),
-    Table.
+    State.
 
 -spec get_rrd(Table::tid() | atom(), TableIndex::table_index()) -> rrd:rrd() | undefined.
 get_rrd(Table, TableIndex) ->
@@ -307,7 +312,9 @@ start_link(DHTNodeGroup) ->
 init(null) ->
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     TableName = pid_groups:my_groupname() ++ ":monitor",
-    ets:new(list_to_atom(TableName), [ordered_set, protected]).
+    {ets:new(list_to_atom(TableName), [ordered_set, protected]),
+     % 10s monitoring interval, only keep newest in the client process
+     rrd:create(10 * 1000000, 1, {timing_with_hist, ms})}.
 
 %% @doc Checks whether config parameters of the monitor process exist and are
 %%      valid.

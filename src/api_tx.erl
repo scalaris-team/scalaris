@@ -76,16 +76,7 @@ req_list(ReqList) ->
 -spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
 req_list(TLog, ReqList) ->
     {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/2, [TLog, ReqList]),
-    monitor:client_monitor_set_value(
-      ?MODULE, 'req_list',
-      fun(Old) ->
-              Old2 = case Old of
-                         % 10s monitoring interval, only keep newest in the client process
-                         undefined -> rrd:create(10 * 1000000, 1, {timing_with_hist, ms});
-                         _ -> Old
-                     end,
-              rrd:add_now(TimeInUs / 1000, Old2)
-      end),
+    monitor:client_monitor_set_value(api_tx, 'req_list', TimeInUs / 1000),
     Result.
 
 %% @doc Perform a read inside a transaction.
