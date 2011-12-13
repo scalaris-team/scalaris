@@ -422,6 +422,8 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                             [self(), Module, On]),
                     ok;
+                {'$gen_component', [{post_op, Msg1}], NewState} ->
+                    handle_post_op(Msg1, Module, On, NewState, TmpComponentState);
                 {'$gen_component', Commands, NewState} ->
                     %% This is not counted as a bp_step
                     case lists:keyfind(on_handler, 1, Commands) of
@@ -430,24 +432,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                         false ->
                             case lists:keyfind(post_op, 1, Commands) of
                                 {post_op, Msg1} ->
-                                    {_Opts, _Slowest, BPState} = TmpComponentState,
-                                    case bp_state_get_bpactive(BPState) of
-                                        true ->
-                                            ?TRACE_BP_STEPS("~n"
-                                                            "*** Trigger post-op...~n"
-                                                            "    Process: ~p (~p)~n"
-                                                            "    Handler: ~p:~p/2~n"
-                                                            "    Message: ~.0p~n",
-                                                            [self(), pid_groups:group_and_name_of(self()),
-                                                             Module, On,
-                                                             Msg1]),
-                                            self() ! {'$gen_component',
-                                                      bp, breakpoint, step,
-                                                      bp_state_get_bpstepper(BPState)},
-                                            ok;
-                                        false -> ok
-                                    end,
-                                    loop(Module, On, Msg1, NewState, TmpComponentState);
+                                    handle_post_op(Msg1, Module, On, NewState, TmpComponentState);
                                 false ->
                                     % let's fail since the Config list was either
                                     % empty or contained an invalid entry
@@ -470,7 +455,26 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                 end
     end.
 
--spec handle_gen_component_message(Message::tuple(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
+-spec handle_post_op(Message::comm:message(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
+handle_post_op(Message, Module, On, State, ComponentState) ->
+    {_Opts, _Slowest, BPState} = ComponentState,
+    case bp_state_get_bpactive(BPState) of
+        true ->
+            ?TRACE_BP_STEPS("~n"
+                            "*** Trigger post-op...~n"
+                            "    Process: ~p (~p)~n"
+                            "    Handler: ~p:~p/2~n"
+                            "    Message: ~.0p~n",
+                            [self(), pid_groups:group_and_name_of(self()),
+                             Module, On, Msg1]),
+            self() ! {'$gen_component', bp, breakpoint, step,
+                      bp_state_get_bpstepper(BPState)},
+            ok;
+        false -> ok
+    end,
+    loop(Module, On, Message, State, ComponentState).
+
+-spec handle_gen_component_message(Message::comm:message(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
 handle_gen_component_message(Message, Module, On, State, ComponentState) ->
     {_Options, _Slowest, BPState} = ComponentState,
     case Message of
