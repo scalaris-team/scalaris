@@ -722,8 +722,7 @@ rm_my_range_changed(OldNeighbors, NewNeighbors, _IsSlide) ->
                         OldNeighbors::nodelist:neighborhood(),
                         NewNeighbors::nodelist:neighborhood()) -> ok.
 rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
-    NewRange = node:mk_interval_between_nodes(nodelist:pred(NewNeighbors),
-                                              nodelist:node(NewNeighbors)),
+    NewRange = nodelist:node_range(NewNeighbors),
     comm:send_local(Pid, {update_range, NewRange}).
 
 %% @doc Checks whether config parameters of the gossip process exist and are
