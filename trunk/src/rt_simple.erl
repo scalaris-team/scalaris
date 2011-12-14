@@ -59,10 +59,10 @@ hash_key_(Key) ->
 %% @doc Generates a random node id, i.e. a random 128-bit number.
 get_random_node_id() ->
     case config:read(key_creator) of
-        random -> hash_key_(randoms:getRandomId());
+        random -> hash_key_(randoms:getRandomString());
         random_with_bit_mask ->
             {Mask1, Mask2} = config:read(key_creator_bitmask),
-            (hash_key_(randoms:getRandomId()) band Mask2) bor Mask1
+            (hash_key_(randoms:getRandomString()) band Mask2) bor Mask1
     end.
 %% userdevguide-end rt_simple:get_random_node_id
 

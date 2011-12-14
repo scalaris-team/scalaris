@@ -270,7 +270,7 @@ start(Module, Args, Options, Supervisor) ->
             pid_groups:join_as(GroupId, PidName),
             log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
             ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                         ++ randoms:getRandomId()), self()),
+                                         ++ randoms:getRandomString()), self()),
             case lists:keyfind(erlang_register, 1, Options) of
                 false when is_atom(PidName) ->
                     %% we can give this process a better name for
@@ -295,7 +295,7 @@ start(Module, Args, Options, Supervisor) ->
                 catch(erlang:register(Name, self()));
             false ->
                 ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                             ++ randoms:getRandomId()), self()),
+                                             ++ randoms:getRandomString()), self()),
                 ok
         end,
     _ = case lists:member(wait_for_init, Options) of

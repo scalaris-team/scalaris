@@ -74,7 +74,7 @@ new_db(FileName, TokeOptions) ->
          end,
     case toke_drv:new(DB) of
         ok ->
-            RandomName = randoms:getRandomId(),
+            RandomName = randoms:getRandomString(),
             SubscrName = "db_" ++ RandomName ++ ":subscribers",
             case toke_drv:open(DB, FileName, TokeOptions) of
                 ok     -> {{DB, FileName},

@@ -44,7 +44,7 @@ add_node_at_id(Id) ->
 
 -spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
-    DhtNodeId = randoms:getRandomId(),
+    DhtNodeId = randoms:getRandomString(),
     Desc = util:sup_supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [[{my_sup_dht_node_id, DhtNodeId} | Options]]),

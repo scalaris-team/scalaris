@@ -37,7 +37,7 @@
 %% @doc Initializes a new database.
 new_() ->
     % ets prefix: DB_ + random name
-    RandomName = randoms:getRandomId(),
+    RandomName = randoms:getRandomString(),
     DBName = "db_" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
     % better protected? All accesses would have to go to DB-process

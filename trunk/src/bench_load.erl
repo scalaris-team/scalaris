@@ -45,8 +45,8 @@ spawn_new() ->
           end).
 
 worker() ->
-    Key1 = randoms:getRandomId(),
-    Key2 = randoms:getRandomId(),
+    Key1 = randoms:getRandomString(),
+    Key2 = randoms:getRandomString(),
     read_read_iter(Key1, Key2, 1000, 0),
     worker().
 

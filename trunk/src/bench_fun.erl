@@ -184,11 +184,11 @@ retries() -> 10.
 
 -spec get_and_init_key() -> string().
 get_and_init_key() ->
-    Key = randoms:getRandomId(),
+    Key = randoms:getRandomString(),
     get_and_init_key(Key, retries(), _TriedKeys = 1).
 
 get_and_init_key(_Key, 0, TriedKeys) ->
-    NewKey = randoms:getRandomId(),
+    NewKey = randoms:getRandomString(),
     io:format("geT_and_init_key choosing new key and retrying~n"),
     timer:sleep(randoms:rand_uniform(1, 10000 * TriedKeys)),
     get_and_init_key(NewKey, retries(), TriedKeys + 1);
