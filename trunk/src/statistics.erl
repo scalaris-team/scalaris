@@ -51,7 +51,7 @@ get_memory_usage(Ring) ->
 
 -spec get_max_memory_usage(Ring::ring()) -> node_details:memory().
 get_max_memory_usage(Ring) ->
-    lists:foldl(fun (X, Sum) -> util:max(X, Sum) end, 0,
+    lists:foldl(fun (X, Sum) -> erlang:max(X, Sum) end, 0,
                 lists:map(fun get_memory/1, Ring)).
 
 -spec get_load_std_deviation(Ring::ring()) -> float().

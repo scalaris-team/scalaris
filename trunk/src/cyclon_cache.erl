@@ -225,7 +225,7 @@ replace(MyCache, _MyCacheSize, ReceivedCache, SendCache, TargetSize) ->
     % trim MyC1 so it has enough space for all elements of ReceivedCache
     ReceivedCacheSize = cyclon_cache:size(ReceivedCache),
     MyC2 = trim(MyC1, MyC1Size, TargetSize - ReceivedCacheSize),
-    MyC2Size = util:min(MyC1Size, TargetSize - ReceivedCacheSize),
+    MyC2Size = erlang:min(MyC1Size, TargetSize - ReceivedCacheSize),
     % add all received elements to MyC2
     MyC3 = MyC2 ++ ReceivedCache,
     MyC3Size = MyC2Size + ReceivedCacheSize,

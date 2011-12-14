@@ -122,10 +122,10 @@ on({send, DestPid, Message, Options}, State) ->
                     if MQL > 5 ->
                             %% start message bundle for sending
                             %% io:format("MQL ~p~n", [MQL]),
-                            MaxBundle = util:max(200, MQL div 100),
+                            MaxBundle = erlang:max(200, MQL div 100),
                             T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
                             T2 = set_msg_queue_len(T1, 1),
-                            set_desired_bundle_size(T2, util:min(MQL,MaxBundle));
+                            set_desired_bundle_size(T2, erlang:min(MQL,MaxBundle));
                        true ->
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},

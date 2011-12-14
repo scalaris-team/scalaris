@@ -112,5 +112,5 @@ collect(ThreadsLeft, N, Mean, M2, Min, Max, AggAborts) ->
             Delta = Time - Mean,
             NewMean = Mean + Delta / (N + 1),
             collect(ThreadsLeft - 1, N + 1, NewMean, M2 + Delta*(Time - NewMean),
-                    util:min(Time, Min), util:max(Time, Max), AggAborts + Aborts)
+                    erlang:min(Time, Min), erlang:max(Time, Max), AggAborts + Aborts)
     end.
