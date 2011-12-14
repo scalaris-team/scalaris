@@ -556,6 +556,11 @@ handle_breakpoint(Message, State, ComponentState) ->
     wait_for_bp_leave(Message, State, ComponentState, BPActive).
 
 -spec bp_active(comm:message(), any(), component_state()) -> boolean().
+bp_active(_Message, _State,
+          {_Options, _Slowest,
+           {[] = _BPs, false = _BPActive, _HB_BP_Ops, _BPStepped, _StepperPid}}
+          = _ComponentState) ->
+    false;
 bp_active(Message, State,
           {Options, Slowest,
            {BPs, BPActive, HB_BP_Ops, BPStepped, StepperPid}} = _ComponentState) ->
