@@ -243,11 +243,8 @@ timing_update_fun(_Time, Old, undefined) ->
     Old;
 timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
                   {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
-    NewHist2 = lists:foldl(fun({V, C}, Acc) ->
-                                  histogram:add(V, C, Acc)
-                          end, Hist, histogram:get_data(NewHist)),
     {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
-     erlang:min(Min, NewMin), erlang:max(Max, NewMax), NewHist2}.
+     erlang:min(Min, NewMin), erlang:max(Max, NewMax), histogram:merge(Hist, NewHist)}.
 
 -spec check_timeslots(#state{}) -> #state{}.
 check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH, perf_tx = PerfTX}) ->

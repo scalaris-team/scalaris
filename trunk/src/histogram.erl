@@ -25,7 +25,7 @@
 -endif.
 
 % external API
--export([create/1, add/2, add/3, get_data/1]).
+-export([create/1, add/2, add/3, get_data/1, merge/2]).
 
 % private API
 -export([resize/1, insert/2, find_smallest_interval/1, merge_interval/2]).
@@ -57,6 +57,15 @@ add(Value, Count, Histogram = #histogram{data = OldData}) ->
 get_data(Histogram) ->
     Histogram#histogram.data.
 
+%% @doc Merges the given two histograms by adding every data point of Hist2
+%%      to Hist1.
+-spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
+merge(Hist1 = #histogram{data = OldData}, Hist2) ->
+    NewData = lists:foldl(fun({Value, Count}, Acc) ->
+                                  insert({Value, Count}, Acc)
+                          end, OldData, get_data(Hist2)),
+    resize(Hist1#histogram{data = NewData}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % private
@@ -81,7 +90,7 @@ insert({Value, Count}, [{Value2, Count2} | Rest]) ->
     case Value < Value2 of
         true ->
             [{Value, Count}, {Value2, Count2} | Rest];
-         false ->
+        false ->
             [{Value2, Count2} | insert({Value, Count}, Rest)]
     end.
 
