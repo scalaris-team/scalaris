@@ -35,7 +35,8 @@
 -type data_item() :: {float(), pos_integer()}.
 -type data_list() :: list(data_item()).
 -record(histogram, {size = ?required(histogram, size):: non_neg_integer(),
-                    data = [] :: data_list()}).
+                    data = [] :: data_list(),
+                    data_size = 0 :: non_neg_integer()}).
 
 -opaque histogram() :: #histogram{}.
 
@@ -50,8 +51,9 @@ add(Value, Histogram) ->
 -spec add(Value::float(), Count::pos_integer(), Histogram::histogram()) -> histogram().
 add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
-add(Value, Count, Histogram = #histogram{data = OldData}) ->
-    resize(Histogram#histogram{data = insert({Value, Count}, OldData)}).
+add(Value, Count, Histogram = #histogram{data = OldData, data_size = OldDataSize}) ->
+    resize(Histogram#histogram{data = insert({Value, Count}, OldData),
+                               data_size = OldDataSize + 1}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
@@ -60,11 +62,10 @@ get_data(Histogram) ->
 %% @doc Merges the given two histograms by adding every data point of Hist2
 %%      to Hist1.
 -spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
-merge(Hist1 = #histogram{data = OldData}, Hist2) ->
-    NewData = lists:foldl(fun({Value, Count}, Acc) ->
-                                  insert({Value, Count}, Acc)
-                          end, OldData, get_data(Hist2)),
-    resize(Hist1#histogram{data = NewData}).
+merge(Hist1 = #histogram{data = Hist1Data, data_size = Hist1DataSize},
+      Hist2 = #histogram{data_size = Hist2DataSize}) ->
+    NewData = lists:foldl(fun insert/2, Hist1Data, get_data(Hist2)),
+    resize(Hist1#histogram{data = NewData, data_size = Hist1DataSize + Hist2DataSize}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -72,45 +73,50 @@ merge(Hist1 = #histogram{data = OldData}, Hist2) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec resize(Histogram::histogram()) -> histogram().
-resize(Histogram = #histogram{data = Data, size = ExpectedSize}) ->
-    ActualSize = length(Data),
+resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
     if
         ActualSize > ExpectedSize ->
-            SmallestInterval = find_smallest_interval(Data),
-            NewHistogram = Histogram#histogram{data = merge_interval(SmallestInterval, Data)},
+            MinSecondValue = find_smallest_interval(Data),
+            NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
+                                               data_size = ActualSize - 1},
             resize(NewHistogram);
         true ->
             Histogram
     end.
 
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
-insert({Value, Count}, []) ->
-    [{Value, Count}];
-insert({Value, Count}, [{Value2, Count2} | Rest]) ->
-    case Value < Value2 of
-        true ->
-            [{Value, Count}, {Value2, Count2} | Rest];
-        false ->
-            [{Value2, Count2} | insert({Value, Count}, Rest)]
-    end.
+insert(DataItem, []) ->
+    [DataItem];
+insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value < Value2 ->
+    [DataItem | Data];
+insert(DataItem, [DataItem2 | Rest]) ->
+    [DataItem2 | insert(DataItem, Rest)].
 
-%@doc PRE: length(Data) >= 2
--spec find_smallest_interval(Data::data_list()) -> float().
+%% @doc Finds the smallest interval between two consecutive values and returns
+%%      the second value (in the list's order).
+%%      PRE: length(Data) >= 2
+-spec find_smallest_interval(Data::data_list()) -> MinSecondValue::float().
 find_smallest_interval([{Value, _}, {Value2, _} | Rest]) ->
-    find_smallest_interval_loop(Value2 - Value, Value2, Rest).
+    find_smallest_interval_loop(Value2 - Value, Value2, Value2, Rest).
 
--spec find_smallest_interval_loop(MinInterval::float(), LastValue::float(), Data::data_list()) -> float().
-find_smallest_interval_loop(MinInterval, _LastValue, []) ->
-    MinInterval;
-find_smallest_interval_loop(MinInterval, LastValue, [{Value, _} | Rest]) ->
-    find_smallest_interval_loop(erlang:min(MinInterval, Value - LastValue), Value, Rest).
+-spec find_smallest_interval_loop(MinInterval::float(), MinSecondValue::float(), LastValue::float(), Data::data_list()) -> MinSecondValue::float().
+find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
+    MinSecondValue;
+find_smallest_interval_loop(MinInterval, MinSecondValue, LastValue, [{Value, _} | Rest]) ->
+    Diff = Value - LastValue,
+    case MinInterval =< Diff of
+        true -> NewMinInterval = MinInterval,
+                NewMinSecondValue = MinSecondValue;
+        _    -> NewMinInterval = Diff,
+                NewMinSecondValue = Value
+    end,
+    find_smallest_interval_loop(NewMinInterval, NewMinSecondValue, Value, Rest).
 
-%@doc PRE: length(Data) >= 2
--spec merge_interval(Interval::float(), Data::data_list()) -> data_list().
-merge_interval(Interval, [{Value, Count}, {Value2, Count2} | Rest]) ->
-    case Value2 - Value of
-        Interval ->
-            [{(Value*Count + Value2*Count2) / (Count + Count2), Count + Count2} | Rest];
-        _ ->
-            [{Value, Count} | merge_interval(Interval, [{Value2, Count2} | Rest])]
-    end.
+%% @doc Merges two consecutive values if the second of them is MinSecondValue.
+%%      Stops after the first match.
+%%      PRE: length(Data) >= 2, two consecutive values with the given difference
+-spec merge_interval(MinSecondValue::float(), Data::data_list()) -> data_list().
+merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
+    [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
+merge_interval(MinSecondValue, [DataItem | Rest]) ->
+    [DataItem | merge_interval(MinSecondValue, Rest)].

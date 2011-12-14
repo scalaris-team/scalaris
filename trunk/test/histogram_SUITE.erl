@@ -27,7 +27,8 @@ all()   -> [
             resize,
             insert,
             find_smallest_interval,
-            merge_interval
+            merge_interval,
+            perf_add
            ].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
@@ -60,10 +61,13 @@ insert(_Config) ->
     ok.
 
 find_smallest_interval(_Config) ->
-    H = histogram:create(10),
-    Values = [3.5, 3.0, 2.0, 1.0],
-    H2 = lists:foldl(fun histogram:add/2, H, Values),
-    ?equals(0.5, histogram:find_smallest_interval(histogram:get_data(H2))),
+    H1a = histogram:create(10),
+    Values1a = [3.5, 3.0, 2.0, 1.0],
+    H1b = lists:foldl(fun histogram:add/2, H1a, Values1a),
+    ?equals(3.5, histogram:find_smallest_interval(histogram:get_data(H1b))),
+    Values2a = [4.0, 2.5, 2.0, 1.0],
+    H2b = lists:foldl(fun histogram:add/2, H1a, Values2a),
+    ?equals(2.5, histogram:find_smallest_interval(histogram:get_data(H2b))),
     ok.
 
 merge_interval(_Config) ->
@@ -72,6 +76,13 @@ merge_interval(_Config) ->
     H2 = lists:foldl(fun histogram:add/2, H, Values),
     MinInterval = histogram:find_smallest_interval(histogram:get_data(H2)),
     H3 = histogram:merge_interval(MinInterval, histogram:get_data(H2)),
-    ?equals(0.5, MinInterval),
+    ?equals(3.5, MinInterval),
     ?equals(H3, [{1.0,1}, {2.0,1}, {3.25,2}]),
+    ok.
+
+perf_add(_Config) ->
+    Hist = histogram:create(10),
+    AddIntFun = fun(I, AccH) -> histogram:add(float(I), AccH) end,
+    Hist2 = performance_SUITE:iter2_foldl(performance_SUITE:count(), AddIntFun, Hist, "histogram:add (1)"),
+    _Hist3 = performance_SUITE:iter2_foldl(performance_SUITE:count(), AddIntFun, Hist2, "histogram:add (2)"),
     ok.
