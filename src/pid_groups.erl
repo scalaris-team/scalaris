@@ -105,7 +105,7 @@
 %% @doc create a new group with a random name.
 -spec new() -> groupname().
 new() ->
-    randoms:getRandomId().
+    randoms:getRandomString().
 
 %% @doc create a new group with a given prefix.
 -spec new(string()) -> groupname().

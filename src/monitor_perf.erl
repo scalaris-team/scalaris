@@ -56,8 +56,8 @@
 
 -spec run_bench() -> ok.
 run_bench() ->
-    Key1 = randoms:getRandomId(),
-    Key2 = randoms:getRandomId(),
+    Key1 = randoms:getRandomString(),
+    Key2 = randoms:getRandomString(),
     ReqList = [{read, Key1}, {read, Key2}, {commit}],
     {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
     monitor:proc_set_value(?MODULE, 'read_read',

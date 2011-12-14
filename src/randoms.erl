@@ -22,16 +22,21 @@
 
 -include("scalaris.hrl").
 
--export([start/0, stop/0, getRandomId/0, rand_uniform/2]).
+-export([start/0, stop/0, getRandomString/0, getRandomInt/0, rand_uniform/2]).
 
 %% @doc Starts the crypto module's server.
 -spec start() -> ok.
 start() -> crypto:start().
 
-%% @doc Generates a random Id in the range 1 =&lt; Id &lt; 2^32
--spec getRandomId() -> string().
-getRandomId() ->
-    integer_to_list(rand_uniform(1, 16#100000000)).
+%% @doc Generates a random string in the range 1 =&lt; Id &lt; 2^32
+-spec getRandomString() -> string().
+getRandomString() ->
+    integer_to_list(getRandomInt()).
+
+%% @doc Generates a random integer in the range 1 =&lt; Id &lt; 2^32
+-spec getRandomInt() -> pos_integer().
+getRandomInt() ->
+    rand_uniform(1, 16#100000000).
 
 %% @doc Generates a random number N, Lo =&lt; N &lt; Hi using the crypto library
 %%      pseudo-random number generator.

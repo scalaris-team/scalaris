@@ -98,7 +98,7 @@ my_process_list(ServiceGroup, Options) ->
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}]
                      end,
-    DhtNodeId = randoms:getRandomId(),
+    DhtNodeId = randoms:getRandomString(),
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNode = util:sup_supervisor_desc(DhtNodeId, sup_dht_node, start_link,
                                        [[{my_sup_dht_node_id, DhtNodeId}
