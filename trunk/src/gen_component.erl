@@ -547,23 +547,22 @@ gc_state_bp_hold_back({Options, Slowest, BPState}, Message) ->
 
 -spec handle_breakpoint(comm:message(), any(), component_state())
                            -> component_state().
+handle_breakpoint(_Message, _State, {_,_,BPState} = ComponentState)
+  when element(1, BPState) =:= []
+       andalso element(2, BPState) =:= false ->
+    ComponentState;
 handle_breakpoint(Message, State, ComponentState) ->
     BPActive = bp_active(Message, State, ComponentState),
     wait_for_bp_leave(Message, State, ComponentState, BPActive).
 
 -spec bp_active(comm:message(), any(), component_state()) -> boolean().
-bp_active(_Message, _State,
-          {_Options, _Slowest,
-           {[] = _BPs, false = _BPActive, _HB_BP_Ops, false = _BPStepped, unknown}}
-          = _ComponentState) ->
-    false;
 bp_active(Message, State,
           {Options, Slowest,
            {BPs, BPActive, HB_BP_Ops, BPStepped, StepperPid}} = _ComponentState) ->
-    [ ThisBP | RemainingBPs ] = BPs,
     BPActive
         orelse
         begin
+            [ ThisBP | RemainingBPs ] = BPs,
             Decision = case ThisBP of
                            {bp, ThisTag, _BPName} ->
                                ThisTag =:= comm:get_msg_tag(Message);
