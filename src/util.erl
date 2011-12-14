@@ -177,6 +177,8 @@ escape_quotes(String) ->
 escape_quotes_($", Rest) -> [$\\, $" | Rest];
 escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
+%% @doc Variant of erlang:max/2 also taking ?PLUS_INFINITY_TYPE and
+%%      ?MINUS_INFINITY_TYPE into account, e.g. for comparing keys.
 -spec max(?PLUS_INFINITY_TYPE, any()) -> ?PLUS_INFINITY_TYPE;
          (any(), ?PLUS_INFINITY_TYPE) -> ?PLUS_INFINITY_TYPE;
          (T | ?MINUS_INFINITY_TYPE, T | ?MINUS_INFINITY_TYPE) -> T.
@@ -190,6 +192,8 @@ max(A, B) ->
         false -> B
     end.
 
+%% @doc Variant of erlang:min/2 also taking ?PLUS_INFINITY_TYPE and
+%%      ?MINUS_INFINITY_TYPE into account, e.g. for comparing keys.
 -spec min(?MINUS_INFINITY_TYPE, any()) -> ?MINUS_INFINITY_TYPE;
          (any(), ?MINUS_INFINITY_TYPE) -> ?MINUS_INFINITY_TYPE;
          (T | ?PLUS_INFINITY_TYPE, T | ?PLUS_INFINITY_TYPE) -> T.

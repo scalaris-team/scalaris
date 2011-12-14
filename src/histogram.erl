@@ -99,10 +99,11 @@ insert({Value, Count}, [{Value2, Count2} | Rest]) ->
 find_smallest_interval([{Value, _}, {Value2, _} | Rest]) ->
     find_smallest_interval_loop(Value2 - Value, Value2, Rest).
 
+-spec find_smallest_interval_loop(MinInterval::float(), LastValue::float(), Data::data_list()) -> float().
 find_smallest_interval_loop(MinInterval, _LastValue, []) ->
     MinInterval;
 find_smallest_interval_loop(MinInterval, LastValue, [{Value, _} | Rest]) ->
-    find_smallest_interval_loop(util:min(MinInterval, Value - LastValue), Value, Rest).
+    find_smallest_interval_loop(erlang:min(MinInterval, Value - LastValue), Value, Rest).
 
 %@doc PRE: length(Data) >= 2
 -spec merge_interval(Interval::float(), Data::data_list()) -> data_list().

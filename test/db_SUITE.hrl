@@ -947,7 +947,7 @@ prop_get_chunk3(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
             {Next, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
             ?TEST_DB:close(DB2),
             ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
-            ExpectedChunkSize = util:min(count_keys_in_range(Keys, Interval),
+            ExpectedChunkSize = erlang:min(count_keys_in_range(Keys, Interval),
                                          ChunkSize),
             case ExpectedChunkSize =/= length(Chunk) of
                 true ->
