@@ -257,7 +257,7 @@ start(Module, Args, Options) ->
             {ok, Pid}
     end.
 
--spec start(module(), term(), list(), pid()) -> ok.
+-spec start(module(), term(), list(), pid()) -> no_return() | ok.
 start(Module, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
     case util:app_get_env(verbose, false) of
@@ -327,8 +327,7 @@ start(Module, Args, Options, Supervisor) ->
             erlang:Level(Reason)
     end.
 
--spec try_loop(module(), atom(), term(), component_state()) ->
-                      no_return().
+-spec try_loop(module(), atom(), term(), component_state()) -> no_return() | ok.
 try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     try loop(Module, On, State, ComponentState)
     catch Level:Reason ->
@@ -339,13 +338,13 @@ try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
               try_loop(Module, On, State, ComponentState)
     end.
 
--spec loop(module(), atom(), term(), component_state()) -> ok.
+-spec loop(module(), atom(), term(), component_state()) -> no_return() | ok.
 loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     ?CALLING_RECEIVE(Module),
     receive Msg -> loop(Module, On, Msg, State, ComponentState)
     end.
 
--spec loop(module(), atom(), comm:message(), term(), component_state()) -> ok.
+-spec loop(module(), atom(), comm:message(), term(), component_state()) -> no_return() | ok.
 loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     case ReceivedMsg of
         %%%%%%%%%%%%%%%%%%%%
@@ -455,7 +454,8 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                 end
     end.
 
--spec handle_post_op(Message::comm:message(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
+-spec handle_post_op(Message::comm:message(), Module::module(), Handler::atom(),
+                     State::term(), component_state()) -> no_return() | ok.
 handle_post_op(Message, Module, On, State, ComponentState) ->
     {_Opts, _Slowest, BPState} = ComponentState,
     case bp_state_get_bpactive(BPState) of
@@ -474,7 +474,9 @@ handle_post_op(Message, Module, On, State, ComponentState) ->
     end,
     loop(Module, On, Message, State, ComponentState).
 
--spec handle_gen_component_message(Message::comm:message(), Module::module(), Handler::atom(), State::term(), component_state()) -> component_state().
+-spec handle_gen_component_message(Message::comm:message(), Module::module(),
+                                   Handler::atom(), State::term(), component_state())
+        -> component_state().
 handle_gen_component_message(Message, Module, On, State, ComponentState) ->
     {_Options, _Slowest, BPState} = ComponentState,
     case Message of
