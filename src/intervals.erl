@@ -440,14 +440,14 @@ is_continuous([{element, ?MINUS_INFINITY},
                {interval, _A0Br, _A0, ?PLUS_INFINITY, ')'}]) -> true;
 is_continuous(_) -> false.
 
-%% @doc Gets the bounds of a given continuous (!) interval including their
+%% @doc Gets the outer bounds of a given non-empty interval including
 %%      brackets. Note that here
 %%      'all' transfers to {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'},
 %%      {element, Key} to {'[', Key, Key, ']'} and
 %%      [{interval,'[',?MINUS_INFINITY,Key,')'},{interval,'(',Key,?PLUS_INFINITY,')'}] to {'(', Key, Key, ')'}.
 %%      Other normalized intervals that wrap around (as well as the first two)
 %%      are returned the same way they can be constructed with new/4.
-%%      Note: this method will only work on continuous non-empty intervals
+%%      Note: this method will only work on non-empty intervals
 %%      and will throw an exception otherwise!
 -spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()} |
                                 {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
@@ -458,7 +458,11 @@ get_bounds([{interval, '[', ?MINUS_INFINITY, B1, B1Br},
             {interval, A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, B1, B1Br};
 get_bounds([{element, ?MINUS_INFINITY},
             {interval, A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, ?MINUS_INFINITY, ']'};
-get_bounds([]) -> erlang:throw('no bounds in empty interval').
+get_bounds([]) -> erlang:throw('no bounds in empty interval');
+get_bounds([H | T]) ->
+    {LBr, L, _, _} = get_bounds([H]),
+    {_, _, R, RBr} = get_bounds([lists:last(T)]),
+    {LBr, L, R, RBr}.
 
 %% @doc Gets all elements inside the interval and returnes a "rest"-interval,
 %%      i.e. the interval without the elements.

@@ -47,7 +47,7 @@ all() ->
      tester_is_subset, tester_is_subset2,
      tester_minus_well_formed, tester_minus, tester_minus2, tester_minus3,
      tester_not_minus, tester_not_minus2,
-     tester_get_bounds, tester_get_elements,
+     tester_get_bounds_continuous, tester_get_bounds, tester_get_elements,
      tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids, tester_mk_from_node_ids_continuous,
      tester_mk_from_nodes,
      tester_split_is_continuous, tester_split_is_well_formed, tester_split
@@ -667,8 +667,8 @@ tester_not_minus2(_Config) ->
 % intervals:get_bounds/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get_bounds(intervals:interval()) -> boolean().
-prop_get_bounds(I_) ->
+-spec prop_get_bounds_continuous(intervals:interval()) -> boolean().
+prop_get_bounds_continuous(I_) ->
     I = intervals:normalize(I_),
     ?implies(intervals:is_continuous(I),
              case intervals:get_bounds(I) of
@@ -676,6 +676,25 @@ prop_get_bounds(I_) ->
                                                                intervals:new('[', ?MINUS_INFINITY, Key, ')'));
                  {LBr, L, R, RBr}     -> I =:= intervals:new(LBr, L, R, RBr)
              end).
+
+-spec prop_get_bounds(intervals:interval()) -> boolean().
+prop_get_bounds(I_) ->
+    I = intervals:normalize(I_),
+    ?implies(not intervals:is_empty(I),
+             begin
+                 BoundsInterval =
+                     case intervals:get_bounds(I) of
+                         {'(', Key, Key, ')'} -> 
+                             intervals:union(intervals:new('(', Key, ?PLUS_INFINITY, ')'),
+                                             intervals:new('[', ?MINUS_INFINITY, Key, ')'));
+                         {LBr, L, R, RBr} ->
+                             intervals:new(LBr, L, R, RBr)
+                     end,
+                 intervals:is_subset(I, BoundsInterval)
+             end).
+
+tester_get_bounds_continuous(_Config) ->
+    tester:test(?MODULE, prop_get_bounds_continuous, 1, 5000, [{threads, 2}]).
 
 tester_get_bounds(_Config) ->
     tester:test(?MODULE, prop_get_bounds, 1, 5000, [{threads, 2}]).
