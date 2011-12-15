@@ -198,7 +198,7 @@ get_chunk_helper({ETSDB, _Subscr} = DB, Interval, AddDataFun, ChunkSize) ->
         0 -> {intervals:empty(), []};
         _ ->
             %ct:pal("0: ~p ~p", [intervals:get_bounds(Interval), Interval]),
-            {_BeginBr, Begin, End, EndBr} = Bounds = intervals:get_bounds(Interval),
+            {BeginBr, Begin, _End, _EndBr} = Bounds = intervals:get_bounds(Interval),
             % get first key which is in the interval and in the ets table:
             {FirstKey, Chunk0} = first_key_in_interval(DB, Begin, Interval, AddDataFun),
             ChunkSize0 = case Chunk0 of
@@ -226,17 +226,15 @@ get_chunk_helper({ETSDB, _Subscr} = DB, Interval, AddDataFun, ChunkSize) ->
                                 Interval, AddDataFun, ChunkSize0, Chunk0,
                                 BoundsInterval),
             case Next of
-                '$end_of_table' ->
-                    {intervals:empty(), Chunk};
                 '$end_of_interval' ->
                     {intervals:empty(), Chunk};
                 _ ->
-                    case intervals:in(Next, Interval) of
-                        false ->
-                            {intervals:empty(), Chunk};
-                        _ ->
-                            {intervals:new('[', Next, End, EndBr), Chunk}
-                    end
+                    NextToIntBegin =
+                        case BeginBr of
+                            '(' -> intervals:new('[', Next, Begin, ']');
+                            '[' -> intervals:new('[', Next, Begin, ')')
+                        end,
+                    {intervals:intersection(Interval, NextToIntBegin), Chunk}
             end
     end.
 
@@ -266,17 +264,27 @@ first_key_in_interval({ETSDB, _Subscr} = DB, Current, Interval, AddDataFun) ->
                       RealStart::?RT:key(), Interval::intervals:interval(),
                       AddDataFun::add_data_fun(V), ChunkSize::pos_integer(),
                       Chunk::[V], BoundsInterval::intervals:interval())
-        -> {?RT:key() | '$end_of_table' | '$end_of_interval', [V]}.
+        -> {?RT:key() | '$end_of_interval', [V]}.
 get_chunk_inner(_DB, RealStart, RealStart, _Interval, _AddDataFun,
                 _ChunkSize, Chunk, _BoundsInterval) ->
     %ct:pal("inner: 0: ~p", [RealStart]),
     % we hit the start element, i.e. our whole data set has been traversed
     {'$end_of_interval', Chunk};
-get_chunk_inner(_DB, Current, _RealStart, _Interval, _AddDataFun,
+get_chunk_inner({ETSDB, _Subscr} = _DB, Current, RealStart, _Interval, _AddDataFun,
                 0, Chunk, _BoundsInterval) ->
     %ct:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
-    {Current, Chunk};
+    case Current of
+        '$end_of_table' ->
+            % note: should not be '$end_of_table' (table is not empty!)
+            First = ets:first(ETSDB),
+            case First of
+                RealStart -> {'$end_of_interval', Chunk};
+                _         -> {First, Chunk}
+            end;
+        _ ->
+            {Current, Chunk}
+    end;
 get_chunk_inner({ETSDB, _Subscr} = DB, '$end_of_table', RealStart, Interval, AddDataFun,
                 ChunkSize, Chunk, BoundsInterval) ->
     %ct:pal("inner: 2: ~p", ['$end_of_table']),
