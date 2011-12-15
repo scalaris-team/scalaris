@@ -183,7 +183,7 @@ get_chunk_(DB, Interval, FilterFun, ValueFun, ChunkSize) ->
                          DBEntry = get_entry_(DB1, Key),
                          case FilterFun(DBEntry) of
                              true -> [ValueFun(DBEntry) | Data];
-                             _    -> []
+                             _    -> Data
                          end
                  end,
     get_chunk_helper(DB, Interval, AddDataFun, ChunkSize).
