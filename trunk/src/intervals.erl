@@ -445,8 +445,9 @@ is_continuous(_) -> false.
 %%      'all' transfers to {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'},
 %%      {element, Key} to {'[', Key, Key, ']'} and
 %%      [{interval,'[',?MINUS_INFINITY,Key,')'},{interval,'(',Key,?PLUS_INFINITY,')'}] to {'(', Key, Key, ')'}.
-%%      Other normalized intervals that wrap around (as well as the first two)
-%%      are returned the same way they can be constructed with new/4.
+%%      Other continuous normalized intervals that wrap around (as well as the
+%%      first two) are returned the same way they can be constructed with new/4.
+%%      Note: the bounds of non-continuous intervals are not optimal!
 %%      Note: this method will only work on non-empty intervals
 %%      and will throw an exception otherwise!
 -spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()} |
@@ -459,9 +460,16 @@ get_bounds([{interval, '[', ?MINUS_INFINITY, B1, B1Br},
 get_bounds([{element, ?MINUS_INFINITY},
             {interval, A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, ?MINUS_INFINITY, ']'};
 get_bounds([]) -> erlang:throw('no bounds in empty interval');
+% fast creation of bounds by using the first and last value of the interval:
 get_bounds([H | T]) ->
-    {LBr, L, _, _} = get_bounds([H]),
-    {_, _, R, RBr} = get_bounds([lists:last(T)]),
+    case H of
+        {element, X1} -> LBr = '[', L = X1, ok;
+        {interval, LBr, L, _, _} -> ok
+    end,
+    case lists:last(T) of
+        {element, X2} -> RBr = ']', R = X2, ok;
+        {interval, _, _, R, RBr} -> ok
+    end,
     {LBr, L, R, RBr}.
 
 %% @doc Gets all elements inside the interval and returnes a "rest"-interval,
