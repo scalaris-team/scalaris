@@ -240,7 +240,8 @@ get_chunk_helper({{DB, _FileName}, _Subscr}, Interval, AddDataFun, GetKeyFromDat
                  Key = erlang:binary_to_term(Key_),
                  case intervals:in(Key, Interval) of
                      true when ChunkSize =:= all ->
-                         AddDataFun(Key_, Key, DBEntry_, Data);
+                         % note: no need to count items here
+                         {0, AddDataFun(Key_, Key, DBEntry_, Data)};
                      true ->
                          Data1 = AddDataFun(Key_, Key, DBEntry_, Data),
                          % filter out every (2 * ChunkSize) elements
