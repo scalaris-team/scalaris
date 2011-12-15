@@ -935,10 +935,9 @@ prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
     ?TEST_DB:close(DB4),
     true.
 
--spec prop_get_chunk3(Keys::[?RT:key()], BeginBr::intervals:left_bracket(), Begin::?RT:key(),
-                     End::?RT:key(), EndBr::intervals:right_bracket(), ChunkSize::pos_integer()) -> true.
-prop_get_chunk3(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
-    Interval = intervals:new(BeginBr, Begin, End, EndBr),
+-spec prop_get_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
+prop_get_chunk3(Keys2, Interval_, ChunkSize) ->
+    Interval = intervals:normalize(Interval_),
     case not intervals:is_empty(Interval) of
         true ->
             Keys = lists:usort(Keys2),
@@ -947,8 +946,12 @@ prop_get_chunk3(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
             {Next, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
             ?TEST_DB:close(DB2),
             ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
-            ExpectedChunkSize = erlang:min(count_keys_in_range(Keys, Interval),
-                                         ChunkSize),
+            KeysInRange = count_keys_in_range(Keys, Interval),
+            ExpectedChunkSize =
+                case ChunkSize of
+                    all -> KeysInRange;
+                    _   -> erlang:min(KeysInRange, ChunkSize)
+                end,
             case ExpectedChunkSize =/= length(Chunk) of
                 true ->
                     ?ct_fail("chunk has wrong size ~.0p ~.0p ~.0p, expected size: ~.0p",
@@ -969,10 +972,9 @@ prop_get_chunk3(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
         _ -> true
     end.
 
--spec prop_delete_chunk3(Keys::[?RT:key()], BeginBr::intervals:left_bracket(), Begin::?RT:key(),
-                        End::?RT:key(), EndBr::intervals:right_bracket(), ChunkSize::pos_integer()) -> true.
-prop_delete_chunk3(Keys2, BeginBr, Begin, End, EndBr, ChunkSize) ->
-    Interval = intervals:new(BeginBr, Begin, End, EndBr),
+-spec prop_delete_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
+prop_delete_chunk3(Keys2, Interval_, ChunkSize) ->
+    Interval = intervals:normalize(Interval_),
     case not intervals:is_empty(Interval) of
         true ->
             Keys = lists:usort(Keys2),
@@ -1318,12 +1320,12 @@ tester_changed_keys_get_entries4(_Config) ->
     tester:test(?MODULE, prop_changed_keys_get_entries4, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_get_chunk3(_Config) ->
-    prop_get_chunk3([0, 4, 31], '[', 0, 4, ']', 2),
-    prop_get_chunk3([1, 5, 127, 13], '[', 3, 2, ']', 4),
-    tester:test(?MODULE, prop_get_chunk3, 6, rw_suite_runs(1000), [{threads, 2}]).
+    prop_get_chunk3([0, 4, 31], intervals:new('[', 0, 4, ']'), 2),
+    prop_get_chunk3([1, 5, 127, 13], intervals:new('[', 3, 2, ']'), 4),
+    tester:test(?MODULE, prop_get_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_delete_chunk3(_Config) ->
-    tester:test(?MODULE, prop_delete_chunk3, 6, rw_suite_runs(1000), [{threads, 2}]).
+    tester:test(?MODULE, prop_delete_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
     tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000), [{threads, 2}]).
