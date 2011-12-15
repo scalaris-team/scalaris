@@ -80,15 +80,17 @@ delete_entry_(State, Entry) ->
 get_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of
-        true -> [E || Key <- Elements,
-                      E <- [get_entry_(State, Key)],
-                      not db_entry:is_empty(E)];
-        _ -> get_entries_(State,
-                          fun(DBEntry) ->
-                                  (not db_entry:is_empty(DBEntry)) andalso
-                                      intervals:in(db_entry:get_key(DBEntry), Interval)
-                          end,
-                          fun(DBEntry) -> DBEntry end)
+        true ->
+            [E || Key <- Elements, E <- [get_entry_(State, Key)], not db_entry:is_empty(E)];
+        _ ->
+            {_, Data} =
+                get_chunk_(State, Interval,
+                           fun(DBEntry) ->
+                                   (not db_entry:is_empty(DBEntry)) andalso
+                                       intervals:in(db_entry:get_key(DBEntry), Interval)
+                           end,
+                           fun(E) -> E end, all),
+            Data
     end.
 
 %% @doc Returns all key-value pairs of the given DB which are in the given
