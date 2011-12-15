@@ -232,7 +232,7 @@ get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
                        GetKeyFromDataFun::fun((T) -> ?RT:key()), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [T]}.
 get_chunk_helper({{DB, _FileName}, _Subscr}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
-    {BeginBr, Begin, End, EndBr} = intervals:get_bounds(Interval),
+    {BeginBr, Begin, _End, _EndBr} = intervals:get_bounds(Interval),
     % try to find the first existing key in the interval, starting at Begin:
     MInfToBegin = intervals:minus(intervals:all(),
                                   intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
@@ -262,7 +262,14 @@ get_chunk_helper({{DB, _FileName}, _Subscr}, Interval, AddDataFun, GetKeyFromDat
         _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
                case Rest of
                    []      -> {intervals:empty(), Chunk};
-                   [H | _] -> {intervals:new('[', GetKeyFromDataFun(H), End, EndBr), Chunk}
+                   [H | _] ->
+                       Next = GetKeyFromDataFun(H),
+                       NextToIntBegin =
+                           case BeginBr of
+                               '(' -> intervals:new('[', Next, Begin, ']');
+                               '[' -> intervals:new('[', Next, Begin, ')')
+                           end,
+                       {intervals:intersection(Interval, NextToIntBegin), Chunk}
                end
     end.
 
