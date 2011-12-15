@@ -194,7 +194,7 @@ checkinstallation() {
         echo "We were trying to run: $SCALARISCLIENT"
     else
         HOSTNAME=`hostname -f`
-        JAVAHOST="'boot@`$SCALARISCLIENT -lh`'"
+        JAVAHOST=`$SCALARISCLIENT -lh`
         if [ "$HOSTNAME" != "$JAVAHOST" ]; then
             echo "WARNING: the hostnames reported by 'hostname -f' and Java do not match. You won't be"
             echo " able to connect to Scalaris using the Java-API through scalaris.jar. Also, the"
