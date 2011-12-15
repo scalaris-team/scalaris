@@ -336,6 +336,8 @@ get_split_key_inner({ETSDB, _Subscr} = DB, Current, RealStart, TargetLoad, _Spli
     Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
 
+delete_chunk_(DB, Interval, all) ->
+    delete_chunk_(DB, Interval, get_load_(DB));
 delete_chunk_(DB, Interval, ChunkSize) ->
     AddDataFun = fun(_DB1, Key, Data) -> [Key | Data] end,
     {Next, Chunk} = get_chunk_helper(DB, Interval, AddDataFun, ChunkSize),
