@@ -131,7 +131,7 @@ init(_Options) ->
 %% @see sup_scalaris
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(ServiceGroup, Options) ->
-    gen_component:start_link(?MODULE, Options,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
                              [{erlang_register, mgmt_server},
                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 

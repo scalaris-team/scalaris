@@ -137,7 +137,7 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 

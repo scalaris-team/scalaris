@@ -47,4 +47,4 @@ init(_Options) ->
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(
-      ?MODULE, Options, [{pid_groups_join_as, DHTNodeGroup, dht_node_monitor}]).
+      ?MODULE, fun ?MODULE:on/2, Options, [{pid_groups_join_as, DHTNodeGroup, dht_node_monitor}]).

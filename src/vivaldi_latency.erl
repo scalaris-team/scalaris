@@ -95,7 +95,7 @@ init({Owner, RemotePid, Token}) ->
 
 -spec measure_latency(comm:mypid(), vivaldi:network_coordinate(), vivaldi:error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
-    gen_component:start(?MODULE, {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}}, []).
+    gen_component:start(?MODULE, fun ?MODULE:on/2, {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}}, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions

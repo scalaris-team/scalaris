@@ -91,7 +91,7 @@ trigger(Proposer, PaxosID) ->
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname(), pid_groups:pidname()) -> {ok, pid()}.
 start_link(DHTNodeGroup, PidName) ->
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, PidName}]).
 

@@ -90,19 +90,18 @@ start_link(DHTNodeGroup) ->
         true ->
             ResetTrigger = config:read(dc_clustering_reset_trigger),
             ClusterTrigger = config:read(dc_clustering_cluster_trigger),
-            gen_component:start_link(?MODULE, {ResetTrigger, ClusterTrigger},
+            gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, {ResetTrigger, ClusterTrigger},
                                      [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
         false ->
             ignore
     end.
 
 %% @doc Initialises the module with an empty state.
--spec init({module(), module()}) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+-spec init({module(), module()}) -> state_inactive().
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    gen_component:change_handler({inactive, msg_queue:new(), ResetTriggerState, ClusterTriggerState},
-                                 on_inactive).
+    {inactive, msg_queue:new(), ResetTriggerState, ClusterTriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -111,7 +110,7 @@ init({ResetTrigger, ClusterTrigger}) ->
 %% @doc Message handler during start up phase (will change to on_active/2 when a
 %%      'activate_clustering' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                ({activate_clustering}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+                ({activate_clustering}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
 on_inactive({activate_clustering},
             {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
     log:log(info, "[ Clustering ~.0p ] activating...~n", [comm:this()]),
@@ -119,7 +118,7 @@ on_inactive({activate_clustering},
     ClusterTriggerState2 = trigger:now(ClusterTriggerState),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler({[], [], ResetTriggerState2, ClusterTriggerState2},
-                                 on_active);
+                                 fun ?MODULE:on_active/2);
 
 on_inactive(Msg = {query_clustering, _Pid},
             {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
@@ -143,12 +142,12 @@ on_inactive(_Msg, State) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(Message::message(), State::state_active()) -> state_active();
-         ({deactivate_clustering}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+         ({deactivate_clustering}, state_active()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
 on_active({deactivate_clustering},
           {_Centroids, _Sizes, ResetTriggerState, ClusterTriggerState}) ->
     log:log(info, "[ Clustering ~.0p ] deactivating...~n", [comm:this()]),
     gen_component:change_handler({inactive, msg_queue:new(), ResetTriggerState, ClusterTriggerState},
-                                 on_inactive);
+                                 fun ?MODULE:on_inactive/2);
 
 % ignore activate_clustering messages in active state
 % note: remove this if the clustering process is to be deactivated on leave (see

@@ -144,14 +144,13 @@ msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = config:read(gossip_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
+-spec init(module()) -> full_state_inactive().
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_base_interval/0, gossip_trigger),
-    gen_component:change_handler({uninit, msg_queue:new(), TriggerState, gossip_state:new_state()},
-                                 on_inactive).
+    {uninit, msg_queue:new(), TriggerState, gossip_state:new_state()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -161,7 +160,8 @@ init(Trigger) ->
 %%      'activate_gossip' message is received). Queues getter-messages for
 %%      faster startup of dependent processes. 
 -spec on_inactive(message(), full_state_inactive()) -> full_state_inactive();
-                 ({activate_gossip, MyRange::intervals:interval()}, full_state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::full_state_active()}.
+                 ({activate_gossip, MyRange::intervals:interval()}, full_state_inactive())
+                   -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::full_state_active()}.
 on_inactive({activate_gossip, MyRange},
             {uninit, QueuedMessages, TriggerState, PreviousState}) ->
     log:log(info, "[ Gossip ~.0p ] activating...~n", [comm:this()]),
@@ -171,7 +171,8 @@ on_inactive({activate_gossip, MyRange},
                       fun gossip:rm_send_new_range/4, inf),
     State = gossip_state:new_state(),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({PreviousState, State, [], TriggerState2, MyRange}, on_active);
+    gen_component:change_handler({PreviousState, State, [], TriggerState2, MyRange},
+                                 fun ?MODULE:on_active/2);
 
 on_inactive(Msg = {get_values_all, _SourcePid},
             {uninit, QueuedMessages, TriggerState, PreviousState}) ->
@@ -212,13 +213,14 @@ on_inactive(_Msg, State) ->
 
 %% @doc Message handler when the process is activated.
 -spec on_active(message(), full_state_active()) -> full_state_active();
-               ({deactivate_gossip}, full_state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::full_state_inactive()}.
+               ({deactivate_gossip}, full_state_active())
+                 -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::full_state_inactive()}.
 on_active({deactivate_gossip},
           {PreviousState, _State, _QueuedMessages, TriggerState, _MyRange}) ->
     log:log(info, "[ Gossip ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), ?MODULE),
     gen_component:change_handler({uninit, msg_queue:new(), TriggerState, PreviousState},
-                                 on_inactive);
+                                 fun ?MODULE:on_inactive/2);
 
 % Only integrate the new range on activate_gossip messages in active state.
 % note: remove this if the gossip process is to be deactivated on leave (see

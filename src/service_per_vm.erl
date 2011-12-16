@@ -60,7 +60,7 @@ kill_nodes(No) ->
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
-    gen_component:start_link(?MODULE, [],
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                              [{erlang_register, service_per_vm},
                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 

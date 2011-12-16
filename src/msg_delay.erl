@@ -63,7 +63,7 @@ send_local(Seconds, Dest, Msg) ->
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [], % parameters passed to init
                              [{pid_groups_join_as, DHTNodeGroup, msg_delay}]).
 

@@ -68,7 +68,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
     PidName = atom_to_list(Channel) ++ DirStr ++ integer_to_list(IP1) ++ "."
         ++ integer_to_list(IP2) ++ "." ++ integer_to_list(IP3) ++ "."
         ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              {DestIP, DestPort, LocalListenPort, Socket},
                              [{pid_groups_join_as, CommLayerGroup, PidName}]).
 

@@ -79,14 +79,13 @@ deactivate() ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = config:read(routingtable_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+-spec init(module()) -> state_inactive().
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_base_interval/0, trigger_rt),
-    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
-                                 on_inactive).
+    {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -96,7 +95,7 @@ init(Trigger) ->
 %%      'activate_rt' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_rt, Neighbors::nodelist:neighborhood()}, state_inactive())
-                    -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+                    -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
 on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     TriggerState2 = trigger:now(TriggerState),
@@ -105,7 +104,7 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages, TriggerState}) 
                       fun ?MODULE:rm_send_update/4, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Neighbors, ?RT:empty(Neighbors), TriggerState2}, on_active);
+      {Neighbors, ?RT:empty(Neighbors), TriggerState2}, fun ?MODULE:on_active/2);
 
 on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
@@ -124,7 +123,8 @@ on_inactive(_Msg, State) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(message(), state_active()) -> state_active() | unknown_event;
-               ({deactivate_rt}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+               ({deactivate_rt}, state_active())
+                  -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
 on_active({deactivate_rt}, {Neighbors, _OldRT, TriggerState})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), ?MODULE),
@@ -133,7 +133,7 @@ on_active({deactivate_rt}, {Neighbors, _OldRT, TriggerState})  ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {rt_update, ?RT:empty_ext(Neighbors)}),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
-                                 on_inactive);
+                                 fun ?MODULE:on_inactive/2);
 
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ

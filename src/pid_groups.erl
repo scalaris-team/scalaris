@@ -358,7 +358,7 @@ unhide(GrpName) ->
 %% @doc Starts the server
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    gen_component:start_link(?MODULE, [], [{erlang_register, ?MODULE}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{erlang_register, ?MODULE}]).
 
 %% @doc Initiates the server
 %% @private

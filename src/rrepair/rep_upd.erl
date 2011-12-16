@@ -170,7 +170,7 @@ on({web_debug_info, Requestor}, State) ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = get_update_trigger(),
-    gen_component:start_link(?MODULE, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Trigger,
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% @doc Initialises the module and starts the trigger

@@ -66,7 +66,7 @@ unsubscribe() ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = config:read(dn_cache_trigger),
-    gen_component:start_link(?MODULE, Trigger, [{pid_groups_join_as, DHTNodeGroup, dn_cache}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, dn_cache}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state().

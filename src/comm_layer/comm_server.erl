@@ -44,7 +44,7 @@
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(CommLayerGroup) ->
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
                              [ {erlang_register, ?MODULE},
                                {pid_groups_join_as, CommLayerGroup, ?MODULE}

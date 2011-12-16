@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 -behaviour(gen_component).
 
--export([start_link/2, on/2, on_join/2, init/1]).
+-export([start_link/2, on/2, init/1]).
 
 -export([is_first/1, is_alive/1, is_alive_no_slide/1, is_alive_fully_joined/1]).
 
@@ -75,12 +75,6 @@
     {crash, DeadPid::comm:mypid()}.
 
 %% @doc message handler
--spec on_join(message(), dht_node_join:join_state())
-        -> dht_node_join:join_state() |
-           {'$gen_component', [{on_handler, Handler::on}], dht_node_state:state()}.
-on_join(Msg, State) ->
-    dht_node_join:process_join_state(Msg, State).
-
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
@@ -515,7 +509,7 @@ on({zombie, Node}, State) ->
 %% @doc joins this node in the ring and calls the main loop
 -spec init(Options::[tuple()])
         -> dht_node_state:state() |
-           {'$gen_component', [{on_handler, Handler::on_join}], State::dht_node_join:join_state()}.
+           {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::dht_node_join:join_state()}.
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
@@ -534,7 +528,7 @@ init(Options) ->
 %% @doc spawns a scalaris node, called by the scalaris supervisor process
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
-    gen_component:start_link(?MODULE, Options,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 %% userdevguide-end dht_node:start_link
 
