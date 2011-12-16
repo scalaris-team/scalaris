@@ -107,7 +107,7 @@ public class Main {
                     }
                 }
             } else {
-                for (int i = 1; i <= 9; ++i) {
+                for (int i = 1; i <= 18; ++i) {
                     benchmarks.add(i);
                 }
             }
