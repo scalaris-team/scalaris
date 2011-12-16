@@ -59,25 +59,25 @@ deactivate() ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = config:read(dht_node_reregister_trigger),
-    gen_component:start_link(?MODULE, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node_reregister}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+-spec init(module()) -> state_inactive().
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_base_interval/0, register),
-    gen_component:change_handler({inactive, TriggerState}, on_inactive).
+    {inactive, TriggerState}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                 ({activate_reregister}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+                 ({activate_reregister}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
 on_inactive({activate_reregister}, {inactive, TriggerState}) ->
     log:log(info, "[ Reregister ~.0p ] activating...~n", [comm:this()]),
     NewTriggerState = trigger:now(TriggerState),
-    gen_component:change_handler(NewTriggerState, on_active);
+    gen_component:change_handler(NewTriggerState, fun ?MODULE:on_active/2);
 
 on_inactive({web_debug_info, Requestor}, State) ->
     KeyValueList = [{"", ""}, {"inactive re-register process", ""}],
@@ -88,10 +88,10 @@ on_inactive(_Msg, {inactive, _TriggerState} = State) ->
     State.
 
 -spec on_active(message(), state_active()) -> state_active();
-         ({deactivate_reregister}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+         ({deactivate_reregister}, state_active()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
 on_active({deactivate_reregister}, TriggerState)  ->
     log:log(info, "[ Reregister ~.0p ] deactivating...~n", [comm:this()]),
-    gen_component:change_handler({inactive, TriggerState}, on_inactive);
+    gen_component:change_handler({inactive, TriggerState}, fun ?MODULE:on_inactive/2);
 
 on_active({register}, TriggerState) ->
     RegisterMessage = {register, get_dht_node_this()},

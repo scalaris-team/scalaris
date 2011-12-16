@@ -90,7 +90,7 @@ update_subscriptions(OldPids, NewPids) ->
 %% @doc Starts the failure detector server
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
-    gen_component:start_link(?MODULE, [],
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
       [wait_for_init, {erlang_register, ?MODULE},
        {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 

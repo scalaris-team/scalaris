@@ -73,7 +73,7 @@ init([]) ->
 %% @doc spawns a bench_server
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    gen_component:start_link(?MODULE, [], [{erlang_register, bench_server}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{erlang_register, bench_server}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

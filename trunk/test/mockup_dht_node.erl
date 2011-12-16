@@ -34,9 +34,8 @@
         {mockup_dht_node, clear_match_specs}.
 -type module_state() ::
         dht_node_join:join_state() | dht_node_state:state() |
-        {'$gen_component', [{on_handler, Handler::on}], dht_node_state:state()} | 
-        {'$gen_component', [{on_handler, Handler::on_join}], dht_node_join:join_state()}.
--type state() :: {Module::module(), Handler::atom(), ModuleState::module_state(), MsgDropSpecs::[mockup:match_spec()]}.
+        {'$gen_component', [{on_handler, Handler::gen_component:handler()}], dht_node_state:state() | dht_node_join:join_state()}.
+-type state() :: {Module::module(), Handler::gen_component:handler(), ModuleState::module_state(), MsgDropSpecs::[mockup:match_spec()]}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -65,13 +64,13 @@ on(Msg, State = {Module, Handler, ModuleState, MsgDropSpecs}) ->
             NewModuleState = ActionFun(Msg, ModuleState),
             module_state_to_my_state(NewModuleState, {Module, Handler, ModuleState, NewMatchSpecs});
         false ->
-            NewModuleState = Module:Handler(Msg, ModuleState),
+            NewModuleState = Handler(Msg, ModuleState),
             module_state_to_my_state(NewModuleState, State)
     end.
 
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
-    gen_component:start_link(?MODULE, {DHTNodeGroup, Options},
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, {DHTNodeGroup, Options},
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 
 -spec init({DHTNodeGroup::pid_groups:groupname(), Options::[tuple()]}) -> state().
@@ -79,7 +78,7 @@ init({DHTNodeGroup, Options}) ->
     % at first, join pid_groups - allow dht_node to overwrite my_pid (it will join as dht_node!):
     pid_groups:join_as(DHTNodeGroup, mockup_dht_node),
     ModuleState = dht_node:init(Options),
-    module_state_to_my_state(ModuleState, {dht_node, on, ModuleState, []}).
+    module_state_to_my_state(ModuleState, {dht_node, fun dht_node:on/2, ModuleState, []}).
 
 -spec module_state_to_my_state(module_state(), state()) -> state().
 module_state_to_my_state(ModuleState, {Module, OldHandler, _, NewMatchSpecs}) ->

@@ -46,15 +46,18 @@
 -endif.
 
 -export([behaviour_info/1]).
--export([start_link/2, start_link/3,
-         start/4, start/2,
-         start/3]).
+-export([start_link/3, start_link/4,
+         start/3, start/4, start/5]).
 -export([kill/1, sleep/2, runnable/1,
          get_state/1, get_state/2,
          get_component_state/1, get_component_state/2,
          change_handler/2, post_op/2]).
 -export([bp_set/3, bp_set_cond/3, bp_del/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
+
+-ifdef(with_export_type_support).
+-export_type([handler/0]).
+-endif.
 
 -type bp_name() :: atom().
 
@@ -79,6 +82,8 @@
 
 -type component_state() ::
         {Options :: list(), Slowest :: float(), bp_state()}.
+
+-type handler() :: fun((comm:message(), State) -> State).
 
 %% userdevguide-begin gen_component:behaviour
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
@@ -171,9 +176,9 @@ get_component_state(Pid, Timeout) ->
     receive_state_if_alive(Pid, get_component_state_response, Timeout).
 
 %% @doc change the handler for handling messages
--spec change_handler(State, Handler::atom())
-        -> {'$gen_component', [{on_handler, Handler::atom()}], State}.
-change_handler(State, Handler) when is_atom(Handler) ->
+-spec change_handler(State, Handler::handler())
+        -> {'$gen_component', [{on_handler, Handler::handler()}], State}.
+change_handler(State, Handler) when is_function(Handler, 2) ->
     {'$gen_component', [{on_handler, Handler}], State}.
 
 %% @doc perform a post op, i.e. handle a message directly after another
@@ -233,32 +238,32 @@ bp_barrier(Pid) ->
 %% generic framework
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % profile
--spec start_link(module(), term()) -> {ok, pid()}.
-start_link(Module, Args) ->
-    start_link(Module, Args, []).
+-spec start_link(module(), handler(), term()) -> {ok, pid()}.
+start_link(Module, Handler, Args) ->
+    start_link(Module, Handler, Args, []).
 
--spec start_link(module(), term(), list()) -> {ok, pid()}.
-start_link(Module, Args, Options) ->
-    Pid = spawn_link(?MODULE, start, [Module, Args, Options, self()]),
+-spec start_link(module(), handler(), term(), list()) -> {ok, pid()}.
+start_link(Module, Handler, Args, Options) ->
+    Pid = spawn_link(?MODULE, start, [Module, Handler, Args, Options, self()]),
     receive
         {started, Pid} ->
             {ok, Pid}
     end.
 
--spec start(module(), term()) -> {ok, pid()}.
-start(Module, Args) ->
-    start(Module, Args, []).
+-spec start(module(), handler(), term()) -> {ok, pid()}.
+start(Module, Handler, Args) ->
+    start(Module, Handler, Args, []).
 
--spec start(module(), term(), list()) -> {ok, pid()}.
-start(Module, Args, Options) ->
-    Pid = spawn(?MODULE, start, [Module, Args, Options, self()]),
+-spec start(module(), handler(), term(), list()) -> {ok, pid()}.
+start(Module, Handler, Args, Options) ->
+    Pid = spawn(?MODULE, start, [Module, Handler, Args, Options, self()]),
     receive
         {started, Pid} ->
             {ok, Pid}
     end.
 
--spec start(module(), term(), list(), pid()) -> no_return() | ok.
-start(Module, Args, Options, Supervisor) ->
+-spec start(module(), handler(), term(), list(), pid()) -> no_return() | ok.
+start(Module, DefaultHandler, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
     case util:app_get_env(verbose, false) of
         false -> ok;
@@ -310,7 +315,7 @@ start(Module, Args, Options, Supervisor) ->
                               lists:keyfind(on_handler, 1, Config),
                           NewHandler;
                       InitialState ->
-                          on
+                          DefaultHandler
                   end,
         case lists:member(wait_for_init, Options) of
             false -> ok;
@@ -327,25 +332,25 @@ start(Module, Args, Options, Supervisor) ->
             erlang:Level(Reason)
     end.
 
--spec try_loop(module(), atom(), term(), component_state()) -> no_return() | ok.
-try_loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
-    try loop(Module, On, State, ComponentState)
+-spec try_loop(module(), handler(), term(), component_state()) -> no_return() | ok.
+try_loop(Module, Handler, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+    try loop(Module, Handler, State, ComponentState)
     catch Level:Reason ->
               log:log(error, "Error: exception ~p:~p in loop of module ~p "
                           "in (~.0p) with ~p - stacktrace: ~.0p",
-                      [Level, Reason, Module, State, On,
+                      [Level, Reason, Module, State, Handler,
                        erlang:get_stacktrace()]),
-              try_loop(Module, On, State, ComponentState)
+              try_loop(Module, Handler, State, ComponentState)
     end.
 
--spec loop(module(), atom(), term(), component_state()) -> no_return() | ok.
-loop(Module, On, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+-spec loop(module(), handler(), term(), component_state()) -> no_return() | ok.
+loop(Module, Handler, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     ?CALLING_RECEIVE(Module),
-    receive Msg -> loop(Module, On, Msg, State, ComponentState)
+    receive Msg -> loop(Module, Handler, Msg, State, ComponentState)
     end.
 
--spec loop(module(), atom(), comm:message(), term(), component_state()) -> no_return() | ok.
-loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentState) ->
+-spec loop(module(), handler(), comm:message(), term(), component_state()) -> no_return() | ok.
+loop(Module, Handler, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentState) ->
     case ReceivedMsg of
         %%%%%%%%%%%%%%%%%%%%
         %% Attention!:
@@ -355,19 +360,19 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
         %%%%%%%%%%%%%%%%%%%%
         {'$gen_component', kill} ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
-                    [self(), Module, On]),
+                    [self(), Module, Handler]),
             ok;
         GenComponentMessage
           when is_tuple(GenComponentMessage) andalso
                '$gen_component' =:= element(1, GenComponentMessage) ->
             NewComponentState =
-                handle_gen_component_message(GenComponentMessage, Module, On,
+                handle_gen_component_message(GenComponentMessage, Module, Handler,
                                              State, ComponentState),
-            loop(Module, On, State, NewComponentState);
+            loop(Module, Handler, State, NewComponentState);
         % handle failure detector messages
         {ping, Pid} ->
             comm:send(Pid, {pong}, [{channel, prio}]),
-            loop(Module, On, State, ComponentState);
+            loop(Module, Handler, State, ComponentState);
         %% forward a message to group member by its process name
         %% initiated via comm:send/3 with group_member
         {send_to_group_member, Processname, Msg} ->
@@ -376,16 +381,16 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                 failed -> ok;
                 _      -> comm:send_local(Pid, Msg)
             end,
-            loop(Module, On, State, ComponentState);
+            loop(Module, Handler, State, ComponentState);
         Message ->
             TmpComponentState =
                 handle_breakpoint(Message, State, ComponentState),
             %% Start = erlang:now(),
-            case (try Module:On(Message, State)
+            case (try Handler(Message, State)
                   catch Level:Reason ->
                             Stacktrace = erlang:get_stacktrace(),
                             case Stacktrace of
-                                [{Module, On, [Message, State]} | _]
+                                [{Module, Handler, [Message, State]} | _]
                                   when Reason =:= function_clause andalso
                                            Level =:= error ->
                                     unknown_event;
@@ -403,26 +408,26 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                                              Module,
                                              erlang:get(test_server_loc),
                                              State,
-                                             On,
+                                             Handler,
                                              Stacktrace]),
                                     '$exception'
                             end
                   end) of
                 '$exception' ->
-                    NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
-                    loop(Module, On, State, NextComponentState);
+                    NextComponentState = bp_step_done(Module, Handler, Message, TmpComponentState),
+                    loop(Module, Handler, State, NextComponentState);
                 unknown_event ->
                     {NewState, NewComponentState} =
                         handle_unknown_event(Message, State,
-                                             TmpComponentState, Module, On),
-                    NextComponentState = bp_step_done(Module, On, Message, NewComponentState),
-                    loop(Module, On, NewState, NextComponentState);
+                                             TmpComponentState, Module, Handler),
+                    NextComponentState = bp_step_done(Module, Handler, Message, NewComponentState),
+                    loop(Module, Handler, NewState, NextComponentState);
                 kill ->
                     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
-                            [self(), Module, On]),
+                            [self(), Module, Handler]),
                     ok;
                 {'$gen_component', [{post_op, Msg1}], NewState} ->
-                    handle_post_op(Msg1, Module, On, NewState, TmpComponentState);
+                    handle_post_op(Msg1, Module, Handler, NewState, TmpComponentState);
                 {'$gen_component', Commands, NewState} ->
                     %% This is not counted as a bp_step
                     case lists:keyfind(on_handler, 1, Commands) of
@@ -431,7 +436,7 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                         false ->
                             case lists:keyfind(post_op, 1, Commands) of
                                 {post_op, Msg1} ->
-                                    handle_post_op(Msg1, Module, On, NewState, TmpComponentState);
+                                    handle_post_op(Msg1, Module, Handler, NewState, TmpComponentState);
                                 false ->
                                     % let's fail since the Config list was either
                                     % empty or contained an invalid entry
@@ -448,15 +453,15 @@ loop(Module, On, ReceivedMsg, State, {_Options, _Slowest, _BPState} = ComponentS
                     %% io:format("slow message ~p (~p)~n", [Message, Span]),
                     %% loop(Module, NewState, {Options, Span});
                     %%true ->
-                    NextComponentState = bp_step_done(Module, On, Message, TmpComponentState),
-                    loop(Module, On, NewState, NextComponentState)
+                    NextComponentState = bp_step_done(Module, Handler, Message, TmpComponentState),
+                    loop(Module, Handler, NewState, NextComponentState)
                     %%end
                 end
     end.
 
--spec handle_post_op(Message::comm:message(), Module::module(), Handler::atom(),
+-spec handle_post_op(Message::comm:message(), Module::module(), Handler::handler(),
                      State::term(), component_state()) -> no_return() | ok.
-handle_post_op(Message, Module, On, State, ComponentState) ->
+handle_post_op(Message, Module, Handler, State, ComponentState) ->
     {_Opts, _Slowest, BPState} = ComponentState,
     case bp_state_get_bpactive(BPState) of
         true ->
@@ -466,18 +471,18 @@ handle_post_op(Message, Module, On, State, ComponentState) ->
                             "    Handler: ~p:~p/2~n"
                             "    Message: ~.0p~n",
                             [self(), pid_groups:group_and_name_of(self()),
-                             Module, On, Msg1]),
+                             Module, Handler, Msg1]),
             self() ! {'$gen_component', bp, breakpoint, step,
                       bp_state_get_bpstepper(BPState)},
             ok;
         false -> ok
     end,
-    loop(Module, On, Message, State, ComponentState).
+    loop(Module, Handler, Message, State, ComponentState).
 
 -spec handle_gen_component_message(Message::comm:message(), Module::module(),
-                                   Handler::atom(), State::term(), component_state())
+                                   Handler::handler(), State::term(), component_state())
         -> component_state().
-handle_gen_component_message(Message, Module, On, State, ComponentState) ->
+handle_gen_component_message(Message, Module, Handler, State, ComponentState) ->
     {_Options, _Slowest, BPState} = ComponentState,
     case Message of
         {'$gen_component', bp, barrier} ->
@@ -515,7 +520,7 @@ handle_gen_component_message(Message, Module, On, State, ComponentState) ->
             ComponentState;
         {'$gen_component', get_component_state, Pid} ->
             comm:send_local(
-              Pid, {'$gen_component', get_component_state_response, {Module, On, ComponentState}}),
+              Pid, {'$gen_component', get_component_state_response, {Module, Handler, ComponentState}}),
             ComponentState
     end.
 
@@ -675,18 +680,18 @@ handle_bp_request_in_bp(Message, State, ComponentState, BPMsg, FromQueue) ->
     end.
 
 -spec handle_unknown_event(Message::tuple(), any(), component_state(),
-                           module(), atom()) -> {any(), component_state()}.
-handle_unknown_event({web_debug_info, Requestor}, State, ComponentState, Module, On) ->
+                           module(), handler()) -> {any(), component_state()}.
+handle_unknown_event({web_debug_info, Requestor}, State, ComponentState, Module, Handler) ->
     GenCompInfo = lists:flatten(io_lib:format("~p", [State])),
     comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
-                                 {"module", Module}, {"handler", On},
+                                 {"module", Module}, {"handler", Handler},
                                  {"state", GenCompInfo}]}),
     {State, ComponentState};
-handle_unknown_event(UnknownMessage, State, ComponentState, Module, On) ->
+handle_unknown_event(UnknownMessage, State, ComponentState, Module, Handler) ->
    log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p"
            " in pid ~p ~.0p~n in State ~.0p",
-           [UnknownMessage,Module,On,self(), pid_groups:group_and_name_of(self()), State]),
+           [UnknownMessage,Module,Handler,self(), pid_groups:group_and_name_of(self()), State]),
     {State, ComponentState}.
 
 -spec bp_state_new() -> bp_state().
@@ -733,16 +738,16 @@ bp_state_hold_back(BPState, Message) ->
     bp_state_set_queue(BPState, NewQueue).
 
 %% @doc release the bp_step function when we executed a bp_step
--spec bp_step_done(module(), atom(), comm:message(), component_state())
+-spec bp_step_done(module(), handler(), comm:message(), component_state())
                   -> component_state().
-bp_step_done(Module, On, Message, ComponentState) ->
+bp_step_done(Module, Handler, Message, ComponentState) ->
     {Options, Slowest, BPState} = ComponentState,
     case bp_state_get_bpactive(BPState) andalso
           bp_state_get_bpstepped(BPState) of
         true ->
             comm:send_local(bp_state_get_bpstepper(BPState),
                             {'$gen_component', bp, breakpoint, step_done,
-                             self(), Module, On, Message}),
+                             self(), Module, Handler, Message}),
             TmpBPState = bp_state_set_bpstepped(BPState, false),
             NextBPState = bp_state_set_bpstepper(TmpBPState, unknown),
             {Options, Slowest, NextBPState};

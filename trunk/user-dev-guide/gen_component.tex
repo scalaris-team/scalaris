@@ -57,7 +57,10 @@ for this \erlmodule{gen\_component}. Later, the current state of the
 component can be retrieved using \erlfun{gen\_component}{get\_state}{/1}.
 
 To react on messages / events, a message handler is used. The default
-message handler is called \erlfun{your\_gen\_component}{on}{/2}. This can be
+message handler is given to \erlfun{gen\_component}{start\_link}{/3} or
+\erlfun{gen\_component}{start\_link}{/4} as well as
+\erlfun{gen\_component}{start}{/3}, \erlfun{gen\_component}{start}{/4} or
+\erlfun{gen\_component}{start}{/5}. It can be
 changed by calling \erlfun{gen\_component}{change\_handler}{/2} (see
 Section~\ref{sec:gen_component:change_handler}). When an event / message for
 the component arrives, this handler is called with the event itself and the

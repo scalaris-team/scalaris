@@ -304,7 +304,7 @@ web_debug_info_merge_values(Key, Data) ->
 %%      and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, null,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, null,
                              [{pid_groups_join_as, DHTNodeGroup, monitor}]).
 
 %% @doc Initialises the module with an empty state.

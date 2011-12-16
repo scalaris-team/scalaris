@@ -79,7 +79,7 @@ rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname(), any()) -> {ok, pid()}.
 start_link(DHTNodeGroup, Role) ->
-    gen_component:start_link(?MODULE,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, Role}]).
 
@@ -101,7 +101,7 @@ start_link(DHTNodeGroup, Role) ->
      OpenTxNum      :: non_neg_integer()}.
 
 %% initialize: return initial state.
--spec init([]) -> state() | {'$gen_component', [{on_handler, on_init},...],
+-spec init([]) -> state() | {'$gen_component', [{on_handler, gen_component:handler()},...],
                              state()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
@@ -125,7 +125,7 @@ init([]) ->
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
-            gen_component:change_handler(State, on_init);
+            gen_component:change_handler(State, fun ?MODULE:on_init/2);
         _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0}
     end.
 
@@ -634,7 +634,7 @@ on({crash, Pid}, State) ->
         true ->
             gen_component:change_handler(
               state_set_RTMs(NewState, NewRTMs),
-             on_init);
+              fun ?MODULE:on_init/2);
         false -> state_set_RTMs(NewState, NewRTMs)
     end;
 
@@ -676,7 +676,7 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
 
 -spec on_init(comm:message(), state())
     -> state() |
-       {'$gen_component', [{on_handler, Handler::on}], State::state()}.
+       {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state()}.
 on_init({get_node_details}, State) ->
     util:wait_for(fun() -> comm:is_valid(comm:this()) end),
     comm:send_local(pid_groups:get_my(dht_node),
@@ -714,7 +714,7 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     case lists:keymember(unknown, 2, NewRTMs) of %% filled all entries?
         false ->
             rtms_of_same_dht_node(NewRTMs),
-            gen_component:change_handler(state_set_RTMs(State, NewRTMs), on);
+            gen_component:change_handler(state_set_RTMs(State, NewRTMs), fun ?MODULE:on/2);
         _ -> state_set_RTMs(State, NewRTMs)
     end;
 

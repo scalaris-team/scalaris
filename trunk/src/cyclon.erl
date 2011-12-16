@@ -141,15 +141,14 @@ get_subset_rand_next_interval(N, Pid) ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     Trigger = config:read(cyclon_trigger),
-    gen_component:start_link(?MODULE, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger,
                              [{pid_groups_join_as, DHTNodeGroup, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+-spec init(module()) -> state_inactive().
 init(Trigger) ->
     TriggerState = trigger:init(Trigger, fun get_shuffle_interval/0, cy_shuffle),
-    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
-                                 on_inactive).
+    {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -160,7 +159,7 @@ init(Trigger) ->
 %%      faster startup of dependent processes. 
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_cyclon}, state_inactive())
-        -> {'$gen_component', [{on_handler, Handler::on_active}], State::state_active()}.
+        -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon,
@@ -171,7 +170,7 @@ on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     msg_queue:send(QueuedMessages),
     monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
     gen_component:change_handler({cyclon_cache:new(), null, 0, TriggerState2},
-                                 on_active);
+                                 fun ?MODULE:on_active/2);
 
 on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
     {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
@@ -196,12 +195,12 @@ on_inactive(_Msg, State) ->
 
 %% @doc Message handler when the process is activated.
 -spec on_active(message(), state_active()) -> state_active();
-         ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::on_inactive}], State::state_inactive()}.
+         ({deactivate_cyclon}, state_active()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
 on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles, TriggerState})  ->
     log:log(info, "[ Cyclon ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), cyclon),
     gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
-                                 on_inactive);
+                                 fun ?MODULE:on_inactive/2);
 
 on_active({cy_shuffle}, {Cache, Node, Cycles, TriggerState} = State)  ->
     NewCache =

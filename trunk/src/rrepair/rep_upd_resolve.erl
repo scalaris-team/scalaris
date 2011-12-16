@@ -184,4 +184,4 @@ start(Round, RMethod, RStruct, Feedback, SendStats) ->
                                resolve_struct = RStruct,
                                feedback = Feedback,
                                send_stats = SendStats },
-    gen_component:start(?MODULE, State, []).
+    gen_component:start(?MODULE, fun ?MODULE:on/2, State).
