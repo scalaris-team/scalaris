@@ -55,27 +55,28 @@ start_dht_node="" # "dht_node"
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
     echo " options:"
-    echo "    -h        - print this help message"
-    echo "    -d        - daemonize"
-    echo "    -f        - first node (to start a new Scalaris instead of joining one) (not with -q)"
-    echo "    -q        - elect first node from known hosts (not with -f)"
-    echo "    -n <name> - Erlang process name (default 'node')"
-    echo "    -p <port> - TCP port for the Scalaris node"
-    echo "    -y <port> - TCP port for the built-in webserver"
-    echo "    -k <key>  - join at the given key"
-    echo "    -v        - verbose"
+    echo "    -h          - print this help message"
+    echo "    -d          - daemonize"
+    echo "    -e <params> - pass additional parameters to erl"
+    echo "    -f          - first node (to start a new Scalaris instead of joining one) (not with -q)"
+    echo "    -q          - elect first node from known hosts (not with -f)"
+    echo "    -n <name>   - Erlang process name (default 'node')"
+    echo "    -p <port>   - TCP port for the Scalaris node"
+    echo "    -y <port>   - TCP port for the built-in webserver"
+    echo "    -k <key>    - join at the given key"
+    echo "    -v          - verbose"
     echo " services:"
-    echo "    -m        - global Scalaris management server"
-    echo "    -s        - Scalaris node (see also -f)"
+    echo "    -m          - global Scalaris management server"
+    echo "    -s          - Scalaris node (see also -f)"
     echo " commands:"
     echo "    checkinstallation"
-    echo "              - test installation"
-    echo "    start     - start services (see -m and -s)"
-    echo "    stop      - stop a scalaris process defined by its name (see -n)"
-    echo "    restart   - restart a scalaris process by its name (see -n)"
+    echo "                - test installation"
+    echo "    start       - start services (see -m and -s)"
+    echo "    stop        - stop a scalaris process defined by its name (see -n)"
+    echo "    restart     - restart a scalaris process by its name (see -n)"
     echo ""
-    echo "    list      - list locally running Erlang VMs"
-    echo "    debug     - connect to a running node via an Erlang shell"
+    echo "    list        - list locally running Erlang VMs"
+    echo "    debug       - connect to a running node via an Erlang shell"
     echo ""
     exit $1
 }
@@ -289,7 +290,7 @@ scalarisstart(){
         -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
         -connect_all false -hidden -name $NODE_NAME \
         $SCALARIS_ADDITIONAL_PARAMETERS \
-        -s scalaris $*;
+        -s scalaris `echo $erl_flags`;
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not start scalaris"
@@ -315,14 +316,15 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME $*
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME `echo $erl_flags`
 }
 
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifqmsvn:p:y:k:" optionName; do
+while getopts "dhifqmsvn:p:y:k:e:" optionName; do
     case "$optionName" in
+        e) erl_flags=$OPTARG;;
         d) daemonize=1;;
         f) first=1;;
         q) first_quorum=1;;
@@ -357,18 +359,18 @@ case $1 in
         checkinstallation;;
     start)
         shift
-        scalarisstart $*;;
+        scalarisstart;;
     stop)
         scalarisstop;;
     restart)
         scalarisstop
         shift 1
-        scalarisstart $*;;
+        scalarisstart;;
     list)
-        list_erlang_processes $*;;
+        list_erlang_processes;;
     debug)
        shift 1
-       debug $*;;
+       debug;;
     *) usage 1;;
 esac
 
