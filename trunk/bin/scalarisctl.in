@@ -345,6 +345,13 @@ shift $(($OPTIND-1))
 
 fix_node_name
 
+if [ $# -gt 1 ]; then
+    echo "warning: found a command-like parameter ($1), which was not in the last position"
+    echo "         please put commands after all the options"
+    echo "exiting now"
+    exit 1
+fi
+
 case $1 in
     checkinstallation)
         checkinstallation;;
