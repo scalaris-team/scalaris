@@ -24,4 +24,4 @@ DIRNAME=`dirname $ABSPATH`
 
 # start a mgmt_server
 MGMT_NAME_AND_PORTS="-n mgmt_server -p 14194 -y 7999 "
-$DIRNAME/scalarisctl $MGMT_NAME_AND_PORTS -m start $*
+$DIRNAME/scalarisctl $MGMT_NAME_AND_PORTS -m "$@" start
