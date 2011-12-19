@@ -104,7 +104,7 @@ on({del_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
     {Changed, S1} = state_del_entry(State, {Subscriber, WatchedPid, Cookie}),
     %% delete watched pid remotely, if no longer needed
     case Changed of
-        deleted -> _S2 = state_del_watched_pid(S1, WatchedPid);
+        deleted -> _S2 = state_del_watched_pid(S1, WatchedPid, Subscriber);
         unchanged -> S1
     end;
 
@@ -114,7 +114,8 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
     %% entry time is still unmodified since this message was triggered
     RemPids = state_get_rem_pids(State),
     case lists:keyfind(WatchedPid, 1, RemPids) of
-        false -> log:log(error, "req. to delete non watched pid~n"),
+        false -> log:log(warn, "req. to delete non watched pid ~p.~n",
+                         [WatchedPid]),
                  State;
         Entry ->
             NewRemPids =
@@ -439,12 +440,15 @@ state_add_watched_pid(State, WatchedPid) ->
               State, lists:keyreplace(WatchedPid, 1, RemPids, NewEntry))
     end.
 
--spec state_del_watched_pid(state(), comm:mypid()) -> state().
-state_del_watched_pid(State, WatchedPid) ->
+-spec state_del_watched_pid(state(), comm:mypid(), comm:mypid()) -> state().
+state_del_watched_pid(State, WatchedPid, Subscriber) ->
     %% del watched pid remotely, if not longer necessary
     RemPids = state_get_rem_pids(State),
     case lists:keyfind(WatchedPid, 1, RemPids) of
-        false -> log:log(error, "req. to delete non watched pid~n"),
+        false -> log:log(warn,
+                         "req. from ~p (~p) to delete non watched pid ~p.~n",
+                        [Subscriber, pid_groups:group_and_name_of(Subscriber),
+                         WatchedPid]),
                  State;
         Entry ->
             TmpEntry = rempid_dec(Entry),
