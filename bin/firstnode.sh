@@ -26,4 +26,4 @@ DIRNAME=`dirname $ABSPATH`
 # start a dht node (-s)
 # start the first node (declared by -f)
 NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
-$DIRNAME/scalarisctl -m $NODE_NAME_AND_PORTS -s -f start $*
+$DIRNAME/scalarisctl -m $NODE_NAME_AND_PORTS -s -f "$@" start
