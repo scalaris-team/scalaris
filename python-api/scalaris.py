@@ -411,6 +411,56 @@ class DeleteResult(object):
         self.locks_set = locks_set
         self.undefined = undefined
 
+class ConnectionPool(object):
+    """
+    Implements a simple connection pool for Scalaris connections.
+    """
+    
+    def __init__(self, max_connections):
+        """
+        Create a new connection pool with the given maximum number of connections.
+        """
+        self._max_connections = max_connections
+        self._available_conns = []
+        self._checked_out = 0
+    
+    def _new_connection(self):
+        """
+        Creates a new connection for the pool. Override this to use some other
+        connection class than JSONConnection.
+        """
+        return JSONConnection()
+    
+    def get_connection(self):
+        """
+        Gets a connection from the pool. Creates a new connection if necessary.
+        Returns <tt>None</tt> if the maximum number of connections has already
+        been hit.
+        """
+        # TODO: add a variant blocking for at most a given time
+        conn = None
+        if (len(self._available_conns) != 0):
+            conn = self._available_conns.pop(0)
+            self._checked_out += 1
+        elif ((self._max_connections == 0) or (self._checked_out < self._max_connections)):
+            conn = self._new_connection()
+        return conn
+    
+    def release_connection(self, connection):
+        """
+        Puts the given connection back into the pool.
+        """
+        self._available_conns.append(connection)
+        self._checked_out -= 1
+    
+    def close_all(self):
+        """
+        Close all connections to scalaris.
+        """
+        for conn in self._available_conns:
+            conn.close()
+        self._available_conns = []
+
 class TransactionSingleOp(object):
     """
     Single write or read operations on scalaris.
