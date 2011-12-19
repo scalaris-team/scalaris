@@ -89,12 +89,12 @@ We build rpm and deb packages using checkouts from the latest tagged version as 
 || CentOS || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_6/] ||
 || RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_5/] ||
 || RHEL || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_6/] ||
-|| Debian || 5.0 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_5.0/] ||
-|| Debian || 6.0 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/] ||
-|| Ubuntu || 10.04 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/] ||
-|| Ubuntu || 10.10 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.10/] ||
-|| Ubuntu || 11.04 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/] ||
-|| Ubuntu || 11.10 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/] ||
+|| Debian || 5.0 (Lenny) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_5.0/] ||
+|| Debian || 6.0 (Squeeze) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/] ||
+|| Ubuntu || 10.04 (Lucid Lynx) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/] ||
+|| Ubuntu || 10.10 (Maverick Meerkat) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.10/] ||
+|| Ubuntu || 11.04 (Natty Narwhal) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/] ||
+|| Ubuntu || 11.10 (Oneiric Ocelot) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
@@ -125,7 +125,7 @@ This is currently not possible because the Open Build Service does not export a 
 
 === How to add our repository to Debian-based distributions (Debian, Ubuntu)? ===
 
-Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (probably in `/etc/apt/`):
+Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (probably in `/etc/apt/`). _Adapt the URL to the distribution you use (see above)._
 
 {{{
 deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/ ./
@@ -134,8 +134,7 @@ deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/ ./
 Then download our package signing key and add it to your system (as root):
 
 {{{
-wget http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/repodata/repomd.xml.key
-apt-key add repomd.xml.key
+wget -q http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/repodata/repomd.xml.key -O - | sudo apt-key add -
 }}}
 
 Afterwards, installing our Scalaris packages should be possible as usually, e.g. by calling
