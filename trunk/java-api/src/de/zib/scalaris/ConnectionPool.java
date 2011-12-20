@@ -18,7 +18,7 @@ package de.zib.scalaris;
 import java.util.LinkedList;
 
 /**
- * Implements a simple connection pool for Scalaris connections.
+ * Implements a simple (thread-safe) connection pool for Scalaris connections.
  *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.7
@@ -84,8 +84,9 @@ public class ConnectionPool {
 
     /**
      * Tries to get a valid connection from the pool waiting at most
-     * <tt>timeout</tt> milliseconds. If the timeout has been hit, <tt>null</tt>
-     * is returned.
+     * <tt>timeout</tt> milliseconds. Creates a new connection if necessary and
+     * the maximum number of connections has not been hit yet. If the timeout is
+     * hit and no connection is available, <tt>null</tt> is returned.
      *
      * @param timeout
      *            number of milliseconds to wait at most for a valid connection
@@ -97,7 +98,7 @@ public class ConnectionPool {
      * @throws ConnectionException
      *             if creating the connection fails
      */
-    public synchronized Connection getConnection(final long timeout) throws ConnectionException {
+    public Connection getConnection(final long timeout) throws ConnectionException {
         final long timeAtStart = System.currentTimeMillis();
         Connection conn;
         while ((conn = getConnection()) == null) {
@@ -122,7 +123,8 @@ public class ConnectionPool {
     public synchronized void releaseConnection(final Connection conn) {
         availableConns.add(conn);
         --checkedOut;
-        notify();
+        // need to notify all waiting threads so they do not exceed their timeouts
+        notifyAll();
     }
 
     /**
