@@ -40,10 +40,10 @@ def _getResultArray(rows, columns):
     return results
 
 # Creates an random string or binary object from <size> random characters/bytes.
-def _getRandom(size, type):
-    if type == 'string':
+def _getRandom(size, mytype):
+    if mytype == 'string':
         return ''.join(random.choice(string.ascii_uppercase + string.digits) for _x in xrange(size))
-    elif type == 'binary':
+    elif mytype == 'binary':
         return bytearray(random.randrange(0, 256) for _x in xrange(size))
 
 # Prints a result table.
@@ -74,8 +74,8 @@ def _printResults(columns, rows, results, testruns):
         i += 1
 
 def _printException():
-    type, message, trace = sys.exc_info()
-    print str(type) + str(message)
+    mytype, message, trace = sys.exc_info()
+    print str(mytype) + str(message)
     traceback.print_tb(trace)
 
 # Default minimal benchmark.
