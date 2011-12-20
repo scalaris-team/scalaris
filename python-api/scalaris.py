@@ -14,7 +14,8 @@
 #    limitations under the License.
 
 import httplib, urlparse, base64
-import os
+import os, threading, numbers
+from datetime import datetime, timedelta
 try: import simplejson as json
 except ImportError: import json
 
@@ -413,7 +414,7 @@ class DeleteResult(object):
 
 class ConnectionPool(object):
     """
-    Implements a simple connection pool for Scalaris connections.
+    Implements a simple (thread-safe) connection pool for Scalaris connections.
     """
     
     def __init__(self, max_connections):
@@ -422,7 +423,8 @@ class ConnectionPool(object):
         """
         self._max_connections = max_connections
         self._available_conns = []
-        self._checked_out = 0
+        self._checked_out_sema = threading.BoundedSemaphore(value=max_connections)
+        self._wait_cond = threading.Condition()
     
     def _new_connection(self):
         """
@@ -431,27 +433,54 @@ class ConnectionPool(object):
         """
         return JSONConnection()
     
-    def get_connection(self):
+    def _get_connection(self):
         """
         Gets a connection from the pool. Creates a new connection if necessary.
         Returns <tt>None</tt> if the maximum number of connections has already
         been hit.
         """
-        # TODO: add a variant blocking for at most a given time
         conn = None
-        if (len(self._available_conns) != 0):
-            conn = self._available_conns.pop(0)
-            self._checked_out += 1
-        elif ((self._max_connections == 0) or (self._checked_out < self._max_connections)):
+        if self._max_connections == 0:
             conn = self._new_connection()
+        elif self._checked_out_sema.acquire(False):
+            try:
+                conn = self._available_conns.pop(0)
+            except IndexError:
+                conn = self._new_connection()
         return conn
+    
+    def get_connection(self, timeout = None):
+        """
+        Tries to get a valid connection from the pool waiting at most
+        the given timeout. If timeout is an integer, it will be interpreted as
+        a number of milliseconds. Alternatively, timeout can be given as a
+        datetime.timedelta. Creates a new connection if necessary
+        and the maximum number of connections has not been hit yet.
+        If the timeout is hit and no connection is available, <tt>None</tt> is
+        returned.
+        """
+        if timeout == None:
+            return self._get_connection()
+        else:
+            if isinstance(timeout, numbers.Integral ):
+                timeout = timedelta(milliseconds=timeout)
+            start = datetime.now()
+            while True:
+                conn = self._get_connection()
+                if not conn is None:
+                    return conn
+                self._wait_cond.wait(timeout.microseconds / 1000.0)
+                end = datetime.now()
+                if end - start > timeout:
+                    return None
     
     def release_connection(self, connection):
         """
         Puts the given connection back into the pool.
         """
         self._available_conns.append(connection)
-        self._checked_out -= 1
+        self._checked_out_sema.release()
+        self._wait_cond.notify_all()
     
     def close_all(self):
         """
