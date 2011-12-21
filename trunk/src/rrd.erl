@@ -97,10 +97,12 @@ check_timeslot_now(DB) ->
 
 -spec dump(rrd()) -> [{From::time(), To::time(), term()}].
 dump(DB) ->
-    dump_with(DB, fun(_DB, From, To, X) -> {From, To, X} end).
+    dump_with(DB, fun(_DB, From, To, X) ->
+                          {us2timestamp(From), us2timestamp(To), X}
+                  end).
 
--type dump_fun_existing(T) :: fun((rrd(), From::time(), To::time(), Value::term()) -> T).
--type dump_fun_nonexisting(T) :: fun((rrd(), From::time(), To::time()) -> ignore | {keep, T}).
+-type dump_fun_existing(T) :: fun((rrd(), From::internal_time(), To::internal_time(), Value::term()) -> T).
+-type dump_fun_nonexisting(T) :: fun((rrd(), From::internal_time(), To::internal_time()) -> ignore | {keep, T}).
 
 -spec dump_with(rrd(), dump_fun_existing(T)) -> [T].
 dump_with(DB, FunExist) ->
@@ -320,8 +322,8 @@ dump_internal(DB, IndexToFetch, EndIndex, CurrentTime, Rest, FunExist, FunNotExi
 
 dump_internal2(DB, CurrentIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
     Data = DB#rrd.data,
-    From = us2timestamp(CurrentTime),
-    To = us2timestamp(CurrentTime + DB#rrd.slot_length),
+    From = CurrentTime,
+    To = CurrentTime + DB#rrd.slot_length,
     case array:get(CurrentIndex, Data) of
         undefined -> case FunNotExist(DB, From, To) of
                          ignore -> Rest;

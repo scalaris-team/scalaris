@@ -226,24 +226,24 @@ getMonitorData(Monitor, Keys) ->
                                                Value =/= undefined]
     end.
 
--spec monitor_timing_dump_fun_exists(rrd:rrd(), From::util:time(), To::util:time(), Value::term())
+-spec monitor_timing_dump_fun_exists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time(), Value::term())
         -> {TimestampMs::integer(), Count::non_neg_integer(), CountPerS::float(),
             Avg::float(), Min::float(), Max::float(), Stddev::float(),
             Hist::[[Time1_Count2::float() | pos_integer()]]}.
-monitor_timing_dump_fun_exists(_DB, From_, To_, {Sum, Sum2, Count, Min, Max, Hist}) ->
-    Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+monitor_timing_dump_fun_exists(_DB, From_us, To_us, {Sum, Sum2, Count, Min, Max, Hist}) ->
+    Diff_in_s = (To_us - From_us) div 1000,
     CountPerS = Count / Diff_in_s,
     Avg = Sum / Count, Avg2 = Sum2 / Count,
     Stddev = math:sqrt(Avg2 - (Avg * Avg)),
     HistL = [erlang:tuple_to_list(X) || X <- histogram:get_data(Hist)],
-    {round(rrd:timestamp2us(To_) / 1000), Count, CountPerS, Avg, Min, Max, Stddev, HistL}.
+    {round(To_us / 1000), Count, CountPerS, Avg, Min, Max, Stddev, HistL}.
 
--spec monitor_timing_dump_fun_notexists(rrd:rrd(), From::util:time(), To::util:time())
+-spec monitor_timing_dump_fun_notexists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time())
         -> {keep, {TimestampMs::integer(), Count::0, CountPerS::float(),
                    Avg::float(), Min::float(), Max::float(), Stddev::float(),
                    Hist::[{Time::float(), Count::pos_integer()}]}}.
-monitor_timing_dump_fun_notexists(_DB, _From_, To_) ->
-    {keep, {round(rrd:timestamp2us(To_) / 1000), 0, 0.0, 0.0, 0.0, 0.0, 0.0, []}}.
+monitor_timing_dump_fun_notexists(_DB, _From_us, To_us) ->
+    {keep, {round(To_us / 1000), 0, 0.0, 0.0, 0.0, 0.0, 0.0, []}}.
 
 %% @doc Gets the difference in seconds from UTC time to local time.
 -spec get_utc_local_diff_s() -> integer().
