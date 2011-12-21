@@ -37,7 +37,7 @@
 
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
-         get_type/1, get_slot_length/1, get_current_time/1,
+         get_type/1, get_slot_length/1, get_current_time/1, get_value/2,
          add_with/4, timing_with_hist_merge_fun/3]).
 
 % misc
@@ -289,6 +289,15 @@ get_type(DB) -> DB#rrd.type.
 -spec get_current_time(DB::rrd()) -> internal_time().
 get_current_time(DB) ->
     DB#rrd.current_time.
+
+%% @doc If SlotOffset is 0, gets the current value, otherwise the value in a
+%%      previous slot the given offset away from the current one.
+-spec get_value(DB::rrd(), SlotOffset::non_neg_integer()) -> internal_time().
+get_value(DB, 0) ->
+    array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
+get_value(DB, SlotOffset) ->
+    Index = (DB#rrd.current_index + SlotOffset) rem DB#rrd.count,
+    array:get(Index, DB#rrd.data).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
