@@ -129,11 +129,11 @@ on({bulkowner_gather, Id, Target, Msgs, Parents}, State) ->
                        fun(Data2, {PerfRR2, PerfLH2, PerfTX2}) ->
                                case Data2 of
                                    {?MODULE, 'read_read', PerfRR3} ->
-                                       {timing_update_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
+                                       {rrd:timing_with_hist_merge_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
                                    {dht_node, 'lookup_hops', PerfLH3} ->
-                                       {PerfRR2, timing_update_fun(0, PerfLH2, PerfLH3), PerfTX2};
+                                       {PerfRR2, rrd:timing_with_hist_merge_fun(0, PerfLH2, PerfLH3), PerfTX2};
                                    {api_tx, 'req_list', PerfTX3} ->
-                                       {PerfRR2, PerfLH2, timing_update_fun(0, PerfTX2, PerfTX3)}
+                                       {PerfRR2, PerfLH2, rrd:timing_with_hist_merge_fun(0, PerfTX2, PerfTX3)}
                                end
                        end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
              end, {undefined, undefined, undefined}, Msgs),
@@ -155,15 +155,15 @@ on({bulkowner_reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Lead
                       {?MODULE, 'read_read', PerfRR} ->
                           DB = A#state.perf_rr,
                           T = rrd:get_current_time(DB),
-                          A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun timing_update_fun/3)};
+                          A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun rrd:timing_with_hist_merge_fun/3)};
                       {dht_node, 'lookup_hops', PerfLH} ->
                           DB = A#state.perf_lh,
                           T = rrd:get_current_time(DB),
-                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun timing_update_fun/3)};
+                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun rrd:timing_with_hist_merge_fun/3)};
                       {api_tx, 'req_list', PerfTX} ->
                           DB = A#state.perf_tx,
                           T = rrd:get_current_time(DB),
-                          A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun timing_update_fun/3)}
+                          A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun rrd:timing_with_hist_merge_fun/3)}
                   end
           end, Leader, DataL),
     {AllNodes, Leader1};
@@ -173,7 +173,7 @@ on({bulkowner_reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
 
 on({bulkowner_deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg, {AllNodes, Leader} = _State) ->
     ?TRACE1(_Msg, _State),
-    AllNodes1 = integrate_values(OtherState, AllNodes),
+    AllNodes1 = integrate_values(AllNodes, OtherState),
     {AllNodes1, Leader};
 
 on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
@@ -235,17 +235,6 @@ init(null) ->
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec timing_update_fun(Time::rrd:internal_time(), Old::rrd:timing_type(T) | undefined, New::rrd:timing_type(T) | undefined)
-        -> rrd:timing_type(T) | undefined when is_subtype(T, number()).
-timing_update_fun(_Time, undefined, New) ->
-    New;
-timing_update_fun(_Time, Old, undefined) ->
-    Old;
-timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
-                  {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
-    {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
-     erlang:min(Min, NewMin), erlang:max(Max, NewMax), histogram:merge(Hist, NewHist)}.
-
 -spec check_timeslots(#state{}) -> #state{}.
 check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH, perf_tx = PerfTX}) ->
     State#state{perf_rr = rrd:check_timeslot_now(PerfRR),
@@ -272,29 +261,22 @@ reduce_timeslots(N, State) ->
                 perf_lh = rrd:reduce_timeslots(N, State#state.perf_lh),
                 perf_tx = rrd:reduce_timeslots(N, State#state.perf_tx)}.
 
--spec integrate_values(OtherState::#state{}, MyState::#state{}) -> #state{}.
-integrate_values(OtherState, MyState) ->
-    MyPerfRR1 = integrate_value(OtherState#state.perf_rr, MyState#state.perf_rr),
-    MyPerfLH1 = integrate_value(OtherState#state.perf_lh, MyState#state.perf_lh),
-    MyPerfTX1 = integrate_value(OtherState#state.perf_tx, MyState#state.perf_tx),
+%% @doc Integrates values from OtherState by merging all rrd records into MyState.
+-spec integrate_values(MyState::#state{}, OtherState::#state{}) -> #state{}.
+integrate_values(MyState, OtherState) ->
+    MyPerfRR1 = rrd:merge(MyState#state.perf_rr, OtherState#state.perf_rr),
+    MyPerfLH1 = rrd:merge(MyState#state.perf_lh, OtherState#state.perf_lh),
+    MyPerfTX1 = rrd:merge(MyState#state.perf_tx, OtherState#state.perf_tx),
     MyState#state{id = OtherState#state.id,
                   perf_rr = MyPerfRR1, perf_lh = MyPerfLH1, perf_tx = MyPerfTX1}.
-
--spec integrate_value(OtherDB::rrd:rrd(), MyDB::rrd:rrd()) -> rrd:rrd().
-integrate_value(OtherDB, MyDB) ->
-    DataL = rrd:dump_with(OtherDB, fun(_DB, _From, _To, X) -> X end),
-    case DataL of
-        [Data] -> 
-            Time = rrd:get_current_time(OtherDB),
-            rrd:add_with(Time, Data, MyDB, fun timing_update_fun/3);
-        []     -> MyDB
-    end.
 
 %% @doc Checks whether the node is the current leader.
 -spec is_leader(MyRange::intervals:interval()) -> boolean().
 is_leader(MyRange) ->
     intervals:in(?RT:hash_key("0"), MyRange).
 
+%% @doc For each rrd in the given list, accumulate all values in our time span
+%%      into a single timing type value.
 -spec process_rrds(DBs::[{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]) ->
           [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}].
 process_rrds(DBs) ->
@@ -307,7 +289,7 @@ process_rrds(DBs) ->
            case DBDump of
                []      -> [];
                [H | T] ->
-                   Data = lists:foldl(fun(E, A) -> timing_update_fun(0, A, E) end, H, T),
+                   Data = lists:foldl(fun(E, A) -> rrd:timing_with_hist_merge_fun(0, A, E) end, H, T),
                    {Process, Key, Data}
            end
        end || {Process, Key, DB} <- DBs, DB =/= undefined]).

@@ -29,6 +29,7 @@
 
 % external API with transparent time handling
 -export([create/3, add_now/2, check_timeslot_now/1,
+         merge/2,
          dump/1, dump_with/2, dump_with/3]).
 
 % external API without transparent time handling
@@ -37,7 +38,7 @@
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
          get_type/1, get_slot_length/1, get_current_time/1,
-         add_with/4, set_new_update_fun/3, keep_old_update_fun/3]).
+         add_with/4, timing_with_hist_merge_fun/3]).
 
 % misc
 -export([timestamp2us/1, us2timestamp/1, check_config/0]).
@@ -55,6 +56,7 @@
 -type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).
 
 -type timing_type(T) :: {Sum::T, Sum2::T, Count::pos_integer(), Min::T, Max::T, Hist::histogram:histogram()}.
+-type event_type(T) :: [{internal_time(), T}].
 
 -record(rrd, {slot_length   = ?required(rrd, slot_length)   :: timespan(),
               count         = ?required(rrd, count)         :: pos_integer(),
@@ -75,7 +77,8 @@
 % External API with transparent time handling
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% @doc SlotLength in microseconds
+%% @doc Creates a new rrd() record. SlotLength in microseconds, Count is the
+%%      number of time slots to keep, type the type of rrd to create.
 -spec create(SlotLength::timespan(), Count::pos_integer(), Type::timeseries_type()) ->
     rrd().
 create(SlotLength, Count, Type) ->
@@ -111,6 +114,29 @@ dump_with(DB, FunExist, FunNotExist) ->
     dump_internal(DB, (CurrentIndex + 1) rem Count, CurrentIndex,
                   DB#rrd.current_time - (Count - 1) * SlotLength, [], FunExist, FunNotExist).
 
+%% @doc Merges any value of DB2 which is in the current or a future time slot
+%%      of DB1 into it and returns a new rrd.
+%%      Note: gauge rrd values will only be updated if no previous value
+%%      existed since we can not determine which value is newer.
+%%      For any value from DB2 uses (StartTime + EndTime) div 2 as the time for
+%%      adding it.
+-spec merge(DB1::rrd(), DB2::rrd()) -> rrd().
+merge(DB1 = #rrd{type = Type}, DB2 = #rrd{type = Type}) ->
+    MergeFun = case Type of
+        gauge   -> fun gauge_merge_fun/3;
+        counter -> fun counter_merge_fun/3;
+        event   -> fun event_merge_fun/3;
+        {timing, _} -> fun timing_merge_fun/3;
+        {timing_with_hist, _} -> fun timing_with_hist_merge_fun/3
+    end,
+    DataL = dump_with(DB2,
+                      fun(_DB, StartTime, EndTime, X) ->
+                              {(StartTime + EndTime) div 2, X}
+                      end),
+    lists:foldl(fun({TimeX, ValueX}, DBX) ->
+                        add_with(TimeX, ValueX, DBX, MergeFun)
+                end, DB1, DataL).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % Internal API (allows to specify timestamps explicitly)
@@ -126,38 +152,6 @@ create(SlotLength, Count, Type, StartTime) ->
          current_time = StartTime, data = array:new(Count),
          fill_policy = set_undefined}.
 
--spec set_new_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
-set_new_update_fun(_Time, _Old, New) -> New.
-
--spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
-counter_update_fun(_Time, undefined, New) -> New;
-counter_update_fun(_Time, Old, New) -> Old + New.
-
--spec event_update_fun(Time::internal_time(), Old::[{internal_time(), T}] | undefined, NewV)
-        -> [{internal_time(), T | NewV}].
-event_update_fun(Time, undefined, New) -> [{Time, New}];
-event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
-
--spec timing_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
-        -> timing_type(T) when is_subtype(T, number()).
-timing_update_fun(_Time, undefined, New) ->
-    {New, New*New, 1, New, New, histogram:create(0)};
-timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
-    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New), Hist}.
-
--spec timing_with_hist_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
-        -> timing_type(T) when is_subtype(T, number()).
-timing_with_hist_update_fun(_Time, undefined, New) ->
-    Hist = histogram:create(get_timing_hist_size()),
-    {New, New*New, 1, New, New, histogram:add(New, Hist)};
-timing_with_hist_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
-    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New),
-     histogram:add(New, Hist)}.
-
--spec keep_old_update_fun(Time::internal_time(), Old::T | undefined, NewV) -> T | NewV.
-keep_old_update_fun(_Time, undefined, New) -> New;
-keep_old_update_fun(_Time, Old, _New) -> Old.
-
 % @doc Note: gauge, counter and timing types accept only number() as value, event
 %      accepts any value.
 -spec add(Time::time() | internal_time(), Value::term(), rrd()) -> rrd().
@@ -166,7 +160,7 @@ add({_, _, _} = ExternalTime, Value, DB) ->
 add(Time, Value, DB) ->
     case DB#rrd.type of
         gauge ->
-            add_with(Time, Value, DB, fun set_new_update_fun/3);
+            add_with(Time, Value, DB, fun gauge_update_fun/3);
         counter ->
             add_with(Time, Value, DB, fun counter_update_fun/3);
         event ->
@@ -351,6 +345,84 @@ copy_data2(DB, IndexToWrite, CurrentIndex, AccDB) ->
     CurrentData = array:get(CurrentIndex, DB#rrd.data),
     AccData = array:set(IndexToWrite, CurrentData, AccDB#rrd.data),
     AccDB#rrd{data = AccData}.
+
+-spec gauge_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
+gauge_update_fun(_Time, _Old, New) -> New.
+
+-spec counter_update_fun(Time::internal_time(), Old::T | undefined, New::T) -> T when is_subtype(T, number()).
+counter_update_fun(_Time, undefined, New) -> New;
+counter_update_fun(_Time, Old, New) -> Old + New.
+
+-spec event_update_fun(Time::internal_time(), Old::event_type(T) | undefined, NewV)
+        -> event_type(T | NewV).
+event_update_fun(Time, undefined, New) -> [{Time, New}];
+event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
+
+-spec timing_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
+        -> timing_type(T) when is_subtype(T, number()).
+timing_update_fun(_Time, undefined, New) ->
+    {New, New*New, 1, New, New, histogram:create(0)};
+timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
+    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New), Hist}.
+
+-spec timing_with_hist_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
+        -> timing_type(T) when is_subtype(T, number()).
+timing_with_hist_update_fun(_Time, undefined, New) ->
+    Hist = histogram:create(get_timing_hist_size()),
+    {New, New*New, 1, New, New, histogram:add(New, Hist)};
+timing_with_hist_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
+    {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New),
+     histogram:add(New, Hist)}.
+
+-spec keep_old_update_fun(Time::internal_time(), Old::T | undefined, NewV) -> T | NewV.
+keep_old_update_fun(_Time, undefined, New) -> New;
+keep_old_update_fun(_Time, Old, _New) -> Old.
+
+-spec gauge_merge_fun(Time::internal_time(), Old::T | undefined, New::T | undefined)
+        -> T | undefined when is_subtype(T, number()).
+gauge_merge_fun(_Time, undefined, New) -> New;
+gauge_merge_fun(_Time, Old, _New) -> Old.
+
+-spec counter_merge_fun(Time::internal_time(), Old::T | undefined, New::T | undefined)
+        -> T | undefined when is_subtype(T, number()).
+counter_merge_fun(_Time, undefined, New) ->
+    New;
+counter_merge_fun(_Time, Old, undefined) ->
+    Old;
+counter_merge_fun(_Time, Old, New) ->
+    Old + New.
+
+-spec event_merge_fun(Time::internal_time(), Old::event_type(T) | undefined, event_type(NewV) | undefined)
+        -> event_type(T | NewV) | undefined.
+event_merge_fun(_Time, undefined, New) ->
+    New;
+event_merge_fun(_Time, Old, undefined) ->
+    Old;
+event_merge_fun(_Time, Old, New) ->
+    lists:usort(lists:append(Old, New)).
+
+-spec timing_merge_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::timing_type(T) | undefined)
+        -> timing_type(T) | undefined when is_subtype(T, number()).
+timing_merge_fun(_Time, undefined, New) ->
+    New;
+timing_merge_fun(_Time, Old, undefined) ->
+    Old;
+timing_merge_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
+                  {NewSum, NewSum2, NewCount, NewMin, NewMax, _NewHist}) ->
+    {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
+     erlang:min(Min, NewMin), erlang:max(Max, NewMax), Hist}.
+
+-spec timing_with_hist_merge_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::timing_type(T) | undefined)
+        -> timing_type(T) | undefined when is_subtype(T, number()).
+timing_with_hist_merge_fun(_Time, undefined, New) ->
+    New;
+timing_with_hist_merge_fun(_Time, Old, undefined) ->
+    Old;
+timing_with_hist_merge_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
+                  {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
+    {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
+     erlang:min(Min, NewMin), erlang:max(Max, NewMax), histogram:merge(Hist, NewHist)}.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
