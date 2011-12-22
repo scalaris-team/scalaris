@@ -43,9 +43,9 @@
     {get_node_details_response, node_details:node_details()} |
     {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
     {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
-    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}]}} |
+    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
     {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
-    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}]}} |
+    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
     {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
     {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
 
@@ -278,7 +278,7 @@ is_leader(MyRange) ->
 %% @doc For each rrd in the given list, accumulate all values in our time span
 %%      into a single timing type value.
 -spec process_rrds(DBs::[{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]) ->
-          [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type(number())}].
+          [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}].
 process_rrds(DBs) ->
     lists:flatten(
       [begin
