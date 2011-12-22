@@ -39,7 +39,8 @@
 
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
-         get_type/1, get_slot_length/1, get_current_time/1, get_value/2,
+         get_type/1, get_slot_length/1, get_current_time/1,
+         get_value/2, get_value_by_offset/2,
          add_with/4, timing_with_hist_merge_fun/3]).
 
 % misc
@@ -115,11 +116,11 @@ dump_with(DB, FunExist) ->
 
 -spec dump_with(rrd(), dump_fun_existing(T), dump_fun_nonexisting(U)) -> [T | U].
 dump_with(DB, FunExist, FunNotExist) ->
-    SlotLength = DB#rrd.slot_length,
     CurrentIndex = DB#rrd.current_index,
     Count = DB#rrd.count,
     dump_internal(DB, (CurrentIndex + 1) rem Count, CurrentIndex,
-                  DB#rrd.current_time - (Count - 1) * SlotLength, [], FunExist, FunNotExist).
+                  DB#rrd.current_time - (Count - 1) * DB#rrd.slot_length, [],
+                  FunExist, FunNotExist).
 
 %% @doc Merges any value of DB2 which is in the current or a future time slot
 %%      of DB1 into it and returns a new rrd.
@@ -295,12 +296,24 @@ get_type(DB) -> DB#rrd.type.
 get_current_time(DB) ->
     DB#rrd.current_time.
 
+%% @doc Gets the value at the given time or 'undefined' if there is no value.
+-spec get_value(DB::rrd(), Time::util:time() | internal_time()) -> undefined | data_type().
+get_value(DB, {_, _, _} = Time) ->
+    get_value(DB, timestamp2us(Time));
+get_value(DB, InternalTime) when is_integer(InternalTime) ->
+    CurrentIndex = DB#rrd.current_index,
+    Count = DB#rrd.count,
+    EndIndex = (CurrentIndex + 1) rem Count,
+    get_value_internal(
+      DB, InternalTime, CurrentIndex, EndIndex, DB#rrd.current_time).
+
 %% @doc If SlotOffset is 0, gets the current value, otherwise the value in a
 %%      previous slot the given offset away from the current one.
--spec get_value(DB::rrd(), SlotOffset::non_neg_integer()) -> undefined | data_type().
-get_value(DB, 0) ->
+%%      May return 'undefined' if there is no value.
+-spec get_value_by_offset(DB::rrd(), SlotOffset::non_neg_integer()) -> undefined | data_type().
+get_value_by_offset(DB, 0) ->
     array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
-get_value(DB, SlotOffset) ->
+get_value_by_offset(DB, SlotOffset) ->
     Index = (DB#rrd.current_index + SlotOffset) rem DB#rrd.count,
     array:get(Index, DB#rrd.data).
 
@@ -323,6 +336,24 @@ get_slot_type(Time, CurrentTime, StepSize) ->
     FutureSlot = is_future_slot(Time, CurrentTime, StepSize),
     {CurrentSlot, FutureSlot}.
 
+%% @doc Goes through the rrd starting at the current slot and returns the value
+%%      that was recorded at the given time (the time must be in the time slot).
+-spec get_value_internal(rrd(), Time::internal_time(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
+                    CurrentTime::internal_time()) -> data_type() | undefined.
+get_value_internal(DB, Time, EndIndex, EndIndex, CurrentTime) ->
+    case is_current_slot(Time, CurrentTime, DB#rrd.slot_length) of
+        true -> array:get(EndIndex, DB#rrd.data);
+        _    -> undefined
+    end;
+get_value_internal(DB, Time, IndexToFetch, EndIndex, CurrentTime) ->
+    SlotLength = DB#rrd.slot_length,
+    Count = DB#rrd.count,
+    case is_current_slot(Time, CurrentTime, SlotLength) of
+        true -> array:get(IndexToFetch, DB#rrd.data);
+        _    -> get_value_internal(DB, Time, (IndexToFetch + Count - 1) rem Count,
+                                   EndIndex, CurrentTime - SlotLength)
+    end.
+
 -spec dump_internal(rrd(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
                     CurrentTime::internal_time(), Rest::[T],
                     dump_fun_existing(T), dump_fun_nonexisting(U)) -> [T | U].
@@ -330,15 +361,13 @@ dump_internal(DB, EndIndex, EndIndex, CurrentTime, Rest, FunExist, FunNotExist) 
     dump_internal2(DB, EndIndex, CurrentTime, Rest, FunExist, FunNotExist);
 dump_internal(DB, IndexToFetch, EndIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
     NewRest = dump_internal2(DB, IndexToFetch, CurrentTime, Rest, FunExist, FunNotExist),
-    Count = DB#rrd.count,
-    dump_internal(DB, (IndexToFetch + 1) rem Count, EndIndex,
+    dump_internal(DB, (IndexToFetch + 1) rem DB#rrd.count, EndIndex,
                   CurrentTime + DB#rrd.slot_length, NewRest, FunExist, FunNotExist).
 
 dump_internal2(DB, CurrentIndex, CurrentTime, Rest, FunExist, FunNotExist) ->
-    Data = DB#rrd.data,
     From = CurrentTime,
     To = CurrentTime + DB#rrd.slot_length,
-    case array:get(CurrentIndex, Data) of
+    case array:get(CurrentIndex, DB#rrd.data) of
         undefined -> case FunNotExist(DB, From, To) of
                          ignore -> Rest;
                          {keep, X} -> [X | Rest]
