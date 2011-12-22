@@ -24,7 +24,9 @@
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([rrd/0, timing_type/1, internal_time/0]).
+-export_type([rrd/0, data_type/0,
+              gauge_type/0, counter_type/0, timing_type/0, event_type/1,
+              internal_time/0]).
 -endif.
 
 % external API with transparent time handling
@@ -55,8 +57,11 @@
 -type timespan() :: pos_integer().
 -type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).
 
--type timing_type(T) :: {Sum::T, Sum2::T, Count::pos_integer(), Min::T, Max::T, Hist::histogram:histogram()}.
+-type gauge_type() :: number().
+-type counter_type() :: number().
+-type timing_type() :: {Sum::number(), Sum2::number(), Count::pos_integer(), Min::number(), Max::number(), Hist::histogram:histogram()}.
 -type event_type(T) :: [{internal_time(), T}].
+-type data_type() :: gauge_type() | counter_type() | timing_type() | event_type(term()).
 
 -record(rrd, {slot_length   = ?required(rrd, slot_length)   :: timespan(),
               count         = ?required(rrd, count)         :: pos_integer(),
@@ -95,13 +100,13 @@ add_now(Value, DB) ->
 check_timeslot_now(DB) ->
     check_timeslot(os:timestamp(), DB).
 
--spec dump(rrd()) -> [{From::time(), To::time(), term()}].
+-spec dump(rrd()) -> [{From::time(), To::time(), data_type()}].
 dump(DB) ->
     dump_with(DB, fun(_DB, From, To, X) ->
                           {us2timestamp(From), us2timestamp(To), X}
                   end).
 
--type dump_fun_existing(T) :: fun((rrd(), From::internal_time(), To::internal_time(), Value::term()) -> T).
+-type dump_fun_existing(T) :: fun((rrd(), From::internal_time(), To::internal_time(), Value::data_type()) -> T).
 -type dump_fun_nonexisting(T) :: fun((rrd(), From::internal_time(), To::internal_time()) -> ignore | {keep, T}).
 
 -spec dump_with(rrd(), dump_fun_existing(T)) -> [T].
@@ -180,7 +185,7 @@ check_timeslot({_, _, _} = ExternalTime, DB) ->
 check_timeslot(Time, DB) ->
     add_with(Time, undefined, DB, fun keep_old_update_fun/3).
 
--spec add_with(Time::internal_time(), NewV, rrd(), update_fun(term(), NewV)) -> rrd().
+-spec add_with(Time::internal_time(), NewV, rrd(), update_fun(data_type(), NewV)) -> rrd().
 add_with(Time, Value, DB, F) ->
     SlotLength = DB#rrd.slot_length,
     CurrentTime = DB#rrd.current_time,
@@ -203,7 +208,7 @@ add_with(Time, Value, DB, F) ->
             DB
     end.
 
--spec update_with(rrd(), CurrentIndex::non_neg_integer(), Time::internal_time(), NewV, update_fun(term(), NewV)) -> rrd().
+-spec update_with(rrd(), CurrentIndex::non_neg_integer(), Time::internal_time(), NewV, update_fun(data_type(), NewV)) -> rrd().
 update_with(DB, CurrentIndex, Time, NewValue, F) ->
     case array:get(CurrentIndex, DB#rrd.data) of
         undefined ->
@@ -212,7 +217,7 @@ update_with(DB, CurrentIndex, Time, NewValue, F) ->
             DB#rrd{data = array:set(CurrentIndex, F(Time, OldValue, NewValue), DB#rrd.data)}
     end.
 
--spec fill(rrd(), non_neg_integer(), non_neg_integer(), term()) -> rrd().
+-spec fill(rrd(), non_neg_integer(), non_neg_integer(), data_type() | undefined) -> rrd().
 fill(DB, CurrentIndex, CurrentIndex, _LastValue) ->
     DB;
 fill(DB, CurrentGapIndex, CurrentIndex, LastValue) ->
@@ -292,7 +297,7 @@ get_current_time(DB) ->
 
 %% @doc If SlotOffset is 0, gets the current value, otherwise the value in a
 %%      previous slot the given offset away from the current one.
--spec get_value(DB::rrd(), SlotOffset::non_neg_integer()) -> internal_time().
+-spec get_value(DB::rrd(), SlotOffset::non_neg_integer()) -> undefined | data_type().
 get_value(DB, 0) ->
     array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
 get_value(DB, SlotOffset) ->
@@ -369,15 +374,15 @@ counter_update_fun(_Time, Old, New) -> Old + New.
 event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
 
--spec timing_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
-        -> timing_type(T) when is_subtype(T, number()).
+-spec timing_update_fun(Time::internal_time(), Old::timing_type() | undefined, New::number())
+        -> timing_type().
 timing_update_fun(_Time, undefined, New) ->
     {New, New*New, 1, New, New, histogram:create(0)};
 timing_update_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist}, New) ->
     {Sum + New, Sum2 + New*New, Count + 1, erlang:min(Min, New), erlang:max(Max, New), Hist}.
 
--spec timing_with_hist_update_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::T)
-        -> timing_type(T) when is_subtype(T, number()).
+-spec timing_with_hist_update_fun(Time::internal_time(), Old::timing_type() | undefined, New::number())
+        -> timing_type().
 timing_with_hist_update_fun(_Time, undefined, New) ->
     Hist = histogram:create(get_timing_hist_size()),
     {New, New*New, 1, New, New, histogram:add(New, Hist)};
@@ -412,8 +417,8 @@ event_merge_fun(_Time, Old, undefined) ->
 event_merge_fun(_Time, Old, New) ->
     lists:usort(lists:append(Old, New)).
 
--spec timing_merge_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::timing_type(T) | undefined)
-        -> timing_type(T) | undefined when is_subtype(T, number()).
+-spec timing_merge_fun(Time::internal_time(), Old::timing_type() | undefined, New::timing_type() | undefined)
+        -> timing_type() | undefined.
 timing_merge_fun(_Time, undefined, New) ->
     New;
 timing_merge_fun(_Time, Old, undefined) ->
@@ -423,8 +428,8 @@ timing_merge_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
     {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
      erlang:min(Min, NewMin), erlang:max(Max, NewMax), Hist}.
 
--spec timing_with_hist_merge_fun(Time::internal_time(), Old::timing_type(T) | undefined, New::timing_type(T) | undefined)
-        -> timing_type(T) | undefined when is_subtype(T, number()).
+-spec timing_with_hist_merge_fun(Time::internal_time(), Old::timing_type() | undefined, New::timing_type() | undefined)
+        -> timing_type() | undefined.
 timing_with_hist_merge_fun(_Time, undefined, New) ->
     New;
 timing_with_hist_merge_fun(_Time, Old, undefined) ->
