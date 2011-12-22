@@ -30,7 +30,8 @@ all()   -> [simple_create,
             create_timing,
             timestamp,
             add_nonexisting_timeslots,
-            reduce_timeslots
+            reduce_timeslots,
+            tester_empty_rrd
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -138,3 +139,19 @@ timing_perf() ->
     Init = rrd:create(60 * 1000000, 1, {timing, count}),
     _ = lists:foldl(fun(_, Old) -> rrd:add_now(1, Old) end, Init, lists:seq(1, 10000)),
     ok.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intervals:empty/0, intervals:is_empty/1, intervals:in/2 and intervals:is_continuous/1
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::pos_integer(), Type::rrd:timeseries_type(),
+             StartTime::util:time() | rrd:internal_time()) -> boolean().
+prop_empty_rrd(SlotLength, Count, Type, StartTime) ->
+    R=rrd:create(SlotLength, Count, Type, StartTime),
+    ?equals(rrd:dump(R), []),
+    true.
+
+tester_empty_rrd(_Config) ->
+    tester:test(?MODULE, prop_empty_rrd, 4, 500, [{threads, 2}]).
