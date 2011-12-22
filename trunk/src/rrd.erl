@@ -299,15 +299,17 @@ get_current_time(DB) ->
     DB#rrd.current_time.
 
 %% @doc Gets the value at the given time or 'undefined' if there is no value.
--spec get_value(DB::rrd(), Time::util:time() | internal_time()) -> undefined | data_type().
+-spec get_value(DB::rrd(), Time::time() | internal_time()) -> undefined | data_type().
 get_value(DB, {_, _, _} = Time) ->
     get_value(DB, timestamp2us(Time));
 get_value(DB, InternalTime) when is_integer(InternalTime) ->
-    CurrentIndex = DB#rrd.current_index,
-    Count = DB#rrd.count,
-    EndIndex = (CurrentIndex + 1) rem Count,
-    get_value_internal(
-      DB, InternalTime, CurrentIndex, EndIndex, DB#rrd.current_time).
+    case time2slotidx(InternalTime, DB#rrd.current_time, DB#rrd.slot_length,
+                      DB#rrd.current_index, DB#rrd.count) of
+        future -> undefined;
+        past -> undefined;
+        Slot ->
+            array:get(Slot, DB#rrd.data)
+    end.
 
 %% @doc If SlotOffset is 0, gets the current value, otherwise the value in a
 %%      previous slot the given offset away from the current one.
@@ -332,22 +334,21 @@ is_current_slot(Time, CurrentTime, StepSize) ->
 is_future_slot(Time, CurrentTime, StepSize) ->
     CurrentTime + StepSize =< Time.
 
-%% @doc Goes through the rrd starting at the current slot and returns the value
-%%      that was recorded at the given time (the time must be in the time slot).
--spec get_value_internal(rrd(), Time::internal_time(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
-                    CurrentTime::internal_time()) -> data_type() | undefined.
-get_value_internal(DB, Time, EndIndex, EndIndex, CurrentTime) ->
-    case is_current_slot(Time, CurrentTime, DB#rrd.slot_length) of
-        true -> array:get(EndIndex, DB#rrd.data);
-        _    -> undefined
-    end;
-get_value_internal(DB, Time, IndexToFetch, EndIndex, CurrentTime) ->
-    SlotLength = DB#rrd.slot_length,
-    Count = DB#rrd.count,
-    case is_current_slot(Time, CurrentTime, SlotLength) of
-        true -> array:get(IndexToFetch, DB#rrd.data);
-        _    -> get_value_internal(DB, Time, (IndexToFetch + Count - 1) rem Count,
-                                   EndIndex, CurrentTime - SlotLength)
+-spec time2slotidx(Time::internal_time(), CurrentTime::internal_time(),
+                   StepSize::timespan(), CurrentSlot::non_neg_integer(),
+                   SlotCount::pos_integer()) -> non_neg_integer()| future | past.
+time2slotidx(Time, CurrentTime, StepSize, CurrentSlot, SlotCount) ->
+    case is_future_slot(Time, CurrentTime, StepSize) of
+        true -> future;
+        _ ->
+            case is_current_slot(Time, CurrentTime, StepSize) of
+                true -> CurrentSlot;
+                _ ->
+                    SlotOffset = SlotCount + util:floor((Time - CurrentTime) / StepSize),
+                    if SlotOffset > 0 -> (CurrentSlot + SlotOffset) rem SlotCount;
+                       true           -> past
+                    end
+            end
     end.
 
 -spec dump_internal(rrd(), CurrentIdx::non_neg_integer(), EndIdx::non_neg_integer(),
