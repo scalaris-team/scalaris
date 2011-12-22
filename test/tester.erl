@@ -264,6 +264,8 @@ parse_type({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
     {{integer, -Value}, ParseState};
 parse_type({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
+parse_type({type, _Line, array, []}, _Module, ParseState) ->
+    {{builtin_type, array}, ParseState};
 parse_type({type, _Line, dict, []}, _Module, ParseState) ->
     {{builtin_type, dict}, ParseState};
 parse_type({type, _Line, gb_set, []}, _Module, ParseState) ->
