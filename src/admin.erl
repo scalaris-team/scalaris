@@ -30,7 +30,13 @@
 -include("scalaris.hrl").
 
 -type check_ring_deep_error() ::
-        {error, Node::node:node_type(), Preds::nodelist:non_empty_snodelist(), Succs::nodelist:non_empty_snodelist()}.
+        {error,
+         'in_node:', Node::node:node_type(),
+         'predList:', Preds::nodelist:non_empty_snodelist(),
+         'succList:', Succs::nodelist:non_empty_snodelist(),
+         'nodes:', Nodes::nodelist:non_empty_snodelist(),
+         'UnknownPreds:', UnknownPreds::nodelist:snodelist(),
+         'UnknownSuccs:', UnknownSuccs::nodelist:snodelist()}.
 
 %%====================================================================
 %% API functions
@@ -205,7 +211,7 @@ check_ring_deep_foldl({ok, NodeDetails}, {ok, Nodes}) ->
     end;
 check_ring_deep_foldl({failed, _}, Previous) ->
     Previous;
-check_ring_deep_foldl(_, Previous = {error, _Node, _Preds, _Succs}) ->
+check_ring_deep_foldl(_, Previous) ->
     Previous.
 
 -spec number_of_nodes() -> non_neg_integer() | timeout.
