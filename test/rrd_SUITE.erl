@@ -147,11 +147,23 @@ timing_perf() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::pos_integer(), Type::rrd:timeseries_type(),
-             StartTime::util:time() | rrd:internal_time()) -> boolean().
-prop_empty_rrd(SlotLength, Count, Type, StartTime) ->
+                     StartTime::util:time() | rrd:internal_time(),
+                     Offsets::[non_neg_integer(),...],
+                     Times::[util:time() | rrd:internal_time(),...]) -> boolean().
+prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
     R=rrd:create(SlotLength, Count, Type, StartTime),
+    StartTime_us = case StartTime of
+                       {_, _, _} -> rrd:timestamp2us(StartTime);
+                       X         -> X
+                   end,
+    ?equals(rrd:get_slot_start(0, R), StartTime_us),
+    ?equals(rrd:get_type(R), Type),
+    ?equals(rrd:get_slot_length(R), SlotLength),
+    ?equals(rrd:get_current_time(R), StartTime_us),
     ?equals(rrd:dump(R), []),
+    _ = [?equals(rrd:get_value(R, Time), undefined) || Time <- Times],
+    _ = [?equals(rrd:get_value_by_offset(R, Offset), undefined) || Offset <- Offsets],
     true.
 
 tester_empty_rrd(_Config) ->
-    tester:test(?MODULE, prop_empty_rrd, 4, 500, [{threads, 2}]).
+    tester:test(?MODULE, prop_empty_rrd, 6, 500, [{threads, 2}]).
