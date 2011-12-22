@@ -190,23 +190,25 @@ check_timeslot(Time, DB) ->
 add_with(Time, Value, DB, F) ->
     SlotLength = DB#rrd.slot_length,
     CurrentTime = DB#rrd.current_time,
-    {CurrentTimeSlot, FutureTimeSlot} = get_slot_type(Time, CurrentTime, SlotLength),
-    if
-        CurrentTimeSlot ->
+    case is_current_slot(Time, CurrentTime, SlotLength) of
+        true ->
             CurrentIndex = DB#rrd.current_index,
             update_with(DB, CurrentIndex, Time, Value, F);
-        FutureTimeSlot ->
-            Delta = (Time - CurrentTime) div SlotLength,
-            CurrentIndex = (DB#rrd.current_index + Delta) rem DB#rrd.count,
-            % fill with default ???
-            FilledDB = fill(DB, (DB#rrd.current_index + 1) rem DB#rrd.count,
-                            CurrentIndex,
-                            array:get(DB#rrd.current_index, DB#rrd.data)),
-            DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, Value), FilledDB#rrd.data),
-                   current_index = CurrentIndex,
-                   current_time = DB#rrd.current_time + Delta * SlotLength};
-        true -> % PastTimeSlot; ignore
-            DB
+        _ ->
+            case is_future_slot(Time, CurrentTime, SlotLength) of
+                true ->
+                    Delta = (Time - CurrentTime) div SlotLength,
+                    CurrentIndex = (DB#rrd.current_index + Delta) rem DB#rrd.count,
+                    % fill with default ???
+                    FilledDB = fill(DB, (DB#rrd.current_index + 1) rem DB#rrd.count,
+                                    CurrentIndex,
+                                    array:get(DB#rrd.current_index, DB#rrd.data)),
+                    DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, Value), FilledDB#rrd.data),
+                           current_index = CurrentIndex,
+                           current_time = DB#rrd.current_time + Delta * SlotLength};
+                _ -> % PastTimeSlot; ignore
+                    DB
+            end
     end.
 
 -spec update_with(rrd(), CurrentIndex::non_neg_integer(), Time::internal_time(), NewV, update_fun(data_type(), NewV)) -> rrd().
@@ -329,12 +331,6 @@ is_current_slot(Time, CurrentTime, StepSize) ->
 -spec is_future_slot(Time::internal_time(), CurrentTime::internal_time(), StepSize::timespan()) -> boolean().
 is_future_slot(Time, CurrentTime, StepSize) ->
     CurrentTime + StepSize =< Time.
-
--spec get_slot_type(Time::internal_time(), CurrentTime::internal_time(), StepSize::timespan()) -> {boolean(), boolean()}.
-get_slot_type(Time, CurrentTime, StepSize) ->
-    CurrentSlot = is_current_slot(Time, CurrentTime, StepSize),
-    FutureSlot = is_future_slot(Time, CurrentTime, StepSize),
-    {CurrentSlot, FutureSlot}.
 
 %% @doc Goes through the rrd starting at the current slot and returns the value
 %%      that was recorded at the given time (the time must be in the time slot).
