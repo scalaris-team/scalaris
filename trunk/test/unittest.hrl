@@ -39,10 +39,15 @@
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
 -define(assert(Boolean),
-        case Boolean of
-            true  -> ok;
-            false -> ?ct_fail("assertion failed: ~.0p", [??Boolean])
-        end).
+        % wrap in function so that the internal variables are out of the calling function's scope
+        fun() ->
+                case Boolean of
+                    true  -> ok;
+                    UnittestAny ->
+                        unittest_helper:macro_equals_failed(
+                          UnittestAny, true, ??Boolean, true)
+                end
+        end()).
 
 -define(equals(Actual, Expected),
         unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected)).
@@ -55,12 +60,9 @@
         fun() ->
                 case Actual of
                     ExpectedPattern -> ok;
-                    Any ->
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~.0p\" which is "
-                               "not the expected ~s~n",
-                               [??Actual, Any, ??ExpectedPattern])
+                    UnittestAny ->
+                        unittest_helper:macro_equals_failed(
+                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern)
                 end
         end()).
 
@@ -69,13 +71,9 @@
         fun() ->
                 case Actual of
                     ExpectedPattern -> ok;
-                    Any ->
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~.0p\" which is "
-                               "not the expected ~s~n"
-                               "(~s)~n",
-                               [??Actual, Any, ??ExpectedPattern, lists:flatten(Note)])
+                    UnittestAny ->
+                        unittest_helper:macro_equals_failed(
+                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern, Note)
                 end
         end()).
 
@@ -83,20 +81,17 @@
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 try Cmd of
-                    Any -> 
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s evaluated to \"~.0p\"; exception "
-                               "~s:~s was expected~n",
-                               [??Cmd, Any, ??ExceptionType, ??ExceptionPattern])
+                    UnittestAny ->
+                        UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
+                        unittest_helper:macro_equals_failed(
+                          UnittestAny, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr)
                 catch
-                    ExceptionType: ExceptionPattern -> ok;
-                    OtherType: OtherException ->
-                        ct:pal("Failed: Stacktrace ~p~n",
-                               [util:get_stacktrace()]),
-                        ?ct_fail("~s threw exception \"~.0p:~.0p\" but exception "
-                               "~s:~s was expected~n",
-                               [??Cmd, OtherType, OtherException, ??ExceptionType, ??ExceptionPattern])
+                    ExceptionType:ExceptionPattern -> ok;
+                    UnittestOtherType:UnittestOtherException ->
+                        UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
+                        UnittestActExceptionStr = lists:flatten(io_lib:format("exception ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
+                        unittest_helper:macro_equals_failed(
+                          UnittestActExceptionStr, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr)
                 end
         end()).
 
@@ -109,13 +104,13 @@
                     MsgPattern -> ok
                 after
                     Timeout ->
-                        ActualMessage =
+                        UnittestActualMessage =
                             receive
                                 X -> X
                             after
                                 0 -> no_message
                             end,
-                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                 end
         end()).
 -define(expect_message(MsgPattern), ?expect_message_timeout(MsgPattern, 1000)).
@@ -160,35 +155,35 @@
                                     MsgPattern -> ok
                                 after
                                     0 ->
-                                        ActualMessage =
+                                        UnittestActualMessage =
                                             receive
                                                 X -> X
                                             after
                                                 0 -> no_message
                                             end,
-                                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
+                                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                                 end
                             MsgPattern -> ok
                         after
                             Timeout ->
-                                ActualMessage =
+                                UnittestActualMessage =
                                     receive
                                         X -> X
                                     after
                                         0 -> no_message
                                     end,
-                                ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
+                                ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                         end
                     MsgPattern -> ok
                 after
                     Timeout ->
-                        ActualMessage =
+                        UnittestActualMessage =
                             receive
                                 X -> X
                             after
                                 0 -> no_message
                             end,
-                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, ActualMessage])
+                        ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                 end
         end()).
 -define(expect_message_ignore(MsgPattern, IgnoredMessage), ?expect_message_ignore(MsgPattern, IgnoredMessage, 1000)).
