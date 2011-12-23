@@ -570,7 +570,7 @@ macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
         Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr, Note)
     end.
 
--spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> ok | no_return().
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> no_return().
 macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr) ->
     ct:pal("Failed~n"
            " Message    ~s evaluated to~n"
@@ -584,7 +584,7 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr) ->
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal]).
 
--spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> ok | no_return().
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> no_return().
 macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     ct:pal("Failed~n"
            " Message    ~s evaluated to~n"
