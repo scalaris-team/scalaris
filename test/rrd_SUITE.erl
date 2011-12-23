@@ -31,7 +31,9 @@ all()   -> [simple_create,
             timestamp,
             add_nonexisting_timeslots,
             reduce_timeslots,
-            tester_empty_rrd
+            tester_empty_rrd,
+            tester_counter_rrd,
+            tester_gauge_rrd
            ].
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -140,22 +142,22 @@ timing_perf() ->
     _ = lists:foldl(fun(_, Old) -> rrd:add_now(1, Old) end, Init, lists:seq(1, 10000)),
     ok.
 
+%% @doc Converts a time (either a tuple as returned by erlang:now/0 or a number
+%%      representing the number of microseconds since epoch) to the number of
+%%      microseconds since epoch.
+-spec time2us(util:time() | rrd:internal_time()) -> rrd:internal_time().
+time2us({_, _, _} = Time) ->
+    rrd:timestamp2us(Time);
+time2us(Time) ->
+    Time.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% intervals:empty/0, intervals:is_empty/1, intervals:in/2 and intervals:is_continuous/1
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::1..10, Type::rrd:timeseries_type(),
                      StartTime::util:time() | rrd:internal_time(),
                      Offsets::[non_neg_integer(),...],
                      Times::[util:time() | rrd:internal_time(),...]) -> boolean().
 prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
-    R=rrd:create(SlotLength, Count, Type, StartTime),
-    StartTime_us = case StartTime of
-                       {_, _, _} -> rrd:timestamp2us(StartTime);
-                       X         -> X
-                   end,
+    R = rrd:create(SlotLength, Count, Type, StartTime),
+    StartTime_us = time2us(StartTime),
     ?equals(rrd:get_slot_start(0, R), StartTime_us),
     ?equals(rrd:get_type(R), Type),
     ?equals(rrd:get_slot_length(R), SlotLength),
@@ -165,5 +167,102 @@ prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
     _ = [?equals(rrd:get_value_by_offset(R, Offset), undefined) || Offset <- Offsets],
     true.
 
+-type rrd_data() :: [{util:time() | rrd:internal_time(), number()},...].
+-type rrd_data_us() :: [{rrd:internal_time(), number()},...].
+
 tester_empty_rrd(_Config) ->
     tester:test(?MODULE, prop_empty_rrd, 6, 1000, [{threads, 2}]).
+
+-spec round_us_time(Time::rrd:internal_time(), SlotLength::rrd:timespan(),
+                    StartTime::rrd:internal_time()) -> rrd:internal_time().
+%% round_us_time(Time, SlotLength, StartTime) when Time < StartTime ->
+%%     StartTime;
+round_us_time(Time, SlotLength, StartTime) ->
+    case (Time - StartTime) rem SlotLength of
+        X when X >=  0 -> Time - X;
+        X              -> Time - (X + SlotLength)
+    end.
+%%     StartTime + (Time div SlotLength) * SlotLength.
+%%     Time - ((Time - StartTime) rem SlotLength).
+
+%% @doc Merges consecutive data for a 'counter' rrd into a single date item.
+%%      PRE: Data_us2 must be sorted (by its time components) using a stable
+%%           sort.
+-spec merge_conseq_data(Data_us2::rrd_data_us(), gauge | counter, rrd_data_us()) -> rrd_data_us().
+merge_conseq_data([], _, Result) ->
+    lists:reverse(Result);
+merge_conseq_data([X | TD], Type, []) ->
+    merge_conseq_data(TD, Type, [X]);
+merge_conseq_data([{Time, X1} | TD], counter = Type, [{Time, X2} | TR]) ->
+    merge_conseq_data(TD, Type, [{Time, X1 + X2} | TR]);
+merge_conseq_data([{Time, X1} | TD], gauge = Type, [{Time, _X2} | TR]) ->
+    merge_conseq_data(TD, Type, [{Time, X1} | TR]);
+merge_conseq_data([X | TD], Type, Result) ->
+    merge_conseq_data(TD, Type, [X | Result]).
+
+-spec prop_counter_gauge_rrd(SlotLength::rrd:timespan(), Count::1..10,
+                             StartTime::util:time() | rrd:internal_time(),
+                             Data::rrd_data(), Offsets::[non_neg_integer(),...],
+                             Times::[util:time() | rrd:internal_time(),...],
+                             Type::gauge | counter) -> boolean().
+prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, _Offsets, _Times, Type) ->
+    R0 = rrd:create(SlotLength, Count, Type, StartTime),
+    % we need sorted data (old data is not inserted into the rrd, only data in the current time slot)
+    % can not reliably sort the time tuples -> only use rrd:internal_time() but
+    Data_us = lists:keysort(1, [{time2us(TimeX), CountX} || {TimeX, CountX} <- Data]),
+    R1 = lists:foldl(fun ?MODULE:apply/2, R0, Data_us),
+    StartTime_us = time2us(StartTime),
+%%     ct:pal("StartTime_us: ~.0p~n", [StartTime_us]),
+    ?equals(rrd:get_type(R1), Type),
+    ?equals(rrd:get_slot_length(R1), SlotLength),
+%%     ct:pal("Data_us: ~.0p~n", [Data_us]),
+    % round down to StartTime + x * SlotLength:
+    Data_us2 = [{round_us_time(TimeX, SlotLength, StartTime_us), CountX} || {TimeX, CountX} <- Data_us],
+%%     ct:pal("Data_us2: ~.0p~n", [Data_us2]),
+    Times_us2 = [TimeX || {TimeX, _} <- Data_us2],
+    CurTime_us = lists:max([StartTime_us | Times_us2]),
+    ?equals(rrd:get_slot_start(0, R1), CurTime_us),
+    ?equals(rrd:get_current_time(R1), CurTime_us),
+    
+    % check data:
+    MinTime_us = erlang:max(StartTime_us - 1, CurTime_us - Count * SlotLength),
+    Data_us2_merged = merge_conseq_data(Data_us2, Type, []),
+%%     ct:pal("Data_us2_merged: ~.0p~n", [Data_us2_merged]),
+    {DataIn, _DataOut} =
+        lists:partition(fun({TimeX, _}) ->
+                                TimeX > MinTime_us andalso
+                                    TimeX =< CurTime_us
+                        end, Data_us2_merged),
+%%     ct:pal("DataOut: ~.0p~n", [DataOut]),
+%%     ct:pal("DataIn: ~.0p~n", [DataIn]),
+    Dump = rrd:dump_with(R1, fun(_, FromX, _ToX, ValueX) -> {FromX, ValueX} end),
+    % note: dump returns the newest value first
+    ?equals(Dump, lists:reverse(DataIn)),
+%%     ?equals(rrd:dump(R), []),
+%%     _ = [?equals(rrd:get_value(R, Time), undefined) || Time <- Times],
+%%     _ = [?equals(rrd:get_value_by_offset(R, Offset), undefined) || Offset <- Offsets],
+    true.
+
+-spec prop_counter_rrd(SlotLength::rrd:timespan(), Count::1..10,
+                       StartTime::util:time() | rrd:internal_time(),
+                       Data::rrd_data(), Offsets::[non_neg_integer(),...],
+                       Times::[util:time() | rrd:internal_time(),...]) -> boolean().
+prop_counter_rrd(SlotLength, Count, StartTime, Data, Offsets, Times) ->
+    prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times, counter).
+
+tester_counter_rrd(_Config) ->
+    rrd_SUITE:prop_counter_rrd(87, 10, {130,381,3}, [{78,153},{64,-0.236915872440062}], [2,1000], [{388,0,5000}]),
+    rrd_SUITE:prop_counter_rrd(85, 6, 4, [{107,4},{52,0.9981532170299772},{302,4},{232,417}], [126,42,3,4], [{143,255,5},209,138,{5,407,0}]),
+    tester:test(?MODULE, prop_counter_rrd, 6, 5000, [{threads, 2}]).
+
+-spec prop_gauge_rrd(SlotLength::rrd:timespan(), Count::1..10,
+                       StartTime::util:time() | rrd:internal_time(),
+                       Data::rrd_data(), Offsets::[non_neg_integer(),...],
+                       Times::[util:time() | rrd:internal_time(),...]) -> boolean().
+prop_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times) ->
+    prop_counter_gauge_rrd(SlotLength, Count, StartTime, Data, Offsets, Times, gauge).
+
+tester_gauge_rrd(_Config) ->
+    rrd_SUITE:prop_gauge_rrd(87, 10, {130,381,3}, [{78,153},{64,-0.236915872440062}], [2,1000], [{388,0,5000}]),
+    rrd_SUITE:prop_gauge_rrd(85, 6, 4, [{107,4},{52,0.9981532170299772},{302,4},{232,417}], [126,42,3,4], [{143,255,5},209,138,{5,407,0}]),
+    tester:test(?MODULE, prop_gauge_rrd, 6, 5000, [{threads, 2}]).
