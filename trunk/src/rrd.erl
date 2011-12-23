@@ -197,14 +197,32 @@ add_with(Time, Value, DB, F) ->
         _ ->
             case is_future_slot(Time, CurrentTime, SlotLength) of
                 true ->
+                    Count = DB#rrd.count,
+                    CurrentIndex = DB#rrd.current_index,
+                    FillPolicy = DB#rrd.fill_policy,
                     Delta = (Time - CurrentTime) div SlotLength,
-                    CurrentIndex = (DB#rrd.current_index + Delta) rem DB#rrd.count,
-                    % fill with default ???
-                    FilledDB = fill(DB, (DB#rrd.current_index + 1) rem DB#rrd.count,
-                                    CurrentIndex,
-                                    array:get(DB#rrd.current_index, DB#rrd.data)),
-                    DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, Value), FilledDB#rrd.data),
-                           current_index = CurrentIndex,
+                            NewIndex = (CurrentIndex + Delta) rem Count,
+                    FilledData =
+                        case Delta > Count of
+                            true when FillPolicy =:= set_undefined ->
+                                % need to wipe all data clean so that old data
+                                % is not falsely presented for new time slots
+                                % as an optimisation, simply create a new array here
+                                array:new(Count);
+                            true ->
+                                % fill everything:
+                                fill(DB#rrd.data, FillPolicy, Count,
+                                     (CurrentIndex + 1) rem Count,
+                                     CurrentIndex,
+                                     array:get(CurrentIndex, DB#rrd.data));
+                            _ ->
+                                fill(DB#rrd.data, FillPolicy, Count,
+                                     (CurrentIndex + 1) rem Count,
+                                     NewIndex,
+                                     array:get(CurrentIndex, DB#rrd.data))
+                        end,
+                    DB#rrd{data = array:set(NewIndex, F(Time, undefined, Value), FilledData),
+                           current_index = NewIndex,
                            current_time = DB#rrd.current_time + Delta * SlotLength};
                 _ -> % PastTimeSlot; ignore
                     DB
@@ -220,18 +238,18 @@ update_with(DB, CurrentIndex, Time, NewValue, F) ->
             DB#rrd{data = array:set(CurrentIndex, F(Time, OldValue, NewValue), DB#rrd.data)}
     end.
 
--spec fill(rrd(), non_neg_integer(), non_neg_integer(), data_type() | undefined) -> rrd().
-fill(DB, CurrentIndex, CurrentIndex, _LastValue) ->
-    DB;
-fill(DB, CurrentGapIndex, CurrentIndex, LastValue) ->
-    case DB#rrd.fill_policy of
+-spec fill(array(), fill_policy_type(), pos_integer(), non_neg_integer(), non_neg_integer(), data_type() | undefined) -> array().
+fill(Data, _FillPolicy, _Count, CurrentIndex, CurrentIndex, _LastValue) ->
+    Data;
+fill(Data, FillPolicy, Count, CurrentGapIndex, CurrentIndex, LastValue) ->
+    case FillPolicy of
         set_undefined ->
-            fill(DB#rrd{data = array:set(CurrentGapIndex, undefined, DB#rrd.data)},
-                 (CurrentGapIndex + 1) rem DB#rrd.count,
+            fill(array:set(CurrentGapIndex, undefined, Data), FillPolicy, Count,
+                 (CurrentGapIndex + 1) rem Count,
                  CurrentIndex, LastValue);
         keep_last_value ->
-            fill(DB#rrd{data = array:set(CurrentGapIndex, LastValue, DB#rrd.data)},
-                 (CurrentGapIndex + 1) rem DB#rrd.count,
+            fill(array:set(CurrentGapIndex, LastValue, Data), FillPolicy, Count,
+                 (CurrentGapIndex + 1) rem Count,
                  CurrentIndex, LastValue)
     end.
 
