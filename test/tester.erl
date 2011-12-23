@@ -401,10 +401,10 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
            catch
                throw:Term ->
                    {fail, lists:flatten(io_lib:format("exception (throw) in ~.0p:~.0p(): ~.0p~n",
-                            [Module, Func, {exception, Term}]))};
+                            [Module, Func, {exception, {Term, erlang:get_stacktrace()}}]))};
                exit:Reason ->
                    {fail, lists:flatten(io_lib:format("exception (exit) in ~.0p:~.0p(): ~.0p~n",
-                            [Module, Func, {exception, Reason}]))};
+                            [Module, Func, {exception, {Reason, erlang:get_stacktrace()}}]))};
                error:Reason ->
                    {fail, lists:flatten(io_lib:format("exception (error) in ~.0p:~.0p(): ~.0p~n",
                             [Module, Func, {exception, {Reason, erlang:get_stacktrace()}}]))}
@@ -417,14 +417,14 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
     catch
         throw:Term2 ->
             {fail, lists:flatten(io_lib:format("exception (throw) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, Args, {exception, Term2}]))};
+                     [Module, Func, Args, {exception, Term2, erlang:get_stacktrace()}]))};
         % special handling for exits that come from a ct:fail() call:
         exit:{test_case_failed, Reason2} ->
             {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n",
-                     [Module, Func, Args, Reason2]))};
+                     [Module, Func, Args, {Reason2, erlang:get_stacktrace()}]))};
         exit:Reason2 ->
             {fail, lists:flatten(io_lib:format("exception (exit) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, Args, {exception, Reason2}]))};
+                     [Module, Func, Args, {exception, {Reason2, erlang:get_stacktrace()}}]))};
         error:Reason2 ->
             {fail, lists:flatten(io_lib:format("exception (error) in ~.0p:~.0p(~.0p): ~.0p~n",
                      [Module, Func, Args, {exception, {Reason2, erlang:get_stacktrace()}}]))}
