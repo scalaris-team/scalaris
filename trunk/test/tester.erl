@@ -376,60 +376,53 @@ run(Module, Func, Arity, Iterations, ParseState) ->
 run_helper(_Module, _Func, _Arity, 0, _FunType, _TypeInfos) ->
     ok;
 run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType, TypeInfos) ->
-    try erlang:apply(Module, Func, []) of
-        true ->
-            run_helper(Module, Func, 0, Iterations - 1, FunType, TypeInfos);
-        X ->
-            {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n", [Module, Func, [], X]))}
-    catch
-        throw:Term -> {fail, lists:flatten(io_lib:format("exception (throw) in ~.0p:~.0p(~.0p): ~.0p~n",
-                               [Module, Func, [], {exception, Term}]))};
-        % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason} ->
-            {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n",
-                     [Module, Func, [], Reason]))};
-        exit:Reason ->
-            {fail, lists:flatten(io_lib:format("exception (exit) in ~.0p:~.0p(~.0p): ~.0p~n",
-                                [Module, Func, [], {exception, Reason}]))};
-        error:Reason ->
-            {fail, lists:flatten(io_lib:format("exception (error) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, [], {exception, {Reason, erlang:get_stacktrace()}}]))}
-    end;
-run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunType, ParseState) ->
+    apply_args(Module, Func, 0, [], Iterations, FunType, TypeInfos);
+run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunType, TypeInfos) ->
     Size = 30,
-    Args = try tester_value_creator:create_value(ArgType, Size, ParseState)
+    Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
            catch
                throw:Term ->
-                   {fail, lists:flatten(io_lib:format("exception (throw) in ~.0p:~.0p(): ~.0p~n",
-                            [Module, Func, {exception, {Term, erlang:get_stacktrace()}}]))};
+                   {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p(): ~.0p~n",
+                                                      [Module, Func, Term])),
+                    erlang:get_stacktrace()};
                exit:Reason ->
-                   {fail, lists:flatten(io_lib:format("exception (exit) in ~.0p:~.0p(): ~.0p~n",
-                            [Module, Func, {exception, {Reason, erlang:get_stacktrace()}}]))};
+                   {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p(): ~.0p~n",
+                                                      [Module, Func, Reason])),
+                    erlang:get_stacktrace()};
                error:Reason ->
-                   {fail, lists:flatten(io_lib:format("exception (error) in ~.0p:~.0p(): ~.0p~n",
-                            [Module, Func, {exception, {Reason, erlang:get_stacktrace()}}]))}
+                   {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p(): ~.0p~n",
+                                                      [Module, Func, Reason])),
+                    erlang:get_stacktrace()}
     end,
+    apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos).
+
+apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos) ->
     try erlang:apply(Module, Func, Args) of
         true ->
-            run_helper(Module, Func, Arity, Iterations - 1, FunType, ParseState);
+            run_helper(Module, Func, Arity, Iterations - 1, FunType, TypeInfos);
         X ->
-            {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n", [Module, Func, Args, X]))}
-    catch
-        throw:Term2 ->
-            {fail, lists:flatten(io_lib:format("exception (throw) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, Args, {exception, Term2, erlang:get_stacktrace()}]))};
-        % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason2} ->
             {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n",
-                     [Module, Func, Args, {Reason2, erlang:get_stacktrace()}]))};
-        exit:Reason2 ->
-            {fail, lists:flatten(io_lib:format("exception (exit) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, Args, {exception, {Reason2, erlang:get_stacktrace()}}]))};
-        error:Reason2 ->
-            {fail, lists:flatten(io_lib:format("exception (error) in ~.0p:~.0p(~.0p): ~.0p~n",
-                     [Module, Func, Args, {exception, {Reason2, erlang:get_stacktrace()}}]))}
+                                               [Module, Func, [], X])),
+             no_stacktrace}
+    catch
+        throw:Term ->
+            {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p: ~.0p~n",
+                                               [Module, Func, Term])),
+             erlang:get_stacktrace()};
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, Reason} ->
+            {fail, lists:flatten(io_lib:format("failed in ~.0p:~.0p failed with ~.0p~n",
+                                               [Module, Func, Reason])),
+             erlang:get_stacktrace()};
+        exit:Reason ->
+            {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p: ~.0p~n",
+                                               [Module, Func, Reason])),
+             erlang:get_stacktrace()};
+        error:Reason ->
+            {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p: ~.0p~n",
+                                               [Module, Func, Reason])),
+             erlang:get_stacktrace()}
     end.
-
 
 -spec run_test/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
                      tester_parse_state:state(), integer()) -> ok.
@@ -444,7 +437,11 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
     %ct:pal("~w~n", [Results]),
     _ = [fun (Result) ->
                  case Result of
-                     {fail, Message} -> ?ct_fail("~.0p", [Message]);
+                     {fail, Message, StackTrace} ->
+                         ct:pal("Failed"),
+                         ct:pal(" Message    ~p~n", [Message]),
+                         ct:pal(" Stacktrace ~p~n", [StackTrace]),
+                         ?ct_fail("~.0p", [Message]);
                      ok -> ok
                  end
          end(XResult) || XResult <- Results],
