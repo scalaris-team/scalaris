@@ -41,6 +41,7 @@
          init_per_group/2, end_per_group/2,
          get_ring_data/0, print_ring_data/0,
          macro_equals/4, macro_equals/5,
+         macro_equals_failed/4, macro_equals_failed/5,
          expect_no_message_timeout/1,
          prepare_config/1,
          start_minimal_procs/3, stop_minimal_procs/1,
@@ -559,36 +560,42 @@ print_ring_data() ->
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr) ->
     case Actual of
         ExpectedVal -> ok;
-        Any ->
-            ct:pal("Failed~n"
-                   " Message    ~s evaluated to~n"
-                   "             \"~.0p\"~n"
-                   "            which is not the expected ~s that evaluates to~n"
-                   "             \"~.0p\"~n"
-                   " Stacktrace ~p~n",
-                   [ActualStr, Any, ExpectedStr, ExpectedVal,
-                    util:get_stacktrace()]),
-            ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n",
-                     [ActualStr, Any, ExpectedStr, ExpectedVal])
+        Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr)
     end.
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> ok | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     case Actual of
         ExpectedVal -> ok;
-        Any ->
-            ct:pal("Failed~n"
-                   " Message    ~s evaluated to~n"
-                   "             \"~.0p\"~n"
-                   "            which is not the expected ~s that evaluates to~n"
-                   "             \"~.0p\"~n"
-                   "            (~s)~n"
-                   " Stacktrace ~p~n",
-                   [ActualStr, Any, ExpectedStr, ExpectedVal, lists:flatten(Note),
-                    util:get_stacktrace()]),
-            ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~s)~n",
-                     [ActualStr, Any, ExpectedStr, ExpectedVal, lists:flatten(Note)])
+        Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr, Note)
     end.
+
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> ok | no_return().
+macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr) ->
+    ct:pal("Failed~n"
+           " Message    ~s evaluated to~n"
+           "             \"~.0p\"~n"
+           "            which is not the expected ~s that evaluates to~n"
+           "             \"~.0p\"~n"
+           " Stacktrace ~p~n",
+           [ActualStr, ActualVal, ExpectedStr, ExpectedVal,
+            util:get_stacktrace()]),
+    ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n",
+             [ActualStr, ActualVal, ExpectedStr, ExpectedVal]).
+
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> ok | no_return().
+macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
+    ct:pal("Failed~n"
+           " Message    ~s evaluated to~n"
+           "             \"~.0p\"~n"
+           "            which is not the expected ~s that evaluates to~n"
+           "             \"~.0p\"~n"
+           "            (~s)~n"
+           " Stacktrace ~p~n",
+           [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note),
+            util:get_stacktrace()]),
+    ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~s)~n",
+             [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note)]).
 
 -spec expect_no_message_timeout(Timeout::pos_integer()) -> ok | no_return().
 expect_no_message_timeout(Timeout) ->
