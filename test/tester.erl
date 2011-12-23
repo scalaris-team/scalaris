@@ -402,25 +402,25 @@ apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos) ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, TypeInfos);
         X ->
             {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n",
-                                               [Module, Func, [], X])),
+                                               [Module, Func, Args, X])),
              no_stacktrace}
     catch
         throw:Term ->
-            {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p: ~.0p~n",
-                                               [Module, Func, Term])),
+            {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p(~.0p): ~.0p~n",
+                                               [Module, Func, Args, Term])),
              erlang:get_stacktrace()};
         % special handling for exits that come from a ct:fail() call:
         exit:{test_case_failed, Reason} ->
-            {fail, lists:flatten(io_lib:format("failed in ~.0p:~.0p failed with ~.0p~n",
-                                               [Module, Func, Reason])),
+            {fail, lists:flatten(io_lib:format("~.0p:~.0p(~.0p) failed with ~.0p~n",
+                                               [Module, Func, Args, Reason])),
              erlang:get_stacktrace()};
         exit:Reason ->
-            {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p: ~.0p~n",
-                                               [Module, Func, Reason])),
+            {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p(~.0p): ~.0p~n",
+                                               [Module, Func, Args, Reason])),
              erlang:get_stacktrace()};
         error:Reason ->
-            {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p: ~.0p~n",
-                                               [Module, Func, Reason])),
+            {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p(~.0p): ~.0p~n",
+                                               [Module, Func, Args, Reason])),
              erlang:get_stacktrace()}
     end.
 
