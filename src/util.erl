@@ -31,7 +31,8 @@
          logged_exec/1,
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          first_matching/2,
-         get_stacktrace/0, dump/0, dump2/0, dump3/0,
+         get_stacktrace/0, get_linetrace/0, get_linetrace/1,
+         dump/0, dump2/0, dump3/0,
          minus_all/2, minus_first/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
@@ -280,6 +281,15 @@ get_stacktrace() ->
         catch exit:_ -> erlang:get_stacktrace()
         end,
     ST.
+
+-spec get_linetrace() -> term() | undefined.
+get_linetrace() ->
+    erlang:get(test_server_loc).
+
+-spec get_linetrace(Pid::pid()) -> term() | undefined.
+get_linetrace(Pid) ->
+    {dictionary, Dict} = erlang:process_info(Pid, dictionary),
+    dump_extract_from_list_may_not_exist(Dict, test_server_loc).
 
 %% @doc Extracts a given ItemInfo from an ItemList that has been returned from
 %%      e.g. erlang:process_info/2 for the dump* methods.

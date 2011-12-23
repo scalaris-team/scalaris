@@ -577,9 +577,10 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr) ->
            "             \"~.0p\"~n"
            "            which is not the expected ~s that evaluates to~n"
            "             \"~.0p\"~n"
-           " Stacktrace ~p~n",
+           " Stacktrace ~p~n"
+           " Linetrace  ~p~n",
            [ActualStr, ActualVal, ExpectedStr, ExpectedVal,
-            util:get_stacktrace()]),
+            util:get_stacktrace(), util:get_linetrace()]), %erlang:get(test_server_loc)
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal]).
 
@@ -591,9 +592,10 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
            "            which is not the expected ~s that evaluates to~n"
            "             \"~.0p\"~n"
            "            (~s)~n"
-           " Stacktrace ~p~n",
+           " Stacktrace ~p~n"
+           " Linetrace  ~p~n",
            [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note),
-            util:get_stacktrace()]),
+            util:get_stacktrace(), util:get_linetrace()]),
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~s)~n",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note)]).
 
