@@ -438,9 +438,9 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
     _ = [fun (Result) ->
                  case Result of
                      {fail, Message, StackTrace} ->
-                         ct:pal("Failed"),
-                         ct:pal(" Message    ~p~n", [Message]),
-                         ct:pal(" Stacktrace ~p~n", [StackTrace]),
+                         ct:pal("Failed~n"
+                                " Message    ~p~n"
+                                " Stacktrace ~p~n", [Message, StackTrace]),
                          ?ct_fail("~.0p", [Message]);
                      ok -> ok
                  end
