@@ -381,18 +381,9 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
     Size = 30,
     Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
            catch
-               throw:Term ->
-                   {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p(): ~.0p~n",
-                                                      [Module, Func, Term])),
-                    erlang:get_stacktrace(), util:get_linetrace()};
-               exit:Reason ->
-                   {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p(): ~.0p~n",
-                                                      [Module, Func, Reason])),
-                    erlang:get_stacktrace(), util:get_linetrace()};
-               error:Reason ->
-                   {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p(): ~.0p~n",
-                                                      [Module, Func, Reason])),
-                    erlang:get_stacktrace(), util:get_linetrace()}
+               Error:Reason ->
+                   {fail, Error, tester_value_creator, create_value, [ArgType, Size, TypeInfos],
+                    Reason, erlang:get_stacktrace(), util:get_linetrace()}
     end,
     apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos).
 
@@ -401,27 +392,12 @@ apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos) ->
         true ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, TypeInfos);
         X ->
-            {fail, lists:flatten(io_lib:format("error ~.0p:~.0p(~.0p) failed with ~.0p~n",
-                                               [Module, Func, Args, X])),
-             no_stacktrace, util:get_linetrace()}
+            {fail, test_case_failed, Module, Func, Args, X, no_stacktrace, util:get_linetrace()}
     catch
-        throw:Term ->
-            {fail, lists:flatten(io_lib:format("throw in ~.0p:~.0p(~.0p): ~.0p~n",
-                                               [Module, Func, Args, Term])),
-             erlang:get_stacktrace(), util:get_linetrace()};
-        % special handling for exits that come from a ct:fail() call:
         exit:{test_case_failed, Reason} ->
-            {fail, lists:flatten(io_lib:format("~.0p:~.0p(~.0p) failed with ~.0p~n",
-                                               [Module, Func, Args, Reason])),
-             erlang:get_stacktrace(), util:get_linetrace()};
-        exit:Reason ->
-            {fail, lists:flatten(io_lib:format("exit in ~.0p:~.0p(~.0p): ~.0p~n",
-                                               [Module, Func, Args, Reason])),
-             erlang:get_stacktrace(), util:get_linetrace()};
-        error:Reason ->
-            {fail, lists:flatten(io_lib:format("error in ~.0p:~.0p(~.0p): ~.0p~n",
-                                               [Module, Func, Args, Reason])),
-             erlang:get_stacktrace(), util:get_linetrace()}
+            {fail, test_case_failed, Module, Func, Args, Reason, erlang:get_stacktrace(), util:get_linetrace()};
+        Error:Reason ->
+            {fail, Error, Module, Func, Args, Reason, erlang:get_stacktrace(), util:get_linetrace()}
     end.
 
 -spec run_test/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
@@ -437,13 +413,18 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
     %ct:pal("~w~n", [Results]),
     _ = [fun (Result) ->
                  case Result of
-                     {fail, Message, StackTrace, LineTrace} ->
+                     {fail, Error, Module, Func, Args, Term, StackTrace, LineTrace} ->
+                         ArgsStr = case lists:flatten([io_lib:format(", ~1000p", [Arg]) || Arg <- Args]) of
+                                       [$,, $ | X] -> X;
+                                       X -> X
+                                   end,
                          ct:pal("Failed~n"
-                                " Message    ~p~n"
+                                " Message    ~p in ~1000p:~1000p(~s):~n"
+                                "            ~p~n"
                                 " Stacktrace ~p~n"
                                 " Linetrace  ~p~n",
-                                [Message, StackTrace, LineTrace]),
-                         ?ct_fail("~.0p", [Message]);
+                                [Error, Module, Func, ArgsStr, Term, StackTrace, LineTrace]),
+                         ?ct_fail("~.0p in ~.0p:~.0p(~.0p): ~.0p", [Error, Module, Func, Args, Term]);
                      ok -> ok
                  end
          end(XResult) || XResult <- Results],
