@@ -146,7 +146,7 @@ timing_perf() ->
 % intervals:empty/0, intervals:is_empty/1, intervals:in/2 and intervals:is_continuous/1
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::pos_integer(), Type::rrd:timeseries_type(),
+-spec prop_empty_rrd(SlotLength::rrd:timespan(), Count::1..10, Type::rrd:timeseries_type(),
                      StartTime::util:time() | rrd:internal_time(),
                      Offsets::[non_neg_integer(),...],
                      Times::[util:time() | rrd:internal_time(),...]) -> boolean().
@@ -166,4 +166,4 @@ prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
     true.
 
 tester_empty_rrd(_Config) ->
-    tester:test(?MODULE, prop_empty_rrd, 6, 500, [{threads, 2}]).
+    tester:test(?MODULE, prop_empty_rrd, 6, 1000, [{threads, 2}]).
