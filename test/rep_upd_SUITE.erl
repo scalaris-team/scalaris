@@ -50,6 +50,7 @@ all() ->
     [get_symmetric_keys_test,
      blobCoding,
      mapInterval,
+     tester_minKeyInInterval,
      bloomSync_simple,
      bloomSync_FprCompare_check,
      bloomSync_times,
@@ -58,15 +59,15 @@ all() ->
      merkleSync_noOutdated,
      merkleSync_simple,
      merkleSync_parts,
-     merkleSync_min_nodes,
-     artSync_noOutdated,
-     artSync_simple,
-     artSync_min_nodes
+     merkleSync_min_nodes
+     %artSync_noOutdated,
+     %artSync_simple
+     %artSync_min_nodes
      ].
 
 suite() ->
     [
-     {timetrap, {seconds, 30}}
+     {timetrap, {seconds, 15}}
     ].
 
 init_per_suite(Config) ->
@@ -144,12 +145,15 @@ get_symmetric_keys_test(Config) ->
     ok.
 
 blobCoding(_) ->
-    KeyOrg = 180000001,
-    Coded = rep_upd_recon:encodeBlob(KeyOrg, 4),
-    {Key, Ver} = rep_upd_recon:decodeBlob(Coded),
-    ct:pal("Coded=[~p] ; decoded key=[~p] val=[~p]", [Coded, Key, Ver]),
-    ?equals(Key, KeyOrg),
-    ?equals(Ver, 4),
+    A = 180000001,
+    B = 4,
+    Coded = rep_upd_recon:encodeBlob(A, B),
+    {DA, DB} = rep_upd_recon:decodeBlob(Coded),
+    ct:pal("A=~p ; B=~p 
+            Coded=[~p] 
+            decoded A=[~p] B=[~p]", [A, B, Coded, DA, DB]),
+    ?equals(A, DA),
+    ?equals(B, DB),
     ok.
 
 mapInterval(_) ->
@@ -163,6 +167,22 @@ mapInterval(_) ->
                   end, 
                   [1,2,3]),
     ok.
+
+-spec prop_minKeyInInterval(?RT:key(), ?RT:key()) -> true.
+prop_minKeyInInterval(L, L) -> true;
+prop_minKeyInInterval(LeftI, RightI) ->
+    I = intervals:new('[', LeftI, RightI, ']'),    
+    Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
+    AnyK = lists:nth(randoms:rand_uniform(1, length(Keys)), Keys),
+    MinLeft = rep_upd_recon:minKeyInInterval(AnyK, I),
+    ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
+    ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK),
+    true.
+
+tester_minKeyInInterval(_) ->
+    randoms:start(),
+    tester:test(?MODULE, prop_minKeyInInterval, 2, 10, [{threads, 2}]),
+    randoms:stop().    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bloom Filter Tests

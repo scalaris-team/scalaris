@@ -27,14 +27,16 @@
 -export([init/1, on/2, start/2, check_config/0]).
 
 %export for testing
--export([encodeBlob/2, decodeBlob/1, 
+-export([encodeBlob/2, decodeBlob/1,
+         minKeyInInterval/2,
          mapInterval/2, map_key_to_quadrant/2, 
          get_key_quadrant/1, get_interval_quadrant/1]).
 
 -ifdef(with_export_type_support).
--export_type([recon_method/0, recon_struct/0, recon_stage/0, keyValVers/0]).
+-export_type([method/0, recon_struct/0, recon_stage/0]).
 -endif.
 
+-define(RESOLVE_METHOD, simple).
 
 -define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE(X,Y), ok).
@@ -52,10 +54,13 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type recon_method() :: bloom | merkle_tree | art | undefined.
--type recon_stage()  :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
--type keyValVers()   :: {?RT:key(), ?DB:value(), ?DB:version()}.
--type exit_reason()  :: empty_interval | {ok, atom()}.
+-type method()         :: bloom | merkle_tree | art | undefined.
+-type recon_stage()    :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
+-type exit_reason()    :: empty_interval | {ok, atom()}.
+
+-type db_entry_enc()   :: binary().
+-type db_as_list_enc() :: [db_entry_enc()].
+-type db_chunk_enc()   :: {intervals:interval(), db_as_list_enc()}.
 
 -record(bloom_recon_struct, 
         {
@@ -71,7 +76,7 @@
 
 -type recon_struct() :: bloom_recon_struct() |
                         merkle_tree:merkle_tree() |
-                        art:art() |
+                        art:art() |                        
                         [internal_params()].
 
 -record(ru_recon_state,
@@ -80,7 +85,7 @@
          ownerRemotePid     = ?required(ru_recon_state, ownerRemotePid) :: comm:mypid(),
          dhtNodePid         = ?required(ru_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_ru_pid        = undefined                                 :: comm:mypid() | undefined,
-         recon_method       = undefined                                 :: recon_method(),   %determines the build sync struct
+         recon_method       = undefined                                 :: method(),   %determines the build sync struct
          recon_struct       = {}                                        :: recon_struct() | {},
          recon_stage        = reconciliation                            :: recon_stage(),
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
@@ -95,10 +100,10 @@
 
 -type message() ::
     {get_state_response, intervals:interval()} |
-    {get_chunk_response, rep_upd:db_chunk()} |
+    {get_chunk_response, db_chunk_enc()} |
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
     {check_node_response, ok | not_found | fail_is_leaf | fail_node, intervals:interval(), [merkle_tree:mt_node_key()]} |
-    {start_recon, recon_method(), recon_stage(), recon_struct(), Master::boolean()} |
+    {start_recon, method(), recon_stage(), recon_struct(), Master::boolean()} |
     {shutdown, exit_reason()} | 
     {crash, DeadPid::comm:mypid()}.
 
@@ -110,8 +115,9 @@ on({get_state_response, MyInterval}, State =
        #ru_recon_state{ recon_stage = build_struct,
                         recon_method = bloom,
                         dhtNodePid = DhtNodePid }) ->
-    comm:send_local(DhtNodePid, {get_chunk, self(), MyInterval, get_max_items(bloom)}),
-    State;
+    ?TRACE("MyI=~p~nMappedTo1=~p", [MyInterval, mapInterval(MyInterval, 1)]),
+    send_chunk_req(DhtNodePid, self(), MyInterval, mapInterval(MyInterval, 1), get_max_items(bloom)),
+    State#ru_recon_state{ recon_struct = [{interval, MyInterval}] };
 
 on({get_state_response, MyInterval}, State = 
        #ru_recon_state{ recon_stage = req_shared_interval,
@@ -147,17 +153,13 @@ on({get_state_response, MyInterval}, State =
             ?TRACE("SYNC CLIENT - INTERSECTION EMPTY", []),
             comm:send_local(self(), {shutdown, intersection_empty});
         false ->
-            %comm:send_local(DhtNodePid, 
-            %                {get_chunk, self(), Intersection, get_max_items(RMethod)}) %only one merkle sync if active
-            comm:send_local(DhtNodePid, 
-                            {get_chunk, self(), 
-                             mapInterval_to_range(Intersection, MyInterval, 2), 
-                             get_max_items(RMethod)})
+            MyIntersec = mapInterval_to_range(Intersection, MyInterval, 2),
+            send_chunk_req(DhtNodePid, self(), MyIntersec, Intersection, get_max_items(RMethod))
     end,
     State#ru_recon_state{ recon_stage = build_struct,
                           recon_struct = [{interval, Intersection}] };
 
-on({get_state_response, MyInterval}, State = 
+on({get_state_response, MyI}, State = 
        #ru_recon_state{ recon_stage = res_shared_interval,
                         recon_method = RMethod,
                         recon_struct = Params,
@@ -165,32 +167,34 @@ on({get_state_response, MyInterval}, State =
                         dest_ru_pid = ClientRU_Pid}) ->
     Interval = util:proplist_get_value(interval, Params),
     ClientPid = util:proplist_get_value(senderPid, Params),
-    MappedIntersec = mapInterval(Interval, get_interval_quadrant(MyInterval)),
-    case intervals:is_subset(MappedIntersec, MyInterval) of
+    MyIntersec = mapInterval(Interval, get_interval_quadrant(MyI)),
+    case intervals:is_subset(MyIntersec, MyI) of
         false ->
             ?TRACE("SYNC MASTER - INTERSEC NOT IN MY I", []),
             comm:send_local(self(), {shutdown, negotiate_interval_master}),            
             comm:send(ClientPid, {shutdown, no_interval_intersection});
         true ->
             RMethod =:= merkle_tree andalso fd:subscribe(ClientRU_Pid),
-            comm:send_local(DhtNodePid, 
-                            {get_chunk, self(), MappedIntersec, get_max_items(RMethod)})
+            send_chunk_req(DhtNodePid, self(), MyIntersec, Interval, get_max_items(RMethod))
     end,    
     State#ru_recon_state{ recon_stage = build_struct, 
                           sync_pid = ClientPid };
 
-on({get_state_response, NodeDBInterval}, State = 
+on({get_state_response, MyI}, State = 
        #ru_recon_state{ recon_stage = reconciliation,
                         recon_method = bloom,
                         dhtNodePid = DhtNodePid,
                         recon_struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
-    SyncInterval = intervals:intersection(NodeDBInterval, BloomI),
-    case intervals:is_empty(SyncInterval) of
+    MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
+    MySyncI = intervals:intersection(MyI, MyBloomI),
+    %?TRACE("BloomI=~p ; MyBloomI=~p ; MySyncI=~p", [BloomI, MyBloomI, MySyncI]),
+    case intervals:is_empty(MySyncI) of
         true ->
             comm:send_local(self(), {shutdown, empty_interval});
         false ->
-            comm:send_local(DhtNodePid, {get_chunk, self(), SyncInterval, get_max_items(bloom)})
+            send_chunk_req(DhtNodePid, self(), MySyncI, 
+                           mapInterval(MySyncI, 1), get_max_items(bloom))
     end,
     State;
 
@@ -198,35 +202,39 @@ on({get_chunk_response, {_, []}}, State) ->
     comm:send_local(self(), {shutdown, req_chunk_is_empty}),
     State;
 
-on({get_chunk_response, {RestI, [First | T] = DBList}}, State =
+on({get_chunk_response, {RestI, DBList}}, State =
        #ru_recon_state{ recon_stage = build_struct,
-                        recon_method = bloom,                            
+                        recon_method = bloom,        
+                        recon_struct = Params,                    
                         sync_round = Round,
                         dhtNodePid = DhtNodePid,
                         ownerRemotePid = MyRU_Pid,
                         sync_master = SyncMaster,
                         stats = Stats }) ->
+    MyI = util:proplist_get_value(interval, Params),
+    %Get Interval of DBList/Chunk
+    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)    
+    ChunkI = mapInterval(MyI, 1),
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE2("FORK RECON", []),
             {ok, Pid} = fork_recon(State, Round + 0.1),
-            comm:send_local(DhtNodePid, {get_chunk, Pid, RestI, get_max_items(bloom)});
+            send_chunk_req(DhtNodePid, Pid, RestI, 
+                           mapInterval(RestI, get_interval_quadrant(ChunkI)), 
+                           get_max_items(bloom));
         _ -> ok
     end,
-    %Get Interval of DBList
-    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)
-    ChunkI = intervals:new('[', db_entry:get_key(First), db_entry:get_key(lists:last(T)), ']'),
     ?TRACE2("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
     {BuildTime, SyncStruct} = 
         util:tc(fun() -> build_recon_struct(bloom, {ChunkI, DBList}, {get_fpr()}) end),
     case SyncMaster of
         true ->
-            ?TRACE("SEND BLOOM - time=~p", [now()]),
-            DestKey = select_sync_node(ChunkI),
+            DestKey = select_sync_node(MyI),
             comm:send_local(DhtNodePid, 
                             {lookup_aux, DestKey, 0, 
                              {send_to_group_member, rep_upd, 
                               {request_recon, MyRU_Pid, Round, false, reconciliation, bloom, SyncStruct}}}),
+            ?TRACE("BLOOM SEND RECON REQUEST TO Key: ~p", [DestKey]),
             comm:send_local(self(), {shutdown, {ok, build_struct}});
         _ -> ok
     end,
@@ -243,7 +251,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         ownerRemotePid = OwnerPid,
                         dhtNodePid = DhtNodePid,
                         sync_round = Round,
-                        stats = Stats })  ->    
+                        stats = Stats })  ->
     {BuildTime, MerkleTree} = 
         case merkle_tree:is_merkle_tree(Params) of
             true -> %extend tree
@@ -257,10 +265,11 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                     {}) 
                         end)
         end,
+    ?TRACE("MERKLE TREE BUILD FINISHED", []),
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE("TREE EXISTS - ADD REST - RestI=~p", [RestI]),
-            comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items(merkle_tree)}),
+            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(merkle_tree)),%MappedI is wrong
             State#ru_recon_state{ recon_struct = MerkleTree, 
                                   stats = 
                                       ru_recon_stats:set([{build_time, BuildTime}], 
@@ -332,38 +341,39 @@ on({get_chunk_response, {[], DBList}}, State =
 on({get_chunk_response, {RestI, DBList}}, State = 
        #ru_recon_state{ recon_stage = reconciliation,
                         recon_method = bloom,
-                        dhtNodePid = DhtNodePid,                        
-                        ownerRemotePid = OwnerPid,
+                        dhtNodePid = DhtNodePid,
+                        ownerLocalPid = Owner,
                         dest_ru_pid = DestRU_Pid,
-                        recon_struct = #bloom_recon_struct{ keyBF = KeyBF,
+                        recon_struct = #bloom_recon_struct{ interval = BloomI, 
+                                                            keyBF = KeyBF,
                                                             versBF = VersBF},
-                        sync_master = Master,
                         sync_round = Round }) ->
-    ?TRACE2("GetChunk Res - Recon Bloom Round=~p", [Round]),
+    %?TRACE("GetChunk Res - Recon Bloom Round=~p~nBloomI=~p", [Round, BloomI]),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
-        comm:send_local(DhtNodePid, {get_chunk, self(), RestI, get_max_items(bloom)}),
-    %set reconciliation
+        send_chunk_req(DhtNodePid, self(), RestI, 
+                       mapInterval(RestI, get_interval_quadrant(BloomI)), 
+                       get_max_items(bloom)),
+    %set reconciliation - TODO rewrite filterPartitionMap to list comprehension
     {Obsolete, _Missing} = 
-        filterPartitionMap(fun(A) -> 
-                                   db_entry:get_version(A) > -1 andalso
-                                       not ?REP_BLOOM:is_element(VersBF, concatKeyVer(A)) 
+        filterPartitionMap(fun(Filter) -> 
+                                   not ?REP_BLOOM:is_element(VersBF, Filter) 
                            end,
-                           fun(B) -> 
-                                   ?REP_BLOOM:is_element(KeyBF, minKey(db_entry:get_key(B)))
+                           fun(Partition) -> 
+                                   {MinKey, _} = decodeBlob(Partition),
+                                   ?REP_BLOOM:is_element(KeyBF, MinKey)
                            end,
-                           fun(C) ->
-                                   { minKey(db_entry:get_key(C)), 
-                                     db_entry:get_value(C), 
-                                     db_entry:get_version(C) }
+                           fun(C) -> 
+                                   {K, _} = decodeBlob(C), 
+                                   K 
                            end,
                            DBList),
+    ?TRACE("Reconcile Bloom Round=~p~nFoundObsolete=~p", [Round, length(Obsolete)]),
     %TODO: Possibility to resolve missing replicas
     length(Obsolete) > 0 andalso
-        comm:send(DestRU_Pid, {request_resolve, Round, simple, {simple_detail_sync, Obsolete},
-                               {Master andalso get_do_feedback(), OwnerPid}, 
-                               {false, OwnerPid}}),
+        comm:send_local(Owner, {request_resolve, {key_sync, ?RESOLVE_METHOD, DestRU_Pid, Obsolete}, []}),
+    %TODO: eval THIS METHOD IS only called by Clients?
     SyncFinished andalso
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
@@ -423,7 +433,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
        #ru_recon_state{ sync_pid = SyncDest,
                         dest_ru_pid = SrcNode,
                         stats = Stats, 
-                        ownerRemotePid = OwnerPid,
+                        ownerLocalPid = OwnerPid,
                         recon_struct = Tree,
                         sync_round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
@@ -469,11 +479,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec add_to_tree(?DB:db_as_list(), merkle_tree:merkle_tree()) -> merkle_tree:merkle_tree().
 add_to_tree(DBItems, MTree) ->
-    TreeI = merkle_tree:get_interval(MTree),
-    lists:foldl(fun({Key, Val, _, _, Ver}, Tree) ->
-                        MinKey = minKeyInInterval(Key, TreeI),
-                        merkle_tree:insert(MinKey, encodeBlob(Ver, Val), Tree)
-                end, 
+    lists:foldl(fun(DBEntryEnc, Tree) -> merkle_tree:insert(DBEntryEnc, Tree) end, 
                 MTree, 
                 DBItems).
 
@@ -492,25 +498,24 @@ compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
 % @doc Starts simple sync for a given node, returns number of leaf sync requests.
 -spec reconcileNode(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> non_neg_integer().
 reconcileNode(Node, Conf) ->
-    Count = case merkle_tree:is_leaf(Node) of
-                true -> reconcileLeaf(Node, Conf);
-                false -> lists:foldl(fun(X, Acc) -> 
-                                             Acc + reconcileNode(X, Conf) 
-                                     end, 
-                                     0, 
-                                     merkle_tree:get_childs(Node))
-            end,
-    Count.
+    case merkle_tree:is_leaf(Node) of
+        true -> reconcileLeaf(Node, Conf);
+        false -> lists:foldl(fun(X, Acc) -> 
+                                     Acc + reconcileNode(X, Conf) 
+                             end, 
+                             0, 
+                             merkle_tree:get_childs(Node))
+    end.
 -spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> 1.
-reconcileLeaf(Node, {DestPid, Round, OwnerPid}) ->
-    ToSync = lists:map(fun({Key, Value}) -> 
-                               {Ver, Val} = decodeBlob(Value),
-                               {Key, Val, Ver}
+reconcileLeaf(Node, {Dest, Round, Owner}) ->
+    ToSync = lists:map(fun(KeyVer) -> 
+                           case decodeBlob(KeyVer) of
+                               {K, _} -> K;
+                               _ -> KeyVer
+                            end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send(DestPid, 
-              {request_resolve, Round, simple, {simple_detail_sync, ToSync},
-               {true, OwnerPid}, {false, OwnerPid}}),
+    comm:send_local(Owner, {request_resolve, {key_sync, ?RESOLVE_METHOD, Dest, ToSync}, []}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -567,8 +572,8 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(Method, DB_Chunk, Args) -> Recon_Struct when
-      is_subtype(Method,       recon_method()),
-      is_subtype(DB_Chunk,     rep_upd:db_chunk()),
+      is_subtype(Method,       method()),
+      is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
       is_subtype(Args,         build_args()),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
 
@@ -585,7 +590,7 @@ build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
                        };
 
 build_recon_struct(merkle_tree, {I, DBItems}, _) ->
-    Tree = add_to_tree(DBItems, merkle_tree:new(I)),
+    Tree = merkle_tree:bulk_build(I, DBItems),
     merkle_tree:gen_hash(Tree);
 
 build_recon_struct(art, Chunk, _) ->
@@ -598,7 +603,7 @@ build_recon_struct(art, Chunk, _) ->
 %% @doc Create two bloom filter of a given database chunk.
 %%      One over all keys and one over all keys concatenated with their version.
 -spec fill_bloom(DB, KeyBloom, VersionBloom) -> {KeyBloom2, VersionBloom2} when
-      is_subtype(DB,            ?DB:db_as_list()),
+      is_subtype(DB,            db_as_list_enc()),
       is_subtype(KeyBloom,      ?REP_BLOOM:bloom_filter()),
       is_subtype(VersionBloom,  ?REP_BLOOM:bloom_filter()),
       is_subtype(KeyBloom2,     ?REP_BLOOM:bloom_filter()),
@@ -606,16 +611,37 @@ build_recon_struct(art, Chunk, _) ->
 
 fill_bloom([], KeyBF, VerBF) ->
     {KeyBF, VerBF};
-fill_bloom([{_, _, _, _, -1} | T], KeyBF, VerBF) ->
-    fill_bloom(T, KeyBF, VerBF);
-fill_bloom([{Key, _, _, _, Ver} | T], KeyBF, VerBF) ->
-    AddKey = minKey(Key),
-    NewKeyBF = ?REP_BLOOM:add(KeyBF, AddKey),
-    NewVerBF = ?REP_BLOOM:add(VerBF, encodeBlob(AddKey, Ver)),
-    fill_bloom(T, NewKeyBF, NewVerBF).
+fill_bloom([DB_Entry_Enc | T], KeyBF, VerBF) ->
+    {KeyOnly, _} = decodeBlob(DB_Entry_Enc),
+    fill_bloom(T, 
+               ?REP_BLOOM:add(KeyBF, KeyOnly), 
+               ?REP_BLOOM:add(VerBF, DB_Entry_Enc)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Sends get_chunk request to local DHT_node process.
+%      Request responses a list of encoded key-version pairs in ChunkI, 
+%      where key is mapped to its assosiated key in MappedI.
+-spec send_chunk_req(DhtPid, AnswerPid, ChunkI, DestI, MaxItems) -> ok when
+    is_subtype(DhtPid,    comm:erl_local_pid()),
+    is_subtype(AnswerPid, comm:erl_local_pid()),
+    is_subtype(ChunkI,    intervals:interval()),
+    is_subtype(DestI,     intervals:interval()),
+    is_subtype(MaxItems,  pos_integer()).
+send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
+    comm:send_local(
+      DhtPid, 
+      {get_chunk, SrcPid, I, 
+       fun(Item) -> db_entry:get_version(Item) =/= -1 end,
+       fun(Item) -> 
+               encodeBlob(minKeyInInterval(db_entry:get_key(Item), DestI), 
+                          db_entry:get_version(Item)) 
+       end,
+       MaxItems}),
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @ doc filter, partition and map items of a list in one run
@@ -634,6 +660,8 @@ filterPartitionMap(Filter, Pred, Map, [H | T], Satis, NonSatis) ->
         false -> filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis)
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc selects a random associated key of an interval ending
 -spec select_sync_node(intervals:interval()) -> ?RT:key().
 select_sync_node(Interval) ->
@@ -644,22 +672,14 @@ select_sync_node(Interval) ->
               ']' -> RKey
           end,
     Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-    lists:nth(random:uniform(erlang:length(Keys)), Keys).
-
-% @doc transforms a key to its smallest associated key
--spec minKey(?RT:key()) -> ?RT:key().
-minKey(Key) ->
-    lists:min(?RT:get_replica_keys(Key)).
+    randoms:start(),
+    Dest = lists:nth(random:uniform(erlang:length(Keys)), Keys),
+    randoms:stop(),
+    Dest.
 
 -spec minKeyInInterval(?RT:key(), intervals:interval()) -> ?RT:key().
 minKeyInInterval(Key, I) ->
-    minKeyInI(I, lists:sort(?RT:get_replica_keys(Key))).
-
-minKeyInI(I, [H|T]) ->
-    case intervals:in(H, I) of
-        true -> H;
-        false -> minKeyInI(I, T)
-    end.
+    erlang:hd([K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)]).
 
 -spec map_key_to_quadrant(?RT:key(), pos_integer()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
@@ -719,21 +739,20 @@ mapInterval_to_range(SrcI, DestRange, Q) ->
         false -> mapInterval_to_range(mapInterval(SrcI, Q), DestRange, Q + 1)
     end.
 
--spec concatKeyVer(db_entry:entry()) -> binary().
-concatKeyVer(DBEntry) ->
-    encodeBlob(minKey(db_entry:get_key(DBEntry)), db_entry:get_version(DBEntry)).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec encodeBlob(?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()) -> binary().
+-spec encodeBlob(?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()) -> db_entry_enc().
 encodeBlob(A, B) -> 
     term_to_binary([A, "#", B]).
 
--spec decodeBlob(binary()) -> {?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()} | fail.
-decodeBlob(Blob) ->
+-spec decodeBlob(db_entry_enc()) -> {?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()} | fail.
+decodeBlob(Blob) when is_binary(Blob) ->
     L = binary_to_term(Blob),
     case length(L) of
         3 -> {hd(L), lists:last(L)};
-       _ -> fail
-    end.
+        _ -> fail
+    end;
+decodeBlob(_) -> fail.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
@@ -790,7 +809,7 @@ get_do_feedback() ->
 get_fpr() ->
     config:read(rep_update_recon_fpr).
 
--spec get_max_items(recon_method()) -> pos_integer().
+-spec get_max_items(method()) -> pos_integer().
 get_max_items(ReconMethod) ->
     case ReconMethod of
         merkle_tree -> all;
