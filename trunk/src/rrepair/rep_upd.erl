@@ -29,11 +29,6 @@
 
 -export([start_link/1, init/1, on/2, check_config/0]).
 
--ifdef(with_export_type_support).
--export_type([db_chunk/0]).
--endif.
-
-
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE_RECON(X,Y), ok).
@@ -50,8 +45,6 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type db_chunk() :: {intervals:interval(), ?DB:db_as_list()}.
-
 -record(rep_upd_state,
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
@@ -65,16 +58,14 @@
     {?TRIGGER_NAME} |
     {get_state, Sender::comm:mypid(), Key::atom()} |
     {request_recon, SenderRUPid::comm:mypid(), Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
-        rep_upd_recon:recon_method(), rep_upd_recon:recon_struct()} |
-    {request_resolve, Round::float(), rep_upd_resolve:ru_resolve_method(), 
-        rep_upd_resolve:ru_resolve_struct(), 
-        rep_upd_resolve:ru_resolve_answer(), rep_upd_resolve:ru_resolve_answer()} |
+        rep_upd_recon:method(), rep_upd_recon:recon_struct()} |
+    {request_resolve, rep_upd_resolve:operation(), rep_upd_resolve:options()} |
     {recon_forked} | 
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
         Master::boolean(), Stats::ru_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
-        Stats::rep_upd_resolve:ru_resolve_stats()}.
+        Stats::rep_upd_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -118,9 +109,8 @@ on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct},
     comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
     State#rep_upd_state{ open_recon = OpenRecon + 1 };
 
-on({request_resolve, Round, RMethod, RStruct, Feedback, SendStats}, 
-   State = #rep_upd_state{ open_resolve = OpenResolve }) ->
-    _ = rep_upd_resolve:start(Round, RMethod, RStruct, Feedback, SendStats),
+on({request_resolve, Operation, Options}, State = #rep_upd_state{ open_resolve = OpenResolve }) ->
+    _ = rep_upd_resolve:start(Operation, Options),
     State#rep_upd_state{ open_resolve = OpenResolve + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -135,10 +125,10 @@ on({recon_progress_report, Sender, Round, Master, Stats}, State) ->
                [Round, Sender, Master, ru_recon_stats:print(Stats), OpenRecon]),
     State#rep_upd_state{ open_recon = OpenRecon };
 
-on({resolve_progress_report, Sender, Round, Stats}, State) ->
+on({resolve_progress_report, Sender, Stats}, State) ->
     OpenResolve = State#rep_upd_state.open_resolve - 1,
-    ?TRACE_RESOLVE("RESOLVE OK - Round=~p - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
-           [Round, Sender, rep_upd_resolve:print_resolve_stats(Stats),
+    ?TRACE_RESOLVE("RESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
+           [Sender, rep_upd_resolve:print_resolve_stats(Stats),
             State#rep_upd_state.open_recon, OpenResolve]),    
     State#rep_upd_state{ open_resolve = OpenResolve };
 
@@ -199,11 +189,11 @@ check_config() ->
         _ -> true
     end.
 
--spec get_resolve_method() -> rep_upd_resolve:ru_resolve_method().
+-spec get_resolve_method() -> rep_upd_resolve:method().
 get_resolve_method() ->
     config:read(rep_update_resolve_method).
 
--spec get_recon_method() -> rep_upd_recon:recon_method().
+-spec get_recon_method() -> rep_upd_recon:method().
 get_recon_method() -> 
 	config:read(rep_update_recon_method).
 

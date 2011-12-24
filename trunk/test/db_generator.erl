@@ -21,47 +21,46 @@
 %%%-------------------------------------------------------------------
 %% @version $Id: $
 
--module(merkle_tree_builder).
+-module(db_generator).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -include("scalaris.hrl").
 
--export([build/3]).
+-export([get_db/3]).
 
 -type distribution() :: uniform.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec build(Tree, AddCount, Distribution) -> MerkleTree when
-    is_subtype(Tree,         merkle_tree:merkle_tree()),
-    is_subtype(AddCount,     pos_integer()),
-    is_subtype(Distribution, distribution()),
-    is_subtype(MerkleTree,   merkle_tree:merkle_tree()).
-build(Tree, AddCount, uniform) ->
-    build_tree_uniform(Tree, [{merkle_tree:get_interval(Tree), AddCount}]).
-
+-ifdef(with_export_type_support).
+-export_type([distribution/0]).
+-endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Local Functions
+
+-spec get_db(intervals:interval(), non_neg_integer(), distribution()) -> [?RT:key()].
+get_db(Interval, ItemCount, Distribution) ->
+    case Distribution of
+        uniform -> uniform_key_list([{Interval, ItemCount}], []);
+        _ -> []
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-build_tree_uniform(Tree, []) ->
-    merkle_tree:gen_hash(Tree);
-build_tree_uniform(Tree, [{I, Add} | R]) ->    
+-spec uniform_key_list([{Interval, ToAdd}], Acc::[Key]) -> [Key] when
+    is_subtype(Interval, intervals:interval()),
+    is_subtype(ToAdd,    non_neg_integer()),
+    is_subtype(Key,      ?RT:key()).
+uniform_key_list([], KeyList) -> KeyList;
+uniform_key_list([{I, Add} | R], KeyList) ->    
     case Add > 100 of
         true -> 
             [I1, I2] = intervals:split(I, 2),
-            build_tree_uniform(Tree, [{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R]);
+            uniform_key_list([{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R], KeyList);
         false -> 
             {_, IL, IR, _} = intervals:get_bounds(I),
             ToAdd = util:for_to_ex(1, Add, 
                                    fun(Index) -> 
                                            ?RT:get_split_key(IL, IR, {Index, Add}) 
                                    end),
-            NTree = lists:foldl(fun(Key, AccTree) -> 
-                                        merkle_tree:insert(Key, Key, AccTree) 
-                                end,
-                                Tree, ToAdd),
-            build_tree_uniform(NTree, R)                                  
+            uniform_key_list(R, lists:append(ToAdd, KeyList))                                  
     end.

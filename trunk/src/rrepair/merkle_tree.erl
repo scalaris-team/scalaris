@@ -25,7 +25,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/2, insert/3, empty/0,
+-export([new/1, new/2, insert/2, empty/0,
+         bulk_build/2, bulk_build/3,
          lookup/2, size/1, size_detail/1,
          gen_hash/1, iterator/1, next/1,
          is_empty/1, is_leaf/1, get_bucket/1,
@@ -51,7 +52,7 @@
 
 -type mt_node_key()     :: binary() | nil.
 -type mt_interval()     :: intervals:interval(). 
--type mt_bucket()       :: orddict:orddict() | nil.
+-type mt_bucket()       :: [].
 -type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 -type hash_fun()        :: fun((binary()) -> mt_node_key()).
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
@@ -62,8 +63,7 @@
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
          leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation - 
-         gen_hash_on    = value             :: value | key      %node hash will be generated on value or an key         
+         inner_hf       = get_XOR_fun()     :: inner_hash_fun() %hash function for inner node signature creation -          
          }).
 -type mt_config() :: #mt_config{}.
 
@@ -99,29 +99,29 @@ get_root(_) -> undefined.
 %      Returns an empty merkle tree ready for work.
 -spec empty() -> merkle_tree().
 empty() ->
-    {merkle_tree, #mt_config{}, {nil, 0, nil, intervals:empty(), []}}.
+    {merkle_tree, #mt_config{}, {nil, 0, [], intervals:empty(), []}}.
 
 -spec is_empty(merkle_tree()) -> boolean().
-is_empty({merkle_tree, _, {nil, 0, nil, I, []}}) -> intervals:is_empty(I);
+is_empty({merkle_tree, _, {nil, 0, [], I, []}}) -> intervals:is_empty(I);
 is_empty(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec new(mt_interval()) -> merkle_tree().
 new(Interval) ->
-    {merkle_tree, #mt_config{}, {nil, 0, orddict:new(), Interval, []}}.
+    new(Interval, []).
 
 % @doc ConfParams = list of tuples defined by {config field name, value}
 %       e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(mt_interval(), [{atom(), term()}]) -> merkle_tree().
 new(Interval, ConfParams) ->
-    {merkle_tree, build_config(ConfParams), {nil, 0, orddict:new(), Interval, []}}.
+    {merkle_tree, build_config(ConfParams), {nil, 0, [], Interval, []}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec lookup(Interval, TreeObj) -> Node | not_found when
+-spec lookup(Interval, Tree) -> Node | not_found when
       is_subtype(Interval, mt_interval()),
-      is_subtype(TreeObj,  merkle_tree() | mt_node()),
+      is_subtype(Tree,     merkle_tree() | mt_node()),
       is_subtype(Node,     mt_node()).
 lookup(I, {merkle_tree, _, Root}) ->
     lookup(I, Root);
@@ -179,43 +179,41 @@ is_merkle_tree(_) -> false.
 
 -spec get_bucket(merkle_tree() | mt_node()) -> [{Key::term(), Value::term()}].
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
-get_bucket({_, C, Bucket, _, []}) when C > 0 -> orddict:to_list(Bucket);
+get_bucket({_, C, Bucket, _, []}) when C > 0 -> Bucket;
 get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert(Key::term(), Val::term(), merkle_tree()) -> merkle_tree().
-insert(Key, Val, {merkle_tree, Config, Root} = Tree) ->
+-spec insert(Key::term(), merkle_tree()) -> merkle_tree().
+insert(Key, {merkle_tree, Config, Root} = Tree) ->
     case intervals:in(Key, get_interval(Root)) of
         true ->
-            Changed = insert_to_node(Key, Val, Root, Config),
-            {merkle_tree, Config, Changed};
+            NewRoot = insert_to_node(Key, Root, Config),
+            {merkle_tree, Config, NewRoot};
         false -> Tree
     end.
 
--spec insert_to_node(Key, Val, Node, Config) -> NewNode when
+-spec insert_to_node(Key, Node, Config) -> NewNode when
       is_subtype(Key,     term()),
-      is_subtype(Val,     term()),
       is_subtype(Node,    mt_node()),
       is_subtype(Config,  mt_config()),
       is_subtype(NewNode, mt_node()).
-insert_to_node(Key, Val, {Hash, Count, Bucket, Interval, []} = Node, Config) 
+insert_to_node(Key, {Hash, Count, Bucket, Interval, []}, Config) 
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
-    case orddict:is_key(Key, Bucket) of
-        true -> Node;
-        false -> {Hash, Count + 1, orddict:store(Key, Val, Bucket), Interval, []}
-    end;
+    %TODO: check if key is already in bucket
+    {Hash, Count + 1, [Key | Bucket], Interval, []};
 
-insert_to_node(Key, Val, {_, Count, Bucket, Interval, []}, Config) 
+insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config) 
   when Count =:= Config#mt_config.bucket_size ->    
     ChildI = intervals:split(Interval, Config#mt_config.branch_factor),
     NewLeafs = lists:map(fun(I) -> 
-                              NewBucket = orddict:filter(fun(K, _) -> intervals:in(K, I) end, Bucket),
-                              {nil, orddict:size(NewBucket), NewBucket, I, []}
+                                 %TODO possibile optimiziation impl filter&count function
+                              NewBucket = lists:filter(fun(K) -> intervals:in(K, I) end, Bucket),
+                              {nil, length(NewBucket), NewBucket, I, []}
                          end, ChildI),
-    insert_to_node(Key, Val, {nil, 1 + Config#mt_config.branch_factor, nil, Interval, NewLeafs}, Config);
+    insert_to_node(Key, {nil, 1 + Config#mt_config.branch_factor, [], Interval, NewLeafs}, Config);
 
-insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs} = Node, Config) ->
+insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
     {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
     case length(_Dest) =:= 0 of
         true ->
@@ -224,9 +222,43 @@ insert_to_node(Key, Val, {Hash, Count, nil, Interval, Childs} = Node, Config) ->
         false ->
             Dest = hd(_Dest),
             OldSize = node_size(Dest),
-            NewDest = insert_to_node(Key, Val, Dest, Config),
-            {Hash, Count + (node_size(NewDest) - OldSize), nil, Interval, [NewDest|Rest]}
+            NewDest = insert_to_node(Key, Dest, Config),
+            {Hash, Count + (node_size(NewDest) - OldSize), [], Interval, [NewDest|Rest]}
     end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec bulk_build(mt_interval(), [term()]) -> merkle_tree().
+bulk_build(I, L) ->
+    bulk_build(I, [], L).
+
+-spec bulk_build(Interval, Params, KeyList) -> MerkleTree when
+    is_subtype(Interval,   mt_interval()),
+    is_subtype(Params,     [{atom(), term()}]),
+    is_subtype(KeyList,    [term()]),
+    is_subtype(MerkleTree, merkle_tree()).
+bulk_build(I, Params, KeyList) ->
+    InitNode = {nil, 1, [], I, []},
+    Config = build_config(Params),
+    {merkle_tree, Config, p_bulk_build(InitNode, Config, KeyList)}.
+
+p_bulk_build({_, C, _, I, _}, 
+             #mt_config{ branch_factor = Branch } = Config, 
+             KeyList) ->
+    ChildsI = intervals:split(I, Branch),
+    IKList = keys_to_intervals(KeyList, ChildsI),
+    ChildNodes = build_childs(IKList, Config, []),
+    NCount = lists:foldl(fun(N, Acc) -> Acc + node_size(N) end, 0, ChildNodes),
+    {nil, C + NCount, [], I, ChildNodes}.
+
+build_childs([], _, Acc) ->
+    Acc;
+build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
+    BucketSize = Config#mt_config.bucket_size,
+    Node = case Count > BucketSize of
+               true -> p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
+               false -> {nil, Count, Bucket, Interval, []}
+           end,
+    build_childs(T, Config, [Node | Acc]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -238,24 +270,18 @@ gen_hash({merkle_tree, Config, Root}) ->
       is_subtype(Node,   mt_node()),
       is_subtype(Config, mt_config()),
       is_subtype(Node2,  mt_node()).
-gen_hash_node({_, Count, Bucket, I, []}, Config = #mt_config{ gen_hash_on = HashProp }) ->
+gen_hash_node({_, Count, Bucket, I, []}, Config) ->
     LeafHf = Config#mt_config.leaf_hf,
     Hash = case Count > 0 of
-               true ->
-                   ToHash = case HashProp of
-                                key -> orddict:fetch_keys(Bucket);
-                                value -> lists:map(fun({_, V}) -> V end, 
-                                                   orddict:to_list(Bucket))
-                            end,
-                   LeafHf(erlang:term_to_binary(ToHash));
+               true -> LeafHf(erlang:term_to_binary(Bucket));
                _ -> LeafHf(term_to_binary(0))
            end,
     {Hash, Count, Bucket, I, []};
-gen_hash_node({_, Count, nil, I, List}, Config) ->    
+gen_hash_node({_, Count, [], I, List}, Config) ->    
     NewChilds = lists:map(fun(X) -> gen_hash_node(X, Config) end, List),
     InnerHf = Config#mt_config.inner_hf,
     Hash = InnerHf(lists:map(fun({H, _, _, _, _}) -> H end, NewChilds)),
-    {Hash, Count, nil, I, NewChilds}.
+    {Hash, Count, [], I, NewChilds}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -371,11 +397,37 @@ build_config(ParamList) ->
                             branch_factor -> Conf#mt_config{ branch_factor = Val };
                             bucket_size -> Conf#mt_config{ bucket_size = Val };
                             leaf_hf -> Conf#mt_config{ leaf_hf = Val };
-                            inner_hf -> Conf#mt_config{ inner_hf = Val };
-                            gen_hash_on -> Conf#mt_config{ gen_hash_on = Val }
+                            inner_hf -> Conf#mt_config{ inner_hf = Val }
                         end
                 end, 
                 #mt_config{}, ParamList).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc inserts key into its matching interval
+%      precondition: key fits into one of the given intervals
+key_in_I(Key, Intervals) ->
+    p_key_in_I(Key, [], Intervals).
+
+p_key_in_I(Key, Left, {Interval, C, L}) ->
+    lists:append([Left, [{Interval, C+1, [Key | L]}]]);
+p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
+    CheckKey = case rep_upd_recon:decodeBlob(Key) of
+                   {K, _} -> K;
+                   _ -> Key
+               end,
+    case intervals:in(CheckKey, Interval) of
+        true -> lists:append([Left, [{Interval, C+1, [Key | L]}], Right]);
+        false -> p_key_in_I(Key, lists:append([Left, [P]]), Right)
+    end.
+
+-spec keys_to_intervals([Key], [I]) -> [{I, Count, [Key]}] when
+    is_subtype(Key,   term()),
+    is_subtype(I,     intervals:interval()),
+    is_subtype(Count, non_neg_integer()).
+keys_to_intervals(KList, IList) ->
+    IBucket = lists:map(fun(I) -> {I, 0, []} end, IList),
+    lists:foldl(fun(Key, Acc) -> key_in_I(Key, Acc) end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

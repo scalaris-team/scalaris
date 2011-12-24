@@ -56,31 +56,25 @@ end_per_suite(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-performance(_) ->
-    
+performance(_) ->    
     ToAdd = 2000,
     ExecTimes = 100,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
+    DB = db_generator:get_db(I, ToAdd, uniform),
+
     {TreeTime, Tree} = 
-        util:tc(fun() -> 
-                        merkle_tree_builder:build(merkle_tree:new(I), ToAdd, uniform) 
-                end, []),
-    
-    %measure build times
-    BT = measure_util:time_avg(
-           fun() -> 
-                   art:new(Tree) 
-           end,
-           [], ExecTimes, false),    
-    %Output
+        util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
+    BuildTime = 
+        measure_util:time_avg(fun() -> art:new(Tree) end, [], ExecTimes, false),    
+
     ct:pal("ART Performance
             ------------------------
             PARAMETER: AddedItems=~p ; ExecTimes=~p
             TreeTime (ms)= ~p
             ARTBuildTime (ms)= ~p", 
            [ToAdd, ExecTimes, TreeTime / 1000,
-            measure_util:print_result(BT, ms)]),
+            measure_util:print_result(BuildTime, ms)]),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,7 +108,8 @@ tester_new(_) ->
 prop_lookup(L, L) -> true;    
 prop_lookup(L, R) ->    
     I = intervals:new('[', L, R, ']'),
-    Tree = merkle_tree_builder:build(merkle_tree:new(I), 400, uniform),    
+    DB = db_generator:get_db(I, 400, uniform),
+    Tree = merkle_tree:bulk_build(I, DB),
     Art = art:new(Tree),
     Found = nodes_in_art(merkle_tree:iterator(Tree), Art, 0),
     ?assert(Found > 0),

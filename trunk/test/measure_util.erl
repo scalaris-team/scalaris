@@ -25,7 +25,7 @@
 -module(measure_util).
 
 
--export([time_avg/4, print_result/2]).
+-export([time_avg/4, print_result/1, print_result/2]).
 
 -type measure_result() :: { Min::non_neg_integer(), 
                             Max::non_neg_integer(),
@@ -53,6 +53,16 @@ time_avg(Fun, Args, ExecTimes, SkipFirstValue) ->
     Med = lists:nth(((Length + 1) div 2), lists:sort(Times)),
     Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg}.
+
+-spec print_result(measure_result()) -> [{atom(), any()}].
+print_result({Min, Max, Med, Avg} = Values) ->
+    MaxVal = lists:max([Min, Max, Med, Avg]),
+    if
+        MaxVal > 100000 -> print_result(Values, s);
+        MaxVal > 1000 -> print_result(Values, ms);
+        true -> print_result(Values, us)
+    end.
+        
 
 -spec print_result(measure_result(), time_unit()) -> [{atom(), any()}].
 print_result({Min, Max, Med, Avg}, Unit) ->

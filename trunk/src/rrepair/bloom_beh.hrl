@@ -77,7 +77,7 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 %       an M-bit large BloomFilter with a maximum of N Elements.
 %       prefers smaller values (truncates decimals)
 -spec calc_HF_num(integer(), integer()) -> pos_integer().
-calc_HF_num(_, N) when N == 0 -> 1;
+calc_HF_num(_, N) when N =:= 0 -> 1;
 calc_HF_num(M, N) when N > 0 ->
     Result = ln(2) * (M / N),
     if 
@@ -93,7 +93,7 @@ calc_HF_numEx(N, FPR) ->
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate FPR up to N-Elements.
 -spec calc_least_size(integer(), float()) -> integer().
-calc_least_size(N, _) when N == 0 -> 1;
+calc_least_size(N, FPR) when N =:= 0 orelse FPR =:= 0 -> 1;
 calc_least_size(N, FPR) when N > 0 -> 
     erlang:round((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
@@ -102,7 +102,8 @@ calc_least_size(N, FPR) when N > 0 ->
 %       FPR = (1-e^(-kn/m))^k
 %       M = number of BF-Bits
 -spec calc_FPR(integer(), integer(), integer()) -> float().
-calc_FPR(M, N, K) -> 
+calc_FPR(M, _, _) when M =:= 0-> 1;
+calc_FPR(M, N, K) when M > 0-> 
     math:pow(1 - math:pow(math:exp(1), (-K*N) / M), K).
 
 
