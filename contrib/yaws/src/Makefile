@@ -60,7 +60,7 @@ MODULES=yaws \
 
 
 EBIN_FILES=$(MODULES:%=../ebin/%.$(EMULATOR)) ../ebin/yaws.app ../ebin/yaws.appup
-ERLC_FLAGS+=-W $(DEBUG_FLAGS) -pa ../../yaws -I ../include
+ERLC_FLAGS+=-Werror $(DEBUG_FLAGS) -pa ../../yaws -I ../include
 
 #
 # Targets
@@ -81,7 +81,6 @@ yaws_generated.erl:	yaws_generated.template ../vsn.mk
 	    ../scripts/gen-yaws-generated true > yaws_generated.erl
 
 yaws_configure.hrl:	 ../vsn.mk ../include.mk
-	set -x; \
 	if [  $(HAVE_SENDFILE) = "true" ]; then \
 		echo "-define(HAVE_SENDFILE, true)." > yaws_configure.hrl; \
 	else touch yaws_configure.hrl; fi
@@ -109,7 +108,7 @@ debug:
 
 clean:
 	rm -f $(EBIN_FILES) yaws_generated.erl charset.def \
-		mime_types.erl yaws_configure.hrl
+		mime_types.erl yaws_configure.hrl mime_type_c.beam
 
 install: regen all docsinstall
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/lib/yaws/examples/ebin

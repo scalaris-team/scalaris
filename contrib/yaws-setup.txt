@@ -2,7 +2,7 @@
 2) extract somewhere else
 3) copy ebin/, include/, src/, LICENSE, vsn.mk to <scalaris>/contrib/yaws
 4) ./configure && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
-5) copy src/mime_types.erl and src/yaws_generated.erl to their respective folders in <scalaris>/contrib/yaws
+5) copy src/mime_types.erl and src/yaws_generated.erl to <scalaris>/contrib/yaws/src
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
-7) that's it, go back to <scalaris>/ and run ./configure && make
+7) that's it, go back to <scalaris>/ and run make clean && ./configure && make

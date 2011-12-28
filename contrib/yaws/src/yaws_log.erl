@@ -129,7 +129,6 @@ wrap_log(_ServerName, _Type, {Fd, FileName}, LogWrapSize) ->
             file:delete(Old),
             file:rename(FileName, Old),
             {ok, Fd2} = file:open(FileName, [write, raw]),
-            error_logger:info_msg("Wrap log ~p",[FileName]),
             {Fd2, FileName};
         false ->
             {Fd, FileName};
@@ -284,7 +283,7 @@ handle_call({reopen, Sconfs}, _From, State) ->
     Dir = State#state.dir,
     %% close all files
     yaws_logger:close_logs(),
-    
+
     %% reopen logfiles
     SCs = lists:flatten(Sconfs),
     lists:foreach(fun(SC) ->
@@ -529,5 +528,5 @@ left_fill(N, Width, _Fill) when length(N) >= Width ->
 left_fill(N, Width, Fill) ->
     left_fill([Fill|N], Width, Fill).
 
-    
- 
+
+

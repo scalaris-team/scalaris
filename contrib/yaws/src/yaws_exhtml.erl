@@ -45,7 +45,7 @@ sformat() -> % test
 check_xhtml(XHTMLContent) when is_list(XHTMLContent) ->
     check_xhtml(list_to_binary(XHTMLContent));
 check_xhtml(XHTMLContent) when is_binary(XHTMLContent) ->
-    {ok, Filename} = misc:mktemp("confd"),
+    {ok, Filename} = yaws:mktemp("confd"),
     ok = file:write_file(Filename, XHTMLContent),
     DTD = filename:join(code:priv_dir(webgui), "xhtml1-strict.dtd"),
     Cmd = "xmllint --dtdvalid "++DTD++" -noout -nonet "++Filename++" 2>&1",
@@ -197,7 +197,7 @@ block_level("select") -> yes;
 %% The following elements may also be considered block-level elements since
 %% they may contain block-level elements:
 block_level("dd") -> yes;
-block_level("dt") -> yes;    
+block_level("dt") -> yes;
 block_level("frameset") -> yes;
 block_level("li") -> yes;
 block_level("td") -> yes;

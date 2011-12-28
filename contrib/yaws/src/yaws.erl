@@ -101,7 +101,7 @@
 -export([sconf_to_srvstr/1,
          redirect_host/2, redirect_port/1,
          redirect_scheme_port/1, redirect_scheme/1,
-         tmpdir/0, tmpdir/1, split_at/2,
+         tmpdir/0, tmpdir/1, mktemp/1, split_at/2,
          id_dir/1, ctl_file/1]).
 
 
@@ -218,7 +218,9 @@ setup_gconf(GL, GC) ->
            id = lkup(id, GL,
                      GC#gconf.id),
            enable_soap = lkup(enable_soap, GL,
-                              GC#gconf.enable_soap)
+                              GC#gconf.enable_soap),
+           soap_srv_mods = lkup(soap_srv_mods, GL,
+                                GC#gconf.soap_srv_mods)
           }.
 
 set_gc_flags([{tty_trace, Bool}|T], Flags) ->
@@ -514,7 +516,9 @@ hex_to_string(Hex) ->
 
 
 universal_time_as_string() ->
-    time_to_string(calendar:universal_time(), "GMT").
+    universal_time_as_string(calendar:universal_time()).
+universal_time_as_string(UTime) ->
+    time_to_string(UTime, "GMT").
 local_time_as_gmt_string(LocalTime) ->
     time_to_string(erlang:localtime_to_universaltime(LocalTime),"GMT").
 
@@ -1375,10 +1379,10 @@ make_expires_header(MimeType, FI) ->
     end.
 
 make_expires_header(access, TTL, _FI) ->
-    DateTime = erlang:localtime(),
+    DateTime = erlang:universaltime(),
     Secs = calendar:datetime_to_gregorian_seconds(DateTime) + TTL,
     ExpireTime = calendar:gregorian_seconds_to_datetime(Secs),
-    ["Expires: ", local_time_as_gmt_string(ExpireTime), "\r\n"];
+    ["Expires: ", universal_time_as_string(ExpireTime), "\r\n"];
 make_expires_header(modify, TTL, FI) ->
     DateTime = FI#file_info.mtime,
     Secs = calendar:datetime_to_gregorian_seconds(DateTime) + TTL,
@@ -1920,7 +1924,7 @@ do_http_get_headers(CliSock, SSL) ->
 
 
 http_recv_request(CliSock, SSL) ->
-    setopts(CliSock, [{packet, http}], SSL),
+    setopts(CliSock, [{packet, http}, {packet_size, 16#4000}], SSL),
     case do_recv(CliSock, 0,  SSL) of
         {ok, R} when is_record(R, http_request) ->
             R;
@@ -1941,7 +1945,7 @@ http_recv_request(CliSock, SSL) ->
     end.
 
 http_collect_headers(CliSock, Req, H, SSL, Count) when Count < 1000 ->
-    setopts(CliSock, [{packet, httph}], SSL),
+    setopts(CliSock, [{packet, httph}, {packet_size, 16#4000}], SSL),
     Recv = do_recv(CliSock, 0, SSL),
     case Recv of
         {ok, {http_header,  _Num, 'Host', _, Host}} ->
@@ -2245,6 +2249,53 @@ tmpdir(DefaultTmpDir) ->
         _ ->
 	    DefaultTmpDir
     end.
+
+%% mktemp function borrowed from Klacke's misc module
+%% Modified to use tmpdir/1 so it works on Windows too.
+%% Note that mktemp/2 could be exported too, but no Yaws
+%% code needs it, yet anyway.
+mktemp(Template) ->
+   mktemp(Template, file).
+
+mktemp(Template, Ret) ->
+   Tdir = tmpdir("/tmp"),
+   Max = 1000,
+   mktemp(Tdir, Template, Ret, 0, Max, "").
+
+mktemp(Dir, Template, Ret, I, Max, Suffix) when I < Max ->
+   {X,Y,Z} = now(),
+   PostFix = integer_to_list(X) ++ "-" ++ integer_to_list(Y) ++ "-" ++
+             integer_to_list(Z),
+   F = filename:join(Dir, Template ++ [$_ | PostFix] ++ Suffix),
+   filelib:ensure_dir(F),
+   case file:open(F, [read, raw]) of
+       {error, enoent} when Ret == file ->
+           {ok, F};
+       {error, enoent} when Ret == fd ->
+           case file:open(F, [read, write, raw]) of
+               {ok, Fd} ->
+                   file:delete(F),
+                   {ok, Fd};
+               Err ->
+                   Err
+           end;
+       {error, enoent} when Ret == binfd ->
+           case file:open(F, [read, write, raw, binary]) of
+               {ok, Fd} ->
+                   file:delete(F),
+                   {ok, Fd};
+               Err ->
+                   Err
+           end;
+       {ok, Fd} ->
+           file:close(Fd),
+           mktemp(Dir, Template, Ret, I+1, Max, Suffix);
+       _Err ->
+           mktemp(Dir, Template, Ret, I+1, Max, Suffix)
+   end;
+mktemp(_Dir, _Template, _Ret, _I, _Max, _Suffix) ->
+   {error, too_many}.
+
 
 %% This feature is usable together with
 %% privbind and authbind on linux
