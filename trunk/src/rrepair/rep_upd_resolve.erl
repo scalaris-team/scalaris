@@ -71,6 +71,10 @@
          }).
 -type stats() :: #resolve_stats{}.
 
+-type operation() ::
+    {key_upd, ?DB:kvv_list()} |
+    {key_sync, method(), DestPid::comm:mypid(), [?RT:key()]}.
+
 -record(ru_resolve_state,
         {
          ownerLocalPid  = ?required(ru_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
@@ -83,10 +87,6 @@
          send_stats     = nil                                           :: nil | comm:mypid() 
          }).
 -type state() :: #ru_resolve_state{}.
-
--type operation() ::
-    {key_upd, ?DB:kvv_list()} |
-    {key_sync, method(), DestPid::comm:mypid(), [?RT:key()]}.
 
 -type message() ::
     {get_state_response, intervals:interval()} |
