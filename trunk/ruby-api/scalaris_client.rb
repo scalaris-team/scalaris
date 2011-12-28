@@ -17,7 +17,8 @@ require 'optparse'
 require 'pp'
 begin
   require "#{File.dirname(__FILE__)}/scalaris"
-rescue LoadError
+rescue LoadError => e
+  raise unless e.message =~ /scalaris/
   require "scalaris"
 end
 
