@@ -29,7 +29,7 @@
 -include("unittest.hrl").
 
 -define(BLOOM, bloom).
--define(HFS, hfs_lhsp_md5).
+-define(HFS, hfs_lhsp).
 
 -define(Fpr_Test_NumTests, 30).
 

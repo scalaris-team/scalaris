@@ -37,7 +37,7 @@ all() -> [
           tester_iter,
           tester_lookup,
           test_empty,
-          eprof,
+          %eprof,
           %fprof
           performance          
          ].
