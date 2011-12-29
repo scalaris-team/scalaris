@@ -493,7 +493,9 @@ compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
     end.
 
 % @doc Starts simple sync for a given node, returns number of leaf sync requests.
--spec reconcileNode(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> non_neg_integer().
+-spec reconcileNode(merkle_tree:mt_node() | not_found, 
+                    {comm:mypid() | undefined, float(), comm:mypid() | undefined}) -> non_neg_integer().
+reconcileNode(not_found, _) -> 0;
 reconcileNode(Node, Conf) ->
     case merkle_tree:is_leaf(Node) of
         true -> reconcileLeaf(Node, Conf);
@@ -503,7 +505,11 @@ reconcileNode(Node, Conf) ->
                              0, 
                              merkle_tree:get_childs(Node))
     end.
--spec reconcileLeaf(merkle_tree:mt_node(), {comm:mypid(), float(), comm:mypid()}) -> 1.
+
+-spec reconcileLeaf(merkle_tree:mt_node(), 
+                    {comm:mypid() | undefined, float(), comm:mypid() | undefined}) -> 1.
+reconcileLeaf(_, {undefined, _, _}) -> erlang:error("Recon Destination PID undefined");
+reconcileLeaf(_, {_, _, undefined}) -> erlang:error("Recon Owner PID undefined");
 reconcileLeaf(Node, {Dest, Round, Owner}) ->
     ToSync = lists:map(fun(KeyVer) -> 
                            case decodeBlob(KeyVer) of
