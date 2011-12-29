@@ -44,8 +44,7 @@ check_split_key_half(Begin, End, SplitKey) ->
     ?equals_pattern_w_note(
         BeginToSplitKey,
         Result when Result == SplitKeyToEnd orelse Result == (SplitKeyToEnd - 1),
-        io_lib:format("SplitKey: ~.0p", [SplitKey])),
-    true.
+        io_lib:format("SplitKey: ~.0p", [SplitKey])).
 
 -spec check_split_key(Begin::?RT:key(), End::?RT:key() | ?PLUS_INFINITY_TYPE, SplitKey::?RT:key(), {SplitFracA::1..100, SplitFracB::0..100}) -> true.
 check_split_key(Begin, End, SplitKey, SplitFraction) ->
@@ -61,8 +60,7 @@ check_split_key(Begin, End, SplitKey, SplitFraction) ->
         BeginToSplitKey,
         Range when Range == (FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction),
         io_lib:format("FullRange * Factor = ~.0p, SplitKey: ~.0p",
-                      [(FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction), SplitKey])),
-    true.
+                      [(FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction), SplitKey])).
 
 additional_tests(_Config) ->
     ok.

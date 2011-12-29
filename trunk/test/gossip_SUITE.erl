@@ -187,8 +187,7 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
         false -> ok
     end,
     % no further messages
-    ?expect_no_message(),
-    true.
+    ?expect_no_message().
 
 test_on_trigger1() ->
     GossipNewValues = gossip_state:new_internal(),
@@ -310,8 +309,7 @@ prop_on_get_node_details_response_local_info(Load, PreviousState, State, MsgQueu
     ?equals(NewPreviousState, PreviousState),
     ?equals(NewMsgQueue, []),
     ?equals_pattern(NewTriggerState, TriggerState),
-    ?expect_no_message(),
-    true.
+    ?expect_no_message().
 
 test_on_get_node_details_response_local_info1() ->
     GossipNewValues = gossip_state:new_internal(),

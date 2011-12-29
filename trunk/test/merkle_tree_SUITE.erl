@@ -189,8 +189,7 @@ prop_branch_bucket(L, R, Branch, Bucket) ->
     ct:pal("Branch=~p ; Bucket=~p ; Tree1Size=~p ; Tree2Size=~p", 
            [Branch, Bucket, merkle_tree:size(Tree1), merkle_tree:size(Tree2)]),
     ?equals(merkle_tree:size(Tree1), 1),    
-    ?equals(merkle_tree:size(Tree2), Branch + 1),    
-    true.
+    ?equals(merkle_tree:size(Tree2), Branch + 1).
 
 tester_branch_bucket(_) ->
     tester:test(?MODULE, prop_branch_bucket, 4, 10, [{threads, 1}]).
@@ -216,8 +215,7 @@ prop_tree_hash(L, R, ToAdd) ->
     ?equals(RootHash1, RootHash2),
     ?assert(RootHash1 > 0),
     ?assert(RootHash3 > 0),
-    ?assert(RootHash3 =/= RootHash1),
-    true.
+    ?assert(RootHash3 =/= RootHash1).
 
 tester_tree_hash(_) ->
     tester:test(?MODULE, prop_tree_hash, 3, 10, [{threads, 1}]).
@@ -239,8 +237,7 @@ prop_insert(L, R, ToAdd) ->
     Size3 = merkle_tree:size(Tree3),
     %ct:pal("ToAdd=~p ; Tree1Size=~p ; Tree2Size=~p ; Tree3Size=~p", [ToAdd, Size1, Size2,Size3]),
     ?equals(Size1, Size2),
-    ?assert(Size1 < Size3),
-    true.
+    ?assert(Size1 < Size3).
 
 tester_insert(_) ->
     tester:test(?MODULE, prop_insert, 3, 2, [{threads, 1}]).
@@ -259,8 +256,7 @@ prop_size(L, R, ToAdd) ->
             Simple: ~p Nodes
             InnerNodes: ~p   ;   Leafs: ~p",
            [ToAdd, Size, Inner, Leafs]),
-    ?equals(Size, Inner + Leafs),
-    true.
+    ?equals(Size, Inner + Leafs).
     
 tester_size(_) ->
   tester:test(?MODULE, prop_size, 3, 10, [{threads, 1}]).
@@ -278,8 +274,7 @@ prop_iter(L, R, ToAdd) ->
     ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n"
            "Tree: IterationTime=~p s", 
            [L, R, ToAdd, IterateT / (1000*1000)]),
-    ?equals(Count, Inner + Leafs),
-    true.
+    ?equals(Count, Inner + Leafs).
 
 tester_iter(_Config) ->
     %prop_iter(0, 10000001, 10000).

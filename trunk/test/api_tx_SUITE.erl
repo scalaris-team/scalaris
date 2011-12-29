@@ -412,8 +412,7 @@ tester_read_not_existing(_Config) ->
 -spec prop_write_read_not_existing(Key::client_key(), Value::client_value()) -> true | no_return().
 prop_write_read_not_existing(Key, Value) ->
     ?equals(api_tx:write(Key, Value), {ok}),
-    ?equals(api_tx:read(Key), {ok, Value}),
-    true.
+    ?equals(api_tx:read(Key), {ok, Value}).
 
 tester_write_read_not_existing(_Config) ->
     tester:test(?MODULE, prop_write_read_not_existing, 2, 10000).
@@ -422,8 +421,7 @@ tester_write_read_not_existing(_Config) ->
 prop_write_read(Key, Value1, Value2) ->
     ?equals(api_tx:write(Key, Value1), {ok}),
     ?equals(api_tx:write(Key, Value2), {ok}),
-    ?equals(api_tx:read(Key), {ok, Value2}),
-    true.
+    ?equals(api_tx:read(Key), {ok, Value2}).
 
 tester_write_read(_Config) ->
     tester:test(?MODULE, prop_write_read, 3, 10000).
@@ -455,8 +453,7 @@ prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove) ->
            {ok, List} = api_tx:read(Key),
            SortedList = lists:sort(fun util:'=:<'/2, List),
            ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_first(lists:append(Initial, ToAdd), ToRemove)))
-    end,
-    true.
+    end.
 
 tester_add_del_on_list(_Config) ->
     tester:test(?MODULE, prop_add_del_on_list, 4, 10000).
@@ -499,8 +496,7 @@ prop_add_on_nr2(Key, Existing, Initial, ToAdd) ->
                true when ToAdd == 0 -> ?equals(Number, Initial);
                _     -> ?equals(Number, (Initial + ToAdd))
            end
-    end,
-    true.
+    end.
 
 tester_add_on_nr(_Config) ->
     tester:test(?MODULE, prop_add_on_nr, 3, 10000).
@@ -540,8 +536,7 @@ prop_test_and_set2(Key, Existing, RealOldValue, OldValue, NewValue) ->
        true ->
            ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {fail, {key_changed, RealOldValue}}),
            ?equals(api_tx:read(Key), {ok, RealOldValue})
-    end,
-    true.
+    end.
 
 tester_test_and_set(_Config) ->
     tester:test(?MODULE, prop_test_and_set, 4, 10000).

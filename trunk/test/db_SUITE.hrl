@@ -967,8 +967,7 @@ prop_get_chunk3(Keys2, Interval_, ChunkSize) ->
                                          [Next, Interval])),
             ?equals_w_note([Entry || Entry <- Chunk,
                                      intervals:in(db_entry:get_key(Entry), Next)],
-                           [], io_lib:format("Next: ~.0p", [Next])),
-            true;
+                           [], io_lib:format("Next: ~.0p", [Next]));
         _ -> true
     end.
 
@@ -988,8 +987,7 @@ prop_delete_chunk3(Keys2, Interval_, ChunkSize) ->
             PostDeleteSize = ?TEST_DB:get_load(DB5),
             ?TEST_DB:close(DB5),
             ?equals(PostDeleteChunkSize, PostDeleteSize), % delete should have deleted all items in Chunk
-            ?equals(length(Keys) - length(Chunk), PostDeleteSize), % delete should have deleted all items in Chunk
-            true;
+            ?equals(length(Keys) - length(Chunk), PostDeleteSize); % delete should have deleted all items in Chunk
         _ -> true
     end.
 
@@ -1372,8 +1370,7 @@ tester_stop_record_changes(_Config) ->
 check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
     ?equals_w_note(?TEST_DB:get_entry2(DB, Key), {ExpExists, ExpDBEntry}, Note),
     ?equals_w_note(?TEST_DB:get_entry(DB, Key), ExpDBEntry, Note),
-    ?equals_w_note(?TEST_DB:read(DB, Key), ExpRead, Note),
-    true.
+    ?equals_w_note(?TEST_DB:read(DB, Key), ExpRead, Note).
 
 % note: use manageable values for ReadLock!
 -spec create_db_entry(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
@@ -1407,8 +1404,7 @@ check_db(DB, ExpCheckDB, ExpLoad, ExpData, ExpCKData, Note) ->
     ?equals_w_note(?TEST_DB:check_db(DB), ExpCheckDB, Note),
     ?equals_w_note(?TEST_DB:get_load(DB), ExpLoad, Note),
     ?equals_w_note(lists:sort(?TEST_DB:get_data(DB)), lists:sort(ExpData), Note),
-    ?equals_w_note(?TEST_DB:get_changes(DB), ExpCKData, Note),
-    true.
+    ?equals_w_note(?TEST_DB:get_changes(DB), ExpCKData, Note).
 
 %% @doc Like check_db/5 but do not check DB using ?TEST_DB:check_db.
 -spec check_db2(DB::?TEST_DB:db(), ExpLoad::integer(),
@@ -1424,8 +1420,7 @@ check_db2(DB, ExpLoad, ExpData, Note) ->
 check_db2(DB, ExpLoad, ExpData, ExpCKData, Note) ->
     ?equals_w_note(?TEST_DB:get_load(DB), ExpLoad, Note),
     ?equals_w_note(lists:sort(?TEST_DB:get_data(DB)), lists:sort(ExpData), Note),
-    ?equals_w_note(?TEST_DB:get_changes(DB), ExpCKData, Note),
-    true.
+    ?equals_w_note(?TEST_DB:get_changes(DB), ExpCKData, Note).
 
 get_random_interval_from_changes(DB) ->
     {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),

@@ -42,7 +42,7 @@
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 case Boolean of
-                    true  -> ok;
+                    true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
                           UnittestAny, true, ??Boolean, true)
@@ -59,7 +59,7 @@
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 case Actual of
-                    ExpectedPattern -> ok;
+                    ExpectedPattern -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
                           UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern)
@@ -70,7 +70,7 @@
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 case Actual of
-                    ExpectedPattern -> ok;
+                    ExpectedPattern -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
                           UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern, Note)
@@ -86,7 +86,7 @@
                         unittest_helper:macro_equals_failed(
                           UnittestAny, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr)
                 catch
-                    ExceptionType:ExceptionPattern -> ok;
+                    ExceptionType:ExceptionPattern -> true;
                     UnittestOtherType:UnittestOtherException ->
                         UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         UnittestActExceptionStr = lists:flatten(io_lib:format("exception ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
@@ -101,7 +101,7 @@
         % wrap in function so that the internal variables are out of the calling function's scope
         fun() ->
                 receive
-                    MsgPattern -> ok
+                    MsgPattern -> true
                 after
                     Timeout ->
                         UnittestActualMessage =
@@ -121,7 +121,7 @@
 
 -define(consume_message(Message, Timeout),
     receive
-        Message -> ok
+        Message -> true
     after
         Timeout -> timeout
     end).
@@ -132,7 +132,7 @@
                 Fun = fun(F) ->
                               case ?consume_message(Message, 0) of
                                   ok -> F(F);
-                                  timeout -> ok
+                                  timeout -> true
                               end
                       end,
                 Fun(Fun)
@@ -152,7 +152,7 @@
                                 receive
                                     IgnoredMessage ->
                                         ct:pal("ignored \"~.0p\" for the last time~n", [IgnoredMessage]),
-                                    MsgPattern -> ok
+                                    MsgPattern -> true
                                 after
                                     0 ->
                                         UnittestActualMessage =
@@ -163,7 +163,7 @@
                                             end,
                                         ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                                 end
-                            MsgPattern -> ok
+                            MsgPattern -> true
                         after
                             Timeout ->
                                 UnittestActualMessage =
@@ -174,7 +174,7 @@
                                     end,
                                 ?ct_fail("expected message ~s but got \"~.0p\"~n", [??MsgPattern, UnittestActualMessage])
                         end
-                    MsgPattern -> ok
+                    MsgPattern -> true
                 after
                     Timeout ->
                         UnittestActualMessage =

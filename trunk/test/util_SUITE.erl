@@ -190,8 +190,7 @@ tester_minus_all_sort(_Config) ->
 %%      approach avoiding a re-implementation of util:minus_first/2.
 -spec prop_minus_first(List::[T], Excluded::[T]) -> boolean().
 prop_minus_first(List, Excluded) ->
-    ?equals(util:minus_first(List, Excluded), lists:foldl(fun lists:delete/2, List, Excluded)),
-    true.
+    ?equals(util:minus_first(List, Excluded), lists:foldl(fun lists:delete/2, List, Excluded)).
 
 %% @doc Checks that the order of items stays the same using util:minus_first/2.
 -spec prop_minus_first_sort(List::[T], Excluded::[T]) -> boolean().

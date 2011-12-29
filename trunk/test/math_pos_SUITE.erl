@@ -141,8 +141,7 @@ prop_make_same_length(A, B, Pos) ->
     ?equals(math_pos:remove_zeros(A1, Pos, all), math_pos:remove_zeros(A, Pos, all)),
     ?equals(math_pos:remove_zeros(B1, Pos, all), math_pos:remove_zeros(B, Pos, all)),
     ?equals(math_pos:remove_zeros(A1, Pos, A1Added), A),
-    ?equals(math_pos:remove_zeros(B1, Pos, B1Added), B),
-    true.
+    ?equals(math_pos:remove_zeros(B1, Pos, B1Added), B).
 
 -spec tester_make_same_length(Config::[tuple()]) -> ok.
 tester_make_same_length(_Config) ->
@@ -182,8 +181,7 @@ tester_plus_valid(_Config) ->
 -spec prop_plus_symm_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_plus_symm_base(A_, B_, Pos, Base) ->
     {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
-    ?equals(math_pos:plus(A, B, Base), math_pos:plus(B, A, Base)),
-    true.
+    ?equals(math_pos:plus(A, B, Base), math_pos:plus(B, A, Base)).
 
 -spec prop_plus_symm1(A::[0..9], B::[0..9]) -> true.
 prop_plus_symm1(A_, B_) -> prop_plus_symm_base(A_, B_, front, 10).
@@ -238,8 +236,7 @@ tester_minus_valid(_Config) ->
 prop_minus_base(A_, B_, Pos, Base) ->
     {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
     A_B = math_pos:minus(A, B, Base),
-    ?equals(math_pos:plus(A_B, B, Base), A),
-    true.
+    ?equals(math_pos:plus(A_B, B, Base), A).
 
 -spec prop_minus1(A::[0..9], B::[0..9]) -> true.
 prop_minus1(A_, B_) -> prop_minus_base(A_, B_, front, 10).
