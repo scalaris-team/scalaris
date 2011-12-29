@@ -348,14 +348,12 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
                         sync_round = Round }) ->
-    %?TRACE("GetChunk Res - Recon Bloom Round=~p~nBloomI=~p", [Round, BloomI]),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
         send_chunk_req(DhtNodePid, self(), RestI, 
                        mapInterval(RestI, get_interval_quadrant(BloomI)), 
                        get_max_items(bloom)),
-    %set reconciliation - TODO rewrite filterPartitionMap to list comprehension
     {Obsolete, _Missing} = 
         filterPartitionMap(fun(Filter) -> 
                                    not ?REP_BLOOM:is_element(VersBF, Filter) 
@@ -364,16 +362,15 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                    {MinKey, _} = decodeBlob(Partition),
                                    ?REP_BLOOM:is_element(KeyBF, MinKey)
                            end,
-                           fun(C) -> 
-                                   {K, _} = decodeBlob(C), 
+                           fun(Map) -> 
+                                   {K, _} = decodeBlob(Map), 
                                    K 
                            end,
                            DBList),
-    ?TRACE("Reconcile Bloom Round=~p~nFoundObsolete=~p", [Round, length(Obsolete)]),
+    ?TRACE("Reconcile Bloom Round=~p ; FoundObsolete=~p", [Round, length(Obsolete)]),
     %TODO: Possibility to resolve missing replicas
     length(Obsolete) > 0 andalso
         comm:send_local(Owner, {request_resolve, {key_sync, ?RESOLVE_METHOD, DestRU_Pid, Obsolete}, []}),
-    %TODO: eval THIS METHOD IS only called by Clients?
     SyncFinished andalso
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
