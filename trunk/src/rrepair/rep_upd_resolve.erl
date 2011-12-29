@@ -6,7 +6,7 @@
 %
 %       http://www.apache.org/licenses/LICENSE-2.0
 %
-%   Unless required by applicable law or agreed to in writing, software
+%   Unless required by applicable request_resolvelaw or agreed to in writing, software
 %   distributed under the License is distributed on an "AS IS" BASIS,
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
@@ -35,7 +35,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/2]).
+-export([init/1, on/2, start/3]).
 -export([print_resolve_stats/1]).
 
 
@@ -64,6 +64,7 @@
 
 -record(resolve_stats,
         {
+         round           = 0  :: float(),
          diffCount       = 0  :: non_neg_integer(),
          updatedCount    = 0  :: non_neg_integer(),
          notUpdatedCount = 0  :: non_neg_integer(),
@@ -129,7 +130,8 @@ on({get_state_response, MyI}, State =
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
                           intervals:in(K, MyI)],
-    comm:send_local(DhtNodePid, {get_entries, self(), intervals:from_elements(FilterKeyList)}),
+    comm:send_local(DhtNodePid, 
+                    {get_entries, self(), intervals:from_elements(FilterKeyList)}),
     State;
 
 on({get_entries_response, Entries}, State =
@@ -140,7 +142,10 @@ on({get_entries_response, Entries}, State =
     KVVList = [{db_entry:get_key(X), 
                 db_entry:get_value(X), 
                 db_entry:get_version(X)} || X <- Entries],
-    comm:send(Dest, {request_resolve, {key_upd, KVVList}, [{feedback, MyNodePid}]}),
+    comm:send(Dest, {request_resolve, 
+                     Stats#resolve_stats.round, 
+                     {key_upd, KVVList}, 
+                     [{feedback, MyNodePid}]}),
     comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
     State;
 
@@ -148,7 +153,8 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
        #ru_resolve_state{ operation = {key_upd, _},
                           stats = #resolve_stats{ diffCount = Diff,
                                                   updatedCount = Ok, 
-                                                  notUpdatedCount = Failed
+                                                  notUpdatedCount = Failed,
+                                                  round = Round
                                                 } = Stats,
                           feedback = Feedback,
                           feedbackItems = FBItems,
@@ -167,7 +173,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                end,
     _ = case Diff - 1 =:= Ok + Failed of
             true ->
-                send_feedback(Feedback, NewFBItems),
+                send_feedback(Feedback, NewFBItems, Round),
                 send_stats(SendStats, NewStats),
                 comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
             _ ->
@@ -186,10 +192,10 @@ on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-send_feedback(nil, _) -> ok;
-send_feedback(_, []) -> ok;
-send_feedback(Dest, Items) ->
-    comm:send(Dest, {request_resolve, {key_upd, Items}, []}).
+send_feedback(nil, _, _) -> ok;
+send_feedback(_, [], _) -> ok;
+send_feedback(Dest, Items, Round) ->
+    comm:send(Dest, {request_resolve, Round + 0.00009, {key_upd, Items}, []}).
 
 send_stats(nil, _) -> ok;
 send_stats(SendStats, Stats) ->
@@ -216,17 +222,19 @@ init(State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start(Operation, Options) -> {ok, MyPid} when
+-spec start(Round, Operation, Options) -> {ok, MyPid} when
+      is_subtype(Round,     float()),                                                        
       is_subtype(Operation, operation()),
       is_subtype(Options,   options()),
       is_subtype(MyPid,     pid()).
-start(Operation, Options) ->
+start(Round, Operation, Options) ->    
     Feedback = util:proplist_get_value(feedback, Options, nil),
     SendStats = util:proplist_get_value(send_stats, Options, nil),
     State = #ru_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),
-                               operation = Operation, 
+                               operation = Operation,
+                               stats = #resolve_stats{ round = Round },
                                feedback = Feedback,
                                send_stats = SendStats },    
     gen_component:start(?MODULE, fun ?MODULE:on/2, State).

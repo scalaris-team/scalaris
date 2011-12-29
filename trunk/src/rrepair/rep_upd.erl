@@ -59,7 +59,7 @@
     {get_state, Sender::comm:mypid(), Key::atom()} |
     {request_recon, SenderRUPid::comm:mypid(), Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
         rep_upd_recon:method(), rep_upd_recon:recon_struct()} |
-    {request_resolve, rep_upd_resolve:operation(), rep_upd_resolve:options()} |
+    {request_resolve, Round::float(), rep_upd_resolve:operation(), rep_upd_resolve:options()} |
     {recon_forked} | 
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
@@ -109,8 +109,8 @@ on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct},
     comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
     State#rep_upd_state{ open_recon = OpenRecon + 1 };
 
-on({request_resolve, Operation, Options}, State = #rep_upd_state{ open_resolve = OpenResolve }) ->
-    _ = rep_upd_resolve:start(Operation, Options),
+on({request_resolve, Round, Operation, Options}, State = #rep_upd_state{ open_resolve = OpenResolve }) ->
+    _ = rep_upd_resolve:start(Round, Operation, Options),
     State#rep_upd_state{ open_resolve = OpenResolve + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -370,7 +370,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     ?TRACE("Reconcile Bloom Round=~p ; FoundObsolete=~p", [Round, length(Obsolete)]),
     %TODO: Possibility to resolve missing replicas
     length(Obsolete) > 0 andalso
-        comm:send_local(Owner, {request_resolve, {key_sync, ?RESOLVE_METHOD, DestRU_Pid, Obsolete}, []}),
+        comm:send_local(Owner, {request_resolve, Round, {key_sync, ?RESOLVE_METHOD, DestRU_Pid, Obsolete}, []}),
     SyncFinished andalso
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
@@ -512,7 +512,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(Owner, {request_resolve, {key_sync, ?RESOLVE_METHOD, Dest, ToSync}, []}),
+    comm:send_local(Owner, {request_resolve, Round, {key_sync, ?RESOLVE_METHOD, Dest, ToSync}, []}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -788,8 +788,7 @@ fork_recon(Conf, Round) ->
 -spec check_config() -> boolean().
 check_config() ->
     case config:read(rep_update_activate) of
-        true ->
-            config:cfg_is_bool(rep_update_sync_feedback) andalso                
+        true ->                
             config:cfg_is_float(rep_update_recon_fpr) andalso
             config:cfg_is_greater_than(rep_update_recon_fpr, 0) andalso
             config:cfg_is_less_than(rep_update_recon_fpr, 1) andalso
@@ -797,10 +796,6 @@ check_config() ->
             config:cfg_is_greater_than(rep_update_max_items, 0);
         _ -> true
     end.
-
--spec get_do_feedback() -> boolean().
-get_do_feedback() ->
-    config:read(rep_update_sync_feedback).
 
 -spec get_fpr() -> float().
 get_fpr() ->

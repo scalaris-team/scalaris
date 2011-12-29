@@ -95,7 +95,6 @@ get_rrepair_config_parameter() ->
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 1000},
-     {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
 
 get_bloom_RepUpd_config() ->
@@ -106,7 +105,6 @@ get_bloom_RepUpd_config() ->
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 10000},
-     {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, false}].
 
 get_merkle_tree_RepUpd_config() ->
@@ -117,7 +115,6 @@ get_merkle_tree_RepUpd_config() ->
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
      {rep_update_max_items, 100000},
-     {rep_update_sync_feedback, true},
      {rep_update_negotiate_sync_interval, true}].
 
 get_art_RepUpd_config() ->
