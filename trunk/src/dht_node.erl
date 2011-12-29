@@ -44,7 +44,7 @@
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
       {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),  
-            ValFun::fun((db_entry:entry()) -> any()), Interval::intervals:interval()} |
+            ValFun::fun((db_entry:entry()) -> any())} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),  
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer()} |
@@ -272,8 +272,8 @@ on({get_entries, Source_PID, Interval}, State) ->
     comm:send_local(Source_PID, {get_entries_response, Entries}),
     State;
 
-on({get_entries, Source_PID, FilterFun, ValFun, Interval}, State) ->
-    Entries = ?DB:get_entries(dht_node_state:get(State, db), FilterFun, ValFun, Interval),
+on({get_entries, Source_PID, FilterFun, ValFun}, State) ->
+    Entries = ?DB:get_entries(dht_node_state:get(State, db), FilterFun, ValFun),
     comm:send_local(Source_PID, {get_entries_response, Entries}),
     State;
 
