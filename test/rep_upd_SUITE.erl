@@ -173,8 +173,7 @@ prop_minKeyInInterval(LeftI, RightI) ->
     AnyK = lists:nth(randoms:rand_uniform(1, length(Keys)), Keys),
     MinLeft = rep_upd_recon:minKeyInInterval(AnyK, I),
     ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
-    ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK),
-    true.
+    ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
 
 tester_minKeyInInterval(_) ->
     randoms:start(),
