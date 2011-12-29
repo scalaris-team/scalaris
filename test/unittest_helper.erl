@@ -556,17 +556,17 @@ print_ring_data() ->
 
 -include("unittest.hrl").
 
--spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> ok | no_return().
+-spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr) ->
     case Actual of
-        ExpectedVal -> ok;
+        ExpectedVal -> true;
         Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr)
     end.
 
--spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> ok | no_return().
+-spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     case Actual of
-        ExpectedVal -> ok;
+        ExpectedVal -> true;
         Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr, Note)
     end.
 
@@ -599,15 +599,15 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~s)~n",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note)]).
 
--spec expect_no_message_timeout(Timeout::pos_integer()) -> ok | no_return().
+-spec expect_no_message_timeout(Timeout::pos_integer()) -> true | no_return().
 expect_no_message_timeout(Timeout) ->
     receive
         ActualMessage ->
             ?ct_fail("expected no message but got \"~.0p\"~n", [ActualMessage])
-    after Timeout -> ok
+    after Timeout -> true
 end.
 
--spec check_ring_load(ExpLoad::pos_integer()) -> ok | no_return().
+-spec check_ring_load(ExpLoad::pos_integer()) -> true | no_return().
 check_ring_load(ExpLoad) ->
     Ring = statistics:get_ring_details(),
     Load = statistics:get_total_load(Ring),

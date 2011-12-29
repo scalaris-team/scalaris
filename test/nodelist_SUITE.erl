@@ -2640,8 +2640,7 @@ prop_largest_smaller_than2_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
                          intervals:in(node:id(Node),
                                       intervals:new('(', node:id(LSTNode), Id, ')'))],
             ?equals([LSTNode | BetterNodes], [LSTNode])
-    end,
-    true.
+    end.
 
 tester_largest_smaller_than2(_Config) ->
     tester:test(?MODULE, prop_largest_smaller_than2, 5, 5000, [{threads, 2}]).
@@ -2704,8 +2703,7 @@ prop_largest_smaller_than3_fixed_types(BaseNode, AddNodes, PredsLength, SuccsLen
                                               intervals:new('(', node:id(LSTNode), Id, ')'))],
                     ?equals([LSTNode | BetterNodes], [LSTNode])
             end
-    end,
-    true.
+    end.
 
 tester_largest_smaller_than3(_Config) ->
     tester:test(?MODULE, prop_largest_smaller_than3, 5, 5000, [{threads, 2}]).

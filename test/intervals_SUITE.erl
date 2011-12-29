@@ -140,8 +140,7 @@ prop_empty_continuous() ->
 -spec prop_empty(intervals:key()) -> true.
 prop_empty(X) ->
     ?assert(intervals:is_empty(intervals:empty())),
-    ?assert(not intervals:in(X, intervals:empty())),
-    true.
+    ?assert(not intervals:in(X, intervals:empty())).
 
 tester_empty_well_formed(_Config) ->
     tester:test(?MODULE, prop_empty_well_formed, 0, 1, [{threads, 2}]).
@@ -168,8 +167,7 @@ prop_all_continuous() ->
 -spec prop_all(intervals:key()) -> true.
 prop_all(X) ->
     ?assert(intervals:is_all(intervals:all())),
-    ?assert(intervals:in(X, intervals:all())),
-    true.
+    ?assert(intervals:in(X, intervals:all())).
 
 tester_all_well_formed(_Config) ->
     tester:test(?MODULE, prop_all_well_formed, 0, 1, [{threads, 2}]).
@@ -195,15 +193,13 @@ prop_new1_continuous(X) ->
 
 -spec prop_new1_bounds(intervals:key()) -> true.
 prop_new1_bounds(X) ->
-    ?equals(intervals:get_bounds(intervals:new(X)), {'[', X, X, ']'}),
-    true.
+    ?equals(intervals:get_bounds(intervals:new(X)), {'[', X, X, ']'}).
 
 -spec prop_new1(intervals:key()) -> true.
 prop_new1(X) ->
     ?equals(intervals:new(X), intervals:new('[', X, X, ']')),
     ?assert(intervals:in(X, intervals:new(X))),
-    ?assert(not intervals:is_empty(intervals:new(X))),
-    true.
+    ?assert(not intervals:is_empty(intervals:new(X))).
 
 tester_new1_well_formed(_Config) ->
     tester:test(?MODULE, prop_new1_well_formed, 1, 5000, [{threads, 2}]).
@@ -236,8 +232,7 @@ prop_new2_bounds(X, Y) ->
     case intervals:is_all(I) of
         false -> ?equals(intervals:get_bounds(I), {'[', X, Y, ']'});
         true  -> ?equals(intervals:get_bounds(I), {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'})
-    end,
-    true.
+    end.
 
 -spec prop_new2(intervals:key(), intervals:key()) -> true.
 prop_new2(X, Y) ->
@@ -247,8 +242,7 @@ prop_new2(X, Y) ->
     ?equals(A, B),
     ?assert(intervals:in(X, A)),
     ?assert(intervals:in(Y, A)),
-    ?assert(not intervals:is_empty(A)),
-    true.
+    ?assert(not intervals:is_empty(A)).
 
 tester_new2_well_formed(_Config) ->
     tester:test(?MODULE, prop_new2_well_formed, 2, 5000, [{threads, 2}]).
@@ -315,8 +309,7 @@ prop_new4(XBr, X, Y, YBr) ->
             ?equals(?implies(XBr =:= '(', not intervals:in(X, I)), true),
             ?equals(?implies(YBr =:= ']' andalso Y =/= ?PLUS_INFINITY, intervals:in(Y, I)), true),
             ?equals(?implies(YBr =:= ')' orelse Y =:= ?PLUS_INFINITY, not intervals:in(Y, I)), true)
-    end,
-    true.
+    end.
 
 tester_new4_well_formed(_Config) ->
     tester:test(?MODULE, prop_new4_well_formed, 4, 5000, [{threads, 2}]).
@@ -548,8 +541,7 @@ prop_is_left_right_of(A0Br, A0, A1, A1Br, B0Br, B0, B1, B1Br) ->
     B = intervals:new(B0Br, B0, B1, B1Br),
     ?equals(?implies(intervals:is_left_of(A, B), intervals:is_empty(intervals:minus(intervals:new(A0Br, A0, B1, B1Br), intervals:union(A, B)))), true),
     ?equals(?implies(intervals:is_right_of(A, B), intervals:is_empty(intervals:minus(intervals:new(B0Br, B0, A1, A1Br), intervals:union(A, B)))), true),
-    ?equals(intervals:is_adjacent(A, B), intervals:is_left_of(A, B) orelse intervals:is_right_of(A, B)),
-    true.
+    ?equals(intervals:is_adjacent(A, B), intervals:is_left_of(A, B) orelse intervals:is_right_of(A, B)).
 
 tester_is_left_right_of(_Config) ->
     tester:test(intervals_SUITE, prop_is_left_right_of, 8, 5000, [{threads, 2}]).
@@ -620,15 +612,13 @@ prop_minus2(XBr, X, Y, YBr) ->
                         false -> intervals:new(switch_br2(YBr), Y, X, switch_br2(XBr))
                     end
             end,
-    ?equals(intervals:minus(intervals:all(), I), I_inv),
-    true.
+    ?equals(intervals:minus(intervals:all(), I), I_inv).
 
 -spec prop_minus3(intervals:interval()) -> true.
 prop_minus3(A_) ->
     A = intervals:normalize(A_),
     A_inv = intervals:minus(intervals:all(), A),
-    ?equals(intervals:union(A, A_inv), intervals:all()),
-    true.
+    ?equals(intervals:union(A, A_inv), intervals:all()).
 
 -spec prop_not_minus(intervals:interval(), intervals:interval(), intervals:key()) -> boolean().
 prop_not_minus(A_, B_, X) ->
@@ -708,8 +698,7 @@ tester_get_bounds(_Config) ->
 prop_get_elements(I_) ->
     I = intervals:normalize(I_),
     {Elements, RestInt} = intervals:get_elements(I),
-    ?equals(lists:foldl(fun(E, Acc) -> intervals:union(intervals:new(E), Acc) end, RestInt, Elements), I),
-    true.
+    ?equals(lists:foldl(fun(E, Acc) -> intervals:union(intervals:new(E), Acc) end, RestInt, Elements), I).
 
 tester_get_elements(_Config) ->
     tester:test(?MODULE, prop_get_elements, 1, 5000, [{threads, 2}]).
@@ -784,8 +773,7 @@ prop_mk_from_node_ids(X, Y) ->
         false ->
             ?assert(intervals:new('(', X, Y, ']') =:= I andalso
                         not intervals:in(X, I))
-    end,
-    true.
+    end.
 
 tester_mk_from_node_ids_well_formed(_Config) ->
     tester:test(?MODULE, prop_mk_from_node_ids_well_formed, 2, 5000, [{threads, 2}]).

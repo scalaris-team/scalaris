@@ -64,9 +64,8 @@ prop_add(X, Y) ->
     B2 = ?BLOOM:add(B1, X),
     ?assert(?BLOOM:is_element(B2, X)),
     B3 = ?BLOOM:add(B2, Y),
-    ?assert(?BLOOM:is_element(B3, X) andalso
-                ?BLOOM:is_element(B3,Y)),
-    true.
+    ?assert(?BLOOM:is_element(B3, X)),
+    ?assert(?BLOOM:is_element(B3, Y)).
 
 tester_add(_) ->
     tester:test(?MODULE, prop_add, 2, 100, [{threads, 2}]).
@@ -106,8 +105,7 @@ tester_join(_) ->
 prop_equals(List) ->
     B1 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
     B2 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
-    ?assert(?BLOOM:equals(B1, B2)),
-    true.
+    ?assert(?BLOOM:equals(B1, B2)).
 
 tester_equals(_) ->
     tester:test(?MODULE, prop_equals, 1, 100, [{threads, 2}]).

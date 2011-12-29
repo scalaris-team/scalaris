@@ -96,8 +96,7 @@ prop_new(L, R) ->
     ?equals(util:proplist_get_value(inner_bf_fpr, Conf1) + 0.1,
             util:proplist_get_value(inner_bf_fpr, Conf2)),
     ?equals(util:proplist_get_value(leaf_bf_fpr, Conf1) + 0.1,
-            util:proplist_get_value(leaf_bf_fpr, Conf2)),    
-    true.
+            util:proplist_get_value(leaf_bf_fpr, Conf2)).
 
 tester_new(_) ->
     tester:test(?MODULE, prop_new, 2, 100).
@@ -112,9 +111,8 @@ prop_lookup(L, R) ->
     Tree = merkle_tree:bulk_build(I, DB),
     Art = art:new(Tree),
     Found = nodes_in_art(merkle_tree:iterator(Tree), Art, 0),
-    ?assert(Found > 0),
     ct:pal("TreeNodes=~p ; Found=~p", [merkle_tree:size(Tree), Found]),
-    true.
+    ?assert(Found > 0).
 
 -spec nodes_in_art(merkle_tree:mt_iter(), art:art(), non_neg_integer()) -> non_neg_integer().
 nodes_in_art(Iter, Art, Acc) ->

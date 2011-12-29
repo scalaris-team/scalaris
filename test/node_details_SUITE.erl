@@ -78,8 +78,7 @@ safe_compare(NodeDetails, Tag, ExpValue, Unknown, Known) ->
     case ValIsUnknown of
         true -> ?equals_w_note(node_details:contains(NodeDetails, Tag), false, atom_to_list(Tag));
         _    -> ?equals_w_note(node_details:get(NodeDetails, Tag), ExpValue, atom_to_list(Tag))
-    end,
-    true.
+    end.
 
 %% @doc Compares NodeDetails with the given values. Either Unknown or Known
 %%      must be non-empty. A value is unknown (and thus not part of the
@@ -110,8 +109,7 @@ node_details_equals(NodeDetails, Pred, PredList, Node, MyRange, Succ, SuccList, 
     safe_compare(NodeDetails, hostname, Hostname, Unknown, Known),
     safe_compare(NodeDetails, rt_size, RTSize, Unknown, Known),
     safe_compare(NodeDetails, message_log, MsgLog, Unknown, Known),
-    safe_compare(NodeDetails, memory, Memory, Unknown, Known),
-    true.
+    safe_compare(NodeDetails, memory, Memory, Unknown, Known).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
