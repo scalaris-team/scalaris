@@ -142,8 +142,10 @@ public class PeerNode {
         this.lastConnectSuccess = new Date();
     }
 
-    /* (non-Javadoc)
-     * @see java.lang.Object#toString()
+    /**
+     * Returns a string representation of this node.
+     * 
+     * @return the name of the node
      */
     @Override
     public String toString() {

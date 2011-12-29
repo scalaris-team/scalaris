@@ -32,42 +32,66 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 /**
  * Provides methods to interact with a specific Scalaris (Erlang) VM.
  *
- * <p>
- * Instances of this class can be generated using a given connection to a
- * scalaris node ({@link #ScalarisVM(Connection)}) or without a
- * connection ({@link #ScalarisVM()}) in which case a new connection
- * is created using {@link ConnectionFactory#createConnection()}.
- * </p>
- *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.6
+ * @version 3.10
  * @since 3.6
  */
 public class ScalarisVM {
+    /**
+     * Implements a {@link ConnectionPolicy} which only supports a single node
+     * and does not issue automatic re-tries (duplicating the operations of this
+     * class may be dangerous).
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     * 
+     * @version 3.10
+     * @since 3.10
+     * 
+     * @see DefaultConnectionPolicy
+     */
+    private static class FixedNodeConnectionPolicy extends ConnectionPolicy {
+        /**
+         * Creates a new connection policy working with the given remote node.
+         *
+         * Provided for convenience.
+         *
+         * Attention: This method also synchronises on the node.
+         *
+         * @param remoteNode the (only) available remote node
+         */
+        public FixedNodeConnectionPolicy(final String remoteNode) {
+            super(new PeerNode(remoteNode));
+        }
+
+        @Override
+        public <E extends Exception> PeerNode selectNode(int retry,
+                PeerNode failedNode, E e) throws E, UnsupportedOperationException {
+            // no re-try, i.e. re-throw any previous exception:
+            if (e != null) {
+                throw e;
+            }
+            return availableRemoteNodes.get(0);
+        }
+    }
+    
     /**
      * Connection to a Scalaris node.
      */
     private final Connection connection;
 
     /**
-     * Constructor, uses the default connection returned by
-     * {@link ConnectionFactory#createConnection()}.
-     *
+     * Creates a connection to the erlang VM of the given Scalaris node. Uses
+     * the connection policy of the global connection factory.
+     * 
+     * @param node
+     *            Scalaris node to connect with
      * @throws ConnectionException
-     *             if the connection fails
+     *             if the connection fails or the connection policy is not
+     *             cloneable
      */
-    public ScalarisVM() throws ConnectionException {
-        connection = ConnectionFactory.getInstance().createConnection();
-    }
-
-    /**
-     * Constructor, uses the given connection to an erlang node.
-     *
-     * @param conn
-     *            connection to use for the transaction
-     */
-    public ScalarisVM(final Connection conn) {
-        connection = conn;
+    public ScalarisVM(final String node) throws ConnectionException {
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        connection = cf.createConnection(new FixedNodeConnectionPolicy(node));
     }
 
     /**
@@ -536,7 +560,7 @@ public class ScalarisVM {
      * connection for use by {@link ConnectionFactory#addNode(String)}.
      *
      * @param max
-     *            maximum number of nodes to return
+     *            maximum number of nodes to return (> 0)
      *
      * @return a list of nodes (may be empty!)
      *
@@ -549,6 +573,9 @@ public class ScalarisVM {
      */
     public List<String> getOtherVMs(int max)
             throws ConnectionException, UnknownException {
+        if (max <= 0) {
+            throw new IllegalArgumentException("max must be an integer > 0");
+        }
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "get_other_vms",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(max) });
         try {

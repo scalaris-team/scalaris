@@ -40,33 +40,26 @@ public class ScalarisVMTest {
     protected enum DeleteAction {
         SHUTDOWN, KILL
     }
+    
+    final static String scalarisNode;
 
     static {
         // set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working):
-        ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy()).setMaxRetries(0);
-    }
-
-    /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#ScalarisVM()}.
-     *
-     * @throws ConnectionException
-     */
-    @Test
-    public final void testScalarisVM1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
-        conn.closeConnection();
+        DefaultConnectionPolicy cp = ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy());
+        cp.setMaxRetries(0);
+        scalarisNode = cp.selectNode().toString();
     }
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#ScalarisVM(de.zib.scalaris.Connection)}
+     * {@link de.zib.scalaris.ScalarisVM#ScalarisVM(String)}
      * .
      *
      * @throws ConnectionException
      */
     @Test
-    public final void testScalarisVM2() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM(ConnectionFactory.getInstance().createConnection("test"));
+    public final void testScalarisVM() throws ConnectionException {
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
     }
 
@@ -78,7 +71,7 @@ public class ScalarisVMTest {
      */
     @Test
     public void testDoubleClose() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.closeConnection();
     }
@@ -91,7 +84,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetVersion_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.getVersion();
     }
@@ -103,7 +96,7 @@ public class ScalarisVMTest {
      */
     @Test
     public final void testGetVersion1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final String version = conn.getVersion();
             assertTrue(!version.isEmpty());
@@ -120,7 +113,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetInfo_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.getInfo();
     }
@@ -132,7 +125,7 @@ public class ScalarisVMTest {
      */
     @Test
     public final void testGetInfo1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final GetInfoResult info = conn.getInfo();
             //        System.out.println(info.scalarisVersion);
@@ -156,7 +149,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetNumberOfNodes_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.getNumberOfNodes();
     }
@@ -167,7 +160,7 @@ public class ScalarisVMTest {
      */
     @Test
     public final void testGetNumberOfNodes1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final int numberOfNodes = conn.getNumberOfNodes();
             assertTrue(numberOfNodes >= 0);
@@ -184,7 +177,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetNodes_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.getNodes();
     }
@@ -196,7 +189,7 @@ public class ScalarisVMTest {
      */
     @Test
     public final void testGetNodes1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final List<String> nodes = conn.getNodes();
             assertTrue(nodes.size() >= 0);
@@ -215,7 +208,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testAddNodes_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.addNodes(1);
     }
@@ -262,7 +255,7 @@ public class ScalarisVMTest {
      * @throws InterruptedException
      */
     private final void testAddNodesX(final int nodesToAdd) throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             int size = conn.getNumberOfNodes();
             final AddNodesResult addedNodes = conn.addNodes(nodesToAdd);
@@ -294,7 +287,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testShutdownNode_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.shutdownNode("test");
     }
@@ -321,7 +314,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testKillNode_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.killNode("test");
     }
@@ -347,7 +340,7 @@ public class ScalarisVMTest {
      * @throws InterruptedException
      */
     private final void testDeleteNode(final DeleteAction action) throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final int size = conn.getNumberOfNodes();
             final String name = conn.addNodes(1).successful.get(0);
@@ -380,7 +373,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testShutdownNodes_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.shutdownNodes(1);
     }
@@ -428,7 +421,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testKillNodes_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.killNodes(1);
     }
@@ -475,7 +468,7 @@ public class ScalarisVMTest {
      * @throws InterruptedException
      */
     private final void testDeleteNodesX(final int nodesToRemove, final DeleteAction action) throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final int size = conn.getNumberOfNodes();
             if (nodesToRemove >= 1) {
@@ -512,7 +505,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testShutdownNodesList_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.shutdownNodesByName(Arrays.asList("test"));
     }
@@ -563,7 +556,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testKillNodesList_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.killNodes(Arrays.asList("test"));
     }
@@ -613,7 +606,7 @@ public class ScalarisVMTest {
      * @throws InterruptedException
      */
     private final void testDeleteNodesListX(final int nodesToRemove, final DeleteAction action) throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final int size = conn.getNumberOfNodes();
             if (nodesToRemove >= 1) {
@@ -656,7 +649,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testGetOtherVMs_NotConnected() throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.getOtherVMs(1);
     }
@@ -695,15 +688,12 @@ public class ScalarisVMTest {
     }
 
     private final void testGetOtherVMsX(final int max) throws ConnectionException, InterruptedException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         try {
             final List<String> result = conn.getOtherVMs(max);
             assertTrue("list too long:" + result.toString(), result.size() <= max);
-            final ConnectionFactory cf = new ConnectionFactory();
             for (final String node : result) {
-                cf.setNode(node);
-                cf.setClientName(ConnectionFactory.getInstance().getClientName() + "2");
-                final ScalarisVM conn2 = new ScalarisVM(cf.createConnection());
+                final ScalarisVM conn2 = new ScalarisVM(node);
                 try {
                     conn2.getInfo();
                 } finally {
@@ -723,7 +713,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testShutdownVM_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.shutdownVM();
     }
@@ -736,7 +726,7 @@ public class ScalarisVMTest {
     @Ignore("we still need the Scalaris Erlang VM")
     @Test
     public final void testShutdownVM1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.shutdownVM();
     }
 
@@ -748,7 +738,7 @@ public class ScalarisVMTest {
      */
     @Test(expected=ConnectionException.class)
     public final void testKillVM_NotConnected() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.closeConnection();
         conn.killVM();
     }
@@ -761,7 +751,7 @@ public class ScalarisVMTest {
     @Ignore("we still need the Scalaris Erlang VM")
     @Test
     public final void testKillVM1() throws ConnectionException {
-        final ScalarisVM conn = new ScalarisVM();
+        final ScalarisVM conn = new ScalarisVM(scalarisNode);
         conn.killVM();
     }
 }

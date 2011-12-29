@@ -72,7 +72,7 @@ import de.zib.tools.PropertyLoader;
  * default, {@link DefaultConnectionPolicy} is used.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 2.4
+ * @version 3.10
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -309,6 +309,30 @@ public class ConnectionFactory {
     public Connection createConnection(final String clientName)
             throws ConnectionException {
         return createConnection(clientName, clientNameAppendUUID);
+    }
+
+    /**
+     * Creates a connection to a scalaris erlang node specified by the given
+     * parameters. Uses the given connection policy.
+     *
+     * If {@link #clientNameAppendUUID} has been set, a pseudo UUID is appended
+     * to the given name. BEWARE that scalaris nodes accept only one connection
+     * per client name!
+     *
+     * @param connectionPolicy
+     *            override the connection policy that will be used for the new
+     *            connection
+     *
+     * @return the created connection
+     *
+     * @throws ConnectionException
+     *             if the connection fails
+     *
+     * @since 3.10
+     */
+    public Connection createConnection(final ConnectionPolicy connectionPolicy)
+            throws ConnectionException {
+        return createConnection(clientName, clientNameAppendUUID, connectionPolicy);
     }
 
     /**
