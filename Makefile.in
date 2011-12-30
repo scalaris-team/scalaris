@@ -89,23 +89,23 @@ compile:
 test-all: test java-test python-test interop-test db_verify_use_SUITE performance_SUITE benchmark_SUITE java-bench python-bench
 
 test: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 %_SUITE: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 %_SUITE-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
 test-vts: compile
-	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@
+	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ @CTHOOKS_FLAGS@
 
 test-clean:
 	-rm -rf ct_run.*@* ct.log index.html all_runs.html variables-*@* \
@@ -444,13 +444,13 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl test/*.erl bin/*.cfg
 
 dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl test/measure_util.erl --no_native | sed -f contrib/dialyzer-col.sed
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl --no_native | sed -f contrib/dialyzer-col.sed
 
 dialyzer-all: compile
 	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test | sed -f contrib/dialyzer-col.sed
 
 %_SUITE-dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
+	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl test/$*_SUITE.erl --no_native | sed -f contrib/dialyzer-col.sed
 
 plt: compile
 	$(DIALYZER) --plt_info > /dev/null ; \
