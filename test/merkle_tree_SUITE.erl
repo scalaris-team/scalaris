@@ -44,7 +44,7 @@ all() -> [
 
 suite() ->
     [
-     {timetrap, {seconds, 60}}
+     {timetrap, {seconds, 25}}
     ].
 
 init_per_suite(Config) ->
@@ -164,7 +164,7 @@ prop_lookup(L, R) ->
     true.
 
 tester_lookup(_) ->
-    tester:test(?MODULE, prop_lookup, 2, 10, [{threads, 2}]).
+    tester:test(?MODULE, prop_lookup, 2, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -192,7 +192,7 @@ prop_branch_bucket(L, R, Branch, Bucket) ->
     ?equals(merkle_tree:size(Tree2), Branch + 1).
 
 tester_branch_bucket(_) ->
-    tester:test(?MODULE, prop_branch_bucket, 4, 10, [{threads, 1}]).
+    tester:test(?MODULE, prop_branch_bucket, 4, 10, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -200,7 +200,6 @@ tester_branch_bucket(_) ->
 -spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
 prop_tree_hash(L, L, _) -> true;
 prop_tree_hash(L, R, ToAdd) ->
-    %ct:pal("prop_tree_hash params: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
     I = intervals:new('[', L, R, ']'),
     DB = db_generator:get_db(I, ToAdd, uniform),
     
@@ -211,36 +210,32 @@ prop_tree_hash(L, R, ToAdd) ->
     RootHash1 = merkle_tree:get_hash(Tree1),
     RootHash2 = merkle_tree:get_hash(Tree2),
     RootHash3 = merkle_tree:get_hash(Tree3),    
-    %ct:pal("Hash1=[~p]~nHash2=[~p]~nHash3=[~p]", [RootHash1, RootHash2, RootHash3]),
     ?equals(RootHash1, RootHash2),
     ?assert(RootHash1 > 0),
     ?assert(RootHash3 > 0),
     ?assert(RootHash3 =/= RootHash1).
 
 tester_tree_hash(_) ->
-    tester:test(?MODULE, prop_tree_hash, 3, 10, [{threads, 1}]).
+    tester:test(?MODULE, prop_tree_hash, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_insert(intervals:key(), intervals:key(), 1..1000) -> true.
+-spec prop_insert(intervals:key(), intervals:key(), 1..50) -> true.
 prop_insert(L, L, _) -> true;
-prop_insert(L, R, ToAdd) ->
+prop_insert(L, R, BucketSize) ->
     I = intervals:new('[', L, R, ']'),
-    DB = db_generator:get_db(I, ToAdd, uniform),
-    
-    Tree1 = merkle_tree:bulk_build(I, DB),
-    Tree2 = merkle_tree:bulk_build(I, DB),
-    Tree3 = build_tree(I, ToAdd * 2, uniform),
-
+    DB = db_generator:get_db(I, BucketSize, uniform),    
+    Tree1 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),
+    Tree2 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),    
+    Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),    
     Size1 = merkle_tree:size(Tree1),
     Size2 = merkle_tree:size(Tree2),
     Size3 = merkle_tree:size(Tree3),
-    %ct:pal("ToAdd=~p ; Tree1Size=~p ; Tree2Size=~p ; Tree3Size=~p", [ToAdd, Size1, Size2,Size3]),
     ?equals(Size1, Size2),
     ?assert(Size1 < Size3).
 
 tester_insert(_) ->
-    tester:test(?MODULE, prop_insert, 3, 2, [{threads, 1}]).
+    tester:test(?MODULE, prop_insert, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -259,7 +254,7 @@ prop_size(L, R, ToAdd) ->
     ?equals(Size, Inner + Leafs).
     
 tester_size(_) ->
-  tester:test(?MODULE, prop_size, 3, 10, [{threads, 1}]).
+  tester:test(?MODULE, prop_size, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -278,7 +273,7 @@ prop_iter(L, R, ToAdd) ->
 
 tester_iter(_Config) ->
     %prop_iter(0, 10000001, 10000).
-    tester:test(?MODULE, prop_iter, 3, 4, [{threads, 1}]).
+    tester:test(?MODULE, prop_iter, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
