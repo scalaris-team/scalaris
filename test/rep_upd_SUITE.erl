@@ -176,9 +176,7 @@ prop_minKeyInInterval(LeftI, RightI) ->
     ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
 
 tester_minKeyInInterval(_) ->
-    randoms:start(),
-    tester:test(?MODULE, prop_minKeyInInterval, 2, 10, [{threads, 2}]),
-    randoms:stop().    
+    tester:test(?MODULE, prop_minKeyInInterval, 2, 10, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bloom Filter Tests

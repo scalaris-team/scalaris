@@ -675,10 +675,7 @@ select_sync_node(Interval) ->
               ']' -> RKey
           end,
     Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-    randoms:start(),
-    Dest = lists:nth(random:uniform(erlang:length(Keys)), Keys),
-    randoms:stop(),
-    Dest.
+    util:randomelem(Keys).
 
 -spec minKeyInInterval(?RT:key(), intervals:interval()) -> ?RT:key().
 minKeyInInterval(Key, I) ->
