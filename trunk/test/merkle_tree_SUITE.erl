@@ -71,7 +71,7 @@ eprof(_) ->
     Fun = fun() -> merkle_tree:bulk_build(I, [], Keys) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),
-    eprof:analyze(),
+    eprof:analyze(procs, [{sort, time}]),
     
     ok.
 
