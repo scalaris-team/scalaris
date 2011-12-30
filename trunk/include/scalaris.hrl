@@ -91,8 +91,10 @@
 %-define(PDB_ETS, true). % may have performance issues with msg_delay
 
 % for debugging:
+-ifdef(have_ctline_support).
 % allows the retrieval of the current function and line number a process is in
 % (process dictionary, key test_server_loc)
 %-compile({parse_transform, ct_line}).
+-endif.
 
 -include("types.hrl").
