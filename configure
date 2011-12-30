@@ -3769,7 +3769,7 @@ if ac_fn_erl_try_run "$LINENO"; then :
   CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_DIALYZER="-Dhave_ctline_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is available" >&5
 $as_echo "$as_me: ct_line is available" >&6;}
 else
-  CTLINESUPPORT=""; CTLINESUPPORT_DIALYZER="-Dtypes_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
+  CTLINESUPPORT=""; CTLINESUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
 $as_echo "$as_me: ct_line is not available" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
