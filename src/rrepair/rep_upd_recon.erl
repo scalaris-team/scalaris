@@ -532,7 +532,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
     is_subtype(Stats,  ru_recon_stats:stats()).
 art_recon(Tree, Art, #ru_recon_state{ sync_round = Round, 
                                       dest_ru_pid = DestPid,
-                                      ownerRemotePid = OwnerPid,
+                                      ownerLocalPid = OwnerPid,
                                       stats = Stats }) ->
     case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
         true -> 

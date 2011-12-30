@@ -44,7 +44,7 @@
 %   simple - run one sync round
 %   times - measure sync time (building, protocol)
 %   parts - get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
-%   min_nodes - sync in an one node ring
+%   min_nodes - sync in an single node ring
 
 all() ->
     [get_symmetric_keys_test,
@@ -59,10 +59,10 @@ all() ->
      merkleSync_noOutdated,
      merkleSync_simple,
      merkleSync_parts,
-     merkleSync_min_nodes
-     %artSync_noOutdated,
-     %artSync_simple
-     %artSync_min_nodes
+     merkleSync_min_nodes,
+     artSync_noOutdated,
+     artSync_simple,
+     artSync_min_nodes
      ].
 
 suite() ->
@@ -170,7 +170,7 @@ prop_minKeyInInterval(L, L) -> true;
 prop_minKeyInInterval(LeftI, RightI) ->
     I = intervals:new('[', LeftI, RightI, ']'),    
     Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
-    AnyK = lists:nth(randoms:rand_uniform(1, length(Keys)), Keys),
+    AnyK = util:randomelem(Keys),
     MinLeft = rep_upd_recon:minKeyInInterval(AnyK, I),
     ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
     ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
@@ -381,7 +381,7 @@ fill_symmetric_ring(DataCount, NodeCount, OutdatedProbability) ->
                              %random replica is outdated                             
                              case OutdatedProbability >= randoms:rand_uniform(1, 100) of
                                  true ->
-                                     OldKey = lists:nth(randoms:rand_uniform(1, length(RepKeys) + 1), RepKeys),
+                                     OldKey = util:randomelem(RepKeys),
                                      api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
                                      receive {set_key_entry_reply, _} -> ok end,
                                      ok;
