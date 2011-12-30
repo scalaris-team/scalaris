@@ -468,11 +468,16 @@ kill_new_processes(OldProcesses, Options) ->
 %%      Also starts the crypto application needed for unit tests using the
 %%      tester.
 -spec init_per_suite(kv_opts()) -> kv_opts().
+-ifdef(have_cthooks_support).
 init_per_suite(Config) ->
     Processes = get_processes(),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     [{processes, Processes} | Config].
+-else.
+init_per_suite(Config) ->
+    Config.
+-endif.
 
 %% @doc Generic end_per_suite for all unit tests. Tries to stop a scalaris ring
 %%      started with make_ring* (if there is one) and stops the inets and
@@ -482,16 +487,22 @@ init_per_suite(Config) ->
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
 -spec end_per_suite(Config) -> Config when is_subtype(Config, kv_opts()).
+-ifdef(have_cthooks_support).
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
+    error_logger:tty(false),
     randoms:stop(),
     _ = inets:stop(),
+    error_logger:tty(true),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
-    error_logger:tty(true),
     Config.
+-else.
+end_per_suite(Config) ->
+    Config.
+-endif.
 
 -type ct_group_props() ::
     [parallel | sequence | shuffle | {shuffle, {integer(), integer(), integer()}} |
