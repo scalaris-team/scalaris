@@ -47,7 +47,13 @@
          start_minimal_procs/3, stop_minimal_procs/1,
          check_ring_load/1, check_ring_data/0, check_ring_data/2]).
 
+-ifdef(with_export_type_support).
+-export_type([process_info/0, kv_opts/0]).
+-endif.
+
 -include("scalaris.hrl").
+
+-type kv_opts() :: [{Key::atom(), Value::term()}].
 
 %% @doc Sets the current working directory to "../bin" if it does not end with
 %%      "/bin" yet. Assumes that the current working directory is a sub-dir of
@@ -132,7 +138,7 @@ make_ring_with_ids(Ids) ->
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
 %%      a {config, [{Key, Value},...]} option.
--spec make_ring_with_ids([?RT:key(),...] | fun(() -> [?RT:key(),...]), Options::[tuple()]) -> pid().
+-spec make_ring_with_ids([?RT:key(),...] | fun(() -> [?RT:key(),...]), Options::kv_opts()) -> pid().
 make_ring_with_ids(Ids, Options) when is_list(Ids) ->
     make_ring_with_ids(fun () -> Ids end, Options);
 make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
@@ -178,7 +184,7 @@ make_ring(Size) ->
 %% @doc Creates a ring with Size rangom IDs.
 %%      Passes Options to the supervisor, e.g. to set config variables, specify
 %%      a {config, [{Key, Value},...]} option.
--spec make_ring(Size::pos_integer(), Options::[tuple()]) -> pid().
+-spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
 make_ring(Size, Options) ->
     _ = fix_cwd(),
     error_logger:tty(true),
@@ -434,7 +440,7 @@ kill_new_processes(OldProcesses, Options) ->
                           end, fun(_P1, P2) -> P2 end),
 %%     ct:pal("Proc-Old: ~.0p~n", [_OnlyOld]),
 %%     ct:pal("Proc-Both: ~.0p~n", [_Both]),
-%%     ct:pal("Proc-New: ~.0p~n", [_OnlyNew]),
+%%     ct:pal("Proc-New: ~.0p~n", [OnlyNew]),
     Killed = [begin
 %%                   ct:pal("killing ~.0p~n", [Proc]),
                   Tabs = util:ets_tables_of(X),
@@ -461,7 +467,7 @@ kill_new_processes(OldProcesses, Options) ->
 %%      information and stores information about all running processes.
 %%      Also starts the crypto application needed for unit tests using the
 %%      tester.
--spec init_per_suite([tuple()]) -> [tuple()].
+-spec init_per_suite(kv_opts()) -> kv_opts().
 init_per_suite(Config) ->
     Processes = get_processes(),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
@@ -475,7 +481,7 @@ init_per_suite(Config) ->
 %%      of processes which are now running but haven't been running before.
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
--spec end_per_suite([tuple()]) -> [tuple()].
+-spec end_per_suite(Config) -> Config when is_subtype(Config, kv_opts()).
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     unittest_helper:stop_ring(),
@@ -511,10 +517,10 @@ create_ct_groups(TestCases, SpecialOptions) ->
          {testcase_to_groupname(TestCase), Options, [TestCase]}
      end || TestCase <- TestCases].
 
--spec init_per_group(atom(), [tuple()]) -> [tuple()].
+-spec init_per_group(atom(), Config) -> Config when is_subtype(Config, kv_opts()).
 init_per_group(_Group, Config) -> Config.
 
--spec end_per_group(atom(), [tuple()]) -> {return_group_result, ok | failed}.
+-spec end_per_group(atom(), kv_opts()) -> {return_group_result, ok | failed}.
 end_per_group(_Group, Config) ->
     Status = test_server:lookup_config(tc_group_result, Config),
     case proplists:get_value(failed, Status) of
@@ -531,28 +537,37 @@ end_per_group(_Group, Config) ->
                            {succ, comm:erl_pid_plain()},
                            ok | timeout}].
 get_ring_data() ->
-    DHTNodes = pid_groups:find_all(dht_node),
-    lists:sort(
-      fun(E1, E2) ->
-              erlang:element(2, E1) =< erlang:element(2, E2)
-      end,
-      [begin
-           comm:send_local(DhtNode,
-                           {unittest_get_bounds_and_data, comm:this()}),
-           receive
-               {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
-                   {DhtNode, Bounds, Data,
-                    {pred, comm:make_local(node:pidX(Pred))},
-                    {succ, comm:make_local(node:pidX(Succ))}, ok}
-           % note: no timeout possible - can not leave messages in queue!
-%%            after 500 -> {DhtNode, empty, [], null, null, timeout}
-           end
-       end || DhtNode <- DHTNodes]).
+    Self = self(),
+    erlang:spawn(
+      fun() ->
+              DHTNodes = pid_groups:find_all(dht_node),
+              Data =
+                  lists:sort(
+                    fun(E1, E2) ->
+                            erlang:element(2, E1) =< erlang:element(2, E2)
+                    end,
+                    [begin
+                         comm:send_local(DhtNode,
+                                         {unittest_get_bounds_and_data, comm:this()}),
+                         receive
+                             {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
+                                 {DhtNode, Bounds, Data,
+                                  {pred, comm:make_local(node:pidX(Pred))},
+                                  {succ, comm:make_local(node:pidX(Succ))}, ok}
+                         % we are in a separate process, any message in the
+                         % message box should not influence the calling process
+                             after 500 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
+                         end
+                     end || DhtNode <- DHTNodes]),
+              Self ! {data, Data}
+      end),
+    receive {data, Data} -> Data
+    end.
 
 -spec print_ring_data() -> ok.
 print_ring_data() ->
     DataAll = get_ring_data(),
-    ct:pal("~.0p~n", [DataAll]).
+    ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
 
 -include("unittest.hrl").
 
