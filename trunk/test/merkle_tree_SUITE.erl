@@ -261,18 +261,14 @@ tester_size(_) ->
 -spec prop_iter(intervals:key(), intervals:key(), 1000..2000) -> true.
 prop_iter(L, L, _) -> true;
 prop_iter(L, R, ToAdd) ->
-    ct:pal("PARAMS: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
     I = intervals:new('[', L, R, ']'),
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    {IterateT, Count} = util:tc(fun() -> count_iter(merkle_tree:iterator(Tree), 0) end),
-    ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n"
-           "Tree: IterationTime=~p s", 
-           [L, R, ToAdd, IterateT / (1000*1000)]),
+    Count = count_iter(merkle_tree:iterator(Tree), 0),
+    ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n", [L, R, ToAdd]),
     ?equals(Count, Inner + Leafs).
 
 tester_iter(_Config) ->
-    %prop_iter(0, 10000001, 10000).
     tester:test(?MODULE, prop_iter, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -285,7 +281,7 @@ prop_store_to_dot(L, R, ToAdd) ->
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p", [ToAdd, Inner, Leafs]),
-    merkle_tree:store_to_DOT(Tree, "StoreToDotTest"),
+    merkle_tree:store_to_DOT(Tree, "StoreToDotTest2"),
     true.
 
 tester_store_to_dot(_) ->

@@ -97,7 +97,6 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
              end,
     comm:send_local(Pid, {start_recon, get_recon_method(), RStage, {}, true}),
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
-    %?TRACE("Trigger NEXT", []),
     State#rep_upd_state{ trigger_state = NewTriggerState, 
                          sync_round = Round + 1,
                          open_recon = OpenRecon + 1 };
