@@ -36,15 +36,14 @@ all() -> [
           tester_insert,
           tester_iter,
           tester_lookup,
-          test_empty,
+          test_empty
           %eprof,
-          %fprof
-          performance          
+          %fprof          
          ].
 
 suite() ->
     [
-     {timetrap, {seconds, 25}}
+     {timetrap, {seconds, 10}}
     ].
 
 init_per_suite(Config) ->
@@ -90,56 +89,6 @@ fprof(_) ->
     fprof:profile(),
     fprof:analyse(),
     
-    ok.
-
-% @doc measures performance of merkle_tree operations
-performance(_) ->
-    % PARAMETER
-    ExecTimes = 100,
-    ToAdd = 2000,
-    
-    I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
-    DB = db_generator:get_db(I, ToAdd, uniform),
-    
-    TestTree = merkle_tree:bulk_build(I, DB),
-    {Inner, Leafs} = merkle_tree:size_detail(TestTree),    
-    
-    BuildT = measure_util:time_avg(
-           fun() -> merkle_tree:bulk_build(I, DB) end, 
-           [], ExecTimes, false),
-        
-    IterateT = measure_util:time_avg(
-           fun() -> count_iter(merkle_tree:iterator(TestTree), 0) end, 
-           [], ExecTimes, false),
-    
-    GenHashT = measure_util:time_avg(
-            fun() -> merkle_tree:gen_hash(TestTree) end,
-            [], ExecTimes, false),
-    
-    SimpleSizeT = measure_util:time_avg(
-            fun() -> merkle_tree:size(TestTree) end,
-            [], ExecTimes, false),
-    
-    DetailSizeT = measure_util:time_avg(
-            fun() -> merkle_tree:size_detail(TestTree) end,
-            [], ExecTimes, false),
-
-    ct:pal("
-            Merkle_Tree Performance
-            ------------------------
-            PARAMETER: AddedItems=~p ; ExecTimes=~p
-            TreeSize: InnerNodes=~p ; Leafs=~p,
-            BuildTime:      ~p
-            IterationTime : ~p
-            GenHashTime:    ~p
-            SimpleSizeTime: ~p
-            DetailSizeTime: ~p", 
-           [ToAdd, ExecTimes, Inner, Leafs,
-            measure_util:print_result(BuildT, ms), 
-            measure_util:print_result(IterateT),
-            measure_util:print_result(GenHashT),
-            measure_util:print_result(SimpleSizeT),
-            measure_util:print_result(DetailSizeT)]),    
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
