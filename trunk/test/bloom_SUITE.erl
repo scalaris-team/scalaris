@@ -38,9 +38,8 @@ all() -> [
           tester_add_list,
           tester_join,
           tester_equals,
-          tester_fpr,
+          tester_fpr
           %fprof,
-          performance
          ].
 
 suite() ->
@@ -151,41 +150,6 @@ measure_fp(DestFpr, MaxElements) ->
                          fun(X, Y) -> X + Y end,
                          0),
     NumFound / NumNotIn.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-performance(_) ->
-    %parameter
-    ExecTimes = 100,
-    ToAdd = 2000, % req: mod 2 = 0
-
-    %measure Build times
-    BuildTime =
-        measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
-                                                 fun(I) -> I end,
-                                                 fun(I, B) -> ?BLOOM:add(B, I) end,
-                                                 newBloom(ToAdd, 0.1))
-                              end,
-                              [], ExecTimes, false),
-    %measure join time
-    BF1 = for_to_ex(1,
-                    round(ToAdd / 2),
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(ToAdd, 0.1)),
-    BF2 = for_to_ex(round(ToAdd / 2) + 1,
-                    ToAdd,
-                    fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, newBloom(ToAdd, 0.1)),
-    JoinTime =
-        measure_util:time_avg(fun() -> ?BLOOM:join(BF1, BF2) end, [], ExecTimes, false),
-
-    %print results
-    ct:pal("EXECUTION TIMES in microseconds
-           PARAMETER: AddedItems=~p ; ExecTimes=~p
-           BuildTimes: ~p
-           JoinTimes : ~p",
-           [ToAdd, ExecTimes, 
-            measure_util:print_result(BuildTime, ms), 
-            measure_util:print_result(JoinTime, us)]),
-    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
