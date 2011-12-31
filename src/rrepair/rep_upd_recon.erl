@@ -115,7 +115,6 @@ on({get_state_response, MyInterval}, State =
        #ru_recon_state{ recon_stage = build_struct,
                         recon_method = bloom,
                         dhtNodePid = DhtNodePid }) ->
-    ?TRACE("MyI=~p~nMappedTo1=~p", [MyInterval, mapInterval(MyInterval, 1)]),
     send_chunk_req(DhtNodePid, self(), MyInterval, mapInterval(MyInterval, 1), get_max_items(bloom)),
     State#ru_recon_state{ recon_struct = [{interval, MyInterval}] };
 
@@ -146,8 +145,6 @@ on({get_state_response, MyInterval}, State =
     MyIMapped = mapInterval(MyInterval, 1),
     SrcIMapped = mapInterval(SrcInterval, 1),
     Intersection = intervals:intersection(MyIMapped, SrcIMapped),
-    ?TRACE2("REQ SHARED I FROM~nMyI=[~p] -~nMyIMapped=[~p]~nSrcI=[~p]~nSrcIMapped=~p~nIntersec=~p", 
-           [MyInterval, MyIMapped, SrcInterval, SrcIMapped, Intersection]),
     case intervals:is_empty(Intersection) of
         true ->
             ?TRACE("SYNC CLIENT - INTERSECTION EMPTY", []),
@@ -188,7 +185,6 @@ on({get_state_response, MyI}, State =
                        }) ->
     MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
     MySyncI = intervals:intersection(MyI, MyBloomI),
-    %?TRACE("BloomI=~p ; MyBloomI=~p ; MySyncI=~p", [BloomI, MyBloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
         true ->
             comm:send_local(self(), {shutdown, empty_interval});
@@ -224,7 +220,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
                            get_max_items(bloom));
         _ -> ok
     end,
-    ?TRACE2("RECV CHUNK interval= ~p  - RestInterval= ~p - DBLength=~p", [ChunkI, RestI, length(DBList)]),
     {BuildTime, SyncStruct} = 
         util:tc(fun() -> build_recon_struct(bloom, {ChunkI, DBList}, {get_fpr()}) end),
     case SyncMaster of
@@ -255,8 +250,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     {BuildTime, MerkleTree} = 
         case merkle_tree:is_merkle_tree(Params) of
             true -> %extend tree
-                {BTime, NTree} = 
-                    util:tc(fun() -> add_to_tree(DBList, Params) end),
+                {BTime, NTree} = util:tc(fun() -> add_to_tree(DBList, Params) end),
                 {ru_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
             false -> %build new tree
                 Interval = util:proplist_get_value(interval, Params),
@@ -265,7 +259,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                     {}) 
                         end)
         end,
-    ?TRACE("MERKLE TREE BUILD FINISHED", []),
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE("TREE EXISTS - ADD REST - RestI=~p", [RestI]),
@@ -409,20 +402,14 @@ on({check_node, SrcPid, Interval, Hash}, State =
             comm:send(SrcPid, {check_node_response, not_found, Interval, []});
         _ ->
             IsLeaf = merkle_tree:is_leaf(Node),
-            %?TRACE2("COMPARE RECV{I=[~p] Hash=[~p]} with MY {I=[~p] Hash=[~p]}", 
-            %       [Interval, Hash, merkle_tree:get_interval(Node), merkle_tree:get_hash(Node)]),
-            case merkle_tree:get_hash(Node) =:= Hash of
-                true ->
-                    comm:send(SrcPid, {check_node_response, ok, Interval, []});
-                false when IsLeaf -> 
-                    comm:send(SrcPid, {check_node_response, fail_is_leaf, Interval, []});
-                false when not IsLeaf ->
-                    ChildHashs = lists:map(fun(N) ->
-                                                   merkle_tree:get_hash(N)
-                                           end, 
-                                           merkle_tree:get_childs(Node)),
-                    comm:send(SrcPid, {check_node_response, fail_node, Interval, ChildHashs})
-            end
+            {Result, ChildHashs} = case merkle_tree:get_hash(Node) =:= Hash of
+                                       true -> {ok, []};
+                                       false when IsLeaf -> {fail_is_leaf, []};
+                                       false when not IsLeaf ->
+                                           {fail_node, 
+                                            [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
+                                   end,
+            comm:send(SrcPid, {check_node_response, Result, Interval, ChildHashs})
     end,
     State#ru_recon_state{ sync_pid = SrcPid };
 
@@ -434,23 +421,23 @@ on({check_node_response, Result, I, ChildHashs}, State =
                         recon_struct = Tree,
                         sync_round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
-    NewStats = ru_recon_stats:inc([{tree_compareLeft, -1}, {tree_nodesCompared, 1}], Stats),
-    FinalStats = 
+    IncOps = 
         case Result of
-            not_found -> ru_recon_stats:inc([{error_count, 1}], NewStats); 
-            ok -> ru_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], NewStats); 
+            not_found -> [{error_count, 1}]; 
+            ok -> [{tree_compareSkipped, merkle_tree:size(Node)}]; 
             fail_is_leaf ->
                 Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
-                ru_recon_stats:inc([{tree_leafsSynced, Leafs}], NewStats);               
+                [{tree_leafsSynced, Leafs}];               
             fail_node ->
                 MyChilds = merkle_tree:get_childs(Node),
                 {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
-                SkippedSubNodes = lists:foldl(fun(MNode, Acc) -> 
-                                                      Acc + case merkle_tree:is_leaf(MNode) of
-                                                                true -> 0;
-                                                                false -> merkle_tree:size(MNode)
-                                                            end
-                                              end, 0, Matched),
+                SkippedSubNodes = 
+                    lists:foldl(fun(MNode, Acc) -> 
+                                        Acc + case merkle_tree:is_leaf(MNode) of
+                                                  true -> 0;
+                                                  false -> merkle_tree:size(MNode)
+                                              end
+                                end, 0, Matched),
                 lists:foreach(fun(X) -> 
                                       comm:send(SyncDest, 
                                                 {check_node,
@@ -458,11 +445,12 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                                  merkle_tree:get_interval(X), 
                                                  merkle_tree:get_hash(X)}) 
                               end, NotMatched),
-                ru_recon_stats:inc([{tree_compareLeft, length(NotMatched)},
-                                    {tree_nodesCompared, length(Matched)},
-                                    {tree_compareSkipped, SkippedSubNodes}], 
-                                   NewStats)    
+                [{tree_compareLeft, length(NotMatched)},
+                 {tree_nodesCompared, length(Matched)},
+                 {tree_compareSkipped, SkippedSubNodes}]    
         end,
+    FinalStats = ru_recon_stats:inc(IncOps ++ [{tree_compareLeft, -1}, 
+                                               {tree_nodesCompared, 1}], Stats),
     CompLeft = ru_recon_stats:get(tree_compareLeft, FinalStats),
     if CompLeft =< 1 ->
            comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
@@ -499,11 +487,8 @@ reconcileNode(not_found, _) -> 0;
 reconcileNode(Node, Conf) ->
     case merkle_tree:is_leaf(Node) of
         true -> reconcileLeaf(Node, Conf);
-        false -> lists:foldl(fun(X, Acc) -> 
-                                     Acc + reconcileNode(X, Conf) 
-                             end, 
-                             0, 
-                             merkle_tree:get_childs(Node))
+        false -> lists:foldl(fun(X, Acc) -> Acc + reconcileNode(X, Conf) end, 
+                             0, merkle_tree:get_childs(Node))
     end.
 
 -spec reconcileLeaf(merkle_tree:mt_node(), 

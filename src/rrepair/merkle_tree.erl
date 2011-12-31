@@ -43,7 +43,7 @@
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
-%-define(DOT_SHORTNAME(X), X).
+%-define(DOT_SHORTNAME(X), X). %short Node names in exported merkle tree dot-pictures
 -define(DOT_SHORTNAME(X), b).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,7 +130,7 @@ lookup(I, {_, _, _, I, _} = Node) ->
 lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
         true when length(ChildList) =:= 0 -> Node;
-        true -> 
+        true ->
             IChilds = 
                 lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
             case length(IChilds) of
@@ -207,9 +207,14 @@ insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config)
   when Count =:= Config#mt_config.bucket_size ->    
     ChildI = intervals:split(Interval, Config#mt_config.branch_factor),
     NewLeafs = lists:map(fun(I) -> 
-                                 %TODO possibile optimiziation impl filter&count function
-                              NewBucket = lists:filter(fun(K) -> intervals:in(K, I) end, Bucket),
-                              {nil, length(NewBucket), NewBucket, I, []}
+                                 {NewBucket, BCount} =
+                                     lists:foldl(fun(K, {List, Sum} = Acc) -> 
+                                                         case intervals:in(K, I) of
+                                                             true -> {[K | List], Sum + 1};
+                                                             false -> Acc
+                                                         end
+                                                 end, {[], 0}, Bucket),
+                              {nil, BCount, NewBucket, I, []}
                          end, ChildI),
     insert_to_node(Key, {nil, 1 + Config#mt_config.branch_factor, [], Interval, NewLeafs}, Config);
 
