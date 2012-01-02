@@ -130,7 +130,7 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
                          {error, {RunTimeError, StackTrace}} |
                          {timetrap_timeout, integer()} |
                          {failed, {Suite::atom(), end_per_testcase, FailInfo}},
-                 CTHState::state()) -> NewCTHState::state()
+                 CTHState::state()) -> NewCTHState::#state{}
     when is_subtype(FailInfo, {timetrap_timeout, integer()} | {RunTimeError, StackTrace} | UserTerm),
          is_subtype(RunTimeError, term()),
          is_subtype(StackTrace, list()),
@@ -146,7 +146,7 @@ on_tc_fail(TC, Reason, State) when is_record(State, state) ->
 -spec on_tc_skip(TestcaseName::end_per_suite | init_per_group | end_per_group | atom(),
                  Reason::{tc_auto_skip, {Suite, Func::atom(), Reason}} |
                          {tc_user_skip, {Suite, TestCase::atom(), Comment::string()}},
-                 CTHState::state()) -> NewCTHState::state()
+                 CTHState::state()) -> NewCTHState::#state{}
     when is_subtype(Suite, atom()),
          is_subtype(Reason, {failed, FailReason} | {require_failed_in_suite0, RequireInfo}),
          is_subtype(FailReason, {Suite, ConfigFunc, FailInfo} | {Suite, FailedCaseInSequence}),
