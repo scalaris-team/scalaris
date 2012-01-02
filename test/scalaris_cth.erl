@@ -104,7 +104,7 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
 pre_init_per_testcase(TC, Config, {ok, State}) ->
     pre_init_per_testcase(TC, Config, State);
 pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
-    ct:pal("Starting ~p:~ps.~n", [State#state.suite, TC]),
+    ct:pal("Starting ~p:~p.~n", [State#state.suite, TC]),
     {Config, State#state{tc_start = os:timestamp()}}.
 
 %% @doc Called after each test case.
@@ -115,7 +115,7 @@ post_end_per_testcase(TC, Config, Return, {ok, State}) ->
     post_end_per_testcase(TC, Config, Return, State);
 post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) ->
     TCTime_us = timer:now_diff(os:timestamp(), State#state.tc_start),
-    ct:pal("Finished ~p:~p in ~fs with ~p.~n", [State#state.suite, TC, TCTime_us / 1000000, Return]),
+    ct:pal("Finished ~p:~p in ~fs with ~.0p.~n", [State#state.suite, TC, TCTime_us / 1000000, Return]),
     case Return of
         {timetrap_timeout, _} ->
             unittest_helper:print_ring_data();
