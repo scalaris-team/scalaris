@@ -279,8 +279,8 @@ get_stacktrace() ->
     case (try erlang:exit(a)
           catch exit:_ -> erlang:get_stacktrace()
           end) of
-        [{util, get_stacktrace, 0} | ST] -> ok;
-        [{util, get_stacktrace, 0, _} | ST] -> ok;
+        [{util, get_stacktrace, 0} | ST] -> ok; % erlang < R15
+        [{util, get_stacktrace, 0, _} | ST] -> ok; % erlang >= R15
         ST -> ST % just in case
     end,
     ST.
