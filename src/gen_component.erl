@@ -45,7 +45,9 @@
 -define(CALLING_RECEIVE(MODULE), ok).
 -endif.
 
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 -export([start_link/3, start_link/4,
          start/3, start/4, start/5]).
 -export([kill/1, sleep/2, runnable/1,
@@ -86,6 +88,9 @@
 -type handler() :: fun((comm:message(), State) -> State).
 
 %% userdevguide-begin gen_component:behaviour
+-ifdef(have_callback_support).
+-callback init(Args::term()) -> State::term().
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -94,9 +99,10 @@ behaviour_info(callbacks) ->
 %%      {on, 2}        % handle a single message
 %%                     % on(Msg, State) -> NewState | unknown_event | kill
     ];
-%% userdevguide-end gen_component:behaviour
 behaviour_info(_Other) ->
     undefined.
+-endif.
+%% userdevguide-end gen_component:behaviour
 
 %%% API
 -spec kill(Pid::pid() | port() | atom()) -> ok.
