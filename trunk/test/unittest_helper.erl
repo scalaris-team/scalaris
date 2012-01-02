@@ -470,13 +470,13 @@ kill_new_processes(OldProcesses, Options) ->
 -spec init_per_suite(kv_opts()) -> kv_opts().
 -ifdef(have_cthooks_support).
 init_per_suite(Config) ->
+    Config.
+-else.
+init_per_suite(Config) ->
     Processes = get_processes(),
     ct:pal("Starting unittest ~p~n", [ct:get_status()]),
     randoms:start(),
     [{processes, Processes} | Config].
--else.
-init_per_suite(Config) ->
-    Config.
 -endif.
 
 %% @doc Generic end_per_suite for all unit tests. Tries to stop a scalaris ring
@@ -489,6 +489,9 @@ init_per_suite(Config) ->
 -spec end_per_suite(Config) -> Config when is_subtype(Config, kv_opts()).
 -ifdef(have_cthooks_support).
 end_per_suite(Config) ->
+    Config.
+-else.
+end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
     unittest_helper:stop_ring(),
     % the following might still be running in case there was no ring:
@@ -498,9 +501,6 @@ end_per_suite(Config) ->
     error_logger:tty(true),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
-    Config.
--else.
-end_per_suite(Config) ->
     Config.
 -endif.
 
