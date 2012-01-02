@@ -65,14 +65,22 @@ comparison(_) ->
     
     BloomT = m_bloom(I, DB, DBSize, Iter),
     MerkleT = m_merkle(I, DB, DBSize, Iter),
-    ArtT = m_art(I, DB, DBSize, Iter),    
+    ArtT = m_art(I, DB, DBSize, Iter),        
+        
+    {_, _, _, BBuildT, _} = util:proplist_get_value(build_time, BloomT),
+    {_, _, _, MBuildT, _} = util:proplist_get_value(build_time, MerkleT),
+    {_, _, _, ABuildT, _} = util:proplist_get_value(build_time, ArtT),
+    TreeT = util:proplist_get_value(tree_time, ArtT),
     
-    ct:pal("Performance Comparison"
-           "----------------------"
-           "BuildTime:~nbloom:~p~nmerkle_tree:~p~nart:~p", 
-           [measure_util:print_result(BloomT, ms), 
-            measure_util:print_result(MerkleT, ms), 
-            measure_util:print_result(ArtT, ms)]),
+    ct:pal("Performance Comparison~n"
+           "DBSize=~p ; Iterations=~p"
+           "-----------------------------------------------~n"
+           "                    bloom|merkleTree|  art~n"
+           "BuildTime Avg ms: ~6.2f | ~6.2f | ~6.2f (~.2f ohne Merkle)", 
+           [DBSize, Iter,
+            BBuildT / 1000, 
+            MBuildT / 1000, 
+            (ABuildT + TreeT) / 1000, ABuildT / 1000]),
     ok.
 
 m_bloom(_I, DB, DBSize, Iterations) ->
@@ -86,22 +94,22 @@ m_bloom(_I, DB, DBSize, Iterations) ->
                                       lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
                               end,
                               Iterations, false),    
-    BuildTime.
+    [{build_time, BuildTime}].
 
 m_merkle(I, DB, _DBSize, Iterations) ->
     BuildT = 
         measure_util:time_avg(fun() -> merkle_tree:bulk_build(I, DB) end, 
                               Iterations, false),
     
-    BuildT.
+    [{build_time, BuildT}].
 
 m_art(I, DB, _DBSize, Iterations) ->    
-    {_TreeTime, Tree} = 
+    {TreeTime, Tree} = 
         util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
     BuildTime = 
         measure_util:time_avg(fun() -> art:new(Tree) end, Iterations, false),
     
-    BuildTime.
+    [{build_time, BuildTime}, {tree_time, TreeTime}].
 
 art(_) ->    
     ToAdd = 2000,
@@ -203,9 +211,9 @@ bloom(_) ->
 
     %print results
     ct:pal("EXECUTION TIMES in microseconds
-           PARAMETER: AddedItems=~p ; ExecTimes=~p
-           BuildTimes: ~p
-           JoinTimes : ~p",
+            PARAMETER: AddedItems=~p ; ExecTimes=~p
+            BuildTimes: ~p
+            JoinTimes : ~p",
            [ToAdd, ExecTimes, 
             measure_util:print_result(BuildTime, ms), 
             measure_util:print_result(JoinTime, us)]),
