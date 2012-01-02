@@ -35,14 +35,13 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [], true).
+    unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    unittest_helper:stop_minimal_procs(Config),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
     
 test_timeout(_Config) ->
+    unittest_helper:make_ring(4),
     timer:sleep(2000).
