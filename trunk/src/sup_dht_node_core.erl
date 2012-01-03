@@ -41,7 +41,7 @@ start_link(DHTNodeGroup, Options) ->
 -spec init({pid_groups:groupname(), Options::[tuple()]}) ->
                   {ok, {{one_for_all, MaxRetries::pos_integer(),
                          PeriodInSeconds::pos_integer()},
-                        [ProcessDescr::any()]}}.
+                        [ProcessDescr::supervisor:child_spec()]}}.
 init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,

@@ -70,7 +70,7 @@ start_link() ->
 
 -spec init(ChildSpecs) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
                                       PeriodInSeconds::pos_integer()},
-                         ChildSpecs}}.
+                         ChildSpecs}} when is_subtype(ChildSpecs, [supervisor:child_spec()]).
 init(ChildSpecs) ->
     {ok, {{one_for_all, 10, 1}, ChildSpecs}}.
 

@@ -53,7 +53,7 @@ start_link(Options) ->
 
 -spec init([tuple()])
         -> {ok, {{one_for_one, MaxRetries::pos_integer(),
-                  PeriodInSeconds::pos_integer()}, [ProcessDescr::any()]}}.
+                  PeriodInSeconds::pos_integer()}, [ProcessDescr::supervisor:child_spec()]}}.
 init(Options) ->
     randoms:start(),
     _ = config:start_link2(Options),

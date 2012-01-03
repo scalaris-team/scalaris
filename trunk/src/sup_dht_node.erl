@@ -48,7 +48,7 @@ start_link() ->
 %% userdevguide-begin sup_dht_node:init
 -spec init({pid_groups:groupname(), [tuple()]})
         -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()},
-                 [ProcessDescr::any()]}}.
+                 [ProcessDescr::supervisor:child_spec()]}}.
 init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     mgmt_server:connect(),

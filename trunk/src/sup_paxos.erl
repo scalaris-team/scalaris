@@ -43,7 +43,7 @@ start_link(PidGroup, Options) ->
 -spec init({pid_groups:groupname(), Options::[tuple()]}) ->
                   {ok, {{one_for_one, MaxRetries::pos_integer(),
                          PeriodInSeconds::pos_integer()},
-                        [ProcessDescr::any()]}}.
+                        [ProcessDescr::supervisor:child_spec()]}}.
 init({PidGroup, Options}) ->
     {SupervisorName, ProposerName, AcceptorName, LearnerName} =
         case lists:keyfind(sup_paxos_prefix, 1, Options) of

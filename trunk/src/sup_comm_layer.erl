@@ -30,7 +30,7 @@ start_link() ->
 
 -spec init([]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
                                       PeriodInSeconds::pos_integer()},
-                         [ProcessDescr::any()]}}.
+                         [ProcessDescr::supervisor:child_spec()]}}.
 init([]) ->
     CommLayerGroup = pid_groups:new("comm_layer_"),
     pid_groups:join_as(CommLayerGroup, ?MODULE),

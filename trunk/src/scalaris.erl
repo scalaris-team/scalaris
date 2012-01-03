@@ -54,7 +54,7 @@ stop() ->
 %% functions called by application:start(scalaris)
 %% triggered by ?MODULE:start/0.
 -spec start(StartType::normal, StartArgs::[])
-        -> {ok, Pid::pid()} | ignore |
+        -> {ok, Pid::pid()} |
            {error, Error::{already_started, Pid::pid()} | term()}.
 start(normal, []) ->
     case util:app_get_env(verbose, false) of
@@ -62,7 +62,10 @@ start(normal, []) ->
         false -> ok
     end,
     _ = pid_groups:start_link(),
-    sup_scalaris:start_link().
+    case sup_scalaris:start_link() of
+        ignore -> {error, ignore};
+        X      -> X
+    end.
 
 -spec stop(any()) -> ok.
 stop(_State) ->
