@@ -238,7 +238,7 @@ AC_RUN_IFELSE(
        [CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; AC_MSG_NOTICE([ct_line is not available])])
 
 AS_IF(
-       [test -n `$RUN_TEST --help | grep ct_hooks 2>/dev/null && echo ok` ],
+       [test -n "`$RUN_TEST --help | grep ct_hooks 2>/dev/null`" ],
        [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; AC_MSG_NOTICE([ct_hooks is available])],
        [CTHOOKS_FLAGS=""; CTHOOKS_EMAKEFILE=""; CTHOOKS_EDOC=""; CTHOOKS_DIALYZER=""; AC_MSG_NOTICE([ct_hooks is not available])])
 
