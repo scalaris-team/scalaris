@@ -396,7 +396,11 @@ loop(Module, Handler, ReceivedMsg, State, {_Options, _Slowest, _BPState} = Compo
                   catch Level:Reason ->
                             Stacktrace = erlang:get_stacktrace(),
                             case Stacktrace of
-                                [{Module, Handler, [Message, State]} | _]
+                                [{Module, Handler, [Message, State]} | _] % for erlang < R15
+                                  when Reason =:= function_clause andalso
+                                           Level =:= error ->
+                                    unknown_event;
+                                [{Module, Handler, [Message, State], _} | _] % erlang >= R15
                                   when Reason =:= function_clause andalso
                                            Level =:= error ->
                                     unknown_event;
