@@ -25,7 +25,8 @@
 -module(measure_util).
 
 
--export([time_avg/3, print_result/1, print_result/2]).
+-export([time_avg/3]).
+-export([print/1, print/2, get/3]).
 
 -type measure_result() :: { Min::non_neg_integer(), 
                             Max::non_neg_integer(),
@@ -34,17 +35,19 @@
                             Iterations::pos_integer()
                            }.
 
+-type measure_options() :: skip_first_value.
+
 -type time_unit() :: us | ms | s.
+-type mr_type() :: min | max | med | avg.
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
-%      Result = {MinTime, MaxTime, MedianTime, AverageTime}
--spec time_avg(fun(), pos_integer(), boolean()) -> measure_result().
-time_avg(Fun, Iterations, SkipFirstValue) ->
+-spec time_avg(fun(), pos_integer(), [measure_options()]) -> measure_result().
+time_avg(Fun, Iterations, Options) ->
     L = util:s_repeatAndCollect(
           fun() -> {Time, _} = util:tc(Fun, []), Time end,
           [], Iterations),
-    Times = case SkipFirstValue of
+    Times = case lists:member(skip_first_value, Options) of
                 true -> lists:nthtail(1, L);
                 _ -> L
             end,   
@@ -55,18 +58,18 @@ time_avg(Fun, Iterations, SkipFirstValue) ->
     Avg = round(lists:foldl(fun(X, Sum) -> X + Sum end, 0, Times) / Length),
     {Min, Max, Med, Avg, Iterations}.
 
--spec print_result(measure_result()) -> [{atom(), any()}].
-print_result({Min, Max, Med, Avg, _} = Values) ->
+-spec print(measure_result()) -> [{atom(), any()}].
+print({Min, Max, Med, Avg, _} = Values) ->
     MaxVal = lists:max([Min, Max, Med, Avg]),
     if
-        MaxVal > 100000 -> print_result(Values, s);
-        MaxVal > 1000 -> print_result(Values, ms);
-        true -> print_result(Values, us)
+        MaxVal > 100000 -> print(Values, s);
+        MaxVal > 1000 -> print(Values, ms);
+        true -> print(Values, us)
     end.
         
 
--spec print_result(measure_result(), time_unit()) -> [{atom(), any()}].
-print_result({Min, Max, Med, Avg, Iter}, Unit) ->
+-spec print(measure_result(), time_unit()) -> [{atom(), any()}].
+print({Min, Max, Med, Avg, Iter}, Unit) ->
     [{unit, Unit},
      {min, value_to_unit(Min, Unit)},
      {max, value_to_unit(Max, Unit)},
@@ -74,10 +77,19 @@ print_result({Min, Max, Med, Avg, Iter}, Unit) ->
      {avg, value_to_unit(Avg, Unit)},
      {iterations, Iter}].
 
+-spec get(measure_result(), mr_type(), time_unit()) -> float().
+get({Min, Max, Med, Avg, _}, Type, Unit) ->
+    case Type of
+        min -> value_to_unit(Min, Unit);
+        max -> value_to_unit(Max, Unit);
+        med -> value_to_unit(Med, Unit);
+        avg -> value_to_unit(Avg, Unit)
+    end.
+
 -spec value_to_unit(non_neg_integer(), time_unit()) -> float().
 value_to_unit(Val, Unit) ->
     case Unit of
-        us -> Val;
+        us -> erlang:float(Val);
         ms -> Val / 1000;
         s -> Val / 100000
     end.
