@@ -142,7 +142,7 @@ AS_IF([test "x$TOKEPREFIX" != xno],
               [AC_CHECK_FILE($ERLANG_LIB_DIR_toke/priv/libtoke.so,
                 [HAVETOKE=", {d, have_toke}"
                  HAVETOKE_EDOC=", {have_toke, true}"
-                 HAVETOKE_DIALYZER="-Dhave_toke"
+                 HAVETOKE_DIALYZER=" -Dhave_toke"
                  ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
                 ],
                 [HAVETOKE=""
@@ -168,53 +168,53 @@ AC_SUBST([ERLANG_TOKE_FLAGS])
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
        [GBTREESISBUILTIN=""; GBTREESISBUILTIN_EDOC=""; GBTREESISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([gb_tree() is a built-in type])],
-       [GBTREESISBUILTIN=", {d, types_not_builtin}"; GBTREESISBUILTIN_EDOC=", {types_not_builtin, true}"; GBTREESISBUILTIN_DIALYZER="-Dtypes_not_builtin"; AC_MSG_NOTICE([gb_tree() is not built-in])])
+       [GBTREESISBUILTIN=", {d, types_not_builtin}"; GBTREESISBUILTIN_EDOC=", {types_not_builtin, true}"; GBTREESISBUILTIN_DIALYZER=" -Dtypes_not_builtin"; AC_MSG_NOTICE([gb_tree() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::term()).], [ok])],
        [TERMISBUILTIN=""; TERMISBUILTIN_EDOC=""; TERMISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([term() is a built-in type])],
-       [TERMISBUILTIN=", {d, term_not_builtin}"; TERMISBUILTIN_EDOC=", {term_not_builtin, true}"; TERMISBUILTIN_DIALYZER="-Dterm_not_builtin"; AC_MSG_NOTICE([term() is not built-in])])
+       [TERMISBUILTIN=", {d, term_not_builtin}"; TERMISBUILTIN_EDOC=", {term_not_builtin, true}"; TERMISBUILTIN_DIALYZER=" -Dterm_not_builtin"; AC_MSG_NOTICE([term() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::node()).], [ok])],
        [NODEISBUILTIN=""; NODEISBUILTIN_EDOC=""; NODEISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([node() is a built-in type])],
-       [NODEISBUILTIN=", {d, node_not_builtin}"; NODEISBUILTIN_EDOC=", {node_not_builtin, true}"; NODEISBUILTIN_DIALYZER="-Dnode_not_builtin"; AC_MSG_NOTICE([node() is not built-in])])
+       [NODEISBUILTIN=", {d, node_not_builtin}"; NODEISBUILTIN_EDOC=", {node_not_builtin, true}"; NODEISBUILTIN_DIALYZER=" -Dnode_not_builtin"; AC_MSG_NOTICE([node() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::module()).], [ok])],
        [MODULEISBUILTIN=""; MODULEISBUILTIN_EDOC=""; MODULEISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([module() is a built-in type])],
-       [MODULEISBUILTIN=", {d, module_not_builtin}"; MODULEISBUILTIN_EDOC=", {module_not_builtin, true}"; MODULEISBUILTIN_DIALYZER="-Dmodule_not_builtin"; AC_MSG_NOTICE([module() is not built-in])])
+       [MODULEISBUILTIN=", {d, module_not_builtin}"; MODULEISBUILTIN_EDOC=", {module_not_builtin, true}"; MODULEISBUILTIN_DIALYZER=" -Dmodule_not_builtin"; AC_MSG_NOTICE([module() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::boolean()).], [ok])],
        [BOOLEANISBUILTIN=""; BOOLEANISBUILTIN_EDOC=""; BOOLEANISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([boolean() is a built-in type])],
-       [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; BOOLEANISBUILTIN_EDOC=", {boolean_not_builtin, true}"; BOOLEANISBUILTIN_DIALYZER="-Dboolean_not_builtin"; AC_MSG_NOTICE([boolean() is not built-in])])
+       [BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; BOOLEANISBUILTIN_EDOC=", {boolean_not_builtin, true}"; BOOLEANISBUILTIN_DIALYZER=" -Dboolean_not_builtin"; AC_MSG_NOTICE([boolean() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
        [TIDISBUILTIN=""; TIDISBUILTIN_EDOC=""; TIDISBUILTIN_DIALYZER=""; AC_MSG_NOTICE([tid() is a built-in type])],
-       [TIDISBUILTIN=", {d, tid_not_builtin}"; TIDISBUILTIN_EDOC=", {tid_not_builtin, true}"; TIDISBUILTIN_DIALYZER="-Dtid_not_builtin"; AC_MSG_NOTICE([tid() is not built-in])])
+       [TIDISBUILTIN=", {d, tid_not_builtin}"; TIDISBUILTIN_EDOC=", {tid_not_builtin, true}"; TIDISBUILTIN_DIALYZER=" -Dtid_not_builtin"; AC_MSG_NOTICE([tid() is not built-in])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype()} | ok).], [ok])],
        [RECURSIVETYPESALLOWED=""; RECURSIVETYPESALLOWED_EDOC=""; RECURSIVETYPESALLOWED_DIALYZER=""; AC_MSG_NOTICE([recursive types are supported])],
-       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"; RECURSIVETYPESALLOWED_DIALYZER="-Drecursive_types_are_not_allowed"; AC_MSG_NOTICE([recursive types are not supported])])
+       [RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"; RECURSIVETYPESALLOWED_DIALYZER=" -Drecursive_types_are_not_allowed"; AC_MSG_NOTICE([recursive types are not supported])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, mytype2()} | ok). -type(mytype2() :: ok).], [ok])],
        [TYPEFORWARDDECLARATIONS=""; TYPEFORWARDDECLARATIONS_EDOC=""; TYPEFORWARDDECLARATIONS_DIALYZER=""; AC_MSG_NOTICE([type forward declarations are supported])],
-       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"; TYPEFORWARDDECLARATIONS_DIALYZER="-Dtype_forward_declarations_are_not_allowed"; AC_MSG_NOTICE([type forward declarations are not supported])])
+       [TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"; TYPEFORWARDDECLARATIONS_DIALYZER=" -Dtype_forward_declarations_are_not_allowed"; AC_MSG_NOTICE([type forward declarations are not supported])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([[-export_type([mytype/0]). -type(mytype()::ok).]], [ok])],
-       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_EDOC=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_DIALYZER="-Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
+       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_EDOC=", {with_export_type_support, true}"; EXPORTTYPESUPPORT_DIALYZER=" -Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
        [EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_EDOC=""; EXPORTTYPESUPPORT_DIALYZER=""; AC_MSG_NOTICE([export_type is not supported])])
 
 if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    AC_MSG_NOTICE([forward declarations or recursive types are not allowed])
    FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
    FORWARDORRECURSIVE_EDOC=", {forward_or_recursive_types_are_not_allowed, true}"
-   FORWARDORRECURSIVE_DIALYZER="-Dforward_or_recursive_types_are_not_allowed"
+   FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
 fi
 
 AC_RUN_IFELSE(
@@ -234,23 +234,23 @@ AC_RUN_IFELSE(
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-compile({parse_transform, ct_line}).], [ok])],
-       [CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER="-Dhave_ctline_support"; AC_MSG_NOTICE([ct_line is available])],
+       [CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; AC_MSG_NOTICE([ct_line is available])],
        [CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; AC_MSG_NOTICE([ct_line is not available])])
 
 AS_IF(
        [test -n `$RUN_TEST --help | grep ct_hooks 2>/dev/null && echo ok` ],
-       [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER="-Dhave_cthooks_support"; AC_MSG_NOTICE([ct_hooks is available])],
+       [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; AC_MSG_NOTICE([ct_hooks is available])],
        [CTHOOKS_FLAGS=""; CTHOOKS_EMAKEFILE=""; CTHOOKS_EDOC=""; CTHOOKS_DIALYZER=""; AC_MSG_NOTICE([ct_hooks is not available])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-callback init() -> ok.], [ok])],
-       [CALLBACKSUPPORT=", {d, have_callback_support}"; CALLBACKSUPPORT_EDOC=", {have_callback_support, true}"; CALLBACKSUPPORT_DIALYZER="-Dhave_callback_support"; AC_MSG_NOTICE([-callback is available])],
+       [CALLBACKSUPPORT=", {d, have_callback_support}"; CALLBACKSUPPORT_EDOC=", {have_callback_support, true}"; CALLBACKSUPPORT_DIALYZER=" -Dhave_callback_support"; AC_MSG_NOTICE([-callback is available])],
        [CALLBACKSUPPORT=""; CALLBACKSUPPORT_EDOC=""; CALLBACKSUPPORT_DIALYZER=""; AC_MSG_NOTICE([-callback is not available])])
 
-EMAKEFILEDEFINES="$HAVETOKE $GBTREESISBUILTIN $TERMISBUILTIN $NODEISBUILTIN $MODULEISBUILTIN $BOOLEANISBUILTIN $TIDISBUILTIN $RECURSIVETYPESALLOWED $TYPEFORWARDDECLARATIONS $FORWARDORRECURSIVE $EXPORTTYPESUPPORT $CTLINESUPPORT $CTHOOKS_EMAKEFILE $CALLBACKSUPPORT $ERLANG_NATIVE_FLAGS"
-EDOCMACROS="$HAVETOKE_EDOC $GBTREESISBUILTIN_EDOC $TERMISBUILTIN_EDOC $NODEISBUILTIN_EDOC $MODULEISBUILTIN_EDOC $BOOLEANISBUILTIN_EDOC $TIDISBUILTIN_EDOC $RECURSIVETYPESALLOWED_EDOC $TYPEFORWARDDECLARATIONS_EDOC $FORWARDORRECURSIVE_EDOC $EXPORTTYPESUPPORT_EDOC $CTLINESUPPORT_EDOC $CTHOOKS_EDOC $CALLBACKSUPPORT_EDOC"
+EMAKEFILEDEFINES="${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${ERLANG_NATIVE_FLAGS}"
+EDOCMACROS="${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}"
 EDOCMACROS="${EDOCMACROS#, }"
-DIALYZER_FLAGS="$HAVETOKE_DIALYZER $GBTREESISBUILTIN_DIALYZER $TERMISBUILTIN_DIALYZER $NODEISBUILTIN_DIALYZER $MODULEISBUILTIN_DIALYZER $BOOLEANISBUILTIN_DIALYZER $TIDISBUILTIN_DIALYZER $RECURSIVETYPESALLOWED_DIALYZER $TYPEFORWARDDECLARATIONS_DIALYZER $FORWARDORRECURSIVE_DIALYZER $EXPORTTYPESUPPORT_DIALYZER $CTLINESUPPORT_DIALYZER $CTHOOKS_DIALYZER $CALLBACKSUPPORT_DIALYZER"
+DIALYZER_FLAGS="${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(EMAKEFILECOMPILECOMPAT)
