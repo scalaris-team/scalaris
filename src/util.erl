@@ -273,7 +273,8 @@ logged_exec(Cmd) ->
 
 %% @doc Gets the current stack trace. Use this method in order to get a stack
 %%      trace if no exception was thrown.
--spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]}].
+-spec get_stacktrace() -> [{Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()]} |
+                           {Module::atom(), Function::atom(), ArityOrArgs::byte() | [term()], Sources::[term()]}].
 get_stacktrace() ->
     % throw an exception for erlang:get_stacktrace/0 to return the actual stack trace
     case (try erlang:exit(a)
