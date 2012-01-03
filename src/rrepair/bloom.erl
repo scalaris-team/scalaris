@@ -33,12 +33,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -record(bloom, {
-                size          = 0                             :: integer(),     %bit-length of the bloom filter - requirement: size rem 8 = 0
-                filter        = <<>>                          :: binary(),      %length = size div 8
-                expItems      = ?required(bloom, expItems)    :: integer(),     %extected number of items
-                targetFPR     = ?required(bloom, targetFPR)   :: float(),       %target false-positive-rate
-                hfs           = ?required(bloom, hfs)         :: ?REP_HFS:hfs(),%HashFunctionSet
-                addedItems    = 0                             :: integer()      %number of inserted items
+                size          = 0                             :: non_neg_integer(),%bit-length of the bloom filter - requirement: size rem 8 = 0
+                filter        = <<>>                          :: binary(),         %length = size div 8
+                target_fpr    = ?required(bloom, target_fpr)  :: float(),          %target false-positive-rate
+                hfs           = ?required(bloom, hfs)         :: ?REP_HFS:hfs(),   %HashFunctionSet
+                max_items     = ?required(bloom, max_items)   :: non_neg_integer(),%extected number of items
+                items_count   = 0                             :: non_neg_integer() %number of inserted items
                }).
 -type bloom_filter_t() :: #bloom{}.
 
@@ -54,26 +54,30 @@ new_(N, FPR, Hfs) ->
     #bloom{
            size = Size,
            filter = <<0:Size>>,
-           expItems = N, 
-           targetFPR = calc_FPR(Size, N, calc_HF_num(Size, N)),
+           max_items = N, 
+           target_fpr = calc_FPR(Size, N, calc_HF_num(Size, N)),
            hfs = Hfs,
-           addedItems = 0
+           items_count = 0
           }.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc adds a range of items to bloom filter
 add_list_(Bloom, Items) ->
     #bloom{
            size = BFSize, 
            hfs = Hfs, 
-           addedItems = FilledCount,
+           items_count = FilledCount,
            filter = Filter
           } = Bloom,
     Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]), %TODO: USE FLATTEN???
     Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
     Bloom#bloom{
                 filter = set_Bits(Filter, Positions),
-                addedItems = FilledCount + length(Items)
+                items_count = FilledCount + length(Items)
                }.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns true if the bloom filter contains item
 is_element_(Bloom, Item) -> 
@@ -86,11 +90,13 @@ is_element_(Bloom, Item) ->
     Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
     check_Bits(Filter, Positions).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %% @doc joins two bloom filter, returned bloom filter represents their union
-join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR = Fpr1,
-             filter = F1, hfs = Hfs}, 
-      #bloom{size = Size2, expItems = ExpItem2, addedItems = Items2, targetFPR = Fpr2,
-             filter = F2}) ->
+join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1, 
+             target_fpr = Fpr1, filter = F1, hfs = Hfs}, 
+      #bloom{size = Size2, max_items = ExpItem2, items_count = Items2, 
+             target_fpr = Fpr2, filter = F2}) ->
     NewSize = erlang:max(Size1, Size2),
     <<F1Val : Size1>> = F1,
     <<F2Val : Size2>> = F2,
@@ -98,47 +104,68 @@ join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR =
     #bloom{
            size = NewSize,
            filter = <<NewFVal:NewSize>>,                            
-           expItems = erlang:max(ExpItem1, ExpItem2), 
-           targetFPR = erlang:min(Fpr1, Fpr2),
+           max_items = erlang:max(ExpItem1, ExpItem2), 
+           target_fpr = erlang:min(Fpr1, Fpr2),
            hfs = Hfs,                              
-           addedItems = Items1 + Items2 %approximation            
+           items_count = Items1 + Items2 %approximation            
            }.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc checks equality of two bloom filters
 equals_(Bloom1, Bloom2) ->
     #bloom{
            size = Size1, 
-           addedItems = Items1,
+           items_count = Items1,
            filter = Filter1
           } = Bloom1,
     #bloom{
            size = Size2, 
-           addedItems = Items2,
+           items_count = Items2,
            filter = Filter2
           } = Bloom2,
     Size1 =:= Size2 andalso
         Items1 =:= Items2 andalso
         Filter1 =:= Filter2.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc bloom filter debug information
 print_(Bloom) -> 
     #bloom{
-           expItems = MaxItems, 
-           targetFPR = TargetFPR,
+           max_items = MaxItems, 
+           target_fpr = TargetFpr,
            size = Size,
            hfs = Hfs,
-           addedItems = NumItems
+           items_count = NumItems
           } = Bloom,
     HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
     [{filter_bit_size, Size},
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
      {hash_fun_num, HCount},
      {max_items, MaxItems},
-     {dest_fpr, TargetFPR},
+     {dest_fpr, TargetFpr},
      {items_inserted, NumItems},
-     {act_fpr, calc_FPR(Size, NumItems, HCount)}].
+     {act_fpr, calc_FPR(Size, NumItems, HCount)},
+     {compression_rate, Size / MaxItems}].
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+get_property(Bloom, Property) ->
+    FieldNames = record_info(fields, bloom),
+    {_, N} = lists:foldl(fun(I, {Nr, Res}) -> case I =:= Property of
+                                                  true -> {Nr + 1, Nr};
+                                                  false -> {Nr + 1, Res}
+                                              end 
+                         end, {1, -1}, FieldNames),
+    if
+        N =:= -1 -> not_found;
+        true -> erlang:element(N + 1, Bloom)
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% bit operations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Sets all filter-bits at given positions to 1
 -spec set_Bits(binary(), [integer()]) -> binary().
@@ -162,7 +189,10 @@ check_Bits(Filter, [Pos | Positions]) ->
         false -> false
     end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helper functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec ln(X::number()) -> float().
 ln(X) -> 
     util:log(X, math:exp(1)).

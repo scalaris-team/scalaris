@@ -31,7 +31,7 @@
 -define(BLOOM, bloom).
 -define(HFS, hfs_lhsp).
 
--define(Fpr_Test_NumTests, 30).
+-define(Fpr_Test_NumTests, 25).
 
 all() -> [
           tester_add,
@@ -44,7 +44,7 @@ all() -> [
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 45}}
     ].
 
 init_per_suite(Config) ->
@@ -64,7 +64,10 @@ prop_add(X, Y) ->
     ?assert(?BLOOM:is_element(B2, X)),
     B3 = ?BLOOM:add(B2, Y),
     ?assert(?BLOOM:is_element(B3, X)),
-    ?assert(?BLOOM:is_element(B3, Y)).
+    ?assert(?BLOOM:is_element(B3, Y)),
+    ?equals(?BLOOM:get_property(B1, items_count), 0),
+    ?equals(?BLOOM:get_property(B2, items_count), 1),
+    ?equals(?BLOOM:get_property(B3, items_count), 2).
 
 tester_add(_) ->
     tester:test(?MODULE, prop_add, 2, 100, [{threads, 2}]).
@@ -74,20 +77,20 @@ tester_add(_) ->
 -spec prop_add_list([?BLOOM:key(),...]) -> true.
 prop_add_list(Items) ->
     B1 = newBloom(erlang:length(Items), 0.1),
-    B2 = ?BLOOM:add_list(B1, Items),
+    B2 = ?BLOOM:add(B1, Items),
     lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B2, X)) end, Items),
-    true.
+    ?equals(?BLOOM:get_property(B2, items_count), length(Items)).
 
 tester_add_list(_) ->
-    tester:test(?MODULE, prop_add_list, 1, 100, [{threads, 2}]).
+    tester:test(?MODULE, prop_add_list, 1, 10, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_join([?BLOOM:key(),...], [?BLOOM:key(),...]) -> true.
 prop_join(List1, List2) ->
     BSize = erlang:length(List1) + erlang:length(List2),
-    B1 = ?BLOOM:add_list(newBloom(BSize, 0.1), List1),
-    B2 = ?BLOOM:add_list(newBloom(BSize, 0.1), List2),
+    B1 = ?BLOOM:add(newBloom(BSize, 0.1), List1),
+    B2 = ?BLOOM:add(newBloom(BSize, 0.1), List2),
     B3 = ?BLOOM:join(B1, B2),
     lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B1, X) andalso
                                         ?BLOOM:is_element(B3, X)) end, List1),
@@ -102,8 +105,8 @@ tester_join(_) ->
 
 -spec prop_equals([?BLOOM:key(),...]) -> true.
 prop_equals(List) ->
-    B1 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
-    B2 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
+    B1 = ?BLOOM:add(newBloom(erlang:length(List), 0.1), List),
+    B2 = ?BLOOM:add(newBloom(erlang:length(List), 0.1), List),
     ?assert(?BLOOM:equals(B1, B2)).
 
 tester_equals(_) ->
@@ -111,45 +114,46 @@ tester_equals(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_fpr(100..10000) -> true.
-prop_fpr(ElementCount) ->
-    DestFpr = randoms:rand_uniform(1, 500) / 1000,
-    %DestFpr = 0.01,
-    FalsePositives = util:p_repeatAndAccumulate(
-                       fun measure_fp/2,
-                       [DestFpr, ElementCount],
-                       ?Fpr_Test_NumTests,
-                       fun(X, Y) -> X + Y end,
-                       0),
-    AvgFpr = FalsePositives / ?Fpr_Test_NumTests,
-    ct:pal("FalsePositives=~p - NumberOfTests=~p - Elements=~p~n"
-           "DestFpr: ~f~nMeasured Fpr: ~f~n
-            BloomFilter=~p~n",
-           [FalsePositives, ?Fpr_Test_NumTests, ElementCount, DestFpr, AvgFpr,
-            ?BLOOM:print(?BLOOM:new(ElementCount, DestFpr))]),
-    %?assert(DestFpr >= AvgFpr orelse DestFpr * 1.3 >= AvgFpr),
-    true.
+-spec prop_fpr(500..10000, string | int) -> true.
+prop_fpr(ItemCount, ItemType) ->
+    InList = random_list(ItemType, ItemCount),
+    
+    DestFpr = randoms:rand_uniform(1, 100) / 1000,
+    DestFPRList = [DestFpr, DestFpr*0.8, DestFpr*0.5],
+    HFCount = ?BLOOM:calc_HF_numEx(ItemCount, DestFpr),
+    
+    FPs = [{util:p_repeatAndAccumulate(
+              fun measure_fpr/3, [{Fpr, HFCount}, {InList, ItemCount}, ItemType],
+              ?Fpr_Test_NumTests, fun(X, Y) -> X + Y end, 
+              0) / ?Fpr_Test_NumTests, Fpr} 
+           || Fpr <- DestFPRList],
+    FPs2 = [{D, M, (1 - D/M) * 100, 
+             if M-D =< 0 -> "ok"; true -> "fail" end } 
+           || {M, D} <- FPs],
+    ct:pal("ItemCount=~p ; ItemType=~p ; Tests=~p ; Functions=~p ; CompressionRate=~.2f~n"
+               "DestFpr, Measured, Diff in %, Status~n~p",
+               [ItemCount, ItemType, ?Fpr_Test_NumTests, HFCount, 
+                ?BLOOM:calc_least_size(ItemCount, DestFpr) / ItemCount, FPs2]),
+    true.    
+
+measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
+    Hfs = ?HFS:new(HFCount),    
+    InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),    
+    BF = ?BLOOM:add(InitBF, InList),
+    
+    Count = trunc(10 / ?BLOOM:get_property(BF, target_fpr)),
+    _NotInList = random_list(ListItemType, Count),
+    NotInList = lists:filter(fun(I) -> not lists:member(I, InList) end, _NotInList),    
+    Found = lists:foldl(fun(I, Acc) -> 
+                                Acc + case ?BLOOM:is_element(BF, I) of
+                                          true -> 1;
+                                          false -> 0
+                                      end
+                        end, 0, NotInList),
+    Found / Count.
 
 tester_fpr(_) ->
-    tester:test(?MODULE, prop_fpr, 1, 1, [{threads, 2}]).
-
-%% @doc measures false positives by adding 1..MaxElements into a new BF
-%%      and checking number of found items which are not in the BF
-measure_fp(DestFpr, MaxElements) ->
-    BF = newBloom(MaxElements, DestFpr),
-    BF1 = for_to_ex(1, MaxElements, fun(I) -> I end, fun(I, B) -> ?BLOOM:add(B, I) end, BF),
-    NumNotIn = trunc(10 / DestFpr),
-    %count found items which should not be in the bloom filter
-    NumFound = for_to_ex(MaxElements + 1,
-                         MaxElements + 1 + NumNotIn,
-                         fun(I) -> case ?BLOOM:is_element(BF1, I) of
-                                       true -> 1;
-                                       false -> 0
-                                   end
-                         end,
-                         fun(X, Y) -> X + Y end,
-                         0),
-    NumFound / NumNotIn.
+    tester:test(?MODULE, prop_fpr, 2, 2, [{threads, 1}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -173,6 +177,12 @@ newBloom(ElementNum, Fpr) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % UTILS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec random_list(ItemType :: int | string, pos_integer()) -> [string() | pos_integer()].
+random_list(int, Count) ->
+    util:for_to_ex(1, Count, fun(_) -> randoms:getRandomInt() end);
+random_list(string, Count) ->
+    util:for_to_ex(1, Count, fun(_) -> randoms:getRandomString() end).
 
 for_to_ex(I, N, Fun, AccuFun, Accu) ->
     NewAccu = AccuFun(Fun(I), Accu),
