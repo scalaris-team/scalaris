@@ -48,6 +48,7 @@
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
 
+-spec get_neighbors(state()) -> nodelist:neighborhood().
 get_neighbors({Neighbors, _RandViewSize, _Interval, _TriggerState, _Cache, _Churn}) ->
     Neighbors.
 
@@ -56,6 +57,8 @@ get_neighbors({Neighbors, _RandViewSize, _Interval, _TriggerState, _Cache, _Chur
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
+-spec init(Me::node:node_type(), Pred::node:node_type(),
+           Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState1 =
@@ -67,6 +70,7 @@ init(Me, Pred, Succ) ->
     cyclon:get_subset_rand_next_interval(1, comm:self_with_cookie(rm)),
     {Neighborhood, config:read(cyclon_cache_size), min_interval, TriggerState2, [], true}.
 
+-spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
 unittest_create_state(Neighbors) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState1 =
@@ -80,6 +84,7 @@ unittest_create_state(Neighbors) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
+-spec on(custom_message(), state()) -> state() | unknown_event.
 on({rm_trigger},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
@@ -188,38 +193,49 @@ on({{get_node_details_response, NodeDetails}, rm}, State) ->
 
 on(_, _State) -> unknown_event.
 
+-spec new_pred(State::state(), NewPred::node:node_type()) -> state().
 new_pred(State, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
 %%     trigger_update(OldNeighborhood, [], nodelist:new_neighborhood(nodelist:node(OldNeighborhood), NewPred)),
     % we trust NewPred to be alive -> integrate node:
     update_nodes(State, [NewPred], [], null).
 
+-spec new_succ(State::state(), NewSucc::node:node_type()) -> state().
 new_succ(State, NewSucc) ->
     % similar to new_pred/2
     update_nodes(State, [NewSucc], [], null).
 
+-spec remove_pred(State::state(), OldPred::node:node_type(),
+                  PredsPred::node:node_type()) -> state().
 remove_pred(State, OldPred, PredsPred) ->
     update_nodes(State, [PredsPred], [OldPred], null).
 
+-spec remove_succ(State::state(), OldSucc::node:node_type(),
+                  SuccsSucc::node:node_type()) -> state().
 remove_succ(State, OldSucc, SuccsSucc) ->
     update_nodes(State, [SuccsSucc], [OldSucc], null).
 
+-spec update_node(State::state(), NewMe::node:node_type()) -> state().
 update_node({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
     {NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn}.
 
+-spec leave(State::state()) -> ok.
 leave(_State) -> ok.
 
 % failure detector reported dead node
+-spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
 crashed_node(State, DeadPid) ->
     update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1).
 
 % dead-node-cache reported dead node to be alive again
+-spec zombie_node(State::state(), Node::node:node_type()) -> state().
 zombie_node(State, Node) ->
     % this node could potentially be useful as it has been in our state before
     update_nodes(State, [Node], [], null).
 
+-spec get_web_debug_info(State::state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
 
 %% @doc Checks whether config parameters of the rm_tman process exist and are

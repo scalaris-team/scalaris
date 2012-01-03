@@ -90,16 +90,6 @@ update_entry(DB, Entry) -> update_entry_(DB, Entry).
 -spec delete_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 delete_entry(DB, Entry) -> delete_entry_(DB, Entry).
 
-% convenience methods
-% (should not be used inside the DB implementation and thus do not need a wrapper):
--spec read(DB::db(), Key::?RT:key()) ->
-         {ok, Value::value(), Version::version()} | {ok, empty_val, -1}.
--spec write(DB::db(), Key::?RT:key(), Value::value(), Version::version()) ->
-         NewDB::db().
-
--spec delete(DB::db(), Key::?RT:key()) ->
-         {NewDB::db(), Status::ok | locks_set | undef}.
-
 % operations on / with multiple DB entries:
 -spec get_entries(DB::db(), Range::intervals:interval()) -> db_as_list().
 get_entries(DB, Range) -> get_entries_(DB, Range).
@@ -179,59 +169,11 @@ get_changes(DB) -> get_changes_(DB).
 -spec get_changes(DB::db(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes(DB, Interval) -> get_changes_(DB, Interval).
 
-% note: no need for a wrapper here:
--spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
-
-%% private methods (must be implemented by the DB)
--spec new_() -> db_t().
--spec open_(DBName::db_name()) -> db_t().
--spec close_(DB::db_t()) -> any().
--spec close_(DB::db_t(), Delete::boolean()) -> any().
--spec get_name_(DB::db_t()) -> db_name().
--spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
--spec get_load_(DB::db_t()) -> Load::integer().
-
--spec get_entry_(DB::db_t(), Key::?RT:key()) -> db_entry:entry().
--spec get_entry2_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
--spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
--spec update_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
--spec delete_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-
--spec get_entries_(DB::db_t(), Range::intervals:interval()) -> db_as_list().
--spec get_entries_(DB::db_t(),
-                   FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
-                   ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
-        -> [Value].
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db_as_list()}.
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
-                 FilterFun::fun((db_entry:entry()) -> boolean()),
-                 ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), [V]}.
--spec update_entries_(DB::db_t(), Values::[db_entry:entry()],
-                      Pred::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> boolean()),
-                      UpdateFun::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> UpdatedEntry::db_entry:entry()))
-        -> NewDB::db_t().
--spec delete_entries_(DB::db_t(),
-                      RangeOrFun::intervals:interval() |
-                                  fun((DBEntry::db_entry:entry()) -> boolean()))
-        -> NewDB::db_t().
--spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db_t()}.
-
--spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
-         {NewDB::db_t(), db_as_list()}.
--spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
-        -> {?RT:key(), TakenLoad::pos_integer()}.
--spec get_data_(DB::db_t()) -> db_as_list().
--spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-
--spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
--spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
--spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
-
--spec record_changes_(OldDB::db_t(), intervals:interval()) -> NewDB::db_t().
--spec stop_record_changes_(OldDB::db_t()) -> NewDB::db_t().
--spec stop_record_changes_(OldDB::db_t(), intervals:interval()) -> NewDB::db_t().
--spec get_changes_(DB::db_t()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
--spec get_changes_(DB::db_t(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
+% Methods that should not be used inside the DB implementation (and thus do not need a wrapper):
+%% -spec read(DB::db(), Key::?RT:key()) ->
+%%          {ok, Value::value(), Version::version()} | {ok, empty_val, -1}.
+%% -spec write(DB::db(), Key::?RT:key(), Value::value(), Version::version()) ->
+%%          NewDB::db().
+%% -spec delete(DB::db(), Key::?RT:key()) ->
+%%          {NewDB::db(), Status::ok | locks_set | undef}.
+%% -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.

@@ -30,32 +30,3 @@
          get_web_debug_info/1,
          check_config/0,
          unittest_create_state/1]).
-
--spec get_neighbors(state()) -> nodelist:neighborhood().
-
--spec init(Me::node:node_type(), Pred::node:node_type(),
-           Succ::node:node_type()) -> state().
-
--spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
-
--spec on(custom_message(), state()) -> state() | unknown_event.
-
--spec zombie_node(State::state(), Node::node:node_type()) -> state().
-
--spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
-
--spec new_pred(State::state(), NewPred::node:node_type()) -> state().
-
--spec new_succ(State::state(), NewSucc::node:node_type()) -> state().
-
--spec leave(State::state()) -> ok.
-
--spec remove_pred(State::state(), OldPred::node:node_type(),
-                  PredsPred::node:node_type()) -> state().
-
--spec remove_succ(State::state(), OldSucc::node:node_type(),
-                  SuccsSucc::node:node_type()) -> state().
-
--spec update_node(State::state(), NewMe::node:node_type()) -> state().
-
--spec get_web_debug_info(State::state()) -> [{string(), string()}].

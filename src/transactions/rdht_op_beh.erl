@@ -23,8 +23,15 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 % for behaviour
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 
+-ifdef(have_callback_support).
+-callback tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
+-callback tlogentry_get_value(tx_tlog:tlog_entry()) -> any().
+-callback tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -32,6 +39,6 @@ behaviour_info(callbacks) ->
      {tlogentry_get_value, 1},
      {tlogentry_get_version, 1}
     ];
-
 behaviour_info(_Other) ->
     undefined.
+-endif.

@@ -41,12 +41,15 @@
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
+-spec get_number_of_samples(Conn::dht_node_join:connection()) -> ok.
 get_number_of_samples({_, ContactNode} = Connection) ->
     comm:send(ContactNode, {join, number_of_samples_request, comm:this(),
                             ?MODULE, Connection}).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.
+-spec get_number_of_samples_remote(
+        SourcePid::comm:mypid(), Conn::dht_node_join:connection()) -> ok.
 get_number_of_samples_remote(SourcePid, Connection) ->
     MyPidWithCookie =
         comm:self_with_cookie({join, ?MODULE, {get_samples, SourcePid, Connection}}),
@@ -57,6 +60,9 @@ get_number_of_samples_remote(SourcePid, Connection) ->
 %%      given key. This will simulate the join operation and return a lb_op()
 %%      with all the data needed in sort_candidates/1.
 %%      Note: this is executed at an existing node.
+-spec create_join(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
+                  SourcePid::comm:mypid(), Conn::dht_node_join:connection())
+        -> dht_node_state:state().
 create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
     case dht_node_state:get(DhtNodeState, slide_pred) of
         null ->
@@ -162,6 +168,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
 %%      the operation with the largest address range at the joining node will
 %%      be at the front.
 %%      Note: this is executed at the joining node.
+-spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
 sort_candidates(Ops) ->
     lb_common:bestStddev(Ops, plus_infinity, fun lb_psv_split:my_sort_fun/2).
 
@@ -185,6 +192,7 @@ process_join_msg({gossip_get_values_best_response, BestValues},
 
 %% @doc Checks whether config parameters of the passive load balancing
 %%      algorithm exist and are valid.
+-spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(lb_psv_gossip_min_samples) and
     config:cfg_is_greater_than_equal(lb_psv_gossip_min_samples, 1).

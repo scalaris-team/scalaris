@@ -20,12 +20,20 @@
 -vsn('$Id$').
 
 % for behaviour
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Behaviour definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-ifdef(have_callback_support).
+-type state() :: term().
 
+-callback init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(),
+               MaxIntervalFun::trigger:interval_fun(), comm:message_tag()) -> state().
+-callback now(state()) -> state().
+-callback next(state(), IntervalTag::trigger:interval()) -> state().
+-callback stop(state()) -> state().
+
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -34,6 +42,6 @@ behaviour_info(callbacks) ->
      {next, 2},
      {stop, 1}
     ];
-
 behaviour_info(_Other) ->
     undefined.
+-endif.

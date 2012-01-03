@@ -21,15 +21,52 @@
 -vsn('$Id$').
 
 % for behaviour
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
-
--include("scalaris.hrl").
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Behaviour definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-endif.
 
 %% userdevguide-begin rt_beh:behaviour
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
+-include("client_types.hrl").
+-type rt() :: term().
+-type external_rt() :: term().
+-type key() :: term().
+
+-callback empty(nodelist:neighborhood()) -> rt().
+-callback empty_ext(nodelist:neighborhood()) -> external_rt().
+-callback hash_key(client_key()) -> key().
+-callback get_random_node_id() -> key().
+-callback next_hop(dht_node_state:state(), key()) -> comm:mypid().
+
+-callback init_stabilize(nodelist:neighborhood(), rt()) -> rt().
+-callback update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
+                 NewNeighbors::nodelist:neighborhood())
+        -> {trigger_rebuild, rt()} | {ok, rt()}.
+-callback filter_dead_node(rt(), comm:mypid()) -> rt().
+
+-callback to_pid_list(rt()) -> [comm:mypid()].
+-callback get_size(rt() | external_rt()) -> non_neg_integer().
+-callback get_replica_keys(key()) -> [key()].
+
+-callback n() -> number().
+-callback get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
+-callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
+
+-callback dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
+
+-callback to_list(dht_node_state:state()) -> nodelist:snodelist().
+-callback export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
+-callback handle_custom_message(comm:message(), rt_loop:state_active()) -> rt_loop:state_active() | unknown_event.
+
+-callback check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
+-callback check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
+
+-callback check_config() -> boolean().
+
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -65,7 +102,7 @@ behaviour_info(callbacks) ->
      {check, 4}, {check, 5},
      {check_config, 0}
     ];
-%% userdevguide-end rt_beh:behaviour
-
 behaviour_info(_Other) ->
     undefined.
+-endif.
+%% userdevguide-end rt_beh:behaviour

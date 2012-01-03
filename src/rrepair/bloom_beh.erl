@@ -19,8 +19,23 @@
 
 -module(bloom_beh).
 
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
+-type bloom_filter() :: term().
+-type key() :: binary() | integer() | float() | boolean() | atom() | tuple() | ?RT:key().
+
+-callback new(integer(), float()) -> bloom_filter().
+-callback new(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter().
+-callback add(bloom_filter(), key()) -> bloom_filter().
+-callback is_element(bloom_filter(), key()) -> boolean().
+-callback equals(bloom_filter(), bloom_filter()) -> boolean().
+-callback join(bloom_filter(), bloom_filter()) -> bloom_filter().
+-callback print(bloom_filter()) -> [{atom(), any()}].
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -29,6 +44,6 @@ behaviour_info(callbacks) ->
      {is_element, 2}, {equals, 2}, {join, 2},
      {print, 1}
     ];
-
 behaviour_info(_Other) ->
     undefined.
+-endif.

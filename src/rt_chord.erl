@@ -45,10 +45,12 @@
 
 %% userdevguide-begin rt_chord:empty
 %% @doc Creates an empty routing table.
+-spec empty(nodelist:neighborhood()) -> rt().
 empty(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
 %% @doc Hashes the key to the identifier space.
+-spec hash_key(client_key()) -> key().
 hash_key(Key) -> hash_key_(Key).
 
 %% @doc Hashes the key to the identifier space (internal function to allow
@@ -61,6 +63,7 @@ hash_key_(Key) ->
 
 %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
 %%      parameters set in the config file (key_creator and key_creator_bitmask).
+-spec get_random_node_id() -> key().
 get_random_node_id() ->
     case config:read(key_creator) of
         random -> hash_key_(randoms:getRandomString());
@@ -75,6 +78,7 @@ get_random_node_id() ->
 
 %% userdevguide-begin rt_chord:init_stabilize
 %% @doc Starts the stabilization routine.
+-spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) ->
     % calculate the longest finger
     Id = nodelist:nodeid(Neighbors),
@@ -87,6 +91,7 @@ init_stabilize(Neighbors, RT) ->
 
 %% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
+-spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, DeadPid) ->
     DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
                             node:same_process(Node, DeadPid)],
@@ -95,10 +100,12 @@ filter_dead_node(RT, DeadPid) ->
 %% userdevguide-end rt_chord:filter_dead_node
 
 %% @doc Returns the pids of the routing table entries.
+-spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(RT) ->
     [node:pidX(Node) || Node <- gb_trees:values(RT)].
 
 %% @doc Returns the size of the routing table.
+-spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(RT) ->
     gb_trees:size(RT).
 
@@ -107,6 +114,7 @@ get_size(RT) ->
 normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Returns the size of the address space.
+-spec n() -> number().
 n() -> n_().
 %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
 -spec n_() -> 16#100000000000000000000000000000000.
@@ -114,6 +122,7 @@ n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
+-spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
 get_range(Begin, End) -> get_range_(Begin, End).
 
 %% @doc Helper for get_range/2 to make dialyzer happy with internal use of
@@ -129,12 +138,14 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 %%      special case of Begin==End, the whole key range is split in halves.
 %%      Beware: (Num/Denom) must be in [0, 1]; the final key will be rounded
 %%      down and may thus be Begin.
+-spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
 get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
     normalize(Begin + (get_range_(Begin, End) * Num) div Denom).
 
 %% @doc Returns the replicas of the given key.
+-spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
     [Key,
      Key bxor 16#40000000000000000000000000000000,
@@ -143,6 +154,7 @@ get_replica_keys(Key) ->
     ].
 
 %% @doc Dumps the RT state for output in the web interface.
+-spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 dump(RT) ->
     [{lists:flatten(io_lib:format("~p", [Index])),
       lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- gb_trees:to_list(RT)].
@@ -206,6 +218,7 @@ next_index({I, J}) ->
 
 %% @doc Checks whether config parameters of the rt_chord process exist and are
 %%      valid.
+-spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(chord_base) and
         config:cfg_is_greater_than_equal(chord_base, 2) and
@@ -245,6 +258,8 @@ handle_custom_message(_Message, _State) ->
 %% userdevguide-begin rt_chord:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, Neighbors, ReportToFD) ->
     check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
 
@@ -252,6 +267,8 @@ check(OldRT, NewRT, Neighbors, ReportToFD) ->
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table also changes if the Pred or Succ
 %%      change.
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldRT =:= NewRT andalso
              nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) andalso
@@ -280,6 +297,7 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_chord:empty_ext
+-spec empty_ext(nodelist:neighborhood()) -> external_rt().
 empty_ext(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty_ext
 
@@ -290,6 +308,7 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %%      proper next hop.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
+-spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
@@ -319,6 +338,7 @@ next_hop(State, Id) ->
 %% userdevguide-end rt_chord:next_hop
 
 %% userdevguide-begin rt_chord:export_rt_to_dht_node
+-spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, Neighbors) ->
     Id = nodelist:nodeid(Neighbors),
     Pred = nodelist:pred(Neighbors),
@@ -337,6 +357,7 @@ export_rt_to_dht_node(RT, Neighbors) ->
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
+-spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) ->
     RT = dht_node_state:get(State, rt),
     Neighbors = dht_node_state:get(State, neighbors),

@@ -63,35 +63,6 @@ client_key_to_binary(Key) ->
 
 % note: can not use wrapper methods for all methods to make dialyzer happy
 % about the opaque types since it doesn't recognize the module's own opaque
-% type if returned by a method outside the module's scope, e.g. node:id/1
-% if required, e.g. a method is used internally and externally, use a wrapper
-% in the implementation
-
--spec empty(nodelist:neighborhood()) -> rt().
--spec empty_ext(nodelist:neighborhood()) -> external_rt().
--spec hash_key(client_key()) -> key().
--spec get_random_node_id() -> key().
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-
--spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-
--spec to_pid_list(rt()) -> [comm:mypid()].
--spec get_size(rt() | external_rt()) -> non_neg_integer().
--spec get_replica_keys(key()) -> [key()].
-
--spec n() -> number().
--spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
--spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
-
--spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
-
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
--spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
-
--spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
-            ReportToFD::boolean()) -> ok.
--spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
-            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
-
--spec check_config() -> boolean().
+% type if returned by a method outside the module's scope, e.g. node:id/1.
+% If required, e.g. a method is used internally and externally, use a wrapper
+% in the implementing module.
