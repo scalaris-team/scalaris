@@ -546,31 +546,42 @@ end_per_group(_Group, Config) ->
                            ?DB:db_as_list(), 
                            {pred, comm:erl_pid_plain()},
                            {succ, comm:erl_pid_plain()},
-                           ok | timeout}].
+                           ok | timeout}] | 
+                         {exception, Level::throw | error | exit, Reason::term(), Stacktrace::term()}.
 get_ring_data() ->
     Self = self(),
     erlang:spawn(
       fun() ->
-              DHTNodes = pid_groups:find_all(dht_node),
-              Data =
-                  lists:sort(
-                    fun(E1, E2) ->
-                            erlang:element(2, E1) =< erlang:element(2, E2)
-                    end,
-                    [begin
-                         comm:send_local(DhtNode,
-                                         {unittest_get_bounds_and_data, comm:this()}),
-                         receive
-                             {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
-                                 {DhtNode, Bounds, Data,
-                                  {pred, comm:make_local(node:pidX(Pred))},
-                                  {succ, comm:make_local(node:pidX(Succ))}, ok}
-                         % we are in a separate process, any message in the
-                         % message box should not influence the calling process
-                             after 500 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
-                         end
-                     end || DhtNode <- DHTNodes]),
-              Self ! {data, Data}
+              try
+                  DHTNodes = pid_groups:find_all(dht_node),
+                  Data =
+                      lists:sort(
+                        fun(E1, E2) ->
+                                erlang:element(2, E1) =< erlang:element(2, E2)
+                        end,
+                        [begin
+                             comm:send_local(DhtNode,
+                                             {unittest_get_bounds_and_data, comm:this()}),
+                             receive
+                                 {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
+                                     {DhtNode, Bounds, Data,
+                                      {pred, comm:make_local(node:pidX(Pred))},
+                                      {succ, comm:make_local(node:pidX(Succ))}, ok}
+                             % we are in a separate process, any message in the
+                             % message box should not influence the calling process
+                                 after 500 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
+                             end
+                         end || DhtNode <- DHTNodes]),
+                  Self ! {data, Data}
+              catch
+                  Level:Reason ->
+                      Result =
+                          case erlang:whereis(ct_test_ring) of
+                              undefined -> [];
+                              _         -> {exception, Level, Reason, erlang:get_stacktrace()}
+                          end,
+                      Self ! {data, Result}
+              end
       end),
     receive {data, Data} -> Data
     end.
