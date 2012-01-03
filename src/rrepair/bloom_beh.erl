@@ -24,9 +24,9 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {new, 3},
+     {new, 2}, {new, 3},
      {add, 2},
-     {is_element, 2},
+     {is_element, 2}, {equals, 2}, {join, 2},
      {print, 1}
     ];
 
