@@ -31,8 +31,8 @@
 
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE_RECON(X,Y), ok).
--define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE_RECON(X,Y), ok).
+%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE_RESOLVE(X,Y), ok).
 -define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 

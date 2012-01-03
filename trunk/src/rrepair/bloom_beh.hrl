@@ -17,8 +17,8 @@
 %% @end
 %% @version $Id$
 
--export([new/2, new/3, add/2, add_list/2, is_element/2]).
--export([equals/2, join/2, print/1]).
+-export([new/2, new/3, add/2, is_element/2]).
+-export([equals/2, join/2, print/1, get_property/2]).
 
 -export([calc_HF_num/2,
          calc_HF_numEx/2,
@@ -45,11 +45,9 @@ new(MaxElements, FPR) ->
     Hfs = ?REP_HFS:new(calc_HF_numEx(MaxElements, FPR)),
     new(MaxElements, FPR, Hfs).
 
--spec add(bloom_filter(), key()) -> bloom_filter().
+-spec add(bloom_filter(), key() | [key()]) -> bloom_filter().
+add(Bloom, Item) when is_list(Item) -> add_list_(Bloom, Item);
 add(Bloom, Item) -> add_list_(Bloom, [Item]).
-
--spec add_list(bloom_filter(), [key()]) -> bloom_filter().
-add_list(Bloom, Items) -> add_list_(Bloom, Items).
 
 -spec is_element(bloom_filter(), key()) -> boolean().
 is_element(Bloom, Item) -> is_element_(Bloom, Item).
@@ -75,14 +73,13 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 
 % @doc  Calculates optimal number of hash functions for
 %       an M-bit large BloomFilter with a maximum of N Elements.
-%       prefers smaller values (truncates decimals)
 -spec calc_HF_num(integer(), integer()) -> pos_integer().
 calc_HF_num(_, N) when N =:= 0 -> 1;
 calc_HF_num(M, N) when N > 0 ->
     Result = ln(2) * (M / N),
     if 
         Result < 1 -> 1;
-        true -> trunc(Result)
+        true -> trunc(Result + 1)
     end.
 
 -spec calc_HF_numEx(integer(), float()) -> integer().
@@ -94,7 +91,7 @@ calc_HF_numEx(N, FPR) ->
 %       with a bounded false-positive rate FPR up to N-Elements.
 -spec calc_least_size(integer(), float()) -> integer().
 calc_least_size(N, FPR) when N =:= 0 orelse FPR =:= 0 -> 1;
-calc_least_size(N, FPR) when N > 0 -> 
+calc_least_size(N, FPR) when N > 0 ->
     erlang:round((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
 % @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
@@ -114,3 +111,4 @@ calc_FPR(M, N, K) when M > 0->
 -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
 -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
 -spec print_(bloom_filter_t()) -> [{atom(), any()}].
+-spec get_property(bloom_filter_t(), atom()) -> any() | not_found.
