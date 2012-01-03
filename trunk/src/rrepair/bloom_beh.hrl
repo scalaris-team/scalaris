@@ -18,7 +18,7 @@
 %% @version $Id$
 
 -export([new/2, new/3, add/2, is_element/2]).
--export([equals/2, join/2, print/1, get_property/2]).
+-export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/2,
          calc_HF_numEx/2,

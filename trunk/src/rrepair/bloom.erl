@@ -28,6 +28,8 @@
 
 -include("scalaris.hrl").
 
+-export([get_property/2]). %for Tests
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -157,6 +159,7 @@ print_(Bloom) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec get_property(bloom_filter_t(), atom()) -> not_found | term().
 get_property(Bloom, Property) ->
     FieldNames = record_info(fields, bloom),
     {_, N} = lists:foldl(fun(I, {Nr, Res}) -> case I =:= Property of

@@ -67,20 +67,21 @@ comparison(_) ->
     MerkleT = m_merkle(I, DB, DBSize, Iter),
     ArtT = m_art(I, DB, DBSize, Iter),        
         
-    {_, _, _, BBuildT, _} = util:proplist_get_value(build_time, BloomT),
-    {_, _, _, MBuildT, _} = util:proplist_get_value(build_time, MerkleT),
-    {_, _, _, ABuildT, _} = util:proplist_get_value(build_time, ArtT),
+    BBuildT = util:proplist_get_value(build_time, BloomT),
+    MBuildT = util:proplist_get_value(build_time, MerkleT),
+    ABuildT = util:proplist_get_value(build_time, ArtT),
     TreeT = util:proplist_get_value(tree_time, ArtT),
     
-    ct:pal("Performance Comparison~n"
-           "DBSize=~p ; Iterations=~p"
-           "-----------------------------------------------~n"
-           "                    bloom|merkleTree|  art~n"
-           "BuildTime Avg ms: ~6.2f | ~6.2f | ~6.2f (~.2f ohne Merkle)", 
+    ct:pal("Performance Comparison
+            DBSize=~p ; Iterations=~p
+            -----------------------------------------------
+                                bloom|merkleTree|  art
+            BuildTime Avg ms: ~f | ~f | ~f (~f ohne Merkle)", 
            [DBSize, Iter,
-            BBuildT / 1000, 
-            MBuildT / 1000, 
-            (ABuildT + TreeT) / 1000, ABuildT / 1000]),
+            measure_util:get(BBuildT, avg, ms), 
+            measure_util:get(MBuildT, avg, ms), 
+            measure_util:get(ABuildT, avg, ms) + TreeT / 1000, 
+            measure_util:get(ABuildT, avg, ms)]),
     ok.
 
 m_bloom(_I, DB, DBSize, Iterations) ->
@@ -89,17 +90,16 @@ m_bloom(_I, DB, DBSize, Iterations) ->
     BaseBF = bloom:new(DBSize, Fpr, Hfs),
     
     %measure Build times    
-    BuildTime =
-        measure_util:time_avg(fun() -> 
-                                      lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
-                              end,
-                              Iterations, false),    
+    BuildTime = measure_util:time_avg(
+                  fun() -> 
+                          lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
+                  end, Iterations, []),
     [{build_time, BuildTime}].
 
 m_merkle(I, DB, _DBSize, Iterations) ->
     BuildT = 
         measure_util:time_avg(fun() -> merkle_tree:bulk_build(I, DB) end, 
-                              Iterations, false),
+                              Iterations, []),
     
     [{build_time, BuildT}].
 
@@ -107,7 +107,7 @@ m_art(I, DB, _DBSize, Iterations) ->
     {TreeTime, Tree} = 
         util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
     BuildTime = 
-        measure_util:time_avg(fun() -> art:new(Tree) end, Iterations, false),
+        measure_util:time_avg(fun() -> art:new(Tree) end, Iterations, []),
     
     [{build_time, BuildTime}, {tree_time, TreeTime}].
 
@@ -121,7 +121,7 @@ art(_) ->
     {TreeTime, Tree} = 
         util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
     BuildTime = 
-        measure_util:time_avg(fun() -> art:new(Tree) end, ExecTimes, false),    
+        measure_util:time_avg(fun() -> art:new(Tree) end, ExecTimes, []),    
 
     ct:pal("ART Performance
             ------------------------
@@ -129,7 +129,7 @@ art(_) ->
             TreeTime (ms)= ~p
             ARTBuildTime (ms)= ~p", 
            [ToAdd, ExecTimes, TreeTime / 1000,
-            measure_util:print_result(BuildTime, ms)]),
+            measure_util:print(BuildTime, ms)]),
     true.
 
 % @doc measures performance of merkle_tree operations
@@ -146,23 +146,23 @@ merkle_tree(_) ->
     
     BuildT = measure_util:time_avg(
            fun() -> merkle_tree:bulk_build(I, DB) end, 
-           ExecTimes, false),
+           ExecTimes, []),
         
     IterateT = measure_util:time_avg(
            fun() -> merkle_tree_SUITE:count_iter(merkle_tree:iterator(TestTree), 0) end, 
-           ExecTimes, false),
+           ExecTimes, []),
     
     GenHashT = measure_util:time_avg(
             fun() -> merkle_tree:gen_hash(TestTree) end,
-            ExecTimes, false),
+            ExecTimes, []),
     
     SimpleSizeT = measure_util:time_avg(
             fun() -> merkle_tree:size(TestTree) end,
-            ExecTimes, false),
+            ExecTimes, []),
     
     DetailSizeT = measure_util:time_avg(
             fun() -> merkle_tree:size_detail(TestTree) end,
-            ExecTimes, false),
+            ExecTimes, []),
 
     ct:pal("
             Merkle_Tree Performance
@@ -175,11 +175,11 @@ merkle_tree(_) ->
             SimpleSizeTime: ~p
             DetailSizeTime: ~p", 
            [ToAdd, ExecTimes, Inner, Leafs,
-            measure_util:print_result(BuildT, ms), 
-            measure_util:print_result(IterateT),
-            measure_util:print_result(GenHashT),
-            measure_util:print_result(SimpleSizeT),
-            measure_util:print_result(DetailSizeT)]),    
+            measure_util:print(BuildT, ms), 
+            measure_util:print(IterateT),
+            measure_util:print(GenHashT),
+            measure_util:print(SimpleSizeT),
+            measure_util:print(DetailSizeT)]),    
     ok.
 
 bloom(_) ->
@@ -190,15 +190,25 @@ bloom(_) ->
 
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
     BaseBF = bloom:new(ToAdd, Fpr, Hfs),
+    List = random_list(ToAdd),
+    TestBF = bloom:add(BaseBF, List),
     
-    %measure Build times
-    BuildTime =
-        measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
-                                                 fun(I) -> I end,
-                                                 fun(I, B) -> bloom:add(B, I) end,
-                                                 BaseBF)
-                              end,
-                              ExecTimes, false),
+    AddT = measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
+                                                    fun(I) -> I end,
+                                                    fun(I, B) -> bloom:add(B, I) end,
+                                                    BaseBF)
+                                 end,
+                                 ExecTimes, []),
+    
+    AddListT = measure_util:time_avg(fun() -> bloom:add(BaseBF, List) end,
+                                     ExecTimes, []),    
+    
+    IsElemT = measure_util:time_avg(
+                fun() -> 
+                        lists:foreach(fun(I) -> bloom:is_element(TestBF, I) end, List) 
+                end,
+                ExecTimes, []),
+    
     %measure join time
     BF1 = for_to_ex(1,
                     round(ToAdd / 2),
@@ -207,21 +217,29 @@ bloom(_) ->
                     ToAdd,
                     fun(I) -> I end, fun(I, B) -> bloom:add(B, I) end, BaseBF),
     JoinTime =
-        measure_util:time_avg(fun() -> bloom:join(BF1, BF2) end, ExecTimes, false),
+        measure_util:time_avg(fun() -> bloom:join(BF1, BF2) end, ExecTimes, []),
 
     %print results
-    ct:pal("EXECUTION TIMES in microseconds
+    ct:pal("AVG EXECUTION TIMES OF BLOOM FILTER OPERATIONS
             PARAMETER: AddedItems=~p ; ExecTimes=~p
-            BuildTimes: ~p
-            JoinTimes : ~p",
+            --------------------------------------------------------------
+            Add       : ~p
+            AddList   : ~p
+            IsElement : ~p
+            Join      : ~p",
            [ToAdd, ExecTimes, 
-            measure_util:print_result(BuildTime, ms), 
-            measure_util:print_result(JoinTime, us)]),
+            measure_util:print(AddT),
+            measure_util:print(AddListT), 
+            measure_util:print(IsElemT),
+            measure_util:print(JoinTime)]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % UTILS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+random_list(Count) ->
+    util:for_to_ex(1, Count, fun(_) -> randoms:getRandomInt() end).
 
 for_to_ex(I, N, Fun, AccuFun, Accu) ->
     NewAccu = AccuFun(Fun(I), Accu),
