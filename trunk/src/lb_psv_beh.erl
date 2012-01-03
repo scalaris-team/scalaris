@@ -21,15 +21,28 @@
 -vsn('$Id$ ').
 
 % for behaviour
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
-
--include("scalaris.hrl").
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Behaviour definition
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-endif.
 
 %% userdevguide-begin rt_beh:behaviour
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
+
+-callback get_number_of_samples(Conn::dht_node_join:connection()) -> ok.
+-callback get_number_of_samples_remote(
+        SourcePid::comm:mypid(), Conn::dht_node_join:connection()) -> ok.
+-callback create_join(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
+                      SourcePid::comm:mypid(), Conn::dht_node_join:connection())
+        -> dht_node_state:state().
+-callback sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
+-callback process_join_msg(comm:message(), LbPsvState::term(),
+                           DhtNodeState::dht_node_state:state())
+        -> dht_node_state:state() | unknown_event.
+
+-callback check_config() -> boolean().
+
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -46,7 +59,7 @@ behaviour_info(callbacks) ->
      % common methods
      {check_config, 0}
     ];
-%% userdevguide-end rt_beh:behaviour
-
 behaviour_info(_Other) ->
     undefined.
+-endif.
+%% userdevguide-end rt_beh:behaviour

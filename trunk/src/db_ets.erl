@@ -35,6 +35,7 @@
 -include("db_common.hrl").
 
 %% @doc Initializes a new database.
+-spec new_() -> db_t().
 new_() ->
     % ets prefix: DB_ + random name
     RandomName = randoms:getRandomString(),
@@ -46,23 +47,27 @@ new_() ->
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
+-spec open_(DBName::db_name()) -> db_t().
 open_(_FileName) ->
     log:log(warn, "[ Node ~w:db_ets ] open/1 not supported, executing new/0 instead", [self()]),
     new().
 
 %% @doc Closes and deletes the DB.
+-spec close_(DB::db_t(), Delete::boolean()) -> any().
 close_(State = {DB, Subscr}, _Delete) ->
     _ = call_subscribers(State, close_db),
     ets:delete(DB),
     ets:delete(Subscr).
 
 %% @doc Returns the name of the table for open/1.
+-spec get_name_(DB::db_t()) -> db_name().
 get_name_({DB, _Subscr}) ->
     erlang:atom_to_list(ets:info(DB, name)).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
+-spec get_entry2_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
 get_entry2_({DB, _Subscr}, Key) ->
     case ets:lookup(DB, Key) of
         [Entry] -> {true, Entry};
@@ -71,6 +76,7 @@ get_entry2_({DB, _Subscr}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 %%      Note: is the Entry is a null entry, it will be deleted!
+-spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_entry_(State = {DB, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
@@ -80,19 +86,23 @@ set_entry_(State = {DB, _Subscr}, Entry) ->
 
 %% @doc Updates an existing (!) entry in the DB.
 %%      TODO: use ets:update_element here?
+-spec update_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
 %% @doc Removes all values with the given key from the DB.
+-spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
 delete_entry_at_key_(State = {DB, _Subscr}, Key) ->
     ets:delete(DB, Key),
     call_subscribers(State, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
+-spec get_load_(DB::db_t()) -> Load::integer().
 get_load_({DB, _Subscr}) ->
     ets:info(DB, size).
 
 %% @doc Returns the number of stored keys in the given interval.
+-spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
 get_load_(State = {DB, _Subscr}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
@@ -109,7 +119,8 @@ get_load_(State = {DB, _Subscr}, Interval) ->
             ets:foldl(F, 0, DB)
     end.
 
-%% @doc adds keys
+%% @doc Adds all db_entry objects in the Data list.
+-spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
 add_data_(State = {DB, _Subscr}, Data) ->
     ets:insert(DB, Data),
     _ = lists:foldl(fun(Entry, _) ->
@@ -121,6 +132,8 @@ add_data_(State = {DB, _Subscr}, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
+-spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
+         {NewDB::db_t(), db_as_list()}.
 split_data_(State = {DB, _Subscr}, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
                 Key = db_entry:get_key(DBEntry),
@@ -139,6 +152,10 @@ split_data_(State = {DB, _Subscr}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
+-spec get_entries_(DB::db_t(),
+                   FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
+                   ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
+        -> [Value].
 get_entries_({DB, _Subscr}, FilterFun, ValueFun) ->
     F = fun (DBEntry, Data) ->
                  case FilterFun(DBEntry) of
@@ -150,6 +167,10 @@ get_entries_({DB, _Subscr}, FilterFun, ValueFun) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
+-spec delete_entries_(DB::db_t(),
+                      RangeOrFun::intervals:interval() |
+                                  fun((DBEntry::db_entry:entry()) -> boolean()))
+        -> NewDB::db_t().
 delete_entries_(State = {DB, _Subscr}, FilterFun) when is_function(FilterFun) ->
     F = fun(DBEntry, _) ->
                 case FilterFun(DBEntry) of
@@ -173,9 +194,14 @@ delete_entries_(State, Interval) ->
     end.
 
 %% @doc Returns all DB entries.
+-spec get_data_(DB::db_t()) -> db_as_list().
 get_data_({DB, _Subscr}) ->
     ets:tab2list(DB).
 
+-spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
+                 FilterFun::fun((db_entry:entry()) -> boolean()),
+                 ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), [V]}.
 get_chunk_(DB, Interval, FilterFun, ValueFun, all) ->
     get_chunk_(DB, Interval, FilterFun, ValueFun, get_load_(DB));
 get_chunk_(DB, Interval, FilterFun, ValueFun, ChunkSize) ->
@@ -315,6 +341,8 @@ get_chunk_inner({ETSDB, _Subscr} = DB, Current, RealStart, Interval, AddDataFun,
 %%      from the DB when starting at the key directly after Begin.
 %%      Precond: a load larger than 0
 %%      Note: similar to get_chunk/2.
+-spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+        -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_(DB, Begin, TargetLoad, forward) ->
     get_split_key_(DB, Begin, TargetLoad, fun ets:first/1, fun ets:next/2);
 get_split_key_(DB, Begin, TargetLoad, backward) ->
@@ -377,6 +405,8 @@ get_split_key_inner({ETSDB, _Subscr} = DB, Current, RealStart, TargetLoad, _Spli
     Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
 
+-spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), db_t()}.
 delete_chunk_(DB, Interval, all) ->
     delete_chunk_(DB, Interval, get_load_(DB));
 delete_chunk_(DB, Interval, ChunkSize) ->

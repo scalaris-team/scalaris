@@ -39,6 +39,7 @@
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
 
+-spec get_neighbors(state()) -> nodelist:neighborhood().
 get_neighbors({Neighbors, _TriggerState}) ->
     Neighbors.
 
@@ -47,6 +48,8 @@ get_neighbors({Neighbors, _TriggerState}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
+-spec init(Me::node:node_type(), Pred::node:node_type(),
+           Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
@@ -55,6 +58,7 @@ init(Me, Pred, Succ) ->
     get_successorlist(node:pidX(Succ)),
     {Neighborhood, NewTriggerState}.
 
+-spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
 unittest_create_state(Neighbors) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
@@ -65,6 +69,7 @@ unittest_create_state(Neighbors) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
+-spec on(custom_message(), state()) -> state() | unknown_event.
 on({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
@@ -102,45 +107,56 @@ on({rm, get_succlist_response, Succ, SuccsSuccList},
 
 on(_, _State) -> unknown_event.
 
+-spec new_pred(State::state(), NewPred::node:node_type()) -> state().
 new_pred({OldNeighborhood, TriggerState}, NewPred) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewPred,
                                         predListLength(), succListLength()),
     {NewNeighborhood, TriggerState}.
 
+-spec new_succ(State::state(), NewSucc::node:node_type()) -> state().
 new_succ({OldNeighborhood, TriggerState}, NewSucc) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewSucc,
                                         predListLength(), succListLength()),
     {NewNeighborhood, TriggerState}.
 
+-spec remove_pred(State::state(), OldPred::node:node_type(),
+                  PredsPred::node:node_type()) -> state().
 remove_pred({OldNeighborhood, TriggerState}, OldPred, PredsPred) ->
     NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
     {NewNbh2, TriggerState}.
 
+-spec remove_succ(State::state(), OldSucc::node:node_type(),
+                  SuccsSucc::node:node_type()) -> state().
 remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
     NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
     {NewNbh2, TriggerState}.
 
+-spec update_node(State::state(), NewMe::node:node_type()) -> state().
 update_node({OldNeighborhood, TriggerState}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
     {NewNeighborhood, NewTriggerState}.
 
+-spec leave(State::state()) -> ok.
 leave(_State) -> ok.
 
 % failure detector reported dead node
+-spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
 crashed_node({OldNeighborhood, TriggerState}, DeadPid) ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
     {NewNeighborhood, TriggerState}.
 
 % dead-node-cache reported dead node to be alive again
+-spec zombie_node(State::state(), Node::node:node_type()) -> state().
 zombie_node({OldNeighborhood, TriggerState}, Node) ->
     % this node could potentially be useful as it has been in our state before
     NewNeighborhood = nodelist:add_node(OldNeighborhood, Node,
                                         predListLength(), succListLength()),
     {NewNeighborhood, TriggerState}.
 
+-spec get_web_debug_info(State::state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
 
 %% @doc Checks whether config parameters of the rm_chord process exist and are

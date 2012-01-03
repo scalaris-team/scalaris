@@ -40,10 +40,12 @@
 
 %% userdevguide-begin rt_simple:empty
 %% @doc Creates an "empty" routing table containing the successor.
+-spec empty(nodelist:neighborhood()) -> rt().
 empty(Neighbors) -> nodelist:succ(Neighbors).
 %% userdevguide-end rt_simple:empty
 
 %% @doc Hashes the key to the identifier space.
+-spec hash_key(client_key()) -> key().
 hash_key(Key) -> hash_key_(Key).
 
 %% @doc Hashes the key to the identifier space (internal function to allow
@@ -57,6 +59,7 @@ hash_key_(Key) ->
 
 %% userdevguide-begin rt_simple:get_random_node_id
 %% @doc Generates a random node id, i.e. a random 128-bit number.
+-spec get_random_node_id() -> key().
 get_random_node_id() ->
     case config:read(key_creator) of
         random -> hash_key_(randoms:getRandomString());
@@ -72,6 +75,7 @@ get_random_node_id() ->
 
 %% userdevguide-begin rt_simple:init_stabilize
 %% @doc Triggered by a new stabilization round, renews the routing table.
+-spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, _RT) -> empty(Neighbors).
 %% userdevguide-end rt_simple:init_stabilize
 
@@ -86,21 +90,25 @@ update(_OldRT, _OldNeighbors, NewNeighbors) ->
 %% userdevguide-begin rt_simple:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
+-spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, _DeadPid) -> RT.
 %% userdevguide-end rt_simple:filter_dead_node
 
 %% userdevguide-begin rt_simple:to_pid_list
 %% @doc Returns the pids of the routing table entries.
+-spec to_pid_list(rt()) -> [comm:mypid()].
 to_pid_list(Succ) -> [node:pidX(Succ)].
 %% userdevguide-end rt_simple:to_pid_list
 
 %% userdevguide-begin rt_simple:get_size
 %% @doc Returns the size of the routing table.
+-spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(_RT) -> 1.
 %% userdevguide-end rt_simple:get_size
 
 %% userdevguide-begin rt_simple:n
 %% @doc Returns the size of the address space.
+-spec n() -> number().
 n() -> n_().
 %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
 -spec n_() -> 16#100000000000000000000000000000000.
@@ -113,6 +121,7 @@ normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
+-spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
 get_range(Begin, End) -> get_range_(Begin, End).
 
 %% @doc Helper for get_range/2 to make dialyzer happy with internal use of
@@ -128,6 +137,7 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 %%      Begin==End, the whole key range is split in halves.
 %%      Beware: SplitFactor must be in [0, 1]; the final key will be rounded
 %%      down and may thus be Begin.
+-spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
 get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
@@ -135,6 +145,7 @@ get_split_key(Begin, End, {Num, Denom}) ->
 
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.
+-spec get_replica_keys(key()) -> [key()].
 get_replica_keys(Key) ->
     [Key,
      Key bxor 16#40000000000000000000000000000000,
@@ -145,11 +156,13 @@ get_replica_keys(Key) ->
 
 %% userdevguide-begin rt_simple:dump
 %% @doc Dumps the RT state for output in the web interface.
+-spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 dump(Succ) -> [{"0", lists:flatten(io_lib:format("~p", [Succ]))}].
 %% userdevguide-end rt_simple:dump
 
 %% @doc Checks whether config parameters of the rt_simple process exist and are
 %%      valid.
+-spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_in(key_creator, [random, random_with_bit_mask]) and
         case config:read(key_creator) of
@@ -172,6 +185,8 @@ handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-begin rt_simple:check
 %% @doc Notifies the dht_node and failure detector if the routing table changed.
 %%      Provided for convenience (see check/5).
+-spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
+            ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, Neighbors, ReportToFD) ->
     check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
 
@@ -179,6 +194,8 @@ check(OldRT, NewRT, Neighbors, ReportToFD) ->
 %%      Also updates the failure detector if ReportToFD is set.
 %%      Note: the external routing table only changes the internal RT has
 %%      changed.
+-spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
+            NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, _OldNeighbors, NewNeighbors, ReportToFD) ->
     case OldRT =:= NewRT of
         true -> ok;
@@ -202,17 +219,20 @@ check(OldRT, NewRT, _OldNeighbors, NewNeighbors, ReportToFD) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_simple:empty_ext
+-spec empty_ext(nodelist:neighborhood()) -> external_rt().
 empty_ext(Neighbors) -> empty(Neighbors).
 %% userdevguide-end rt_simple:empty_ext
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
+-spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, rt)).
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node. Both
 %%      are the same here.
+-spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %% userdevguide-end rt_simple:export_rt_to_dht_node
 
@@ -220,5 +240,6 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
+-spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) -> [dht_node_state:get(State, rt)].
 %% userdevguide-end rt_simple:to_list

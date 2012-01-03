@@ -64,7 +64,6 @@ unsubscribe(Topic, URL) ->
     end.
 
 %% @doc queries the subscribers of a query
-%% @spec get_subscribers(string()) -> [string()]
 -spec get_subscribers(Topic::string()) -> [string()].
 get_subscribers(Topic) ->
     {Res, Value} = api_tx:read(Topic),

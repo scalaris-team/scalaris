@@ -14,6 +14,7 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc Common functions for database implementations.
+%%      Requires an implementation of Module:delete_entry_at_key_/2.
 %%      Note: include from a DB implementation!
 %%      TODO: Most of them are only provided for convenience - check if
 %%      they are still needed (they all are based on the new
@@ -22,26 +23,29 @@
 %% @end
 %% @version $Id$
 
-% needed by delete_entry_:
--spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
-
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
+-spec close_(DB::db_t()) -> any().
 close_(State) ->
     close_(State, true).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
+-spec get_entry_(DB::db_t(), Key::?RT:key()) -> db_entry:entry().
 get_entry_(State, Key) ->
     {_Exists, Result} = get_entry2_(State, Key),
     Result.
 
 %% @doc Reads the version and value of a key.
+-spec read(DB::db(), Key::?RT:key()) ->
+         {ok, Value::value(), Version::version()} | {ok, empty_val, -1}.
 read(DB, Key) ->
     DBEntry = get_entry_(DB, Key),
     {ok, db_entry:get_value(DBEntry), db_entry:get_version(DBEntry)}.
 
 %% @doc Updates the value of the given key.
+-spec write(DB::db(), Key::?RT:key(), Value::value(), Version::version()) ->
+         NewDB::db().
 write(DB, Key, Value, Version) ->
     {Exists, DBEntry} = get_entry2_(DB, Key),
     case Exists of
@@ -57,6 +61,8 @@ write(DB, Key, Value, Version) ->
 %% @doc Deletes the key. Returns {DB, undef} if the key does not exist in the
 %%      DB, {DB, locks_set} if read or write locks are still set and {DB, ok}
 %%      if the operation was successfully performed.
+-spec delete(DB::db(), Key::?RT:key()) ->
+         {NewDB::db(), Status::ok | locks_set | undef}.
 delete(DB, Key) ->
     {Exists, DBEntry} = get_entry2_(DB, Key),
     case Exists of
@@ -72,11 +78,13 @@ delete(DB, Key) ->
     end.
 
 %% @doc Removes all values with the given entry's key from the DB.
+-spec delete_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 delete_entry_(State, Entry) ->
     Key = db_entry:get_key(Entry),
     delete_entry_at_key_(State, Key).
 
 %% @doc Gets (non-empty) db_entry objects in the given range.
+-spec get_entries_(DB::db_t(), Range::intervals:interval()) -> db_as_list().
 get_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of
@@ -101,12 +109,18 @@ get_entries_(State, Interval) ->
 %%      Returns the chunk and the remaining interval for which the DB may still
 %%      have data (a subset of I).
 %%      Precond: Interval is a subset of the range of the dht_node and continuous!
+-spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), db_as_list()}.
 get_chunk_(DB, Interval, ChunkSize) ->
     get_chunk_(DB, Interval, fun(_) -> true end, fun(E) -> E end, ChunkSize).
 
 %% @doc Updates all (existing or non-existing) non-locked entries from
 %%      NewEntries for which Pred(OldEntry, NewEntry) returns true with
 %%      UpdateFun(OldEntry, NewEntry).
+-spec update_entries_(DB::db_t(), Values::[db_entry:entry()],
+                      Pred::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> boolean()),
+                      UpdateFun::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> UpdatedEntry::db_entry:entry()))
+        -> NewDB::db_t().
 update_entries_(OldDB, NewEntries, Pred, UpdateFun) ->
     F = fun(NewEntry, DB) ->
                 {Exists, OldEntry} = get_entry2_(DB, db_entry:get_key(NewEntry)),
@@ -128,6 +142,7 @@ update_entries_(OldDB, NewEntries, Pred, UpdateFun) ->
 %%      - no empty_val values (these should only be in the DB temporarily)
 %%      - version is greater than or equal to 0
 %%      Returns the result of the check and a list of invalid entries.
+-spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
 check_db(DB) ->
     Data = get_data(DB),
     ValidFun = fun(DBEntry) ->
@@ -146,15 +161,18 @@ check_db(DB) ->
 
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
+-spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
 set_subscription_(State = {_DB, Subscr}, SubscrTuple) ->
     ets:insert(Subscr, SubscrTuple),
     State.
 
 %% doc Gets a subscription stored under Tag (empty list if there is none).
+-spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
 get_subscription_({_DB, Subscr}, Tag) ->
     ets:lookup(Subscr, Tag).
 
 %% doc Removes a subscription stored under Tag (if there is one).
+-spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
 remove_subscription_(State = {_DB, Subscr}, Tag) ->
     case ets:lookup(Subscr, Tag) of
         [] -> ok;
@@ -248,6 +266,7 @@ subscr_delta_remove(State, Interval) ->
 
 %% @doc Adds the new interval to the interval to record changes for. Entries
 %%      which have (potentially) changed can then be gathered by get_changes/1.
+-spec record_changes_(OldDB::db_t(), intervals:interval()) -> NewDB::db_t().
 record_changes_(State, NewInterval) ->
     RecChanges = get_subscription_(State, record_changes),
     NewSubscr =
@@ -261,11 +280,13 @@ record_changes_(State, NewInterval) ->
 
 %% @doc Stops recording changes and removes all entries from the table of
 %%      changed keys.
+-spec stop_record_changes_(OldDB::db_t()) -> NewDB::db_t().
 stop_record_changes_(State) ->
     remove_subscription_(State, record_changes).
 
 %% @doc Stops recording changes in the given interval and removes all such
 %%      entries from the table of changed keys.
+-spec stop_record_changes_(OldDB::db_t(), intervals:interval()) -> NewDB::db_t().
 stop_record_changes_(State, Interval) ->
     RecChanges = get_subscription_(State, record_changes),
     case RecChanges of
@@ -284,6 +305,7 @@ stop_record_changes_(State, Interval) ->
 %% @doc Gets all db_entry objects which have (potentially) been changed or
 %%      deleted (might return objects that have not changed but have been
 %%      touched by one of the DB setters).
+-spec get_changes_(DB::db_t()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes_(State) ->
     CKDB = subscr_delta_check_table(State),
     get_changes_helper(State, ?CKETS:tab2list(CKDB), intervals:all(), [], []).
@@ -291,6 +313,7 @@ get_changes_(State) ->
 %% @doc Gets all db_entry objects in the given interval which have
 %%      (potentially) been changed or deleted (might return objects that have
 %%      not changed but have been touched by one of the DB setters).
+-spec get_changes_(DB::db_t(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes_(State, Interval) ->
     CKDB = subscr_delta_check_table(State),
     get_changes_helper(State, ?CKETS:tab2list(CKDB), Interval, [], []).

@@ -47,9 +47,6 @@
 -export([make_global/1, make_local/1]).
 -export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
 -export([is_valid/1, is_local/1]).
--ifdef(TCP_LAYER).
--export([get_ip/1, get_port/1]).
--endif.
 %%-export([node/1]).
 %% Message manipulation
 -export([get_msg_tag/1]).
@@ -72,6 +69,8 @@
 -type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_cookie().
 -type erl_pid_plain() :: erl_local_pid_plain() | {reg_name(), node()}. % port()
 
+% NOTE: Cannot move these type specs to the appropriate include files as they
+%       need to be in this order for Erlang R13.
 -ifdef(TCP_LAYER).
 -type mypid_plain() :: {inet:ip_address(), integer(), erl_pid_plain()}.
 -endif.
@@ -103,31 +102,17 @@
                          {group_member, Process::atom()} |
                          {channel, main | prio} | quiet].
 
+-ifdef(TCP_LAYER).
+-include("comm_tcp.hrl").
+-endif.
+-ifdef(BUILTIN).
+-include("comm_builtin.hrl").
+-endif.
+
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
 send(Pid, Message) ->
     send(Pid, Message, []).
-
-%% @doc Sends a message to an arbitrary process with the given options.
-%%      If a shepherd is given, it will be informed when the sending fails;
-%%      with a message of the form:
-%%       {send_error, Pid, Message, Reason}.
-%%      If a group_member is given, the message is send to an arbitrary process
-%%      of another node instructing it to forward the message to a process in
-%%      its group with the given name.
--spec send(mypid(), message() | group_message(), send_options()) -> ok.
--ifdef(TCP_LAYER).
-send(Pid, Message, Options) ->
-    {RealPid, RealMsg1} = unpack_cookie(Pid, Message),
-    comm_layer:send(RealPid, pack_group_member(RealMsg1, Options), Options).
--endif.
--ifdef(BUILTIN). %% @hidden
-send(Pid, Message, Options) ->
-    {RealPid, RealMsg1} = unpack_cookie(Pid, Message),
-    % note: ignore further options, e.g. shepherd, with BUILTIN
-    RealPid ! pack_group_member(RealMsg1, Options),
-    ok.
--endif.
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()).
@@ -144,59 +129,9 @@ send_local_after(Delay, Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
     erlang:send_after(Delay, RealPid, RealMessage).
 
--spec make_global(erl_pid_plain()) -> mypid().
--ifdef(TCP_LAYER).
-%% @doc TCP_LAYER: Converts a local erlang pid to a global pid of type mypid()
-%%      for use in send/2.
-make_global(Pid) -> get(Pid, this()).
--endif.
--ifdef(BUILTIN).
-%% @doc BUILTIN: Returns the given pid (with BUILTIN communication, global pids
-%%      are the same as local pids) for use in send/2.
-make_global(Pid) -> Pid.
--endif.
-
--spec make_local(mypid()) -> erl_pid_plain().
--ifdef(TCP_LAYER).
-%% @doc TCP_LAYER: Converts a global mypid() of the current node to a local
-%%      erlang pid.
-make_local(Pid) -> comm_layer:make_local(Pid).
--endif.
--ifdef(BUILTIN).
-%% @doc BUILTIN: Returns the given pid (with BUILTIN communication, global pids
-%%      are the same as local pids).
-make_local(Pid) -> Pid.
--endif.
-
 %% @doc Returns the pid of the current process.
 -spec this() -> mypid().
 this() -> this_().
-
-%% @doc Returns the pid of the current process.
-%%      Note: use this_/1 in internal functions (needed for dialyzer).
--spec this_() -> mypid_plain().
--ifdef(TCP_LAYER).
-this_() -> comm_layer:this().
--endif.
--ifdef(BUILTIN). %% @hidden
-this_() -> self().
--endif.
-
-%% @doc Creates the PID a process with name Name would have on node _Node.
--spec get(erl_pid_plain(), mypid()) -> mypid().
--ifdef(TCP_LAYER).
-get(Name, {Pid, c, Cookie} = _Node) -> {get(Name, Pid), c, Cookie};
-get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
--endif.
--ifdef(BUILTIN). %% @hidden
-get(Name, {Pid, c, Cookie} = _Node) -> {get(Name, Pid), c, Cookie};
-get(Name, {_Pid, Host} = _Node) when is_atom(Name) -> {Name, Host};
-get(Name, Pid = _Node) when is_atom(Name) -> {Name, node(Pid)};
-get(Name, Pid = _Node) ->
-    A = node(Name),
-    A = node(Pid), % we assume that you only call get with local pids
-    Name.
--endif.
 
 %% @doc Encapsulates the current process' pid (as returned by this/0)
 %%      and the given cookie for seamless use of cookies with send/2.
@@ -212,41 +147,6 @@ this_with_cookie(Cookie) -> {this_(), c, Cookie}.
 %%      {Msg, Cookie} to the Pid.
 -spec self_with_cookie(any()) -> erl_local_pid_with_cookie().
 self_with_cookie(Cookie) -> {self(), c, Cookie}.
-
--spec is_valid(mypid() | any()) -> boolean().
-%% @doc Checks if the given pid is valid.
--ifdef(TCP_LAYER).
-is_valid({Pid, c, _Cookie}) -> is_valid(Pid);
-is_valid(Pid) -> comm_layer:is_valid(Pid).
--endif.
--ifdef(BUILTIN). %% @hidden
-is_valid({Pid, c, _Cookie}) -> is_valid(Pid);
-is_valid(Pid) when is_pid(Pid) orelse is_atom(Pid) orelse is_port(Pid) -> true;
-is_valid({RegName, _Node}) when is_atom(RegName)                       -> true;
-is_valid(_) -> false.
--endif.
-
--spec is_local(mypid()) -> boolean().
--ifdef(TCP_LAYER).
-%% @doc TCP_LAYER: Checks whether a global mypid() can be converted to a local
-%%      pid of the current node.
-is_local(Pid) -> comm_layer:is_local(Pid).
--endif.
--ifdef(BUILTIN).
-%% @doc BUILTIN: Checks whether a pid is located at the same node than the
-%%      current process.
-is_local(Pid) -> erlang:node(Pid) =:= node().
--endif.
-
-% -spec node(
-% -ifdef(TCP_LAYER).
-% node({Pid, c, _Cookie}) -> node(Pid);
-% node(Pid) -> {element(1, Pid), element(2, Pid)}.
-% -endif.
-% -ifdef(BUILTIN).
-% node({Pid, c, _Cookie}) -> node(Pid);
-% node(Pid) -> erlang:node(Pid).
-% -endif.
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
 %%      atom).
@@ -280,16 +180,6 @@ pack_group_member(Message, Options) ->
         false                   -> Message;
         {group_member, Process} -> {send_to_group_member, Process, Message}
     end.
-
--ifdef(TCP_LAYER).
--spec get_ip(mypid()) -> inet:ip_address().
-%% @doc TCP_LAYER: Gets the IP address of the given (global) mypid().
-get_ip(Pid) -> comm_layer:get_ip(Pid).
-
--spec get_port(mypid()) -> non_neg_integer().
-%% @doc TCP_LAYER: Gets the port of the given (global) mypid().
-get_port(Pid) -> comm_layer:get_port(Pid).
--endif.
 
 %% @doc Initializes the comm_layer by sending a message to the known_hosts. A
 %%      valid PID for comm:this/0 will be available afterwards.

@@ -42,10 +42,3 @@ apply_val(Hfsc, Item) -> apply_val_(Hfsc, Item).
 
 -spec hfs_size(hfs()) -> integer().
 hfs_size(Hfsc) -> hfs_size_(Hfsc).
-
-
-% >private function specs - TO IMPLEMENT if behaviour is used
--spec new_(integer()) -> hfs_t().
--spec new_([function()], integer()) -> hfs_t().
--spec apply_val_(hfs_t(), itemKey()) -> [integer()].
--spec hfs_size_(hfs_t()) -> integer().

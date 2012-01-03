@@ -38,6 +38,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initializes a new database (will launch a process for it).
+-spec new_() -> db_t().
 new_() ->
     Dir = util:make_filename(atom_to_list(node())),
     FullDir = lists:flatten([config:read(db_directory), "/", Dir]),
@@ -56,6 +57,7 @@ new_() ->
 
 %% @doc Re-opens an existing database (will launch a process for it).
 %%      BEWARE: use with caution in order to preserve consistency!
+-spec open_(DBName::db_name()) -> db_t().
 open_(FileName) ->
     new_db(FileName, [read, write]).
 
@@ -88,6 +90,7 @@ new_db(FileName, TokeOptions) ->
     end.
 
 %% @doc Deletes all contents of the given DB.
+-spec close_(DB::db_t(), Delete::boolean()) -> any().
 close_(State = {{DB, FileName}, _Subscr}, Delete) ->
     _ = call_subscribers(State, close_db),
     toke_drv:close(DB),
@@ -105,12 +108,14 @@ close_(State = {{DB, FileName}, _Subscr}, Delete) ->
 
 %% @doc Returns the name of the DB, i.e. the path to its file, which can be
 %%      used with open/1.
+-spec get_name_(DB::db_t()) -> db_name().
 get_name_({{_DB, FileName}, _Subscr}) ->
     FileName.
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
+-spec get_entry2_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
 get_entry2_({{DB, _FileName}, _Subscr}, Key) ->
     case toke_drv:get(DB, erlang:term_to_binary(Key, [{minor_version, 1}])) of
         not_found -> {false, db_entry:new(Key)};
@@ -118,6 +123,7 @@ get_entry2_({{DB, _FileName}, _Subscr}, Key) ->
     end.
 
 %% @doc Inserts a complete entry into the DB.
+-spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
@@ -129,10 +135,12 @@ set_entry_(State = {{DB, _FileName}, _Subscr}, Entry) ->
     end.
 
 %% @doc Updates an existing (!) entry in the DB.
+-spec update_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
 %% @doc Removes all values with the given key from the DB.
+-spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
 delete_entry_at_key_(State, Key) ->
     delete_entry_at_key_(State, Key, erlang:term_to_binary(Key, [{minor_version, 1}])).
 
@@ -141,11 +149,13 @@ delete_entry_at_key_(State = {{DB, _FileName}, _Subscr}, Key, Key_) ->
     call_subscribers(State, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
+-spec get_load_(DB::db_t()) -> Load::integer().
 get_load_({{DB, _FileName}, _Subscr}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
 
 %% @doc Returns the number of stored keys in the given interval.
+-spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
 get_load_(State = {{DB, _FileName}, _Subscr}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
@@ -163,6 +173,7 @@ get_load_(State = {{DB, _FileName}, _Subscr}, Interval) ->
     end.
 
 %% @doc Adds all db_entry objects in the Data list.
+-spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
 add_data_(State = {{DB, _FileName}, _Subscr}, Data) ->
     % -> do not use set_entry (no further checks for changed keys necessary)
     _ = lists:foldl(
@@ -178,6 +189,8 @@ add_data_(State = {{DB, _FileName}, _Subscr}, Data) ->
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed
 %%      keys!
+-spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
+         {NewDB::db_t(), db_as_list()}.
 split_data_(State = {{DB, _FileName}, _Subscr}, MyNewInterval) ->
     % first collect all toke keys to remove from my db (can not delete while doing fold!)
     F = fun(_K, DBEntry_, HisList) ->
@@ -204,6 +217,10 @@ split_data_(State = {{DB, _FileName}, _Subscr}, MyNewInterval) ->
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
+-spec get_entries_(DB::db_t(),
+                   FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
+                   ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
+        -> [Value].
 get_entries_({{DB, _FileName}, _Subscr}, FilterFun, ValueFun) ->
     F = fun (_Key, DBEntry_, Data) ->
                  DBEntry = erlang:binary_to_term(DBEntry_),
@@ -217,6 +234,10 @@ get_entries_({{DB, _FileName}, _Subscr}, FilterFun, ValueFun) ->
 %% @doc Returns all ValueFun(DBEntry) objects of the given DB which are in the
 %%      given interval and satisfy FilterFun but at most ChunkSize elements.
 %%      See get_chunk/3 for more details.
+-spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
+                 FilterFun::fun((db_entry:entry()) -> boolean()),
+                 ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), [V]}.
 get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
     AddDataFun = fun(_Key_, _Key, DBEntry_, Data) ->
                          DBEntry = erlang:binary_to_term(DBEntry_),
@@ -293,6 +314,10 @@ get_chunk_helper_filter(Data, MInfToBegin, GetKeyFromDataFun, ChunkSize) ->
 
 %% @doc Deletes all objects in the given Range or (if a function is provided)
 %%      for which the FilterFun returns true from the DB.
+-spec delete_entries_(DB::db_t(),
+                      RangeOrFun::intervals:interval() |
+                                  fun((DBEntry::db_entry:entry()) -> boolean()))
+        -> NewDB::db_t().
 delete_entries_(State = {{DB, _FileName}, _Subscr}, FilterFun) when is_function(FilterFun) ->
     % first collect all toke keys to delete (can not delete while doing fold!)
     F = fun(KeyToke, DBEntry_, ToDelete) ->
@@ -321,6 +346,8 @@ delete_entries_(State, Interval) ->
                             end)
     end.
 
+-spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), db_t()}.
 delete_chunk_(DB, Interval, ChunkSize) ->
     AddDataFun = fun(Key_, Key, _DBEntry_, Data) -> [{Key, Key_} | Data] end,
     {Next, Chunk} = get_chunk_helper(DB, Interval, AddDataFun, fun({K, _K_}) -> K end, ChunkSize),
@@ -328,6 +355,7 @@ delete_chunk_(DB, Interval, ChunkSize) ->
     {Next, DB2}.
 
 %% @doc Returns all DB entries.
+-spec get_data_(DB::db_t()) -> db_as_list().
 get_data_({{DB, _FileName}, _Subscr}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
@@ -337,6 +365,8 @@ get_data_({{DB, _FileName}, _Subscr}) ->
 %%      from the DB when starting at the key directly after Begin.
 %%      Precond: a load larger than 0
 %%      Note: similar to get_chunk/2.
+-spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+        -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_(DB, Begin, TargetLoad, Direction) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of

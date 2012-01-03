@@ -23,8 +23,19 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 % for behaviour
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
+-callback work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
+                     rdht_tx:request()) -> ok.
+-callback validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
+-callback validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
+-callback commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-callback abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
@@ -44,6 +55,6 @@ behaviour_info(callbacks) ->
      %% abort(DB, RTLogentry, OwnProposalWas)
      {abort, 3}
     ];
-
 behaviour_info(_Other) ->
     undefined.
+-endif.

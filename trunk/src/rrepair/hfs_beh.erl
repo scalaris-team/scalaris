@@ -19,16 +19,25 @@
 
 -module(hfs_beh).
 
+-ifndef(have_callback_support).
 -export([behaviour_info/1]).
+-endif.
 
+-ifdef(have_callback_support).
+-type itemKey() :: any().
+-type hfs()     :: term().
+-callback new(integer()) -> hfs().
+-callback new([function()], integer()) -> hfs().
+-callback apply_val(hfs(), itemKey()) -> [integer()].
+-callback hfs_size(hfs()) -> integer().
+-else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {new, 1},
-     {new, 2}, 
+     {new, 1}, {new, 2}, 
      {apply_val, 2},
      {hfs_size, 1}
     ];
-
 behaviour_info(_Other) ->
     undefined.
+-endif.

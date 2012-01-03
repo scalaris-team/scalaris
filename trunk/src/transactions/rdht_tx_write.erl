@@ -73,8 +73,7 @@ work_phase(ClientPid, ReqId, Request) ->
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
 %%   [TransLogEntries] (replicas)
--spec validate_prefilter(tx_tlog:tlog_entry()) ->
-                                [tx_tlog:tlog_entry()].
+-spec validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
     ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLog]),
     Key = tx_tlog:get_entry_key(TLogEntry),

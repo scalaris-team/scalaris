@@ -47,6 +47,7 @@
 %% %% API  
 %% 
 %% % @doc creates a new sbf
+%% -spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter_t().
 %% new_(N, FPR, Hfs) ->
 %%     CellSize = case config:cfg_is_integer(sbf_cell_size) of
 %%                    true -> config:read(sbf_cell_size);
@@ -66,6 +67,7 @@
 %%           }.
 %% 
 %% % @doc adds a range of items
+%% -spec add_list_(bloom_filter_t(), [key()]) -> bloom_filter_t().
 %% add_list_(Sbf, Items) ->
 %%     #sbf{
 %%            cellCount = CellCount, 
@@ -82,6 +84,7 @@
 %%            }.
 %% 
 %% % @doc returns true if item is found
+%% -spec is_element_(bloom_filter_t(), key()) -> boolean().
 %% is_element_(Bloom, Item) -> 
 %%     #bloom{
 %%            size = BFSize,          
@@ -94,6 +97,7 @@
 %% 
 %% 
 %% %% @doc joins two bloom filter, returned bloom filter represents their union
+%% -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
 %% join_(#bloom{size = Size1, expItems = ExpItem1, addedItems = Items1, targetFPR = Fpr1,
 %%              filter = F1, hfs = Hfs}, 
 %%       #bloom{size = Size2, expItems = ExpItem2, addedItems = Items2, targetFPR = Fpr2,
@@ -112,6 +116,7 @@
 %%            }.
 %% 
 %% %% @doc checks equality of two bloom filters
+%% -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
 %% equals_(Bloom1, Bloom2) ->
 %%     #bloom{
 %%            size = Size1, 
@@ -128,6 +133,7 @@
 %%         Filter1 =:= Filter2.
 %% 
 %% % @doc bloom filter debug information
+%% -spec print_(bloom_filter_t()) -> [{atom(), any()}].
 %% print_(Bloom) -> 
 %%     #bloom{
 %%            expItems = MaxItems, 

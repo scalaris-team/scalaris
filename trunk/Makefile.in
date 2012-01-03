@@ -29,7 +29,6 @@ YAWS_PATH= /usr/local/lib/yaws
 
 APP_NAME = @PACKAGE_TARNAME@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
-VSN = $Id$
 
 prefix = @prefix@
 exec_prefix = @exec_prefix@
@@ -435,7 +434,7 @@ doc: .make-doc
 
 .make-doc: $(SOURCEPATHS_ERL)
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
-	'"."' '[{def,{vsn,"$(VSN)"}},no_packages]'
+	'"."' '[{def, {vsn, "$(VERSION)"}}, no_packages, {preprocess, true}, {includes, ["include", "contrib/yaws/include", "contrib/log4erl/include"]}, {macros, [@EDOCMACROS@]}]'
 	@touch .make-doc
 
 docs: doc java-doc

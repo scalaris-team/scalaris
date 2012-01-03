@@ -43,15 +43,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns a new lhsp hfs with default functions
+-spec new_(integer()) -> hfs_t().
 new_(HFCount) -> 
     new_([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
 
+-spec new_([function()], integer()) -> hfs_t().
 new_([H1, H2] = HFList, HFCount) when length(HFList) =:= 2 -> 
     {hfs_lhsp, HFCount, H1, H2};
 new_(_, _) ->
     erlang:error("hash function list length =/= 2").
 
 % @doc Applies Val to all hash functions in container HC
+-spec apply_val_(hfs_t(), itemKey()) -> [integer()].
 apply_val_({hfs_lhsp, K, H1, H2}, Val) ->
     ValBin = term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -59,6 +62,7 @@ apply_val_({hfs_lhsp, K, H1, H2}, Val) ->
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
 % @doc Returns number of hash functions in the container
+-spec hfs_size_(hfs_t()) -> integer().
 hfs_size_(Hfs) -> 
     {hfs_lhsp, K, _, _} = Hfs,
     K.

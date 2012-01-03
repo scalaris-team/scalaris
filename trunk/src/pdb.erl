@@ -33,7 +33,7 @@
 -ifdef(PDB_ERL).
 -type tableid() :: atom().
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 -type tableid() :: tid() | atom().
 -endif.
 -spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
@@ -45,7 +45,7 @@
 new(TableName, _Params) ->
     TableName.
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 new(TableName, Params) ->
     ets:new(TableName, Params).
 -endif.
@@ -55,7 +55,7 @@ new(TableName, Params) ->
 get(Key, _TableName) ->
     erlang:get(Key).
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 get(Key, TableName) ->
     case ets:lookup(TableName, Key) of
         [] -> undefined;
@@ -69,7 +69,7 @@ set(NewTuple, _TableName) ->
     erlang:put(element(1, NewTuple), NewTuple),
     ok.
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 set(NewTuple, TableName) ->
     ets:insert(TableName, NewTuple),
     ok.
@@ -81,7 +81,7 @@ delete(Key, _TableName) ->
     erlang:erase(Key),
     ok.
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 delete(Key, TableName) ->
     ets:delete(TableName, Key),
     ok.
@@ -92,7 +92,7 @@ delete(Key, TableName) ->
 tab2list(_TableName) ->
     [ X || {_,X} <- erlang:get()].
 -endif.
--ifdef(PDB_ETS). %% @hidden
+-ifdef(PDB_ETS).
 tab2list(TableName) ->
   ets:tab2list(TableName).
 -endif.

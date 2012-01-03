@@ -102,13 +102,3 @@ calc_least_size(N, FPR) when N > 0 ->
 calc_FPR(M, _, _) when M =:= 0-> 1;
 calc_FPR(M, N, K) when M > 0-> 
     math:pow(1 - math:pow(math:exp(1), (-K*N) / M), K).
-
-
-%% private function specs - TO IMPLEMENT if behaviour is used
--spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter_t().
--spec add_list_(bloom_filter_t(), [key()]) -> bloom_filter_t().
--spec is_element_(bloom_filter_t(), key()) -> boolean().
--spec equals_(bloom_filter(), bloom_filter()) -> boolean().
--spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
--spec print_(bloom_filter_t()) -> [{atom(), any()}].
--spec get_property(bloom_filter_t(), atom()) -> any() | not_found.
