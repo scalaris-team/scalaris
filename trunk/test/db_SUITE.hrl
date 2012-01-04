@@ -1011,8 +1011,10 @@ prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
     NewEntry1 = ?TEST_DB:get_entry(DB4, db_entry:get_key(Entry1)),
     NewEntry2 = ?TEST_DB:get_entry(DB4, db_entry:get_key(Entry2)),
     check_changes(DB4, ChangesInterval, "update_entries_1"),
-    check_entry_in_changes(DB4, ChangesInterval, NewEntry1, Old1, "update_entries_2"),
-    check_entry_in_changes(DB4, ChangesInterval, NewEntry2, Old2, "update_entries_3"),
+    ?implies(db_entry:get_version(element(2, Old1)) < db_entry:get_version(Entry1),
+             check_entry_in_changes(DB4, ChangesInterval, NewEntry1, Old1, "update_entries_2")),
+    ?implies(db_entry:get_version(element(2, Old2)) < db_entry:get_version(Entry2),
+             check_entry_in_changes(DB4, ChangesInterval, NewEntry2, Old2, "update_entries_3")),
     
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "update_entries_4"),
 
@@ -1326,6 +1328,9 @@ tester_delete_chunk3(_Config) ->
     tester:test(?MODULE, prop_delete_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
+    prop_changed_keys_update_entries(
+      [{?RT:hash_key("200"),empty_val,false,0,-1}], intervals:all(),
+      {?RT:hash_key("100"),empty_val,false,1,-1}, {?RT:hash_key("200"),empty_val,false,296,-1}),
     tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete_entries1(_Config) ->
@@ -1536,7 +1541,7 @@ check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note
             case length([K || K <- DeletedKeys, K =:= Key]) of
                 1 -> ok;
                 _ -> ?ct_fail("element(2, ?TEST_DB:get_changes(DB)) evaluated "
-                              "to \"~w\" and did not contain 1x key ~w~n(~s)~n",
+                              "to \"~w\" and did not contain 1x deleted key ~w~n(~s)~n",
                               [DeletedKeys, Key, lists:flatten(Note)])
             end;
         _    -> true
@@ -1560,9 +1565,9 @@ check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntr
         true ->
             case length([E || E <- ChangedEntries, E =:= NewEntry]) of
                 1 -> ok;
-                _ -> ?ct_fail("~s evaluated to \"~w\" and did not contain 1x entry ~w~n(~s)~n",
-                              ["element(1, ?TEST_DB:get_changes(DB))",
-                               ChangedEntries, NewEntry, lists:flatten(Note)])
+                _ -> ?ct_fail("element(1, ?TEST_DB:get_changes(DB)) evaluated "
+                              "to \"~w\" and did not contain 1x changed entry ~w~n(~s)~n",
+                              [ChangedEntries, NewEntry, lists:flatten(Note)])
             end;
         _    -> ok
     end.
