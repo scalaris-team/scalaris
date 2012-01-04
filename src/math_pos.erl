@@ -26,7 +26,7 @@
 -type position_var() :: [non_neg_integer()].
 
 -export([plus/3, minus/3, divide/3, multiply/3,
-         make_same_length/3, remove_zeros/3]).
+         make_same_length/3, make_same_length/4, remove_zeros/3]).
 
 %% @doc A + B
 -spec plus(A::position_var(), B::position_var(), Base::pos_integer()) -> position_var().
@@ -106,13 +106,20 @@ divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
                end,
     divide_torev(DR, Divisor, NewCarry, [Diff2 | Product_rev], Base).
 
-%% @doc Bring two lists to the same length by appending or prepending 0's.
+%% @doc Bring two lists to the same length by appending or prepending zeros.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back)
         -> {A::position_var(), B::position_var(),
             AddedToA::non_neg_integer(), AddedToB::non_neg_integer()}.
 make_same_length(A, B, AddTo) ->
+    make_same_length(A, B, AddTo, 0).
+
+%% @doc Bring two lists to the same length by appending or prepending at least MinAdd zeros.
+-spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back, MinAdd::non_neg_integer())
+        -> {A::position_var(), B::position_var(),
+            AddedToA::non_neg_integer(), AddedToB::non_neg_integer()}.
+make_same_length(A, B, AddTo, MinAdd) ->
     A_l = erlang:length(A), B_l = erlang:length(B),
-    MaxLength = erlang:max(A_l, B_l),
+    MaxLength = erlang:max(A_l, B_l) + MinAdd,
     AddToALength = MaxLength - A_l, AddToBLength = MaxLength - B_l,
     AddToA = lists:duplicate(AddToALength, 0),
     AddToB = lists:duplicate(AddToBLength, 0),
