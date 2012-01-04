@@ -634,20 +634,22 @@ is_right_of(X, Y) ->
 split(I, 1) -> [I];
 split(I, Parts) ->
     case is_continuous(I) of
-        true -> lists:reverse(split2(intervals:get_bounds(I), Parts, []));
+        true ->
+            {LBr, Key, Key, RBr} = intervals:get_bounds(I),
+            lists:reverse(split2(LBr, Key, Key, RBr, Parts, []));
         false -> erlang:throw('interval is not continuous')
     end.
 
--spec split2({left_bracket(), key(), key(), right_bracket()}, pos_integer(), Acc::[interval()]) -> [interval()].
-split2({LBr, Key, Key, RBr}, _, Acc) ->
+-spec split2(left_bracket(), key(), key(), right_bracket(), pos_integer(), Acc::[interval()]) -> [interval()].
+split2(LBr, Key, Key, RBr, _, Acc) ->
     [new(LBr, Key, Key, RBr) | Acc];
-split2({LBr, LKey, RKey, RBr}, 1, Acc) ->
+split2(LBr, LKey, RKey, RBr, 1, Acc) ->
     [new(LBr, LKey, RKey, RBr) | Acc];
-split2({LBr, LKey, RKey, RBr}, Parts, Acc) ->
+split2(LBr, LKey, RKey, RBr, Parts, Acc) ->
     SplitKey = ?RT:get_split_key(LKey, RKey, {1, Parts}),
     case SplitKey =:= LKey of
         true -> [new(LBr, LKey, RKey, RBr) | Acc];
-        false -> split2({'(', SplitKey, RKey, RBr}, 
+        false -> split2('(', SplitKey, RKey, RBr, 
                         Parts - 1, 
                         [new(LBr, LKey, SplitKey, ']') | Acc])
     end.
