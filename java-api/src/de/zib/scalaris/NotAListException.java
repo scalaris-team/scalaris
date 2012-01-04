@@ -20,7 +20,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
  * Exception that is thrown if a add_del_on_list operation on a scalaris ring
- * fails because the participating values are no lists.
+ * fails because the participating values are not lists.
  *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.8

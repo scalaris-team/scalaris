@@ -102,6 +102,17 @@ class JSONConnection(object):
             return bytearray(base64.b64decode(value['value'].encode('ascii')))
         else:
             return value['value']
+        
+    # result: {'status': 'ok'} or
+    #         {'status': 'fail', 'reason': 'timeout'}
+    @staticmethod
+    def check_fail_abort(result):
+        """
+        Processes the result of some Scalaris operation and raises a
+        TimeoutError if found.
+        """
+        if result == {'status': 'fail', 'reason': 'timeout'}:
+            raise TimeoutError(result)
     
     # result: {'status': 'ok', 'value': xxx} or
     #         {'status': 'fail', 'reason': 'timeout' or 'not_found'}
@@ -156,7 +167,45 @@ class JSONConnection(object):
         raise UnknownError(result)
         
     # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'not_a_list'} or
+    @staticmethod
+    def process_result_add_del_on_list(result):
+        """
+        Processes the result of a add_del_on_list operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result:
+            if result == {'status': 'ok'}:
+                return None
+            elif result['status'] == 'fail' and 'reason' in result:
+                if len(result) == 2:
+                    if result['reason'] == 'timeout':
+                        raise TimeoutError(result)
+                    elif result['reason'] == 'not_a_list':
+                        raise NotAListError(result)
+        raise UnknownError(result)
+        
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'not_a_number'} or
+    @staticmethod
+    def process_result_add_on_nr(result):
+        """
+        Processes the result of a add_on_nr operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result:
+            if result == {'status': 'ok'}:
+                return None
+            elif result['status'] == 'fail' and 'reason' in result:
+                if len(result) == 2:
+                    if result['reason'] == 'timeout':
+                        raise TimeoutError(result)
+                    elif result['reason'] == 'not_a_number':
+                        raise NotANumberError(result)
+        raise UnknownError(result)
+        
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'not_found'} or
     #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
     @staticmethod
     def process_result_test_and_set(result):
@@ -171,8 +220,6 @@ class JSONConnection(object):
                 if len(result) == 2:
                     if result['reason'] == 'timeout':
                         raise TimeoutError(result)
-                    elif result['reason'] == 'abort':
-                        raise AbortError(result)
                     elif result['reason'] == 'not_found':
                         raise NotFoundError(result)
                 elif result['reason'] == 'key_changed' and 'value' in result and len(result) == 3:
@@ -387,6 +434,28 @@ class NotFoundError(ScalarisError):
     def __str__(self):
         return repr(self.raw_result)
 
+class NotAListError(ScalarisError):
+    """
+    Exception that is thrown if a add_del_on_list operation on a scalaris ring
+    fails because the participating values are not lists.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class NotANumberError(ScalarisError):
+    """
+    Exception that is thrown if a add_del_on_list operation on a scalaris ring
+    fails because the participating values are not numbers.
+    """
+    
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
 class TimeoutError(ScalarisError):
     """
     Exception that is thrown if a read or write operation on a scalaris ring
@@ -548,8 +617,38 @@ class TransactionSingleOp(object):
         Raises the appropriate exceptions if a failure occurred during the
         operation.
         """
-        # note: we need to process a commit result as the write has been committed
-        return self._conn.process_result_commit(result)
+        self._conn.check_fail_abort(result)
+        return self._conn.process_result_write(result)
+
+    def process_result_add_del_on_list(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a add_del_on_list operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_add_del_on_list(result)
+
+    def process_result_add_on_nr(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a add_on_nr operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_add_on_nr(result)
+
+    def process_result_test_and_set(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a test_and_set operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_test_and_set(result)
 
     def read(self, key):
         """
@@ -566,16 +665,38 @@ class TransactionSingleOp(object):
         """
         value = self._conn.encode_value(value)
         result = self._conn.call('write', [key, value])
-        self._conn.process_result_commit(result)
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_write(result)
     
-    def test_and_set(self, key, oldvalue, newvalue):
+    def add_del_on_list(self, key, to_add, to_remove):
         """
-        Atomic test and set, i.e. if the old value at key is oldvalue, then
-        write newvalue.
+        Changes the list stored at the given key, i.e. first adds all items in
+        to_add then removes all items in to_remove.
+        Both, to_add and to_remove, must be lists.
+        Assumes en empty list if no value exists at key.
         """
-        oldvalue = self._conn.encode_value(oldvalue)
-        newvalue = self._conn.encode_value(newvalue)
-        result = self._conn.call('test_and_set', [key, oldvalue, newvalue])
+        result = self._conn.call('add_del_on_list', [key, to_add, to_remove])
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_add_del_on_list(result)
+    
+    def add_on_nr(self, key, to_add):
+        """
+        Changes the number stored at the given key, i.e. adds some value.
+        Assumes 0 if no value exists at key.
+        """
+        result = self._conn.call('add_on_nr', [key, to_add])
+        self._conn.check_fail_abort(result)
+        self._conn.process_result_add_on_nr(result)
+    
+    def test_and_set(self, key, old_value, new_value):
+        """
+        Atomic test and set, i.e. if the old value at key is old_value, then
+        write new_value.
+        """
+        old_value = self._conn.encode_value(old_value)
+        new_value = self._conn.encode_value(new_value)
+        result = self._conn.call('test_and_set', [key, old_value, new_value])
+        self._conn.check_fail_abort(result)
         self._conn.process_result_test_and_set(result)
 
     def nop(self, value):
@@ -658,6 +779,33 @@ class Transaction(object):
         """
         return self._conn.process_result_write(result)
 
+    def process_result_add_del_on_list(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a add_del_on_list operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.process_result_add_del_on_list(result)
+
+    def process_result_add_on_nr(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a add_on_nr operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.process_result_add_on_nr(result)
+
+    def process_result_test_and_set(self, result):
+        """
+        Processes a result element from the list returned by req_list() which
+        originated from a test_and_set operation.
+        Raises the appropriate exceptions if a failure occurred during the
+        operation.
+        """
+        self._conn.process_result_test_and_set(result)
+
     def _process_result_commit(self, result):
         """
         Processes a result element from the list returned by req_list() which
@@ -699,7 +847,39 @@ class Transaction(object):
         transaction.
         """
         result = self.req_list(self.new_req_list().add_write(key, value))[0]
-        self._process_result_commit(result)
+        self.process_result_write(result)
+    
+    def add_del_on_list(self, key, to_add, to_remove):
+        """
+        Issues a add_del_on_list operation to scalaris and adds it to the
+        current transaction.
+        Changes the list stored at the given key, i.e. first adds all items in
+        to_add then removes all items in to_remove.
+        Both, to_add and to_remove, must be lists.
+        Assumes en empty list if no value exists at key.
+        """
+        result = self.req_list(self.new_req_list().add_add_del_on_list(key, to_add, to_remove))[0]
+        self.process_result_add_del_on_list(result)
+    
+    def add_on_nr(self, key, to_add):
+        """
+        Issues a add_on_nr operation to scalaris and adds it to the
+        current transaction.
+        Changes the number stored at the given key, i.e. adds some value.
+        Assumes 0 if no value exists at key.
+        """
+        result = self.req_list(self.new_req_list().add_add_on_nr(key, to_add))[0]
+        self.process_result_add_on_nr(result)
+    
+    def test_and_set(self, key, old_value, new_value):
+        """
+        Issues a test_and_set operation to scalaris and adds it to the
+        current transaction.
+        Atomic test and set, i.e. if the old value at key is old_value, then
+        write new_value.
+        """
+        result = self.req_list(self.new_req_list().add_test_and_set(key, old_value, new_value))[0]
+        self.process_result_test_and_set(result)
 
     def nop(self, value):
         """
@@ -746,6 +926,33 @@ class _JSONReqList(object):
         if (self._is_commit):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'write': {key: JSONConnection.encode_value(value)}})
+        return self
+    
+    def add_add_del_on_list(self, key, to_add, to_remove):
+        """
+        Adds a add_del_on_list operation to the request list.
+        """
+        if (self._is_commit):
+            raise RuntimeError("No further request supported after a commit!")
+        self._requests.append({'add_del_on_list': {'key': key, 'add': to_add, 'del': to_remove}})
+        return self
+    
+    def add_add_on_nr(self, key, to_add):
+        """
+        Adds a add_on_nr operation to the request list.
+        """
+        if (self._is_commit):
+            raise RuntimeError("No further request supported after a commit!")
+        self._requests.append({'add_on_nr': {key: to_add}})
+        return self
+    
+    def add_test_and_set(self, key, old_value, new_value):
+        """
+        Adds a test_and_set operation to the request list.
+        """
+        if (self._is_commit):
+            raise RuntimeError("No further request supported after a commit!")
+        self._requests.append({'add_del_on_list': {'key': key, 'old': old_value, 'new': new_value}})
         return self
     
     def add_commit(self):

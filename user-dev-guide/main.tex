@@ -916,11 +916,13 @@ supported (the given result is the \code{<result_object>} mentioned above):
 \begin{lstlisting}[language=java]
 "ok"
 \end{lstlisting}
-  \item[] \hspace{-1.7em}single read/write:
-  \item \code{req_list_commit_each(<req_list_rw>)} - commit each request in the list, result:
+  \item[] \hspace{-1.7em}single operations, e.g. read/write:
+  \item \code{req_list_commit_each(<req_list_ce>)} - commit each request in the list, result:
 \begin{lstlisting}[language=java]
 {[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
-  {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
+  {"status": "fail", "reason": "timeout" or "abort" or "not_found" or
+                               "not_a_list" or "not_a_number"} or
+  {"status": "fail", "reason": "key_changed", "value": <json_value>}]}
 \end{lstlisting}
   \item \code{read(<key>)} - read the value at \code{key}, result:
 \begin{lstlisting}[language=java]
@@ -931,6 +933,20 @@ supported (the given result is the \code{<result_object>} mentioned above):
 \begin{lstlisting}[language=java]
 {"status": "ok"} or
 {"status": "fail", "reason": "timeout" or "abort"}
+\end{lstlisting}
+  \item \code{add_del_on_list(<key>, ToAdd, ToRemove)} - adding to / removing from a list
+  (for the list at \code{key} adds all values in the \code{ToAdd} list and
+  then removes all values in the \code{ToRemove} list; if there is no value at
+  \code{key}, uses an empty list - both value lists are \code{[<value>]}), result:
+\begin{lstlisting}[language=java]
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort" or "not_a_list"}
+\end{lstlisting}
+  \item \code{add_on_nr(<key>, <value>)} - adding to a number
+  (adds \code{value} to the number at \code{key} - both values must be numbers), result:
+\begin{lstlisting}[language=java]
+{"status": "ok"} or
+{"status": "fail", "reason": "timeout" or "abort" or "not_a_number"}
 \end{lstlisting}
   \item \code{test_and_set(<key>, OldValue, NewValue)} - atomic test-and-set
   (write \code{NewValue} to \code{key} if the current value is \code{OldValue}
@@ -945,13 +961,17 @@ supported (the given result is the \code{<result_object>} mentioned above):
 \begin{lstlisting}[language=java]
 {"tlog": <tlog>,
  "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
-             {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
+             {"status": "fail", "reason": "timeout" or "abort" or "not_found" or
+                                          "not_a_list" or "not_a_number"} or
+             {"status": "fail", "reason": "key_changed", "value": <json_value>}]}
 \end{lstlisting}
   \item \code{req_list(<tlog>, <req_list>)} - process a list of requests with a previous translog, result:
 \begin{lstlisting}[language=java]
 {"tlog": <tlog>,
  "results": [{"status": "ok"} or {"status": "ok", "value": <json_value>} or
-             {"status": "fail", "reason": "timeout" or "abort" or "not_found"}]}
+             {"status": "fail", "reason": "timeout" or "abort" or "not_found" or
+                                          "not_a_list" or "not_a_number"} or
+             {"status": "fail", "reason": "key_changed", "value": <json_value>}]}
 \end{lstlisting}
   \item[] \hspace{-1.7em}replication layer functions:
   \item \code{delete(<key>)} - delete the value at \code{key}, default timeout 2s, result:
@@ -998,8 +1018,12 @@ supported (the given result is the \code{<result_object>} mentioned above):
 Note:
 \begin{lstlisting}[language=java]
 <json_value> = {"type": "as_is" or "as_bin", "value": <value>}
-<req_list_rw> = [{"read", <key>} | {"write", {<key>: <json_value>}}]
-<req_list> = [{"read", <key>} | {"write", {<key>: <json_value>}} | {"commit", _}]
+<operation> = {"read", <key>} or {"write", {<key>: <json_value>}} or
+              {"add_del_on_list", {"key": <key>, "add": [<value>], "del": [<value>]}} or
+              {"add_on_nr", {<key>: <value>}} or
+              {"test_and_set", {"key": <key>, "old": <json_value>, "new": <json_value>}}
+<req_list_ce> = [<operation>]
+<req_list> = [<operation> or {"commit", _}]
 \end{lstlisting}
 The \code{<value>} inside \code{<json_value>} is either a base64-encoded
 string representing a binary object (type = \code{"as_bin"}) or the value

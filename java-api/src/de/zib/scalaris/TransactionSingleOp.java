@@ -472,8 +472,9 @@ public class TransactionSingleOp {
     }
 
     /**
-     * Changes the list stored at the given key, i.e. removes and/or adds some
-     * items.
+     * Changes the list stored at the given key, i.e. first adds all items in
+     * <tt>toAdd</tt> then removes all items in <tt>toRemove</tt>.
+     * Assumes en empty list if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
@@ -509,8 +510,9 @@ public class TransactionSingleOp {
     }
 
     /**
-     * Changes the list stored at the given key, i.e. removes and/or adds some
-     * items.
+     * Changes the list stored at the given key, i.e. first adds all items in
+     * <tt>toAdd</tt> then removes all items in <tt>toRemove</tt>.
+     * Assumes en empty list if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
@@ -555,6 +557,7 @@ public class TransactionSingleOp {
 
     /**
      * Changes the number stored at the given key, i.e. adds some value.
+     * Assumes <tt>0</tt> if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
@@ -586,6 +589,7 @@ public class TransactionSingleOp {
 
     /**
      * Changes the number stored at the given key, i.e. adds some value.
+     * Assumes <tt>0</tt> if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
@@ -617,6 +621,7 @@ public class TransactionSingleOp {
 
     /**
      * Changes the number stored at the given key, i.e. adds some value.
+     * Assumes <tt>0</tt> if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
@@ -653,6 +658,7 @@ public class TransactionSingleOp {
 
     /**
      * Changes the number stored at the given key, i.e. adds some value.
+     * Assumes <tt>0</tt> if no value exists at <tt>key</tt>.
      *
      * @param key
      *            the key to write the value to
