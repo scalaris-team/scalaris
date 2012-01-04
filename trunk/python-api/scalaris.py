@@ -45,18 +45,18 @@ class JSONConnection(object):
         except Exception as instance:
             raise ConnectionError(instance)
 
-    def call(self, function, params):
+    def call(self, function, params, retry_if_bad_status = True):
         """
         Calls the given function with the given parameters via the JSON
         interface of scalaris.
         """
-        params = {'jsonrpc': '2.0',
+        params2 = {'jsonrpc': '2.0',
                   'method': function,
                   'params': params,
                   'id': 0}
         try:
             # use compact JSON encoding:
-            params_json = json.dumps(params, separators=(',',':'))
+            params_json = json.dumps(params2, separators=(',',':'))
             headers = {"Content-type": "application/json; charset=utf-8"}
             # no need to quote - we already encode to json:
             #self._conn.request("POST", DEFAULT_PATH, urllib.quote(params_json), headers)
@@ -68,6 +68,12 @@ class JSONConnection(object):
             data = response.read().decode('utf-8')
             response_json = json.loads(data)
             return response_json['result']
+        except httplib.BadStatusLine as instance:
+            self.close()
+            if retry_if_bad_status:
+                return self.call(function, params, retry_if_bad_status = False)
+            else:
+                raise ConnectionError(instance)
         except ConnectionError:
             self.close()
             raise
