@@ -635,8 +635,8 @@ split(I, 1) -> [I];
 split(I, Parts) ->
     case is_continuous(I) of
         true ->
-            {LBr, Key, Key, RBr} = intervals:get_bounds(I),
-            lists:reverse(split2(LBr, Key, Key, RBr, Parts, []));
+            {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+            lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, []));
         false -> erlang:throw('interval is not continuous')
     end.
 
