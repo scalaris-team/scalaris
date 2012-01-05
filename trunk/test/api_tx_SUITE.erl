@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -396,7 +396,7 @@ random_write_read2(Count) ->
     random_write_read2(Count -1).
 
 random_write_read(_) ->
-    random_write_read2(50000).
+    random_write_read2(10000).
 
 -spec prop_read_not_existing(Key::client_key()) -> boolean().
 prop_read_not_existing(Key) ->

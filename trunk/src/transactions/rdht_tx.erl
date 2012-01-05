@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
+% @copyright 2009-2012 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -236,6 +236,8 @@ collect_replies(TLog, ReqIdsReqList) ->
 
 %% @doc Merge TLog entries, if same key. Check for version mismatch,
 %%      take over values.
+%%      SortedTlog is old TLog
+%%      SortedRTlog is TLog received from newer RDHT operations
 -spec merge_tlogs(tx_tlog:tlog(), tx_tlog:tlog()) -> tx_tlog:tlog().
 merge_tlogs(SortedTLog, SortedRTLog) ->
     merge_tlogs_iter(SortedTLog, SortedRTLog, []).
@@ -310,7 +312,9 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
                        {tx_tlog:tlog_entry(), result_entry_read()}.
 tlog_read(Entry, _Key) ->
     Res = case tx_tlog:get_entry_status(Entry) of
-              {fail, Reason} -> {fail, Reason};
+              {fail, not_a_list} ->  {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, not_a_number} -> {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, _Reason} = R -> R;
               value -> {ok, tx_tlog:get_entry_value(Entry)};
               not_found -> {fail, not_found}
           end,
@@ -321,18 +325,26 @@ tlog_read(Entry, _Key) ->
 -spec tlog_write(tx_tlog:tlog_entry(), client_key(), client_value()) ->
                        {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_write(Entry, _Key, Value) ->
+    NewEntryAndResult =
+        fun(FEntry, FValue) ->
+                case tx_tlog:get_entry_operation(FEntry) of
+                    rdht_tx_write ->
+                        {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
+                    rdht_tx_read ->
+                        E1 = tx_tlog:set_entry_operation(FEntry, rdht_tx_write),
+                        E2 = tx_tlog:set_entry_value(E1, FValue),
+                        {E2, {ok}}
+            end
+        end,
     case tx_tlog:get_entry_status(Entry) of
+        {fail, not_a_list} ->
+            NewEntryAndResult(Entry, Value);
+        {fail, not_a_number} ->
+            NewEntryAndResult(Entry, Value);
         {fail, Reason} ->
             {Entry, {fail, Reason}};
         value ->
-            case tx_tlog:get_entry_operation(Entry) of
-                rdht_tx_write ->
-                    {tx_tlog:set_entry_value(Entry, Value), {ok}};
-                rdht_tx_read ->
-                    E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
-                    E2 = tx_tlog:set_entry_value(E1, Value),
-                    {E2, {ok}}
-            end;
+            NewEntryAndResult(Entry, Value);
         not_found ->
             E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
             E2 = tx_tlog:set_entry_value(E1, Value),
@@ -350,7 +362,12 @@ tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel) when
       (not erlang:is_list(ToDel)) ->
     %% input type error
     Error = {fail, not_a_list},
-    {tx_tlog:set_entry_status(Entry, Error), Error};
+    NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
+                       {fail, _} -> Entry;
+                       not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
+                       _ -> tx_tlog:set_entry_status(Entry, Error)
+                   end,
+    {NewTlogEntry, Error};
 tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
@@ -368,7 +385,12 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
             tlog_write(Entry, Key, encode_value(NewValue2));
         {ok, _} -> %% value is not a list
             Error = {fail, not_a_list},
-            {tx_tlog:set_entry_status(Entry, Error), Error};
+            NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
+                               {fail, _} -> Entry;
+                               not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
+                               _ -> tx_tlog:set_entry_status(Entry, Error)
+                           end,
+            {NewTlogEntry, Error};
         X when erlang:is_tuple(X) -> %% other previous error
             {Entry, X}
     end.
@@ -379,7 +401,12 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
 tlog_add_on_nr(Entry, _Key, X)
   when (not erlang:is_number(X)) ->
     Error = {fail, not_a_number},
-    {tx_tlog:set_entry_status(Entry, Error), Error};
+    NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
+                       {fail, _} -> Entry;
+                       not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
+                       _ -> tx_tlog:set_entry_status(Entry, Error)
+                   end,
+    {NewTlogEntry, Error};
 tlog_add_on_nr(Entry, Key, X) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
@@ -395,7 +422,12 @@ tlog_add_on_nr(Entry, Key, X) ->
             tlog_write(Entry, Key, X);
         {ok, _} ->
             Error = {fail, not_a_number},
-            {tx_tlog:set_entry_status(Entry, Error), Error};
+            NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
+                               {fail, _} -> Entry;
+                               not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
+                               _ -> tx_tlog:set_entry_status(Entry, Error)
+                           end,
+            {NewTlogEntry, Error};
         E when erlang:is_tuple(E) -> %% other previous error
             {Entry, E}
     end.
