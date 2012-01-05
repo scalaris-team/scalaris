@@ -51,7 +51,13 @@ all()   -> [new_tlog_0,
             tester_add_on_nr,
             tester_add_on_nr_maybe_invalid,
             tester_test_and_set_not_existing,
-            tester_test_and_set
+            tester_test_and_set,
+            tester_tlog_add_del_on_list_not_existing,
+            tester_tlog_add_del_on_list,
+            tester_tlog_add_del_on_list_maybe_invalid,
+            tester_tlog_add_on_nr_not_existing,
+            tester_tlog_add_on_nr,
+            tester_tlog_add_on_nr_maybe_invalid
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -426,13 +432,32 @@ prop_write_read(Key, Value1, Value2) ->
 tester_write_read(_Config) ->
     tester:test(?MODULE, prop_write_read, 3, 10000).
 
+-spec prop_add_del_on_list2(Key::client_key(), Initial::client_value(), OldExists::boolean(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
+prop_add_del_on_list2(Key, Initial, OldExists, ToAdd, ToRemove) ->
+    if (not erlang:is_list(Initial)) orelse
+           (not erlang:is_list(ToAdd)) orelse
+           (not erlang:is_list(ToRemove)) ->
+           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {fail, not_a_list}),
+           Result = api_tx:read(Key),
+           if OldExists -> ?equals(Result, {ok, Initial});
+              true      -> ?equals(Result, {fail, not_found})
+           end;
+       true ->
+           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {ok}),
+           Result = api_tx:read(Key),
+           ?equals_pattern(Result, {ok, _List}),
+           {ok, List} = Result,
+           SortedList = lists:sort(fun util:'=:<'/2, List),
+           ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_first(lists:append(Initial, ToAdd), ToRemove)))
+    end.
+
 -spec prop_add_del_on_list_not_existing(Key::client_key(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
 prop_add_del_on_list_not_existing(Key, ToAdd, ToRemove) ->
-    OldValue = case api_tx:read(Key) of
-                   {ok, Value} -> Value;
-                   _ -> []
-               end,
-    prop_add_del_on_list2(Key, OldValue, ToAdd, ToRemove).
+    case api_tx:read(Key) of
+        {ok, OldValue} -> OldExists = true;
+        _ -> OldValue = [], OldExists = false
+    end,
+    prop_add_del_on_list2(Key, OldValue, OldExists, ToAdd, ToRemove).
 
 tester_add_del_on_list_not_existing(_Config) ->
     tester:test(?MODULE, prop_add_del_on_list_not_existing, 3, 10000).
@@ -440,20 +465,7 @@ tester_add_del_on_list_not_existing(_Config) ->
 -spec prop_add_del_on_list(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
 prop_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove).
-
--spec prop_add_del_on_list2(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
-prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove) ->
-    if (not erlang:is_list(Initial)) orelse
-           (not erlang:is_list(ToAdd)) orelse
-           (not erlang:is_list(ToRemove)) ->
-           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {fail, not_a_list});
-       true ->
-           ?equals(api_tx:add_del_on_list(Key, ToAdd, ToRemove), {ok}),
-           {ok, List} = api_tx:read(Key),
-           SortedList = lists:sort(fun util:'=:<'/2, List),
-           ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_first(lists:append(Initial, ToAdd), ToRemove)))
-    end.
+    prop_add_del_on_list2(Key, Initial, true, ToAdd, ToRemove).
 
 tester_add_del_on_list(_Config) ->
     tester:test(?MODULE, prop_add_del_on_list, 4, 10000).
@@ -461,10 +473,32 @@ tester_add_del_on_list(_Config) ->
 -spec prop_add_del_on_list_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
 prop_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
-    prop_add_del_on_list2(Key, Initial, ToAdd, ToRemove).
+    prop_add_del_on_list2(Key, Initial, true, ToAdd, ToRemove).
 
 tester_add_del_on_list_maybe_invalid(_Config) ->
     tester:test(?MODULE, prop_add_del_on_list_maybe_invalid, 4, 10000).
+
+-spec prop_add_on_nr2(Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
+prop_add_on_nr2(Key, Existing, Initial, ToAdd) ->
+    if (not erlang:is_number(Initial)) orelse
+           (not erlang:is_number(ToAdd)) ->
+           ?equals(api_tx:add_on_nr(Key, ToAdd), {fail, not_a_number}),
+           Result = api_tx:read(Key),
+           if Existing -> ?equals(Result, {ok, Initial});
+              true     -> ?equals(Result, {fail, not_found})
+           end;
+       true ->
+           ?equals(api_tx:add_on_nr(Key, ToAdd), {ok}),
+           Result = api_tx:read(Key),
+           ?equals_pattern(Result, {ok, _Number}),
+           {ok, Number} = Result,
+           case Existing of
+               false -> ?equals(Number, ToAdd);
+               % note: Initial+ToAdd could be float when Initial is not and thus Number is neither
+               true when ToAdd == 0 -> ?equals(Number, Initial);
+               _     -> ?equals(Number, (Initial + ToAdd))
+           end
+    end.
 
 -spec prop_add_on_nr_not_existing(Key::client_key(), ToAdd::number()) -> true | no_return().
 prop_add_on_nr_not_existing(Key, ToAdd) ->
@@ -482,22 +516,6 @@ prop_add_on_nr(Key, Initial, ToAdd) ->
     ?equals(api_tx:write(Key, Initial), {ok}),
     prop_add_on_nr2(Key, true, Initial, ToAdd).
 
--spec prop_add_on_nr2(Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
-prop_add_on_nr2(Key, Existing, Initial, ToAdd) ->
-    if (not erlang:is_number(Initial)) orelse
-           (not erlang:is_number(ToAdd)) ->
-           ?equals(api_tx:add_on_nr(Key, ToAdd), {fail, not_a_number});
-       true ->
-           ?equals(api_tx:add_on_nr(Key, ToAdd), {ok}),
-           {ok, Number} = api_tx:read(Key),
-           case Existing of
-               false -> ?equals(Number, ToAdd);
-               % note: Initial+ToAdd could be float when Initial is not and thus Number is neither
-               true when ToAdd == 0 -> ?equals(Number, Initial);
-               _     -> ?equals(Number, (Initial + ToAdd))
-           end
-    end.
-
 tester_add_on_nr(_Config) ->
     tester:test(?MODULE, prop_add_on_nr, 3, 10000).
 
@@ -508,6 +526,19 @@ prop_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
 
 tester_add_on_nr_maybe_invalid(_Config) ->
     tester:test(?MODULE, prop_add_on_nr_maybe_invalid, 3, 10000).
+
+-spec prop_test_and_set2(Key::client_key(), Existing::boolean(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
+prop_test_and_set2(Key, Existing, RealOldValue, OldValue, NewValue) ->
+    if not Existing ->
+           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {fail, not_found}),
+           ?equals(api_tx:read(Key), {fail, not_found});
+       RealOldValue =:= OldValue ->
+           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {ok}),
+           ?equals(api_tx:read(Key), {ok, NewValue});
+       true ->
+           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {fail, {key_changed, RealOldValue}}),
+           ?equals(api_tx:read(Key), {ok, RealOldValue})
+    end.
 
 -spec prop_test_and_set_not_existing(Key::client_key(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
 prop_test_and_set_not_existing(Key, OldValue, NewValue) ->
@@ -525,18 +556,118 @@ prop_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
     ?equals(api_tx:write(Key, RealOldValue), {ok}),
     prop_test_and_set2(Key, true, RealOldValue, OldValue, NewValue).
 
--spec prop_test_and_set2(Key::client_key(), Existing::boolean(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
-prop_test_and_set2(Key, Existing, RealOldValue, OldValue, NewValue) ->
-    if not Existing ->
-           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {fail, not_found}),
-           ?equals(api_tx:read(Key), {fail, not_found});
-       RealOldValue =:= OldValue ->
-           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {ok}),
-           ?equals(api_tx:read(Key), {ok, NewValue});
-       true ->
-           ?equals(api_tx:test_and_set(Key, OldValue, NewValue), {fail, {key_changed, RealOldValue}}),
-           ?equals(api_tx:read(Key), {ok, RealOldValue})
-    end.
-
 tester_test_and_set(_Config) ->
     tester:test(?MODULE, prop_test_and_set, 4, 10000).
+
+%%% operations with TLOG:
+
+-spec prop_tlog_add_del_on_list2(TLog::tx_tlog:tlog(), Key::client_key(), Initial::client_value(), OldExists::boolean(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
+prop_tlog_add_del_on_list2(TLog0, Key, Initial, OldExists, ToAdd, ToRemove) ->
+    {TLog1, Result1} = api_tx:add_del_on_list(TLog0, Key, ToAdd, ToRemove),
+    {TLog2, Result2} = api_tx:read(TLog1, Key),
+    if (not erlang:is_list(Initial)) orelse
+           (not erlang:is_list(ToAdd)) orelse
+           (not erlang:is_list(ToRemove)) ->
+           ?equals(Result1, {fail, not_a_list}),
+           if OldExists -> ?equals(Result2, {ok, Initial});
+              true      -> ?equals(Result2, {fail, not_found})
+           end,
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {fail, abort}),
+           if OldExists -> ?equals(api_tx:read(Key), {ok, Initial});
+              true      -> ?equals(api_tx:read(Key), {fail, not_found})
+           end;
+       true ->
+           ?equals(Result1, {ok}),
+           ?equals_pattern(Result2, {ok, _List}),
+           {ok, List} = Result2,
+           SortedList = lists:sort(fun util:'=:<'/2, List),
+           ?equals(SortedList, lists:sort(fun util:'=:<'/2, util:minus_first(lists:append(Initial, ToAdd), ToRemove))),
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {ok}),
+           ?equals(api_tx:read(Key), Result2)
+    end.
+
+-spec prop_tlog_add_del_on_list_not_existing(Key::client_key(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
+prop_tlog_add_del_on_list_not_existing(Key, ToAdd, ToRemove) ->
+    case api_tx:read(Key) of
+        {ok, OldValue} -> OldExists = true;
+        _ -> OldValue = [], OldExists = false
+    end,
+    prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, OldValue, OldExists, ToAdd, ToRemove).
+
+tester_tlog_add_del_on_list_not_existing(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_del_on_list_not_existing, 3, 10000).
+
+-spec prop_tlog_add_del_on_list(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
+prop_tlog_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
+    ?equals(api_tx:write(Key, Initial), {ok}),
+    prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, Initial, true, ToAdd, ToRemove).
+
+tester_tlog_add_del_on_list(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_del_on_list, 4, 10000).
+
+-spec prop_tlog_add_del_on_list_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
+prop_tlog_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
+    ?equals(api_tx:write(Key, Initial), {ok}),
+    prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, Initial, true, ToAdd, ToRemove).
+
+tester_tlog_add_del_on_list_maybe_invalid(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_del_on_list_maybe_invalid, 4, 10000).
+
+-spec prop_tlog_add_on_nr2(TLog::tx_tlog:tlog(), Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
+prop_tlog_add_on_nr2(TLog0, Key, Existing, Initial, ToAdd) ->
+    {TLog1, Result1} = api_tx:add_on_nr(TLog0, Key, ToAdd),
+    {TLog2, Result2} = api_tx:read(TLog1, Key),
+    if (not erlang:is_number(Initial)) orelse
+           (not erlang:is_number(ToAdd)) ->
+           ?equals(Result1, {fail, not_a_number}),
+           if Existing -> ?equals(Result2, {ok, Initial});
+              true     -> ?equals(Result2, {fail, not_found})
+           end,
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {fail, abort}),
+           if Existing -> ?equals(api_tx:read(Key), {ok, Initial});
+              true     -> ?equals(api_tx:read(Key), {fail, not_found})
+           end;
+       true ->
+           ?equals(Result1, {ok}),
+           ?equals_pattern(Result2, {ok, _Number}),
+           {ok, Number} = Result2,
+           case Existing of
+               false -> ?equals(Number, ToAdd);
+               % note: Initial+ToAdd could be float when Initial is not and thus Number is neither
+               true when ToAdd == 0 -> ?equals(Number, Initial);
+               _     -> ?equals(Number, (Initial + ToAdd))
+           end,
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {ok}),
+           ?equals(api_tx:read(Key), Result2)
+    end.
+
+-spec prop_tlog_add_on_nr_not_existing(Key::client_key(), ToAdd::number()) -> true | no_return().
+prop_tlog_add_on_nr_not_existing(Key, ToAdd) ->
+    {Existing, OldValue} = case api_tx:read(Key) of
+                               {ok, Value} -> {true, Value};
+                               _ -> {false, 0}
+                           end,
+    prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, Existing, OldValue, ToAdd).
+
+tester_tlog_add_on_nr_not_existing(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_on_nr_not_existing, 2, 10000).
+
+-spec prop_tlog_add_on_nr(Key::client_key(), Initial::client_value(), ToAdd::number()) -> true | no_return().
+prop_tlog_add_on_nr(Key, Initial, ToAdd) ->
+    ?equals(api_tx:write(Key, Initial), {ok}),
+    prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, true, Initial, ToAdd).
+
+tester_tlog_add_on_nr(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_on_nr, 3, 10000).
+
+-spec prop_tlog_add_on_nr_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
+prop_tlog_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
+    ?equals(api_tx:write(Key, Initial), {ok}),
+    prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, true, Initial, ToAdd).
+
+tester_tlog_add_on_nr_maybe_invalid(_Config) ->
+    tester:test(?MODULE, prop_tlog_add_on_nr_maybe_invalid, 3, 10000).
