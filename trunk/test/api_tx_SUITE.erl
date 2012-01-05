@@ -460,7 +460,7 @@ prop_add_del_on_list_not_existing(Key, ToAdd, ToRemove) ->
     prop_add_del_on_list2(Key, OldValue, OldExists, ToAdd, ToRemove).
 
 tester_add_del_on_list_not_existing(_Config) ->
-    tester:test(?MODULE, prop_add_del_on_list_not_existing, 3, 10000).
+    tester:test(?MODULE, prop_add_del_on_list_not_existing, 3, 5000).
 
 -spec prop_add_del_on_list(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
 prop_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
@@ -468,7 +468,7 @@ prop_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
     prop_add_del_on_list2(Key, Initial, true, ToAdd, ToRemove).
 
 tester_add_del_on_list(_Config) ->
-    tester:test(?MODULE, prop_add_del_on_list, 4, 10000).
+    tester:test(?MODULE, prop_add_del_on_list, 4, 5000).
 
 -spec prop_add_del_on_list_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
 prop_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
@@ -476,7 +476,7 @@ prop_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
     prop_add_del_on_list2(Key, Initial, true, ToAdd, ToRemove).
 
 tester_add_del_on_list_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_add_del_on_list_maybe_invalid, 4, 10000).
+    tester:test(?MODULE, prop_add_del_on_list_maybe_invalid, 4, 5000).
 
 -spec prop_add_on_nr2(Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
 prop_add_on_nr2(Key, Existing, Initial, ToAdd) ->
@@ -509,7 +509,7 @@ prop_add_on_nr_not_existing(Key, ToAdd) ->
     prop_add_on_nr2(Key, Existing, OldValue, ToAdd).
 
 tester_add_on_nr_not_existing(_Config) ->
-    tester:test(?MODULE, prop_add_on_nr_not_existing, 2, 10000).
+    tester:test(?MODULE, prop_add_on_nr_not_existing, 2, 5000).
 
 -spec prop_add_on_nr(Key::client_key(), Initial::client_value(), ToAdd::number()) -> true | no_return().
 prop_add_on_nr(Key, Initial, ToAdd) ->
@@ -517,7 +517,7 @@ prop_add_on_nr(Key, Initial, ToAdd) ->
     prop_add_on_nr2(Key, true, Initial, ToAdd).
 
 tester_add_on_nr(_Config) ->
-    tester:test(?MODULE, prop_add_on_nr, 3, 10000).
+    tester:test(?MODULE, prop_add_on_nr, 3, 5000).
 
 -spec prop_add_on_nr_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
 prop_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
@@ -525,7 +525,7 @@ prop_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
     prop_add_on_nr2(Key, true, Initial, ToAdd).
 
 tester_add_on_nr_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_add_on_nr_maybe_invalid, 3, 10000).
+    tester:test(?MODULE, prop_add_on_nr_maybe_invalid, 3, 5000).
 
 -spec prop_test_and_set2(Key::client_key(), Existing::boolean(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
 prop_test_and_set2(Key, Existing, RealOldValue, OldValue, NewValue) ->
@@ -549,7 +549,7 @@ prop_test_and_set_not_existing(Key, OldValue, NewValue) ->
     prop_test_and_set2(Key, Existing, RealOldValue, OldValue, NewValue).
 
 tester_test_and_set_not_existing(_Config) ->
-    tester:test(?MODULE, prop_test_and_set_not_existing, 3, 10000).
+    tester:test(?MODULE, prop_test_and_set_not_existing, 3, 5000).
 
 -spec prop_test_and_set(Key::client_key(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
 prop_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
@@ -557,7 +557,7 @@ prop_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
     prop_test_and_set2(Key, true, RealOldValue, OldValue, NewValue).
 
 tester_test_and_set(_Config) ->
-    tester:test(?MODULE, prop_test_and_set, 4, 10000).
+    tester:test(?MODULE, prop_test_and_set, 4, 5000).
 
 %%% operations with TLOG:
 
@@ -597,7 +597,7 @@ prop_tlog_add_del_on_list_not_existing(Key, ToAdd, ToRemove) ->
     prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, OldValue, OldExists, ToAdd, ToRemove).
 
 tester_tlog_add_del_on_list_not_existing(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_del_on_list_not_existing, 3, 10000).
+    tester:test(?MODULE, prop_tlog_add_del_on_list_not_existing, 3, 5000).
 
 -spec prop_tlog_add_del_on_list(Key::client_key(), Initial::client_value(), ToAdd::[client_value()], ToRemove::[client_value()]) -> true | no_return().
 prop_tlog_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
@@ -605,7 +605,7 @@ prop_tlog_add_del_on_list(Key, Initial, ToAdd, ToRemove) ->
     prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, Initial, true, ToAdd, ToRemove).
 
 tester_tlog_add_del_on_list(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_del_on_list, 4, 10000).
+    tester:test(?MODULE, prop_tlog_add_del_on_list, 4, 5000).
 
 -spec prop_tlog_add_del_on_list_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
 prop_tlog_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
@@ -613,7 +613,7 @@ prop_tlog_add_del_on_list_maybe_invalid(Key, Initial, ToAdd, ToRemove) ->
     prop_tlog_add_del_on_list2(api_tx:new_tlog(), Key, Initial, true, ToAdd, ToRemove).
 
 tester_tlog_add_del_on_list_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_del_on_list_maybe_invalid, 4, 10000).
+    tester:test(?MODULE, prop_tlog_add_del_on_list_maybe_invalid, 4, 5000).
 
 -spec prop_tlog_add_on_nr2(TLog::tx_tlog:tlog(), Key::client_key(), Existing::boolean(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
 prop_tlog_add_on_nr2(TLog0, Key, Existing, Initial, ToAdd) ->
@@ -654,7 +654,7 @@ prop_tlog_add_on_nr_not_existing(Key, ToAdd) ->
     prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, Existing, OldValue, ToAdd).
 
 tester_tlog_add_on_nr_not_existing(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_on_nr_not_existing, 2, 10000).
+    tester:test(?MODULE, prop_tlog_add_on_nr_not_existing, 2, 5000).
 
 -spec prop_tlog_add_on_nr(Key::client_key(), Initial::client_value(), ToAdd::number()) -> true | no_return().
 prop_tlog_add_on_nr(Key, Initial, ToAdd) ->
@@ -662,7 +662,7 @@ prop_tlog_add_on_nr(Key, Initial, ToAdd) ->
     prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, true, Initial, ToAdd).
 
 tester_tlog_add_on_nr(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_on_nr, 3, 10000).
+    tester:test(?MODULE, prop_tlog_add_on_nr, 3, 5000).
 
 -spec prop_tlog_add_on_nr_maybe_invalid(Key::client_key(), Initial::client_value(), ToAdd::client_value()) -> true | no_return().
 prop_tlog_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
@@ -670,4 +670,4 @@ prop_tlog_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
     prop_tlog_add_on_nr2(api_tx:new_tlog(), Key, true, Initial, ToAdd).
 
 tester_tlog_add_on_nr_maybe_invalid(_Config) ->
-    tester:test(?MODULE, prop_tlog_add_on_nr_maybe_invalid, 3, 10000).
+    tester:test(?MODULE, prop_tlog_add_on_nr_maybe_invalid, 3, 5000).
