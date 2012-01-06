@@ -677,12 +677,7 @@ public class TransactionTest {
 
             // now try to read the data:
             for (int i = 0; i < (testData.length - 1); i += 2) {
-                try {
-                    t.read(testTime + key + i).stringListValue();
-                    // an UnknownException must be thrown
-                    assertTrue(false);
-                } catch (final UnknownException e) {
-                }
+                t.read(testTime + key + i).stringListValue();
             }
 
             // try to read the data with another transaction (verify old value is read):
@@ -837,12 +832,7 @@ public class TransactionTest {
             }
 
             // now try to read the data:
-            try {
-                t.read(testTime + key).stringListValue();
-                // an UnknownException must be thrown
-                assertTrue(false);
-            } catch (final UnknownException e) {
-            }
+            t.read(testTime + key).stringListValue();
 
             // try to read the data with another transaction (verify old value is read):
             do {
@@ -1027,12 +1017,7 @@ public class TransactionTest {
 
             // now try to read the data:
             for (int i = 0; i < (testData.length - 1); i += 2) {
-                try {
-                    t.read(testTime + key + i).stringValue();
-                    // an UnknownException must be thrown
-                    assertTrue(false);
-                } catch (final UnknownException e) {
-                }
+                t.read(testTime + key + i).stringValue();
             }
 
             // try to read the data with another transaction (verify old value is read):
@@ -1167,12 +1152,7 @@ public class TransactionTest {
             }
 
             // now try to read the data:
-            try {
-                t.read(testTime + key).stringListValue();
-                // an UnknownException must be thrown
-                assertTrue(false);
-            } catch (final UnknownException e) {
-            }
+            t.read(testTime + key).stringValue();
 
             // try to read the data with another transaction (verify old value is read):
             do {
