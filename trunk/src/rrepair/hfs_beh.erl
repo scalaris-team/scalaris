@@ -29,14 +29,14 @@
 -callback new(integer()) -> hfs().
 -callback new([function()], integer()) -> hfs().
 -callback apply_val(hfs(), itemKey()) -> [integer()].
--callback hfs_size(hfs()) -> integer().
+-callback size(hfs()) -> integer().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
      {new, 1}, {new, 2}, 
      {apply_val, 2},
-     {hfs_size, 1}
+     {size, 1}
     ];
 behaviour_info(_Other) ->
     undefined.
