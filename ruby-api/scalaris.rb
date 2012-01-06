@@ -66,7 +66,7 @@ module Scalaris
   else
     DEFAULT_URL = 'http://localhost:8000'
   end
-      
+  
   # socket timeout in seconds
   DEFAULT_TIMEOUT = 5
   # path to the json rpc page
@@ -115,6 +115,18 @@ module Scalaris
     include InternalScalarisSimpleError
   end
 
+  # Exception that is thrown if a add_del_on_list operation on a scalaris ring
+  # fails because the participating values are not lists.
+  class NotAListError < ScalarisError
+    include InternalScalarisSimpleError
+  end
+
+  # Exception that is thrown if a add_del_on_list operation on a scalaris ring
+  # fails because the participating values are not numbers.
+  class NotANumberError < ScalarisError
+    include InternalScalarisSimpleError
+  end
+
   # Exception that is thrown if a read or write operation on a Scalaris ring
   # fails due to a timeout.
   class TimeoutError < ScalarisError
@@ -144,9 +156,9 @@ module Scalaris
     # Creates a JSON connection to the given URL using the given TCP timeout
     def initialize(url = DEFAULT_URL, timeout = DEFAULT_TIMEOUT)
       begin
-      @uri = URI.parse(url)
-      @timeout = timeout
-      start
+        @uri = URI.parse(url)
+        @timeout = timeout
+        start
       rescue Exception => error
         raise ConnectionError.new(error)
       end
@@ -185,7 +197,7 @@ module Scalaris
         raise ConnectionError.new(error)
       end
     end
-  
+    
     # Encodes the value to the form required by the Scalaris JSON API
     def self.encode_value(value, binary = false)
       if binary
@@ -194,7 +206,7 @@ module Scalaris
         return { :type => :as_is, :value => value }
       end
     end
-  
+    
     # Decodes the value from the Scalaris JSON API form to a native type
     def self.decode_value(value)
       if not (value.has_key?('type') and value.has_key?('value'))
@@ -204,6 +216,17 @@ module Scalaris
         return Base64.decode64(value['value'])
       else
         return value['value']
+      end
+    end
+
+    # Processes the result of some Scalaris operation and raises a
+    # TimeoutError if found.
+    #
+    # result: {'status': 'ok'} or
+    #         {'status': 'fail', 'reason': 'timeout'}
+    def self.check_fail_abort(result)
+      if result == {:status => 'fail', :reason => 'timeout'}
+        raise TimeoutError.new(result)
       end
     end
 
@@ -264,11 +287,55 @@ module Scalaris
       raise UnknownError.new(result)
     end
 
+    # Processes the result of a add_del_on_list operation.
+    # Raises the appropriate exception if the operation failed.
+    #
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'not_a_list'}
+    def self.process_result_add_del_on_list(result)
+      if result.is_a?(Hash) and result.has_key?('status')
+        if result == {'status' => 'ok'}
+          return nil
+        elsif result['status'] == 'fail' and result.has_key?('reason')
+          if result.length == 2
+            if result['reason'] == 'timeout'
+              raise TimeoutError.new(result)
+            elsif result['reason'] == 'not_a_list'
+              raise NotAListError.new(result)
+            end
+          end
+        end
+      end
+      raise UnknownError.new(result)
+    end
+
+    # Processes the result of a add_on_nr operation.
+    # Raises the appropriate exception if the operation failed.
+    #
+    # results: {'status': 'ok'} or
+    #          {'status': 'fail', 'reason': 'timeout' or 'not_a_number'}
+    def self.process_result_add_on_nr(result)
+      if result.is_a?(Hash) and result.has_key?('status')
+        if result == {'status' => 'ok'}
+          return nil
+        elsif result['status'] == 'fail' and result.has_key?('reason')
+          if result.length == 2
+            if result['reason'] == 'timeout'
+              raise TimeoutError.new(result)
+            elsif result['reason'] == 'not_a_number'
+              raise NotANumberError.new(result)
+            end
+          end
+        end
+      end
+      raise UnknownError.new(result)
+    end
+
     # Processes the result of a test_and_set operation.
     # Raises the appropriate exception if the operation failed.
     # 
     # results: {'status' => 'ok'} or
-    #          {'status' => 'fail', 'reason' => 'timeout' or 'abort' or 'not_found'} or
+    #          {'status' => 'fail', 'reason' => 'timeout' or 'not_found'} or
     #          {'status' => 'fail', 'reason' => 'key_changed', 'value': xxx}
     def self.process_result_test_and_set(result)
       if result.is_a?(Hash) and result.has_key?('status')
@@ -278,8 +345,6 @@ module Scalaris
           if result.length == 2
             if result['reason'] == 'timeout'
               raise TimeoutError.new(result)
-            elsif result['reason'] == 'abort'
-              raise AbortError.new(result)
             elsif result['reason'] == 'not_found'
               raise NotFoundError.new(result)
             end
@@ -379,11 +444,11 @@ module Scalaris
       if result.is_a?(Array)
         for element in result
           if element == 'ok':
-            ok += 1
+              ok += 1
           elsif element == 'locks_set':
-            locks_set += 1
+              locks_set += 1
           elsif element == 'undef':
-            undefined += 1
+              undefined += 1
           else
             raise UnknownError.new(:'Unknown reason ' + element + :'in ' + result)
           end
@@ -402,8 +467,8 @@ module Scalaris
     #                       {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}]}
     def self.process_result_req_list_t(result)
       if (not result.has_key?('tlog')) or (not result.has_key?('results')) or
-        (not result['results'].is_a?(Array))
-          raise UnknownError.new(result)
+          (not result['results'].is_a?(Array))
+        raise UnknownError.new(result)
       end
       {:tlog => result['tlog'], :result => result['results']}
     end
@@ -466,7 +531,7 @@ module Scalaris
     # Request lists can be created using new_req_list().
     # The returned list has the following form:
     # [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or
-      # {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
+    # {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}].
     # Elements of this list can be processed with process_result_read() and
     # process_result_write().
     def req_list(reqlist)
@@ -491,9 +556,37 @@ module Scalaris
     # operation.
     def process_result_write(result)
       # note: we need to process a commit result as the write has been committed
+      @conn.class.check_fail_abort(result)
       @conn.class.process_result_commit(result)
     end
     
+    # Processes a result element from the list returned by req_list() which
+    # originated from a add_del_on_list operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_add_del_on_list(result)
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_add_del_on_list(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a add_on_nr operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_add_on_nr(result)
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_add_on_nr(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a test_and_set operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_test_and_set(result)
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_test_and_set(result)
+    end
+
     # Read the value at key.
     # Beware: lists of (small) integers may be (falsely) returned as a string -
     # use str_to_list() to convert such strings.
@@ -506,7 +599,34 @@ module Scalaris
     def write(key, value, binary = false)
       value = @conn.class.encode_value(value, binary)
       result = @conn.call(:write, [key, value])
+      @conn.class.check_fail_abort(result)
       @conn.class.process_result_commit(result)
+    end
+
+    # Changes the list stored at the given key, i.e. first adds all items in
+    # to_add then removes all items in to_remove.
+    # Both, to_add and to_remove, must be lists.
+    # Assumes en empty list if no value exists at key.
+    def add_del_on_list(key, to_add, to_remove)
+      result = @conn.call(:add_del_on_list, [key, to_add, to_remove])
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_add_del_on_list(result)
+    end
+
+    # Changes the number stored at the given key, i.e. adds some value.
+    # Assumes 0 if no value exists at key.
+    def add_on_nr(key, to_add)
+      result = @conn.call(:add_on_nr, [key, to_add])
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_add_on_nr(result)
+    end
+
+    # Atomic test and set, i.e. if the old value at key is old_value, then
+    # write new_value.
+    def test_and_set(key, old_value, new_value)
+      result = @conn.call(:test_and_set, [key, old_value, new_value])
+      @conn.class.check_fail_abort(result)
+      @conn.class.process_result_test_and_set(result)
     end
 
     # Atomic test and set, i.e. if the old value at key is oldvalue, then
@@ -515,6 +635,7 @@ module Scalaris
       oldvalue = @conn.class.encode_value(oldvalue)
       newvalue = @conn.class.encode_value(newvalue)
       result = @conn.call(:test_and_set, [key, oldvalue, newvalue])
+      @conn.class.check_fail_abort(result)
       @conn.class.process_result_test_and_set(result)
     end
 
@@ -576,6 +697,30 @@ module Scalaris
     def process_result_write(result)
       @conn.class.process_result_write(result)
     end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a add_del_on_list operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_add_del_on_list(result)
+      @conn.class.process_result_add_del_on_list(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a add_on_nr operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_add_on_nr(result)
+      @conn.class.process_result_add_on_nr(result)
+    end
+
+    # Processes a result element from the list returned by req_list() which
+    # originated from a test_and_set operation.
+    # Raises the appropriate exceptions if a failure occurred during the
+    # operation.
+    def process_result_test_and_set(result)
+      @conn.class.process_result_test_and_set(result)
+    end
     
     # Processes a result element from the list returned by req_list() which
     # originated from a commit operation.
@@ -616,7 +761,36 @@ module Scalaris
       result = req_list(new_req_list().add_write(key, value, binary))[0]
       _process_result_commit(result)
     end
-    
+
+    # Issues a add_del_on_list operation to scalaris and adds it to the
+    # current transaction.
+    # Changes the list stored at the given key, i.e. first adds all items in
+    # to_add then removes all items in to_remove.
+    # Both, to_add and to_remove, must be lists.
+    # Assumes en empty list if no value exists at key.
+    def add_del_on_list(key, to_add, to_remove)
+      result = req_list(new_req_list().add_add_del_on_list(key, to_add, to_remove))[0]
+      _process_result_add_del_on_list(result)
+    end
+
+    # Issues a add_on_nr operation to scalaris and adds it to the
+    # current transaction.
+    # Changes the number stored at the given key, i.e. adds some value.
+    # Assumes 0 if no value exists at key.
+    def add_on_nr(key, to_add)
+      result = req_list(new_req_list().add_add_on_nr(key, to_add))[0]
+      _process_result_add_on_nr(result)
+    end
+
+    # Issues a test_and_set operation to scalaris and adds it to the
+    # current transaction.
+    # Atomic test and set, i.e. if the old value at key is old_value, then
+    # write new_value.
+    def test_and_set(key, old_value, new_value)
+      result = req_list(new_req_list().add_test_and_set(key, old_value, new_value))[0]
+      _process_result_test_and_set(result)
+    end
+
     include InternalScalarisNopClose
   end
 
@@ -634,7 +808,7 @@ module Scalaris
     # Adds a read operation to the request list.
     def add_read(key)
       if (@is_commit):
-        raise RuntimeError.new('No further request supported after a commit!')
+          raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'read' => key}
       self
@@ -643,16 +817,45 @@ module Scalaris
     # Adds a write operation to the request list.
     def add_write(key, value, binary = false)
       if (@is_commit):
-        raise RuntimeError.new('No further request supported after a commit!')
+          raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'write' => {key => JSONConnection.encode_value(value, binary)}}
       self
     end
-    
+
+    # Adds a add_del_on_list operation to the request list.
+    def add_add_del_on_list(key, to_add, to_remove)
+      if (@is_commit):
+          raise RuntimeError.new('No further request supported after a commit!')
+      end
+      @requests << {'add_del_on_list' => {'key' => key, 'add' => to_add, 'del'=> to_remove}}
+      self
+    end
+
+    # Adds a add_on_nr operation to the request list.
+    def add_add_on_nr(key, to_add)
+      if (@is_commit):
+          raise RuntimeError.new('No further request supported after a commit!')
+      end
+      @requests << {'add_on_nr' => {key => to_add}}
+      self
+    end
+
+    # Adds a test_and_set operation to the request list.
+    def add_test_and_set(key, old_value, new_value)
+      if (@is_commit):
+          raise RuntimeError.new('No further request supported after a commit!')
+      end
+      @requests << {'test_and_set' => {'key' => key,
+          'old' => JSONConnection.encode_value(old_value, false),
+          'new' => JSONConnection.encode_value(new_value, false)}}
+      self
+    end
+
     # Adds a commit operation to the request list.
     def add_commit
       if (@is_commit):
-        raise RuntimeError.new('Only one commit per request list allowed!')
+          raise RuntimeError.new('Only one commit per request list allowed!')
       end
       @requests << {'commit' => ''}
       @is_commit = true
