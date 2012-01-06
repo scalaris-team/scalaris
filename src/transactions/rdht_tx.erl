@@ -441,8 +441,8 @@ tlog_test_and_set(Entry, Key, Old, New) ->
         {ok, Old} ->
             tlog_write(Entry, Key, encode_value(New));
         {ok, RealOldValue} ->
-            Error = {fail, {key_changed, RealOldValue}},
-            {tx_tlog:set_entry_status(Entry, Error), Error};
+            {tx_tlog:set_entry_status(Entry, {fail, key_changed}),
+             {fail, {key_changed, RealOldValue}}};
         X when erlang:is_tuple(X) -> %% other previous error
             {Entry, X}
     end.
