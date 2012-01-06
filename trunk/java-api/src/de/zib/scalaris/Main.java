@@ -253,6 +253,9 @@ public class Main {
 //        if (line.hasOption("help")) {
             final HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("scalaris [Options]", getOptions());
+            if (!line.hasOption("help")) {
+                System.exit(1);
+            }
         }
     }
 
