@@ -115,9 +115,9 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
             rl_chk_and_encode(RL, [{rdht_tx_write, Key,
                                     encode_value(Value)} | Acc],
                               OKorAbort);
-        {commit} ->
+        {commit} = Commit ->
             log:log(warn, "Commit not at end of a req_list. Deciding abort."),
-            rl_chk_and_encode(RL, [{commit} | Acc], abort);
+            rl_chk_and_encode(RL, [Commit | Acc], abort);
         Op ->
             rl_chk_and_encode(RL, [Op | Acc], OKorAbort)
     end.
@@ -297,11 +297,11 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
-            {rdht_tx_read, Key}         -> tlog_read(Entry, Key);
-            {rdht_tx_write, Key, Value} -> tlog_write(Entry, Key, Value);
+            {rdht_tx_read, Key}           -> tlog_read(Entry, Key);
+            {rdht_tx_write, Key, Value}   -> tlog_write(Entry, Key, Value);
             %% non-native functions:
             {add_del_on_list, Key, ToAdd, ToDel} -> tlog_add_del_on_list(Entry, Key, ToAdd, ToDel);
-            {add_on_nr, Key, X}          -> tlog_add_on_nr(Entry, Key, X);
+            {add_on_nr, Key, X}           -> tlog_add_on_nr(Entry, Key, X);
             {test_and_set, Key, Old, New} -> tlog_test_and_set(Entry, Key, Old, New)
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
@@ -342,8 +342,8 @@ tlog_write(Entry, _Key, Value) ->
             NewEntryAndResult(Entry, Value);
         {fail, not_a_number} ->
             NewEntryAndResult(Entry, Value);
-        {fail, Reason} ->
-            {Entry, {fail, Reason}};
+        {fail, _Reason} = Failed ->
+            {Entry, Failed};
         value ->
             NewEntryAndResult(Entry, Value);
         not_found ->
@@ -351,6 +351,18 @@ tlog_write(Entry, _Key, Value) ->
             E2 = tx_tlog:set_entry_value(E1, Value),
             E3 = tx_tlog:set_entry_status(E2, value),
             {E3, {ok}}
+    end.
+
+%% @doc For 2-Phase operations like add_del_on_list and add_on_nr, we need to
+%%      keep any previous error in the tlog status and do not overwrite it with
+%%      the new one. If there is no error yet, set it to the given one.
+-spec update_tlog_entry_2phase_op(Entry::tx_tlog:tlog_entry(), Error::{fail, atom()})
+        -> tx_tlog:tlog_entry().
+update_tlog_entry_2phase_op(Entry, Error) ->
+    case tx_tlog:get_entry_status(Entry) of
+        {fail, _} -> Entry;
+        not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
+        _         -> tx_tlog:set_entry_status(Entry, Error)
     end.
 
 %% @doc Simulate a change on a set via read and write requests.
@@ -363,12 +375,7 @@ tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel) when
       (not erlang:is_list(ToDel)) ->
     %% input type error
     Error = {fail, not_a_list},
-    NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
-                       {fail, _} -> Entry;
-                       not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
-                       _ -> tx_tlog:set_entry_status(Entry, Error)
-                   end,
-    {NewTlogEntry, Error};
+    {update_tlog_entry_2phase_op(Entry, Error), Error};
 tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
@@ -386,12 +393,7 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
             tlog_write(Entry, Key, encode_value(NewValue2));
         {ok, _} -> %% value is not a list
             Error = {fail, not_a_list},
-            NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
-                               {fail, _} -> Entry;
-                               not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
-                               _ -> tx_tlog:set_entry_status(Entry, Error)
-                           end,
-            {NewTlogEntry, Error};
+            {update_tlog_entry_2phase_op(Entry, Error), Error};
         X when erlang:is_tuple(X) -> %% other previous error
             {Entry, X}
     end.
@@ -399,15 +401,9 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
 -spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
                       client_value()) ->
                              {tx_tlog:tlog_entry(), result_entry_write()}.
-tlog_add_on_nr(Entry, _Key, X)
-  when (not erlang:is_number(X)) ->
+tlog_add_on_nr(Entry, _Key, X) when (not erlang:is_number(X)) ->
     Error = {fail, not_a_number},
-    NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
-                       {fail, _} -> Entry;
-                       not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
-                       _ -> tx_tlog:set_entry_status(Entry, Error)
-                   end,
-    {NewTlogEntry, Error};
+    {update_tlog_entry_2phase_op(Entry, Error), Error};
 tlog_add_on_nr(Entry, Key, X) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
@@ -423,12 +419,7 @@ tlog_add_on_nr(Entry, Key, X) ->
             tlog_write(Entry, Key, X);
         {ok, _} ->
             Error = {fail, not_a_number},
-            NewTlogEntry = case tx_tlog:get_entry_status(Entry) of
-                               {fail, _} -> Entry;
-                               not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
-                               _ -> tx_tlog:set_entry_status(Entry, Error)
-                           end,
-            {NewTlogEntry, Error};
+            {update_tlog_entry_2phase_op(Entry, Error), Error};
         E when erlang:is_tuple(E) -> %% other previous error
             {Entry, E}
     end.
