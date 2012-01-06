@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
@@ -293,6 +294,53 @@ public class Main {
             // print help if no other option was given
 //        if (line.hasOption("help")) {
             final HelpFormatter formatter = new HelpFormatter();
+            formatter.setOptionComparator(new Comparator<Option>() {
+                private int optionToInt(final Option option) {
+                    if (option.getLongOpt().equals("help")) {
+                        return 1;
+                    } else if (option.getLongOpt().equals("verbose")) {
+                        return 2;
+                    } else if (option.getLongOpt().equals("localhost")) {
+                        return 3;
+                    } else if (option.getLongOpt().equals("minibench")) {
+                        return 4;
+                    } else if (option.getLongOpt().equals("read")) {
+                        return 5;
+                    } else if (option.getLongOpt().equals("write")) {
+                        return 6;
+                    } else if (option.getLongOpt().equals("test-and-set")) {
+                        return 7;
+                    } else if (option.getLongOpt().equals("add-del-on-list")) {
+                        return 8;
+                    } else if (option.getLongOpt().equals("add-on-nr")) {
+                        return 9;
+                    } else if (option.getLongOpt().equals("delete")) {
+                        return 10;
+                    } else if (option.getLongOpt().equals("publish")) {
+                        return 11;
+                    } else if (option.getLongOpt().equals("subscribe")) {
+                        return 12;
+                    } else if (option.getLongOpt().equals("unsubscribe")) {
+                        return 13;
+                    } else if (option.getLongOpt().equals("getsubscribers")) {
+                        return 14;
+                    } else {
+                        return 0;
+                    }
+                }
+
+                public int compare(final Option arg0, final Option arg1) {
+                    final int arg0_i = optionToInt(arg0);
+                    final int arg1_i = optionToInt(arg1);
+                    if (arg0_i < arg1_i) {
+                        return -1;
+                    } else if (arg0_i == arg1_i) {
+                        return 0;
+                    } else {
+                        return 1;
+                    }
+                }
+            });
             formatter.printHelp("scalaris [Options]", getOptions());
             if (!line.hasOption("help")) {
                 System.exit(1);
