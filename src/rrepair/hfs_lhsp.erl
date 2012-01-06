@@ -61,10 +61,16 @@ apply_val_({hfs_lhsp, K, H1, H2}, Val) ->
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
+-spec apply_val_(hfs_t(), pos_integer(), itemKey()) -> [integer()].
+apply_val_({hfs_lhsp, K, H1, H2}, I, Val) when I =< K-> 
+    ValBin = term_to_binary(Val),
+    HV1 = hash_value(ValBin, H1),
+    HV2 = hash_value(ValBin, H2),
+    HV1 + (I - 1) * HV2.   
+
 % @doc Returns number of hash functions in the container
--spec hfs_size_(hfs_t()) -> integer().
-hfs_size_(Hfs) -> 
-    {hfs_lhsp, K, _, _} = Hfs,
+-spec size_(hfs_t()) -> integer().
+size_({hfs_lhsp, K, _, _}) -> 
     K.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

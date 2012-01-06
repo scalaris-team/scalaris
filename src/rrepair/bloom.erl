@@ -147,7 +147,7 @@ print_(Bloom) ->
            hfs = Hfs,
            items_count = NumItems
           } = Bloom,
-    HCount = apply(element(1, Hfs), hfs_size, [Hfs]),
+    HCount = apply(element(1, Hfs), size, [Hfs]),
     [{filter_bit_size, Size},
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
      {hash_fun_num, HCount},

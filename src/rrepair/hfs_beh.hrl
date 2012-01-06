@@ -18,8 +18,8 @@
 %% @version $Id$
 
 % export
--export([new/1, new/2, apply_val/2]).
--export([hfs_size/1]).
+-export([new/1, new/2, apply_val/2, apply_val/3]).
+-export([size/1]).
 
 % types
 -type itemKey() :: any().
@@ -38,7 +38,12 @@ new(HashFunList, HashFunCount) -> new_(HashFunList, HashFunCount).
 new(HFCount) -> new_(HFCount).
 
 -spec apply_val(hfs(), itemKey()) -> [integer()].
-apply_val(Hfsc, Item) -> apply_val_(Hfsc, Item).
+apply_val(Hfs, Item) -> apply_val_(Hfs, Item).
 
--spec hfs_size(hfs()) -> integer().
-hfs_size(Hfsc) -> hfs_size_(Hfsc).
+% @doc apply Item on hash function I of function set Hfs; I = 1..hfs_size
+-spec apply_val(hfs(), pos_integer(), itemKey()) -> [integer()].
+apply_val(Hfs, I, Item) -> apply_val_(Hfs, I, Item).
+
+% @doc retruns numer ob hash functions in the set
+-spec size(hfs()) -> integer().
+size(Hfsc) -> size_(Hfsc).
