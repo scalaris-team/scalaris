@@ -172,3 +172,5 @@ if __name__ == "__main__":
         print ' -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)'
         print '                                      [1|...|9|all] (default: all'
         print '                                      benchmarks, 100 test runs)'
+        if len(sys.argv) == 1 or (len(sys.argv) >= 2 and sys.argv[1] in ["--help", "-h"]):
+            sys.exit(1)
