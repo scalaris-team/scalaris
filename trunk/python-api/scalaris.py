@@ -952,7 +952,7 @@ class _JSONReqList(object):
         """
         if (self._is_commit):
             raise RuntimeError("No further request supported after a commit!")
-        self._requests.append({'add_del_on_list': {'key': key, 'old': old_value, 'new': new_value}})
+        self._requests.append({'test_and_set': {'key': key, 'old': old_value, 'new': new_value}})
         return self
     
     def add_commit(self):
