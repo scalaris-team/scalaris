@@ -74,21 +74,21 @@ optparse = OptionParser.new do |opts|
   end
 
   options[:test_and_set] = nil
-  opts.on('--test-and-set KEY,OLDVALUE,NEWVALUE', Array, 'write key KEY to NEWVALUE if the old value was OLDVALUE' ) do |list|
+  opts.on('--test-and-set KEY,OLDVALUE,NEWVALUE', Array, 'write key KEY to NEWVALUE if the current value is OLDVALUE' ) do |list|
     raise OptionParser::InvalidOption.new(list) unless list.size == 3
     options[:test_and_set] = list
     options[:help] = false
   end
 
   options[:add_del_on_list] = nil
-  opts.on('--add-del-on-list KEY,TOADD,TOREMOVE', Array, 'add and remove elements from the value of key KEY' ) do |list|
+  opts.on('--add-del-on-list KEY,TOADD,TOREMOVE', Array, 'add and remove elements from the value at key KEY' ) do |list|
     raise OptionParser::InvalidOption.new(list) unless list.size == 3
     options[:add_del_on_list] = list
     options[:help] = false
   end
 
   options[:add_on_nr] = nil
-  opts.on('--add-on-nr KEY,VALUE', Array, 'add VALUE to the value of key KEY' ) do |list|
+  opts.on('--add-on-nr KEY,VALUE', Array, 'add VALUE to the value at key KEY' ) do |list|
     raise OptionParser::InvalidOption.new(list) unless list.size == 2
     options[:add_on_nr] = list
     options[:help] = false

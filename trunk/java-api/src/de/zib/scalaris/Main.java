@@ -41,27 +41,45 @@ public class Main {
      *
      * <pre>
      * <code>
-     * > java -jar scalaris.jar -help
+     * > java -jar scalaris.jar --help
      * usage: scalaris [Options]
-     *  -h,--help                        print this message
-     *  -v,--verbose                     print verbose information, e.g. the
-     *                                   properties read
-     *  -lh,--localhost                  gets the local host's name as known to
-     *                                   Java (for debugging purposes)
-     *  -b,--minibench                   run mini benchmark
-     *  -r,--read <key>                  read an item
-     *  -w,--write <key> <value>         write an item
-     *  -d,--delete <key> <[timeout]>    delete an item (default timeout: 2000ms)
-     *                                   WARNING: This function can lead to
-     *                                   inconsistent data (e.g. deleted items
-     *                                   can re-appear). Also when re-creating an
-     *                                   item the version before the delete can
-     *                                   re-appear.
-     *  -p,--publish <topic> <message>   publish a new message for the given
-     *                                   topic
-     *  -s,--subscribe <topic> <url>     subscribe to a topic
-     *  -g,--getsubscribers <topic>      get subscribers of a topic
-     *  -u,--unsubscribe <topic> <url>   unsubscribe from a topic
+     *  -h,--help                                         print this message
+     *  -v,--verbose                                      print verbose
+     *                                                    information, e.g. the
+     *                                                    properties read
+     *  -lh,--localhost                                   gets the local host's
+     *                                                    name as known to Java
+     *                                                    (for debugging
+     *                                                    purposes)
+     *  -b,--minibench <[runs]> <[benchmarks]>            run selected mini
+     *                                                    benchmark(s)
+     *                                                    [1|...|9|all] (default:
+     *                                                    all benchmarks, 100
+     *                                                    test runs)
+     *  -r,--read <key>                                   read an item
+     *  -w,--write <key> <value>                          write an item
+     *     --test-and-set <key> <old_value> <new_value>   atomic test and set,
+     *                                                    i.e. write <key> to
+     *                                                    <new_value> if the
+     *                                                    current value is
+     *                                                    <old_value>
+     *  -d,--delete <key> <[timeout]>                     delete an item (default
+     *                                                    timeout: 2000ms)
+     *                                                    WARNING: This function
+     *                                                    can lead to
+     *                                                    inconsistent data (e.g.
+     *                                                    deleted items can
+     *                                                    re-appear). Also when
+     *                                                    re-creating an item the
+     *                                                    version before the
+     *                                                    delete can re-appear.
+     *  -p,--publish <topic> <message>                    publish a new message
+     *                                                    for the given topic
+     *  -s,--subscribe <topic> <url>                      subscribe to a topic
+     *  -u,--unsubscribe <topic> <url>                    unsubscribe from a
+     *                                                    topic
+     *  -g,--getsubscribers <topic>                       get subscribers of a
+     *                                                    topic
      * </code>
      * </pre>
      *
@@ -145,6 +163,29 @@ public class Main {
                 printException("write failed with abort", e, verbose);
             } catch (final UnknownException e) {
                 printException("write failed with unknown", e, verbose);
+            }
+        } else if (line.hasOption("test-and-set")) { // test_and_set
+            final String[] optionValues = line.getOptionValues("test-and-set");
+            checkArguments(optionValues, 3, options, "test-and-set");
+            final String key = optionValues[0];
+            final String oldValue = optionValues[1];
+            final String newValue = optionValues[2];
+            try {
+                final TransactionSingleOp sc = new TransactionSingleOp();
+                sc.testAndSet(key, oldValue, newValue);
+                System.out.println("testAndSet(" + key + ", " + oldValue + ", " + newValue + "): ok");
+            } catch (final ConnectionException e) {
+                printException("testAndSet failed with connection error", e, verbose);
+            } catch (final TimeoutException e) {
+                printException("testAndSet failed with timeout", e, verbose);
+            } catch (final AbortException e) {
+                printException("testAndSet failed with abort", e, verbose);
+            } catch (final UnknownException e) {
+                printException("testAndSet failed with unknown", e, verbose);
+            } catch (final NotFoundException e) {
+                printException("testAndSet failed with not found", e, verbose);
+            } catch (final KeyChangedException e) {
+                printException("testAndSet failed with key changed (current value: " + e.getOldValue().toString() + ")", e, verbose);
             }
         } else if (line.hasOption("p")) { // publish
             final String[] optionValues = line.getOptionValues("publish");
@@ -289,6 +330,14 @@ public class Main {
         write.setOptionalArg(true);
         group.addOption(write);
 
+        final Option test_and_set = new Option(null, "test-and-set", true,
+                "atomic test and set, i.e. write <key> to " +
+                "<new_value> if the current value is <old_value>");
+        test_and_set.setArgName("key> <old_value> <new_value");
+        test_and_set.setArgs(3);
+        test_and_set.setOptionalArg(true);
+        group.addOption(test_and_set);
+
         final Option publish = new Option("p", "publish", true, "publish a new message for the given topic");
         publish.setArgName("topic> <message");
         publish.setArgs(2);
@@ -324,7 +373,7 @@ public class Main {
         group.addOption(delete);
 
         final Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
-        bench.setArgName("runs> <benchmarks");
+        bench.setArgName("[runs]> <[benchmarks]");
         bench.setArgs(10);
         bench.setOptionalArg(true);
         group.addOption(bench);
@@ -406,6 +455,18 @@ public class Main {
      */
     final static void printException(final String description, final AbortException e, final boolean verbose) {
         printException(description, e, verbose, 7);
+    }
+
+    /**
+     * Prints the given exception with the given description and terminates the
+     * JVM.
+     *
+     * @param description  will be prepended to the error message
+     * @param e            the exception to print
+     * @param verbose      specifies whether to include the stack trace or not
+     */
+    final static void printException(final String description, final KeyChangedException e, final boolean verbose) {
+        printException(description, e, verbose, 8);
     }
 
     /**

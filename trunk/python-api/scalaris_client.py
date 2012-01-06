@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 from scalaris import TransactionSingleOp, ReplicatedDHT, PubSub
-from scalaris import ConnectionError, TimeoutError, NotFoundError, AbortError, UnknownError
+from scalaris import ConnectionError, TimeoutError, NotFoundError, AbortError, KeyChangedError, UnknownError
 import scalaris_bench
 import sys
 
@@ -55,6 +55,29 @@ if __name__ == "__main__":
             sys.exit(1)
         except UnknownError as instance:
             print 'write(' + key + ', ' + value + ') failed with unknown: ' + str(instance)
+            sys.exit(1)
+    elif (len(sys.argv) == 5 and sys.argv[1] == "--test-and-set"):
+        sc = TransactionSingleOp()
+        key = sys.argv[2]
+        old_value = sys.argv[3]
+        new_value = sys.argv[4]
+        try:
+            sc.test_and_set(key, old_value, new_value)
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + '): ok'
+        except ConnectionError as instance:
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + ') failed with connection error'
+            sys.exit(1)
+        except TimeoutError as instance:
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + ') failed with timeout'
+            sys.exit(1)
+        except AbortError as instance:
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + ') failed with abort'
+            sys.exit(1)
+        except KeyChangedError as instance:
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + ') failed with key_change (current old value: ' + instance.old_value + ')'
+            sys.exit(1)
+        except UnknownError as instance:
+            print 'test_and_set(' + key + ', ' + old_value + ', ' + new_value + ') failed with unknown: ' + str(instance)
             sys.exit(1)
     elif (len(sys.argv) == 3 and sys.argv[1] in ["--delete", "-d"]):
         rdht = ReplicatedDHT()
@@ -154,23 +177,32 @@ if __name__ == "__main__":
             scalaris_bench.minibench(testruns, benchmarks)
     else:
         print 'usage: ' + sys.argv[0] + ' [Options]'
-        print ' -r,--read <key>                      read an item'
-        print ' -w,--write <key> <value>             write an item'
-        print ' -d,--delete <key> [<timeout>]        delete an item (default timeout:'
-        print '                                      2000ms)'
-        print '                                      WARNING: This function can lead to'
-        print '                                      inconsistent data (e.g. deleted'
-        print '                                      items can re-appear). Also when'
-        print '                                      re-creating an item the version'
-        print '                                      before the delete can re-appear.'
-        print ' -p,--publish <topic> <message>       publish a new message for the given'
-        print '                                      topic'
-        print ' -s,--subscribe <topic> <url>         subscribe to a topic'
-        print ' -g,--getsubscribers <topic>          get subscribers of a topic'
-        print ' -u,--unsubscribe <topic> <url>       unsubscribe from a topic'
-        print ' -h,--help                            print this message'
-        print ' -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)'
-        print '                                      [1|...|9|all] (default: all'
-        print '                                      benchmarks, 100 test runs)'
+        print ' -r,--read <key>'
+        print '                            read an item'
+        print ' -w,--write <key> <value>'
+        print '                            write an item'
+        print ' --test-and-set <key> <old_value> <new_value>'
+        print '                            atomic test and set, i.e. write <key> to'
+        print '                            <new_value> if the current value is <old_value>'
+        print ' -d,--delete <key> [<timeout>]'
+        print '                            delete an item (default timeout: 2000ms)'
+        print '                            WARNING: This function can lead to inconsistent'
+        print '                            data (e.g. deleted items can re-appear).'
+        print '                            Also if an item is re-created, the version'
+        print '                            before the delete can re-appear.'
+        print ' -p,--publish <topic> <message>'
+        print '                            publish a new message for the given topic'
+        print ' -s,--subscribe <topic> <url>'
+        print '                            subscribe to a topic'
+        print ' -g,--getsubscribers <topic>'
+        print '                            get subscribers of a topic'
+        print ' -u,--unsubscribe <topic> <url>'
+        print '                            unsubscribe from a topic'
+        print ' -h,--help'
+        print '                            print this message'
+        print ' -b,--minibench [<runs> [<benchmarks>]]'
+        print '                            run selected mini benchmark(s)'
+        print '                            [1|...|9|all] (default: all benchmarks)'
+        print '                            <runs> times (default: 100 test runs)'
         if len(sys.argv) == 1 or (len(sys.argv) >= 2 and sys.argv[1] in ["--help", "-h"]):
             sys.exit(1)
