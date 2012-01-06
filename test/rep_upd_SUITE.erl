@@ -209,7 +209,7 @@ bloomSync_FprCompare_check(Config) ->
     BConf = get_bloom_RepUpd_config(),    
     R1 = start_sync(Config, 4, 1000, 100, 2, 0.2, BConf),
     R2 = start_sync(Config, 4, 1000, 100, 2, 0.1, BConf),
-    ?assert(lists:nth(2, R1) < lists:nth(2, R2)),    
+    ?assert(lists:nth(2, R1) < lists:nth(2, R2) orelse lists:last(R1) < lists:last(R2)),
     ok.
 
 bloomSync_times(Config) ->
