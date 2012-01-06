@@ -314,6 +314,7 @@ tlog_read(Entry, _Key) ->
     Res = case tx_tlog:get_entry_status(Entry) of
               {fail, not_a_list} ->  {ok, tx_tlog:get_entry_value(Entry)};
               {fail, not_a_number} -> {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, key_changed} -> {ok, tx_tlog:get_entry_value(Entry)};
               {fail, _Reason} = R -> R;
               value -> {ok, tx_tlog:get_entry_value(Entry)};
               not_found -> {fail, not_found}
