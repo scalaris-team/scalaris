@@ -57,7 +57,9 @@ all()   -> [new_tlog_0,
             tester_tlog_add_del_on_list_maybe_invalid,
             tester_tlog_add_on_nr_not_existing,
             tester_tlog_add_on_nr,
-            tester_tlog_add_on_nr_maybe_invalid
+            tester_tlog_add_on_nr_maybe_invalid,
+            tester_tlog_test_and_set_not_existing,
+            tester_tlog_test_and_set
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -671,3 +673,46 @@ prop_tlog_add_on_nr_maybe_invalid(Key, Initial, ToAdd) ->
 
 tester_tlog_add_on_nr_maybe_invalid(_Config) ->
     tester:test(?MODULE, prop_tlog_add_on_nr_maybe_invalid, 3, 5000).
+
+-spec prop_tlog_test_and_set2(TLog::tx_tlog:tlog(), Key::client_key(), Existing::boolean(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
+prop_tlog_test_and_set2(TLog0, Key, Existing, RealOldValue, OldValue, NewValue) ->
+    {TLog1, Result1} = api_tx:test_and_set(TLog0, Key, OldValue, NewValue),
+    {TLog2, Result2} = api_tx:read(TLog1, Key),
+    if not Existing ->
+           ?equals(Result1, {fail, not_found}),
+           ?equals(Result2, {fail, not_found}),
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {ok}),
+           ?equals(api_tx:read(Key), {fail, not_found});
+       RealOldValue =:= OldValue ->
+           ?equals(Result1, {ok}),
+           ?equals(Result2, {ok, NewValue}),
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {ok}),
+           ?equals(api_tx:read(Key), Result2);
+       true ->
+           ?equals(Result1, {fail, {key_changed, RealOldValue}}),
+           ?equals(Result2, {ok, RealOldValue}),
+           Result3 = api_tx:commit(TLog2),
+           ?equals(Result3, {fail, abort}),
+           ?equals(api_tx:read(Key), {ok, RealOldValue})
+    end.
+
+-spec prop_tlog_test_and_set_not_existing(Key::client_key(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
+prop_tlog_test_and_set_not_existing(Key, OldValue, NewValue) ->
+    {Existing, RealOldValue} = case api_tx:read(Key) of
+                                   {ok, Value} -> {true, Value};
+                                   _ -> {false, unknown}
+                               end,
+    prop_tlog_test_and_set2(api_tx:new_tlog(), Key, Existing, RealOldValue, OldValue, NewValue).
+
+tester_tlog_test_and_set_not_existing(_Config) ->
+    tester:test(?MODULE, prop_tlog_test_and_set_not_existing, 3, 5000).
+
+-spec prop_tlog_test_and_set(Key::client_key(), RealOldValue::client_value(), OldValue::client_value(), NewValue::client_value()) -> true | no_return().
+prop_tlog_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
+    ?equals(api_tx:write(Key, RealOldValue), {ok}),
+    prop_tlog_test_and_set2(api_tx:new_tlog(), Key, true, RealOldValue, OldValue, NewValue).
+
+tester_tlog_test_and_set(_Config) ->
+    tester:test(?MODULE, prop_tlog_test_and_set, 4, 5000).
