@@ -204,5 +204,5 @@ if __name__ == "__main__":
         print '                            run selected mini benchmark(s)'
         print '                            [1|...|9|all] (default: all benchmarks)'
         print '                            <runs> times (default: 100 test runs)'
-        if len(sys.argv) == 1 or (len(sys.argv) >= 2 and sys.argv[1] in ["--help", "-h"]):
+        if len(sys.argv) == 1 or (len(sys.argv) >= 2 and not sys.argv[1] in ["--help", "-h"]):
             sys.exit(1)
