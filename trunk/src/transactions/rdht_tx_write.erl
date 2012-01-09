@@ -1,4 +1,4 @@
-%% @copyright 2009-2011 Zuse Institute Berlin
+%% @copyright 2009-2012 Zuse Institute Berlin
 %%                 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -190,11 +190,11 @@ update_tlog_entry(TLogEntry, Request) ->
     case Status of
         value ->
             tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
-        not_found ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
-        {fail, timeout} ->
-            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
-                               WriteValue)
+        {fail, not_found} ->
+            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue)
+%        {fail, timeout} ->
+%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
+%                               WriteValue)
     end.
 
 %% @doc Checks whether used config parameters exist and are valid.

@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin
+% @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status() :: {fail, term()} | value | not_found.
+-type tx_status() :: value | {fail, abort | not_found}.
 -type tx_op()     :: rdht_tx_read   | rdht_tx_write.
 
 -type tlog_key() :: client_key() | ?RT:key().
@@ -94,8 +94,10 @@ find_entry_by_key(TLog, Key) ->
 -spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
 entry_is_sane_for_commit(Entry, Acc) ->
     Acc andalso
-        not (is_tuple(get_entry_status(Entry)) andalso
-                 fail =:= element(1, get_entry_status(Entry))).
+        not (is_tuple(get_entry_status(Entry))
+             andalso fail =:= element(1, get_entry_status(Entry))
+             andalso not_found =/= element(2, get_entry_status(Entry))
+            ).
 
 -spec is_sane_for_commit(tlog()) -> boolean().
 is_sane_for_commit(TLog) ->

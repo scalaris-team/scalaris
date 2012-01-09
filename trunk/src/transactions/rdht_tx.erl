@@ -130,7 +130,14 @@ tlog_and_results_to_abort(TLog, ReqList) ->
                                                     req_get_key(X),
                                                     {fail, abort})
                 || X <- ReqList, X =/= {commit} ],
-    {NewTLog, [ {fail, abort} || _ <- ReqList ]}.
+    {NewTLog, [ case element(1, X) of
+                    read -> {fail, not_found};
+                    write -> {ok};
+                    add_del_on_list -> {ok};
+                    add_on_nr -> {ok};
+                    test_and_set -> {fail, abort};
+                    commit -> {fail, abort}
+                end || X <- ReqList ]}.
 
 %% @doc Send requests to the DHT, gather replies and merge TLogs.
 -spec upd_tlog_via_rdht(tx_tlog:tlog(), [request_on_key()]) -> tx_tlog:tlog().
@@ -312,12 +319,10 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
                        {tx_tlog:tlog_entry(), result_entry_read()}.
 tlog_read(Entry, _Key) ->
     Res = case tx_tlog:get_entry_status(Entry) of
-              {fail, not_a_list} ->  {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, not_a_number} -> {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, key_changed} -> {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, _Reason} = R -> R;
               value -> {ok, tx_tlog:get_entry_value(Entry)};
-              not_found -> {fail, not_found}
+              %% try reading from a failed entry (type mismatch was the reason?)
+              {fail, abort} -> {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, not_found} = R -> R %% not_found
           end,
     {Entry, decode_result(Res)}.
 
@@ -338,31 +343,15 @@ tlog_write(Entry, _Key, Value) ->
             end
         end,
     case tx_tlog:get_entry_status(Entry) of
-        {fail, not_a_list} ->
-            NewEntryAndResult(Entry, Value);
-        {fail, not_a_number} ->
-            NewEntryAndResult(Entry, Value);
-        {fail, _Reason} = Failed ->
-            {Entry, Failed};
         value ->
             NewEntryAndResult(Entry, Value);
-        not_found ->
+        {fail, not_found} ->
             E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
             E2 = tx_tlog:set_entry_value(E1, Value),
             E3 = tx_tlog:set_entry_status(E2, value),
-            {E3, {ok}}
-    end.
-
-%% @doc For 2-Phase operations like add_del_on_list and add_on_nr, we need to
-%%      keep any previous error in the tlog status and do not overwrite it with
-%%      the new one. If there is no error yet, set it to the given one.
--spec update_tlog_entry_2phase_op(Entry::tx_tlog:tlog_entry(), Error::{fail, atom()})
-        -> tx_tlog:tlog_entry().
-update_tlog_entry_2phase_op(Entry, Error) ->
-    case tx_tlog:get_entry_status(Entry) of
-        {fail, _} -> Entry;
-        not_found -> tx_tlog:set_entry_status(Entry, {fail, not_found});
-        _         -> tx_tlog:set_entry_status(Entry, Error)
+            {E3, {ok}};
+        {fail, abort} = Failed ->
+            {Entry, Failed}
     end.
 
 %% @doc Simulate a change on a set via read and write requests.
@@ -374,9 +363,9 @@ tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->
     %% input type error
-    Error = {fail, not_a_list},
-    {update_tlog_entry_2phase_op(Entry, Error), Error};
+    {tx_tlog:set_entry_status(Entry, {fail, abort}), {fail, not_a_list}};
 tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
+    Status = tx_tlog:get_entry_status(Entry),
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
         {ok, OldValue} when erlang:is_list(OldValue) ->
@@ -384,27 +373,33 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
             case ToAdd =:= [] andalso ToDel =:= [] of
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    NewValue1 = lists:append(ToAdd, OldValue),
-                    NewValue2 = util:minus_first(NewValue1, ToDel),
-                    tlog_write(Entry, Key, encode_value(NewValue2))
+                    case value =:= Status
+                        orelse {fail, not_found} =:= Status of
+                        true ->
+                            NewValue1 = lists:append(ToAdd, OldValue),
+                            NewValue2 = util:minus_first(NewValue1, ToDel),
+                            tlog_write(Entry, Key, encode_value(NewValue2));
+                        false -> %% TLog has abort, report ok for this op.
+                            {Entry, {ok}}
+                    end
             end;
         {fail, not_found} -> %% key creation
             NewValue2 = util:minus_first(ToAdd, ToDel),
             tlog_write(Entry, Key, encode_value(NewValue2));
         {ok, _} -> %% value is not a list
-            Error = {fail, not_a_list},
-            {update_tlog_entry_2phase_op(Entry, Error), Error};
-        X when erlang:is_tuple(X) -> %% other previous error
-            {Entry, X}
+            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+             {fail, not_a_list}}
     end.
 
 -spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
                       client_value()) ->
                              {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_add_on_nr(Entry, _Key, X) when (not erlang:is_number(X)) ->
-    Error = {fail, not_a_number},
-    {update_tlog_entry_2phase_op(Entry, Error), Error};
+    %% check type of input data
+    {tx_tlog:set_entry_status(Entry, {fail, abort}),
+     {fail, not_a_number}};
 tlog_add_on_nr(Entry, Key, X) ->
+    Status = tx_tlog:get_entry_status(Entry),
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
         {ok, OldValue} when erlang:is_number(OldValue) ->
@@ -412,16 +407,20 @@ tlog_add_on_nr(Entry, Key, X) ->
             case X == 0 of %% also accepts 0.0
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    NewValue = OldValue + X,
-                    tlog_write(Entry, Key, encode_value(NewValue))
+                    case value =:= Status orelse
+                        {fail, not_found} =:= Status of
+                        true ->
+                            NewValue = OldValue + X,
+                            tlog_write(Entry, Key, encode_value(NewValue));
+                        false -> %% TLog has abort, report ok for this op.
+                            {Entry, {ok}}
+                    end
             end;
-        {fail, not_found} -> %% key creation
-            tlog_write(Entry, Key, X);
         {ok, _} ->
-            Error = {fail, not_a_number},
-            {update_tlog_entry_2phase_op(Entry, Error), Error};
-        E when erlang:is_tuple(E) -> %% other previous error
-            {Entry, E}
+            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+             {fail, not_a_number}};
+        {fail, not_found} -> %% key creation
+            tlog_write(Entry, Key, X)
     end.
 
 -spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
@@ -433,7 +432,7 @@ tlog_test_and_set(Entry, Key, Old, New) ->
         {ok, Old} ->
             tlog_write(Entry, Key, encode_value(New));
         {ok, RealOldValue} ->
-            {tx_tlog:set_entry_status(Entry, {fail, key_changed}),
+            {tx_tlog:set_entry_status(Entry, {fail, abort}),
              {fail, {key_changed, RealOldValue}}};
         X when erlang:is_tuple(X) -> %% other previous error
             {Entry, X}

@@ -1,4 +1,4 @@
-%% @copyright 2009-2011 Zuse Institute Berlin
+%% @copyright 2009-2012 Zuse Institute Berlin
 %%            2009 onScale solutions GmbH
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -200,18 +200,18 @@ on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
             delete_if_all_replied(Tmp2Entry, Reps, Table);
         false -> pdb:set(TmpEntry, Table)
     end,
-    State;
-
-%% triggered periodically
-on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
-    ?TRACE("~p rdht_tx_read:on(timeout) Id ~p~n", [self(), Id]),
-    case pdb:get(Id, Table) of
-        undefined -> ok;
-        Entry ->
-            %% inform client on timeout if Id exists and client is not informed
-            timeout_inform(Entry),
-            pdb:delete(Id, Table)
-    end,
+%    State;
+%
+%%% triggered periodically
+%on({timeout_id, Id}, {_Reps, _MajOk, _MajDeny, Table} = State) ->
+%    ?TRACE("~p rdht_tx_read:on(timeout) Id ~p~n", [self(), Id]),
+%    case pdb:get(Id, Table) of
+%        undefined -> ok;
+%        Entry ->
+%            %% inform client on timeout if Id exists and client is not informed
+%            timeout_inform(Entry),
+%            pdb:delete(Id, Table)
+%    end,
     State.
 
 -spec get_entry(rdht_tx:req_id(), atom()) -> rdht_tx_read_state:read_state().
@@ -224,17 +224,17 @@ get_entry(Id, Table) ->
         Any -> Any
     end.
 
--spec timeout_inform(rdht_tx_read_state:read_state()) -> ok.
-%% inform client on timeout if Id exists and client is not informed yet
-timeout_inform(Entry) ->
-    case {rdht_tx_read_state:is_client_informed(Entry),
-          rdht_tx_read_state:get_client(Entry)} of
-        {_, unknown} -> ok;
-        {false, Client} ->
-            TmpEntry = rdht_tx_read_state:set_decided(Entry, {fail, timeout}),
-            inform_client(Client, TmpEntry);
-        _ -> ok
-    end.
+% -spec timeout_inform(rdht_tx_read_state:read_state()) -> ok.
+% %% inform client on timeout if Id exists and client is not informed yet
+% timeout_inform(Entry) ->
+%     case {rdht_tx_read_state:is_client_informed(Entry),
+%           rdht_tx_read_state:get_client(Entry)} of
+%         {_, unknown} -> ok;
+%         {false, Client} ->
+%             TmpEntry = rdht_tx_read_state:set_decided(Entry, {fail, timeout}),
+%             inform_client(Client, TmpEntry);
+%         _ -> ok
+%     end.
 
 -spec inform_client(pid(), rdht_tx_read_state:read_state()) -> ok.
 inform_client(Client, Entry) ->

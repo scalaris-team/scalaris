@@ -1,4 +1,4 @@
-%% @copyright 2009, 2010 onScale solutions GmbH
+%% @copyright 2009, 2010, 2012 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -127,12 +127,12 @@ update_decided(State, MajOk, MajDeny) ->
         true ->
             case {OK, Abort} of
                 {true, false} -> set_decided(State, value);
-                {false, true} -> set_decided(State, not_found);
+                {false, true} -> set_decided(State, {fail, not_found});
                 _ -> State
             end;
         false ->
             case get_numreplied(State) of
-                4 -> set_decided(State, not_found); % all replied with -1
+                4 -> set_decided(State, {fail, not_found}); % all replied with -1
                 _ -> State
             end
     end.
