@@ -1,7 +1,7 @@
 \section{\texorpdfstring{The \erlmodule{gen\_component}}
          {The gen\_component}}
 \erlmoduleindex{gen\_component}
-\svnrev{r1620}
+\svnrev{r2675}
 
 The generic component model implemented by
 \erlmodule[noindex]{gen\_component} allows to add some common functionality
@@ -118,6 +118,13 @@ A \erlmodule{gen\_component} can be stopped using:
 
 \erlfun{gen\_component}{kill}{Pid} or by returning \code{kill} from the
 current message handler.
+
+\subsection{\texorpdfstring{How to determine whether a process is a \erlmodule{gen\_component}?}
+             {How to determine whether a process is a gen\_component?}}
+
+A \erlmodule{gen\_component} can be detected by:
+
+\erlfun{gen\_component}{is\_gen\_component}{Pid}, which returns a boolean.
 
 \subsection{What happens when unexpected events / messages arrive?}
 
