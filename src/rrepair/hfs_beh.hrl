@@ -45,5 +45,5 @@ apply_val(Hfs, Item) -> apply_val_(Hfs, Item).
 apply_val(Hfs, I, Item) -> apply_val_(Hfs, I, Item).
 
 % @doc retruns numer ob hash functions in the set
--spec size(hfs()) -> integer().
+-spec size(hfs()) -> non_neg_integer().
 size(Hfsc) -> size_(Hfsc).

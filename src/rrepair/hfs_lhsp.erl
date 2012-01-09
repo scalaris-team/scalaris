@@ -69,7 +69,7 @@ apply_val_({hfs_lhsp, K, H1, H2}, I, Val) when I =< K->
     HV1 + (I - 1) * HV2.   
 
 % @doc Returns number of hash functions in the container
--spec size_(hfs_t()) -> integer().
+-spec size_(hfs_t()) -> non_neg_integer().
 size_({hfs_lhsp, K, _, _}) -> 
     K.
 
