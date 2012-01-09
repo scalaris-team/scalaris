@@ -220,6 +220,8 @@
 {\catcode`\#=13\catcode`\$=13\catcode`\_=11\catcode`\==13
 }{\catcode`\#=6\catcode`\$=3\catcode`\_=8}
 
+%shortcut for multi columns
+\newcommand{\mc}[3]{\multicolumn{#1}{#2}{#3}}
 % new left-justified column types
 \newcolumntype{P}[1]{>{\raggedright}p{#1}}
 \newcolumntype{M}[1]{>{\raggedright}m{#1}}
@@ -765,7 +767,7 @@ and their mapping to these layers. The appropriate JSON calls
 are shown in Section~\sieheref{sec.api.json}.
 
 Special care needs to be taken when trying to delete keys (no matter which API
-is used). This can only be done outside the transaction layer and is thus not
+is being used). This can only be done outside the transaction layer and is thus not
 absolutely safe. Refer to the following thread on the mailing list:
 \url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
 
@@ -817,7 +819,7 @@ and \emph{custom} types.
 
 \emph{Composite} types are
 \begin{itemize}
-  \item lists of native types (except binary objects)
+  \item lists of native types \emph{(except binary objects!)}
   \item JavaScript Object Notation (JSON)\footnote{see \url{http://json.org/}}
 \end{itemize}
 
@@ -862,6 +864,198 @@ json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false
     \label{api.supported_types}
   \end{threeparttable}
 \end{table}
+
+\subsection{Supported Operations}
+
+Most operations are available to all APIs, but some (especially convenience
+methods) are API- or language-specific. The following paragraphs
+provide a brief overview of what is available to which API. For a full
+reference, see the documentation of the specific API.
+
+\subsubsection{Transaction Layer}
+
+\paragraph{Read}
+Reads the value stored at a given key using quorum read.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:read(Key)}\\
+Java:   & \code{TransactionSingleOp.read(Key)}\\
+JSON:   & \code{read(Key)}\\
+Python: & \code{TransactionSingleOp.read(Key)}\\
+Ruby:   & \code{TransactionSingleOp.read(Key)}
+\end{tabular}
+
+\paragraph{Write}
+Writes a value to a given key.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:write(Key, Value)}\\
+Java:   & \code{TransactionSingleOp.write(Key, Value)}\\
+JSON:   & \code{write(Key, Value)}\\
+Python: & \code{TransactionSingleOp.write(Key, Value)}\\
+Ruby:   & \code{TransactionSingleOp.write(Key, Value)}
+\end{tabular}
+
+\paragraph{``Add to'' \& ``Delete from'' List Operations}
+For the list stored at a given key, first add all elements from a given list,
+then remove all elements from a second given list.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:add_del_on_list(Key, ToAddList, ToRemoveList)}\\
+Java:   & \code{TransactionSingleOp.addDelOnList(Key, ToAddList, ToRemoveList)}\\
+JSON:   & \code{add_del_on_list(Key, ToAddList, ToRemoveList)}\\
+Python: & \code{TransactionSingleOp.add_del_on_list(Key, ToAddList, ToRemoveList)}\\
+Ruby:   & \code{TransactionSingleOp.add_del_on_list(Key, ToAddList, ToRemoveList)}
+\end{tabular}
+
+\paragraph{Add to a number}
+Adds a given number to the number stored at a given key.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:add_on_nr(Key, ToAddNumber)}\\
+Java:   & \code{TransactionSingleOp.addOnNr(Key, ToAddNumber)}\\
+JSON:   & \code{add_on_nr(Key, ToAddList, ToAddNumber)}\\
+Python: & \code{TransactionSingleOp.add_on_nr(Key, ToAddNumber)}\\
+Ruby:   & \code{TransactionSingleOp.add_on_nr(Key, ToAddNumber)}
+\end{tabular}
+
+\paragraph{Atomic Test and Set}
+Writes the given (new) value to a key if the current value is equal to the
+given old value.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:test_and_set(Key, OldValue, NewValue)}\\
+Java:   & \code{TransactionSingleOp.testAndSet(Key, OldValue, NewValue)}\\
+JSON:   & \code{add_on_nr(Key, OldValue, NewValue)}\\
+Python: & \code{TransactionSingleOp.test_and_set(Key, OldValue, NewValue)}\\
+Ruby:   & \code{TransactionSingleOp.test_and_set(Key, OldValue, NewValue)}
+\end{tabular}
+
+\paragraph{Bulk Operations}
+Executes multiple requests, i.e. operations, where each of them will be
+committed.
+
+\emph{Collecting requests and executing all of them in a single call yields
+better performance than executing all on their own.}
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:req_list_commit_each(RequestList)}\\
+Java:   & \code{TransactionSingleOp.req_list(RequestList)}\\
+JSON:   & \code{req_list_commit_each(RequestList)}\\
+Python: & \code{TransactionSingleOp.req_list(RequestList)}\\
+Ruby:   & \code{TransactionSingleOp.req_list(RequestList)}
+\end{tabular}
+
+\paragraph{Read (with TLog)}
+Reads the value stored at a given key using quorum read as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:read(TLog, Key)}\\
+Java:   & \code{Transaction.read(Key)}\\
+JSON:   & \code{n/a} - use \code{req_list}\\
+Python: & \code{Transaction.read(Key)}\\
+Ruby:   & \code{Transaction.read(Key)}
+\end{tabular}
+
+\paragraph{Write (with TLog)}
+Writes a value to a given key as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:write(TLog, Key, Value)}\\
+Java:   & \code{Transaction.write(Key, Value)}\\
+JSON:   & \code{n/a} - use \code{req_list}\\
+Python: & \code{Transaction.write(Key, Value)}\\
+Ruby:   & \code{Transaction.write(Key, Value)}
+\end{tabular}
+
+\paragraph{``Add to'' \& ``Delete from'' List Operations (with TLog)}
+For the list stored at a given key, first add all elements from a given list,
+then remove all elements from a second given list as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:add_del_on_list(TLog, Key, ToAddList, ToRemoveList)}\\
+Java:   & \code{Transaction.addDelOnList(Key, ToAddList, ToRemoveList)}\\
+JSON:   & \code{n/a} - use \code{req_list}\\
+Python: & \code{Transaction.add_del_on_list(Key, ToAddList, ToRemoveList)}\\
+Ruby:   & \code{Transaction.add_del_on_list(Key, ToAddList, ToRemoveList)}
+\end{tabular}
+
+\paragraph{Add to a number (with TLog)}
+Adds a given number to the number stored at a given key as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:add_on_nr(TLog, Key, ToAddNumber)}\\
+Java:   & \code{Transaction.addOnNr(Key, ToAddNumber)}\\
+JSON:   & \code{n/a} - use \code{req_list}\\
+Python: & \code{Transaction.add_on_nr(Key, ToAddNumber)}\\
+Ruby:   & \code{Transaction.add_on_nr(Key, ToAddNumber)}
+\end{tabular}
+
+\paragraph{Atomic Test and Set (with TLog)}
+Writes the given (new) value to a key if the current value is equal to the
+given old value as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:test_and_set(TLog, Key, OldValue, NewValue)}\\
+Java:   & \code{Transaction.testAndSet(Key, OldValue, NewValue)}\\
+JSON:   & \code{test_and_set(Key, OldValue, NewValue)}\\
+Python: & \code{Transaction.test_and_set(Key, OldValue, NewValue)}\\
+Ruby:   & \code{Transaction.test_and_set(Key, OldValue, NewValue)}
+\end{tabular}
+
+\paragraph{Bulk Operations (with TLog)}
+Executes multiple requests, i.e. operations, as an additional part
+of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
+Only one \code{commit} request is allowed per call!
+
+\emph{Collecting requests and executing all of them in a single call yields
+better performance than executing all on their own.}
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_tx:req_list(RequestList)}, \code{api_tx:req_list(TLog, RequestList)}\\
+Java:   & \code{Transaction.req_list(RequestList)}\\
+JSON:   & \code{req_list(RequestList)}, \code{req_list(TLog, RequestList)}\\
+Python: & \code{Transaction.req_list(RequestList)}\\
+Ruby:   & \code{Transaction.req_list(RequestList)}
+\end{tabular}
+
+\subsubsection{Replication Layer}
+
+\paragraph{Delete}
+Tries to delete a value at a given key.
+
+\emph{Warning: This can only be done outside the transaction layer and is thus not
+absolutely safe. Refer to the following thread on the mailing list:
+\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_rdht:delete(Key)}, \code{api_rdht:delete(Key, Timeout)}\\
+Java:   & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}\\
+JSON:   & \code{delete(Key)}, \code{delete(Key, Timeout)}\\
+Python: & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}\\
+Ruby:   & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}
+\end{tabular}
+
+\subsubsection{Convenience Methods / Classes}
+
+\paragraph{Connection Pool}
+Implements a thread-safe pool of connections to Scalaris instances. Can be
+instantiated with a fixed maximum number of connections. Connections are either taken from
+a pool of available connections or are created on demand. If finished, a connection can be
+put back into the pool.
+
+\begin{tabular}{ll}
+Erlang  & \code{n/a}\\
+Java:   & \code{ConnectionPool}\\
+JSON:   & \code{n/a}\\
+Python: & \code{ConnectionPool}\\
+Ruby:   & \code{n/a}
+\end{tabular}
 
 \subsection{JSON API}
 \label{sec.api.json}
@@ -1018,10 +1212,10 @@ supported (the given result is the \code{<result_object>} mentioned above):
 Note:
 \begin{lstlisting}[language=java]
 <json_value> = {"type": "as_is" or "as_bin", "value": <value>}
-<operation> = {"read", <key>} or {"write", {<key>: <json_value>}} or
-              {"add_del_on_list", {"key": <key>, "add": [<value>], "del": [<value>]}} or
-              {"add_on_nr", {<key>: <value>}} or
-              {"test_and_set", {"key": <key>, "old": <json_value>, "new": <json_value>}}
+<operation> = {"read": <key>} or {"write", {<key>: <json_value>}} or
+              {"add_del_on_list": {"key": <key>, "add": [<value>], "del": [<value>]}} or
+              {"add_on_nr": {<key>: <value>}} or
+              {"test_and_set": {"key": <key>, "old": <json_value>, "new": <json_value>}}
 <req_list_ce> = [<operation>]
 <req_list> = [<operation> or {"commit", _}]
 \end{lstlisting}
@@ -1044,7 +1238,7 @@ The following example illustrates the message flow:
 Make a transaction, that sets two keys & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 %
-\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\begin{tabular}{p{0.78\textwidth}p{0.13\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
@@ -1065,7 +1259,7 @@ Make a transaction, that sets two keys & $\to$ & \\
  & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
 \end{tabular}\vspace{-1.5em} \\
 
-\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+\begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
 & 
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
@@ -1084,7 +1278,7 @@ Make a transaction, that sets two keys & $\to$ & \\
 In a second transaction: Read the two keys & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 %
-\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\begin{tabular}{p{0.78\textwidth}p{0.13\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
@@ -1104,7 +1298,7 @@ In a second transaction: Read the two keys & $\to$ & \\
  & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
 \end{tabular}\vspace{-1.5em} \\
 
-\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+\begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
 & 
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
@@ -1128,7 +1322,7 @@ write and the commit for the whole transaction. Also include the latest
 translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 %
-\begin{tabular}{p{0.77\textwidth}p{0.14\textwidth}}
+\begin{tabular}{p{0.78\textwidth}p{0.13\textwidth}}
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"jsonrpc": "2.0",
@@ -1149,7 +1343,7 @@ translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
  & $\leftarrow$ & \hfill{}\scalaris{} sends results back \\
 \end{tabular}\vspace{-1.5em} \\
 
-\begin{tabular}{p{0.14\textwidth}p{0.77\textwidth}}
+\begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
 & 
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
@@ -1199,41 +1393,10 @@ interface client. For
 convenience, we provide a wrapper script called \code{scalaris} which
 sets up the Java environment:
 
-\begin{lstlisting}[language={}]
-%> ./java-api/scalaris --help
-./java-api/scalaris [script options] [options]
-Script Options:
-  --help, -h             print this message and scalaris help
-  --noconfig             suppress sourcing of config files in $HOME/.scalaris/
-                         and ${prefix}/etc/scalaris/
-  --execdebug            print scalaris exec line generated by this
-                         launch script
-  --noerl                do not ask erlang for its (local) host name
-  
-usage: scalaris [Options]
- -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)
-                                      [1|...|9|all] (default: all
-                                      benchmarks, 100 test runs)
- -d,--delete <key> <[timeout]>        delete an item (default timeout:
-                                      2000ms)
-                                      WARNING: This function can lead to
-                                      inconsistent data (e.g. deleted
-                                      items can re-appear). Also when
-                                      re-creating an item the version
-                                      before the delete can re-appear.
- -g,--getsubscribers <topic>          get subscribers of a topic
- -h,--help                            print this message
- -lh,--localhost                      gets the local host's name as known
-                                      to Java (for debugging purposes)
- -p,--publish <topic> <message>       publish a new message for the given
-                                      topic
- -r,--read <key>                      read an item
- -s,--subscribe <topic> <url>         subscribe to a topic
- -u,--unsubscribe <topic> <url>       unsubscribe from a topic
- -v,--verbose                         print verbose information, e.g. the
-                                      properties read
- -w,--write <key> <value>             write an item
+\begin{lstlisting}[language=sh]
+%> ./java-api/scalaris --noconfig --help
 \end{lstlisting}
+\lstinputlisting[language={}]{scalaris-client-java.out}
 
 \code{read}, \code{write} and \code{delete} can be used to read, write
 and delete from/to the overlay, respectively. \code{getsubscribers},
@@ -1254,38 +1417,17 @@ further connection properties) by adapting the values defined in
 
 \subsection{Python command line interface}
 
-\begin{lstlisting}[language={}]
+\begin{lstlisting}[language=sh]
 %> ./python-api/scalaris_client.py --help
-usage: ./python-api/scalaris_client.py [Options]
- -r,--read <key>                      read an item
- -w,--write <key> <value>             write an item
- -d,--delete <key> [<timeout>]        delete an item (default timeout:
-                                      2000ms)
-                                      WARNING: This function can lead to
-                                      inconsistent data (e.g. deleted
-                                      items can re-appear). Also when
-                                      re-creating an item the version
-                                      before the delete can re-appear.
- -p,--publish <topic> <message>       publish a new message for the given
-                                      topic
- -s,--subscribe <topic> <url>         subscribe to a topic
- -g,--getsubscribers <topic>          get subscribers of a topic
- -u,--unsubscribe <topic> <url>       unsubscribe from a topic
- -h,--help                            print this message
- -b,--minibench <runs> <benchmarks>   run selected mini benchmark(s)
-                                      [1|...|9|all] (default: all
-                                      benchmarks, 100 test runs)
 \end{lstlisting}
+\lstinputlisting[language={}]{scalaris-client-python.out}
 
 \subsection{Ruby command line interface}
 
-\begin{lstlisting}[language={}]
-%> ./ruby-api/scalaris_client.rb --help
-Usage: scalaris_client [options]
-    -r, --read KEY                   read key KEY
-    -w, --write KEY,VALUE            write key KEY to VALUE
-    -h, --help                       Show this message
+\begin{lstlisting}[language=sh]
+%> ../ruby-api/scalaris_client.rb --help
 \end{lstlisting}
+\lstinputlisting[language={}]{scalaris-client-ruby.out}
 
 
 \chapter{Testing the system}
