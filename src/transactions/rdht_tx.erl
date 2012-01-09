@@ -179,16 +179,30 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
     case TKey =:= req_get_key(Req) of
         true ->
             %% key is in TLog, rdht op not necessary
-            case req_get_op(Req) of
-                rdht_tx_read ->
-                    %% when operation is a read and TLog is optimized, we
-                    %% need the op anyway to calculate the result entry.
-                    %% Not yet activated:
-                    %% first_req_per_key_not_in_tlog_iter
-                    %%   (USTLog, RTail, [Req | Acc]);
+            case tx_tlog:get_entry_operation(TEntry) of
+                rdht_tx_write ->
                     first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
                 _ ->
-                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
+                    case req_get_op(Req) of
+                        %% when operation needs the value (read) and
+                        %% TLog is optimized, we need the op anyway to
+                        %% calculate the result entry.
+                        rdht_tx_read ->
+                            first_req_per_key_not_in_tlog_iter
+                              (USTLog, RTail, [Req | Acc]);
+                        test_and_set ->
+                            first_req_per_key_not_in_tlog_iter
+                              (USTLog, RTail, [Req | Acc]);
+                        add_on_nr ->
+                            first_req_per_key_not_in_tlog_iter
+                              (USTLog, RTail, [Req | Acc]);
+                        add_del_on_list ->
+                            first_req_per_key_not_in_tlog_iter
+                              (USTLog, RTail, [Req | Acc]);
+                        %%first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
+                        _ ->
+                            first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
+                    end
             end;
         false ->
             case TKey < req_get_key(Req) of
@@ -272,12 +286,14 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                             =/= tx_tlog:get_entry_version(RTEntry) of
                             true ->
                                 tx_tlog:set_entry_status(RTEntry, {fail, abort});
-                            false -> RTEntry
+                            false ->
+                                Val = tx_tlog:get_entry_value(RTEntry),
+                                tx_tlog:set_entry_value(TEntry, Val)
                         end,
                     merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
                 _ ->
                     log:log(warn,
-                            "Duplicate key in TLog merge should not happen"),
+                            "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
                     merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
             end;
         false ->
@@ -297,7 +313,8 @@ do_reqs_on_tlog(TLog, ReqList) ->
 %%      of results.
 -spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], results()) ->
                                   {tx_tlog:tlog(), results()}.
-do_reqs_on_tlog_iter(TLog, [], Acc) -> {TLog, lists:reverse(Acc)};
+do_reqs_on_tlog_iter(TLog, [], Acc) ->
+    {tlog_cleanup(TLog), lists:reverse(Acc)};
 do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
     Key = req_get_key(Req),
     Entry = tx_tlog:find_entry_by_key(TLog, Key),
@@ -313,6 +330,13 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
     do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc]).
+
+-spec tlog_cleanup(tx_tlog:tlog()) -> tx_tlog:tlog().
+tlog_cleanup(TLog) ->
+    [ case tx_tlog:get_entry_operation(TLogEntry) of
+          rdht_tx_read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
+          rdht_tx_write -> TLogEntry
+      end || TLogEntry <- TLog ].
 
 %% @doc Get a result entry for a read from the given TLog entry.
 -spec tlog_read(tx_tlog:tlog_entry(), client_key()) ->
