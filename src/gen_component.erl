@@ -1,4 +1,4 @@
-%% @copyright 2007-2011 Zuse Institute Berlin
+%% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@
 -endif.
 -export([start_link/3, start_link/4,
          start/3, start/4, start/5]).
--export([kill/1, sleep/2, runnable/1,
+-export([kill/1, sleep/2, is_gen_component/1, runnable/1,
          get_state/1, get_state/2,
          get_component_state/1, get_component_state/2,
          change_handler/2, post_op/2]).
@@ -109,6 +109,11 @@ behaviour_info(_Other) ->
 kill(Pid) ->        Pid ! {'$gen_component', kill}, ok.
 -spec sleep(Pid::pid() | port() | atom(), TimeInMs::integer() | infinity) -> ok.
 sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
+
+-spec is_gen_component(Pid::pid()) -> boolean().
+is_gen_component(Pid) ->
+    Call = element(2, erlang:process_info(Pid, initial_call)),
+    gen_component =:= element(1, Call).
 
 -spec runnable(Pid::pid()) -> boolean().
 runnable(Pid) ->
