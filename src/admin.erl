@@ -62,7 +62,7 @@ add_node(Options) ->
     end.
 
 -spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
-add_nodes(0) -> [];
+add_nodes(0) -> {[], []};
 add_nodes(Count) ->
     Results = [add_node([]) || _X <- lists:seq(1, Count)],
     lists:partition(fun(E) -> not is_tuple(E) end, Results).
