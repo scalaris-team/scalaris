@@ -59,7 +59,9 @@ all()   -> [new_tlog_0,
             tester_tlog_add_on_nr,
             tester_tlog_add_on_nr_maybe_invalid,
             tester_tlog_test_and_set_not_existing,
-            tester_tlog_test_and_set
+            tester_tlog_test_and_set,
+            tester_req_list,
+            tester_req_list_on_same_key
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -89,8 +91,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 new_tlog_0(_Config) ->
-    ?equals(api_tx:new_tlog(), []),
-    ok.
+    ?equals(api_tx:new_tlog(), []).
 
 req_list_2(_Config) ->
     EmptyTLog = api_tx:new_tlog(),
@@ -716,3 +717,196 @@ prop_tlog_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
 
 tester_tlog_test_and_set(_Config) ->
     tester:test(?MODULE, prop_tlog_test_and_set, 4, 5000).
+
+%% same result when executing a req_list in a bunch or as sequential
+%% single requests.
+-spec prop_tester_req_list([api_tx:request_on_key()]) -> true | no_return().
+prop_tester_req_list(ReqList) ->
+    {TLogAll, ResultAll} = api_tx:req_list(ReqList),
+    {TLogSeq, ResultSeq} =
+        lists:foldl(fun(Req, {TLog, Res}) ->
+                            {NTlog, NRes} = api_tx:req_list(TLog, [Req]),
+                            {NTlog, lists:append(Res, NRes)}
+                    end, {api_tx:new_tlog(), []}, ReqList),
+    ?equals(ResultAll, ResultSeq),
+    ?equals(TLogAll, TLogSeq).
+
+tester_req_list(_Config) ->
+    tester:test(?MODULE, prop_tester_req_list, 1, 5000).
+
+check_op_on_tlog([], _Req, _NTLog, _NRes, _RingVal) -> true;
+check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
+    OldEntry = hd(TLog),
+    NewEntry = hd(NTLog),
+    %% Version is same.
+    case tx_tlog:get_entry_status(OldEntry) of
+        {fail, not_found} ->
+            case element(1, Req) of
+                write ->
+                    ?equals(tx_tlog:get_entry_status(NewEntry), value),
+                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                            rdht_tx:encode_value(element(3, Req))),
+                    ?equals(NRes, [{ok}]);
+                read ->
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            {fail, not_found}),
+                    ?equals(NRes, [{fail, not_found}]);
+                test_and_set ->
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            {fail, not_found}),
+                    ?equals(NRes, [{fail, not_found}]);
+                add_on_nr ->
+                    %% Check value content
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            value), %% will create the value
+                    ?equals(NRes, [{ok}]);
+                add_del_on_list ->
+                    %% Check value content
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            value), %% will create the value
+                    ?equals(NRes, [{ok}])
+            end;
+        {fail, abort} = Fail ->
+            TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, value),
+            ?equals_w_note(NRes,
+                           element(2, api_tx:req_list([TmpTLogEntry], [Req])),
+                           {Req, RingVal}),
+            ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
+        value ->
+            case tx_tlog:get_entry_operation(OldEntry) of
+                rdht_tx_read ->
+                    ?equals(NRes, element(2, api_tx:req_list([Req])));
+                rdht_tx_write ->
+                    ?equals([{ok}, hd(NRes)], element(2, api_tx:req_list([{write, element(2, Req), rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))}, Req])))
+            end,
+            case element(1, Req) of
+                write ->
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            value),
+                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                            rdht_tx:encode_value(element(3, Req))),
+                    ?equals(NRes, [{ok}]);
+                read ->
+                    ?equals(TLog, NTLog),
+                    case tx_tlog:get_entry_operation(OldEntry) of
+                        rdht_tx_read ->
+                            ?equals(NRes, [{ok, RingVal}]);
+                        rdht_tx_write ->
+                            ?equals(NRes, [{ok, rdht_tx:decode_value(tx_tlog:get_entry_value(NewEntry))}])
+                    end;
+                test_and_set ->
+                    case hd(NRes) of
+                        {ok} ->
+                            ?equals(value,
+                                    tx_tlog:get_entry_status(NewEntry));
+                        {fail, {key_changed, _X}} ->
+                            ?equals({fail, abort},
+                                    tx_tlog:get_entry_status(NewEntry)),
+                            ?equals(tx_tlog:get_entry_value(OldEntry),
+                                    tx_tlog:get_entry_value(NewEntry))
+                    end;
+                add_on_nr ->
+                    case hd(NRes) of
+                        {ok} ->
+                            ?equals(value,
+                                    tx_tlog:get_entry_status(NewEntry));
+                        {fail, not_a_number} ->
+                            ?equals({fail, abort},
+                                    tx_tlog:get_entry_status(NewEntry)),
+                            ?equals(tx_tlog:get_entry_value(OldEntry),
+                                    tx_tlog:get_entry_value(NewEntry))
+                    end;
+                add_del_on_list ->
+                    case hd(NRes) of
+                        {ok} ->
+                            ?equals(value,
+                                    tx_tlog:get_entry_status(NewEntry));
+                        {fail, not_a_list} ->
+                            ?equals({fail, abort},
+                                    tx_tlog:get_entry_status(NewEntry)),
+                            ?equals(tx_tlog:get_entry_value(OldEntry),
+                                    tx_tlog:get_entry_value(NewEntry))
+                    end
+            end
+    end.
+
+
+check_commit([], {ok}, _RingVal) -> true;
+check_commit(TLog, CommitRes, RingVal) ->
+    TEntry = hd(TLog),
+    Key = tx_tlog:get_entry_key(TEntry),
+    case CommitRes of
+        {ok} ->
+            case tx_tlog:get_entry_operation(TEntry) of
+                rdht_tx_read ->
+                    NewRingVal = case api_tx:read(Key) of
+                                     {fail, not_found} -> none;
+                                     {ok, NewVal} -> NewVal
+                                 end,
+                    ?equals(RingVal, NewRingVal);
+                rdht_tx_write ->
+                    ?equals(value, tx_tlog:get_entry_status(TEntry)),
+                    {ok, NewRingVal} = api_tx:read(Key),
+                    ?equals(rdht_tx:decode_value(
+                              tx_tlog:get_entry_value(TEntry)),
+                            NewRingVal)
+            end;
+        {fail, abort} ->
+            ?equals({fail, abort}, tx_tlog:get_entry_status(TEntry)),
+            NewRingVal = case api_tx:read(Key) of
+                             {fail, not_found} -> none;
+                             {ok, NewVal} -> NewVal
+                         end,
+            ?equals(RingVal, NewRingVal)
+    end.
+
+%% same result when executing a req_list in a bunch or as sequential
+%% single requests.
+-spec prop_tester_req_list_on_same_key(client_key(), [api_tx:request_on_key()]) -> true | no_return().
+prop_tester_req_list_on_same_key(Key, InReqList) ->
+    ReqList = [ setelement(2, Req, Key) || Req <- InReqList ],
+
+    RingVal = case api_tx:read(Key) of
+                  {fail, not_found} -> none;
+                  {ok, Val} -> Val
+              end,
+    %% perform on key not in DHT
+    {TLogSeqE, _ResultSeqE} =
+        lists:foldl(fun(Req, {TLog, Res}) ->
+                            {NTLog, NRes} = api_tx:req_list(TLog, [Req]),
+                            check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal),
+                            {NTLog, lists:append(Res, NRes)}
+                    end, {api_tx:new_tlog(), []}, ReqList),
+
+    CommitE = api_tx:commit(TLogSeqE),
+    check_commit(TLogSeqE, CommitE, RingVal),
+
+    %% perform on key as int
+    api_tx:write(Key, 42),
+    {TLogSeqI, _ResultSeqI} =
+        lists:foldl(fun(Req, {TLog, Res}) ->
+                            {NTLog, NRes} = api_tx:req_list(TLog, [Req]),
+                            check_op_on_tlog(TLog, Req, NTLog, NRes, 42),
+                            {NTLog, lists:append(Res, NRes)}
+                    end, {api_tx:new_tlog(), []}, ReqList),
+
+    CommitI = api_tx:commit(TLogSeqI),
+    check_commit(TLogSeqI, CommitI, 42),
+
+    %% perform on key as list
+    api_tx:write(Key, [42]),
+    {TLogSeqL, _ResultSeqL} =
+        lists:foldl(fun(Req, {TLog, Res}) ->
+                            {NTLog, NRes} = api_tx:req_list(TLog, [Req]),
+                            check_op_on_tlog(TLog, Req, NTLog, NRes, [42]),
+                            {NTLog, lists:append(Res, NRes)}
+                    end, {api_tx:new_tlog(), []}, ReqList),
+
+    CommitL = api_tx:commit(TLogSeqL),
+    check_commit(TLogSeqL, CommitL, [42]),
+
+    true.
+
+tester_req_list_on_same_key(_Config) ->
+    tester:test(?MODULE, prop_tester_req_list_on_same_key, 2, 5000).
+

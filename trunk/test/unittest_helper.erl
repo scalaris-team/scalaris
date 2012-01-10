@@ -1,4 +1,4 @@
-%  Copyright 2008-2011 Zuse Institute Berlin
+%  Copyright 2008-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -628,13 +628,13 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
            "             \"~.0p\"~n"
            "            which is not the expected ~s that evaluates to~n"
            "             \"~.0p\"~n"
-           "            (~s)~n"
+           "            (~.0p)~n"
            " Stacktrace ~p~n"
            " Linetrace  ~p~n",
-           [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note),
+           [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note,
             util:get_stacktrace(), util:get_linetrace()]),
-    ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~s)~n",
-             [ActualStr, ActualVal, ExpectedStr, ExpectedVal, lists:flatten(Note)]).
+    ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n(~.0p)~n",
+             [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note]).
 
 -spec expect_no_message_timeout(Timeout::pos_integer()) -> true | no_return().
 expect_no_message_timeout(Timeout) ->
