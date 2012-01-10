@@ -280,8 +280,11 @@ get_stacktrace() ->
     case (try erlang:exit(a)
           catch exit:_ -> erlang:get_stacktrace()
           end) of
-        [{util, get_stacktrace, 0} | ST] -> ok; % erlang < R15
-        [{util, get_stacktrace, 0, _} | ST] -> ok; % erlang >= R15
+        % erlang < R15 : {util, get_stacktrace, 0}
+        % erlang >= R15: {util, get_stacktrace, 0, _}
+        [T | ST] when erlang:element(1, T) =:= util andalso
+                          erlang:element(2, T) =:= get_stacktrace andalso
+                          erlang:element(3, T) =:= 0 -> ok;
         ST -> ST % just in case
     end,
     ST.
@@ -829,20 +832,21 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     {NewMegaSecs, NewSecs, MicroSecs}.
 
 %% for(i; I<=n; i++) { fun(i) }
--spec for_to(integer(), integer(), fun()) -> ok.
-for_to(I, N, Fun) ->
-    if I =< N -> Fun(I), for_to(I+1, N, Fun);
-       true -> ok
-    end.
+-spec for_to(integer(), integer(), fun((integer()) -> any())) -> ok.
+for_to(I, N, Fun) when I =< N ->
+    Fun(I),
+    for_to(I + 1, N, Fun);
+for_to(_I, _N, _Fun) ->
+    ok.
 
 %% for(i; I<=n; i++) { Acc = [fun(i)|Acc] }
 for_to_ex(N, N, Fun, Acc) ->
-    [Fun(N)|Acc];
+    [Fun(N) | Acc];
 for_to_ex(I, N, Fun, Acc) ->
     R = Fun(I),
-    for_to_ex(I+1, N, Fun, [R|Acc]).
+    for_to_ex(I + 1, N, Fun, [R | Acc]).
 
--spec for_to_ex(integer(), integer(), anyFun(T)) -> [T].
+-spec for_to_ex(integer(), integer(), fun((integer()) -> T)) -> [T].
 for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
 

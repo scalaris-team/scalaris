@@ -61,7 +61,7 @@ apply_val_({hfs_lhsp, K, H1, H2}, Val) ->
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
--spec apply_val_(hfs_t(), pos_integer(), itemKey()) -> [integer()].
+-spec apply_val_(hfs_t(), pos_integer(), itemKey()) -> integer().
 apply_val_({hfs_lhsp, K, H1, H2}, I, Val) when I =< K-> 
     ValBin = term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -77,7 +77,7 @@ size_({hfs_lhsp, K, _, _}) ->
 % private functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec hash_value(binary(), hfs_fun()) -> integer() | binary().
+-spec hash_value(binary(), hfs_fun()) -> integer().
 hash_value(Val, HashFun) ->
     H = HashFun(Val),
     case erlang:is_binary(H) of
