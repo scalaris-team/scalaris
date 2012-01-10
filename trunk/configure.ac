@@ -237,7 +237,7 @@ AC_RUN_IFELSE(
        [CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; AC_MSG_NOTICE([ct_line is available])],
        [CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; AC_MSG_NOTICE([ct_line is not available])])
 
-$RUN_TEST --help -noshell | grep "ct_hooks" 2>/dev/null 1>/dev/null
+$ERL -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
 AS_IF(
        [test $? -eq 0 ],
        [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; AC_MSG_NOTICE([ct_hooks is available])],
