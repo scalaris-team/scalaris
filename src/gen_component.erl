@@ -401,13 +401,14 @@ loop(Module, Handler, ReceivedMsg, State, {_Options, _Slowest, _BPState} = Compo
                   catch Level:Reason ->
                             Stacktrace = erlang:get_stacktrace(),
                             case Stacktrace of
-                                [{Module, Handler, [Message, State]} | _] % for erlang < R15
-                                  when Reason =:= function_clause andalso
-                                           Level =:= error ->
-                                    unknown_event;
-                                [{Module, Handler, [Message, State], _} | _] % erlang >= R15
-                                  when Reason =:= function_clause andalso
-                                           Level =:= error ->
+                                % erlang < R15 : {Module, Handler, [Message, State]}
+                                % erlang >= R15: {Module, Handler, [Message, State], _} 
+                                [T | _] when
+                                  erlang:element(1, T) =:= Module andalso
+                                      erlang:element(2, T) =:= Handler andalso
+                                      erlang:element(3, T) =:= [Message, State] andalso
+                                      Reason =:= function_clause andalso
+                                      Level =:= error ->
                                     unknown_event;
                                 _ ->
                                     log:log(error,

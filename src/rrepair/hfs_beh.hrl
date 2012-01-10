@@ -41,7 +41,7 @@ new(HFCount) -> new_(HFCount).
 apply_val(Hfs, Item) -> apply_val_(Hfs, Item).
 
 % @doc apply Item on hash function I of function set Hfs; I = 1..hfs_size
--spec apply_val(hfs(), pos_integer(), itemKey()) -> [integer()].
+-spec apply_val(hfs(), pos_integer(), itemKey()) -> integer().
 apply_val(Hfs, I, Item) -> apply_val_(Hfs, I, Item).
 
 % @doc retruns numer ob hash functions in the set
