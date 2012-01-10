@@ -272,13 +272,13 @@ data_to_json(Data) ->
 
 %% interface for monitoring calls
 get_node_info() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitoring:get_node_info()}}]}.
+    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_node_info()}}]}.
 
 get_node_performance() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitoring:get_node_performance()}}]}.
+    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_node_performance()}}]}.
 
 get_service_info() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitoring:get_service_info()}}]}.
+    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_service_info()}}]}.
 
 get_service_performance() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitoring:get_service_performance()}}]}.
+    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_service_performance()}}]}.
