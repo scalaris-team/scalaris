@@ -20,5 +20,10 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-export([hash_key/1]).
 
+-include("scalaris.hrl").
+-include("client_types.hrl").
 
+-spec hash_key(client_key()) -> ?RT:key().
+hash_key(Key) -> ?RT:hash_key(Key).
