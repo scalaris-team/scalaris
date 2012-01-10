@@ -45,7 +45,10 @@ class JSONConnection(object):
         except Exception as instance:
             raise ConnectionError(instance)
 
-    def call(self, function, params, retry_if_bad_status = True):
+    def callp(self, path, function, params, retry_if_bad_status = True):
+        return self.call(function, params, path = path, retry_if_bad_status = retry_if_bad_status)
+
+    def call(self, function, params, path = DEFAULT_PATH, retry_if_bad_status = True):
         """
         Calls the given function with the given parameters via the JSON
         interface of scalaris.
@@ -59,8 +62,8 @@ class JSONConnection(object):
             params_json = json.dumps(params2, separators=(',',':'))
             headers = {"Content-type": "application/json; charset=utf-8"}
             # no need to quote - we already encode to json:
-            #self._conn.request("POST", DEFAULT_PATH, urllib.quote(params_json), headers)
-            self._conn.request("POST", DEFAULT_PATH, params_json, headers)
+            #self._conn.request("POST", path, urllib.quote(params_json), headers)
+            self._conn.request("POST", path, params_json, headers)
             response = self._conn.getresponse()
             #print response.status, response.reason
             if (response.status < 200 or response.status >= 300):
@@ -71,7 +74,7 @@ class JSONConnection(object):
         except httplib.BadStatusLine as instance:
             self.close()
             if retry_if_bad_status:
-                return self.call(function, params, retry_if_bad_status = False)
+                return self.call(function, params, path = path, retry_if_bad_status = False)
             else:
                 raise ConnectionError(instance)
         except ConnectionError:
@@ -594,7 +597,7 @@ class TransactionSingleOp(object):
         Elements of this list can be processed with process_result_read() and
         process_result_write().
         """
-        result = self._conn.call('req_list_commit_each', [reqlist.get_requests()])
+        result = self._conn.callp('/api/tx.yaws', 'req_list_commit_each', [reqlist.get_requests()])
         result = self._conn.process_result_req_list_tso(result)
         return result
     
@@ -656,7 +659,7 @@ class TransactionSingleOp(object):
         Beware: lists of (small) integers may be (falsely) returned as a string -
         use str_to_list() to convert such strings.
         """
-        result = self._conn.call('read', [key])
+        result = self._conn.callp('/api/tx.yaws', 'read', [key])
         return self._conn.process_result_read(result)
 
     def write(self, key, value):
@@ -664,7 +667,7 @@ class TransactionSingleOp(object):
         Write the value to key.
         """
         value = self._conn.encode_value(value)
-        result = self._conn.call('write', [key, value])
+        result = self._conn.callp('/api/tx.yaws', 'write', [key, value])
         self._conn.check_fail_abort(result)
         self._conn.process_result_write(result)
     
@@ -675,7 +678,7 @@ class TransactionSingleOp(object):
         Both, to_add and to_remove, must be lists.
         Assumes en empty list if no value exists at key.
         """
-        result = self._conn.call('add_del_on_list', [key, to_add, to_remove])
+        result = self._conn.callp('/api/tx.yaws', 'add_del_on_list', [key, to_add, to_remove])
         self._conn.check_fail_abort(result)
         self._conn.process_result_add_del_on_list(result)
     
@@ -684,7 +687,7 @@ class TransactionSingleOp(object):
         Changes the number stored at the given key, i.e. adds some value.
         Assumes 0 if no value exists at key.
         """
-        result = self._conn.call('add_on_nr', [key, to_add])
+        result = self._conn.callp('/api/tx.yaws', 'add_on_nr', [key, to_add])
         self._conn.check_fail_abort(result)
         self._conn.process_result_add_on_nr(result)
     
@@ -695,7 +698,7 @@ class TransactionSingleOp(object):
         """
         old_value = self._conn.encode_value(old_value)
         new_value = self._conn.encode_value(new_value)
-        result = self._conn.call('test_and_set', [key, old_value, new_value])
+        result = self._conn.callp('/api/tx.yaws', 'test_and_set', [key, old_value, new_value])
         self._conn.check_fail_abort(result)
         self._conn.process_result_test_and_set(result)
 
@@ -704,7 +707,7 @@ class TransactionSingleOp(object):
         No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
-        result = self._conn.call('nop', [value])
+        result = self._conn.callp('/api/tx.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
     def close_connection(self):
@@ -747,9 +750,9 @@ class Transaction(object):
         for its success.
         """
         if self._tlog is None:
-            result = self._conn.call('req_list', [reqlist.get_requests()])
+            result = self._conn.callp('/api/tx.yaws', 'req_list', [reqlist.get_requests()])
         else:
-            result = self._conn.call('req_list', [self._tlog, reqlist.get_requests()])
+            result = self._conn.callp('/api/tx.yaws', 'req_list', [self._tlog, reqlist.get_requests()])
         (tlog, result) = self._conn.process_result_req_list_t(result)
         self._tlog = tlog
         if reqlist.is_commit():
@@ -886,7 +889,7 @@ class Transaction(object):
         No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
-        result = self._conn.call('nop', [value])
+        result = self._conn.callp('/api/tx.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
     def close_connection(self):
@@ -1039,7 +1042,7 @@ class PubSub(object):
         # note: do NOT encode the content, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # content = self._conn.encode_value(content)
-        result = self._conn.call('publish', [topic, content])
+        result = self._conn.callp('/api/pubsub.yaws', 'publish', [topic, content])
         self._conn.process_result_publish(result)
 
     def subscribe(self, topic, url):
@@ -1049,7 +1052,7 @@ class PubSub(object):
         # note: do NOT encode the URL, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # url = self._conn.encode_value(url)
-        result = self._conn.call('subscribe', [topic, url])
+        result = self._conn.callp('/api/pubsub.yaws', 'subscribe', [topic, url])
         self._conn.process_result_subscribe(result)
 
     def unsubscribe(self, topic, url):
@@ -1059,14 +1062,14 @@ class PubSub(object):
         # note: do NOT encode the URL, this is not decoded on the erlang side!
         # (only strings are allowed anyway)
         # url = self._conn.encode_value(url)
-        result = self._conn.call('unsubscribe', [topic, url])
+        result = self._conn.callp('/api/pubsub.yaws', 'unsubscribe', [topic, url])
         self._conn.process_result_unsubscribe(result)
 
     def get_subscribers(self, topic):
         """
         Gets the list of all subscribers to topic.
         """
-        result = self._conn.call('get_subscribers', [topic])
+        result = self._conn.callp('/api/pubsub.yaws', 'get_subscribers', [topic])
         return self._conn.process_result_get_subscribers(result)
 
     def nop(self, value):
@@ -1074,7 +1077,7 @@ class PubSub(object):
         No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
-        result = self._conn.call('nop', [value])
+        result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
     def close_connection(self):
@@ -1107,7 +1110,7 @@ class ReplicatedDHT(object):
         can re-appear). Also when re-creating an item the version before the
         delete can re-appear.
         """
-        result = self._conn.call('delete', [key, timeout])
+        result = self._conn.callp('/api/rdht.yaws', 'delete', [key, timeout])
         (success, ok, results) = self._conn.process_result_delete(result)
         self._lastDeleteResult = results
         if success == True:
@@ -1132,7 +1135,7 @@ class ReplicatedDHT(object):
         No operation (may be used for measuring the JSON overhead).
         """
         value = self._conn.encode_value(value)
-        result = self._conn.call('nop', [value])
+        result = self._conn.callp('/api/rdht.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
     def close_connection(self):

@@ -1,0 +1,28 @@
+<erl module=jsonrpc_api_dht_raw_mod>
+-compile(export_all).
+
+out(A) ->
+    Peer = if is_tuple(A#arg.clisock) andalso
+              element(1, A#arg.clisock) =:= sslsocket ->
+                   ssl:peername(A#arg.clisock);
+              true ->
+                   inet:peername(A#arg.clisock)
+           end,
+    {ok, {IP, _}} = Peer,
+    A2 = A#arg{state = [{ip, IP}]},
+    case A2#arg.clidata of
+        {partial,_} -> send(A2, 413); % send error code 413 (Request Entity Too Large)
+        _ -> yaws_rpc:handler_session(A2, {?MODULE, handler})
+    end.
+
+handler([{ip, _IP}] = _State, {call, Operation, {array, Params}}, Session) ->
+    {true, 0, Session, {response, api_json_dht_raw:handler(Operation, Params)}}.
+
+send(Args, StatusCode) -> send(Args, StatusCode, "").
+
+send(_Args, StatusCode, Payload) ->
+    [{status, StatusCode},
+     {content, "application/json", Payload},
+     {header, {content_length, lists:flatlength(Payload) }}].
+
+</erl>
