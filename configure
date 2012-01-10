@@ -3782,7 +3782,7 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-$RUN_TEST --help -noshell | grep "ct_hooks" 2>/dev/null 1>/dev/null
+$ERL -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
 if test $? -eq 0 ; then :
   CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is available" >&5
 $as_echo "$as_me: ct_hooks is available" >&6;}
