@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
 -type commit_result() :: {ok} | {fail, abort | timeout}.
--type testandset_result() :: commit_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
+-type testandset_result() :: write_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 -type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
 
 %% @doc Get an empty transaction log to start a new transaction.

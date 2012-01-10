@@ -135,7 +135,7 @@ tlog_and_results_to_abort(TLog, ReqList) ->
                     write -> {ok};
                     add_del_on_list -> {ok};
                     add_on_nr -> {ok};
-                    test_and_set -> {fail, abort};
+                    test_and_set -> {ok};
                     commit -> {fail, abort}
                 end || X <- ReqList ]}.
 
@@ -374,8 +374,8 @@ tlog_write(Entry, _Key, Value) ->
             E2 = tx_tlog:set_entry_value(E1, Value),
             E3 = tx_tlog:set_entry_status(E2, value),
             {E3, {ok}};
-        {fail, abort} = Failed ->
-            {Entry, Failed}
+        {fail, abort} ->
+            {Entry, {ok}}
     end.
 
 %% @doc Simulate a change on a set via read and write requests.
