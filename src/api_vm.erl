@@ -64,8 +64,7 @@ get_nodes() ->
 
 %% @doc Adds Number Scalaris nodes to this VM.
 -spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
-add_nodes(0) -> {[], []};
-add_nodes(Number) ->
+add_nodes(Number) when is_integer(Number) andalso Number >= 0 ->
     Result = {Ok, _Failed} = admin:add_nodes(Number),
     % at least wait for the successful nodes to have joined, i.e. left the join phases
     util:wait_for(
@@ -97,12 +96,12 @@ shutdown_node(Name) ->
     end.
 %% @doc Sends a graceful leave request to multiple nodes.
 -spec shutdown_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
-shutdown_nodes(Count) ->
+shutdown_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
     Ok = admin:del_nodes(Count, true),
     wait_for_nodes_to_disappear(Ok),
     Ok.
 -spec shutdown_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
-shutdown_nodes_by_name(Names) ->
+shutdown_nodes_by_name(Names) when is_list(Names) ->
     Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, true),
     wait_for_nodes_to_disappear(Ok),
     Result.
@@ -116,12 +115,12 @@ kill_node(Name) ->
     end.
 %% @doc Kills multiple nodes.
 -spec kill_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
-kill_nodes(Count) ->
+kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
     Ok = admin:del_nodes(Count, false),
     wait_for_nodes_to_disappear(Ok),
     Ok.
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
-kill_nodes_by_name(Names) ->
+kill_nodes_by_name(Names) when is_list(Names) ->
     Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, false),
     wait_for_nodes_to_disappear(Ok),
     Result.
@@ -129,7 +128,7 @@ kill_nodes_by_name(Names) ->
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.
 -spec get_other_vms(MaxVMs::pos_integer()) -> [{ErlNode::node(), Ip::inet:ip_address(), Port::non_neg_integer(), YawsPort::non_neg_integer()}].
-get_other_vms(MaxVMs) ->
+get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
     DhtModule = config:read(dht_node),
     RandomConns =
         lists:append(
