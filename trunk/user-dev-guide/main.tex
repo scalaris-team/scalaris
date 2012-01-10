@@ -763,13 +763,11 @@ Currently we offer the following APIs:
 Each API contains methods for accessing functions from the three layers
 \scalaris{} is composed of.
 Table~\ref{api.layers} shows the modules and classes of Erlang, Java, Python and Ruby
-and their mapping to these layers. The appropriate JSON calls
-are shown in Section~\sieheref{sec.api.json}.
-
-Special care needs to be taken when trying to delete keys (no matter which API
-is being used). This can only be done outside the transaction layer and is thus not
-absolutely safe. Refer to the following thread on the mailing list:
-\url{http://groups.google.com/group/scalaris/browse_thread/thread/ff1d9237e218799}.
+and their mapping to these layers. Details about the supported operations and
+how to access them in each of the APIs are provided in
+Section~\sieheref{sec:apis.ops}. A more detailed discussion about the generic
+JSON API including examples of JSON calls is shown in
+Section~\sieheref{sec.api.json}.
 
 \begin{table}
   \centering
@@ -790,6 +788,7 @@ absolutely safe. Refer to the following thread on the mailing list:
     %\cmidrule(lr){2-4}
                       & \code{api_dht_raw}     &                              &                            \\
                       & \code{api_vm}          & \code{ScalarisVM}            &                            \\
+                      & \code{api_monitoring}  &                              &                            \\
     \bottomrule
     \end{tabular}
     \caption{Layered API structure}
@@ -866,6 +865,7 @@ json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false
 \end{table}
 
 \subsection{Supported Operations}
+\label{sec:apis.ops}
 
 Most operations are available to all APIs, but some (especially convenience
 methods) are API- or language-specific. The following paragraphs
@@ -946,6 +946,8 @@ Python: & \code{TransactionSingleOp.req_list(RequestList)}\\
 Ruby:   & \code{TransactionSingleOp.req_list(RequestList)}
 \end{tabular}
 
+\subsubsection{Transaction Layer (with TLog)}
+
 \paragraph{Read (with TLog)}
 Reads the value stored at a given key using quorum read as an additional part
 of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
@@ -1024,6 +1026,62 @@ Python: & \code{Transaction.req_list(RequestList)}\\
 Ruby:   & \code{Transaction.req_list(RequestList)}
 \end{tabular}
 
+\subsubsection{Transaction Layer (Pub/Sub)}
+Scalaris implements a simple Publish/Subscribe system. Subscribers can
+subscribe URLs for some topic. If an event is published to that topic, a
+JSON-RPC is send to that URL, i.e. a JSON object of the following form:
+\begin{lstlisting}[language=java]
+{
+ "method": "notify",
+ "params": [<topic>, <content>],
+ "id"    : <number>
+}
+\end{lstlisting}
+
+\paragraph{Publish}
+Publishes an event under a given topic.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_pubsub:publish(Topic, Content)}\\
+Java:   & \code{PubSub.publish(Topic, Content)}\\
+JSON:   & \code{publish(Topic, Content)}\\
+Python: & \code{PubSub.publish(Topic, Content)}\\
+Ruby:   & \code{PubSub.publish(Topic, Content)}
+\end{tabular}
+
+\paragraph{Subscribe}
+Subscribes a URL for a topic.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_pubsub:subscribe(Topic, URL)}\\
+Java:   & \code{PubSub.subscribe(Topic, URL)}\\
+JSON:   & \code{subscribe(Topic, URL)}\\
+Python: & \code{PubSub.subscribe(Topic, URL)}\\
+Ruby:   & \code{PubSub.subscribe(Topic, URL)}
+\end{tabular}
+
+\paragraph{Unsubscribe}
+Subscribes a URL from a topic.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_pubsub:unsubscribe(Topic, URL)}\\
+Java:   & \code{PubSub.unsubscribe(Topic, URL)}\\
+JSON:   & \code{unsubscribe(Topic, URL)}\\
+Python: & \code{PubSub.unsubscribe(Topic, URL)}\\
+Ruby:   & \code{PubSub.unsubscribe(Topic, URL)}
+\end{tabular}
+
+\paragraph{Get Subscribers}
+Gets a list of subscribed URLs for a given topic.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_pubsub:get_subscribers(Topic)}\\
+Java:   & \code{PubSub.getSubscribers(Topic)}\\
+JSON:   & \code{get_subscribers(Topic)}\\
+Python: & \code{PubSub.get_subscribers(Topic)}\\
+Ruby:   & \code{PubSub.get_subscribers(Topic)}
+\end{tabular}
+
 \subsubsection{Replication Layer}
 
 \paragraph{Delete}
@@ -1041,6 +1099,174 @@ Python: & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Time
 Ruby:   & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}
 \end{tabular}
 
+\paragraph{Get Replica Keys}
+Gets the (hashed) keys used for the replicas of a given (user) key
+(ref. Section~\nameref{sec:apis.ops.p2player}).
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_rdht:get_replica_keys(Key)}\\
+Java:   & \code{n/a}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\subsubsection{P2P Layer}
+\label{sec:apis.ops.p2player}
+
+\paragraph{Hash Key}
+Generates the hash of a given (user) key.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_dht:hash_key(Key)}\\
+Java:   & \code{n/a}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Replica Keys}
+Gets the (hashed) keys used for the replicas of a given (hashed) key.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_dht_raw:get_replica_keys(HashedKey)}\\
+Java:   & \code{n/a}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Range Read}
+Reads all Key-Value pairs in a given range of (hashed) keys.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_dht_raw:range_read(StartHashedKey, EndHashedKey)}\\
+Java:   & \code{n/a}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\subsubsection{P2P Layer (VM Management)}
+
+\paragraph{Get Scalaris Version}
+Gets the version of \scalaris{} running in the requested Erlang VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:get_version()}\\
+Java:   & \code{ScalarisVM.getVersion()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Node Info}
+Gets various information about the requested Erlang VM and the running
+\scalaris{} code, e.g. \scalaris{} version, erlang version, memory use, uptime.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:get_info()}\\
+Java:   & \code{ScalarisVM.getInfo()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Information about Different VMs}
+Get connection info about other Erlang VMs running \scalaris{} nodes.
+Note: This info is provided by the \erlmodule{cyclon} service built into
+\scalaris{}.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:get_other_vms(MaxVMs)}\\
+Java:   & \code{ScalarisVM.getOtherVMs(MaxVMs)}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Number of Scalaris Nodes in the VM}
+Gets the number of Scalaris nodes running inside the Erlang VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:number_of_nodes()}\\
+Java:   & \code{ScalarisVM.getNumberOfNodes()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Scalaris Nodes}
+Gets a list of Scalaris nodes running inside the Erlang VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:get_nodes()}\\
+Java:   & \code{ScalarisVM.getNodes()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Add Scalaris Nodes}
+Starts additional Scalaris nodes inside the Erlang VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:add_nodes(Number)}\\
+Java:   & \code{ScalarisVM.addNodes(Number)}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Shutdown Scalaris Nodes}
+Gracefully kill some Scalaris nodes inside the Erlang VM. This will first move
+the data from the nodes to other nodes and then shut them down.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:shutdown_node(Name)},\newline
+          \code{api_vm:shutdown_nodes(Count)}, \code{api_vm:shutdown_nodes_by_name(Names)}\\
+Java:   & \code{ScalarisVM.shutdownNode(Name)},\newline
+          \code{ScalarisVM.shutdownNodes(Number)}, \code{ScalarisVM.shutdownNodesByName(Names)}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Kill Scalaris Nodes}
+Immediately kills some Scalaris nodes inside the Erlang VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:kill_node(Name)},\newline
+          \code{api_vm:kill_nodes(Count)}, \code{api_vm:kill_nodes_by_name(Names)}\\
+Java:   & \code{ScalarisVM.killNode(Name)},\newline
+          \code{ScalarisVM.killNodes(Number)}, \code{ScalarisVM.killNodesByName(Names)}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Shutdown the Erlang VM}
+Gracefully shuts down all \scalaris{} nodes in the Erlang VM and then exits.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:shutdown_vm()}\\
+Java:   & \code{ScalarisVM.shutdownVM()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Kill the Erlang VM}
+Immediately kills all \scalaris{} nodes in the Erlang VM and then exits.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_vm:kill_vm()}\\
+Java:   & \code{ScalarisVM.killVM()}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
 \subsubsection{Convenience Methods / Classes}
 
 \paragraph{Connection Pool}
@@ -1054,6 +1280,18 @@ Erlang  & \code{n/a}\\
 Java:   & \code{ConnectionPool}\\
 JSON:   & \code{n/a}\\
 Python: & \code{ConnectionPool}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Connection Policies}
+Defines policies on how to select a node to connect to from a set of
+possible nodes and whether and how to automatically re-connect.
+
+\begin{tabular}{ll}
+Erlang  & \code{n/a}\\
+Java:   & \code{ConnectionPolicy}\\
+JSON:   & \code{n/a}\\
+Python: & \code{n/a}\\
 Ruby:   & \code{n/a}
 \end{tabular}
 

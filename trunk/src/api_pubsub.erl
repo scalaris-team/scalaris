@@ -22,16 +22,14 @@
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 
-%% @doc publishs an event under a given topic.
-%%      called e.g. from the java-interface
+%% @doc Publishes an event under a given topic.
 -spec publish(string(), string()) -> {ok}.
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
     _ = [ pubsub_publish:publish(X, Topic, Content) || X <- Subscribers ],
     {ok}.
 
-%% @doc subscribes a url for a topic.
-%%      called e.g. from the java-interface
+%% @doc Subscribes a URL for a topic.
 -spec subscribe(string(), string()) -> api_tx:commit_result().
 subscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
@@ -46,7 +44,7 @@ subscribe(Topic, URL) ->
         end,
     CommitRes.
 
-%% @doc unsubscribes a url for a topic.
+%% @doc Unsubscribes a URL from a topic.
 -spec unsubscribe(string(), string()) -> api_tx:commit_result() | {fail, not_found}.
 unsubscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
@@ -63,7 +61,7 @@ unsubscribe(Topic, URL) ->
         _ -> Res
     end.
 
-%% @doc queries the subscribers of a query
+%% @doc Queries the subscribers of a query.
 -spec get_subscribers(Topic::string()) -> [string()].
 get_subscribers(Topic) ->
     {Res, Value} = api_tx:read(Topic),

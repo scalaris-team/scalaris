@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Defines a policy on how to select a node to connect with from a set of
+ * Defines a policy on how to select a node to connect to from a set of
  * possible nodes and whether to automatically re-connect.
  *
  * @author Nico Kruber, kruber@zib.de
