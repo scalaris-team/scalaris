@@ -387,8 +387,8 @@ run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunT
     end,
     apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos).
 
-apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos) ->
-    try erlang:apply(Module, Func, Args) of
+apply_args(Module, Func, Arity, Args, Iterations, {'fun', ArgType, ResultType} = FunType, TypeInfos) ->
+    try tester_type_checker:check(erlang:apply(Module, Func, Args), ResultType, TypeInfos) of
         true ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, TypeInfos);
         X ->
