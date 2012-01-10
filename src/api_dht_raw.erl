@@ -21,12 +21,15 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([range_read/2]).
+-export([get_replica_keys/1, range_read/2]).
 
 -export([unreliable_lookup/2,
          unreliable_get_key/1, unreliable_get_key/3]).
 
 -include("scalaris.hrl").
+
+-spec get_replica_keys(?RT:key()) -> [?RT:key()].
+get_replica_keys(Key) -> ?RT:get_replica_keys(Key).
 
 %% userdevguide-begin api_dht_raw:lookup
 -spec unreliable_lookup(Key::?RT:key(), Msg::comm:message()) -> ok.

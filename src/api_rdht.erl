@@ -20,7 +20,9 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+-export([get_replica_keys/1]).
 -export([delete/1, delete/2]).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
@@ -75,3 +77,6 @@ delete_collect_results(ReplicaKeys, ClientsId, Results) ->
             %% probably an outdated message: drop it.
             delete_collect_results(ReplicaKeys, ClientsId, Results)
     end.
+
+-spec get_replica_keys(client_key()) -> [?RT:key()].
+get_replica_keys(Key) -> ?RT:get_replica_keys(?RT:hash_key(Key)).
