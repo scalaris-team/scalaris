@@ -15,7 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc API for monitoring individual nodes and the whole ring
 %% @version $Id$
--module(api_monitoring).
+-module(api_monitor).
 -author('schuett@zib.de').
 -vsn('$Id$').
 
