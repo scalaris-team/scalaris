@@ -46,14 +46,14 @@
 -endif.
 
 -type tx_status() :: value | {fail, abort | not_found}.
--type tx_op()     :: rdht_tx_read   | rdht_tx_write.
+-type tx_op()     :: rdht_tx_read | rdht_tx_write.
 
--type tlog_key() :: client_key() | ?RT:key().
+-type tlog_key() :: client_key().%% | ?RT:key().
 %% TLogEntry: {Operation, Key, Status, Value, Version}
 %% Sample: {read,"key3",value,"value3",0}
 -type tlog_entry() ::
           { tx_op(),                  %% operation
-            tlog_key, %% key | hashed and replicated key
+            tlog_key(), %% key | hashed and replicated key
             integer(),                %% version
             tx_status(),              %% status
             any()                     %% value

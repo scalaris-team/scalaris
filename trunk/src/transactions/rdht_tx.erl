@@ -116,7 +116,7 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
                                     encode_value(Value)} | Acc],
                               OKorAbort);
         {commit} = Commit ->
-            log:log(warn, "Commit not at end of a req_list. Deciding abort."),
+            log:log(info, "Commit not at end of a req_list. Deciding abort."),
             rl_chk_and_encode(RL, [Commit | Acc], abort);
         Op ->
             rl_chk_and_encode(RL, [Op | Acc], OKorAbort)
@@ -126,10 +126,15 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
 -spec tlog_and_results_to_abort(tx_tlog:tlog(), [request()]) ->
                                        {tx_tlog:tlog(), results()}.
 tlog_and_results_to_abort(TLog, ReqList) ->
-    NewTLog = [ tx_tlog:add_or_update_status_by_key(TLog,
-                                                    req_get_key(X),
-                                                    {fail, abort})
-                || X <- ReqList, X =/= {commit} ],
+    NewTLog = lists:foldl(fun(Req, AccTLog) ->
+                                  case Req of
+                                      {commit} -> AccTLog;
+                                      _ ->
+                                          tx_tlog:add_or_update_status_by_key(
+                                            AccTLog,
+                                            req_get_key(Req),
+                                            {fail, abort})
+                                  end end, TLog, ReqList),
     {NewTLog, [ case element(1, X) of
                     read -> {fail, not_found};
                     write -> {ok};

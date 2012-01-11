@@ -26,7 +26,8 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
-all()   -> [new_tlog_0,
+all()   -> [
+            new_tlog_0,
             req_list_2,
             read_2,
             write_3,
@@ -61,7 +62,8 @@ all()   -> [new_tlog_0,
             tester_tlog_test_and_set_not_existing,
             tester_tlog_test_and_set,
             tester_req_list,
-            tester_req_list_on_same_key
+            tester_req_list_on_same_key,
+            tester_exported_functions
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -910,3 +912,23 @@ prop_tester_req_list_on_same_key(Key, InReqList) ->
 tester_req_list_on_same_key(_Config) ->
     tester:test(?MODULE, prop_tester_req_list_on_same_key, 2, 5000).
 
+tester_exported_functions(_Config) ->
+    %% Perform chain operations.
+    Count = 1000,
+    tester:test(api_tx, new_tlog, 0, Count),
+    tester:test(api_tx, req_list, 1, Count),
+    tester:test(api_tx, req_list, 2, Count),
+    tester:test(api_tx, read, 2, Count),
+    tester:test(api_tx, write, 3, Count),
+    tester:test(api_tx, add_del_on_list, 4, Count),
+    tester:test(api_tx, add_on_nr, 3, Count),
+    tester:test(api_tx, test_and_set, 4, Count),
+    tester:test(api_tx, commit, 1, Count),
+    %% Perform single operation transactions.
+    tester:test(api_tx, req_list_commit_each, 1, Count),
+    tester:test(api_tx, read, 1, Count),
+    tester:test(api_tx, write, 2, Count),
+    tester:test(api_tx, add_del_on_list, 3, Count),
+    tester:test(api_tx, add_on_nr, 2, Count),
+    tester:test(api_tx, test_and_set, 3, Count),
+    true.
