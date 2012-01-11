@@ -25,7 +25,7 @@ Currently we offer the following APIs:
 
 Each API contains methods for accessing functions from the three layers
 \scalaris{} is composed of.
-Table~\ref{api.layers} shows the modules and classes of Erlang, Java, Python and Ruby
+Table~\ref{tab.api.layers} shows the modules and classes of Erlang, Java, Python and Ruby
 and their mapping to these layers. Details about the supported operations and
 how to access them in each of the APIs are provided in
 Section~\sieheref{sec:apis.ops}. A more detailed discussion about the generic
@@ -34,28 +34,33 @@ Section~\sieheref{sec.api.json}.
 
 \begin{table}
   \centering
-    \begin{tabular}{p{4cm}lll}
+    \begin{tabular}{p{2cm}llll}
     \toprule
-                      & Erlang                 & Java                         & Python / Ruby              \\
-                      & \footnotesize{module}  & \footnotesize{class in \code{de.zib.scalaris}}%
-                                                                              & \footnotesize{class in module \code{scalaris}} \\
+      & Erlang                 & Java                         & JSON                & Python / Ruby              \\
+      & \footnotesize{module}  & \footnotesize{class in \code{de.zib.scalaris}}%
+                                                              & \footnotesize{file in \code{<URL>/api/}}%
+                                                                                    & \footnotesize{class in module \code{scalaris}} \\
     \midrule
-    Transaction Layer & \code{api_tx}          & \code{Transaction},          & \code{Transaction},        \\
-                      &                        & \code{TransactionSingleOp}   & \code{TransactionSingleOp} \\
-    %\cmidrule(lr){2-4}
-                      & \code{api_pubsub}      & \code{PubSub}                & \code{PubSub}              \\
-    \cmidrule(lr){1-4}
-    Replication Layer & \code{api_rdht}        & \code{ReplicatedDHT}         & \code{ReplicatedDHT}       \\
-    \cmidrule(lr){1-4}
-    P2P Layer         & \code{api_dht}         &                              &                            \\
-    %\cmidrule(lr){2-4}
-                      & \code{api_dht_raw}     &                              &                            \\
-                      & \code{api_vm}          & \code{ScalarisVM}            &                            \\
-                      & \code{api_monitor}     &                              &                            \\
+    \multirow{3}{2cm}{Transaction\\Layer}
+      & \code{api_tx}          & \code{Transaction},          & \code{tx.yaws}      & \code{Transaction},        \\
+      &                        & \code{TransactionSingleOp}   &                     & \code{TransactionSingleOp} \\
+    %\cmidrule(lr){2-5}
+      & \code{api_pubsub}      & \code{PubSub}                & \code{pubsub.yaws}  & \code{PubSub}              \\
+    \cmidrule(lr){1-5}
+    \multirow{2}{2cm}{Replication\\Layer}
+      & \code{api_rdht}        & \code{ReplicatedDHT}         & \code{rdht.yaws}    & \code{ReplicatedDHT}       \\
+      &                        &                              &                     &                            \\
+    \cmidrule(lr){1-5}
+    \multirow{4}{2cm}{P2P Layer}
+      & \code{api_dht}         &                              &                     &                            \\
+    %\cmidrule(lr){2-5}
+      & \code{api_dht_raw}     &                              & \code{dht_raw.yaws} &                            \\
+      & \code{api_vm}          & \code{ScalarisVM}            &                     &                            \\
+      & \code{api_monitor}     & \code{Monitor}               & \code{monitor.yaws} &                            \\
     \bottomrule
     \end{tabular}
     \caption{Layered API structure}
-    \label{api.layers}
+    \label{tab.api.layers}
 \end{table}
 
 \subsection{Supported Types}
@@ -90,7 +95,7 @@ Special care needs to be taken using custom types as they may not be accessible
 through every API or may be misinterpreted by an API. The use of them is
 discouraged.
 
-Table~\ref{api.supported_types} shows the mapping of supported types to the
+Table~\ref{tab.api.supported_types} shows the mapping of supported types to the
 language-specific types of each API.
 
 \begin{table}
@@ -123,7 +128,7 @@ json_val() :: string() | number() | json_obj() | {array, [any()]} | true | false
 \end{lstlisting}
     \end{tablenotes}
     \caption{Types supported by the \scalaris{} APIs}
-    \label{api.supported_types}
+    \label{tab.api.supported_types}
   \end{threeparttable}
 \end{table}
 
@@ -143,7 +148,7 @@ Reads the value stored at a given key using quorum read.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:read(Key)}\\
 Java:   & \code{TransactionSingleOp.read(Key)}\\
-JSON:   & \code{read(Key)}\\
+JSON:   & \code{tx.yaws/read(Key)}\\
 Python: & \code{TransactionSingleOp.read(Key)}\\
 Ruby:   & \code{TransactionSingleOp.read(Key)}
 \end{tabular}
@@ -154,7 +159,7 @@ Writes a value to a given key.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:write(Key, Value)}\\
 Java:   & \code{TransactionSingleOp.write(Key, Value)}\\
-JSON:   & \code{write(Key, Value)}\\
+JSON:   & \code{tx.yaws/write(Key, Value)}\\
 Python: & \code{TransactionSingleOp.write(Key, Value)}\\
 Ruby:   & \code{TransactionSingleOp.write(Key, Value)}
 \end{tabular}
@@ -166,7 +171,7 @@ then remove all elements from a second given list.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:add_del_on_list(Key, ToAddList, ToRemoveList)}\\
 Java:   & \code{TransactionSingleOp.addDelOnList(Key, ToAddList, ToRemoveList)}\\
-JSON:   & \code{add_del_on_list(Key, ToAddList, ToRemoveList)}\\
+JSON:   & \code{tx.yaws/add_del_on_list(Key, ToAddList, ToRemoveList)}\\
 Python: & \code{TransactionSingleOp.add_del_on_list(Key, ToAddList, ToRemoveList)}\\
 Ruby:   & \code{TransactionSingleOp.add_del_on_list(Key, ToAddList, ToRemoveList)}
 \end{tabular}
@@ -177,7 +182,7 @@ Adds a given number to the number stored at a given key.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:add_on_nr(Key, ToAddNumber)}\\
 Java:   & \code{TransactionSingleOp.addOnNr(Key, ToAddNumber)}\\
-JSON:   & \code{add_on_nr(Key, ToAddList, ToAddNumber)}\\
+JSON:   & \code{tx.yaws/add_on_nr(Key, ToAddList, ToAddNumber)}\\
 Python: & \code{TransactionSingleOp.add_on_nr(Key, ToAddNumber)}\\
 Ruby:   & \code{TransactionSingleOp.add_on_nr(Key, ToAddNumber)}
 \end{tabular}
@@ -189,7 +194,7 @@ given old value.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:test_and_set(Key, OldValue, NewValue)}\\
 Java:   & \code{TransactionSingleOp.testAndSet(Key, OldValue, NewValue)}\\
-JSON:   & \code{add_on_nr(Key, OldValue, NewValue)}\\
+JSON:   & \code{tx.yaws/add_on_nr(Key, OldValue, NewValue)}\\
 Python: & \code{TransactionSingleOp.test_and_set(Key, OldValue, NewValue)}\\
 Ruby:   & \code{TransactionSingleOp.test_and_set(Key, OldValue, NewValue)}
 \end{tabular}
@@ -204,7 +209,7 @@ better performance than executing all on their own.}
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:req_list_commit_each(RequestList)}\\
 Java:   & \code{TransactionSingleOp.req_list(RequestList)}\\
-JSON:   & \code{req_list_commit_each(RequestList)}\\
+JSON:   & \code{tx.yaws/req_list_commit_each(RequestList)}\\
 Python: & \code{TransactionSingleOp.req_list(RequestList)}\\
 Ruby:   & \code{TransactionSingleOp.req_list(RequestList)}
 \end{tabular}
@@ -268,7 +273,7 @@ of a previous transaction or for starting a new one \emph{(no auto-commit!)}.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:test_and_set(TLog, Key, OldValue, NewValue)}\\
 Java:   & \code{Transaction.testAndSet(Key, OldValue, NewValue)}\\
-JSON:   & \code{test_and_set(Key, OldValue, NewValue)}\\
+JSON:   & \code{tx.yaws/test_and_set(Key, OldValue, NewValue)}\\
 Python: & \code{Transaction.test_and_set(Key, OldValue, NewValue)}\\
 Ruby:   & \code{Transaction.test_and_set(Key, OldValue, NewValue)}
 \end{tabular}
@@ -284,7 +289,7 @@ better performance than executing all on their own.}
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_tx:req_list(RequestList)}, \code{api_tx:req_list(TLog, RequestList)}\\
 Java:   & \code{Transaction.req_list(RequestList)}\\
-JSON:   & \code{req_list(RequestList)}, \code{req_list(TLog, RequestList)}\\
+JSON:   & \code{tx.yaws/req_list(RequestList)}, \code{req_list(TLog, RequestList)}\\
 Python: & \code{Transaction.req_list(RequestList)}\\
 Ruby:   & \code{Transaction.req_list(RequestList)}
 \end{tabular}
@@ -307,7 +312,7 @@ Publishes an event under a given topic.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_pubsub:publish(Topic, Content)}\\
 Java:   & \code{PubSub.publish(Topic, Content)}\\
-JSON:   & \code{publish(Topic, Content)}\\
+JSON:   & \code{pubsub.yaws/publish(Topic, Content)}\\
 Python: & \code{PubSub.publish(Topic, Content)}\\
 Ruby:   & \code{PubSub.publish(Topic, Content)}
 \end{tabular}
@@ -318,7 +323,7 @@ Subscribes a URL for a topic.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_pubsub:subscribe(Topic, URL)}\\
 Java:   & \code{PubSub.subscribe(Topic, URL)}\\
-JSON:   & \code{subscribe(Topic, URL)}\\
+JSON:   & \code{pubsub.yaws/subscribe(Topic, URL)}\\
 Python: & \code{PubSub.subscribe(Topic, URL)}\\
 Ruby:   & \code{PubSub.subscribe(Topic, URL)}
 \end{tabular}
@@ -329,7 +334,7 @@ Subscribes a URL from a topic.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_pubsub:unsubscribe(Topic, URL)}\\
 Java:   & \code{PubSub.unsubscribe(Topic, URL)}\\
-JSON:   & \code{unsubscribe(Topic, URL)}\\
+JSON:   & \code{pubsub.yaws/unsubscribe(Topic, URL)}\\
 Python: & \code{PubSub.unsubscribe(Topic, URL)}\\
 Ruby:   & \code{PubSub.unsubscribe(Topic, URL)}
 \end{tabular}
@@ -340,7 +345,7 @@ Gets a list of subscribed URLs for a given topic.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_pubsub:get_subscribers(Topic)}\\
 Java:   & \code{PubSub.getSubscribers(Topic)}\\
-JSON:   & \code{get_subscribers(Topic)}\\
+JSON:   & \code{pubsub.yaws/get_subscribers(Topic)}\\
 Python: & \code{PubSub.get_subscribers(Topic)}\\
 Ruby:   & \code{PubSub.get_subscribers(Topic)}
 \end{tabular}
@@ -357,7 +362,7 @@ absolutely safe. Refer to the following thread on the mailing list:
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_rdht:delete(Key)}, \code{api_rdht:delete(Key, Timeout)}\\
 Java:   & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}\\
-JSON:   & \code{delete(Key)}, \code{delete(Key, Timeout)}\\
+JSON:   & \code{rdht.yaws/delete(Key)}, \code{rdht.yaws/delete(Key, Timeout)}\\
 Python: & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}\\
 Ruby:   & \code{ReplicatedDHT.delete(Key)}, \code{ReplicatedDHT.delete(Key, Timeout)}
 \end{tabular}
@@ -405,7 +410,7 @@ Reads all Key-Value pairs in a given range of (hashed) keys.
 \begin{tabular}{lp{14cm}}
 Erlang  & \code{api_dht_raw:range_read(StartHashedKey, EndHashedKey)}\\
 Java:   & \code{n/a}\\
-JSON:   & \code{n/a}\\
+JSON:   & \code{dht_raw.yaws/range_read(StartHashedKey, EndHashedKey)}\\
 Python: & \code{n/a}\\
 Ruby:   & \code{n/a}
 \end{tabular}
@@ -530,6 +535,58 @@ Python: & \code{n/a}\\
 Ruby:   & \code{n/a}
 \end{tabular}
 
+\subsubsection{P2P Layer (Monitoring)}
+
+\paragraph{Get Node Info}
+Gets some information about the node, e.g. \scalaris{} version, Erlang version,
+number of \scalaris{} nodes in the VM.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_monitor:get_node_info()}\\
+Java:   & \code{Monitor.getNodeInfo()}\\
+JSON:   & \code{monitor.yaws/get_node_info()}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Node Performance}
+Gets some performance information about the node, e.g. the average latency and
+standard deviation of transactional operations.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_monitor:get_node_performance()}\\
+Java:   & \code{Monitor.getNodePerformance()}\\
+JSON:   & \code{monitor.yaws/get_node_performance()}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Service Info}
+Gets some information about the whole \scalaris{} ring (may be estimated if no
+management server is used). Includes the overall load and the total number of
+nodes in the ring.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_monitor:get_service_info()}\\
+Java:   & \code{Monitor.getServiceInfo()}\\
+JSON:   & \code{monitor.yaws/get_service_info()}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
+\paragraph{Get Service Performance}
+Gets some performance information about the whole \scalaris{} ring, e.g. the
+average latency and standard deviation of transactional operations. Both are
+aggregated and may be estimates.
+
+\begin{tabular}{lp{14cm}}
+Erlang  & \code{api_monitor:get_service_performance()}\\
+Java:   & \code{Monitor.getServicePerformance()}\\
+JSON:   & \code{monitor.yaws/get_service_performance()}\\
+Python: & \code{n/a}\\
+Ruby:   & \code{n/a}
+\end{tabular}
+
 \subsubsection{Convenience Methods / Classes}
 
 \paragraph{Connection Pool}
@@ -576,8 +633,13 @@ Request lists are also supported for single read/write operations, i.e.
 every single operation is committed on its own. 
 
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
-8000 by default and the page \code{jsonrpc.yaws} (For example at:
-\url{http://localhost:8000/jsonrpc.yaws}).
+8000 by default and pages under \code{<URL>/api/}.
+For backwards-compatibility the page \code{<URL>/jsonrpc.yaws} provides some
+functions otherwise provided by the different pages under \code{<URL>/api/} but
+beware that this may be removed in future.
+Other examples include \url{http://localhost:8000/api/tx.yaws}.
+See Table~\sieheref{tab.api.layers} for a mapping of the layers to the
+different pages.
 Requests are issued by sending a JSON object with header
 \code{"Content-type"="application/json"} to this URL.
 The result will then be returned as a JSON object with the same content type.
@@ -607,11 +669,12 @@ request and is returned in the result.
 The following operations (shown as \code{<method>(<params>)}) are currently
 supported (the given result is the \code{<result_object>} mentioned above):
 \begin{itemize}
+  \item[] \hspace{-1.7em}generic, e.g. for testing - \code{<URL>/api/*.yaws}
   \item \code{nop(Value)} - no operation, result:
 \begin{lstlisting}[language=java]
 "ok"
 \end{lstlisting}
-  \item[] \hspace{-1.7em}single operations, e.g. read/write:
+  \item[] \hspace{-1.7em}single operations, e.g. read/write - \code{<URL>/api/tx.yaws}:
   \item \code{req_list_commit_each(<req_list_ce>)} - commit each request in the list, result:
 \begin{lstlisting}[language=java]
 {[{"status": "ok"} or {"status": "ok", "value": <json_value>} or
@@ -651,7 +714,7 @@ supported (the given result is the \code{<result_object>} mentioned above):
 {"status": "fail", "reason": "timeout" or "abort" or "not_found"} or
 {"status": "fail", "reason": "key_changed", "value": <json_value>}
 \end{lstlisting}
-  \item[] \hspace{-1.7em}transactions:
+  \item[] \hspace{-1.7em}transactions - \code{<URL>/api/tx.yaws}:
   \item \code{req_list(<req_list>)} - process a list of requests, result:
 \begin{lstlisting}[language=java]
 {"tlog": <tlog>,
@@ -668,7 +731,7 @@ supported (the given result is the \code{<result_object>} mentioned above):
                                           "not_a_list" or "not_a_number"} or
              {"status": "fail", "reason": "key_changed", "value": <json_value>}]}
 \end{lstlisting}
-  \item[] \hspace{-1.7em}replication layer functions:
+  \item[] \hspace{-1.7em}replication layer functions - \code{<URL>/api/rdht.yaws}:
   \item \code{delete(<key>)} - delete the value at \code{key}, default timeout 2s, result:
 \begin{lstlisting}[language=java]
 {"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
@@ -679,13 +742,13 @@ supported (the given result is the \code{<result_object>} mentioned above):
 {"ok": <number>, "results": ["ok" or "locks_set" or "undef"]} or
 {"failure": "timeout", "ok": <number>, "results": ["ok" or "locks_set" or "undef"]}
 \end{lstlisting}
-  \item[] \hspace{-1.7em}raw DHT functions:
+  \item[] \hspace{-1.7em}raw DHT functions - \code{<URL>/api/dht_raw.yaws}:
   \item \code{range_read(From, To)} - read a range of (raw) keys, result:
 \begin{lstlisting}[language=java]
 {"status": "ok" or "timeout",
  "value": [{"key": <key>, "value": <json_value>, "version": <version>}]}
 \end{lstlisting}
-  \item[] \hspace{-1.7em}publish/subscribe:
+  \item[] \hspace{-1.7em}publish/subscribe - \code{<URL>/api/pubsub.yaws}:
   \item \code{publish(Topic, Content)} - publish \code{Content} to \code{Topic} (\code{<key>}), result:
 \begin{lstlisting}[language=java]
 {"status": "ok"}
@@ -708,6 +771,29 @@ supported (the given result is the \code{<result_object>} mentioned above):
 % \begin{lstlisting}[language=java]
 % "ok"
 % \end{lstlisting}
+  \item[] \hspace{-1.7em}monitor - \code{<URL>/api/monitor.yaws}:
+  \item \code{get_node_info()} - gets some information about the node, result:
+\begin{lstlisting}[language=java]
+{"status": "ok" or "timeout",
+ "value": [{"scalaris_version": <version_string>,
+            "erlang_version": <version_string>,
+            "dht_nodes": <number>}]}
+\end{lstlisting}
+  \item \code{get_node_performance()} - gets some performance information about the node, result:
+\begin{lstlisting}[language=java]
+{"status": "ok" or "timeout",
+ "value": [{"latency_avg": <perf_data>, "latency_stddev": <perf_data>}]}
+\end{lstlisting}
+  \item \code{get_service_info()} - gets some information about the \scalaris{} ring, result:
+\begin{lstlisting}[language=java]
+{"status": "ok" or "timeout",
+ "value": [{"total_load": <number>, "nodes": <number>}]}
+\end{lstlisting}
+  \item \code{get_service_performance()} - gets some performance information about the \scalaris{} ring, result:
+\begin{lstlisting}[language=java]
+{"status": "ok" or "timeout",
+ "value": [{"latency_avg": <perf_data>, "latency_stddev": <perf_data>}]}
+\end{lstlisting}
 \end{itemize}
 
 Note:
@@ -719,6 +805,7 @@ Note:
               {"test_and_set": {"key": <key>, "old": <json_value>, "new": <json_value>}}
 <req_list_ce> = [<operation>]
 <req_list> = [<operation> or {"commit", _}]
+<perf_data> = {<number>: <perf_val>,...}
 \end{lstlisting}
 The \code{<value>} inside \code{<json_value>} is either a base64-encoded
 string representing a binary object (type = \code{"as_bin"}) or the value
