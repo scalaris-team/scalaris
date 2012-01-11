@@ -62,11 +62,11 @@ tester_type_check_module({Module, InExcludeList}, Count) ->
 tester_type_check(_Config) ->
 
     Count = 1000,
+    config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
-%%               {intervals, [{get_bounds, 1}]}, %% throws exception on []%                {util, [
-%                        {collect_while, 1}
-%                       ]},
+%%               {randoms, []},
+%%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
                {api_dht, []},
                {api_dht_raw, []},
                {api_monitor, []},
@@ -76,7 +76,10 @@ tester_type_check(_Config) ->
                {rdht_tx, [
                           {decode_value, 1} %% not every binary is an erlterm
                          ]}
-
+%%               {util, [
+%%                       {collect_while, 1}
+%%                      ]}
+%%
               ],
     [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
     true.
