@@ -53,9 +53,7 @@
         {ok, client_value()} | {fail, abort | timeout | not_found}.
 -type result_entry_write()  :: {ok} | {fail, abort | timeout}.
 -type result_entry_commit() :: {ok} | {fail, abort | timeout}.
--type result_entry() :: result_entry_read()
-                      | result_entry_write()
-                      | result_entry_commit().
+-type result_entry() :: api_tx:result().
 -type results() :: [ result_entry() ].
 
 %% @doc Perform several requests inside a transaction.
@@ -138,6 +136,8 @@ tlog_and_results_to_abort(TLog, ReqList) ->
     {NewTLog, [ case element(1, X) of
                     read -> {fail, not_found};
                     write -> {ok};
+                    rdht_tx_read -> {fail, not_found};
+                    rdht_tx_write -> {ok};
                     add_del_on_list -> {ok};
                     add_on_nr -> {ok};
                     test_and_set -> {ok};
