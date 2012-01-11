@@ -51,9 +51,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 tester_type_check_module({Module, InExcludeList}, Count) ->
-    ModuleFile = code:where_is_file(atom_to_list(Module) ++ ".beam"),
-    {ok, {Module, [{exports, ExpFuncs}]}}
-        = beam_lib:chunks(ModuleFile, [exports]),
+    ExpFuncs = Module:module_info(exports),
     ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
     [ begin
           ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
