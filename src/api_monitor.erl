@@ -24,10 +24,14 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--spec get_node_info() -> list().
+%% @doc Gets some information about the current Erlang node.
+%%      Note: The list of returned tuples may grow in future versions; do not
+%%            expect that only the given values are returned!
+-spec get_node_info() -> [{scalaris_version | erlang_version, nonempty_string()} |
+                          {dht_nodes, non_neg_integer()},...].
 get_node_info() ->
     %MyMonitor = pid_groups:pid_of("clients_group", monitor),
-    %statistics:getMonitorStats(MyMonitor, Keys),
+    %statistics:getMonitorStats(MyMonitor, Keys, tuple),
     [{scalaris_version, ?SCALARIS_VERSION},
      {erlang_version, erlang:system_info(otp_release)},
      {dht_nodes, length(pid_groups:find_all(dht_node))}].
@@ -36,7 +40,7 @@ get_node_info() ->
 get_node_performance() ->
     Monitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}]) of
+        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
@@ -53,7 +57,7 @@ get_service_info() ->
 get_service_performance() ->
     Monitor = pid_groups:find_a(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}]) of
+        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,

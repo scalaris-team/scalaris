@@ -42,18 +42,25 @@ handler(AnyOp, AnyParams) ->
     {struct, [{failure, "unknownreq"}]}.
 
 %% interface for monitoring calls
--spec get_node_info() -> {struct, [tuple()]}.
+-spec get_node_info() -> {struct, [{Key::atom(), Value::term()}]}.
 get_node_info() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_node_info()}}]}.
+    {struct, [{status, "ok"}, {value, tuple_list_to_json(api_monitor:get_node_info())}]}.
 
--spec get_node_performance() -> {struct, [tuple()]}.
+-spec get_node_performance() -> {struct, [{Key::atom(), Value::term()}]}.
 get_node_performance() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_node_performance()}}]}.
+    {struct, [{status, "ok"}, {value, tuple_list_to_json(api_monitor:get_node_performance())}]}.
 
--spec get_service_info() -> {struct, [tuple()]}.
+-spec get_service_info() -> {struct, [{Key::atom(), Value::term()}]}.
 get_service_info() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_service_info()}}]}.
+    {struct, [{status, "ok"}, {value, tuple_list_to_json(api_monitor:get_service_info())}]}.
 
--spec get_service_performance() -> {struct, [tuple()]}.
+-spec get_service_performance() -> {struct, [{Key::atom(), Value::term()}]}.
 get_service_performance() ->
-    {struct, [{status, "ok"}, {value, {struct, api_monitor:get_service_performance()}}]}.
+    {struct, [{status, "ok"}, {value, tuple_list_to_json(api_monitor:get_service_performance())}]}.
+
+%% @doc Recursively converts 2-tuple lists to JSON objects.
+-spec tuple_list_to_json([{Key::atom(), Value::term()}]) -> {struct, [{Key::atom(), Value::term()}]}.
+tuple_list_to_json([]) -> [];
+tuple_list_to_json([{Key, _} | _] = List) when is_atom(Key) ->
+    {struct, [{KeyX, tuple_list_to_json(ValueX)} || {KeyX, ValueX} <- List]};
+tuple_list_to_json(X) -> X.
