@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,9 +27,9 @@
 -include("client_types.hrl").
 
 -type(delete_result() ::
-        {ok, ResultsOk::pos_integer(),
+        {ok, ResultsOk::non_neg_integer(),
          ResultList::[ok | locks_set | undef]}
-      | {fail, timeout, ResultsOk::pos_integer(),
+      | {fail, timeout, ResultsOk::non_neg_integer(),
          ResultList::[ok | locks_set | undef]}).
 
 -spec delete(Key::client_key()) -> delete_result().

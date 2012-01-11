@@ -15,14 +15,15 @@
 %%%-------------------------------------------------------------------
 %%% File    tester_type_checker.erl
 %%% @author Thorsten Schuett <schuett@zib.de>
+%%% @author Florian Schintke <schintke@zib.de>
 %%% @doc    check whether a given value is of a given type
 %%% @end
 %%% Created :  10 Jan 2012 by Thorsten Schuett <schuett@zib.de>
 %%%-------------------------------------------------------------------
 %% @version $Id$
 -module(tester_type_checker).
-
 -author('schuett@zib.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -export([check/3]).
@@ -36,7 +37,7 @@ check(true, {atom, true}, _ParseState) ->
 check(true, bool, _ParseState) ->
     true;
 check(Value, Type, ParseState) ->
-    %ct:pal("inner_check(~w, ~w)", [Value, Type]),
+    %ct:pal("new inner_check(~w, ~w)", [Value, Type]),
     inner_check(Value, Type, ParseState).
 
 inner_check(Value, {list, InnerType}, ParseState) when is_list(Value) ->
@@ -56,7 +57,7 @@ inner_check(Value, {tuple, TupleType}, ParseState) when is_tuple(Value) ->
     case erlang:size(Value) =:= erlang:length(TupleType) of
         false -> false;
         true ->
-            check_tuple_type(Value, TupleType, ParseState, 1)
+            check_tuple_type(erlang:tuple_to_list(Value), TupleType, ParseState)
     end;
 inner_check(Value, {union, TypeList}, ParseState) ->
     %ct:pal("inner check union ~p~n", [TypeList]),
@@ -69,18 +70,31 @@ inner_check(Value, bool, _ParseState) when is_boolean(Value) ->
     true;
 inner_check(Value, integer, _ParseState) when is_integer(Value) ->
     true;
+inner_check(Value, non_neg_integer, _ParseState) when is_integer(Value) ->
+    (0 =< Value);
+inner_check(Value, pos_integer, _ParseState) when is_integer(Value) ->
+    (0 < Value);
+inner_check(Value, {integer, IntVal}, _ParseState) when is_integer(Value) ->
+    Value =:= IntVal;
+inner_check(Value, binary, _ParseState) when is_binary(Value) ->
+    true;
+inner_check(Value, atom, _ParseState) when is_atom(Value) ->
+    true;
+inner_check(Value, float, _ParseState) when is_float(Value) ->
+    true;
+inner_check(Value, pid, _ParseState) when is_pid(Value) ->
+    true;
 inner_check(Value, {atom, AtomValue}, _ParseState) when is_atom(Value) ->
-    Value == AtomValue;
+    Value =:= AtomValue;
 
 inner_check(_Value, _Type, _ParseState) ->
-    %ct:pal("failed inner_check(~w, ~w)", [Value, Type]),
     false.
 
-check_tuple_type(Value, [NextType | Rest] = _TupleType, ParseState, Idx) ->
+check_tuple_type([], [], _ParseState) ->
+    true;
+check_tuple_type(Value, [NextType | Rest] = _TupleType, ParseState) ->
     %ct:pal("check_tuple_type(~w, ~w)", [Value, _TupleType]),
-    inner_check(erlang:element(Idx, Value), NextType, ParseState)
+    inner_check(hd(Value), NextType, ParseState)
         andalso
-        check_tuple_type(Value, Rest, ParseState, Idx + 1);
-check_tuple_type(Value, [], _ParseState, Idx) ->
-    erlang:tuple_size(Value) + 1 == Idx.
+        check_tuple_type(tl(Value), Rest, ParseState).
 
