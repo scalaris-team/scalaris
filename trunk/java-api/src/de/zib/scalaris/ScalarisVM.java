@@ -38,43 +38,6 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  */
 public class ScalarisVM {
     /**
-     * Implements a {@link ConnectionPolicy} which only supports a single node
-     * and does not issue automatic re-tries (duplicating the operations of this
-     * class may be dangerous).
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     * 
-     * @version 3.10
-     * @since 3.10
-     * 
-     * @see DefaultConnectionPolicy
-     */
-    private static class FixedNodeConnectionPolicy extends ConnectionPolicy {
-        /**
-         * Creates a new connection policy working with the given remote node.
-         *
-         * Provided for convenience.
-         *
-         * Attention: This method also synchronises on the node.
-         *
-         * @param remoteNode the (only) available remote node
-         */
-        public FixedNodeConnectionPolicy(final String remoteNode) {
-            super(new PeerNode(remoteNode));
-        }
-
-        @Override
-        public <E extends Exception> PeerNode selectNode(int retry,
-                PeerNode failedNode, E e) throws E, UnsupportedOperationException {
-            // no re-try, i.e. re-throw any previous exception:
-            if (e != null) {
-                throw e;
-            }
-            return availableRemoteNodes.get(0);
-        }
-    }
-    
-    /**
      * Connection to a Scalaris node.
      */
     private final Connection connection;
@@ -82,7 +45,7 @@ public class ScalarisVM {
     /**
      * Creates a connection to the erlang VM of the given Scalaris node. Uses
      * the connection policy of the global connection factory.
-     * 
+     *
      * @param node
      *            Scalaris node to connect with
      * @throws ConnectionException
@@ -130,31 +93,31 @@ public class ScalarisVM {
          */
         public final String scalarisVersion;
         /**
-         * Scalaris version string.
+         * Erlang version string.
          */
         public final String erlangVersion;
         /**
-         * Scalaris version string.
+         * Total amount of memory currently allocated.
          */
         public final int memTotal;
         /**
-         * Scalaris version string.
+         * Uptime of the Erlang VM.
          */
         public final int uptime;
         /**
-         * Scalaris version string.
+         * Erlang node name.
          */
         public final String erlangNode;
         /**
-         * Scalaris version string.
+         * IP address to reach the Scalaris node inside the Erlang VM.
          */
         public final Inet4Address ip;
         /**
-         * Scalaris version string.
+         * Port to reach the Scalaris node inside the Erlang VM.
          */
         public final int port;
         /**
-         * Scalaris version string.
+         * Yaws port to reach the JSON API and web debug interface.
          */
         public final int yawsPort;
 
@@ -168,9 +131,9 @@ public class ScalarisVM {
          * @param port
          * @param yawsPort
          */
-        public GetInfoResult(String scalarisVersion, String erlangVersion,
-                int memTotal, int uptime, String erlangNode, Inet4Address ip,
-                int port, int yawsPort) {
+        public GetInfoResult(final String scalarisVersion, final String erlangVersion,
+                final int memTotal, final int uptime, final String erlangNode, final Inet4Address ip,
+                final int port, final int yawsPort) {
             super();
             this.scalarisVersion = scalarisVersion;
             this.erlangVersion = erlangVersion;
@@ -200,7 +163,7 @@ public class ScalarisVM {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "get_info",
                     new OtpErlangObject[] {});
         try {
-            OtpErlangList received = (OtpErlangList) received_raw;
+            final OtpErlangList received = (OtpErlangList) received_raw;
             final Map<String, OtpErlangObject> result = new LinkedHashMap<String, OtpErlangObject>(
                     received.arity());
             for (final OtpErlangObject iter : received) {
@@ -212,16 +175,16 @@ public class ScalarisVM {
                     throw new UnknownException(received_raw);
                 }
             }
-            String scalarisVersion = new ErlangValue(result.get("scalaris_version")).stringValue();
-            String erlangVersion = new ErlangValue(result.get("erlang_version")).stringValue();
-            int memTotal = new ErlangValue(result.get("mem_total")).intValue();
-            int uptime = new ErlangValue(result.get("uptime")).intValue();
-            String erlangNode = new ErlangValue(result.get("erlang_node")).stringValue();
-            OtpErlangTuple erlIP = (OtpErlangTuple) result.get("ip");
-            Inet4Address ip = (Inet4Address) Inet4Address.getByName(
+            final String scalarisVersion = new ErlangValue(result.get("scalaris_version")).stringValue();
+            final String erlangVersion = new ErlangValue(result.get("erlang_version")).stringValue();
+            final int memTotal = new ErlangValue(result.get("mem_total")).intValue();
+            final int uptime = new ErlangValue(result.get("uptime")).intValue();
+            final String erlangNode = new ErlangValue(result.get("erlang_node")).stringValue();
+            final OtpErlangTuple erlIP = (OtpErlangTuple) result.get("ip");
+            final Inet4Address ip = (Inet4Address) Inet4Address.getByName(
                     erlIP.elementAt(0) + "." + erlIP.elementAt(1) + "." + erlIP.elementAt(2) + "." + erlIP.elementAt(3));
-            int port = new ErlangValue(result.get("port")).intValue();
-            int yawsPort = new ErlangValue(result.get("yaws_port")).intValue();
+            final int port = new ErlangValue(result.get("port")).intValue();
+            final int yawsPort = new ErlangValue(result.get("yaws_port")).intValue();
             return new GetInfoResult(scalarisVersion, erlangVersion, memTotal, uptime, erlangNode, ip, port, yawsPort);
         } catch (final ClassCastException e) {
             throw new UnknownException(e, received_raw);
@@ -296,7 +259,7 @@ public class ScalarisVM {
          */
         public final String errors;
 
-        protected AddNodesResult(List<String> successful, String errors) {
+        protected AddNodesResult(final List<String> successful, final String errors) {
             this.successful = successful;
             this.errors = errors;
         }
@@ -324,7 +287,7 @@ public class ScalarisVM {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             final List<String> successful = new ErlangValue(received.elementAt(0)).stringListValue();
-            OtpErlangList errors = ErlangValue.otpObjectToOtpList(received.elementAt(1));
+            final OtpErlangList errors = ErlangValue.otpObjectToOtpList(received.elementAt(1));
             String error_str;
             if (errors.arity() == 0) {
                 error_str = "";
@@ -354,7 +317,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public boolean shutdownNode(String name)
+    public boolean shutdownNode(final String name)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_node",
                     new OtpErlangObject[] { new OtpErlangString(name) });
@@ -382,7 +345,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public boolean killNode(String name)
+    public boolean killNode(final String name)
             throws ConnectionException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_node",
                     new OtpErlangObject[] { new OtpErlangString(name) });
@@ -413,7 +376,7 @@ public class ScalarisVM {
          */
         public final List<String> notFound;
 
-        protected DeleteNodesByNameResult(List<String> successful, List<String> notFound) {
+        protected DeleteNodesByNameResult(final List<String> successful, final List<String> notFound) {
             this.successful = successful;
             this.notFound = notFound;
         }
@@ -571,7 +534,7 @@ public class ScalarisVM {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public List<String> getOtherVMs(int max)
+    public List<String> getOtherVMs(final int max)
             throws ConnectionException, UnknownException {
         if (max <= 0) {
             throw new IllegalArgumentException("max must be an integer > 0");
@@ -582,11 +545,11 @@ public class ScalarisVM {
             final OtpErlangList list = ErlangValue.otpObjectToOtpList(received_raw);
             final ArrayList<String> result = new ArrayList<String>(list.arity());
             for (int i = 0; i < list.arity(); ++i) {
-                OtpErlangTuple connTuple = ((OtpErlangTuple) list.elementAt(i));
+                final OtpErlangTuple connTuple = ((OtpErlangTuple) list.elementAt(i));
                 if (connTuple.arity() != 4) {
                     throw new UnknownException(received_raw);
                 }
-                OtpErlangAtom name_otp = (OtpErlangAtom) connTuple.elementAt(i);
+                final OtpErlangAtom name_otp = (OtpErlangAtom) connTuple.elementAt(i);
                 result.add(name_otp.atomValue());
             }
             return result;
