@@ -31,9 +31,9 @@
 %-include("unittest.hrl").
 
 %-spec check/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> bool().
-check(true, {atom, true}, ParseState) ->
+check(true, {atom, true}, _ParseState) ->
     true;
-check(true, bool, ParseState) ->
+check(true, bool, _ParseState) ->
     true;
 check(Value, Type, ParseState) ->
     %ct:pal("inner_check(~w, ~w)", [Value, Type]),
@@ -41,7 +41,7 @@ check(Value, Type, ParseState) ->
 
 inner_check(Value, {list, InnerType}, ParseState) when is_list(Value) ->
     lists:all(fun (El) -> inner_check(El, InnerType, ParseState) end, Value);
-inner_check(_Value, {typedef, tester, test_any}, ParseState) ->
+inner_check(_Value, {typedef, tester, test_any}, _ParseState) ->
     true;
 inner_check(Value, {typedef, Module, TypeName}, ParseState) ->
     case tester_parse_state:lookup_type({type, Module, TypeName}, ParseState) of
@@ -50,7 +50,7 @@ inner_check(Value, {typedef, Module, TypeName}, ParseState) ->
         {value, Type} ->
             inner_check(Value, Type, ParseState)
     end;
-inner_check(Value, {tuple, {typedef, tester, test_any}}, ParseState) when is_tuple(Value) ->
+inner_check(Value, {tuple, {typedef, tester, test_any}}, _ParseState) when is_tuple(Value) ->
     true;
 inner_check(Value, {tuple, TupleType}, ParseState) when is_tuple(Value) ->
     case erlang:size(Value) =:= erlang:length(TupleType) of
@@ -62,25 +62,25 @@ inner_check(Value, {union, TypeList}, ParseState) ->
     %ct:pal("inner check union ~p~n", [TypeList]),
     lists:any(fun (Type) -> inner_check(Value, Type, ParseState) end, TypeList);
 
-inner_check(Value, {range, {integer, Min}, {integer, Max}}, ParseState) when is_integer(Value) ->
+inner_check(Value, {range, {integer, Min}, {integer, Max}}, _ParseState) when is_integer(Value) ->
     (Min =< Value) andalso (Max >= Value);
 
-inner_check(Value, bool, ParseState) when is_boolean(Value) ->
+inner_check(Value, bool, _ParseState) when is_boolean(Value) ->
     true;
-inner_check(Value, integer, ParseState) when is_integer(Value) ->
+inner_check(Value, integer, _ParseState) when is_integer(Value) ->
     true;
-inner_check(Value, {atom, AtomValue}, ParseState) when is_atom(Value) ->
+inner_check(Value, {atom, AtomValue}, _ParseState) when is_atom(Value) ->
     Value == AtomValue;
 
-inner_check(Value, Type, ParseState) ->
+inner_check(_Value, _Type, _ParseState) ->
     %ct:pal("failed inner_check(~w, ~w)", [Value, Type]),
     false.
 
-check_tuple_type(Value, [NextType | Rest] = TupleType, ParseState, Idx) ->
-    %ct:pal("check_tuple_type(~w, ~w)", [Value, TupleType]),
+check_tuple_type(Value, [NextType | Rest] = _TupleType, ParseState, Idx) ->
+    %ct:pal("check_tuple_type(~w, ~w)", [Value, _TupleType]),
     inner_check(erlang:element(Idx, Value), NextType, ParseState)
         andalso
         check_tuple_type(Value, Rest, ParseState, Idx + 1);
-check_tuple_type(Value, [], ParseState, Idx) ->
+check_tuple_type(Value, [], _ParseState, Idx) ->
     erlang:tuple_size(Value) + 1 == Idx.
 
