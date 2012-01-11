@@ -231,7 +231,7 @@ getMonitorData(Monitor, Keys) ->
             Avg::float(), Min::float(), Max::float(), Stddev::float(),
             Hist::[[Time1_Count2::float() | pos_integer()]]}.
 monitor_timing_dump_fun_exists(_DB, From_us, To_us, {Sum, Sum2, Count, Min, Max, Hist}) ->
-    Diff_in_s = (To_us - From_us) div 1000,
+    Diff_in_s = (To_us - From_us) div 1000000,
     CountPerS = Count / Diff_in_s,
     Avg = Sum / Count, Avg2 = Sum2 / Count,
     Stddev = math:sqrt(Avg2 - (Avg * Avg)),
