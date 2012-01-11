@@ -37,66 +37,192 @@ check(true, {atom, true}, _ParseState) ->
 check(true, bool, _ParseState) ->
     true;
 check(Value, Type, ParseState) ->
-    %ct:pal("new inner_check(~w, ~w)", [Value, Type]),
-    inner_check(Value, Type, ParseState).
+    %% ct:pal("new inner_check(~w, ~w)", [Value, Type]),
+    case inner_check(Value, Type, [], ParseState) of
+        true -> true;
+        {false, CheckStack} = R ->
+            ct:pal("Type check failed: ~.0p", [CheckStack]),
+            R
+    end.
 
-inner_check(Value, {list, InnerType}, ParseState) when is_list(Value) ->
-    lists:all(fun (El) -> inner_check(El, InnerType, ParseState) end, Value);
-inner_check(_Value, {typedef, tester, test_any}, _ParseState) ->
+inner_check(Value, Type, CheckStack, ParseState) ->
+    case Type of
+        {typedef, _Module, _TypeName} ->
+            check_typedef(Value, Type, CheckStack, ParseState);
+        {range, {integer, _Min}, {integer, _Max}} ->
+            check_range(Value, Type, CheckStack, ParseState);
+        {list, _InnerType} ->
+            check_list(Value, Type, CheckStack, ParseState);
+        {tuple, _Tuple} ->
+            check_tuple(Value, Type, CheckStack, ParseState);
+        {union, _Union} ->
+            check_union(Value, Type, CheckStack, ParseState);
+        atom ->
+            case is_atom(Value) of
+                true -> true;
+                false -> {false, [{Value, no_atom} | CheckStack]}
+            end;
+        {atom, _Atom} ->
+            check_atom(Value, Type, CheckStack, ParseState);
+        binary ->
+            case is_binary(Value) of
+                true -> true;
+                false -> {false, [{Value, no_binary} | CheckStack]}
+            end;
+        bool ->
+            case is_boolean(Value) of
+                true -> true;
+                false -> {false, [{Value, no_boolean} | CheckStack]}
+            end;
+        float ->
+            case is_float(Value) of
+                true -> true;
+                false -> {false, [{Value, no_float} | CheckStack]}
+            end;
+        integer ->
+            case is_integer(Value) of
+                true -> true;
+                false -> {false, [{Value, no_integer} | CheckStack]}
+            end;
+        {integer, Int} ->
+            case Value =:= Int of
+                true -> true;
+                false -> {false, [{Value, not_integer, Int} | CheckStack]}
+            end;
+        neg_integer ->
+            case is_integer(Value) andalso 0 > Value of
+                true -> true;
+                false -> {false, [{Value, no_neg_integer} | CheckStack]}
+            end;
+        nil ->
+            case Value of
+                [] -> true;
+                _ -> {false, [{Value, no_empty_list} | CheckStack]}
+            end;
+        non_neg_integer ->
+            case is_integer(Value) andalso 0 =< Value of
+                true -> true;
+                false -> {false, [{Value, no_non_neg_integer} | CheckStack]}
+            end;
+        pid ->
+            case is_pid(Value) of
+                true -> true;
+                false -> {false, [{Value, no_pid} | CheckStack]}
+            end;
+        pos_integer ->
+            case is_integer(Value) andalso 0 < Value of
+                true -> true;
+                false -> {false, [{Value, no_pos_integer} | CheckStack]}
+            end;
+        _ ->
+            ct:pal("Type checker: unsupported type: ~p", [Type]),
+            {false, [{type_checker_unsupported_type, Type} | CheckStack]}
+    end.
+
+check_typedef(_Value, {typedef, tester, test_any}, _, _) ->
     true;
-inner_check(Value, {typedef, Module, TypeName}, ParseState) ->
+check_typedef(Value, {typedef, Module, TypeName} = T,
+              CheckStack, ParseState) ->
     case tester_parse_state:lookup_type({type, Module, TypeName}, ParseState) of
         none ->
-            false;
-        {value, Type} ->
-            inner_check(Value, Type, ParseState)
-    end;
-inner_check(Value, {tuple, {typedef, tester, test_any}}, _ParseState) when is_tuple(Value) ->
-    true;
-inner_check(Value, {tuple, TupleType}, ParseState) when is_tuple(Value) ->
-    case erlang:size(Value) =:= erlang:length(TupleType) of
-        false -> false;
+            {false, [{tester_lookup_type_failed,
+                      {Module, TypeName}} | CheckStack]};
+        {value, InnerType} ->
+            inner_check(Value, InnerType,
+                        [{Value, T} | CheckStack], ParseState)
+    end.
+
+check_range(Value, {range, {integer, Min}, {integer, Max}} = T,
+            CheckStack, _ParseState) ->
+    case is_integer(Value) of
         true ->
-            check_tuple_type(erlang:tuple_to_list(Value), TupleType, ParseState)
-    end;
-inner_check(Value, {union, TypeList}, ParseState) ->
-    %ct:pal("inner check union ~p~n", [TypeList]),
-    lists:any(fun (Type) -> inner_check(Value, Type, ParseState) end, TypeList);
+            case (Min =< Value) andalso (Max >= Value) of
+                true -> true;
+                false ->
+                    {false,
+                     [{Value, not_in,
+                       '[', Min, '..', Max, ']'} | CheckStack ]}
+            end;
+        false ->
+            {false, [{Value, no_integer_in_range, T} | CheckStack]}
+    end.
 
-inner_check(Value, {range, {integer, Min}, {integer, Max}}, _ParseState) when is_integer(Value) ->
-    (Min =< Value) andalso (Max >= Value);
+check_list(Value, {list, InnerType} = T, CheckStack, ParseState) ->
+    case is_list(Value) of
+        true ->
+            check_list_iter(Value, InnerType,
+                            [{Value, T} | CheckStack], ParseState, 1);
+        false ->
+            {false, [{Value, not_a_list, T} | CheckStack]}
+    end.
 
-inner_check(Value, bool, _ParseState) when is_boolean(Value) ->
+check_list_iter([], _Type, _CheckStack, _ParseState, _Count) ->
     true;
-inner_check(Value, integer, _ParseState) when is_integer(Value) ->
-    true;
-inner_check(Value, non_neg_integer, _ParseState) when is_integer(Value) ->
-    (0 =< Value);
-inner_check(Value, pos_integer, _ParseState) when is_integer(Value) ->
-    (0 < Value);
-inner_check(Value, neg_integer, _ParseState) when is_integer(Value) ->
-    (0 > Value);
-inner_check(Value, {integer, IntVal}, _ParseState) when is_integer(Value) ->
-    Value =:= IntVal;
-inner_check(Value, binary, _ParseState) when is_binary(Value) ->
-    true;
-inner_check(Value, atom, _ParseState) when is_atom(Value) ->
-    true;
-inner_check(Value, float, _ParseState) when is_float(Value) ->
-    true;
-inner_check(Value, pid, _ParseState) when is_pid(Value) ->
-    true;
-inner_check(Value, {atom, AtomValue}, _ParseState) when is_atom(Value) ->
-    Value =:= AtomValue;
+check_list_iter([Value | Tail], Type, CheckStack, ParseState, Count) ->
+    case inner_check(Value, Type,
+                     [{Value, list_element, Count, Type} | CheckStack],
+                     ParseState) of
+        true ->
+            check_list_iter(Tail, Type, CheckStack, ParseState, Count + 1);
+        {false, Stack} ->
+            {false, Stack}
+    end.
 
-inner_check(_Value, _Type, _ParseState) ->
-    false.
+check_atom(Value, {atom, Atom} = T, CheckStack, _ParseState) ->
+    case is_atom(Value) of
+        true ->
+            case Value =:= Atom of
+                true -> true;
+                false ->
+                    {false, [{Value, not_the_atom, Atom} | CheckStack]}
+            end;
+        false ->
+            {false, [{Value, no_atom, T} | CheckStack]}
+    end.
 
-check_tuple_type([], [], _ParseState) ->
+check_tuple(Value, {tuple, Tuple} = T, CheckStack, ParseState) ->
+    case is_tuple(Value) of
+        true ->
+            case erlang:size(Value) =:= length(Tuple) of
+                true ->
+                    check_tuple_iter(tuple_to_list(Value), Tuple,
+                                     [{Value, T} | CheckStack], ParseState, 1);
+                false ->
+                    {false, [{Value, not_same_arity, T} | CheckStack]}
+            end;
+        false ->
+            {false, [{Value, not_a_tuple, T} | CheckStack]}
+    end.
+
+check_tuple_iter([], [], _CheckStack, _ParseState, _Count) ->
     true;
-check_tuple_type(Value, [NextType | Rest] = _TupleType, ParseState) ->
-    %ct:pal("check_tuple_type(~w, ~w)", [Value, _TupleType]),
-    inner_check(hd(Value), NextType, ParseState)
-        andalso
-        check_tuple_type(tl(Value), Rest, ParseState).
+check_tuple_iter([Value | Tail], [Type | TypeTail], CheckStack,
+                 ParseState, Count) ->
+    case inner_check(Value, Type,
+                     [{Value, tuple_element, Count, Type} | CheckStack],
+                     ParseState) of
+        true ->
+            check_tuple_iter(Tail, TypeTail, CheckStack, ParseState, Count + 1);
+        {false, Stack} ->
+            {false, Stack}
+    end.
+
+check_union(Value, {union, Union}, CheckStack, ParseState) ->
+    case lists:foldl(
+           fun(Type, Res) ->
+                   case Res of
+                       true -> true;
+                       {false, Stack} ->
+                           case inner_check(Value, Type, [], ParseState) of
+                               true -> true;
+                               {false, NewStack} ->
+                                   {false, Stack ++ NewStack}
+                           end
+                   end
+           end, {false, []}, Union) of
+        true -> true;
+        {false, UnionStack} ->
+            {false, [{Value, no_union_variant_matched, UnionStack} | CheckStack]}
+    end.
+
 
