@@ -40,20 +40,18 @@ public class ScalarisVMTest {
     protected enum DeleteAction {
         SHUTDOWN, KILL
     }
-    
+
     final static String scalarisNode;
 
     static {
         // set not to automatically try reconnects (auto-retries prevent ConnectionException tests from working):
-        DefaultConnectionPolicy cp = ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy());
+        final DefaultConnectionPolicy cp = ((DefaultConnectionPolicy) ConnectionFactory.getInstance().getConnectionPolicy());
         cp.setMaxRetries(0);
         scalarisNode = cp.selectNode().toString();
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#ScalarisVM(String)}
-     * .
+     * Test method for {@link ScalarisVM#ScalarisVM(String)} .
      *
      * @throws ConnectionException
      */
@@ -77,8 +75,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getVersion()} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#getVersion()} with a closed connection.
      *
      * @throws ConnectionException
      */
@@ -90,7 +87,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getVersion()}.
+     * Test method for {@link ScalarisVM#getVersion()}.
      *
      * @throws ConnectionException
      */
@@ -106,8 +103,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getInfo()} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#getInfo()} with a closed connection.
      *
      * @throws ConnectionException
      */
@@ -119,7 +115,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getInfo()}.
+     * Test method for {@link ScalarisVM#getInfo()}.
      *
      * @throws ConnectionException
      */
@@ -142,8 +138,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getNumberOfNodes()}
-     * with a closed connection.
+     * Test method for {@link ScalarisVM#getNumberOfNodes()} with a closed
+     * connection.
      *
      * @throws ConnectionException
      */
@@ -155,7 +151,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getNumberOfNodes()}.
+     * Test method for {@link ScalarisVM#getNumberOfNodes()}.
+     *
      * @throws ConnectionException
      */
     @Test
@@ -170,8 +167,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getNodes()}
-     * with a closed connection.
+     * Test method for {@link ScalarisVM#getNodes()} with a closed connection.
      *
      * @throws ConnectionException
      */
@@ -183,7 +179,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getNodes()}.
+     * Test method for {@link ScalarisVM#getNodes()}.
      *
      * @throws ConnectionException
      */
@@ -200,8 +196,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#addNodes(int)}
-     * with a closed connection.
+     * Test method for {@link ScalarisVM#addNodes(int)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -214,7 +210,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#addNodes(int)}.
+     * Test method for {@link ScalarisVM#addNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -225,7 +221,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#addNodes(int)}.
+     * Test method for {@link ScalarisVM#addNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -236,7 +232,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#addNodes(int)}.
+     * Test method for {@link ScalarisVM#addNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -247,9 +243,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)} and
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(int)}.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)} and
+     * {@link ScalarisVM#killNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -278,9 +273,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNode(java.lang.String)} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#shutdownNode(String)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -293,8 +287,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNode(java.lang.String)}.
+     * Test method for {@link ScalarisVM#shutdownNode(String)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -305,9 +298,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNode(java.lang.String)} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#killNode(String)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -320,8 +312,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNode(java.lang.String)}.
+     * Test method for {@link ScalarisVM#killNode(String)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -332,9 +323,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNode(String)} and
-     * {@link de.zib.scalaris.ScalarisVM#killNode(String)}.
+     * Test method for {@link ScalarisVM#shutdownNode(String)} and
+     * {@link ScalarisVM#killNode(String)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -364,9 +354,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -379,7 +368,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)}.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -390,7 +379,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)}.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -401,7 +390,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)}.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -412,9 +401,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(int)} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#killNodes(int)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -427,7 +415,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#killNodes(int)}.
+     * Test method for {@link ScalarisVM#killNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -438,7 +426,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#killNodes(int)}.
+     * Test method for {@link ScalarisVM#killNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -449,7 +437,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#killNodes(int)}.
+     * Test method for {@link ScalarisVM#killNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -460,9 +448,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodes(int)} and
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(int)}.
+     * Test method for {@link ScalarisVM#shutdownNodes(int)} and
+     * {@link ScalarisVM#killNodes(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -496,8 +483,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)} with a
+     * Test method for {@link ScalarisVM#shutdownNodesByName(List)} with a
      * closed connection.
      *
      * @throws ConnectionException
@@ -511,8 +497,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
+     * Test method for {@link ScalarisVM#shutdownNodesByName(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -524,7 +509,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
+     * {@link ScalarisVM#shutdownNodesByName(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -536,7 +521,7 @@ public class ScalarisVMTest {
 
     /**
      * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)}.
+     * {@link ScalarisVM#shutdownNodesByName(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -547,9 +532,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#killNodes(List)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -562,8 +546,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)}.
+     * Test method for {@link ScalarisVM#killNodes(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -574,8 +557,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)}.
+     * Test method for {@link ScalarisVM#killNodes(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -586,8 +568,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)}.
+     * Test method for {@link ScalarisVM#killNodes(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -598,9 +579,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for
-     * {@link de.zib.scalaris.ScalarisVM#shutdownNodesByName(java.util.List)} and
-     * {@link de.zib.scalaris.ScalarisVM#killNodes(java.util.List)}.
+     * Test method for {@link ScalarisVM#shutdownNodesByName(List)} and
+     * {@link ScalarisVM#killNodes(List)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -641,8 +621,8 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)} with
-     * a closed connection.
+     * Test method for {@link ScalarisVM#getOtherVMs(int)} with a closed
+     * connection.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -655,7 +635,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     * Test method for {@link ScalarisVM#getOtherVMs(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -666,7 +646,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     * Test method for {@link ScalarisVM#getOtherVMs(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -677,7 +657,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#getOtherVMs(int)}.
+     * Test method for {@link ScalarisVM#getOtherVMs(int)}.
      *
      * @throws ConnectionException
      * @throws InterruptedException
@@ -706,8 +686,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownVM()} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#shutdownVM()} with a closed connection.
      *
      * @throws ConnectionException
      */
@@ -719,7 +698,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#shutdownVM()}.
+     * Test method for {@link ScalarisVM#shutdownVM()}.
      *
      * @throws ConnectionException
      */
@@ -731,8 +710,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#killVM()} with a
-     * closed connection.
+     * Test method for {@link ScalarisVM#killVM()} with a closed connection.
      *
      * @throws ConnectionException
      */
@@ -744,7 +722,7 @@ public class ScalarisVMTest {
     }
 
     /**
-     * Test method for {@link de.zib.scalaris.ScalarisVM#killVM()}.
+     * Test method for {@link ScalarisVM#killVM()}.
      *
      * @throws ConnectionException
      */
