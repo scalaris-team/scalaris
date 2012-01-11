@@ -629,7 +629,7 @@ format_gossip_value(Value, Key, Fun) ->
 getMonitorClientData() ->
     ClientMonitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(ClientMonitor, [{api_tx, 'req_list'}]) of
+        case statistics:getMonitorStats(ClientMonitor, [{api_tx, 'req_list'}], list) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
@@ -659,7 +659,7 @@ getMonitorRingData() ->
         Monitor ->
             Prefix = [],
             ReqKeys = [{monitor_perf, 'read_read'}, {dht_node, 'lookup_hops'}, {api_tx, 'req_list'}],
-            case statistics:getMonitorStats(Monitor, ReqKeys) of
+            case statistics:getMonitorStats(Monitor, ReqKeys, list) of
                 [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
                 [{monitor_perf, 'read_read', DataRR},
                  {dht_node, 'lookup_hops', DataLH},

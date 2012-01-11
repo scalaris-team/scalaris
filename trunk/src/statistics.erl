@@ -23,7 +23,7 @@
          get_total_load/1, get_average_load/1, get_load_std_deviation/1,
          get_average_rt_size/1, get_rt_size_std_deviation/1,
          get_memory_usage/1, get_max_memory_usage/1,
-         getMonitorStats/2]).
+         getMonitorStats/3]).
 
 -include("scalaris.hrl").
 
@@ -217,6 +217,8 @@ is_valid({failed, _}) ->
     false.
 
 %%%-----------------------------Monitor-------------------------------
+-type time_list(Value) :: [[Time1_Value2::non_neg_integer() | Value]].
+-type tuple_list(Value) :: [{Time1_Value2::non_neg_integer(), Value}].
 
 -spec getMonitorData(Monitor::pid(), [{Process::atom(), Key::monitor:key()}]) -> [{Process::atom(), Key::monitor:key(), rrd:rrd()}].
 getMonitorData(Monitor, Keys) ->
@@ -229,14 +231,14 @@ getMonitorData(Monitor, Keys) ->
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time(), Value::term())
         -> {TimestampMs::integer(), Count::non_neg_integer(), CountPerS::float(),
             Avg::float(), Min::float(), Max::float(), Stddev::float(),
-            Hist::[[Time1_Count2::float() | pos_integer()]]}.
+            Hist::tuple_list(pos_integer())}.
 monitor_timing_dump_fun_exists(_DB, From_us, To_us, {Sum, Sum2, Count, Min, Max, Hist}) ->
     Diff_in_s = (To_us - From_us) div 1000000,
     CountPerS = Count / Diff_in_s,
     Avg = Sum / Count, Avg2 = Sum2 / Count,
     Stddev = math:sqrt(Avg2 - (Avg * Avg)),
-    HistL = [erlang:tuple_to_list(X) || X <- histogram:get_data(Hist)],
-    {round(To_us / 1000), Count, CountPerS, Avg, Min, Max, Stddev, HistL}.
+    HistTpl = [X || X <- histogram:get_data(Hist)],
+    {round(To_us / 1000), Count, CountPerS, Avg, Min, Max, Stddev, HistTpl}.
 
 -spec monitor_timing_dump_fun_notexists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time())
         -> {keep, {TimestampMs::integer(), Count::0, CountPerS::float(),
@@ -255,15 +257,22 @@ get_utc_local_diff_s() ->
                 calendar:now_to_local_time(SampleTime)),
     Local_s - UTC_s.
 
--type time_list(Value) :: [[Time1_Value2::float() | Value]].
--spec getMonitorStats(Monitor::pid(), [{Process::atom(), Key::monitor:key()}])
+-spec getMonitorStats
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], list)
         -> [{Process::atom(), Key::monitor:key(),
              {CountD::time_list(non_neg_integer()),
               CountPerSD::time_list(float()), AvgD::time_list(float()),
               MinD::time_list(float()), MaxD::time_list(float()),
               StddevD::time_list(float()),
-              HistD::[[Time::float() | [[Time1_Count2::float() | pos_integer()]]]]}}].
-getMonitorStats(Monitor, Keys) ->
+              HistD::time_list(time_list(pos_integer()))}}];
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], tuple)
+        -> [{Process::atom(), Key::monitor:key(),
+             {CountD::tuple_list(non_neg_integer()),
+              CountPerSD::tuple_list(float()), AvgD::tuple_list(float()),
+              MinD::tuple_list(float()), MaxD::tuple_list(float()),
+              StddevD::tuple_list(float()),
+              HistD::tuple_list(tuple_list(pos_integer()))}}].
+getMonitorStats(Monitor, Keys, Type) ->
     UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
     [begin
          Dump = rrd:dump_with(DB, fun monitor_timing_dump_fun_exists/4,
@@ -273,10 +282,28 @@ getMonitorStats(Monitor, Keys) ->
                fun({TimeUTC, Count, CountPerS, Avg, Min, Max, Stddev, Hist},
                    {CountD, CountPerSD, AvgD, MinD, MaxD, StddevD, HistD}) ->
                        Time = TimeUTC + UtcToLocalDiff_ms,
-                       {[[Time, Count] | CountD], [[Time, CountPerS] | CountPerSD],
-                        [[Time, Avg] | AvgD], [[Time, Min] | MinD],
-                        [[Time, Max] | MaxD], [[Time, Stddev] | StddevD],
-                        [[Time, Hist] | HistD]}
+                       case Type of
+                           list ->
+                               CountAcc = [Time, Count],
+                               CountPerSAcc = [Time, CountPerS],
+                               AvgAcc = [Time, Avg],
+                               MinAcc = [Time, Min],
+                               MaxAcc = [Time, Max],
+                               StddevAcc = [Time, Stddev],
+                               HistL = [erlang:tuple_to_list(X) || X <- Hist],
+                               HistAcc = [Time, HistL];
+                           tuple ->
+                               CountAcc = {Time, Count},
+                               CountPerSAcc = {Time, CountPerS},
+                               AvgAcc = {Time, Avg},
+                               MinAcc = {Time, Min},
+                               MaxAcc = {Time, Max},
+                               StddevAcc = {Time, Stddev},
+                               HistAcc = {Time, Hist}
+                       end,
+                       {[CountAcc | CountD], [CountPerSAcc | CountPerSD],
+                        [AvgAcc | AvgD], [MinAcc | MinD], [MaxAcc | MaxD],
+                        [StddevAcc | StddevD], [HistAcc | HistD]}
                end, {[], [], [], [], [], [], []}, Dump),
          {Process, Key, Value}
      end || {Process, Key, DB} <- getMonitorData(Monitor, Keys)].

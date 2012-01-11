@@ -54,7 +54,7 @@
 -type timeseries_type() :: gauge | counter | event | {timing | timing_with_hist, us | ms | s | count}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: util:time().
--type internal_time() :: non_neg_integer().
+-type internal_time() :: non_neg_integer(). % default: micro seconds since Epoch
 -type timespan() :: pos_integer().
 -type update_fun(T, NewV) :: fun((Time::internal_time(), Old::T | undefined, NewV) -> T).
 
