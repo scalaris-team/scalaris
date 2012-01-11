@@ -100,7 +100,8 @@ new(X) -> normalize_simple({element, X}).
 %%      '[?MINUS_INFINITY,?PLUS_INFINITY)' translates to 'all'.
 %% -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval();
 %%          (LeftBr::left_bracket(), A::key(), B::?PLUS_INFINITY, RightBr::')') -> interval().
--spec new(LeftBr::left_bracket(), A::key(), B::key() | ?PLUS_INFINITY_TYPE, RightBr::right_bracket()) -> interval().
+-spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval();
+         (LeftBr::left_bracket(), A::key(), B::?PLUS_INFINITY_TYPE, RightBr::')') -> interval().
 new(LeftBr, Begin, End, RightBr) when End =/= ?PLUS_INFINITY orelse RightBr =:= ')' ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
 
