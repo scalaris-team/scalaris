@@ -1,4 +1,4 @@
-%  @copyright 2011 Zuse Institute Berlin
+%  @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -104,7 +104,9 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
 pre_init_per_testcase(TC, Config, {ok, State}) ->
     pre_init_per_testcase(TC, Config, State);
 pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
-    ct:pal("Starting ~p:~p.~n", [State#state.suite, TC]),
+    ct:pal("Start ~p:~p~n"
+           "####################################################",
+           [State#state.suite, TC]),
     {Config, State#state{tc_start = os:timestamp()}}.
 
 %% @doc Called after each test case.
@@ -115,10 +117,16 @@ post_end_per_testcase(TC, Config, Return, {ok, State}) ->
     post_end_per_testcase(TC, Config, Return, State);
 post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) ->
     TCTime_us = timer:now_diff(os:timestamp(), State#state.tc_start),
-    ct:pal("Finished ~p:~p in ~fs with ~.0p.~n", [State#state.suite, TC, TCTime_us / 1000000, Return]),
+    ct:pal("####################################################~n"
+           "End ~p:~p -> ~.0p (after ~fs)",
+           [State#state.suite, TC, Return, TCTime_us / 1000000]),
     case Return of
         {timetrap_timeout, _} ->
-            unittest_helper:print_ring_data();
+            case config:read(no_print_ring_data) of
+                true -> ok;
+                failed ->
+                    unittest_helper:print_ring_data()
+            end;
         _ -> ok
     end,
     {Return, State#state{tc_start = undefined} }.

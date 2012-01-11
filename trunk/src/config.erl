@@ -151,8 +151,13 @@ populate_db(File) ->
             _ = lists:map(fun process_term/1, Terms),
             ok;
         {error, enoent} ->
-            error_logger:info_msg("Can't load config file ~p: File does not exist. "
-                                  " Ignoring.\n", [File]),
+            case File =/= "scalaris.local.cfg" of
+                true ->
+                    error_logger:info_msg(
+                      "Can't load config file ~p: File does not exist. "
+                      " Ignoring.\n", [File]);
+                false -> ok
+            end,
             fail;
         {error, Reason} ->
             error_logger:error_msg("Can't load config file ~p: ~p. Exiting.\n",

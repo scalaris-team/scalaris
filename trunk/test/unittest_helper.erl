@@ -194,7 +194,7 @@ make_ring(Size, Options) ->
     end,
     Pid = start_process(
             fun() ->
-                    ct:pal("Trying to build Scalaris~n"),
+                    ct:pal("unittest_helper:make_ring size ~p", [Size]),
                     erlang:register(ct_test_ring, self()),
                     randoms:start(),
                     {ok, _GroupsPid} = pid_groups:start_link(),
@@ -209,7 +209,7 @@ make_ring(Size, Options) ->
     check_ring_size(Size),
     wait_for_stable_ring(),
     check_ring_size(Size),
-    ct:pal("Scalaris has booted with ~p node(s)...~n", [Size]),
+    ct:pal("unittest_helper:make_ring size ~p done.", [Size]),
     ?TRACE_RING_DATA(),
     Pid.
 
@@ -236,7 +236,7 @@ stop_ring(Pid) ->
             stop_pid_groups(),
             catch(unregister(ct_test_ring)),
             error_logger:tty(true),
-            ct:pal("Scalaris ring stopped.~n"),
+            ct:pal("unittest_helper:stop_ring done."),
             ok
         end
     catch
@@ -263,9 +263,9 @@ stop_pid_groups() ->
 -spec wait_for_stable_ring() -> ok.
 wait_for_stable_ring() ->
     util:wait_for(fun() ->
-                     R = admin:check_ring(),
-                     ct:pal("CheckRing: ~p~n", [R]),
-                     R =:= ok
+                          R = admin:check_ring(),
+                          %% ct:pal("CheckRing: ~p~n", [R]),
+                          R =:= ok
              end, 500).
 
 -spec wait_for_stable_ring_deep() -> ok.

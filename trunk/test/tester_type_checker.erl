@@ -74,6 +74,8 @@ inner_check(Value, non_neg_integer, _ParseState) when is_integer(Value) ->
     (0 =< Value);
 inner_check(Value, pos_integer, _ParseState) when is_integer(Value) ->
     (0 < Value);
+inner_check(Value, neg_integer, _ParseState) when is_integer(Value) ->
+    (0 > Value);
 inner_check(Value, {integer, IntVal}, _ParseState) when is_integer(Value) ->
     Value =:= IntVal;
 inner_check(Value, binary, _ParseState) when is_binary(Value) ->

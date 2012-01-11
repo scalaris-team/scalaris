@@ -34,7 +34,12 @@
         % functions with no return
         case erlang:whereis(ct_test_ring) of
             undefined -> ok;
-            _         -> unittest_helper:print_ring_data()
+            _         ->
+                case config:read(no_print_ring_data) of
+                    true -> ok;
+                    failed ->
+                        unittest_helper:print_ring_data()
+                end
         end,
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 
