@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,10 +53,17 @@ inner_check(Value, {typedef, Module, TypeName}, ParseState) ->
 inner_check(Value, {tuple, {typedef, tester, test_any}}, ParseState) when is_tuple(Value) ->
     true;
 inner_check(Value, {tuple, TupleType}, ParseState) when is_tuple(Value) ->
-    check_tuple_type(Value, TupleType, ParseState, 1);
+    case erlang:size(Value) =:= erlang:length(TupleType) of
+        false -> false;
+        true ->
+            check_tuple_type(Value, TupleType, ParseState, 1)
+    end;
 inner_check(Value, {union, TypeList}, ParseState) ->
+    %ct:pal("inner check union ~p~n", [TypeList]),
     lists:any(fun (Type) -> inner_check(Value, Type, ParseState) end, TypeList);
 
+inner_check(Value, {range, {integer, Min}, {integer, Max}}, ParseState) when is_integer(Value) ->
+    (Min =< Value) andalso (Max >= Value);
 
 inner_check(Value, bool, ParseState) when is_boolean(Value) ->
     true;
