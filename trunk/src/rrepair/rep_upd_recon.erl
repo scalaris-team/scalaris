@@ -214,8 +214,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE2("FORK RECON", []),
-            {R, F} = Round,
-            {ok, Pid} = fork_recon(State, {R, F + 1}),
+            {ok, Pid} = fork_recon(State, Round),
             send_chunk_req(DhtNodePid, Pid, RestI, 
                            mapInterval(RestI, get_interval_quadrant(ChunkI)), 
                            get_max_items(bloom));
@@ -483,7 +482,7 @@ compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
 
 % @doc Starts simple sync for a given node, returns number of leaf sync requests.
 -spec reconcileNode(merkle_tree:mt_node() | not_found, 
-                    {comm:mypid() | undefined, float(), comm:mypid() | undefined}) -> non_neg_integer().
+                    {comm:mypid() | undefined, rep_upd:round(), comm:mypid() | undefined}) -> non_neg_integer().
 reconcileNode(not_found, _) -> 0;
 reconcileNode(Node, Conf) ->
     case merkle_tree:is_leaf(Node) of
@@ -493,7 +492,7 @@ reconcileNode(Node, Conf) ->
     end.
 
 -spec reconcileLeaf(merkle_tree:mt_node(), 
-                    {comm:mypid() | undefined, float(), comm:mypid() | undefined}) -> 1.
+                    {comm:mypid() | undefined, rep_upd:round(), comm:mypid() | undefined}) -> 1.
 reconcileLeaf(_, {undefined, _, _}) -> erlang:error("Recon Destination PID undefined");
 reconcileLeaf(_, {_, _, undefined}) -> erlang:error("Recon Owner PID undefined");
 reconcileLeaf(Node, {Dest, Round, Owner}) ->
@@ -750,7 +749,7 @@ init(State) ->
     State#ru_recon_state{ sync_start_time = erlang:now() }.
 
 -spec start(Round, Sender_RU_Pid) -> {ok, MyPid} when
-      is_subtype(Round,         float()),
+      is_subtype(Round,         rep_upd:round()),
       is_subtype(Sender_RU_Pid, comm:mypid() | undefined),
       is_subtype(MyPid,         pid()).
 
@@ -762,9 +761,9 @@ start(Round, SenderRUPid) ->
                              sync_round = Round },
     gen_component:start(?MODULE, fun ?MODULE:on/2, State).
 
--spec fork_recon(state(), float()) -> {ok, pid()}.
-fork_recon(Conf, Round) ->
-    State = Conf#ru_recon_state{ sync_round = Round },
+-spec fork_recon(state(), rep_upd:round()) -> {ok, pid()}.
+fork_recon(Conf, {ReconRound, Fork}) ->
+    State = Conf#ru_recon_state{ sync_round = {ReconRound, Fork} },
     comm:send_local(Conf#ru_recon_state.ownerLocalPid, {recon_forked}),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State).
 
