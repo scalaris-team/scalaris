@@ -31,10 +31,10 @@
 
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE_RECON(X,Y), ok).
-%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE_RESOLVE(X,Y), ok).
-%-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RECON(X,Y), ok).
+-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RESOLVE(X,Y), ok).
+-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -44,11 +44,16 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-ifdef(with_export_type_support).
+-export_type([round/0]).
+-endif.
+
+-type round() :: {non_neg_integer(), non_neg_integer()}.
 
 -record(rep_upd_state,
         {
          trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
-         sync_round     = 0.0                                       :: float(),
+         sync_round     = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer()
          }).
@@ -57,14 +62,14 @@
 -type message() ::
     {?TRIGGER_NAME} |
     {get_state, Sender::comm:mypid(), Key::atom()} |
-    {request_recon, SenderRUPid::comm:mypid(), Round::float(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
+    {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
         rep_upd_recon:method(), rep_upd_recon:recon_struct()} |
-    {request_resolve, Round::float(), rep_upd_resolve:operation(), rep_upd_resolve:options()} |
+    {request_resolve, Round::round(), rep_upd_resolve:operation(), rep_upd_resolve:options()} |
     {recon_forked} | 
     {web_debug_info, Requestor::comm:erl_local_pid()} |
-    {recon_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
+    {recon_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
         Master::boolean(), Stats::ru_recon_stats:stats()} |
-    {resolve_progress_report, Sender::comm:erl_local_pid(), Round::float(), 
+    {resolve_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
         Stats::rep_upd_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,8 +102,9 @@ on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
              end,
     comm:send_local(Pid, {start_recon, get_recon_method(), RStage, {}, true}),
     NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
+    {R, F} = Round,
     State#rep_upd_state{ trigger_state = NewTriggerState, 
-                         sync_round = Round + 1,
+                         sync_round = {R + 1, F},
                          open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
@@ -124,10 +130,10 @@ on({recon_progress_report, _Sender, _Round, Master, _Stats}, State) ->
                [_Round, _Sender, Master, ru_recon_stats:print(_Stats), OpenRecon]),
     State#rep_upd_state{ open_recon = OpenRecon };
 
-on({resolve_progress_report, Sender, Stats}, State) ->
+on({resolve_progress_report, _Sender, _Stats}, State) ->
     OpenResolve = State#rep_upd_state.open_resolve - 1,
     ?TRACE_RESOLVE("RESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
-           [Sender, rep_upd_resolve:print_resolve_stats(Stats),
+           [_Sender, rep_upd_resolve:print_resolve_stats(_Stats),
             State#rep_upd_state.open_recon, OpenResolve]),    
     State#rep_upd_state{ open_resolve = OpenResolve };
 

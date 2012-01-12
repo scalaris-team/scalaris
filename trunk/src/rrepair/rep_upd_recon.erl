@@ -90,7 +90,7 @@
          recon_stage        = reconciliation                            :: recon_stage(),
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
          sync_master        = false                                     :: boolean(),               %true if process is sync leader
-         sync_round         = 0                                         :: float(),
+         sync_round         = 0                                         :: rep_upd:round(),
          stats              = ru_recon_stats:new()                      :: ru_recon_stats:stats(),
          sync_start_time    = {0, 0, 0}                                 :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
          }).
@@ -214,7 +214,8 @@ on({get_chunk_response, {RestI, DBList}}, State =
     case intervals:is_empty(RestI) of
         false ->
             ?TRACE2("FORK RECON", []),
-            {ok, Pid} = fork_recon(State, Round + 0.1),
+            {R, F} = Round,
+            {ok, Pid} = fork_recon(State, {R, F + 1}),
             send_chunk_req(DhtNodePid, Pid, RestI, 
                            mapInterval(RestI, get_interval_quadrant(ChunkI)), 
                            get_max_items(bloom));
