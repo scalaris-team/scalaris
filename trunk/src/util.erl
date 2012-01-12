@@ -939,7 +939,7 @@ collect_while(GatherFun, Count) ->
     end.
 
 % @doc Gets the value of a property list - proplist:get_value/2 is 10x slower than this
--spec proplist_get_value(atom(), [{atom(), any()}]) -> any().
+-spec proplist_get_value(atom(), [{atom(), T}]) -> T.
 proplist_get_value(Key, List) ->
     case lists:keyfind(Key, 1, List) of
         {_K, V} -> V;
@@ -948,7 +948,7 @@ proplist_get_value(Key, List) ->
 
 % @doc If List contains a key-value pair named key, the value will be returned
 %      otherwise default.
--spec proplist_get_value(atom(), [{atom(), any()}], any()) -> any().
+-spec proplist_get_value(atom(), [{atom(), T}], T) -> T.
 proplist_get_value(Key, List, Default) ->
     case proplist_get_value(Key, List) of 
         undefined -> Default;
