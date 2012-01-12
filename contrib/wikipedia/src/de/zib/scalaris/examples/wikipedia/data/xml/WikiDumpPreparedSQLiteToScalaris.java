@@ -43,7 +43,8 @@ import de.zib.scalaris.TransactionSingleOp;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
-    private static final int MAX_SCALARIS_CONNECTIONS = Runtime.getRuntime().availableProcessors() * 2;
+    private static final int MAX_SCALARIS_CONNECTIONS = Runtime.getRuntime().availableProcessors() * 4;
+    private static final int REQUEST_BUNDLE_SIZE = 10;
     private static final int PRINT_SCALARIS_KV_PAIRS_EVERY = 5000;
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
@@ -200,6 +201,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 String key = st.columnString(0);
                 writeToScalaris(key, WikiDumpPrepareSQLiteForScalarisHandler.readObject(stRead, key));
             }
+            st.dispose();
             // some requests may be left over
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "");
             executor.execute(worker);
@@ -223,8 +225,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     protected <T> void writeToScalaris(String key, T value) {
         ++importedKeys;
         requests.addWrite(key, value);
-        // bundle 10 request
-        if (requests.size() >= 10) {
+        // bundle requests:
+        if (requests.size() >= REQUEST_BUNDLE_SIZE) {
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "keys up to " + key);
             executor.execute(worker);
             requests = new TransactionSingleOp.RequestList();
