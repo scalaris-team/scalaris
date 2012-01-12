@@ -142,39 +142,52 @@ run(Module, Func, Arity, Iterations, ParseState) ->
                        tester_parse_state:state()) -> any().
 run_helper(_Module, _Func, _Arity, 0, _FunType, _TypeInfos) ->
     ok;
-run_helper(Module, Func, 0, Iterations, {'fun', _ArgType, _ResultType} = FunType,
+run_helper(Module, Func, 0, Iterations, {union_fun, FunTypes} = FunType,
            TypeInfos) ->
-    apply_args(Module, Func, 0, [], Iterations, FunType, TypeInfos);
-run_helper(Module, Func, Arity, Iterations, {'fun', ArgType, _ResultType} = FunType,
+    CurrentFunType = util:randomelem(FunTypes),
+    {'fun', _ArgType, _ResultType} = CurrentFunType,
+    apply_args(Module, Func, 0, [], Iterations, CurrentFunType, FunType,
+               TypeInfos);
+run_helper(Module, Func, Arity, Iterations, {union_fun, FunTypes} = FunType,
            TypeInfos) ->
     Size = 30,
+    CurrentFunType = util:randomelem(FunTypes),
+    {'fun', ArgType, _ResultType} = CurrentFunType,
     Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
            catch
                Error:Reason ->
-                   {fail, no_result, Error, tester_value_creator, create_value,
+                   {fail, no_result, no_result_type, Error, tester_value_creator,
+                    create_value,
                     [ArgType, Size, TypeInfos],
                     Reason, erlang:get_stacktrace(), util:get_linetrace()}
     end,
-    apply_args(Module, Func, Arity, Args, Iterations, FunType, TypeInfos).
+    apply_args(Module, Func, Arity, Args, Iterations, CurrentFunType, FunType,
+               TypeInfos).
 
 apply_args(Module, Func, Arity, Args, Iterations,
-           {'fun', ArgType, ResultType} = FunType, TypeInfos) ->
+           {'fun', _ArgType, ResultType}, FunTypes, TypeInfos) ->
+    %ct:pal("~w:~w ~w", [Module, Func, Args]),
     try erlang:apply(Module, Func, Args) of
         Result ->
+            %ct:pal("~w ~n~w", [Result, ResultType]),
             case tester_type_checker:check(Result, ResultType, TypeInfos) of
                 true ->
-                    run_helper(Module, Func, Arity, Iterations - 1, FunType, TypeInfos);
-                X ->
+                    run_helper(Module, Func, Arity, Iterations - 1, FunTypes,
+                               TypeInfos);
+                {false, ErrorMsg} ->
                     % @todo give good error message
-                    {fail, Result, test_case_failed, Module, Func, Args, X,
-                     no_stacktrace, util:get_linetrace()}
+                    {fail, Result, ResultType, test_case_failed, Module, Func,
+                     Args, ErrorMsg, no_stacktrace, util:get_linetrace()};
+                X ->
+                    ct:pal("~w", [X]),
+                    X
             end
     catch
         exit:{test_case_failed, Reason} ->
-            {fail, no_result, test_case_failed, Module, Func, Args, Reason,
-             erlang:get_stacktrace(), util:get_linetrace()};
+            {fail, no_result, no_result_type, test_case_failed, Module, Func,
+             Args, Reason, erlang:get_stacktrace(), util:get_linetrace()};
         Error:Reason ->
-            {fail, no_result, Error, Module, Func, Args, Reason,
+            {fail, no_result, no_result_type, Error, Module, Func, Args, Reason,
              erlang:get_stacktrace(), util:get_linetrace()}
     end.
 
@@ -182,10 +195,7 @@ apply_args(Module, Func, Arity, Args, Iterations,
                      tester_parse_state:state(), integer()) -> ok.
 run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
     Master = self(),
-    {value, FunType} = tester_parse_state:lookup_type({'fun', Module, Func, Arity},
-                                                      ParseState),
-    {'fun', _ArgType, ResultType} = FunType,
-        _Pids = [spawn(fun () ->
+    _Pids = [spawn(fun () ->
                            Result = run(Module, Func, Arity,
                                         Iterations div Threads, ParseState),
                            Master ! {result, Result}
@@ -194,7 +204,7 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
     %ct:pal("~w~n", [Results]),
     _ = [fun (Result) ->
                  case Result of
-                     {fail, ResultValue, Error, Module, Func, Args, Term,
+                     {fail, ResultValue, ResultType, Error, Module, Func, Args, Term,
                       StackTrace, LineTrace} ->
                          ArgsStr = case lists:flatten([io_lib:format(", ~1000p", [Arg]) || Arg <- Args]) of
                                        [$,, $ | X] -> X;

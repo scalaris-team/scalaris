@@ -104,9 +104,9 @@ parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, _List}},
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
     tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec,
                                      NewParseState);
-parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, [AFunSpec]}},
+parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
             Module, ParseState) ->
-    {TheFunSpec, NewParseState} = parse_type(AFunSpec, Module, ParseState),
+    {TheFunSpec, NewParseState} = parse_type({union_fun, AFunSpec}, Module, ParseState),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity},
                                      TheFunSpec, NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
@@ -123,6 +123,12 @@ parse_chunk({eof, _Line}, _Module, ParseState) ->
 
 -spec parse_type/3 :: (any(), module(), tester_parse_state:state()) ->
     {type_spec() , tester_parse_state:state()}.
+parse_type({union_fun, FunSpecs}, Module, ParseState) ->
+    {FunSpecs2, PS2} = lists:foldl(fun (FunType, {List, PS}) ->
+                        {ParsedFunType, PS1 } = parse_type(FunType, Module, PS),
+                        {[ParsedFunType | List], PS1}
+                end, {[], ParseState}, FunSpecs),
+    {{union_fun, FunSpecs2}, PS2};
 parse_type({type, _Line, 'fun', [Arg, Result]}, Module, ParseState) ->
     {ArgType, ParseState2} = parse_type(Arg, Module, ParseState),
     {ResultType, ParseState3} = parse_type(Result, Module, ParseState2),
@@ -174,6 +180,8 @@ parse_type({type, _Line, any, []}, _Module, ParseState) ->
     {{typedef, tester, test_any}, ParseState};
 parse_type({type, _Line, atom, []}, _Module, ParseState) ->
     {atom, ParseState};
+parse_type({type, _Line, arity, []}, _Module, ParseState) ->
+    {arity, ParseState};
 parse_type({type, _Line, binary, []}, _Module, ParseState) ->
     {binary, ParseState};
 parse_type({type, _Line, pid, []}, _Module, ParseState) ->
