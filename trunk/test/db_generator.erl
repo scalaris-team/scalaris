@@ -27,9 +27,13 @@
 
 -include("scalaris.hrl").
 
--export([get_db/3]).
+-export([get_db/3, get_db/4]).
 
--type distribution() :: uniform.
+-type distribution() :: uniform.% |
+                        %{binomial, P::float()}.
+-type result() :: ?RT:key() | 
+                  {?RT:key(), ?DB:value()}.
+-type option() :: {output, list_key_val | list_key}.          
 
 -ifdef(with_export_type_support).
 -export_type([distribution/0]).
@@ -37,30 +41,42 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_db(intervals:interval(), non_neg_integer(), distribution()) -> [?RT:key()].
-get_db(Interval, ItemCount, Distribution) ->
+% @doc This will generate a list of [ItemCount] keys with requested distribution 
+%      in the given interval.
+-spec get_db(intervals:interval(), non_neg_integer(), distribution()) -> [result()].
+get_db(I, Count, Distribution) ->
+    get_db(I, Count, Distribution, []).
+
+-spec get_db(intervals:interval(), non_neg_integer(), distribution(), [option()]) -> [result()].
+get_db(Interval, ItemCount, Distribution, Options) ->
+    OutputType = util:proplist_get_value(output, Options, list_key),
     case Distribution of
-        uniform -> uniform_key_list([{Interval, ItemCount}], []);
+        uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         _ -> []
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec uniform_key_list([{Interval, ToAdd}], Acc::[Key]) -> [Key] when
-    is_subtype(Interval, intervals:interval()),
-    is_subtype(ToAdd,    non_neg_integer()),
-    is_subtype(Key,      ?RT:key()).
-uniform_key_list([], KeyList) -> KeyList;
-uniform_key_list([{I, Add} | R], KeyList) ->    
+-spec uniform_key_list([{Interval, ToAdd}], Acc::Result, OutputType) -> Result when
+    is_subtype(Interval,   intervals:interval()),
+    is_subtype(ToAdd,      non_neg_integer()),
+    is_subtype(OutputType, list_key_val | list_key),
+    is_subtype(Result,     [result()]).
+uniform_key_list([], Acc, _) -> Acc;
+uniform_key_list([{I, Add} | R], Acc, AccType) ->    
     case Add > 100 of
         true -> 
             [I1, I2] = intervals:split(I, 2),
-            uniform_key_list([{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R], KeyList);
+            uniform_key_list([{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R], Acc, AccType);
         false -> 
             {_, IL, IR, _} = intervals:get_bounds(I),
             ToAdd = util:for_to_ex(1, Add, 
                                    fun(Index) -> 
-                                           ?RT:get_split_key(IL, IR, {Index, Add}) 
+                                           Key = ?RT:get_split_key(IL, IR, {Index, Add}),
+                                           case AccType of
+                                               list_key -> Key;
+                                               list_key_val -> {Key, 1}
+                                           end
                                    end),
-            uniform_key_list(R, lists:append(ToAdd, KeyList))                                  
+            uniform_key_list(R, lists:append(ToAdd, Acc), AccType)                                  
     end.

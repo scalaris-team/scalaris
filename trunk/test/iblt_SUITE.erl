@@ -36,12 +36,13 @@
 all() -> [
           tester_insert,
           tester_delete,
-          tester_get
+          tester_get,
+          tester_list_entries
          ].
 
 suite() ->
     [
-     {timetrap, {seconds, 15}}
+     {timetrap, {seconds, 30}}
     ].
 
 init_per_suite(Config) ->
@@ -64,7 +65,7 @@ prop_insert(HFCount, CellCount, Key, Value) ->
     ?equals(iblt:get(IBLT2, Key), Value).
   
 tester_insert(_) ->
-    tester:test(?MODULE, prop_insert, 4, 100, [{threads, 2}]).    
+    tester:test(?MODULE, prop_insert, 4, 1000, [{threads, 2}]).    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -76,10 +77,16 @@ prop_delete(HFCount, CellCount, Key, Value) ->
     ?equals(iblt:get(IBLT2, Key), Value),
     IBLT3 = iblt:delete(IBLT2, Key, Value),
     ?equals(iblt:get_item_count(IBLT3), 0),
-    ?equals(iblt:get(IBLT3, Key), not_found).
+    ?equals(iblt:get(IBLT3, Key), not_found),
+    %detail check: count of every cell must be zero
+    {iblt, _, T, _, _, _} = IBLT3,
+    Count = lists:foldl(fun({_, Col}, Acc) ->
+                                Acc + lists:foldl(fun({C, _, _}, A) -> A+C end, 0, Col)
+                        end, 0, T),
+    ?equals(Count, 0).
   
 tester_delete(_) ->
-    tester:test(?MODULE, prop_delete, 4, 100, [{threads, 2}]).    
+    tester:test(?MODULE, prop_delete, 4, 1000, [{threads, 2}]).    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -99,5 +106,28 @@ prop_get(HFCount, CellCount, Items) ->
     ?assert(FSum =:= length(Items)).
   
 tester_get(_) ->
-    tester:test(?MODULE, prop_delete, 4, 100, [{threads, 2}]). 
+    tester:test(?MODULE, prop_delete, 4, 1000, [{threads, 2}]). 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_list_entries(?RT:key(), ?RT:key(), 10..200) -> true.
+prop_list_entries(L, R, Count) ->
+    I = intervals:new('[', L, R, ']'),
+    DB = db_generator:get_db(I, Count, uniform, [{output, list_key_val}]),
+    IBLT = lists:foldl(fun({Key, Val}, Acc) -> iblt:insert(Acc, Key, Val) end, 
+                       iblt:new(?REP_HFS:new(3), erlang:round(1.5 * Count)), 
+                       DB),
+    List = iblt:list_entries(IBLT),
+    Found = length(List),
+%%     ct:pal("--IBLT--            
+%%             ItemsInserted=~p/~p
+%%             ListEntrySize=~p/~p (~f%)
+%%             FPR=~p", 
+%%            [iblt:get_item_count(IBLT), Count,
+%%             Found, Count, (Found / Count) * 100,
+%%             iblt:get_fpr(IBLT)]),
+    ?assert(Found > 0 andalso Found =< Count).
+
+tester_list_entries(_) ->
+    tester:test(?MODULE, prop_list_entries, 3, 1000, [{threads, 2}]).
 
