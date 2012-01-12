@@ -37,8 +37,8 @@ all() -> [
           tester_add,
           tester_add_list,
           tester_join,
-          tester_equals,
-          tester_fpr
+          tester_equals
+          %tester_fpr
           %fprof,
          ].
 
