@@ -33,6 +33,12 @@
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-type key()   :: integer().
+-type value() :: integer().
+-type cell() :: {Count  :: non_neg_integer(),
+                 KeySum :: key(),
+                 ValSum :: value()}.
+
 -type table() :: [[cell()]] | [].
 
 -record(iblt, {
@@ -42,13 +48,6 @@
                col_size    = 0                    :: non_neg_integer(), %cells per column
                items_count = 0                    :: non_neg_integer()  %number of inserted items
                }).
-
--type key()   :: integer().
--type value() :: integer().
-
--type cell() :: {Count  :: non_neg_integer(),
-                 KeySum :: key(),
-                 ValSum :: value()}.
 
 -type iblt() :: #iblt{}.
 %-opaque iblt() :: #iblt{}. 
