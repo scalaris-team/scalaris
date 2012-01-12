@@ -82,7 +82,7 @@ inner_check(Value, Type, CheckStack, ParseState) ->
         node ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_atom/1, no_node);
-        {nonempty_list, InnerType} ->
+        {nonempty_list, _InnerType} ->
             check_list(Value, Type, CheckStack, ParseState);
         nonempty_string ->
             %% see http://www.erlang.org/doc/reference_manual/typespec.html
