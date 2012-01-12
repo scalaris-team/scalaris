@@ -47,76 +47,93 @@ check(Value, Type, ParseState) ->
 
 inner_check(Value, Type, CheckStack, ParseState) ->
     case Type of
-        {typedef, _Module, _TypeName} ->
-            check_typedef(Value, Type, CheckStack, ParseState);
-        {range, {integer, _Min}, {integer, _Max}} ->
-            check_range(Value, Type, CheckStack, ParseState);
+        atom ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_atom/1, no_atom);
+        {atom, _Atom} ->
+            check_atom(Value, Type, CheckStack, ParseState);
+        binary ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_binary/1, no_binary);
+        bool ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_boolean/1, no_boolean);
+        float ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_float/1, no_float);
+        integer ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_integer/1, no_integer);
+        {integer, Int} ->
+            check_basic_type_with_prop(
+              Value, Type, CheckStack, ParseState,
+              fun erlang:is_integer/1, {not_the_integer, Int},
+              fun(X) -> Int =:= X end);
         {list, _InnerType} ->
             check_list(Value, Type, CheckStack, ParseState);
+        neg_integer ->
+            check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
+                                       fun erlang:is_integer/1, no_neg_integer,
+                                       fun(X) -> 0 > X end);
+        nil ->
+            check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
+                                       fun erlang:is_list/1, no_empty_list,
+                                       fun(X) -> [] =:= X end);
+        node ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_atom/1, no_node);
+        {nonempty_list, InnerType} ->
+            check_list(Value, Type, CheckStack, ParseState);
+        nonempty_string ->
+            %% see http://www.erlang.org/doc/reference_manual/typespec.html
+            inner_check(Value, {nonempty_list,
+                                {range, {integer, 0}, {integer, 16#10ffff}}},
+                        [{Value, nonempty_string} | CheckStack], ParseState);
+        non_neg_integer ->
+            check_basic_type_with_prop(
+              Value, Type, CheckStack, ParseState,
+              fun erlang:is_integer/1, no_non_neg_integer,
+              fun(X) -> 0 =< X end);
+        number ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_number/1, no_number);
+        pid ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_pid/1, no_pid);
+        pos_integer ->
+            check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
+                                       fun erlang:is_integer/1, no_pos_integer,
+                                       fun(X) -> 0 < X end);
+        {range, {integer, _Min}, {integer, _Max}} ->
+            check_range(Value, Type, CheckStack, ParseState);
+        {typedef, _Module, _TypeName} ->
+            check_typedef(Value, Type, CheckStack, ParseState);
         {tuple, _Tuple} ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {union, _Union} ->
             check_union(Value, Type, CheckStack, ParseState);
-        atom ->
-            case is_atom(Value) of
-                true -> true;
-                false -> {false, [{Value, no_atom} | CheckStack]}
-            end;
-        {atom, _Atom} ->
-            check_atom(Value, Type, CheckStack, ParseState);
-        binary ->
-            case is_binary(Value) of
-                true -> true;
-                false -> {false, [{Value, no_binary} | CheckStack]}
-            end;
-        bool ->
-            case is_boolean(Value) of
-                true -> true;
-                false -> {false, [{Value, no_boolean} | CheckStack]}
-            end;
-        float ->
-            case is_float(Value) of
-                true -> true;
-                false -> {false, [{Value, no_float} | CheckStack]}
-            end;
-        integer ->
-            case is_integer(Value) of
-                true -> true;
-                false -> {false, [{Value, no_integer} | CheckStack]}
-            end;
-        {integer, Int} ->
-            case Value =:= Int of
-                true -> true;
-                false -> {false, [{Value, not_integer, Int} | CheckStack]}
-            end;
-        neg_integer ->
-            case is_integer(Value) andalso 0 > Value of
-                true -> true;
-                false -> {false, [{Value, no_neg_integer} | CheckStack]}
-            end;
-        nil ->
-            case Value of
-                [] -> true;
-                _ -> {false, [{Value, no_empty_list} | CheckStack]}
-            end;
-        non_neg_integer ->
-            case is_integer(Value) andalso 0 =< Value of
-                true -> true;
-                false -> {false, [{Value, no_non_neg_integer} | CheckStack]}
-            end;
-        pid ->
-            case is_pid(Value) of
-                true -> true;
-                false -> {false, [{Value, no_pid} | CheckStack]}
-            end;
-        pos_integer ->
-            case is_integer(Value) andalso 0 < Value of
-                true -> true;
-                false -> {false, [{Value, no_pos_integer} | CheckStack]}
-            end;
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
             {false, [{type_checker_unsupported_type, Type} | CheckStack]}
+    end.
+
+check_basic_type(Value, _Type, CheckStack, _ParseState,
+                 TypeCheck, Report) ->
+    case TypeCheck(Value) of
+        true -> true;
+        false -> {false, [{Value, Report} | CheckStack]}
+    end.
+
+check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
+                           TypeCheck, Report,
+                           ValCheck) ->
+    case check_basic_type(Value, Type, CheckStack, ParseState,
+                          TypeCheck, Report) of
+        true ->
+            case ValCheck(Value) of
+                true -> true;
+                false -> {false, [{Value, Report} | CheckStack]}
+            end
     end.
 
 check_typedef(_Value, {typedef, tester, test_any}, _, _) ->
@@ -154,7 +171,16 @@ check_list(Value, {list, InnerType} = T, CheckStack, ParseState) ->
                             [{Value, T} | CheckStack], ParseState, 1);
         false ->
             {false, [{Value, not_a_list, T} | CheckStack]}
+    end;
+check_list(Value, {nonempty_list, InnerType} = T, CheckStack, ParseState) ->
+    case is_list(Value) andalso [] =/= Value of
+        true ->
+            check_list_iter(Value, InnerType,
+                            [{Value, T} | CheckStack], ParseState, 1);
+        false ->
+            {false, [{Value, no_nonempty_list, T} | CheckStack]}
     end.
+
 
 check_list_iter([], _Type, _CheckStack, _ParseState, _Count) ->
     true;
