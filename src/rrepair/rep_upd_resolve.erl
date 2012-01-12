@@ -64,11 +64,11 @@
 
 -record(resolve_stats,
         {
-         round           = 0  :: float(),
-         diffCount       = 0  :: non_neg_integer(),
-         updatedCount    = 0  :: non_neg_integer(),
-         notUpdatedCount = 0  :: non_neg_integer(),
-         errorCount      = 0  :: non_neg_integer()         
+         round           = {0, 0}   :: rep_upd:round(),
+         diffCount       = 0        :: non_neg_integer(),
+         updatedCount    = 0        :: non_neg_integer(),
+         notUpdatedCount = 0        :: non_neg_integer(),
+         errorCount      = 0        :: non_neg_integer()         
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -195,7 +195,7 @@ on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,
 send_feedback(nil, _, _) -> ok;
 send_feedback(_, [], _) -> ok;
 send_feedback(Dest, Items, Round) ->
-    comm:send(Dest, {request_resolve, Round + 0.00009, {key_upd, Items}, []}).
+    comm:send(Dest, {request_resolve, Round, {key_upd, Items}, []}).
 
 send_stats(nil, _) -> ok;
 send_stats(SendStats, Stats) ->
@@ -223,7 +223,7 @@ init(State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec start(Round, Operation, Options) -> {ok, MyPid} when
-      is_subtype(Round,     float()),                                                        
+      is_subtype(Round,     rep_upd:round()),                                                        
       is_subtype(Operation, operation()),
       is_subtype(Options,   options()),
       is_subtype(MyPid,     pid()).
