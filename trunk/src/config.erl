@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -311,7 +311,7 @@ cfg_is_float(Key) ->
 -spec cfg_is_tuple(Key::atom(), TupleSize::pos_integer()) -> boolean().
 cfg_is_tuple(Key, Size) ->
     Pred = fun(Value) ->
-                   erlang:is_tuple(Value) and
+                   erlang:is_tuple(Value) andalso
                        (erlang:tuple_size(Value) =:= Size)
            end,
     Msg = io_lib:format("is not a valid tuple of size ~p", [Size]),
@@ -320,7 +320,7 @@ cfg_is_tuple(Key, Size) ->
 -spec cfg_is_tuple(Key::atom(), TupleSize::pos_integer(), Pred::fun((any()) -> boolean()), PredDescr::string()) -> boolean().
 cfg_is_tuple(Key, Size, Pred, PredDescr) ->
     CompletePred = fun(Value) ->
-                           erlang:is_tuple(Value) and
+                           erlang:is_tuple(Value) andalso
                                (erlang:tuple_size(Value) =:= Size) and
                                Pred(Value)
                    end,
@@ -366,6 +366,7 @@ cfg_is_in_range(Key, Min, Max) ->
     cfg_test_and_error(Key, IsInRange, Msg).
 
 -spec cfg_is_greater_than(Key::atom(), Min::number() | atom()) -> boolean().
+cfg_is_greater_than(_Key, failed) -> false; %% stop endless loop
 cfg_is_greater_than(Key, Min) when erlang:is_atom(Min) ->
     cfg_is_greater_than(Key, read(Min));
 cfg_is_greater_than(Key, Min) ->
@@ -374,6 +375,7 @@ cfg_is_greater_than(Key, Min) ->
     cfg_test_and_error(Key, IsGreaterThan, Msg).
 
 -spec cfg_is_greater_than_equal(Key::atom(), Min::number() | atom()) -> boolean().
+cfg_is_greater_than_equal(_Key, failed) -> false; %% stop endless loop
 cfg_is_greater_than_equal(Key, Min) when erlang:is_atom(Min) ->
     cfg_is_greater_than_equal(Key, read(Min));
 cfg_is_greater_than_equal(Key, Min) ->
@@ -382,6 +384,7 @@ cfg_is_greater_than_equal(Key, Min) ->
     cfg_test_and_error(Key, IsGreaterThanEqual, Msg).
 
 -spec cfg_is_less_than(Key::atom(), Max::number() | atom()) -> boolean().
+cfg_is_less_than(_Key, failed) -> false; %% stop endless loop
 cfg_is_less_than(Key, Max) when erlang:is_atom(Max) ->
     cfg_is_less_than(Key, read(Max));
 cfg_is_less_than(Key, Max) ->
@@ -390,6 +393,7 @@ cfg_is_less_than(Key, Max) ->
     cfg_test_and_error(Key, IsLessThan, Msg).
 
 -spec cfg_is_less_than_equal(Key::atom(), Max::number() | atom()) -> boolean().
+cfg_is_less_than_equal(_Key, failed) -> false; %% stop endless loop
 cfg_is_less_than_equal(Key, Max) when erlang:is_atom(Max) ->
     cfg_is_less_than_equal(Key, read(Max));
 cfg_is_less_than_equal(Key, Max) ->

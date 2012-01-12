@@ -28,7 +28,7 @@
 
 all()   -> [
 %%            tester_type_check_paxos,
-%%            tester_type_check_api,
+            tester_type_check_api,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
@@ -91,6 +91,16 @@ tester_type_check_util(_Config) ->
     Modules = [
 %%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
                {db_entry, []},
+               {config, [
+                         {check_config, 0},
+                         {cfg_is_tuple, 4}, %% needs a fun as parameter
+                         {cfg_is_list, 3}, %% needs a fun as parameter
+                         {cfg_test_and_error, 3}, %% needs a fun as parameter
+                         {start, 2},
+                         {start_link, 1}, {start_link, 2},
+                         {start_link2, 0}, {start_link2, 1},
+                         {loop, 0}
+                        ]},
                {quorum, []},
                {pdb, []},
                {pid_groups, [
