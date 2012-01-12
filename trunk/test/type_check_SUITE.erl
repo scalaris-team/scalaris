@@ -28,7 +28,7 @@
 
 all()   -> [
 %%            tester_type_check_paxos,
-            tester_type_check_api,
+%%            tester_type_check_api,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
@@ -90,6 +90,9 @@ tester_type_check_util(_Config) ->
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
 %%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
+               {db_entry, []},
+               {quorum, []},
+               {pdb, []},
                {pid_groups, [
                              {start_link, 0},
                              {init, 1}, %% tries to create existing ets table

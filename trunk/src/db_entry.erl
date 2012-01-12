@@ -1,4 +1,4 @@
-%% @copyright 2010-2011 Zuse Institute Berlin
+%% @copyright 2010-2012 Zuse Institute Berlin
 %%            and onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +39,7 @@
 % tuple as defined here
 -type entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
                   ReadLock::non_neg_integer(), Version::?DB:version()} |
-                 {Key::?RT:key(), empty_val, WriteLock::boolean(),
+                 {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::boolean(),
                   ReadLock::non_neg_integer(), Version::-1}.
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
@@ -68,14 +68,14 @@ set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
 -spec set_writelock(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::true,
      ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empty_val, WriteLock::true,
+    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::true,
      ReadLock::non_neg_integer(), Version::-1}.
 set_writelock(DBEntry) -> set_writelock(DBEntry, true).
 
 -spec unset_writelock(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
      ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empty_val, WriteLock::false,
+    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false,
      ReadLock::non_neg_integer(), Version::-1}.
 unset_writelock(DBEntry) -> set_writelock(DBEntry, false).
 
@@ -95,7 +95,7 @@ dec_readlock(DBEntry) ->
         N -> set_readlock(DBEntry, N - 1)
     end.
 
--spec get_version(DBEntry::entry()) -> ?DB:version().
+-spec get_version(DBEntry::entry()) -> ?DB:version() | -1.
 get_version(DBEntry) -> element(5, DBEntry).
 
 -spec inc_version(DBEntry::entry()) -> entry().
@@ -107,7 +107,7 @@ set_version(DBEntry, Version) -> setelement(5, DBEntry, Version).
 -spec reset_locks(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
      ReadLock::0, Version::?DB:version()} |
-    {Key::?RT:key(), empty_val, WriteLock::false,
+    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false,
      ReadLock::0, Version::-1}.
 reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
