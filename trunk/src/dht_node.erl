@@ -287,28 +287,30 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
-% @doc send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
+% send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
 on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->    
     {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), HashedKey),
     EntryVersion = db_entry:get_version(Entry),
-    IsNewer = EntryVersion =/= -1 andalso EntryVersion < NewVersion,
-    IsNotLocked = not db_entry:get_writelock(Entry),
-    Updateable = IsNewer 
-                     andalso IsNotLocked 
-                     andalso dht_node_state:is_responsible(HashedKey, State),
-    NewState = case Exists of
-                   true when Updateable ->
-                       UpdateEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
-                       NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdateEntry), 
-                       dht_node_state:set_db(State, NewDB);
-                   _ ->
-                       State
-               end,
-    ResultMsg = case Exists of
-                    true -> {update_key_entry_ack, Entry, true, Updateable};
-                    _ -> {update_key_entry_ack, HashedKey, false, false}
-                end,                    
-    comm:send(Source_PID, ResultMsg),
+    DoUpdate = Exists 
+                   andalso EntryVersion =/= -1 
+                   andalso EntryVersion < NewVersion
+                   andalso not db_entry:get_writelock(Entry)
+                   andalso dht_node_state:is_responsible(HashedKey, State),
+    DoRegen = not Exists 
+                  andalso dht_node_state:is_responsible(HashedKey, State), 
+    {NewState, NewEntry} = 
+        if 
+            DoUpdate ->
+                UpdEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
+                NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry), 
+                {dht_node_state:set_db(State, NewDB), UpdEntry};
+            DoRegen ->
+                RegenEntry = db_entry:new(HashedKey, NewValue, NewVersion),
+                NewDB = ?DB:set_entry(dht_node_state:get(State, db), RegenEntry),
+                {dht_node_state:set_db(State, NewDB), RegenEntry};
+            true -> {State, Entry}
+        end, 
+    comm:send(Source_PID, {update_key_entry_ack, NewEntry, Exists, DoUpdate orelse DoRegen}),
     NewState;
 
 on({db_set_subscription, SubscrTuple}, State) ->
