@@ -67,10 +67,10 @@ comparison(_) ->
     MerkleT = m_merkle(I, DB, DBSize, Iter),
     ArtT = m_art(I, DB, DBSize, Iter),        
         
-    BBuildT = util:proplist_get_value(build_time, BloomT),
-    MBuildT = util:proplist_get_value(build_time, MerkleT),
-    ABuildT = util:proplist_get_value(build_time, ArtT),
-    TreeT = util:proplist_get_value(tree_time, ArtT),
+    BBuildT = proplists:get_value(build_time, BloomT),
+    MBuildT = proplists:get_value(build_time, MerkleT),
+    ABuildT = proplists:get_value(build_time, ArtT),
+    TreeT = proplists:get_valuee(tree_time, ArtT),
     
     ct:pal("Performance Comparison
             DBSize=~p ; Iterations=~p

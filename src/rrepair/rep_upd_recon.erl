@@ -141,7 +141,7 @@ on({get_state_response, MyInterval}, State =
                         dhtNodePid = DhtNodePid,
                         dest_ru_pid = DestRUPid }) ->
     RMethod =:= merkle_tree andalso fd:subscribe(DestRUPid),
-    SrcInterval = util:proplist_get_value(interval, Params),
+    SrcInterval = proplists:get_value(interval, Params),
     MyIMapped = mapInterval(MyInterval, 1),
     SrcIMapped = mapInterval(SrcInterval, 1),
     Intersection = intervals:intersection(MyIMapped, SrcIMapped),
@@ -162,8 +162,8 @@ on({get_state_response, MyI}, State =
                         recon_struct = Params,
                         dhtNodePid = DhtNodePid,
                         dest_ru_pid = ClientRU_Pid}) ->
-    Interval = util:proplist_get_value(interval, Params),
-    ClientPid = util:proplist_get_value(senderPid, Params),
+    Interval = proplists:get_value(interval, Params),
+    ClientPid = proplists:get_value(senderPid, Params),
     MyIntersec = mapInterval(Interval, get_interval_quadrant(MyI)),
     case intervals:is_subset(MyIntersec, MyI) of
         false ->
@@ -207,7 +207,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         ownerRemotePid = MyRU_Pid,
                         sync_master = SyncMaster,
                         stats = Stats }) ->
-    MyI = util:proplist_get_value(interval, Params),
+    MyI = proplists:get_value(interval, Params),
     %Get Interval of DBList/Chunk
     %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)    
     ChunkI = mapInterval(MyI, 1),
@@ -253,7 +253,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                 {BTime, NTree} = util:tc(fun() -> add_to_tree(DBList, Params) end),
                 {ru_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
             false -> %build new tree
-                Interval = util:proplist_get_value(interval, Params),
+                Interval = proplists:get_value(interval, Params),
                 util:tc(fun() -> build_recon_struct(merkle_tree, 
                                                     {Interval, DBList}, 
                                                     {}) 
@@ -303,7 +303,7 @@ on({get_chunk_response, {[], DBList}}, State =
                         sync_round = Round,
                         stats = Stats })  ->
     ToBuild = ?IIF(IsMaster, merkle_tree, art),
-    Interval = util:proplist_get_value(interval, Params),
+    Interval = proplists:get_value(interval, Params),
     {BuildTime, NewStruct} =
         util:tc(fun() -> build_recon_struct(ToBuild, {Interval, DBList}, {}) end),    
     NewStats = 
@@ -311,7 +311,7 @@ on({get_chunk_response, {[], DBList}}, State =
             true -> 
                 %TODO measure sync time
                 {ok, ARStats} = 
-                    art_recon(NewStruct, util:proplist_get_value(art, Params), State),
+                    art_recon(NewStruct, proplists:get_value(art, Params), State),
                 comm:send_local(self(), {shutdown, art_sync_finished}),
                 ru_recon_stats:set([{build_time, BuildTime},
                                     {tree_size, merkle_tree:size_detail(NewStruct)}], 
@@ -379,12 +379,12 @@ on({crash, Pid}, State) ->
     comm:send_local(self(), {shutdown, {fail, crash_of_recon_node, Pid}}),
     State;
 
-on({shutdown, Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
+on({shutdown, _Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
                                         sync_round = Round,
                                         stats = Stats,
                                         sync_master = Master,
                                         sync_start_time = SyncStartTime }) ->
-    ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
+    ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, _Reason]),
     NewStats = ru_recon_stats:set([{recon_time, timer:now_diff(erlang:now(), SyncStartTime)}], Stats),
     comm:send_local(Owner, 
                     {recon_progress_report, self(), Round, Master, NewStats}),
