@@ -60,7 +60,6 @@ tester_type_check_module({Module, InExcludeList}, Count) ->
      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
 
 tester_type_check(_Config) ->
-
     Count = 1000,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
@@ -68,7 +67,10 @@ tester_type_check(_Config) ->
 %%               {randoms, []},
 %%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
                {api_dht, []},
-               {api_dht_raw, []},
+               {api_dht_raw, [
+                              {unreliable_lookup,2}, %% creates arb. messages
+                              {unreliable_get_key,3} %% creates arb. IP-adresses
+                             ]},
                {api_monitor, []},
                {api_pubsub, []},
                {api_rdht, []},
