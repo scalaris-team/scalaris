@@ -1,4 +1,4 @@
-%% @copyright 2009-2011 Zuse Institute Berlin
+%% @copyright 2009-2012 Zuse Institute Berlin
 %%            2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -113,9 +113,13 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_St
             Key = tx_tlog:get_entry_key(RTLogEntry),
             case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
                 true ->
-                    %% we are not in a hurry, tx is already commited and we are the slow minority
-                    msg_delay:send_local(
-                      1, self(), {tp_do_commit_abort, Id, Result});
+                    %% tx is already commited and we either are the
+                    %% slow minority or we already got such a request
+                    %% and already deleted the state,
+                    %% so we claim we committed
+                    %% msg_delay:send_local(
+                    %%   1, self(), {tp_do_commit_abort, Id, Result});
+                    comm:send(TM, {tp_committed, TMItemId});
                 false ->
                     % we don't have an own proposal yet (no validate seen), so we forward msg as is.
                     dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
