@@ -63,16 +63,16 @@ prop_new(L, R) ->
     Art1 = art:new(Tree),
     Conf1 = art:get_config(Art1),
     Art2 = art:new(Tree, 
-                   [{correction_factor, util:proplist_get_value(correction_factor, Conf1) + 1},
-                    {inner_bf_fpr, util:proplist_get_value(inner_bf_fpr, Conf1) + 0.1},
-                    {leaf_bf_fpr, util:proplist_get_value(leaf_bf_fpr, Conf1) + 0.1}]),
+                   [{correction_factor, proplists:get_value(correction_factor, Conf1) + 1},
+                    {inner_bf_fpr, proplists:get_value(inner_bf_fpr, Conf1) + 0.1},
+                    {leaf_bf_fpr, proplists:get_value(leaf_bf_fpr, Conf1) + 0.1}]),
     Conf2 = art:get_config(Art2),
-    ?equals(util:proplist_get_value(correction_factor, Conf1) + 1,
-            util:proplist_get_value(correction_factor, Conf2)),
-    ?equals(util:proplist_get_value(inner_bf_fpr, Conf1) + 0.1,
-            util:proplist_get_value(inner_bf_fpr, Conf2)),
-    ?equals(util:proplist_get_value(leaf_bf_fpr, Conf1) + 0.1,
-            util:proplist_get_value(leaf_bf_fpr, Conf2)).
+    ?equals(proplists:get_value(correction_factor, Conf1) + 1,
+            proplists:get_value(correction_factor, Conf2)),
+    ?equals(proplists:get_value(inner_bf_fpr, Conf1) + 0.1,
+            proplists:get_value(inner_bf_fpr, Conf2)),
+    ?equals(proplists:get_value(leaf_bf_fpr, Conf1) + 0.1,
+            proplists:get_value(leaf_bf_fpr, Conf2)).
 
 tester_new(_) ->
     tester:test(?MODULE, prop_new, 2, 100).

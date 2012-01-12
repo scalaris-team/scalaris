@@ -80,8 +80,8 @@ new(Tree) ->
 new(Tree, _Config) ->
     Config = merge_prop_lists(default_art_config(), _Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
-    InnerBF = ?REP_BLOOM:new(InnerCount, util:proplist_get_value(inner_bf_fpr, Config)),
-    LeafBF = ?REP_BLOOM:new(LeafCount, util:proplist_get_value(leaf_bf_fpr, Config)),
+    InnerBF = ?REP_BLOOM:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
+    LeafBF = ?REP_BLOOM:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
     ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), 
                                  ?REP_BLOOM:print(LBF)]),    
@@ -97,7 +97,7 @@ get_interval({art, _, I, _, _}) -> I.
     
 -spec get_correction_factor(art()) -> non_neg_integer().
 get_correction_factor({art, Config, _, _, _}) ->
-    util:proplist_get_value(correction_factor, Config).
+    proplists:get_value(correction_factor, Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -172,6 +172,6 @@ fill_bloom(Iter, IBF, LBF) ->
 
 merge_prop_lists(DefList, ListB) ->
     lists:foldl(fun({Key, Val}, Acc) ->                         
-                        [{Key, util:proplist_get_value(Key, ListB, Val)} | Acc] 
+                        [{Key, proplists:get_value(Key, ListB, Val)} | Acc] 
                 end, [], DefList).
     

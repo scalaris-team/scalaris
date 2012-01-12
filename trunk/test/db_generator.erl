@@ -49,7 +49,7 @@ get_db(I, Count, Distribution) ->
 
 -spec get_db(intervals:interval(), non_neg_integer(), distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
-    OutputType = util:proplist_get_value(output, Options, list_key),
+    OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         _ -> []
@@ -75,8 +75,11 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
                                            Key = ?RT:get_split_key(IL, IR, {Index, Add}),
                                            case AccType of
                                                list_key -> Key;
-                                               list_key_val -> {Key, 1}
+                                               list_key_val -> {Key, gen_value()}
                                            end
                                    end),
             uniform_key_list(R, lists:append(ToAdd, Acc), AccType)                                  
     end.
+
+gen_value() ->
+    tester_value_creator:create_value(integer, 0, tester_parse_state:new_parse_state()).

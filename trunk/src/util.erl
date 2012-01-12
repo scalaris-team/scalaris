@@ -61,7 +61,6 @@
 -export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
          p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
          parallel_run/4]).
--export([proplist_get_value/2, proplist_get_value/3]).
 
 -export([empty/1]).
 
@@ -936,23 +935,6 @@ collect_while(GatherFun, Count) ->
         {false, Data} -> [Data];
         true          -> GatherFun(Count + 1);
         false         -> []
-    end.
-
-% @doc Gets the value of a property list - proplist:get_value/2 is 10x slower than this
--spec proplist_get_value(atom(), [{atom(), T}]) -> T.
-proplist_get_value(Key, List) ->
-    case lists:keyfind(Key, 1, List) of
-        {_K, V} -> V;
-        _ -> undefined
-    end.
-
-% @doc If List contains a key-value pair named key, the value will be returned
-%      otherwise default.
--spec proplist_get_value(atom(), [{atom(), T}], T) -> T.
-proplist_get_value(Key, List, Default) ->
-    case proplist_get_value(Key, List) of 
-        undefined -> Default;
-        V -> V
     end.
     
 %% empty shell_prompt_func

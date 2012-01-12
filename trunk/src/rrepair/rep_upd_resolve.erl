@@ -228,8 +228,8 @@ init(State) ->
       is_subtype(Options,   options()),
       is_subtype(MyPid,     pid()).
 start(Round, Operation, Options) ->    
-    Feedback = util:proplist_get_value(feedback, Options, nil),
-    SendStats = util:proplist_get_value(send_stats, Options, nil),
+    Feedback = proplists:get_value(feedback, Options, nil),
+    SendStats = proplists:get_value(send_stats, Options, nil),
     State = #ru_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),
