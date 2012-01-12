@@ -26,7 +26,11 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
-all()   -> [tester_type_check].
+all()   -> [
+%%            tester_type_check_paxos,
+            tester_type_check_api,
+            tester_type_check_util
+           ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
 init_per_suite(Config) ->
@@ -59,13 +63,11 @@ tester_type_check_module({Module, InExcludeList}, Count) ->
       end
      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
 
-tester_type_check(_Config) ->
+tester_type_check_api(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
-%%               {randoms, []},
-%%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
                {api_dht, []},
                {api_dht_raw, [
                               {unreliable_lookup,2}, %% creates arb. messages
@@ -78,10 +80,44 @@ tester_type_check(_Config) ->
                {rdht_tx, [
                           {decode_value, 1} %% not every binary is an erlterm
                          ]}
+              ],
+    [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
+    true.
+
+tester_type_check_util(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    %% [{modulename, [excludelist = {fun, arity}]}]
+    Modules = [
+%%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
+               {pid_groups, [
+                             {start_link, 0},
+                             {init, 1}, %% tries to create existing ets table
+                             {on, 2},
+                             {pids_to_names, 2} %% sends remote messages
+                            ]},
+               {randoms, [{start, 0}, {stop, 0}]}
 %%               {util, [
 %%                       {collect_while, 1}
 %%                      ]}
 %%
+              ],
+    [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
+    true.
+
+
+tester_type_check_paxos(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    Modules = [
+%                {acceptor, [
+%                            {msg_accepted, 4} %% tries to send messages
+%                           ]},
+%               {acceptor_state, []},
+%               {learner, []},
+%               {learner_state, []},
+%               {proposer, []},
+%               {proposer_state, []}
               ],
     [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
     true.

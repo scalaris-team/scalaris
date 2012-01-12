@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,11 +38,14 @@ getRandomString() ->
 getRandomInt() ->
     rand_uniform(1, 16#100000000).
 
-%% @doc Generates a random number N, Lo =&lt; N &lt; Hi using the crypto library
+%% @doc Generates a random number N between Lo lt; N &lt; Hi using the crypto library
 %%      pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
-rand_uniform(Lo, Hi) ->
-    crypto:rand_uniform(Lo, Hi).
+rand_uniform(Lo, Hi) when Lo < Hi ->
+    crypto:rand_uniform(Lo, Hi);
+rand_uniform(Hi, Lo) when Lo < Hi ->
+    crypto:rand_uniform(Lo, Hi);
+rand_uniform(X, X) -> X.
 
 %% @doc Stops the crypto module's server.
 -spec stop() -> ok.
