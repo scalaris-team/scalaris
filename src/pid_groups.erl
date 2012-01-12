@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin,
+% @copyright 2007-2012 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -195,7 +195,7 @@ group_with(PidName) ->
     end.
 
 %% @doc find all process groups with a given process name inside
--spec groups_with(pidname()) -> [groupname()].
+-spec groups_with(pidname()) -> [groupname()] | failed.
 groups_with(PidName) ->
     case ets:match(?MODULE, {{'$1', PidName}, '_'}) of
         []   -> failed;
@@ -253,7 +253,7 @@ pid_to_name(Pid) when is_pid(Pid) ->
         X      -> pid_to_name(X)
     end;
 pid_to_name({GrpName, PidName}) ->
-    lists:flatten(io_lib:format("~s:~w", [GrpName, PidName])).
+    lists:flatten(io_lib:format("~.0p:~.0p", [GrpName, PidName])).
 
 %% @doc Resolve (local and remote) pids to names.
 -spec pids_to_names(Pids::[comm:mypid()], Timeout::pos_integer()) -> [string()].
@@ -286,7 +286,7 @@ pids_to_names(Pids, Timeout) ->
 %% for the monitoring in the web interface
 %% @doc get info about a process
 -spec get_web_debug_info(groupname(), nonempty_string()) ->
-   {struct, [{pairs, {array, {struct, [{key | value, nonempty_string()}]}}}]}.
+   {struct, [{pairs, {array, [{struct, [{key | value, nonempty_string()}]}]}}]}.
 get_web_debug_info(GrpName, PidNameString) ->
     PidName = try erlang:list_to_existing_atom(PidNameString)
               catch error:badarg -> PidNameString
