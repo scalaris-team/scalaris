@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
+% @copyright 2009-2012 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -294,8 +294,9 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
                     %% FDSubscribe = enough_tps_registered(TxState, State),
                     ValidRTMs = [ X || X <- tx_state:get_rtms(TxState),
                                        unknown =/= get_rtmpid(X) ],
-                    send_to_rtms([hd(ValidRTMs)], fun(_X) ->
-                                                          {tx_tm_rtm_propose_yourself, TxId} end)
+                    send_to_rtms(ValidRTMs,
+                                 fun(_X) -> {tx_tm_rtm_propose_yourself,
+                                            TxId} end)
             end,
             ok
     end,
@@ -836,7 +837,10 @@ inform_tps(TxState, State, Result) ->
               {ok, ItemState} = get_item_entry(ItemId, State),
               [ case comm:is_valid(TP) of
                     false -> unknown;
-                    true -> msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry, comm:this(), ItemId}, Result), ok
+                    true ->
+                        msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
+                                                    comm:this(), ItemId},
+                                               Result), ok
                 end
                 || {PaxId, RTLogEntry, TP}
                        <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
