@@ -37,15 +37,16 @@ check(true, {atom, true}, _ParseState) ->
 check(true, bool, _ParseState) ->
     true;
 check(Value, Type, ParseState) ->
-    %% ct:pal("new inner_check(~w, ~w)", [Value, Type]),
     case inner_check(Value, Type, [], ParseState) of
-        true -> true;
-        {false, CheckStack} = R ->
-            ct:pal("Type check failed: ~.0p", [CheckStack]),
+        true ->
+            true;
+        {false, _CheckStack} = R ->
+            %ct:pal("Type check failed: ~.0p", [_CheckStack]),
             R
     end.
 
 inner_check(Value, Type, CheckStack, ParseState) ->
+    %ct:pal("new inner_check(~w, ~w)", [Value, Type]),
     case Type of
         atom ->
             check_basic_type(Value, Type, CheckStack, ParseState,
