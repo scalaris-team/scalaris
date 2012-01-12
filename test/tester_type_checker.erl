@@ -248,7 +248,8 @@ check_union(Value, {union, Union}, CheckStack, ParseState) ->
            end, {false, []}, Union) of
         true -> true;
         {false, UnionStack} ->
-            {false, [{Value, no_union_variant_matched, UnionStack} | CheckStack]}
+            {false, [{Value, no_union_variant_matched, UnionStack},
+                     {Value, {union, Union}}| CheckStack]}
     end.
 
 

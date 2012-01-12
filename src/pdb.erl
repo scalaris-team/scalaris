@@ -1,4 +1,4 @@
-%% @copyright 2010-2011 Zuse Institute Berlin
+%% @copyright 2010-2012 Zuse Institute Berlin
 %%            and onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +65,7 @@ get(Key, TableName) ->
 
 -spec set(tuple(), tableid()) -> ok.
 -ifdef(PDB_ERL).
+set({}, _TableName) -> ok; %% empty_tuple is forbidden as key
 set(NewTuple, _TableName) ->
     erlang:put(element(1, NewTuple), NewTuple),
     ok.
