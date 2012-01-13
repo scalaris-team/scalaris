@@ -36,8 +36,6 @@
 -export_type([method/0, recon_struct/0, recon_stage/0]).
 -endif.
 
--define(RESOLVE_METHOD, simple).
-
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
@@ -363,7 +361,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     ?TRACE("Reconcile Bloom Round=~p ; FoundObsolete=~p", [Round, length(Obsolete)]),
     %TODO: Possibility to resolve missing replicas
     length(Obsolete) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_sync, ?RESOLVE_METHOD, DestRU_Pid, Obsolete}, []}),
+        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Obsolete}, []}),
     SyncFinished andalso
         comm:send_local(self(), {shutdown, {ok, reconciliation}}),
     State;
@@ -503,7 +501,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(Owner, {request_resolve, Round, {key_sync, ?RESOLVE_METHOD, Dest, ToSync}, []}),
+    comm:send_local(Owner, {request_resolve, Round, {key_sync, Dest, ToSync}, []}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

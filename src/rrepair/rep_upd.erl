@@ -126,13 +126,13 @@ on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
 on({recon_progress_report, _Sender, _Round, Master, _Stats}, State) ->
     OpenRecon = State#rep_upd_state.open_recon - 1,
     Master andalso
-        ?TRACE_RECON("RECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
+        ?TRACE_RECON("~nRECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
                [_Round, _Sender, Master, ru_recon_stats:print(_Stats), OpenRecon]),
     State#rep_upd_state{ open_recon = OpenRecon };
 
 on({resolve_progress_report, _Sender, _Stats}, State) ->
     OpenResolve = State#rep_upd_state.open_resolve - 1,
-    ?TRACE_RESOLVE("RESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
+    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
            [_Sender, rep_upd_resolve:print_resolve_stats(_Stats),
             State#rep_upd_state.open_recon, OpenResolve]),    
     State#rep_upd_state{ open_resolve = OpenResolve };
@@ -146,7 +146,6 @@ on({web_debug_info, Requestor}, State) ->
                     open_resolve = OpenResol } = State,
     KeyValueList =
         [{"Recon Method:", get_recon_method()},
-         {"Resolve Method:", get_resolve_method()},
          {"Bloom Module:", ?REP_BLOOM},
          {"Sync Round:", Round},
          {"Open Recon Jobs:", OpenRecon},
@@ -188,15 +187,10 @@ check_config() ->
         true ->
             config:cfg_is_module(rep_update_trigger) andalso
             config:cfg_is_atom(rep_update_recon_method) andalso
-            config:cfg_is_atom(rep_update_resolve_method) andalso
             config:cfg_is_integer(rep_update_interval) andalso
             config:cfg_is_greater_than(rep_update_interval, 0);
         _ -> true
     end.
-
--spec get_resolve_method() -> rep_upd_resolve:method().
-get_resolve_method() ->
-    config:read(rep_update_resolve_method).
 
 -spec get_recon_method() -> rep_upd_recon:method().
 get_recon_method() -> 

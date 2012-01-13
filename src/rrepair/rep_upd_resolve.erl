@@ -18,9 +18,8 @@
 %%         Sync-Modes:
 %%           1) key_upd: updates local kv-pairs with received kv-list, if received kv is newer
 %%           2) key_sync: synchronizes kv-pairs between two nodes (only for small lists)
-%%                      technique depends on resolve_method
 %%         Options:
-%%           1) Feedback
+%%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
 %%         Examples: 
 %%            1) remote node D should get one kvv-pair (key,value,version),
@@ -40,7 +39,7 @@
 
 
 -ifdef(with_export_type_support).
--export_type([operation/0, method/0, options/0]).
+-export_type([operation/0, options/0]).
 -export_type([stats/0]).
 -endif.
 
@@ -56,25 +55,28 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type method()  :: simple.
-
--type ru_resolve_option()  :: {feedback, comm:mypid()} | 
-                              {send_stats, comm:mypid()}. %send stats to pid after completion
--type options() :: [ru_resolve_option()].
+-type option()   :: feedback_response |
+                    {feedback, comm:mypid()} | 
+                    {send_stats, comm:mypid()}. %send stats to pid after completion
+-type options()  :: [option()].
+-type feedback() :: {nil | comm:mypid(),        %feedback destination adress
+                     ?DB:kvv_list()}.
 
 -record(resolve_stats,
         {
-         round           = {0, 0}   :: rep_upd:round(),
-         diffCount       = 0        :: non_neg_integer(),
-         updatedCount    = 0        :: non_neg_integer(),
-         notUpdatedCount = 0        :: non_neg_integer(),
-         errorCount      = 0        :: non_neg_integer()         
+         round            = {0, 0} :: rep_upd:round(),
+         diff_size        = 0      :: non_neg_integer(),
+         regen_count      = 0      :: non_neg_integer(),
+         update_count     = 0      :: non_neg_integer(),
+         upd_fail_count   = 0      :: non_neg_integer(),
+         regen_fail_count = 0      :: non_neg_integer(),
+         comment          = []     :: [any()]
          }).
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
     {key_upd, ?DB:kvv_list()} |
-    {key_sync, method(), DestPid::comm:mypid(), [?RT:key()]}.
+    {key_sync, DestPid::comm:mypid(), [?RT:key()]}.
 
 -record(ru_resolve_state,
         {
@@ -83,8 +85,8 @@
          dhtNodePid     = ?required(ru_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = ?required(ru_resolve_state, operation)        :: operation(),
          stats          = #resolve_stats{}                              :: stats(),
-         feedback       = nil                                           :: nil | comm:mypid(), %sends data ids to given Dest which are outdated at Dest
-         feedbackItems  = []                                            :: ?DB:kvv_list(),
+         feedback       = {nil, []}                                     :: feedback(),
+         feedback_resp  = false                                         :: boolean(),
          send_stats     = nil                                           :: nil | comm:mypid() 
          }).
 -type state() :: #ru_resolve_state{}.
@@ -121,12 +123,11 @@ on({get_state_response, MyI}, State =
     ?TRACE("DetailSync START ToDo=~p", [ToUpdate]),
     ToUpdate =:= 0 andalso
         comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
-    State#ru_resolve_state{ stats = Stats#resolve_stats{ diffCount = ToUpdate } };
+    State#ru_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
-       #ru_resolve_state{ operation = {key_sync, _, _, KeyList},
-                          dhtNodePid = DhtNodePid
-                          }) ->    
+       #ru_resolve_state{ operation = {key_sync, _, KeyList},
+                          dhtNodePid = DhtNodePid }) ->    
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
                           intervals:in(K, MyI)],
@@ -135,10 +136,10 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_entries_response, Entries}, State =
-       #ru_resolve_state{ operation = {key_sync, _, Dest, _},
+       #ru_resolve_state{ operation = {key_sync, Dest, _},
                           ownerRemotePid = MyNodePid,
                           stats = Stats }) ->
-    ?TRACE("START GET ENTRIES - KEY KEY SYNC", []),
+    ?TRACE("START GET ENTRIES - KEY SYNC", []),
     KVVList = [{db_entry:get_key(X), 
                 db_entry:get_value(X), 
                 db_entry:get_version(X)} || X <- Entries],
@@ -151,52 +152,74 @@ on({get_entries_response, Entries}, State =
 
 on({update_key_entry_ack, Entry, Exists, Done}, State =
        #ru_resolve_state{ operation = {key_upd, _},
-                          stats = #resolve_stats{ diffCount = Diff,
-                                                  updatedCount = Ok, 
-                                                  notUpdatedCount = Failed,
+                          stats = #resolve_stats{ diff_size = Diff,
+                                                  regen_count = RegenOk,
+                                                  update_count = UpdOk, 
+                                                  upd_fail_count = UpdFail,
+                                                  regen_fail_count = RegenFail,
                                                   round = Round
-                                                } = Stats,
-                          feedback = Feedback,
-                          feedbackItems = FBItems,
-                          send_stats = SendStats
+                                                } = Stats,                          
+                          feedback = FB = {DoFB, FBItems}
                         }) ->
-    %?TRACE("Entry=~p ; Exists=~p ; Done=~p", [Entry, Exists, Done]),
-    NewStats = case Done of 
-                   true  -> Stats#resolve_stats{ updatedCount = Ok +1 };
-                   false -> Stats#resolve_stats{ notUpdatedCount = Failed + 1 } 
+    NewStats = if
+                   Done andalso Exists -> Stats#resolve_stats{ update_count = UpdOk +1 };
+                   Done andalso not Exists -> Stats#resolve_stats{ regen_count = RegenOk +1 };
+                   not Done and Exists -> Stats#resolve_stats{ upd_fail_count = UpdFail + 1 };
+                   not Done and not Exists -> Stats#resolve_stats{ regen_fail_count = RegenFail + 1 }
                end,
-    NewFBItems = case not Done andalso Exists of
-                   true -> [{db_entry:get_key(Entry),
-                             db_entry:get_value(Entry),
-                             db_entry:get_version(Entry)} | FBItems];
-                   false -> FBItems
-               end,
-    _ = case Diff - 1 =:= Ok + Failed of
-            true ->
-                send_feedback(Feedback, NewFBItems, Round),
-                send_stats(SendStats, NewStats),
+    NewFB = if
+                not Done 
+                    andalso Exists 
+                    andalso DoFB =/= nil -> 
+                    {DoFB,
+                     [{db_entry:get_key(Entry),
+                       db_entry:get_value(Entry),
+                       db_entry:get_version(Entry)} | FBItems]};
+                true -> FB
+            end,
+    if
+        (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
+                send_feedback(NewFB, Round),
                 comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
-            _ ->
-                ok
-        end,
-    State#ru_resolve_state{ stats = NewStats, feedbackItems = NewFBItems };
+        true -> ok
+    end,
+    State#ru_resolve_state{ stats = NewStats, feedback = NewFB };
 
-on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,
-                                     stats = Stats }) ->
-    %DoSendResult TODO
-    ?TRACE("ResolveStats: ~p", [print_resolve_stats(Stats)]),
-    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),    
+on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,   
+                                     send_stats = SendStats,                                 
+                                     stats = Stats } = State) ->
+    NStats = build_comment(State, Stats),
+    send_stats(SendStats, NStats),
+    comm:send_local(Owner, {resolve_progress_report, self(), NStats}),    
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-send_feedback(nil, _, _) -> ok;
-send_feedback(_, [], _) -> ok;
-send_feedback(Dest, Items, Round) ->
-    comm:send(Dest, {request_resolve, Round, {key_upd, Items}, []}).
+build_comment(#ru_resolve_state{ operation = Operation,
+                                 feedback = {FBDest, _},
+                                 feedback_resp = Resp 
+                               }, Stats) ->
+    Comment = case Operation of 
+                  {key_upd, _} when Resp ->
+                      "key_upd by feedback";
+                  {key_upd, _} when not Resp andalso FBDest =:= nil ->
+                      "key_upd without feedback"; 
+                  {key_upd, _} when not Resp andalso FBDest =/= nil -> 
+                      ["key_upd with feedback to ", FBDest];
+                  {key_sync, Dest, _} -> 
+                      ["key_sync with", Dest]
+              end,
+    Stats#resolve_stats{ comment = Comment }.
 
+-spec send_feedback(feedback(), rep_upd:round()) -> ok.
+send_feedback({nil, _}, _) -> ok;
+send_feedback({_, []}, _) -> ok;
+send_feedback({Dest, Items}, Round) ->
+    comm:send(Dest, {request_resolve, Round, {key_upd, Items}, [feedback_response]}).
+
+-spec send_stats(nil | comm:mypid(), stats()) -> ok.
 send_stats(nil, _) -> ok;
 send_stats(SendStats, Stats) ->
     comm:send(SendStats, {resolve_stats, Stats}).
@@ -227,14 +250,17 @@ init(State) ->
       is_subtype(Operation, operation()),
       is_subtype(Options,   options()),
       is_subtype(MyPid,     pid()).
-start(Round, Operation, Options) ->    
-    Feedback = proplists:get_value(feedback, Options, nil),
-    SendStats = proplists:get_value(send_stats, Options, nil),
+start(Round, Operation, Options) ->        
+    FBDest = proplists:get_value(feedback, Options, nil),
+    FBResp = proplists:get_value(feedback_response, Options, false),
+    StatsDest = proplists:get_value(send_stats, Options, nil),
+    ct:pal("RESOVLE OPTIONS=~p; FBResp=~p", [Options, FBResp]),
     State = #ru_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),
                                operation = Operation,
                                stats = #resolve_stats{ round = Round },
-                               feedback = Feedback,
-                               send_stats = SendStats },    
+                               feedback = {FBDest, []},
+                               feedback_resp = FBResp,
+                               send_stats = StatsDest },    
     gen_component:start(?MODULE, fun ?MODULE:on/2, State).
