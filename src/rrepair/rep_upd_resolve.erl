@@ -254,7 +254,6 @@ start(Round, Operation, Options) ->
     FBDest = proplists:get_value(feedback, Options, nil),
     FBResp = proplists:get_value(feedback_response, Options, false),
     StatsDest = proplists:get_value(send_stats, Options, nil),
-    ct:pal("RESOVLE OPTIONS=~p; FBResp=~p", [Options, FBResp]),
     State = #ru_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),

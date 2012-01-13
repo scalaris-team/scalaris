@@ -68,7 +68,7 @@
 -type mt_config() :: #mt_config{}.
 
 -type mt_node() :: { Hash        :: mt_node_key(),       %hash of childs/containing items 
-                     Count       :: non_neg_integer(),   %in inner nodes number of subnodes, in leaf nodes number of items in the bucket
+                     Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
@@ -246,10 +246,8 @@ bulk_build(I, Params, KeyList) ->
     Config = build_config(Params),
     {merkle_tree, Config, p_bulk_build(InitNode, Config, KeyList)}.
 
-p_bulk_build({_, C, _, I, _}, 
-             #mt_config{ branch_factor = Branch } = Config, 
-             KeyList) ->
-    ChildsI = intervals:split(I, Branch),
+p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
+    ChildsI = intervals:split(I, Config#mt_config.branch_factor),
     IKList = keys_to_intervals(KeyList, ChildsI),
     ChildNodes = build_childs(IKList, Config, []),
     NCount = lists:foldl(fun(N, Acc) -> Acc + node_size(N) end, 0, ChildNodes),
@@ -292,15 +290,12 @@ gen_hash_node({_, Count, [], I, List}, Config) ->
 
 % @doc Returns the total number of nodes in a tree or node (inner nodes and leafs)
 -spec size(merkle_tree() | mt_node()) -> non_neg_integer().
-size({merkle_tree, _, Root}) ->
-    node_size(Root);
+size({merkle_tree, _, Root}) -> node_size(Root);
 size(Node) -> node_size(Node).
 
 -spec node_size(mt_node()) -> non_neg_integer().
-node_size({_, _, _, _, []}) ->
-    1;
-node_size({_, C, _, _, _}) ->
-    C.
+node_size({_, _, _, _, []}) -> 1;
+node_size({_, C, _, _, _}) -> C.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
