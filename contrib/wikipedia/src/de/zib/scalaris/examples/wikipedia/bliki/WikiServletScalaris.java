@@ -43,6 +43,7 @@ import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
+import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.PageListResult;
 import de.zib.scalaris.examples.wikipedia.RandomTitleResult;

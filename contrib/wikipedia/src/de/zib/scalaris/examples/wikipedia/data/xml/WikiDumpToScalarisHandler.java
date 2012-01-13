@@ -360,7 +360,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
                 throw new RuntimeException(e);
             }
             
-            SaveResult result = ScalarisDataHandler.updatePageList(scalaris_tx, scalaris_pageList_key, scalaris_pageCount_key, new LinkedList<String>(), newEntries);
+            SaveResult result = ScalarisDataHandler.updatePageList(scalaris_tx, scalaris_pageList_key, scalaris_pageCount_key, new LinkedList<String>(), newEntries, "");
             if (!result.success) {
                 System.err.println(result.message);
             }
