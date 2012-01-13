@@ -138,8 +138,6 @@ public class MyScalarisMagicWord extends MyMagicWord {
         if (!isMyMagicWord(name)) {
             return MyMagicWord.processMagicWord(name, origParameter, model);
         }
-
-        final String statKey = name + ":" + origParameter;
         
         // check whether numbers should be printed in raw format and
         // remove this tag from the parameter string:
@@ -161,7 +159,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
         if (name.equals(MAGIC_PAGE_SIZE)) {
             RevisionResult getRevResult = ScalarisDataHandler.getRevision(
                     model.connection, parameter, model.getNamespace());
-            model.addStat(statKey, getRevResult.time);
+            model.addStats(getRevResult.stats);
             int size = 0;
             if (getRevResult.success) {
                 size = getRevResult.revision.unpackedText().getBytes().length;
@@ -193,14 +191,14 @@ public class MyScalarisMagicWord extends MyMagicWord {
          */
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
             BigIntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
-            model.addStat(statKey, pageCountResult.time);
+            model.addStats(pageCountResult.stats);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
         } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
             BigIntegerResult pageCountResult = ScalarisDataHandler
                     .getArticleCount(model.connection);
-            model.addStat(statKey, pageCountResult.time);
+            model.addStats(pageCountResult.stats);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.number);
             }
@@ -219,7 +217,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
             BigIntegerResult catListResult = ScalarisDataHandler
                     .getPagesInCategoryCount(model.connection, category,
                             model.getNamespace());
-            model.addStat(statKey, catListResult.time);
+            model.addStats(catListResult.stats);
             if (catListResult.success) {
                 return model.formatStatisticNumber(rawNumber, catListResult.number);
             }

@@ -15,12 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
+import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 
 /**
  * Bean with common content to display in a jsp. 
@@ -45,7 +43,7 @@ public class WikiPageBeanBase {
     private MyNamespace wikiNamespace = new MyNamespace();
     protected String redirectedTo = "";
     private boolean isEditRestricted = false;
-    protected Map<String, List<Long>> stats = new LinkedHashMap<String, List<Long>>();
+    protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
     
     /**
      * the content of the site
@@ -77,7 +75,7 @@ public class WikiPageBeanBase {
         wikiNamespace = other.wikiNamespace;
         redirectedTo = other.redirectedTo;
         isEditRestricted = other.isEditRestricted;
-        stats = new LinkedHashMap<String, List<Long>>(other.stats);
+        stats = new LinkedMultiHashMap<String, Long>(other.stats);
     }
 
     /**
@@ -221,7 +219,9 @@ public class WikiPageBeanBase {
     }
 
     /**
-     * @return the stats
+     * Gets information about the time needed to look up pages.
+     * 
+     * @return a mapping of page titles to retrieval times
      */
     public Map<String, List<Long>> getStats() {
         return stats;
@@ -231,7 +231,7 @@ public class WikiPageBeanBase {
      * @param stats the stats to set
      */
     public void setStats(Map<String, List<Long>> stats) {
-        this.stats = stats;
+        this.stats = new LinkedMultiHashMap<String, Long>(stats);
     }
 
     /**
@@ -244,11 +244,7 @@ public class WikiPageBeanBase {
      *            the number of milliseconds it took to retrieve the page
      */
     public void addStat(String title, long value) {
-        List<Long> l = stats.get(title);
-        if (l == null) {
-            stats.put(title, l = new ArrayList<Long>(2));
-        }
-        l.add(value);
+        stats.put(title, value);
     }
 
     /**
@@ -261,11 +257,7 @@ public class WikiPageBeanBase {
      *            multiple number of milliseconds it took to retrieve the page
      */
     public void addStats(String title, List<Long> value) {
-        List<Long> l = stats.get(title);
-        if (l == null) {
-            stats.put(title, l = new ArrayList<Long>(value.size()));
-        }
-        l.addAll(value);
+        stats.put(title, value);
     }
 
     /**
@@ -277,9 +269,7 @@ public class WikiPageBeanBase {
      *            it took to retrieve the page
      */
     public void addStats(Map<String, List<Long>> values) {
-        for (Entry<String, List<Long>> value : values.entrySet()) {
-            addStats(value.getKey(), value.getValue());
-        }
+        stats.putAll(values);
     }
 
     /**

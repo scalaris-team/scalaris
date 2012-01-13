@@ -32,36 +32,56 @@ public class SavePageResult extends Result {
     /**
      * Creates a new successful result.
      * 
-     * @param oldPage       old version of the page (may be null)
-     * @param newPage       new version of the page (may be null)
-     * @param newShortRevs  new list of (short) revisions (may be null)
-     * @param pageEdits     new number of page edists (may be null)
-     * @param time          time in milliseconds for this operation
+     * @param oldPage
+     *            old version of the page (may be null)
+     * @param newPage
+     *            new version of the page (may be null)
+     * @param newShortRevs
+     *            new list of (short) revisions (may be null)
+     * @param pageEdits
+     *            new number of page edists (may be null)
+     * @param name
+     *            the name of the operation (for the stats - see {@link #stats})
+     * @param time
+     *            time in milliseconds for this operation
      */
     public SavePageResult(Page oldPage, Page newPage,
-            List<ShortRevision> newShortRevs, BigInteger pageEdits, long time) {
-        super(time);
+            List<ShortRevision> newShortRevs, BigInteger pageEdits,
+            String name, long time) {
+        super(name, time);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;
         this.pageEdits = pageEdits;
     }
+    
     /**
      * Creates a new custom result.
      * 
-     * @param success        the success status
-     * @param message        the message to use
-     * @param connectFailed  whether the connection to the DB failed or not
-     * @param oldPage        old version of the page (may be null)
-     * @param newPage        new version of the page (may be null)
-     * @param newShortRevs   new list of (short) revisions (may be null)
-     * @param pageEdits      new number of page edists (may be null)
-     * @param time           time in milliseconds for this operation
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     * @param oldPage
+     *            old version of the page (may be null)
+     * @param newPage
+     *            new version of the page (may be null)
+     * @param newShortRevs
+     *            new list of (short) revisions (may be null)
+     * @param pageEdits
+     *            new number of page edists (may be null)
+     * @param name
+     *            the name of the operation (for the stats - see {@link #stats})
+     * @param time
+     *            time in milliseconds for this operation
      */
     public SavePageResult(boolean success, String message,
             boolean connectFailed, Page oldPage, Page newPage,
-            List<ShortRevision> newShortRevs, BigInteger pageEdits, long time) {
-        super(success, message, connectFailed, time);
+            List<ShortRevision> newShortRevs, BigInteger pageEdits,
+            String name, long time) {
+        super(success, message, connectFailed, name, time);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;

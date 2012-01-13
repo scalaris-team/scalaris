@@ -23,15 +23,15 @@ import info.bliki.wiki.model.WikiModel;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
+import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 
 /**
  * Wiki model fixing some bugs of {@link WikiModel} and adding some
@@ -90,7 +90,7 @@ public class MyWikiModel extends WikiModel {
 
     protected Set<String> includes = new HashSet<String>();
 
-    protected Map<String, List<Long>> stats = new LinkedHashMap<String, List<Long>>();
+    protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -903,10 +903,31 @@ public class MyWikiModel extends WikiModel {
      *            the number of milliseconds it took to retrieve the page
      */
     public void addStat(String title, long value) {
-        List<Long> l = stats.get(title);
-        if (l == null) {
-            stats.put(title, l = new ArrayList<Long>(2));
-        }
-        l.add(value);
+        stats.put(title, value);
+    }
+
+    /**
+     * Adds the time needed to retrieve the given page to the collected
+     * statistics.
+     * 
+     * @param title
+     *            the title of the page
+     * @param value
+     *            multiple number of milliseconds it took to retrieve the page
+     */
+    public void addStats(String title, List<Long> value) {
+        stats.put(title, value);
+    }
+
+    /**
+     * Adds the time needed to retrieve the given page to the collected
+     * statistics.
+     * 
+     * @param values
+     *            a mapping between page titles and the number of milliseconds
+     *            it took to retrieve the page
+     */
+    public void addStats(Map<String, List<Long>> values) {
+        stats.putAll(values);
     }
 }
