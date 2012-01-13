@@ -110,12 +110,14 @@ public class Main {
 
         if (line.hasOption("minibench")) {
             final String[] optionValues = line.getOptionValues("minibench");
-            int testruns = 100;
+            int nrOperations = 500;
+            int threadsPerNode = 10;
             final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
             if (optionValues != null) {
-                checkArguments(optionValues, 2, options, "b");
-                testruns = Integer.parseInt(optionValues[0]);
-                for (int i = 1; i < Math.min(10, optionValues.length); ++i) {
+                checkArguments(optionValues, 3, options, "b");
+                nrOperations = Integer.parseInt(optionValues[0]);
+                threadsPerNode = Integer.parseInt(optionValues[1]);
+                for (int i = 2; i < Math.min(10, optionValues.length); ++i) {
                     final String benchmarks_str = optionValues[i];
                     if (benchmarks_str.equals("all")) {
                         for (int j = 1; j <= 18; ++j) {
@@ -130,7 +132,7 @@ public class Main {
                     benchmarks.add(i);
                 }
             }
-            Benchmark.minibench(testruns, benchmarks);
+            Benchmark.minibench(nrOperations, threadsPerNode, benchmarks);
         } else if (line.hasOption("r")) { // read
             final String key = line.getOptionValue("read");
             checkArguments(key, options, "r");
@@ -421,7 +423,7 @@ public class Main {
         group.addOption(delete);
 
         final Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
-        bench.setArgName("[runs]> <[benchmarks]");
+        bench.setArgName("[iterations]> <[threads per node]> <[benchmarks]");
         bench.setArgs(10);
         bench.setOptionalArg(true);
         group.addOption(bench);
