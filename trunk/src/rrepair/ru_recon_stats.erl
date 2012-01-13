@@ -24,17 +24,18 @@
 -record(ru_recon_stats,
         {
          tree_size          = {0, 0} :: merkle_tree:mt_size(),
-         tree_compareLeft   = 0      :: non_neg_integer(),
          tree_nodesCompared = 0      :: non_neg_integer(),
-         tree_leafsSynced   = 0      :: non_neg_integer(),
          tree_compareSkipped= 0      :: non_neg_integer(),
+         tree_leafsSynced   = 0      :: non_neg_integer(),
+         tree_compareLeft   = 0      :: non_neg_integer(),
          error_count        = 0      :: non_neg_integer(),
          build_time         = 0      :: non_neg_integer(),   %in us
-         recon_time         = 0      :: non_neg_integer()    %in us
+         recon_time         = 0      :: non_neg_integer(),   %in us
+         finish             = false  :: boolean()
          }). 
 -type stats() :: #ru_recon_stats{}.
 
--type stats_types() :: non_neg_integer() | merkle_tree:mt_size().
+-type stats_types() :: non_neg_integer() | merkle_tree:mt_size() | boolean().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions and Types
@@ -103,7 +104,8 @@ set([{K, V} | L], Stats) ->
              tree_compareSkipped -> Stats#ru_recon_stats{ tree_compareSkipped = V };
              error_count -> Stats#ru_recon_stats{ error_count = V };
              build_time -> Stats#ru_recon_stats{ build_time = V };
-             recon_time -> Stats#ru_recon_stats{ recon_time = V }   
+             recon_time -> Stats#ru_recon_stats{ recon_time = V };
+             finish -> Stats#ru_recon_stats{ finish = V }
          end,
     set(L, NS).
 
@@ -118,6 +120,7 @@ get(K, Stats) ->
         error_count -> Stats#ru_recon_stats.error_count;
         build_time -> Stats#ru_recon_stats.build_time;
         recon_time -> Stats#ru_recon_stats.recon_time;
+        finish -> Stats#ru_recon_stats.finish;
         _ -> 0
     end.
 

@@ -95,12 +95,15 @@
 -type state() :: #ru_recon_state{}.
 
 -type build_args() :: {} | {Fpr::float()}.
+-type tree_cmp_response() :: ok_inner | ok_leaf |
+                             fail_leaf | fail_node |
+                             not_found.
 
 -type message() ::
     {get_state_response, intervals:interval()} |
     {get_chunk_response, db_chunk_enc()} |
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
-    {check_node_response, ok | not_found | fail_is_leaf | fail_node, intervals:interval(), [merkle_tree:mt_node_key()]} |
+    {check_node_response, tree_cmp_response(), intervals:interval(), [merkle_tree:mt_node_key()]} |
     {start_recon, method(), recon_stage(), recon_struct(), Master::boolean()} |
     {shutdown, exit_reason()} | 
     {crash, DeadPid::comm:mypid()}.
@@ -310,7 +313,7 @@ on({get_chunk_response, {[], DBList}}, State =
                 %TODO measure sync time
                 {ok, ARStats} = 
                     art_recon(NewStruct, proplists:get_value(art, Params), State),
-                comm:send_local(self(), {shutdown, art_sync_finished}),
+                comm:send_local(self(), {shutdown, sync_finished}),
                 ru_recon_stats:set([{build_time, BuildTime},
                                     {tree_size, merkle_tree:size_detail(NewStruct)}], 
                                    ARStats);
@@ -345,7 +348,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
         send_chunk_req(DhtNodePid, self(), RestI, 
                        mapInterval(RestI, get_interval_quadrant(BloomI)), 
                        get_max_items(bloom)),
-    {Obsolete, _Missing} = 
+    {Obsolete, Missing} = 
         filterPartitionMap(fun(Filter) -> 
                                    not ?REP_BLOOM:is_element(VersBF, Filter) 
                            end,
@@ -358,12 +361,13 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                    K 
                            end,
                            DBList),
-    ?TRACE("Reconcile Bloom Round=~p ; FoundObsolete=~p", [Round, length(Obsolete)]),
-    %TODO: Possibility to resolve missing replicas
+    ?TRACE("Reconcile Bloom Round=~p ; Obsolete=~p ; Missing=~p", [Round, length(Obsolete), length(Missing)]),
     length(Obsolete) > 0 andalso
         comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Obsolete}, []}),
-    SyncFinished andalso
-        comm:send_local(self(), {shutdown, {ok, reconciliation}}),
+    length(Missing) > 0 andalso
+        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Missing}, []}),
+    SyncFinished andalso        
+        comm:send_local(self(), {shutdown, sync_finished}),
     State;
     
 on({start_recon, ReconMethod, ReconStage, ReconStruct, Master}, State) ->
@@ -377,13 +381,14 @@ on({crash, Pid}, State) ->
     comm:send_local(self(), {shutdown, {fail, crash_of_recon_node, Pid}}),
     State;
 
-on({shutdown, _Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
+on({shutdown, Reason}, #ru_recon_state{ ownerLocalPid = Owner, 
                                         sync_round = Round,
                                         stats = Stats,
                                         sync_master = Master,
                                         sync_start_time = SyncStartTime }) ->
-    ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, _Reason]),
-    NewStats = ru_recon_stats:set([{recon_time, timer:now_diff(erlang:now(), SyncStartTime)}], Stats),
+    ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
+    NewStats = ru_recon_stats:set([{recon_time, timer:now_diff(erlang:now(), SyncStartTime)},
+                                   {finish, Reason =:= sync_finished}], Stats),
     comm:send_local(Owner, 
                     {recon_progress_report, self(), Round, Master, NewStats}),
     kill;
@@ -401,10 +406,11 @@ on({check_node, SrcPid, Interval, Hash}, State =
         _ ->
             IsLeaf = merkle_tree:is_leaf(Node),
             {Result, ChildHashs} = case merkle_tree:get_hash(Node) =:= Hash of
-                                       true -> {ok, []};
-                                       false when IsLeaf -> {fail_is_leaf, []};
+                                       true when IsLeaf -> {ok_leaf, []};
+                                       true when not IsLeaf -> {ok_inner, []};
+                                       false when IsLeaf -> {fail_leaf, []};
                                        false when not IsLeaf ->
-                                           {fail_node, 
+                                           {fail_inner, 
                                             [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
                                    end,
             comm:send(SrcPid, {check_node_response, Result, Interval, ChildHashs})
@@ -422,18 +428,19 @@ on({check_node_response, Result, I, ChildHashs}, State =
     IncOps = 
         case Result of
             not_found -> [{error_count, 1}]; 
-            ok -> [{tree_compareSkipped, merkle_tree:size(Node)}]; 
-            fail_is_leaf ->
+            ok_leaf -> [{tree_compareSkipped, 1}];
+            ok_inner -> [{tree_compareSkipped, merkle_tree:size(Node)}];
+            fail_leaf ->
                 Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
                 [{tree_leafsSynced, Leafs}];               
-            fail_node ->
+            fail_inner ->
                 MyChilds = merkle_tree:get_childs(Node),
                 {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
                 SkippedSubNodes = 
                     lists:foldl(fun(MNode, Acc) -> 
                                         Acc + case merkle_tree:is_leaf(MNode) of
                                                   true -> 0;
-                                                  false -> merkle_tree:size(MNode)
+                                                  false -> merkle_tree:size(MNode) - 1
                                               end
                                 end, 0, Matched),
                 lists:foreach(fun(X) -> 

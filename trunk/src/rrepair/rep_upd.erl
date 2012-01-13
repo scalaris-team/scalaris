@@ -33,8 +33,8 @@
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 %-define(TRACE_RECON(X,Y), ok).
 -define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE_RESOLVE(X,Y), ok).
--define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE_RESOLVE(X,Y), ok).
+%-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -123,11 +123,11 @@ on({request_resolve, Round, Operation, Options}, State = #rep_upd_state{ open_re
 on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
     State#rep_upd_state{ open_recon = Recon + 1 };
 
-on({recon_progress_report, _Sender, _Round, Master, _Stats}, State) ->
+on({recon_progress_report, _Sender, _Round, _Master, Stats}, State) ->
     OpenRecon = State#rep_upd_state.open_recon - 1,
-    Master andalso
+    ru_recon_stats:get(finish, Stats) andalso
         ?TRACE_RECON("~nRECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
-               [_Round, _Sender, Master, ru_recon_stats:print(_Stats), OpenRecon]),
+                     [_Round, _Sender, _Master, ru_recon_stats:print(Stats), OpenRecon]),
     State#rep_upd_state{ open_recon = OpenRecon };
 
 on({resolve_progress_report, _Sender, _Stats}, State) ->
