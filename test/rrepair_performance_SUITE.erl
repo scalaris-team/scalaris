@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,7 +70,7 @@ comparison(_) ->
     BBuildT = proplists:get_value(build_time, BloomT),
     MBuildT = proplists:get_value(build_time, MerkleT),
     ABuildT = proplists:get_value(build_time, ArtT),
-    TreeT = proplists:get_valuee(tree_time, ArtT),
+    TreeT = proplists:get_value(tree_time, ArtT),
     
     ct:pal("Performance Comparison
             DBSize=~p ; Iterations=~p
