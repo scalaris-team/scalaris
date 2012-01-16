@@ -116,11 +116,11 @@ rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_tomcat5}
 mkdir -p %{buildroot}/usr/share/tomcat5/webapps
-cp -r simplewiki %{buildroot}/usr/share/tomcat5/webapps/scalaris-wiki
+cp -r scalaris-wiki %{buildroot}/usr/share/tomcat5/webapps/scalaris-wiki
 %endif
 %if 0%{?with_tomcat6}
 mkdir -p %{buildroot}/usr/share/tomcat6/webapps
-cp -r simplewiki %{buildroot}/usr/share/tomcat6/webapps/scalaris-wiki
+cp -r scalaris-wiki %{buildroot}/usr/share/tomcat6/webapps/scalaris-wiki
 %endif
 
 %clean
