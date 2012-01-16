@@ -43,12 +43,12 @@ install: build
 
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
 	mkdir -p $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps
-	cp -r simplewiki $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps/scalaris-wiki
+	cp -r scalaris-wiki $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
 	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat5/webapps/scalaris-wiki\" />" >  $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/scalaris-wiki.xml
 
 	mkdir -p $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps
-	cp -r simplewiki $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps/scalaris-wiki
+	cp -r scalaris-wiki $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost/
 	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat6/webapps/scalaris-wiki\" />" >  $(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost/scalaris-wiki.xml
 
