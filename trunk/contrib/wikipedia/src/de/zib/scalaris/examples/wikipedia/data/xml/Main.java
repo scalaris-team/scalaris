@@ -323,8 +323,8 @@ public class Main {
         File trees = new File(filename + "-trees.db");
         if (trees.exists()) {
             // read trees from tree file
-            WikiDumpHandler.println(System.out, "reading category tree from " + trees.getName() + " ...");
-            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
+            WikiDumpHandler.println(System.out, "reading category tree from " + trees.getAbsolutePath() + " ...");
+            WikiDumpGetCategoryTreeHandler.readTrees(trees.getAbsolutePath(),
                     templateTree, includeTree, referenceTree);
         } else {
             // build trees from xml file
@@ -335,7 +335,7 @@ public class Main {
                     blacklist, null, maxTime, trees.getPath());
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
-            WikiDumpGetCategoryTreeHandler.readTrees(trees.getName(),
+            WikiDumpGetCategoryTreeHandler.readTrees(trees.getAbsolutePath(),
                     templateTree, includeTree, referenceTree);
         }
 
@@ -343,7 +343,7 @@ public class Main {
         Set<String> allowedCats = new HashSet<String>(rootCategories);
 
         return WikiDumpGetCategoryTreeHandler.getPagesInCategories(
-                trees.getName(), allowedCats, allowedPages, recursionLvl,
+                trees.getAbsolutePath(), allowedCats, allowedPages, recursionLvl,
                 templateTree, includeTree, referenceTree, System.out);
     }
     
