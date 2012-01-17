@@ -37,7 +37,7 @@ set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.4\bin"
+set ERLANG="C:\Program Files\erl5.8.5\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
 set SCALARISDIR=%SCRIPTDIR%..
