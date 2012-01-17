@@ -26,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import com.almworks.sqlite4java.SQLiteConnection;
@@ -402,11 +404,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * 
      * @param dbFileName
      *            name of the DB file
-     * @param allowedCats
-     *            include all pages in these categories
+     * @param allowedCats0
+     *            include all pages in these categories (un-normalised page
+     *            titles)
      * @param allowedPages0
-     *            a number of pages to include (also parses these pages for more
-     *            links - will be normalised)
+     *            a number of pages to include, also parses these pages for more
+     *            links (un-normalised page titles)
      * @param depth
      *            follow links this deep
      * @param templateTree
@@ -417,29 +420,34 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            information about references to a page
      * @param msgOut
      *            the output stream to write status messages to
-     *            
-     * @return full list of allowed pages
+     * @param normalised
+     *            whether the pages should be returned as normalised page titles
+     *            or not
+     * 
+     * @return a (sorted) set of page titles
      * 
      * @throws RuntimeException
      *             if any error occurs
      */
-    public static Set<String> getPagesInCategories(String dbFileName,
-            Set<String> allowedCats, Set<String> allowedPages0, int depth,
+    public static SortedSet<String> getPagesInCategories(String dbFileName,
+            Set<String> allowedCats0, Set<String> allowedPages0, int depth,
             Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
             Map<String, Set<String>> referenceTree,
-            PrintStream msgOut) throws RuntimeException {
+            PrintStream msgOut, boolean normalised) throws RuntimeException {
         SQLiteConnection db = null;
         try {
             db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
             db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
-
-            Set<String> allowedCatsFull = getSubCategories(allowedCats, db,
-                    templateTree, includeTree, referenceTree, msgOut);
-
             SiteInfo siteInfo = readSiteInfo(db);
             MyNamespace namespace = new MyNamespace(siteInfo);
-            Set<String> allowedPages = new HashSet<String>(allowedPages0.size());
+            ArrayList<String> allowedCats = new ArrayList<String>(allowedCats0.size());
+            MyWikiModel.normalisePageTitles(allowedCats0, namespace, allowedCats);
+
+            Set<String> allowedCatsFull = getSubCategories(allowedCats0, allowedCats, db,
+                    templateTree, includeTree, referenceTree, msgOut, namespace);
+
+            ArrayList<String> allowedPages = new ArrayList<String>(allowedPages0.size());
             MyWikiModel.normalisePageTitles(allowedPages0, namespace, allowedPages);
 
             Set<String> currentPages = new HashSet<String>();
@@ -447,12 +455,18 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             currentPages.addAll(allowedCatsFull);
             currentPages.addAll(getPagesDirectlyInCategories(allowedCatsFull, db));
 
-            Set<String> pages = getRecursivePages(currentPages, depth, db,
+            Set<String> normalisedPages = getRecursivePages(currentPages, depth, db,
                     templateTree, includeTree, referenceTree, msgOut);
             
             // no need to drop table - we set temporary tables to be in-memory only
 //            db.exec("DROP TABLE currentPages;");
-            
+
+            final TreeSet<String> pages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+            if (normalised) {
+                pages.addAll(normalisedPages);
+            } else {
+                MyWikiModel.denormalisePageTitles(normalisedPages, namespace, pages);
+            }
             return pages;
         } catch (SQLiteException e) {
             System.err.println("read of pages in categories failed (sqlite error: " + e.toString() + ")");
@@ -470,8 +484,11 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * Note: needs a (temporary) currentPages table to be set up before this
      * call.
      * 
+     * @param allowedCats0
+     *            include all pages in these categories (un-normalised page
+     *            titles)
      * @param allowedCats
-     *            include all pages in these categories
+     *            include all pages in these categories (normalised page titles)
      * @param db
      *            connection to the SQLite database
      * @param templateTree
@@ -484,15 +501,17 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      *            the output stream to write status messages to
      * 
      * @return the set of the given categories and all their sub-categories
+     *         (normalised)
      * 
      * @throws SQLiteException
      *             if an error occurs
      */
-    private static Set<String> getSubCategories(Set<String> allowedCats,
-            SQLiteConnection db, Map<String, Set<String>> templateTree,
+    private static Set<String> getSubCategories(Collection<? extends String> allowedCats0,
+            Collection<? extends String> allowedCats, SQLiteConnection db,
+            Map<String, Set<String>> templateTree,
             Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree,
-            PrintStream msgOut) throws SQLiteException {
+            Map<String, Set<String>> referenceTree, PrintStream msgOut,
+            MyNamespace nsObject) throws SQLiteException {
         Set<String> allowedCatsFull = new HashSet<String>();
         Set<String> currentPages = new HashSet<String>();
         Set<String> newPages = new HashSet<String>();
@@ -502,10 +521,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             try {
                 // need to extend the category set by all sub-categories:
                 currentPages.addAll(allowedCats);
-                SiteInfo siteInfo = readSiteInfo(db);
-                MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
 
-                println(msgOut, " determining sub-categories of " + allowedCats.toString() + "");
+                println(msgOut, " determining sub-categories of " + allowedCats0.toString() + "");
                 do {
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
                     for (String pageTitle : currentPages) {
@@ -524,21 +541,21 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "INNER JOIN currentPages AS cp ON categories.category == cp.id " +
                                     "INNER JOIN pages AS page ON categories.title == page.id " +
                                     // "INNER JOIN pages AS cat ON categories.category == cat.id" +
-                                    "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%';");
+                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getCategory() + ":", nsObject) + "%';");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
-                    println(msgOut, "  adding sub-templates or -categories of " + currentPages.size() + " categories or templates");
+                    println(msgOut, "  adding sub-templates or sub-categories of " + currentPages.size() + " categories or templates");
                     // add all templates (and their requirements) of the pages
                     stmt = db
                             .prepare("SELECT page.title FROM templates " +
                                     "INNER JOIN currentPages AS cp ON templates.template == cp.id " +
                                     "INNER JOIN pages AS page ON templates.title == page.id " +
                                     // "INNER JOIN pages AS tpl ON templates.template == tpl.id" +
-                                    "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getCategoryNamespace() + ":") + "%' OR "
-                                    + "page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
+                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getCategory() + ":", nsObject) + "%' OR "
+                                    + "page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getTemplate() + ":", nsObject) + "%';");
                     while (stmt.step()) {
                         String pageTemplate = stmt.columnString(0);
                         Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
@@ -564,15 +581,17 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     }
     
     /**
-     * Gets all pages in the given category set from an SQLite database.
-     * Note: sub-categories are not taken into account.
+     * Gets all pages in the given category set from an SQLite database. Note:
+     * sub-categories are not taken into account.
      * 
      * @param allowedCats
-     *            include all pages in these categories
+     *            include all pages in these categories (un-normalised page
+     *            titles)
      * @param db
      *            connection to the SQLite database
      * 
-     * @return a set of pages (directly) in the given categories
+     * @return a set of pages (directly) in the given categories (normalised
+     *         page titles)
      * 
      * @throws SQLiteException
      *             if an error occurs
@@ -627,7 +646,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * call.
      * 
      * @param currentPages
-     *            parse these pages recursively
+     *            parse these pages recursively (normalised page titles)
      * @param depth
      *            follow links this deep
      * @param db
@@ -641,7 +660,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * @param msgOut
      *            the output stream to write status messages to
      * 
-     * @return the whole set of pages
+     * @return a set of normalised page titles
      * 
      * @throws SQLiteException
      *             if an error occurs
