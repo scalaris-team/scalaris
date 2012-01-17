@@ -32,7 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.SortedSet;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -294,12 +294,12 @@ public class Main {
             }
         }
         WikiDumpHandler.println(System.out, "filtering by categories " + rootCategories.toString() + " ...");
-        TreeSet<String> pages = new TreeSet<String>(
-                getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl));
         WikiDumpHandler.println(System.out, " wiki dump     : " + filename);
         WikiDumpHandler.println(System.out, " max time      : " + maxTime);
         WikiDumpHandler.println(System.out, " allowed pages : " + allowedPagesFileName);
         WikiDumpHandler.println(System.out, " recursion lvl : " + recursionLvl);
+        SortedSet<String> pages = getPageList(filename, maxTime, allowedPages,
+                rootCategories, recursionLvl);
 
         do {
             FileWriter outFile = new FileWriter(pageListFileName);
@@ -323,17 +323,21 @@ public class Main {
      *            the name of the xml wiki dump file
      * @param maxTime
      *            the maximum time of a revision to use for category parsing
-     * @param categoryTree
-     *            the (preferably empty) category tree object
-     * @param templateTree
-     *            the (preferably empty) template tree object
+     * @param allowedPages
+     *            all allowed pages (un-normalised page titles)
+     * @param rootCategories
+     *            all allowed categories (un-normalised page titles)
+     * @param recursionLvl
+     *            recursion level to include pages linking to
+     * 
+     * @return a set of (de-normalised) page titles
      * 
      * @throws RuntimeException
      * @throws FileNotFoundException
      * @throws IOException
      * @throws SAXException
      */
-    protected static Set<String> getPageList(String filename, Calendar maxTime,
+    protected static SortedSet<String> getPageList(String filename, Calendar maxTime,
             Set<String> allowedPages, LinkedList<String> rootCategories,
             int recursionLvl) throws RuntimeException, FileNotFoundException,
             IOException, SAXException {
@@ -365,7 +369,7 @@ public class Main {
 
         return WikiDumpGetCategoryTreeHandler.getPagesInCategories(
                 trees.getAbsolutePath(), allowedCats, allowedPages, recursionLvl,
-                templateTree, includeTree, referenceTree, System.out);
+                templateTree, includeTree, referenceTree, System.out, false);
     }
     
     /**
