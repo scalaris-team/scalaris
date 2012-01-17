@@ -749,7 +749,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page titles
      */
-    public <T extends Collection<String>> T normalisePageTitles(final T titles, T normalisedTitles) {
+    public <T extends Collection<String>> T normalisePageTitles(final Collection<String> titles, T normalisedTitles) {
         return MyWikiModel.<T>normalisePageTitles(titles, getNamespace(), normalisedTitles);
     }
     
@@ -819,7 +819,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the original page title
      */
-    public <T extends Collection<String>> T denormalisePageTitles(final T titles, T denormalisedTitles) {
+    public <T extends Collection<String>> T denormalisePageTitles(final Collection<String> titles, T denormalisedTitles) {
         return MyWikiModel.<T>denormalisePageTitles(titles, getNamespace(), denormalisedTitles);
     }
     
@@ -838,7 +838,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the original page title
      */
-    public static <T extends Collection<String>> T denormalisePageTitles(final T titles, final MyNamespace nsObject, T denormalisedTitles) {
+    public static <T extends Collection<String>> T denormalisePageTitles(final Collection<String> titles, final MyNamespace nsObject, T denormalisedTitles) {
         for (String title: titles) {
             denormalisedTitles.add(MyWikiModel.denormalisePageTitle(title, nsObject));
         }
