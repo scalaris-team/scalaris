@@ -137,8 +137,10 @@ public class Main {
         ++i;
         
         Set<String> whitelist = null;
+        String whitelistFile = "";
         if (args.length > i && !args[i].isEmpty()) {
-            FileReader inFile = new FileReader(args[i]);
+            whitelistFile = args[i];
+            FileReader inFile = new FileReader(whitelistFile);
             BufferedReader br = new BufferedReader(inFile);
             whitelist = new HashSet<String>();
             String line;
@@ -163,12 +165,20 @@ public class Main {
                 System.exit(-1);
             }
             ++i;
-            WikiDumpHandler handler =
-                    new WikiDumpPrepareSQLiteForScalarisHandler(blacklist, whitelist, maxRevisions, minTime, maxTime, dbFileName);
+            WikiDumpHandler.println(System.out, "wiki prepare file " + dbFileName);
+            WikiDumpHandler.println(System.out, " wiki dump     : " + filename);
+            WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
+            WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
+            WikiDumpHandler.println(System.out, " min time      : " + minTime);
+            WikiDumpHandler.println(System.out, " max time      : " + maxTime);
+            WikiDumpHandler handler = new WikiDumpPrepareSQLiteForScalarisHandler(
+                    blacklist, whitelist, maxRevisions, minTime, maxTime,
+                    dbFileName);
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
         } else {
             if (filename.endsWith(".db")) {
+                WikiDumpHandler.println(System.out, "wiki import from " + filename);
                 WikiDumpPreparedSQLiteToScalaris handler =
                         new WikiDumpPreparedSQLiteToScalaris(filename);
                 handler.setUp();
@@ -179,8 +189,13 @@ public class Main {
                 shutdownHook.run();
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             } else {
-                WikiDumpHandler handler =
-                        new WikiDumpToScalarisHandler(blacklist, whitelist, maxRevisions, minTime, maxTime);
+                WikiDumpHandler.println(System.out, "wiki import from " + filename);
+                WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
+                WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
+                WikiDumpHandler.println(System.out, " min time      : " + minTime);
+                WikiDumpHandler.println(System.out, " max time      : " + maxTime);
+                WikiDumpHandler handler = new WikiDumpToScalarisHandler(
+                        blacklist, whitelist, maxRevisions, minTime, maxTime);
                 InputSource file = getFileReader(filename);
                 runXmlHandler(handler, file);
             }
@@ -256,8 +271,10 @@ public class Main {
         Set<String> allowedPages = new HashSet<String>();
         allowedPages.add("Main Page");
         allowedPages.add("MediaWiki:Noarticletext");
+        String allowedPagesFileName = "";
         if (args.length > i && !args[i].isEmpty()) {
-            FileReader inFile = new FileReader(args[i]);
+            allowedPagesFileName = args[i];
+            FileReader inFile = new FileReader(allowedPagesFileName);
             BufferedReader br = new BufferedReader(inFile);
             String line;
             while ((line = br.readLine()) != null) {
@@ -279,6 +296,10 @@ public class Main {
         WikiDumpHandler.println(System.out, "filtering by categories " + rootCategories.toString() + " ...");
         TreeSet<String> pages = new TreeSet<String>(
                 getPageList(filename, maxTime, allowedPages, rootCategories, recursionLvl));
+        WikiDumpHandler.println(System.out, " wiki dump     : " + filename);
+        WikiDumpHandler.println(System.out, " max time      : " + maxTime);
+        WikiDumpHandler.println(System.out, " allowed pages : " + allowedPagesFileName);
+        WikiDumpHandler.println(System.out, " recursion lvl : " + recursionLvl);
 
         do {
             FileWriter outFile = new FileWriter(pageListFileName);
