@@ -1,3 +1,60 @@
+Scalaris 0.4.0 (codename "Pomacea scalaris")
+============================================
+
+API:
+
+- new functions for incremental data change:
+  test_and_set: check for a provided old value before setting a new one
+  add_on_nr: increment a numeric value
+  add_del_on_list: append or delete entries from a list value
+- added VM API to manage Scalaris nodes inside an Erlang virtual machine
+- added monitoring API to retrieve some live metrics
+- added a connection pool convenience class (Java, Python)
+
+Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/):
+
+- improved performance of page edits
+- improved performance of Wikipedia dump loading
+- several rendering fixes
+
+Business Logic:
+
+- improved handling of large values by reducing overhead of transaction
+  log handling (empty TLog after commit), no copy of value in TLog
+  returned to user after read requests)
+- eliminated timeouts in data hand-over protocol (relies on fd now)
+- added a DB subscribe mechanism, e.g. to become informed when locks
+    are freed
+- fixed a strong consistency issue in the tx protocol
+- gather some run-time statistics and expose them via the APIs and the
+  web debug interface
+
+Infrastructure:
+
+- support for Erlang 15B
+- fd now also uses feedback from TCP layer
+- made message sending more flexible (gets an option list)
+- added and corrected several Erlang type specifications
+- added scripts to create Scalaris images for OpenNebula
+- added tools for using Scalaris as the Database as a Service
+  component in ConPaaS (http://www.conpaas.eu/) which is part of the
+  EU project Contrail (http://contrail-project.eu/)
+- added a separate communication channel for priority messages, e.g. fd
+  (reduces falsely reported node crashes under heavy load)
+
+Tests:
+
+added runtime type-checker for random testing extended unittests
+
+Documentation:
+
+- updated documentation to extended APIs
+
+Bugs:
+
+- fixed numerous bugs
+
+
 Scalaris 0.3.0 (codename "Rhinechis Scalaris")
 ==============================================
 
