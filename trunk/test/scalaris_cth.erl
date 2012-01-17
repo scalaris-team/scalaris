@@ -122,10 +122,9 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
            [State#state.suite, TC, Return, TCTime_us / 1000000]),
     case Return of
         {timetrap_timeout, _} ->
-            case config:read(no_print_ring_data) of
+            case (catch config:read(no_print_ring_data)) of
                 true -> ok;
-                failed ->
-                    unittest_helper:print_ring_data()
+                _ -> unittest_helper:print_ring_data()
             end;
         _ -> ok
     end,
