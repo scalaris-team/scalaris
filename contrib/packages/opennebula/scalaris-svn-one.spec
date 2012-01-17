@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 2328
+%define pkg_version 2729
 Name:           scalaris-svn-one
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -8,7 +8,7 @@ Release:        1
 License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
-Source0:        scalaris-svn-%{version}.tar.gz
+Source0:        scalaris-svn-one-%{version}.tar.gz
 #Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ruby >= 1.8
@@ -106,7 +106,7 @@ BuildArch:  noarch
 Client for scalaris on Opennebula
 
 %prep
-%setup -q -n scalaris-svn-%{version}
+%setup -q -n scalaris-svn-one-%{version}
 
 %build
 ./configure --prefix=%{_prefix} \
