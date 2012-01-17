@@ -62,7 +62,7 @@ time_avg(Fun, Iterations, Options) ->
 print({Min, Max, Med, Avg, _} = Values) ->
     MaxVal = lists:max([Min, Max, Med, Avg]),
     if
-        MaxVal > 100000 -> print(Values, s);
+        MaxVal > 1000000 -> print(Values, s);
         MaxVal > 1000 -> print(Values, ms);
         true -> print(Values, us)
     end.
@@ -91,5 +91,5 @@ value_to_unit(Val, Unit) ->
     case Unit of
         us -> erlang:float(Val);
         ms -> Val / 1000;
-        s -> Val / 100000
+        s -> Val / 1000000
     end.
