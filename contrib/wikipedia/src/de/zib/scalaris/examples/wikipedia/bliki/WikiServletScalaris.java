@@ -23,6 +23,7 @@ import java.io.PrintStream;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
@@ -42,14 +43,12 @@ import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
 import de.zib.scalaris.TransactionSingleOp;
-import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
-import de.zib.scalaris.examples.wikipedia.PageListResult;
-import de.zib.scalaris.examples.wikipedia.RandomTitleResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
@@ -460,52 +459,52 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public PageListResult getPageList(Connection connection) {
+    public ValueResult<List<String>> getPageList(Connection connection) {
         return ScalarisDataHandler.getPageList(connection);
     }
 
     @Override
-    public PageListResult getArticleList(Connection connection) {
+    public ValueResult<List<String>> getArticleList(Connection connection) {
         return ScalarisDataHandler.getArticleList(connection);
     }
 
     @Override
-    public PageListResult getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<String>> getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPagesInCategory(connection, title, nsObject);
     }
 
     @Override
-    public PageListResult getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<String>> getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPagesInTemplate(connection, title, nsObject);
     }
 
     @Override
-    public PageListResult getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<String>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPagesLinkingTo(connection, title, nsObject);
     }
 
     @Override
-    public BigIntegerResult getPageCount(Connection connection) {
+    public ValueResult<BigInteger> getPageCount(Connection connection) {
         return ScalarisDataHandler.getPageCount(connection);
     }
 
     @Override
-    public BigIntegerResult getArticleCount(Connection connection) {
+    public ValueResult<BigInteger> getArticleCount(Connection connection) {
         return ScalarisDataHandler.getArticleCount(connection);
     }
 
     @Override
-    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<BigInteger> getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPagesInCategoryCount(connection, title, nsObject);
     }
 
     @Override
-    public BigIntegerResult getStatsPageEdits(Connection connection) {
+    public ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
         return ScalarisDataHandler.getStatsPageEdits(connection);
     }
 
     @Override
-    public RandomTitleResult getRandomArticle(Connection connection, Random random) {
+    public ValueResult<String> getRandomArticle(Connection connection, Random random) {
         return ScalarisDataHandler.getRandomArticle(connection, random);
     }
 

@@ -1,46 +1,47 @@
 package de.zib.scalaris.examples.wikipedia;
 
-
 /**
- * Result of an operation getting a random page title.
+ * Result of an operation getting a single value.
  * 
  * @author Nico Kruber, kruber@zib.de
+ * 
+ * @param <T>
  */
-public class RandomTitleResult extends Result {
+public class ValueResult<T> extends Result {
     /**
-     * The title of a random page on success.
+     * The retrieved value (may be null, e.g. if unsuccessful).
      */
-    public String title;
+    public T value = null;
 
     /**
-     * Creates a new successful result with the given page title.
+     * Creates a new successful result with the given page list.
      * 
-     * @param title
-     *            the retrieved (random) page title
+     * @param number
+     *            the retrieved number
      */
-    public RandomTitleResult(String title) {
+    public ValueResult(T number) {
         super();
-        this.title = title;
+        this.value = number;
     }
 
     /**
-     * Creates a new successful result with the given page title.
+     * Creates a new successful result with the given value.
      * 
-     * @param title
-     *            the retrieved (random) page title
+     * @param value
+     *            the retrieved value
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
-    public RandomTitleResult(String title, String name, long time) {
+    public ValueResult(T value, String name, long time) {
         super();
-        this.title = title;
+        this.value = value;
         addStat(name, time);
     }
-    
+
     /**
-     * Creates a new custom result.
+     * Creates a new custom result (value = <tt>null</tt>).
      * 
      * @param success
      *            the success status
@@ -49,14 +50,13 @@ public class RandomTitleResult extends Result {
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public RandomTitleResult(boolean success, String message,
+    public ValueResult(boolean success, String message,
             boolean connectFailed) {
         super(success, message, connectFailed);
-        title = "";
     }
-    
+
     /**
-     * Creates a new custom result.
+     * Creates a new custom result (value = <tt>null</tt>).
      * 
      * @param success
      *            the success status
@@ -69,10 +69,9 @@ public class RandomTitleResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RandomTitleResult(boolean success, String message,
+    public ValueResult(boolean success, String message,
             boolean connectFailed, String name, long time) {
         super(success, message, connectFailed);
-        title = "";
         addStat(name, time);
     }
 }

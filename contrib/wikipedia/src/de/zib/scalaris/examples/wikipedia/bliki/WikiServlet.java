@@ -49,15 +49,13 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 
-import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
-import de.zib.scalaris.examples.wikipedia.PageListResult;
-import de.zib.scalaris.examples.wikipedia.RandomTitleResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
@@ -339,11 +337,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("Search");
         page.setFormTitle("Search results");
         page.setFormType(FormType.PageSearchForm);
-        PageListResult result;
+        ValueResult<List<String>> result;
         if (req_search == null) {
             page.setTitle("Special:Search&namespace=" + nsId);
             page.setSearch("");
-            result = new PageListResult(new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<String>(0));
         } else {
             page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
             page.setSearch(req_search);
@@ -389,12 +387,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.FromToForm);
-        PageListResult result;
+        ValueResult<List<String>> result;
         if (req_from == null && req_to == null) {
             page.setTitle("Special:AllPages&namespace=" + nsId);
             page.setFromPage("");
             page.setToPage("");
-            result = new PageListResult(new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<String>(0));
         } else {
             if (req_from == null) {
                 req_from = ""; // start with first page
@@ -446,11 +444,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.PagePrefixForm);
-        PageListResult result;
+        ValueResult<List<String>> result;
         if (req_prefix == null) {
             page.setTitle("Special:PrefixIndex&namespace=" + nsId);
             page.setPrefix("");
-            result = new PageListResult(new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<String>(0));
         } else {
             page.setTitle("Special:PrefixIndex&prefix=" + req_prefix + "&namespace=" + nsId);
             page.setPrefix(req_prefix);
@@ -493,12 +491,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         page.setFormTitle("What links here");
         page.setFormType(FormType.TargetPageForm);
-        PageListResult result;
+        ValueResult<List<String>> result;
         if (req_target == null) {
             page.setPageHeading("Pages that link to a selected page");
             page.setTitle("Special:WhatLinksHere");
             page.setTarget("");
-            result = new PageListResult(new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<String>(0));
         } else {
             page.setPageHeading("Pages that link to \"" + req_target + "\"");
             page.setTitle("Special:WhatLinksHere&target=" + req_target);
@@ -566,7 +564,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewRandomPage(HttpServletRequest request,
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws IOException, ServletException {
-        RandomTitleResult result = getRandomArticle(connection, new Random());
+        ValueResult<String> result = getRandomArticle(connection, new Random());
         page.addStats(result.stats);
         if (result.success) {
             ArrayList<Long> times = new ArrayList<Long>();
@@ -575,7 +573,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             StringBuilder redirectUrl = new StringBuilder(256);
             redirectUrl.append("?title=");
-            redirectUrl.append(URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.title, namespace), "UTF-8"));
+            redirectUrl.append(URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.value, namespace), "UTF-8"));
             redirectUrl.append("&random_times=" + StringUtils.join(times, "%2C"));
             response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
         } else if (result.connect_failed) {
@@ -695,24 +693,24 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.unpackedText());
             if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
-                PageListResult catPagesResult = getPagesInCategory(connection, title, namespace);
+                ValueResult<List<String>> catPagesResult = getPagesInCategory(connection, title, namespace);
                 page.addStats(catPagesResult.stats);
                 if (catPagesResult.success) {
                     TreeSet<String> subCategories = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
                     TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
-                    final List<String> catPageList = new ArrayList<String>(catPagesResult.pages.size());
-                    wikiModel.denormalisePageTitles(catPagesResult.pages, catPageList);
+                    final List<String> catPageList = new ArrayList<String>(catPagesResult.value.size());
+                    wikiModel.denormalisePageTitles(catPagesResult.value, catPageList);
                     for (String pageInCat: catPageList) {
                         String pageNamespace = wikiModel.getNamespace(pageInCat);
                         if (wikiModel.isCategoryNamespace(pageNamespace)) {
                             subCategories.add(wikiModel.getTitleName(pageInCat));
                         } else if (wikiModel.isTemplateNamespace(pageNamespace)) {
                             // all pages using a template are in the category, too
-                            PageListResult tplResult = getPagesInTemplate(connection, pageInCat, namespace);
+                            ValueResult<List<String>> tplResult = getPagesInTemplate(connection, pageInCat, namespace);
                             page.addStats(tplResult.stats);
                             if (tplResult.success) {
-                                final List<String> tplPageList = new ArrayList<String>(tplResult.pages.size());
-                                wikiModel.denormalisePageTitles(tplResult.pages, tplPageList);
+                                final List<String> tplPageList = new ArrayList<String>(tplResult.value.size());
+                                wikiModel.denormalisePageTitles(tplResult.value, tplPageList);
                                 categoryPages.addAll(tplPageList);
                             } else {
                                 if (tplResult.connect_failed) {
@@ -927,12 +925,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @throws ServletException
      */
     private void handleViewSpecialPageList(HttpServletRequest request,
-            HttpServletResponse response, PageListResult result,
+            HttpServletResponse response, ValueResult<List<String>> result,
             Connection connection, WikiPageListBean page)
             throws ServletException, IOException {
         if (result.success) {
             final TreeSet<String> pageList = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
-            MyWikiModel.denormalisePageTitles(result.pages, namespace, pageList);
+            MyWikiModel.denormalisePageTitles(result.value, namespace, pageList);
             page.setNotice(getParam_notice(request));
             String nsPrefix = namespace.getNamespaceByNumber(page.getNamespaceId());
             if (!nsPrefix.isEmpty()) {
@@ -1066,7 +1064,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1093,33 +1091,60 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("Statistics");
         page.setTitle(title);
 
-        BigIntegerResult articleCount = getArticleCount(connection);
-        page.addStats(articleCount.stats);
-        BigIntegerResult pageCount = getPageCount(connection);
-        page.addStats(pageCount.stats);
-        BigInteger uploadedFiles = BigInteger.valueOf(0); // currently not supported
-        BigIntegerResult pageEdits = getStatsPageEdits(connection);
-        page.addStats(pageEdits.stats);
-        double pageEditsPerPage;
-        if (pageCount.number.equals(BigInteger.valueOf(0))) {
-            pageEditsPerPage = 0.0;
-        } else {
-            pageEditsPerPage = pageEdits.number.doubleValue() / pageCount.number.doubleValue();
-        }       
+        String articleCountStr;
+        do {
+            ValueResult<BigInteger> articleCount = getArticleCount(connection);
+            page.addStats(articleCount.stats);
+            if (articleCount.success) {
+                articleCountStr = wikiModel.formatStatisticNumber(false, articleCount.value);
+            } else {
+                articleCountStr = "n/a";
+            }
+        } while(false);
+        
+        String pageCountStr;
+        String pageEditsStr;
+        String pageEditsPerPageStr;
+        do {
+            ValueResult<BigInteger> pageCount = getPageCount(connection);
+            page.addStats(pageCount.stats);
+            if (pageCount.success) {
+                pageCountStr = wikiModel.formatStatisticNumber(false, pageCount.value);
+                
+                ValueResult<BigInteger> pageEdits = getStatsPageEdits(connection);
+                page.addStats(pageEdits.stats);
+                if (pageEdits.success) {
+                    pageEditsStr = wikiModel.formatStatisticNumber(false, pageEdits.value);
+                    if (pageCount.value.equals(BigInteger.valueOf(0))) {
+                        pageEditsPerPageStr = wikiModel.formatStatisticNumber(false, 0.0);
+                    } else {
+                        pageEditsPerPageStr = wikiModel.formatStatisticNumber(false, pageEdits.value.doubleValue() / pageCount.value.doubleValue());
+                    }
+                } else {
+                    pageEditsStr = "n/a";
+                    pageEditsPerPageStr = "n/a";
+                }
+            } else {
+                pageCountStr = "n/a";
+                pageEditsStr = "n/a";
+                pageEditsPerPageStr = "n/a";
+            }
+        } while (false);
+        BigInteger uploadedFiles = BigInteger.valueOf(0); // currently not supported       
         
         Map<String /*group*/, Map<String /*name*/, String /*value*/>> specialPages = new LinkedHashMap<String, Map<String, String>>();
         Map<String, String> curStats;
         // Page statistics
         curStats = new LinkedHashMap<String, String>();
-        curStats.put("Content pages", wikiModel.formatStatisticNumber(false, articleCount.number));
+        curStats.put("Content pages", articleCountStr);
         curStats.put("Pages<br><small class=\"mw-statistic-desc\"> (All pages in the wiki, including talk pages, redirects, etc.)</small>",
-                wikiModel.formatStatisticNumber(false, pageCount.number));
+                pageCountStr);
         curStats.put("Uploaded files", wikiModel.formatStatisticNumber(false, uploadedFiles));
         specialPages.put("Page statistics", curStats);
         // Edit statistics
         curStats = new LinkedHashMap<String, String>();
-        curStats.put("Page edits since Wikipedia was set up", wikiModel.formatStatisticNumber(false, pageEdits.number));
-        curStats.put("Average changes per page", wikiModel.formatStatisticNumber(false, pageEditsPerPage));
+        curStats.put("Page edits since Wikipedia was set up", pageEditsStr);
+        curStats.put("Average changes per page", pageEditsPerPageStr);
         specialPages.put("Edit statistics", curStats);
         // User statistics
         curStats = new LinkedHashMap<String, String>();
@@ -1150,7 +1175,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPage(content.toString());
         page.addStats(wikiModel.getStats());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1220,7 +1245,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>());
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
     

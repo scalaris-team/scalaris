@@ -35,8 +35,8 @@ import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.SaveResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -360,7 +360,9 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
                 throw new RuntimeException(e);
             }
             
-            SaveResult result = ScalarisDataHandler.updatePageList(scalaris_tx, scalaris_pageList_key, scalaris_pageCount_key, new LinkedList<String>(), newEntries, "");
+            ValueResult<Integer> result = ScalarisDataHandler.updatePageList(
+                    scalaris_tx, scalaris_pageList_key, scalaris_pageCount_key,
+                    new LinkedList<String>(), newEntries, "");
             if (!result.success) {
                 System.err.println(result.message);
             }
