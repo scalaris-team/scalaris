@@ -251,18 +251,18 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 showEmptyPage(request, response, new WikiPageBean());
                 return;
             }
-            
-            // if the "search" parameter exists, show the search
-            String req_search = request.getParameter("search");
-            if (req_search != null) {
-                handleSearch(request, response, req_search, connection, new WikiPageListBean());
-                return;
-            }
 
             // get parameters:
             String req_title = request.getParameter("title");
             if (req_title == null) {
                 req_title = MAIN_PAGE;
+            }
+            
+            // if the "search" parameter exists, show the search
+            String req_search = request.getParameter("search");
+            if (req_search != null) {
+                handleSearch(request, response, req_title, req_search, connection, new WikiPageListBean());
+                return;
             }
 
             String req_action = request.getParameter("action");
@@ -270,92 +270,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (req_title.equals("Special:Random")) {
                 handleViewRandomPage(request, response, req_title, connection, new WikiPageBean());
             } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
-                String req_from = request.getParameter("from");
-                if (req_from == null) {
-                    req_from = ""; // shows all pages
-                    int slashIndex = req_title.indexOf('/');
-                    if (slashIndex != (-1)) {
-                        req_from = req_title.substring(slashIndex + 1);
-                    }
-                }
-                String req_to = request.getParameter("to");
-                if (req_to == null) {
-                    req_to = ""; // shows all pages
-                }
-                // use default namespace (id 0) for invalid values
-                int nsId = parseInt(request.getParameter("namespace"), 0);
-                WikiPageListBean page = new WikiPageListBean();
-                page.setPageHeading("All pages");
-                page.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to);
-                page.setFormTitle("All pages");
-                page.setFormType(FormType.FromToForm);
-                page.setFromPage(req_from);
-                page.setToPage(req_to);
-                PageListResult result;
-                if (nsId == 0) {
-                    result = getArticleList(connection);
-                    page.addStats(result.stats);
-                } else {
-                    result = getPageList(connection);
-                    page.addStats(result.stats);
-                    page.setNamespaceId(nsId);
-                }
-                handleViewSpecialPageList(request, response, result, connection, page);
+                handleSpecialAllPages(request, response, req_title, connection, new WikiPageListBean());
             } else if (req_title.startsWith("Special:PrefixIndex")) {
-                String req_prefix = request.getParameter("prefix");
-                if (req_prefix == null) {
-                    req_prefix = ""; // shows all pages
-                    int slashIndex = req_title.indexOf('/');
-                    if (slashIndex != (-1)) {
-                        req_prefix = req_title.substring(slashIndex + 1);
-                    }
-                }
-                // use default namespace (id 0) for invalid values
-                int nsId = parseInt(request.getParameter("namespace"), 0);
-                WikiPageListBean page = new WikiPageListBean();
-                page.setPageHeading("All pages");
-                page.setTitle("Special:PrefixIndex&prefix=" + req_prefix);
-                page.setFormTitle("All pages");
-                page.setFormType(FormType.PagePrefixForm);
-                page.setPrefix(req_prefix);
-                PageListResult result;
-                if (nsId == 0) {
-                    result = getArticleList(connection);
-                    page.addStats(result.stats);
-                } else {
-                    result = getPageList(connection);
-                    page.addStats(result.stats);
-                    page.setNamespaceId(nsId);
-                }
-                handleViewSpecialPageList(request, response, result, connection, page);
+                handleSpecialPrefix(request, response, req_title, connection, new WikiPageListBean());
             } else if (req_title.startsWith("Special:Search")) {
-                if (req_search == null) {
-                    req_search = ""; // shows all pages
-                    int slashIndex = req_title.indexOf('/');
-                    if (slashIndex != (-1)) {
-                        req_search = req_title.substring(slashIndex + 1);
-                    }
-                }
-                handleSearch(request, response, req_search, connection, new WikiPageListBean());
+                handleSearch(request, response, req_title, req_search, connection, new WikiPageListBean());
             } else if (req_title.startsWith("Special:WhatLinksHere")) {
-                String req_target = request.getParameter("target");
-                if (req_target == null) {
-                    req_target = ""; // will show an empty page list
-                    // maybe we got the name separated with a '/' in the title:
-                    int slashIndex = req_title.indexOf('/');
-                    if (slashIndex != (-1)) {
-                        req_target = req_title.substring(slashIndex + 1);
-                    }
-                }
-                WikiPageListBean page = new WikiPageListBean();
-                page.setPageHeading("Pages that link to \"" + req_target + "\"");
-                page.setTitle("Special:WhatLinksHere&target=" + req_target);
-                page.setFormTitle("What links here");
-                page.setFormType(FormType.TargetPageForm);
-                page.setTarget(req_target);
-                PageListResult result = getPagesLinkingTo(connection, req_target, namespace);
-                page.addStats(result.stats);
-                handleViewSpecialPageList(request, response, result, connection, page);
+                handleSpecialWhatLinksHere(request, response, req_title, connection, new WikiPageListBean());
             } else if (req_title.equals("Special:SpecialPages")) {
                 handleViewSpecialPages(request, response, connection, new WikiPageListBean());
             } else if (req_title.equals("Special:Statistics")) {
@@ -390,6 +311,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            the HTTP request
      * @param response
      *            the response object
+     * @param title
+     *            the requested title, e.g. "Special:Search"
      * @param req_search
      *            search string
      * @param connection
@@ -401,25 +324,188 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @throws IOException
      */
     private void handleSearch(HttpServletRequest request,
-            HttpServletResponse response, String req_search,
+            HttpServletResponse response, String title, String req_search,
             Connection connection, WikiPageListBean page)
             throws ServletException, IOException {
+        // note: req_search can only be null if Special:Search is shown
+        if (req_search == null) {
+            int slashIndex = title.indexOf('/');
+            if (slashIndex != (-1)) {
+                req_search = title.substring(slashIndex + 1);
+            }
+        }
         // use default namespace (id 0) for invalid values
         int nsId = parseInt(request.getParameter("namespace"), 0);
         page.setPageHeading("Search");
-        page.setTitle("Special:Search&search=" + req_search);
         page.setFormTitle("Search results");
         page.setFormType(FormType.PageSearchForm);
-        page.setSearch(req_search);
         PageListResult result;
-        if (nsId == 0) {
-            result = getArticleList(connection);
-            page.addStats(result.stats);
+        if (req_search == null) {
+            page.setTitle("Special:Search&namespace=" + nsId);
+            page.setSearch("");
+            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
         } else {
-            result = getPageList(connection);
-            page.addStats(result.stats);
-            page.setNamespaceId(nsId);
+            page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
+            page.setSearch(req_search);
+            if (nsId == 0) {
+                result = getArticleList(connection);
+            } else {
+                result = getPageList(connection);
+            }
         }
+        page.setNamespaceId(nsId);
+        page.addStats(result.stats);
+        handleViewSpecialPageList(request, response, result, connection, page);
+    }
+
+    /**
+     * @param request
+     *            the HTTP request
+     * @param response
+     *            the response object
+     * @param title
+     *            the requested title, e.g. "Special:Search"
+     * @param connection
+     *            connection to the database
+     * @param page
+     *            the bean for the page
+     *
+     * @throws ServletException
+     * @throws IOException
+     */
+    private void handleSpecialAllPages(HttpServletRequest request,
+            HttpServletResponse response, String title,
+            Connection connection, WikiPageListBean page) throws ServletException, IOException {
+        String req_from = request.getParameter("from");
+        if (req_from == null) {
+            int slashIndex = title.indexOf('/');
+            if (slashIndex != (-1)) {
+                req_from = title.substring(slashIndex + 1);
+            }
+        }
+        String req_to = request.getParameter("to");
+        // use default namespace (id 0) for invalid values
+        int nsId = parseInt(request.getParameter("namespace"), 0);
+        page.setPageHeading("All pages");
+        page.setFormTitle("All pages");
+        page.setFormType(FormType.FromToForm);
+        PageListResult result;
+        if (req_from == null && req_to == null) {
+            page.setTitle("Special:AllPages&namespace=" + nsId);
+            page.setFromPage("");
+            page.setToPage("");
+            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+        } else {
+            if (req_from == null) {
+                req_from = ""; // start with first page
+            }
+            if (req_to == null) {
+                req_to = ""; // stop at last page
+            }
+            page.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to + "&namespace=" + nsId);
+            page.setFromPage(req_from);
+            page.setToPage(req_to);
+            if (nsId == 0) {
+                result = getArticleList(connection);
+            } else {
+                result = getPageList(connection);
+            }
+        }
+        page.addStats(result.stats);
+        page.setNamespaceId(nsId);
+        handleViewSpecialPageList(request, response, result, connection, page);
+    }
+
+    /**
+     * @param request
+     *            the HTTP request
+     * @param response
+     *            the response object
+     * @param title
+     *            the requested title, e.g. "Special:Search"
+     * @param connection
+     *            connection to the database
+     * @param page
+     *            the bean for the page
+     *
+     * @throws ServletException
+     * @throws IOException
+     */
+    private void handleSpecialPrefix(HttpServletRequest request,
+            HttpServletResponse response, String title,
+            Connection connection, WikiPageListBean page) throws ServletException, IOException {
+        String req_prefix = request.getParameter("prefix");
+        if (req_prefix == null) {
+            int slashIndex = title.indexOf('/');
+            if (slashIndex != (-1)) {
+                req_prefix = title.substring(slashIndex + 1);
+            }
+        }
+        // use default namespace (id 0) for invalid values
+        int nsId = parseInt(request.getParameter("namespace"), 0);
+        page.setPageHeading("All pages");
+        page.setFormTitle("All pages");
+        page.setFormType(FormType.PagePrefixForm);
+        PageListResult result;
+        if (req_prefix == null) {
+            page.setTitle("Special:PrefixIndex&namespace=" + nsId);
+            page.setPrefix("");
+            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+        } else {
+            page.setTitle("Special:PrefixIndex&prefix=" + req_prefix + "&namespace=" + nsId);
+            page.setPrefix(req_prefix);
+            if (nsId == 0) {
+                result = getArticleList(connection);
+            } else {
+                result = getPageList(connection);
+            }
+        }
+        page.addStats(result.stats);
+        page.setNamespaceId(nsId);
+        handleViewSpecialPageList(request, response, result, connection, page);
+    }
+
+    /**
+     * @param request
+     *            the HTTP request
+     * @param response
+     *            the response object
+     * @param title
+     *            the requested title, e.g. "Special:Search"
+     * @param connection
+     *            connection to the database
+     * @param page
+     *            the bean for the page
+     *
+     * @throws ServletException
+     * @throws IOException
+     */
+    private void handleSpecialWhatLinksHere(HttpServletRequest request,
+            HttpServletResponse response, String title, Connection connection,
+            WikiPageListBean page) throws ServletException, IOException {
+        String req_target = request.getParameter("target");
+        if (req_target == null) {
+            // maybe we got the name separated with a '/' in the title:
+            int slashIndex = title.indexOf('/');
+            if (slashIndex != (-1)) {
+                req_target = title.substring(slashIndex + 1);
+            }
+        }
+        page.setFormTitle("What links here");
+        page.setFormType(FormType.TargetPageForm);
+        PageListResult result;
+        if (req_target == null) {
+            page.setPageHeading("Pages that link to a selected page");
+            page.setTitle("Special:WhatLinksHere");
+            page.setTarget("");
+            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+        } else {
+            page.setPageHeading("Pages that link to \"" + req_target + "\"");
+            page.setTitle("Special:WhatLinksHere&target=" + req_target);
+            page.setTarget(req_target);
+            result = getPagesLinkingTo(connection, req_target, namespace);
+        }
+        page.addStats(result.stats);
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
