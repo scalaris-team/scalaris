@@ -55,26 +55,37 @@ public class FastStringBenchmark extends Benchmark {
      * @see de.zib.scalaris.Main#main(String[])
      */
     public static void main(final String[] args) {
-        int testruns = 100;
+        int operations = 500;
+        int threadsPerNode = 10;
         final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
-        if ((args != null) && (args.length >= 2)) {
-            testruns = Integer.parseInt(args[0]);
-            for (int i = 1; i < Math.min(10, args.length); ++i) {
+        boolean all = false;
+        if ((args == null) || (args.length == 0)) {
+            all = true;
+        } else if (args.length == 1) {
+            operations = Integer.parseInt(args[0]);
+            all = true;
+        } else if (args.length == 2) {
+            operations = Integer.parseInt(args[0]);
+            threadsPerNode = Integer.parseInt(args[1]);
+            all = true;
+        } else if (args.length >= 3) {
+            operations = Integer.parseInt(args[0]);
+            threadsPerNode = Integer.parseInt(args[1]);
+            for (int i = 2; i < Math.min(12, args.length); ++i) {
                 final String benchmarks_str = args[i];
                 if (benchmarks_str.equals("all")) {
-                    for (int j = 1; j <= 9; ++j) {
-                        benchmarks.add(j);
-                    }
+                    all = true;
                 } else {
                     benchmarks.add(Integer.parseInt(benchmarks_str));
                 }
             }
-        } else {
+        }
+        if (all) {
             for (int i = 1; i <= 9; ++i) {
                 benchmarks.add(i);
             }
         }
-        minibench(testruns, benchmarks);
+        minibench(operations, threadsPerNode, benchmarks);
     }
 
     /**
@@ -88,22 +99,25 @@ public class FastStringBenchmark extends Benchmark {
      *  <li>writing {@link String} objects by converting them to {@link OtpErlangBinary}s
      *      (random data, size = {@link #BENCH_DATA_SIZE})</li>
      * </ol>
-     * each testruns times
+     * each with the given number of consecutive operations and parallel
+     * threads per Scalaris node,
      * <ul>
      *  <li>first using a new {@link de.zib.scalaris.Transaction} for each test,</li>
      *  <li>then using a new {@link de.zib.scalaris.Transaction} but re-using a single {@link de.zib.scalaris.Connection},</li>
      *  <li>and finally re-using a single {@link de.zib.scalaris.Transaction} object.</li>
      * </ul>
      *
-     * @param testruns
+     * @param operations
      *            the number of test runs to execute
+     * @param threadsPerNode
+     *            number of threads to spawn for each existing Scalaris node
      * @param benchmarks
      *            the benchmarks to run (1-9 or -1 for all benchmarks)
      */
-    public static void minibench(final int testruns, final Set<Integer> benchmarks) {
-        ConnectionFactory cf = ConnectionFactory.getInstance();
-        List<PeerNode> nodes = cf.getNodes();
-        parallelRuns = nodes.size();
+    public static void minibench(final int operations, final int threadsPerNode, final Set<Integer> benchmarks) {
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        final List<PeerNode> nodes = cf.getNodes();
+        final int parallelRuns = nodes.size();
         // set a connection policy that goes through the available nodes in a round-robin fashion:
         cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
         System.out.println("Number of available nodes: " + nodes.size());
@@ -132,8 +146,8 @@ public class FastStringBenchmark extends Benchmark {
                 "re-use connection",
                 "re-use object" };
         testGroup = "transsinglebench";
-        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
-                testTypes, testTypesStr, testBench, testGroup, 1);
+        runBenchAndPrintResults(benchmarks, results, columns, rows, testTypes,
+                testTypesStr, testBench, testGroup, 1, operations, parallelRuns);
 
         System.out.println("-----");
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
@@ -150,7 +164,7 @@ public class FastStringBenchmark extends Benchmark {
                 "re-use connection",
                 "re-use object" };
         testGroup = "transsinglebench";
-        runBenchAndPrintResults(testruns, benchmarks, results, columns, rows,
-                testTypes, testTypesStr, testBench, testGroup, 1);
+        runBenchAndPrintResults(benchmarks, results, columns, rows, testTypes,
+                testTypesStr, testBench, testGroup, 1, operations, parallelRuns);
     }
 }
