@@ -18,14 +18,41 @@ public class BigIntegerResult extends Result {
      * 
      * @param number
      *            the retrieved number
+     */
+    public BigIntegerResult(BigInteger number) {
+        super();
+        this.number = number;
+    }
+
+    /**
+     * Creates a new successful result with the given page list.
+     * 
+     * @param number
+     *            the retrieved number
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
     public BigIntegerResult(BigInteger number, String name, long time) {
-        super(name, time);
+        super();
         this.number = number;
+        addStat(name, time);
+    }
+
+    /**
+     * Creates a new custom result.
+     * 
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     */
+    public BigIntegerResult(boolean success, String message,
+            boolean connectFailed) {
+        super(success, message, connectFailed);
     }
 
     /**
@@ -44,6 +71,7 @@ public class BigIntegerResult extends Result {
      */
     public BigIntegerResult(boolean success, String message,
             boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed, name, time);
+        super(success, message, connectFailed);
+        addStat(name, time);
     }
 }

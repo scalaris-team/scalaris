@@ -19,14 +19,42 @@ public class PageListResult extends Result {
      * 
      * @param pages
      *            the retrieved revision
+     */
+    public PageListResult(List<String> pages) {
+        super();
+        this.pages = pages;
+    }
+
+    /**
+     * Creates a new successful result with the given page list.
+     * 
+     * @param pages
+     *            the retrieved revision
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
     public PageListResult(List<String> pages, String name, long time) {
-        super(name, time);
+        super();
         this.pages = pages;
+        addStat(name, time);
+    }
+
+    /**
+     * Creates a new custom result.
+     * 
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     */
+    public PageListResult(boolean success, String message,
+            boolean connectFailed) {
+        super(success, message, connectFailed);
+        pages = new LinkedList<String>();
     }
 
     /**
@@ -45,7 +73,8 @@ public class PageListResult extends Result {
      */
     public PageListResult(boolean success, String message,
             boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed, name, time);
+        super(success, message, connectFailed);
         pages = new LinkedList<String>();
+        addStat(name, time);
     }
 }

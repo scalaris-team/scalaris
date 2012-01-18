@@ -343,7 +343,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (req_search == null) {
             page.setTitle("Special:Search&namespace=" + nsId);
             page.setSearch("");
-            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+            result = new PageListResult(new ArrayList<String>(0));
         } else {
             page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
             page.setSearch(req_search);
@@ -394,7 +394,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setTitle("Special:AllPages&namespace=" + nsId);
             page.setFromPage("");
             page.setToPage("");
-            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+            result = new PageListResult(new ArrayList<String>(0));
         } else {
             if (req_from == null) {
                 req_from = ""; // start with first page
@@ -450,7 +450,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (req_prefix == null) {
             page.setTitle("Special:PrefixIndex&namespace=" + nsId);
             page.setPrefix("");
-            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+            result = new PageListResult(new ArrayList<String>(0));
         } else {
             page.setTitle("Special:PrefixIndex&prefix=" + req_prefix + "&namespace=" + nsId);
             page.setPrefix(req_prefix);
@@ -498,7 +498,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setPageHeading("Pages that link to a selected page");
             page.setTitle("Special:WhatLinksHere");
             page.setTarget("");
-            result = new PageListResult(new ArrayList<String>(0), "empty search", 0);
+            result = new PageListResult(new ArrayList<String>(0));
         } else {
             page.setPageHeading("Pages that link to \"" + req_target + "\"");
             page.setTitle("Special:WhatLinksHere&target=" + req_target);
@@ -1066,7 +1066,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>(), title, 0);
+        PageListResult result = new PageListResult(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1150,7 +1150,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPage(content.toString());
         page.addStats(wikiModel.getStats());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>(), title, 0);
+        PageListResult result = new PageListResult(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1220,7 +1220,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        PageListResult result = new PageListResult(new LinkedList<String>(), title, 0);
+        PageListResult result = new PageListResult(new LinkedList<String>());
         handleViewSpecialPageList(request, response, result, connection, page);
     }
     
