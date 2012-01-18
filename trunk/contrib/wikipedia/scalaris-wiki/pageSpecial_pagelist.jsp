@@ -89,7 +89,7 @@ ${ pageBean.page }
                       <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.TargetPageForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="target">Page:</label> </td>
-                                <td class='mw-input'><input name="target" size="30" value="${ pageBean.target }" id="nstarget" />  </td>
+                                <td class='mw-input'><input name="target" size="30" value="${ pageBean.target }" id="nstarget" /> <input type="submit" value="Go" />  </td>
                               </tr>
                       <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.PagePrefixForm) { %>
                               <tr>
@@ -102,6 +102,7 @@ ${ pageBean.page }
                                 <td class='mw-input'><input name="search" size="30" value="${ pageBean.search }" id="nsprefix" />  </td>
                               </tr>
                       <% } %>
+                      <% if (pageBean.getFormType() != WikiPageListBean.FormType.TargetPageForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="namespace">Namespace:</label>  </td>
                                 <td class='mw-input'>
@@ -116,6 +117,7 @@ ${ pageBean.page }
                                   <input type="submit" value="Go" />
                                 </td>
                               </tr>
+                      <% } %>
                             </table>
                           </fieldset>
                         </form>
