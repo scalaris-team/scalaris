@@ -243,7 +243,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                 content.append("  </select>\n");
                 content.append(" </p>\n");
                 content.append(" <p>Maximum number of revisions per page: <input name=\"max_revisions\" size=\"2\" value=\"2\" /></br><span style=\"font-size:80%\">(<tt>-1</tt> to import everything)</span></p>\n");
-                content.append(" <p>No entra newer than: <input name=\"max_time\" size=\"20\" value=\"\" /></br><span style=\"font-size:80%\">(ISO8601 format, e.g. <tt>2004-01-07T08:09:29Z</tt> - leave empty to import everything)</span></p>\n");
+                content.append(" <p>No entry newer than: <input name=\"max_time\" size=\"20\" value=\"\" /></br><span style=\"font-size:80%\">(ISO8601 format, e.g. <tt>2004-01-07T08:09:29Z</tt> - leave empty to import everything)</span></p>\n");
                 content.append(" <input type=\"submit\" value=\"Import\" />\n");
                 content.append("</form>\n");
                 content.append("<p>Note: You will be re-directed to the main page when the import finishes.</p>");
