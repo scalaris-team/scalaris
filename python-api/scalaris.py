@@ -72,15 +72,18 @@ class JSONConnection(object):
             response_json = json.loads(data)
             return response_json['result']
         except httplib.BadStatusLine as instance:
+            #print 'HTTP STATUS:', response.status, response.reason, params_json
             self.close()
             if retry_if_bad_status:
                 return self.call(function, params, path = path, retry_if_bad_status = False)
             else:
                 raise ConnectionError(instance)
         except ConnectionError:
+            #print 'HTTP STATUS:', response.status, response.reason, params_json
             self.close()
             raise
         except Exception as instance:
+            #print 'HTTP STATUS:', response.status, response.reason, params_json
             self.close()
             raise ConnectionError(instance)
 

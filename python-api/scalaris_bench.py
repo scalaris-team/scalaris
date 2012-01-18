@@ -15,23 +15,591 @@
 
 import scalaris
 from datetime import datetime
-import time
+from threading import Thread
+import time, threading
 import random, string
-import sys, traceback
+import os, sys, traceback
 
-# The size of a single data item that is send to scalaris.
 _BENCH_DATA_SIZE = 1000
-# This is used to create different erlang keys for each run.
+"""The size of a single data item that is send to scalaris."""
 _benchTime = 0
-# The time at the start of a single benchmark.
-_timeAtStart = 0
-# Cut 5% off of both ends of the result list.
+"""This is used to create different erlang keys for each run."""
 _PERCENT_TO_REMOVE = 5
-# Number of transactions per test run.
-_TRANSACTIONS_PER_TESTRUN = 10;
+"""Cut 5% off of both ends of the result list."""
+_TESTRUNS = 1;
+"""Number of test runs (accumulates results over all test runs)."""
 
-# Returns a pre-initialized results array with values <tt>-1</tt>.
+if 'SCALARIS_JSON_URLS' in os.environ and os.environ['SCALARIS_JSON_URLS'] != '':
+    DEFAULT_URLS = os.environ['SCALARIS_JSON_URLS'].split()
+else:
+    DEFAULT_URLS = [scalaris.DEFAULT_URL]
+
+def minibench(operations, threads_per_node, benchmarks):
+    """
+    Default minimal benchmark.
+    
+    Tests some strategies for writing key/value pairs to scalaris:
+    1) writing binary objects (random data, size = _BENCH_DATA_SIZE)
+    2) writing string objects (random data, size = _BENCH_DATA_SIZE)
+    each with the given number of consecutive operations and parallel
+    threads per Scalaris node,
+    * first using a new Transaction or TransactionSingleOp for each test,
+    * then using a new Transaction or TransactionSingleOp but re-using a single connection,
+    * and finally re-using a single Transaction or TransactionSingleOp object.
+    """
+    # The time when the (whole) benchmark suite was started.
+    # This is used to create different erlang keys for each run.
+    _benchTime = _getCurrentMillis()
+    
+    parallel_runs = len(DEFAULT_URLS) * threads_per_node;
+    print 'Number of available nodes: ' + str(len(DEFAULT_URLS))
+    print '-> Using ' + str(parallel_runs) + ' parallel instances per test run...'
+
+    print 'Benchmark of scalaris.TransactionSingleOp:'
+    test_types = ['binary', 'string']
+    test_types_str = ['B', 'S']
+    columns = ['TransactionSingleOp.write(string, bytearray)',
+               'TransactionSingleOp.write(string, string)']
+    test_bench = [TransSingleOpBench1, TransSingleOpBench2, TransSingleOpBench3]
+    rows = ['separate connection', 're-use connection', 're-use object']
+    testGroup = 'transsinglebench';
+    results = _getResultArray(rows, columns)
+    _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+            test_types_str, test_bench, testGroup, 1, operations, parallel_runs)
+
+    print '-----'
+    print 'Benchmark of scalaris.Transaction:'
+    test_types = ['binary', 'string']
+    test_types_str = ['B', 'S']
+    columns = ['Transaction.write(string, bytearray)',
+               'Transaction.write(string, string)']
+    test_bench = [TransBench1, TransBench2, TransBench3]
+    rows = ['separate connection', 're-use connection', 're-use object']
+    testGroup = 'transbench';
+    results = _getResultArray(rows, columns)
+    _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+            test_types_str, test_bench, testGroup, 1, operations, parallel_runs)
+
+    print '-----'
+    print 'Benchmark incrementing an integer key (read+write):'
+    test_types = ['int']
+    test_types_str = ['I']
+    columns = ['Transaction.read(string) + Transaction.write(string, int)']
+    test_bench = [TransIncrementBench1, TransIncrementBench2, TransIncrementBench3]
+    rows = ['separate connection', 're-use connection', 're-use object']
+    testGroup = 'transbench_inc';
+    results = _getResultArray(rows, columns)
+    _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+            test_types_str, test_bench, testGroup, 7, operations, parallel_runs)
+
+    print '-----'
+    print 'Benchmark read 5 + write 5:'
+    test_types = ['binary', 'string']
+    test_types_str = ['B', 'S']
+    columns = ['Transaction.read(string) + Transaction.write(string, binary)',
+               'Transaction.read(string) + Transaction.write(string, string)']
+    test_bench = [TransRead5Write5Bench1, TransRead5Write5Bench2, TransRead5Write5Bench3]
+    rows = ['separate connection', 're-use connection', 're-use object']
+    testGroup = 'transbench_r5w5';
+    results = _getResultArray(rows, columns)
+    _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+            test_types_str, test_bench, testGroup, 10, operations, parallel_runs)
+
+    print '-----'
+    print 'Benchmark appending to a String list (read+write):'
+    test_types = ['string']
+    test_types_str = ['S']
+    columns = ['Transaction.read(string) + Transaction.write(string, int)']
+    test_bench = [TransAppendToListBench1, TransAppendToListBench2, TransAppendToListBench3]
+    rows = ['separate connection', 're-use connection', 're-use object']
+    testGroup = 'transbench_append';
+    results = _getResultArray(rows, columns)
+    _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+            test_types_str, test_bench, testGroup, 16, operations, parallel_runs)
+
+class BenchRunnable(Thread):
+    """
+    Abstract base class of a test run that is to be run in a thread.
+    """
+    
+    def __init__(self, key, value, operations):
+        """
+        Create a new runnable.
+        """
+        Thread.__init__(self)
+        self._key = key
+        self._value = value
+        self._operations = operations
+        
+        self._stop = False
+        self._timeAtStart = 0
+        self._speed = -1
+
+    def _testBegin(self):
+        """
+         Call this method when a benchmark is started.
+         Sets the time the benchmark was started.
+        """
+        self._timeAtStart = _getCurrentMillis()
+
+    def _testEnd(self, testRuns):
+        """
+        Call this method when a benchmark is finished.
+        Calculates the time the benchmark took and the number of transactions
+        performed during this time.
+         """
+        timeTaken = _getCurrentMillis() - self._timeAtStart
+        speed = (testRuns * 1000) / timeTaken
+        return speed
+    
+    def pre_init(self, j = None):
+        """
+        Will be called before the benchmark starts with all possible
+        variations of "j" in the operation() call.
+        "j" with None is the overall initialisation run at first.
+        """
+        pass
+    
+    def init(self):
+        """
+        Will be called at the start of the benchmark.
+        """
+        pass
+    
+    def cleanup(self):
+        """
+        Will be called before the end of the benchmark.
+        """
+        pass
+    
+    def operation(self, j):
+        """
+        The operation to execute during the benchmark.
+        """
+        pass
+    
+    def run(self):
+        threading.currentThread().name = "BenchRunnable-" + self._key
+        retry = 0
+        while (retry < 3) and (not self._stop):
+            try:
+                self.pre_init()
+                for j in xrange(self._operations):
+                    self.pre_init(j)
+                self._testBegin()
+                self.init()
+                for j in xrange(self._operations):
+                    self.operation(j)
+                self.cleanup()
+                self._speed = self._testEnd(self._operations)
+                break
+            except:
+                # _printException()
+                pass
+            retry += 1
+
+    def getSpeed(self):
+        return self._speed
+
+    def stop(self):
+        self._stop = True
+
+class BenchRunnable2(BenchRunnable):
+    def __init__(self, key, value, operations):
+        """
+        Create a new runnable.
+        """
+        BenchRunnable.__init__(self, key, value, operations)
+    
+    def init(self):
+        """
+        Will be called at the start of the benchmark.
+        """
+        self._connection = _getConnection()
+    
+    def cleanup(self):
+        """
+        Will be called before the end of the benchmark.
+        """
+        self._connection.close()
+
+class TransSingleOpBench1(BenchRunnable):
+    """
+    Performs a benchmark writing objects using a new TransactionSingleOp object
+    for each test.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+    
+    def operation(self, j):
+        tx = scalaris.TransactionSingleOp(conn = _getConnection())
+        tx.write(self._key + '_' + str(j), self._value)
+        tx.close_connection()
+
+class TransSingleOpBench2(BenchRunnable2):
+    """
+    Performs a benchmark writing objects using a new TransactionSingleOp but
+    re-using a single connection for each test.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable2.__init__(self, key, value, operations)
+
+    def operation(self, j):
+        tx = scalaris.TransactionSingleOp(conn = self._connection)
+        tx.write(self._key + '_' + str(j), self._value)
+
+class TransSingleOpBench3(BenchRunnable):
+    """
+    Performs a benchmark writing objects using a single TransactionSingleOp
+    object for all tests.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+
+    def init(self):
+        self._tx = scalaris.TransactionSingleOp(conn = _getConnection())
+
+    def cleanup(self):
+        self._tx.close_connection()
+
+    def operation(self, j):
+        self._tx.write(self._key + '_' + str(j), self._value)
+
+class TransBench1(BenchRunnable):
+    """
+    Performs a benchmark writing objects using a new Transaction for each test.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = _getConnection())
+        tx.write(self._key + '_' + str(j), self._value)
+        tx.commit()
+        tx.close_connection()
+
+class TransBench2(BenchRunnable2):
+    """
+    Performs a benchmark writing objects using a new Transaction but re-using a
+    single connection for each test.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable2.__init__(self, key, value, operations)
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = self._connection)
+        tx.write(self._key + '_' + str(j), self._value)
+        tx.commit()
+
+class TransBench3(BenchRunnable):
+    """
+    Performs a benchmark writing objects using a single Transaction object
+    for all tests.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+
+    def init(self):
+        self._tx = scalaris.Transaction(conn = _getConnection())
+
+    def cleanup(self):
+        self._tx.close_connection()
+
+    def operation(self, j):
+        self._tx.write(self._key + '_' + str(j), self._value)
+        self._tx.commit()
+
+class TransIncrementBench(BenchRunnable):
+    """
+    Performs a benchmark writing integer numbers on a single key and
+    increasing them.
+    Provides convenience methods for the full increment benchmark
+    implementations.
+    """
+    def __init__(self, key, value, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+    
+    def pre_init(self, j = None):
+        tx_init = scalaris.Transaction(conn = _getConnection())
+        tx_init.write(self._key, 0)
+        tx_init.commit()
+        tx_init.close_connection()
+
+    def operation2(self, tx, j):
+        reqs = tx.new_req_list()
+        reqs.add_add_on_nr(self._key, 1).add_commit()
+        # value_old = tx.read(self._key)
+        # reqs.add_write(key, value_old + 1).add_commit()
+        results = tx.req_list(reqs)
+        # tx.process_result_write(results[0])
+        tx.process_result_add_on_nr(results[0])
+
+class TransIncrementBench1(TransIncrementBench):
+    """
+    Performs a benchmark writing integer numbers on a single key and
+    increasing them using a new Transaction for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransIncrementBench.__init__(self, key, value, operations)
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = _getConnection())
+        self.operation2(tx, j)
+        tx.close_connection()
+
+class TransIncrementBench2(TransIncrementBench):
+    """
+    Performs a benchmark writing integer numbers on a single key and
+    increasing them using a new Transaction but re-using a single
+    connection for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransIncrementBench.__init__(self, key, value, operations)
+    
+    def init(self):
+        self._connection = _getConnection()
+    
+    def cleanup(self):
+        self._connection.close()
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = self._connection)
+        self.operation2(tx, j)
+
+class TransIncrementBench3(TransIncrementBench):
+    """
+    Performs a benchmark writing objects using a single Transaction
+    object for all tests.
+    """
+    def __init__(self, key, value, operations):
+        TransIncrementBench.__init__(self, key, value, operations)
+    
+    def init(self):
+        self._tx = scalaris.Transaction(conn = _getConnection())
+    
+    def cleanup(self):
+        self._tx.close_connection()
+
+    def operation(self, j):
+        self.operation2(self._tx, j)
+
+class TransReadXWriteXBench(BenchRunnable):
+    """
+    Performs a benchmark reading X values and overwriting them afterwards
+    inside a transaction.
+    Provides convenience methods for the full read-x, write-x benchmark
+    implementations.
+    """
+    def __init__(self, key, value, nr_keys, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+        self._keys = []
+        self._value_write = []
+        for i in xrange(nr_keys):
+            self._keys.append(key + "_" + str(i))
+            self._value_write.append(_getRandom(_BENCH_DATA_SIZE, type(value).__name__))
+    
+    def pre_init(self, j = None):
+        value_init = []
+        for i in xrange(len(self._keys)):
+            value_init.append(_getRandom(_BENCH_DATA_SIZE, type(self._value).__name__))
+        
+        tx_init = scalaris.Transaction(conn = _getConnection())
+        reqs = tx_init.new_req_list()
+        for i in xrange(len(self._keys)):
+            reqs.add_write(self._keys[i], value_init[i])
+        reqs.add_commit()
+        results = tx_init.req_list(reqs)
+        for i in xrange(len(self._keys)):
+            tx_init.process_result_write(results[i])
+        tx_init.close_connection()
+
+    def operation2(self, tx, j):
+        reqs = tx.new_req_list()
+        # read old values into the transaction
+        for i in xrange(len(self._keys)):
+            reqs.add_read(self._keys[i])
+        reqs.add_commit()
+        results = tx.req_list(reqs)
+        for i in xrange(len(self._keys)):
+            tx.process_result_read(results[i])
+        
+        # write new values... 
+        reqs = tx.new_req_list()
+        for i in xrange(len(self._keys)):
+            value = self._value_write[j % len(self._value_write)]
+            reqs.add_write(self._keys[i], value)
+        reqs.add_commit()
+        results = tx.req_list(reqs)
+        for i in xrange(len(self._keys)):
+            tx.process_result_write(results[i])
+
+class TransRead5Write5Bench1(TransReadXWriteXBench):
+    """
+    Performs a benchmark reading 5 values and overwriting them afterwards
+    inside a transaction using a new Transaction for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransReadXWriteXBench.__init__(self, key, value, 5, operations)
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = _getConnection())
+        self.operation2(tx, j)
+        tx.close_connection()
+
+class TransRead5Write5Bench2(TransReadXWriteXBench):
+    """
+    Performs a benchmark reading 5 values and overwriting them afterwards
+    inside a transaction using a new Transaction but re-using a single
+    connection for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransReadXWriteXBench.__init__(self, key, value, 5, operations)
+    
+    def init(self):
+        self._connection = _getConnection()
+    
+    def cleanup(self):
+        self._connection.close()
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = self._connection)
+        self.operation2(tx, j)
+
+class TransRead5Write5Bench3(TransReadXWriteXBench):
+    """
+    Performs a benchmark reading 5 values and overwriting them afterwards
+    inside a transaction using a single Transaction object for all tests.
+    """
+    def __init__(self, key, value, operations):
+        TransReadXWriteXBench.__init__(self, key, value, 5, operations)
+    
+    def init(self):
+        self._tx = scalaris.Transaction(conn = _getConnection())
+    
+    def cleanup(self):
+        self._tx.close_connection()
+
+    def operation(self, j):
+        self.operation2(self._tx, j)
+
+class TransAppendToListBench(BenchRunnable):
+    """
+    Performs a benchmark adding values to a list inside a transaction.
+    Provides convenience methods for the full append-to-list benchmark
+    implementations.
+    """
+    def __init__(self, key, value, nr_keys, operations):
+        BenchRunnable.__init__(self, key, value, operations)
+        self._value_init = []
+        for i in xrange(nr_keys):
+            self._value_init.append(_getRandom(_BENCH_DATA_SIZE, 'string'))
+    
+    def pre_init(self, j = None):
+        if j is None:
+            return
+        tx_init = scalaris.Transaction(conn = _getConnection())
+        reqs = tx_init.new_req_list()
+        reqs.add_write(self._key + '_' + str(j), self._value_init).add_commit()
+        results = tx_init.req_list(reqs)
+        tx_init.process_result_write(results[0])
+        tx_init.close_connection()
+
+    def operation2(self, tx, j):
+        reqs = tx.new_req_list()
+        reqs.add_add_del_on_list(self._key + '_' + str(j), [self._value], []).add_commit()
+        # read old list into the transaction
+        # list = scalaris.str_to_list(tx.read(self._key + '_' + str(j)))
+        # write new list ...
+        # list.append(self._value)
+        # reqs.add_write(self._key + '_' + str(j), list).add_commit())
+        
+        results = tx.req_list(reqs)
+        # tx.process_result_write(results[0])
+        tx.process_result_add_del_on_list(results[0])
+
+class TransAppendToListBench1(TransAppendToListBench):
+    """
+    Performs a benchmark adding values to a list inside a transaction
+    using a new Transaction for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransAppendToListBench.__init__(self, key, value, 5, operations)
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = _getConnection())
+        self.operation2(tx, j)
+        tx.close_connection()
+
+class TransAppendToListBench2(TransAppendToListBench):
+    """
+    Performs a benchmark adding values to a list inside a transaction using a
+    new Transaction but re-using a single connection for each test.
+    """
+    def __init__(self, key, value, operations):
+        TransAppendToListBench.__init__(self, key, value, 5, operations)
+    
+    def init(self):
+        self._connection = _getConnection()
+    
+    def cleanup(self):
+        self._connection.close()
+
+    def operation(self, j):
+        tx = scalaris.Transaction(conn = self._connection)
+        self.operation2(tx, j)
+
+class TransAppendToListBench3(TransAppendToListBench):
+    """
+    Performs a benchmark adding values to a list inside a transaction using a
+    single Transaction object for all tests.
+    """
+    def __init__(self, key, value, operations):
+        TransAppendToListBench.__init__(self, key, value, 5, operations)
+    
+    def init(self):
+        self._tx = scalaris.Transaction(conn = _getConnection())
+    
+    def cleanup(self):
+        self._tx.close_connection()
+
+    def operation(self, j):
+        self.operation2(self._tx, j)
+
+def _getCurrentMillis():
+    """
+    Gets the number of milliseconds since epoch.
+    """
+    now = datetime.now()
+    return int(time.mktime(now.timetuple())) * 1000 + (now.microsecond // 1000)
+
+def _testBegin():
+    """
+    Call this method when a benchmark is started.
+    Sets the time the benchmark was started.
+    """
+    global _timeAtStart
+    _timeAtStart = _getCurrentMillis()
+
+def _testEnd(testruns):
+    """
+    Call this method when a benchmark is finished.
+    Calculates the time the benchmark took and the number of transactions
+    performed during this time.
+    Returns the number of achieved transactions per second.
+    """
+    global _timeAtStart
+    timeTaken = _getCurrentMillis() - _timeAtStart
+    speed = (testruns * 1000) // timeTaken
+    return speed
+
+def _getConnection():
+    url = random.choice(DEFAULT_URLS)
+    return scalaris.JSONConnection(url = url)
+
 def _getResultArray(rows, columns):
+    """
+    Returns a pre-initialized results array with values <tt>-1</tt>.
+    """
     results = {}
     for row in rows:
         results[row] = {}
@@ -39,16 +607,112 @@ def _getResultArray(rows, columns):
             results[row][column] = -1
     return results
 
-# Creates an random string or binary object from <size> random characters/bytes.
 def _getRandom(size, mytype):
-    if mytype == 'string':
-        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _x in xrange(size))
+    """
+    Creates an random string or binary object from <size> random characters/bytes.
+    """
+    if mytype == 'int':
+        return random.randint(0, 2147483647)
+    elif mytype == 'string' or mytype == 'str':
+        return ''.join(random.choice(string.ascii_letters + string.digits + string.whitespace) for _x in xrange(size))
+        #return ''.join(random.choice(string.printable) for _x in xrange(size))
     elif mytype == 'binary':
         return bytearray(random.randrange(0, 256) for _x in xrange(size))
 
-# Prints a result table.
-def _printResults(columns, rows, results, testruns):
-    print 'Test runs: ' + str(testruns) + ', each using ' + str(_TRANSACTIONS_PER_TESTRUN) + ' transactions'
+def _integrateResults(results, i, worker, failed):
+    """
+    Integrates the workers' results into the result array.
+    """
+    try:
+        for bench_thread in worker:
+            if failed >= 3:
+                bench_thread.stop()
+                try:
+                    while(bench_thread.isAlive()): # non-blocking join so we are able to receive CTRL-C
+                        bench_thread.join(1)
+                except RuntimeError:
+                    pass
+            else:
+                try:
+                    while(bench_thread.isAlive()): # non-blocking join so we are able to receive CTRL-C
+                        bench_thread.join(1)
+                    speed = bench_thread.getSpeed()
+                except RuntimeError:
+                    speed = -1
+                
+                if speed < 0:
+                    failed += 1
+                else:
+                    results[i] += speed
+        return failed
+    except KeyboardInterrupt:
+        print 'CTRL-C received, aborting...'
+        for bench_thread in worker:
+            bench_thread.stop()
+        sys.exit(1)
+    
+def _getAvgSpeed(results):
+    """
+    Calculates the average number of transactions per second from the results
+    of executing 10 transactions per test run. Will remove the top and bottom
+    _PERCENT_TO_REMOVE percent of the sorted results array.
+    Returns the average number of transactions per second.
+    """
+    results.sort()
+    toRemove = int((len(results) * _PERCENT_TO_REMOVE) // 100);
+    avgSpeed = 0;
+    for i in xrange(toRemove, (len(results) - toRemove)):
+        avgSpeed += results[i]
+    
+    avgSpeed //= len(results) - 2 * toRemove
+    return avgSpeed
+
+def _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
+                             test_types_str, test_bench, testGroup, firstBenchId,
+                             operations, parallelRuns):
+    """
+    Runs the given benchmarks and prints a results table.
+    """
+    for test in xrange(len(results) * len(results.itervalues().next())):
+        try:
+            if (test + firstBenchId) in benchmarks:
+                i = test % len(results);
+                j = test // len(results);
+                results[rows[i]][columns[j]] = _runBench(operations,
+                        _getRandom(_BENCH_DATA_SIZE, test_types[j]),
+                        testGroup + "_" + test_types_str[j] + "_" + str(i + 1),
+                        test_bench[i], parallelRuns)
+                time.sleep(1)
+        except Exception: # do not catch SystemExit
+            _printException()
+    
+    _printResults(columns, rows, results, operations, parallelRuns)
+
+def _runBench(operations, value, name, clazz, parallelRuns):
+    """
+    Runs the given benchmark.
+    """
+    key = str(_benchTime) + name
+    results = [-1]*_TESTRUNS
+
+    for i in xrange(_TESTRUNS):
+        worker = []
+        for thread in xrange(parallelRuns):
+            new_worker = clazz(key + '_' + str(i) + '_' + str(thread), value, operations)
+            worker.append(new_worker) 
+            new_worker.start()
+        failed = 0
+        failed = _integrateResults(results, i, worker, failed);
+        if failed >= 3:
+            return -1
+
+    return _getAvgSpeed(results)
+
+def _printResults(columns, rows, results, operations, parallelRuns):
+    """
+    Prints a result table.
+    """
+    print 'Concurrent threads: ' + str(parallelRuns) + ', each using ' + str(operations) + ' transactions'
     colLen = 25
     emptyFirstColumn = ''.join([' ']*colLen)
     print emptyFirstColumn + '\tspeed (transactions / second)'
@@ -78,474 +742,26 @@ def _printException():
     print str(mytype) + str(message)
     traceback.print_tb(trace)
 
-# Default minimal benchmark.
-#
-# Tests some strategies for writing key/value pairs to scalaris:
-# 1) writing binary objects (random data, size = _BENCH_DATA_SIZE)
-# 2) writing string objects (random data, size = _BENCH_DATA_SIZE)
-# each <testruns> times
-# * first using a new Transaction or TransactionSingleOp for each test,
-# * then using a new Transaction or TransactionSingleOp but re-using a single connection,
-# * and finally re-using a single Transaction or TransactionSingleOp object.
-def minibench(testruns, benchmarks):
-    # The time when the (whole) benchmark suite was started.
-    now = datetime.now()
-    # This is used to create different erlang keys for each run.
-    _benchTime = int(time.mktime(now.timetuple()) * 1000 + (now.microsecond // 1000.0))
-
-    rows = ['separate connection', 're-use connection', 're-use object']
-    columns = ['binary', 'string']
-    results = _getResultArray(rows, columns)
-    
-    print 'Benchmark of TransactionSingleOp:'
-    
-    try:
-        if 1 in benchmarks:
-            results['separate connection']['binary'] = \
-                _transSingleOpBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_1")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 2 in benchmarks:
-            results['re-use connection']['binary'] = \
-                _transSingleOpBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_2")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 3 in benchmarks:
-            results['re-use object']['binary'] = \
-                _transSingleOpBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transsinglebench_B_3")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 4 in benchmarks:
-            results['separate connection']['string'] = \
-                _transSingleOpBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_1")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 5 in benchmarks:
-            results['re-use connection']['string'] = \
-                _transSingleOpBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_2")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 6 in benchmarks:
-            results['re-use object']['string'] = \
-                _transSingleOpBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transsinglebench_S_3")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    _printResults(columns, rows, results, testruns)
-    
-    
-    results = _getResultArray(rows, columns)
-    
-    print '-----'
-    print 'Benchmark of Transaction:'
-    
-    try:
-        if 1 in benchmarks:
-            results['separate connection']['binary'] = \
-                _transBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_1")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 2 in benchmarks:
-            results['re-use connection']['binary'] = \
-                _transBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_2")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 3 in benchmarks:
-            results['re-use object']['binary'] = \
-                _transBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'binary'), "transbench_B_3")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 4 in benchmarks:
-            results['separate connection']['string'] = \
-                _transBench1(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_1")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 5 in benchmarks:
-            results['re-use connection']['string'] = \
-                _transBench2(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_2")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 6 in benchmarks:
-            results['re-use object']['string'] = \
-                _transBench3(testruns, _getRandom(_BENCH_DATA_SIZE, 'string'), "transbench_S_3")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    _printResults(columns, rows, results, testruns)
-    
-    
-    rows = ['separate connection', 're-use connection', 're-use object']
-    columns = ['read+write']
-    results = _getResultArray(rows, columns)
-    
-    print '-----'
-    print 'Benchmark incrementing an integer key (read+write):'
-    
-    try:
-        if 7 in benchmarks:
-            results['separate connection']['read+write'] = \
-                _transIncrementBench1(testruns, "transbench_inc_1")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 8 in benchmarks:
-            results['re-use connection']['read+write'] = \
-                _transIncrementBench2(testruns, "transbench_inc_2")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    try:
-        if 9 in benchmarks:
-            results['re-use object']['read+write'] = \
-                _transIncrementBench3(testruns, "transbench_inc_3")
-            time.sleep(1)
-    except:
-        # _printException()
-        pass
-    
-    _printResults(columns, rows, results, testruns)
-
-# Call this method when a benchmark is started.
-# Sets the time the benchmark was started.
-def _testBegin():
-    global _timeAtStart
-    now = datetime.now()
-    _timeAtStart = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond // 1000)
-
-# Call this method when a benchmark is finished.
-# Calculates the time the benchmark took and the number of transactions
-# performed during this time.
-# Returns the number of achieved transactions per second.
-def _testEnd(testruns):
-    global _timeAtStart
-    now = datetime.now()
-    timeTaken = int(time.mktime(now.timetuple())) * 1000 + (now.microsecond // 1000) - _timeAtStart
-    speed = (testruns * 1000) // timeTaken
-    return speed
-
-# Calculates the average number of transactions per second from the results
-# of executing 10 transactions per test run. Will remove the top and bottom
-# _PERCENT_TO_REMOVE percent of the sorted results array.
-# Returns the average number of transactions per second.
-def _getAvgSpeed(results):
-    results.sort()
-    toRemove = int((len(results) * _PERCENT_TO_REMOVE) // 100);
-    avgSpeed = 0;
-    for i in xrange(toRemove, (len(results) - toRemove)):
-        avgSpeed += results[i]
-    
-    avgSpeed //= len(results) - 2 * toRemove
-    return avgSpeed
-
-# Performs a benchmark writing objects using a new TransactionSingleOp object for each test.
-# Returns the number of achieved transactions per second.
-def _transSingleOpBench1(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.TransactionSingleOp()
-                    tx.write(key + str(i) + str(j), value)
-                    tx.close_connection()
-                
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a new TransactionSingleOp but
-# re-using a single connection for each test.
-# Returns the number of achieved transactions per second.
-def _transSingleOpBench2(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.TransactionSingleOp(conn = conn)
-                    tx.write(key + str(i) + str(j), value)
-                
-                conn.close()
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a single TransactionSingleOp
-# object for all tests.
-# Returns the number of achieved transactions per second.
-def _transSingleOpBench3(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                tx = scalaris.TransactionSingleOp()
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx.write(key + str(i) + str(j), value)
-                
-                tx.close_connection()
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a new Transaction for each test.
-# Returns the number of achieved transactions per second.
-def _transBench1(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.Transaction()
-                    tx.write(key + str(i) + str(j), value)
-                    tx.commit()
-                    tx.close_connection()
-                
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a new Transaction but re-using a
-# single connection for each test.
-# Returns the number of achieved transactions per second.
-def _transBench2(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.Transaction(conn = conn)
-                    tx.write(key + str(i) + str(j), value)
-                    tx.commit()
-                
-                conn.close()
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a single Transaction object
-# for all tests.
-# Returns the number of achieved transactions per second.
-def _transBench3(testruns, value, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                _testBegin()
-                tx = scalaris.Transaction()
-                
-                for j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx.write(key + str(i) + str(j), value)
-                    tx.commit()
-                
-                tx.close_connection()
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing integer numbers on a single key and
-# increasing them using a new Transaction for each test.
-# Returns the number of achieved transactions per second.
-def _transIncrementBench1(testruns, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                key_i = key + str(i)
-                tx_init = scalaris.Transaction()
-                tx_init.write(key_i, 0);
-                tx_init.commit();
-                tx_init.close_connection();
-                _testBegin()
-                
-                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.Transaction()
-                    value_old = tx.read(key_i)
-                    tx.write(key_i, value_old + 1)
-                    tx.commit();
-                    tx.close_connection();
-                
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing integer numbers on a single key and
-# increasing them using a new Transaction but re-using a single
-# connection for each test.
-# Returns the number of achieved transactions per second.
-def _transIncrementBench2(testruns, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                key_i = key + str(i)
-                tx_init = scalaris.Transaction()
-                tx_init.write(key_i, 0);
-                tx_init.commit();
-                tx_init.close_connection();
-                _testBegin()
-                conn = scalaris.JSONConnection(url = scalaris.DEFAULT_URL)
-                
-                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    tx = scalaris.Transaction(conn = conn)
-                    value_old = tx.read(key_i)
-                    tx.write(key_i, value_old + 1)
-                    tx.commit();
-                
-                conn.close()
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
-# Performs a benchmark writing objects using a single Transaction
-# object for all tests.
-# Returns the number of achieved transactions per second.
-def _transIncrementBench3(testruns, name):
-    key = str(_benchTime) + name
-    results = []
-    
-    for i in xrange(testruns):
-        for retry in xrange(3):
-            try:
-                key_i = key + str(i)
-                tx_init = scalaris.Transaction()
-                tx_init.write(key_i, 0);
-                tx_init.commit();
-                tx_init.close_connection();
-                _testBegin()
-                tx = scalaris.Transaction()
-                
-                for _j in xrange(_TRANSACTIONS_PER_TESTRUN):
-                    value_old = tx.read(key_i)
-                    tx.write(key_i, value_old + 1)
-                    tx.commit();
-                    
-                tx.close_connection();
-                results.append(_testEnd(_TRANSACTIONS_PER_TESTRUN))
-                break
-            except:
-                # _printException()
-                if (retry == 2):
-                    return -1
-    return _getAvgSpeed(results)
-
 if __name__ == "__main__":
+    nr_operations = 500
+    threads_per_node = 10
+    allBenchs = False
     if (len(sys.argv) == 1):
-        minibench(100, xrange(1, 10, 1))
-    elif (len(sys.argv) >= 3):
-        testruns = int(sys.argv[1])
+        allBenchs = True
+    elif (len(sys.argv) == 2):
+        nr_operations = int(sys.argv[1])
+    elif (len(sys.argv) == 3):
+        nr_operations = int(sys.argv[1])
+        threads_per_node = int(sys.argv[2])
+    elif (len(sys.argv) >= 4):
+        nr_operations = int(sys.argv[1])
+        threads_per_node = int(sys.argv[2])
         benchmarks = []
-        for i in xrange(2, min(11, len(sys.argv))):
+        for i in xrange(3, len(sys.argv)):
             if sys.argv[i] == 'all':
-                benchmarks = xrange(1, 10, 1)
+                allBenchs = True
             else:
                 benchmarks.append(int(sys.argv[i]))
-        minibench(testruns, benchmarks)
+    if allBenchs:
+        benchmarks = xrange(1, 19, 1)
+    minibench(nr_operations, threads_per_node, benchmarks)
