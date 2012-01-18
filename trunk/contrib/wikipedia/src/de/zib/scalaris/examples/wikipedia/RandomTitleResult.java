@@ -17,14 +17,42 @@ public class RandomTitleResult extends Result {
      * 
      * @param title
      *            the retrieved (random) page title
+     */
+    public RandomTitleResult(String title) {
+        super();
+        this.title = title;
+    }
+
+    /**
+     * Creates a new successful result with the given page title.
+     * 
+     * @param title
+     *            the retrieved (random) page title
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
     public RandomTitleResult(String title, String name, long time) {
-        super(name, time);
+        super();
         this.title = title;
+        addStat(name, time);
+    }
+    
+    /**
+     * Creates a new custom result.
+     * 
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     */
+    public RandomTitleResult(boolean success, String message,
+            boolean connectFailed) {
+        super(success, message, connectFailed);
+        title = "";
     }
     
     /**
@@ -43,7 +71,8 @@ public class RandomTitleResult extends Result {
      */
     public RandomTitleResult(boolean success, String message,
             boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed, name, time);
+        super(success, message, connectFailed);
         title = "";
+        addStat(name, time);
     }
 }

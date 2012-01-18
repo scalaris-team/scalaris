@@ -32,6 +32,21 @@ public class PageHistoryResult extends Result {
      *            the retrieved page
      * @param revisions
      *            the retrieved (short) revisions
+     */
+    public PageHistoryResult(Page page, List<ShortRevision> revisions) {
+        super();
+        this.page = page;
+        this.revisions = revisions;
+    }
+
+    /**
+     * Creates a successful result with an empty message and the given
+     * revisions.
+     * 
+     * @param page
+     *            the retrieved page
+     * @param revisions
+     *            the retrieved (short) revisions
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
@@ -39,9 +54,25 @@ public class PageHistoryResult extends Result {
      */
     public PageHistoryResult(Page page, List<ShortRevision> revisions,
             String name, long time) {
-        super(name, time);
+        super();
         this.page = page;
         this.revisions = revisions;
+        addStat(name, time);
+    }
+
+    /**
+     * Creates a new custom result.
+     * 
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     */
+    public PageHistoryResult(boolean success, String message,
+            boolean connectFailed) {
+        super(success, message, connectFailed);
     }
 
     /**
@@ -60,6 +91,7 @@ public class PageHistoryResult extends Result {
      */
     public PageHistoryResult(boolean success, String message,
             boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed, name, time);
+        super(success, message, connectFailed);
+        addStat(name, time);
     }
 }

@@ -28,17 +28,11 @@ public class Result {
     
     /**
      * Creates a successful result with an empty message.
-     * 
-     * @param name
-     *            the name of the operation (for the stats - see {@link #stats})
-     * @param time
-     *            time in milliseconds for this operation
      */
-    public Result(String name, long time) {
+    public Result() {
         this.success = true;
         this.message = "";
         this.connect_failed = false;
-        addStat(name, time);
     }
     
     /**
@@ -50,28 +44,23 @@ public class Result {
      *            the message to use
      * @param connectFailed
      *            whether the connection to the DB failed or not
-     * @param name
-     *            the name of the operation (for the stats - see {@link #stats})
-     * @param time
-     *            time in milliseconds for this operation
      */
-    public Result(boolean success, String message, boolean connectFailed, String name, long time) {
+    public Result(boolean success, String message, boolean connectFailed) {
         this.success = success;
         this.message = message;
         this.connect_failed = connectFailed;
-        addStat(name, time);
     }
 
     /**
      * Adds the time needed to retrieve the given page to the collected
      * statistics.
      * 
-     * @param title
-     *            the title of the page
-     * @param value
-     *            the number of milliseconds it took to retrieve the page
+     * @param name
+     *            the name of the operation
+     * @param time
+     *            time in milliseconds for this operation
      */
-    public void addStat(String title, long value) {
-        stats.put(title, value);
+    public void addStat(String name, long time) {
+        stats.put(name, time);
     }
 }

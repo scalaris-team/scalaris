@@ -14,6 +14,13 @@ public class SaveResult extends Result {
     
     /**
      * Creates a new successful result.
+     */
+    public SaveResult() {
+        super();
+    }
+    
+    /**
+     * Creates a new successful result.
      * 
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
@@ -21,7 +28,22 @@ public class SaveResult extends Result {
      *            time in milliseconds for this operation
      */
     public SaveResult(String name, long time) {
-        super(name, time);
+        super();
+        addStat(name, time);
+    }
+    
+    /**
+     * Creates a new custom result.
+     * 
+     * @param success
+     *            the success status
+     * @param message
+     *            the message to use
+     * @param connectFailed
+     *            whether the connection to the DB failed or not
+     */
+    public SaveResult(boolean success, String message, boolean connectFailed) {
+        super(success, message, connectFailed);
     }
     
     /**
@@ -39,6 +61,7 @@ public class SaveResult extends Result {
      *            time in milliseconds for this operation
      */
     public SaveResult(boolean success, String message, boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed, name, time);
+        super(success, message, connectFailed);
+        addStat(name, time);
     }
 }

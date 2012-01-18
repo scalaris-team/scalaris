@@ -430,7 +430,7 @@ public class ScalarisDataHandler {
             return getPageList2(connection,
                     getBackLinksPageListKey(title, nsObject), false, statName);
         } else {
-            return new PageListResult(new LinkedList<String>(), statName, 0);
+            return new PageListResult(new LinkedList<String>());
         }
     }
 
