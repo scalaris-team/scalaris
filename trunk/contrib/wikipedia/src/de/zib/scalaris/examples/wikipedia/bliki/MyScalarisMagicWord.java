@@ -15,12 +15,13 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 
 /**
  * Gets values for magic words not handled by {@link MyMagicWord} which need
@@ -190,17 +191,17 @@ public class MyScalarisMagicWord extends MyMagicWord {
          * Statistics / Entire wiki
          */
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
-            BigIntegerResult pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
+            ValueResult<BigInteger> pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
             model.addStats(pageCountResult.stats);
             if (pageCountResult.success) {
-                return model.formatStatisticNumber(rawNumber, pageCountResult.number);
+                return model.formatStatisticNumber(rawNumber, pageCountResult.value);
             }
         } else if (name.equals(MAGIC_NUMBER_ARTICLES)) {
-            BigIntegerResult pageCountResult = ScalarisDataHandler
+            ValueResult<BigInteger> pageCountResult = ScalarisDataHandler
                     .getArticleCount(model.connection);
             model.addStats(pageCountResult.stats);
             if (pageCountResult.success) {
-                return model.formatStatisticNumber(rawNumber, pageCountResult.number);
+                return model.formatStatisticNumber(rawNumber, pageCountResult.value);
             }
         } else if (name.equals(MAGIC_NUMBER_FILES)) {
             // we currently do not store files:
@@ -214,12 +215,12 @@ public class MyScalarisMagicWord extends MyMagicWord {
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
             String category = MyWikiModel.createFullPageName(
                     model.getCategoryNamespace(), parameter.trim());
-            BigIntegerResult catListResult = ScalarisDataHandler
+            ValueResult<BigInteger> catListResult = ScalarisDataHandler
                     .getPagesInCategoryCount(model.connection, category,
                             model.getNamespace());
             model.addStats(catListResult.stats);
             if (catListResult.success) {
-                return model.formatStatisticNumber(rawNumber, catListResult.number);
+                return model.formatStatisticNumber(rawNumber, catListResult.value);
             }
 //            {{NUMBERINGROUP:groupname}}
 //            {{NUMINGROUP:groupname}}

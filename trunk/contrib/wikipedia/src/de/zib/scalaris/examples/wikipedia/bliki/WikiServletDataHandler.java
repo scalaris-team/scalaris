@@ -15,15 +15,15 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.math.BigInteger;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import de.zib.scalaris.examples.wikipedia.BigIntegerResult;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
-import de.zib.scalaris.examples.wikipedia.PageListResult;
-import de.zib.scalaris.examples.wikipedia.RandomTitleResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -39,21 +39,21 @@ public interface WikiServletDataHandler<Connection> {
     /**
      * Gets the key to store {@link SiteInfo} objects at.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getSiteInfoKey();
     
     /**
      * Gets the key to store the (complete) list of pages at.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getPageListKey();
     
     /**
      * Gets the key to store the number of pages at.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getPageCountKey();
     
@@ -61,7 +61,7 @@ public interface WikiServletDataHandler<Connection> {
      * Gets the key to store the (complete) list of articles, i.e. pages in
      * the main namespace) at.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getArticleListKey();
     
@@ -69,7 +69,7 @@ public interface WikiServletDataHandler<Connection> {
      * Gets the key to store the number of articles, i.e. pages in the main
      * namespace, at.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getArticleCountKey();
     
@@ -83,7 +83,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getRevKey(String title, int id, final MyNamespace nsObject);
     
@@ -95,7 +95,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getPageKey(String title, final MyNamespace nsObject);
     
@@ -107,7 +107,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getRevListKey(String title, final MyNamespace nsObject);
     
@@ -119,7 +119,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getCatPageListKey(String title, final MyNamespace nsObject);
     
@@ -131,7 +131,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getCatPageCountKey(String title, final MyNamespace nsObject);
     
@@ -143,7 +143,7 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getTplPageListKey(String title, final MyNamespace nsObject);
     
@@ -155,23 +155,23 @@ public interface WikiServletDataHandler<Connection> {
      * @param nsObject
      *            the namespace for page title normalisation
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getBackLinksPageListKey(String title, final MyNamespace nsObject);
     
     /**
      * Gets the key to store the number of page edits.
      * 
-     * @return Scalaris key
+     * @return DB key
      */
     public String getStatsPageEditsKey();
     
-    
+
     /**
-     * Retrieves a page's history from Scalaris.
+     * Retrieves a page's history from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the page
      * @param nsObject
@@ -179,14 +179,15 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page history on success
      */
-    public PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject);
+    public PageHistoryResult getPageHistory(Connection connection,
+            String title, final MyNamespace nsObject);
 
     /**
      * Retrieves the current, i.e. most up-to-date, version of a page from
-     * Scalaris.
+     * the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the page
      * @param nsObject
@@ -194,13 +195,14 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page and revision on success
      */
-    public RevisionResult getRevision(Connection connection, String title, final MyNamespace nsObject);
+    public RevisionResult getRevision(Connection connection, String title,
+            final MyNamespace nsObject);
     
     /**
-     * Retrieves the given version of a page from Scalaris.
+     * Retrieves the given version of a page from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the page
      * @param id
@@ -210,34 +212,35 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page and revision on success
      */
-    public RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject);
+    public RevisionResult getRevision(Connection connection, String title,
+            int id, final MyNamespace nsObject);
     
     /**
-     * Retrieves a list of available pages from Scalaris.
+     * Retrieves a list of available pages from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPageList(Connection connection);
+    public ValueResult<List<String>> getPageList(Connection connection);
     
     /**
      * Retrieves a list of available articles, i.e. pages in the main
-     * namespace, from Scalaris.
+     * namespace, from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getArticleList(Connection connection);
+    public ValueResult<List<String>> getArticleList(Connection connection);
     
     /**
-     * Retrieves a list of pages in the given category from Scalaris.
+     * Retrieves a list of pages in the given category from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the category
      * @param nsObject
@@ -245,13 +248,14 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesInCategory(Connection connection, String title, final MyNamespace nsObject);
+    public ValueResult<List<String>> getPagesInCategory(Connection connection,
+            String title, final MyNamespace nsObject);
     
     /**
-     * Retrieves a list of pages using the given template from Scalaris.
+     * Retrieves a list of pages using the given template from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the template
      * @param nsObject
@@ -259,13 +263,14 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject);
+    public ValueResult<List<String>> getPagesInTemplate(Connection connection,
+            String title, final MyNamespace nsObject);
     
     /**
-     * Retrieves a list of pages linking to the given page from Scalaris.
+     * Retrieves a list of pages linking to the given page from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the page
      * @param nsObject
@@ -273,34 +278,35 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the page list on success
      */
-    public PageListResult getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject);
+    public ValueResult<List<String>> getPagesLinkingTo(Connection connection,
+            String title, final MyNamespace nsObject);
     
     /**
-     * Retrieves the number of available pages from Scalaris.
+     * Retrieves the number of available pages from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * 
      * @return a result object with the number of pages on success
      */
-    public BigIntegerResult getPageCount(Connection connection);
+    public ValueResult<BigInteger> getPageCount(Connection connection);
     
     /**
      * Retrieves the number of available articles, i.e. pages in the main
-     * namespace, from Scalaris.
+     * namespace, from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * 
      * @return a result object with the number of articles on success
      */
-    public BigIntegerResult getArticleCount(Connection connection);
+    public ValueResult<BigInteger> getArticleCount(Connection connection);
 
     /**
-     * Retrieves the number of pages in the given category from Scalaris.
+     * Retrieves the number of pages in the given category from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param title
      *            the title of the category
      * @param nsObject
@@ -308,30 +314,31 @@ public interface WikiServletDataHandler<Connection> {
      * 
      * @return a result object with the number of pages on success
      */
-    public BigIntegerResult getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject);
+    public ValueResult<BigInteger> getPagesInCategoryCount(Connection connection,
+            String title, final MyNamespace nsObject);
     
     /**
      * Retrieves the number of available articles, i.e. pages in the main
-     * namespace, from Scalaris.
+     * namespace, from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * 
      * @return a result object with the number of articles on success
      */
-    public BigIntegerResult getStatsPageEdits(Connection connection);
+    public ValueResult<BigInteger> getStatsPageEdits(Connection connection);
     
     /**
-     * Retrieves a random page title from Scalaris.
+     * Retrieves a random page title from the DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the DB
      * @param random
      *            the random number generator to use
      * 
      * @return a result object with the page list on success
      */
-    public RandomTitleResult getRandomArticle(Connection connection, Random random);
+    public ValueResult<String> getRandomArticle(Connection connection, Random random);
     
     /**
      * Saves or edits a page with the given parameters
