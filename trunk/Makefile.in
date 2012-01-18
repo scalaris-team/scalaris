@@ -227,7 +227,7 @@ python-bench: compile python
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "pbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
+	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "pbench_boot" stop ; \
 	./bin/scalarisctl -n "pbench_node1" stop ; \
 	./bin/scalarisctl -n "pbench_node2" stop ; \
@@ -305,7 +305,7 @@ python3-bench: compile python3
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "p3bench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
-	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
+	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "p3bench_boot" stop ; \
 	./bin/scalarisctl -n "p3bench_node1" stop ; \
 	./bin/scalarisctl -n "p3bench_node2" stop ; \
