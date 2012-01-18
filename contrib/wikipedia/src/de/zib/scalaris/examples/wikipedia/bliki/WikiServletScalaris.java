@@ -444,6 +444,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
+    public ValueResult<String> getDbVersion(Connection connection) {
+        return ScalarisDataHandler.getDbVersion(connection);
+    }
+
+    @Override
     public PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPageHistory(connection, title, nsObject);
     }

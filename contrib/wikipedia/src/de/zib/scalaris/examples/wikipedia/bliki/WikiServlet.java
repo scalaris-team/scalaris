@@ -1200,6 +1200,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String title = "Special:Version";
         page.setPageHeading("Version");
         page.setTitle(title);
+        String dbVersionStr;
+        do {
+            ValueResult<String> dbVersion = getDbVersion(connection);
+            if (dbVersion.success) {
+                dbVersionStr = dbVersion.value;
+            } else {
+                dbVersionStr = "n/a";
+            }
+        } while(false);
 
         StringBuilder content = new StringBuilder();
         content.append("<h2 id=\"mw-version-license\"> <span class=\"mw-headline\" id=\"License\">License</span></h2>\n");
@@ -1234,7 +1243,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
-        content.append("   <td>???</td>\n"); // TODO: get Scalaris version
+        content.append("   <td>" + dbVersionStr + "</td>\n"); // TODO: get Scalaris version
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td>Server</td>\n");

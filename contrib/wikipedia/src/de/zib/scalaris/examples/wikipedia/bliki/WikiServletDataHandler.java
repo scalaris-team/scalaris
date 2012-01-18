@@ -165,7 +165,17 @@ public interface WikiServletDataHandler<Connection> {
      * @return DB key
      */
     public String getStatsPageEditsKey();
+
     
+    /**
+     * Retrieves the back-ends version string.
+     * 
+     * @param connection
+     *            the connection to the DB
+     * 
+     * @return a result object with the version string on success
+     */
+    public ValueResult<String> getDbVersion(Connection connection);
 
     /**
      * Retrieves a page's history from the DB.

@@ -33,9 +33,11 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.Transaction.ResultList;
 import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -189,6 +191,38 @@ public class ScalarisDataHandler {
     public final static String getStatsPageEditsKey() {
         return "stats:pageedits";
     }
+
+    
+    /**
+     * Retrieves the Scalaris version string.
+     * 
+     * @param connection
+     *            the connection to the DB
+     * 
+     * @return a result object with the version string on success
+     */
+    public static ValueResult<String> getDbVersion(Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "Scalaris version";
+        if (connection == null) {
+            return new ValueResult<String>(false, "no connection to Scalaris",
+                    true, statName, System.currentTimeMillis() - timeAtStart);
+        }
+
+        String node = connection.getRemote().toString();
+        try {
+            ScalarisVM scalarisVm = new ScalarisVM(node);
+            String version = scalarisVm.getVersion();
+            return new ValueResult<String>(version, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        } catch (ConnectionException e) {
+            return new ValueResult<String>(false, "no connection to Scalaris node \"" + node + "\"",
+                    true, statName, System.currentTimeMillis() - timeAtStart);
+        } catch (UnknownException e) {
+            return new ValueResult<String>(false, "unknown exception reading Scalaris version from node \"" + node + "\"",
+                    true, statName, System.currentTimeMillis() - timeAtStart);
+        }
+    }
     
     /**
      * Retrieves a page's history from Scalaris.
@@ -211,9 +245,7 @@ public class ScalarisDataHandler {
                     true, statName, System.currentTimeMillis() - timeAtStart);
         }
         
-        TransactionSingleOp scalaris_single;
-
-        scalaris_single = new TransactionSingleOp(connection);
+        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         requests.addRead(getPageKey(title, nsObject)).addRead(getRevListKey(title, nsObject));
         
