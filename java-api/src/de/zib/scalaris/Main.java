@@ -44,43 +44,36 @@ public class Main {
      * <code>
      * > java -jar scalaris.jar --help
      * usage: scalaris [Options]
-     *  -h,--help                                         print this message
-     *  -v,--verbose                                      print verbose
-     *                                                    information, e.g. the
-     *                                                    properties read
-     *  -lh,--localhost                                   gets the local host's
-     *                                                    name as known to Java
-     *                                                    (for debugging
-     *                                                    purposes)
-     *  -b,--minibench <[runs]> <[benchmarks]>            run selected mini
-     *                                                    benchmark(s)
-     *                                                    [1|...|9|all] (default:
-     *                                                    all benchmarks, 100
-     *                                                    test runs)
-     *  -r,--read <key>                                   read an item
-     *  -w,--write <key> <value>                          write an item
-     *     --test-and-set <key> <old_value> <new_value>   atomic test and set,
-     *                                                    i.e. write <key> to
-     *                                                    <new_value> if the
-     *                                                    current value is
-     *                                                    <old_value>
-     *  -d,--delete <key> <[timeout]>                     delete an item (default
-     *                                                    timeout: 2000ms)
-     *                                                    WARNING: This function
-     *                                                    can lead to
-     *                                                    inconsistent data (e.g.
-     *                                                    deleted items can
-     *                                                    re-appear). Also when
-     *                                                    re-creating an item the
-     *                                                    version before the
-     *                                                    delete can re-appear.
-     *  -p,--publish <topic> <message>                    publish a new message
-     *                                                    for the given topic
-     *  -s,--subscribe <topic> <url>                      subscribe to a topic
-     *  -u,--unsubscribe <topic> <url>                    unsubscribe from a
-     *                                                    topic
-     *  -g,--getsubscribers <topic>                       get subscribers of a
-     *                                                    topic
+     *  -h,--help                                   print this message
+     *  -v,--verbose                                print verbose information,
+     *                                              e.g. the properties read
+     *  -lh,--localhost                             gets the local host's name as
+     *                                              known to Java (for debugging
+     *                                              purposes)
+     *  -b,--minibench <[ops]> <[tpn]> <[benchs]>   run selected mini
+     *                                              benchmark(s) [1|...|18|all]
+     *                                              (default: all benchmarks, 500
+     *                                              operations, 10 threads per
+     *                                              Scalaris node)
+     *  -r,--read <key>                             read an item
+     *  -w,--write <key> <value>                    write an item
+     *     --test-and-set <key> <old> <new>         atomic test and set, i.e.
+     *                                              write <key> to <new> if the
+     *                                              current value is <old>
+     *  -d,--delete <key> <[timeout]>               delete an item (default
+     *                                              timeout: 2000ms)
+     *                                              WARNING: This function can
+     *                                              lead to inconsistent data
+     *                                              (e.g. deleted items can
+     *                                              re-appear). Also when
+     *                                              re-creating an item the
+     *                                              version before the delete can
+     *                                              re-appear.
+     *  -p,--publish <topic> <message>              publish a new message for the
+     *                                              given topic
+     *  -s,--subscribe <topic> <url>                subscribe to a topic
+     *  -u,--unsubscribe <topic> <url>              unsubscribe from a topic
+     *  -g,--getsubscribers <topic>                 get subscribers of a topic
      * </code>
      * </pre>
      *
@@ -113,21 +106,23 @@ public class Main {
             int nrOperations = 500;
             int threadsPerNode = 10;
             final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
+            boolean all = false;
             if (optionValues != null) {
                 checkArguments(optionValues, 3, options, "b");
                 nrOperations = Integer.parseInt(optionValues[0]);
                 threadsPerNode = Integer.parseInt(optionValues[1]);
-                for (int i = 2; i < Math.min(10, optionValues.length); ++i) {
+                for (int i = 2; i < Math.min(20, optionValues.length); ++i) {
                     final String benchmarks_str = optionValues[i];
                     if (benchmarks_str.equals("all")) {
-                        for (int j = 1; j <= 18; ++j) {
-                            benchmarks.add(j);
-                        }
+                        all = true;
                     } else {
                         benchmarks.add(Integer.parseInt(benchmarks_str));
                     }
                 }
             } else {
+                all = true;
+            }
+            if (all) {
                 for (int i = 1; i <= 18; ++i) {
                     benchmarks.add(i);
                 }
@@ -382,8 +377,8 @@ public class Main {
 
         final Option test_and_set = new Option(null, "test-and-set", true,
                 "atomic test and set, i.e. write <key> to " +
-                "<new_value> if the current value is <old_value>");
-        test_and_set.setArgName("key> <old_value> <new_value");
+                "<new> if the current value is <old>");
+        test_and_set.setArgName("key> <old> <new");
         test_and_set.setArgs(3);
         test_and_set.setOptionalArg(true);
         group.addOption(test_and_set);
@@ -422,9 +417,9 @@ public class Main {
         delete.setOptionalArg(true);
         group.addOption(delete);
 
-        final Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|9|all] (default: all benchmarks, 100 test runs)");
-        bench.setArgName("[iterations]> <[threads per node]> <[benchmarks]");
-        bench.setArgs(10);
+        final Option bench = new Option("b", "minibench", true, "run selected mini benchmark(s) [1|...|18|all] (default: all benchmarks, 500 operations, 10 threads per Scalaris node)");
+        bench.setArgName("[ops]> <[tpn]> <[benchs]");
+        bench.setArgs(20);
         bench.setOptionalArg(true);
         group.addOption(bench);
 

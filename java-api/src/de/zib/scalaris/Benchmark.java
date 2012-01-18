@@ -63,11 +63,6 @@ public class Benchmark {
     protected static final int testRuns = 1;
 
     /**
-     * Number of parallel tests per test run, i.e. number of parallel clients.
-     */
-    protected static int parallelRuns;
-
-    /**
      * Default minimal benchmark.
      *
      * Tests some strategies for writing key/value pairs to scalaris:
@@ -77,7 +72,8 @@ public class Benchmark {
      * <li>writing {@link String} objects (random data, size =
      * {@link #BENCH_DATA_SIZE})</li>
      * </ol>
-     * each <tt>testruns</tt> times
+     * each with the given number of consecutive operations and parallel
+     * threads per Scalaris node,
      * <ul>
      * <li>first using a new {@link Transaction} or {@link TransactionSingleOp}
      * for each test,</li>
@@ -92,12 +88,12 @@ public class Benchmark {
      * @param threadsPerNode
      *            number of threads to spawn for each existing Scalaris node
      * @param benchmarks
-     *            the benchmarks to run
+     *            the benchmarks to run (1-18 or -1 for all benchmarks)
      */
     public static void minibench(final int operations, final int threadsPerNode, final Set<Integer> benchmarks) {
         final ConnectionFactory cf = ConnectionFactory.getInstance();
         final List<PeerNode> nodes = cf.getNodes();
-        parallelRuns = nodes.size() * threadsPerNode;
+        final int parallelRuns = nodes.size() * threadsPerNode;
         // set a connection policy that goes through the available nodes in a round-robin fashion:
         cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
         System.out.println("Number of available nodes: " + nodes.size());
@@ -197,6 +193,15 @@ public class Benchmark {
                 parallelRuns);
     }
 
+    /**
+     * Performs a benchmark writing objects using a new TransactionSingleOp
+     * object for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T>
+     *            type to bench on
+     */
     protected static final class TransSingleOpBench1<T> extends BenchRunnable<T> {
         public TransSingleOpBench1(final String key, final T value, final int operations) {
             super(key, value, operations);
@@ -214,6 +219,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a new TransactionSingleOp but
+     * re-using a single connection for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransSingleOpBench2<T> extends BenchRunnable2<T> {
         public TransSingleOpBench2(final String key, final T value, final int operations) {
             super(key, value, operations);
@@ -230,6 +243,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a single TransactionSingleOp
+     * object for all tests.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransSingleOpBench3<T> extends BenchRunnable<T> {
         TransactionSingleOp transaction;
 
@@ -257,6 +278,13 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a new Transaction for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransBench1<T> extends BenchRunnable<T> {
         public TransBench1(final String key, final T value, final int operations) {
             super(key, value, operations);
@@ -275,6 +303,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a new Transaction but re-using a
+     * single connection for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransBench2<T> extends BenchRunnable2<T> {
         public TransBench2(final String key, final T value, final int operations) {
             super(key, value, operations);
@@ -292,6 +328,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a single Transaction object
+     * for all tests.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransBench3<T> extends BenchRunnable<T> {
         Transaction transaction;
 
@@ -320,6 +364,15 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing integer numbers on a single key and
+     * increasing them.
+     *
+     * Provides convenience methods for the full increment benchmark
+     * implementations.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static abstract class TransIncrementBench extends BenchRunnable<Object> {
         public TransIncrementBench(final String key, final Object value, final int operations) {
             super(key, value, operations);
@@ -344,6 +397,12 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing integer numbers on a single key and
+     * increasing them using a new Transaction for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransIncrementBench1 extends TransIncrementBench {
         public TransIncrementBench1(final String key, final Object value, final int operations) {
             super(key, value, operations);
@@ -357,6 +416,13 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing integer numbers on a single key and
+     * increasing them using a new Transaction but re-using a single connection
+     * for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransIncrementBench2 extends TransIncrementBench {
         protected Connection connection;
 
@@ -381,6 +447,12 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark writing objects using a single Transaction object
+     * for all tests.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransIncrementBench3 extends TransIncrementBench {
         Transaction transaction;
 
@@ -404,6 +476,15 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark reading X values and overwriting them afterwards
+     * inside a transaction. Provides convenience methods for the full read-x,
+     * write-x benchmark implementations.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static abstract class TransReadXWriteXBench<T> extends BenchRunnable<T> {
         private final String[] keys;
         private final T[] valueWrite;
@@ -425,8 +506,7 @@ public class Benchmark {
         @SuppressWarnings("unchecked")
         @Override
         protected void pre_init() throws Exception {
-            final T[] valueInit;
-            valueInit = (T[]) Array.newInstance(value.getClass(), keys.length);
+            final T[] valueInit = (T[]) Array.newInstance(value.getClass(), keys.length);
             for (int i = 0; i < keys.length; ++i) {
                 valueInit[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
             }
@@ -483,6 +563,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark reading 5 values and overwriting them afterwards
+     * inside a transaction using a new Transaction for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransRead5Write5Bench1<T> extends TransReadXWriteXBench<T> {
         public TransRead5Write5Bench1(final String key, final T value, final int operations)
                 throws IllegalArgumentException, SecurityException,
@@ -499,6 +587,15 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark reading 5 values and overwriting them afterwards
+     * inside a transaction using a new Transaction but re-using a single
+     * connection for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransRead5Write5Bench2<T> extends TransReadXWriteXBench<T> {
         protected Connection connection;
 
@@ -526,6 +623,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark reading 5 values and overwriting them afterwards
+     * inside a transaction using a single Transaction object for all tests.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @param <T> type to bench on
+     */
     protected static final class TransRead5Write5Bench3<T> extends TransReadXWriteXBench<T> {
         Transaction transaction;
 
@@ -552,6 +657,14 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark adding values to a list inside a transaction.
+     *
+     * Provides convenience methods for the full append-to-list benchmark
+     * implementations.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static abstract class TransAppendToListBench extends BenchRunnable<String> {
         private final List<String> valueInit;
 
@@ -570,30 +683,34 @@ public class Benchmark {
         protected void pre_init(final int j) throws Exception {
             final Transaction tx_init = new Transaction();
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addWrite(key + j, valueInit).addCommit();
+            reqs.addWrite(key + '_' + j, valueInit).addCommit();
             final Transaction.ResultList results = tx_init.req_list(reqs);
             results.processWriteAt(0);
             tx_init.closeConnection();
         }
 
         protected void operation(final Transaction tx, final int j) throws Exception {
-            Transaction.RequestList reqs;
-            reqs = new Transaction.RequestList();
-            reqs.addAddDelOnList(key + j, Arrays.asList(value), new ArrayList<String>(0));
+            final Transaction.RequestList reqs = new Transaction.RequestList();
+            reqs.addAddDelOnList(key + '_' + j, Arrays.asList(value), new ArrayList<String>(0));
             reqs.addCommit();
 //            // read old list into the transaction
-//            final List<String> list = tx.read(key + j).stringListValue();
+//            final List<String> list = tx.read(key + '_' + j).stringListValue();
 //
 //            // write new list ...
-//            reqs = new Transaction.RequestList();
 //            list.add(value);
-//            reqs.addWrite(key + j, value).addCommit();
+//            reqs.addWrite(key + '_' + j, list).addCommit();
             final Transaction.ResultList results = tx.req_list(reqs);
 //            results.processWriteAt(0);
             results.processAddDelOnListAt(0);
         }
     }
 
+    /**
+     * Performs a benchmark adding values to a list inside a transaction using a
+     * new Transaction for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransAppendToListBench1 extends TransAppendToListBench {
         public TransAppendToListBench1(final String key, final String value, final int operations)
                 throws IllegalArgumentException, SecurityException,
@@ -610,6 +727,12 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark adding values to a list inside a transaction using a
+     * new Transaction but re-using a single connection for each test.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransAppendToListBench2 extends TransAppendToListBench {
         protected Connection connection;
 
@@ -637,6 +760,12 @@ public class Benchmark {
         }
     }
 
+    /**
+     * Performs a benchmark adding values to a list inside a transaction using a
+     * single Transaction object for all tests.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     */
     protected static final class TransAppendToListBench3 extends TransAppendToListBench {
         Transaction transaction;
 
@@ -671,7 +800,7 @@ public class Benchmark {
      *
      * @param <T> type of the value to write
      */
-    private abstract static class BenchRunnable<T> extends Thread {
+    protected abstract static class BenchRunnable<T> extends Thread {
         /**
          * Tells the thread to stop.
          */
@@ -1005,8 +1134,10 @@ public class Benchmark {
                 if (benchmarks.contains(test + firstBenchId)) {
                     final int i = test % results.length;
                     final int j = test / results.length;
-                    results[i][j] =
-                        runBench(operations, getRandom(BENCH_DATA_SIZE, testTypes[j]), testGroup + "_" + testTypesStr[j] + "_" + (i+1), testBench[i]);
+                    results[i][j] = runBench(operations,
+                            getRandom(BENCH_DATA_SIZE, testTypes[j]),
+                            testGroup + "_" + testTypesStr[j] + "_" + (i + 1),
+                            testBench[i], parallelRuns);
                     TimeUnit.SECONDS.sleep(1);
                 }
             } catch (final Exception e) {
@@ -1017,8 +1148,7 @@ public class Benchmark {
     }
 
     /**
-     * Performs a benchmark writing objects using a new
-     * {@link TransactionSingleOp} object for each test.
+     * Runs the given benchmark.
      *
      * @param <T>
      *            type of the value to use
@@ -1029,6 +1159,10 @@ public class Benchmark {
      * @param name
      *            the name of the benchmark (will be used as part of the key and
      *            must therefore be unique)
+     * @param clazz
+     *            bench runnable class
+     * @param parallelRuns
+     *            number of test runs (accumulates results over all test runs)
      *
      * @return the number of achieved transactions per second
      * @throws NoSuchMethodException
@@ -1039,11 +1173,13 @@ public class Benchmark {
      * @throws IllegalArgumentException
      */
     @SuppressWarnings("unchecked")
-    protected static <T> long runBench(final int operations, final T value,
+    protected static <T> long runBench(
+            final int operations,
+            final T value,
             final String name,
-            @SuppressWarnings("rawtypes") final Class<? extends BenchRunnable> clazz)
-            throws IllegalArgumentException, SecurityException,
-            InstantiationException, IllegalAccessException,
+            @SuppressWarnings("rawtypes") final Class<? extends BenchRunnable> clazz,
+            final int parallelRuns) throws IllegalArgumentException,
+            SecurityException, InstantiationException, IllegalAccessException,
             InvocationTargetException, NoSuchMethodException {
         final String key = benchTime + name;
         final long[] results = new long[testRuns];
