@@ -1243,7 +1243,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
-        content.append("   <td>" + dbVersionStr + "</td>\n"); // TODO: get Scalaris version
+        content.append("   <td>" + dbVersionStr + "</td>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td>Server</td>\n");

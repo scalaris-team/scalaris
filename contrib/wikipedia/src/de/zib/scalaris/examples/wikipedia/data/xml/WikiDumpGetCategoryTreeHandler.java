@@ -461,7 +461,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             // no need to drop table - we set temporary tables to be in-memory only
 //            db.exec("DROP TABLE currentPages;");
 
-            final TreeSet<String> pages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+            // note: need to sort case-sensitively (wiki is only case-insensitive at the first char)
+            final TreeSet<String> pages = new TreeSet<String>();
             if (normalised) {
                 pages.addAll(normalisedPages);
             } else {
