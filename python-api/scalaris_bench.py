@@ -614,8 +614,7 @@ def _getRandom(size, mytype):
     if mytype == 'int':
         return random.randint(0, 2147483647)
     elif mytype == 'string' or mytype == 'str':
-        return ''.join(random.choice(string.ascii_letters + string.digits + string.whitespace) for _x in xrange(size))
-        #return ''.join(random.choice(string.printable) for _x in xrange(size))
+        return ''.join(random.choice(string.printable) for _x in xrange(size))
     elif mytype == 'binary':
         return bytearray(random.randrange(0, 256) for _x in xrange(size))
 
