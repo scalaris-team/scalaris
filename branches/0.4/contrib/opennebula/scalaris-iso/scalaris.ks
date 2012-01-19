@@ -23,13 +23,13 @@ authconfig
 rootfiles
 
 # for scalaris
-scalaris-svn
-ruby-scalaris-svn
+scalaris
+ruby-scalaris
 screen
 
 # for manager interface
-scalaris-svn-one-manager
-scalaris-svn-one-client
+scalaris-one-manager
+scalaris-one-client
 ruby
 rubygem-oca
 rubygem-sequel
