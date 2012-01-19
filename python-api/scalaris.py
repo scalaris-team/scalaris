@@ -58,6 +58,8 @@ class JSONConnection(object):
                   'params': params,
                   'id': 0}
         try:
+            data = None
+            response = None
             # use compact JSON encoding:
             params_json = json.dumps(params2, separators=(',',':'))
             headers = {"Content-type": "application/json; charset=utf-8"}
@@ -65,9 +67,9 @@ class JSONConnection(object):
             self._conn.request("POST", path, urllib.quote(params_json), headers)
             response = self._conn.getresponse()
             #print response.status, response.reason
-            if (response.status < 200 or response.status >= 300):
-                raise ConnectionError(response)
             data = response.read().decode('utf-8')
+            if (response.status < 200 or response.status >= 300):
+                raise ConnectionError(data, response = response)
             response_json = json.loads(data)
             return response_json['result']
         except httplib.BadStatusLine as instance:
@@ -76,7 +78,7 @@ class JSONConnection(object):
             if retry_if_bad_status:
                 return self.call(function, params, path = path, retry_if_bad_status = False)
             else:
-                raise ConnectionError(instance)
+                raise ConnectionError(data, response = response, error = instance)
         except ConnectionError:
             #print 'HTTP STATUS:', response.status, response.reason, params_json
             self.close()
@@ -84,7 +86,7 @@ class JSONConnection(object):
         except Exception as instance:
             #print 'HTTP STATUS:', response.status, response.reason, params_json
             self.close()
-            raise ConnectionError(instance)
+            raise ConnectionError(data, response = response, error = instance)
 
     @staticmethod
     def encode_value(value):
@@ -400,10 +402,19 @@ class ConnectionError(ScalarisError):
     a connection does not exist or has been disconnected.
     """
     
-    def __init__(self, raw_result):
+    def __init__(self, raw_result, response = None, error = None):
         self.raw_result = raw_result
+        self.response = response
+        self.error = error
     def __str__(self):
-        return repr(self.raw_result)
+        result_str = ''
+        if self.response is not None:
+            result_str += 'status: ' + str(self.response.status)
+            result_str += ', reason: ' + self.response.reason + '\n'
+        if self.error is not None:
+            result_str += 'error: ' + repr(self.error) + '\n'
+        result_str += 'data: ' + repr(self.raw_result)
+        return result_str
 
 class KeyChangedError(ScalarisError):
     """
