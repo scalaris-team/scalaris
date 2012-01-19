@@ -1,0 +1,48 @@
+<html>
+<head>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
+<title>Control Panel</title>
+<style type="text/css">
+table { width:100%; margin-top:20%; margin-left:20%; border-spacing:50px}
+td { vertical-align:top; overflow:hidden; }
+</style>
+</head>
+<body>
+
+<table>
+<tr>
+  <td>
+    <form action="/scalaris" method="post">
+      <div style="margin:0;padding:0;display:inline">
+        <input name="_method" type="hidden" value="post" />
+      </div>
+      Create Scalaris
+      <input id="submit" name="commit" type="submit" value="Go" />
+    </form>
+  </td>
+  <td>
+    <form action="/hadoop" method="post">
+      <div style="margin:0;padding:0;display:inline">
+        <input name="_method" type="hidden" value="post" />
+      </div>
+      Create Hadoop
+      <input id="submit" name="commit" type="submit" value="Go" />
+    </form>
+  </td>
+</tr>
+</table>
+<fieldset style="border: 1px black solid; padding-bottom: 0px">
+<legend>Destroy Cluster</legend>
+<form action="/destroy" method="post">
+  <div style="margin:0;padding:0;display:inline">
+    <input name="_method" type="hidden" value="post" />
+  </div>
+  <label for="user">Manager-URL</label>:
+  <input id="url" name="url" size="30" type="text" value="http://192.0.0.0:4567/" />
+  <input id="submit" name="commit" type="submit" value="Go" />
+</form>
+</fieldset>
+
+<marquee direction=left scrolldelay="10"> The 90s called and they want their web design back. </marquee>
+</body>
+</html>
