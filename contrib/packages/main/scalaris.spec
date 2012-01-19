@@ -1,11 +1,10 @@
 # norootforbuild
 
-%define pkg_version 1
+%define pkg_version 0.4.0
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
-Name:           scalaris-svn
-Conflicts:      scalaris
+Name:           scalaris
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
@@ -13,7 +12,7 @@ License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
-Source99:       scalaris-svn-rpmlintrc
+Source99:       scalaris-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
