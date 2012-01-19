@@ -22,6 +22,8 @@ sed -e "s/AC_INIT(scalaris, .*, schuett@zib.de)/AC_INIT(scalaris, ${VERSION}, sc
     -i configure.ac
 sed -e "s/public static final String version = \".*\";/public static final String version = \"${VERSION}\";/g" \
     -i contrib/wikipedia/src/de/zib/scalaris/examples/wikipedia/bliki/WikiServlet.java
+sed -e "s/version='.*',/version='${VERSION}',/g" \
+    -i python-api/setup.py
 echo "done"
 
 echo "Creating configure script"
