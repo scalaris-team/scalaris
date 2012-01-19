@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='scalaris',
-      version='0.3.0svn',
+      version='0.4.0',
       description='Scalaris python bindings',
       author='Nico Kruber',
       author_email='kruber@zib.de',
