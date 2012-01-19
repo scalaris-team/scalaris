@@ -33,7 +33,7 @@ fi
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder=${folder}/contrib/packages/opennebula
-  sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
+  sed -e "s/%define pkg_version .*/%define pkg_version ${rpmversion}/g" \
       < ${sourcefolder}/scalaris-one.spec     > ./scalaris-one.spec
   result=$?
 fi
