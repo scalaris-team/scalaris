@@ -5,8 +5,7 @@ hadoop-0.20-secondarynamenode
 hadoop-0.20-jobtracker 
 hadoop-0.20-tasktracker 
 hadoop-pig
-sun-java6-jre 
-sun-java6-bin 
+openjdk-6-jre-headless
 hue-common 
 hue-filebrowser 
 hue-jobbrowser 
@@ -16,11 +15,6 @@ libsasl2-2
 openssh-server
 less
 vim
-libboost-program-options1.42.0
-libboost-system1.42.0
-libboost-thread1.42.0
-libfuse2
-fuse-utils
 screen
 dnsmasq
 libfrontier-rpc-perl
@@ -40,3 +34,4 @@ gnuplot
 ganglia-monitor
 gmetad
 ganglia-webfrontend
+xtreemfs-client

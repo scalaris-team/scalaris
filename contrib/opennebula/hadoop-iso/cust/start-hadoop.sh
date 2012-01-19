@@ -20,7 +20,7 @@ fi
 source /root/context.sh
 
 echo "nameserver $HADOOP_MASTER" > /etc/resolv.conf
-/var/lib/sc-manager/start-manager.sh
+/usr/lib/scalaris/contrib/opennebula/start-manager.sh
 if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   /etc/init.d/dnsmasq start
   /usr/bin/dnsupdate-server.pl &
@@ -41,6 +41,7 @@ sed -i "s/@HDFS_MASTER@/$HADOOP_MASTER/g" $HADOOP_DIR/core-site.xml
 sed -i "s/@MAPRED_MASTER@/$HADOOP_MASTER/g" $HADOOP_DIR/mapred-site.xml
 sed -i "s/@MAPRED_MASTER@/$HADOOP_MASTER/g" /etc/hue/hue.ini
 sed -i "s/@HDFS_MASTER@/$HADOOP_MASTER/g" /etc/hue/hue.ini
+sed -i "s/@GANGLIA_MASTER@/$HADOOP_MASTER/g" $HADOOP_DIR/hadoop-metrics.properties
 #sed -i "s/hdfs:\/\/localhost:8020/file:\/\/\/mnt\/xtreemfs/" /etc/hadoop/conf/core-site.xml
 
 
@@ -87,5 +88,14 @@ if [ "x$HADOOP_FIRST" == "xtrue" ]; then
   /etc/init.d/gmetad start
   /etc/init.d/apache2 start
 fi
+
+
+#copy random access log into hdfs
+sleep 30
+cd /root
+wget http://10.0.0.1/bzcmaier/random_access_log.bz2
+bunzip2 random_access_log.bz2
+hadoop fs -mkdir /access_logs
+hadoop fs -copyFromLocal random_access_log /access_logs/access_log
 
 exit 0
