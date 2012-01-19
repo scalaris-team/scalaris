@@ -18,6 +18,7 @@ gem 'json', '>=1.4.1'
 require 'json'
 require 'net/http'
 require 'base64'
+require 'open-uri'
 
 module InternalScalarisSimpleError
   attr_reader :raw_result
@@ -178,11 +179,11 @@ module Scalaris
       start
       req = Net::HTTP::Post.new(DEFAULT_PATH)
       req.add_field('Content-Type', 'application/json; charset=utf-8')
-      req.body =  {
+      req.body = URI::encode({
         :jsonrpc => :'2.0',
         :method => function,
         :params => params,
-        :id => 0 }.to_json({:ascii_only => true})
+        :id => 0 }.to_json({:ascii_only => true}))
       begin
         res = @conn.request(req)
         if res.is_a?(Net::HTTPSuccess)
