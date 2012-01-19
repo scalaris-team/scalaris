@@ -22,6 +22,8 @@
 
 -export([start_link/0, init/1, check_config/0]).
 
+-include("yaws.hrl").
+
 -spec start_link() -> {ok, Pid::pid()} | ignore |
                       {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link() ->
@@ -34,6 +36,13 @@ start_link() ->
     _ = api_json_tx:module_info(),
     Id = io_lib:format("yaws@~p", [node()]),
     Docroot = config:read(docroot),
+    AuthDirs = case config:read(yaws_auth) of
+                   UserPwds = [_|_] -> [#auth{dir = "/",
+                                              docroot = Docroot,
+                                              realm = "Scalaris Web Interface",
+                                              users = UserPwds}];
+                   _                -> []
+               end,
     GconfList = [{max_connections, 800},
                  {logdir, config:read(log_path)},
                  {id, Id}
@@ -43,6 +52,7 @@ start_link() ->
                  {listen, {0,0,0,0}},
                  {allowed_scripts, [yaws]},
                  {partial_post_size, config:read(yaws_max_post_data)},
+                 {authdirs, AuthDirs},
                  {flags, [{access_log, false}]} % {deflate, true}
                 ],
 
@@ -86,6 +96,14 @@ check_config() ->
     config:cfg_is_string(docroot) and
     config:cfg_is_string(log_path) and
     config:cfg_is_port(yaws_port) and
+    config:cfg_is_list(yaws_auth,
+                       fun(X) ->
+                               case X of
+                                   {User, Password} when is_list(User)
+                                     andalso is_list(Password) -> true;
+                                   _ -> false
+                               end
+                       end, "{\"User\", \"Password\"}") and
 
     case config:read(yaws_max_post_data) of
         nolimit -> true;
