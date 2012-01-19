@@ -13,7 +13,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import httplib, urlparse, base64
+import httplib, urlparse, base64, urllib
 import os, threading, numbers
 from datetime import datetime, timedelta
 try: import simplejson as json
@@ -61,9 +61,8 @@ class JSONConnection(object):
             # use compact JSON encoding:
             params_json = json.dumps(params2, separators=(',',':'))
             headers = {"Content-type": "application/json; charset=utf-8"}
-            # no need to quote - we already encode to json:
-            #self._conn.request("POST", path, urllib.quote(params_json), headers)
-            self._conn.request("POST", path, params_json, headers)
+            # note: we need to quote, e.g. if a '%' is in the value string:
+            self._conn.request("POST", path, urllib.quote(params_json), headers)
             response = self._conn.getresponse()
             #print response.status, response.reason
             if (response.status < 200 or response.status >= 300):
