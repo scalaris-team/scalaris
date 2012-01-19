@@ -62,10 +62,10 @@ def minibench(operations, threads_per_node, benchmarks):
                'TransactionSingleOp.write(string, string)']
     test_bench = [TransSingleOpBench1, TransSingleOpBench2, TransSingleOpBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
-    testGroup = 'transsinglebench';
+    test_group = 'transsinglebench';
     results = _getResultArray(rows, columns)
     _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-            test_types_str, test_bench, testGroup, 1, operations, parallel_runs)
+            test_types_str, test_bench, test_group, 1, operations, parallel_runs)
 
     print '-----'
     print 'Benchmark of scalaris.Transaction:'
@@ -75,10 +75,10 @@ def minibench(operations, threads_per_node, benchmarks):
                'Transaction.write(string, string)']
     test_bench = [TransBench1, TransBench2, TransBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
-    testGroup = 'transbench';
+    test_group = 'transbench';
     results = _getResultArray(rows, columns)
     _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-            test_types_str, test_bench, testGroup, 1, operations, parallel_runs)
+            test_types_str, test_bench, test_group, 1, operations, parallel_runs)
 
     print '-----'
     print 'Benchmark incrementing an integer key (read+write):'
@@ -87,10 +87,10 @@ def minibench(operations, threads_per_node, benchmarks):
     columns = ['Transaction.read(string) + Transaction.write(string, int)']
     test_bench = [TransIncrementBench1, TransIncrementBench2, TransIncrementBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
-    testGroup = 'transbench_inc';
+    test_group = 'transbench_inc';
     results = _getResultArray(rows, columns)
     _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-            test_types_str, test_bench, testGroup, 7, operations, parallel_runs)
+            test_types_str, test_bench, test_group, 7, operations, parallel_runs)
 
     print '-----'
     print 'Benchmark read 5 + write 5:'
@@ -100,10 +100,10 @@ def minibench(operations, threads_per_node, benchmarks):
                'Transaction.read(string) + Transaction.write(string, string)']
     test_bench = [TransRead5Write5Bench1, TransRead5Write5Bench2, TransRead5Write5Bench3]
     rows = ['separate connection', 're-use connection', 're-use object']
-    testGroup = 'transbench_r5w5';
+    test_group = 'transbench_r5w5';
     results = _getResultArray(rows, columns)
     _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-            test_types_str, test_bench, testGroup, 10, operations, parallel_runs)
+            test_types_str, test_bench, test_group, 10, operations, parallel_runs)
 
     print '-----'
     print 'Benchmark appending to a String list (read+write):'
@@ -112,10 +112,10 @@ def minibench(operations, threads_per_node, benchmarks):
     columns = ['Transaction.read(string) + Transaction.write(string, int)']
     test_bench = [TransAppendToListBench1, TransAppendToListBench2, TransAppendToListBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
-    testGroup = 'transbench_append';
+    test_group = 'transbench_append';
     results = _getResultArray(rows, columns)
     _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-            test_types_str, test_bench, testGroup, 16, operations, parallel_runs)
+            test_types_str, test_bench, test_group, 16, operations, parallel_runs)
 
 class BenchRunnable(Thread):
     """
@@ -668,27 +668,27 @@ def _getAvgSpeed(results):
     return avgSpeed
 
 def _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
-                             test_types_str, test_bench, testGroup, firstBenchId,
-                             operations, parallelRuns):
+                             test_types_str, test_bench, test_group,
+                             first_bench_id, operations, parallel_runs):
     """
     Runs the given benchmarks and prints a results table.
     """
     for test in xrange(len(results) * len(results.itervalues().next())):
         try:
-            if (test + firstBenchId) in benchmarks:
+            if (test + first_bench_id) in benchmarks:
                 i = test % len(results);
                 j = test // len(results);
                 results[rows[i]][columns[j]] = _runBench(operations,
                         _getRandom(_BENCH_DATA_SIZE, test_types[j]),
-                        testGroup + "_" + test_types_str[j] + "_" + str(i + 1),
-                        test_bench[i], parallelRuns)
+                        test_group + "_" + test_types_str[j] + "_" + str(i + 1),
+                        test_bench[i], parallel_runs)
                 time.sleep(1)
         except Exception: # do not catch SystemExit
             _printException()
     
-    _printResults(columns, rows, results, operations, parallelRuns)
+    _printResults(columns, rows, results, operations, parallel_runs)
 
-def _runBench(operations, value, name, clazz, parallelRuns):
+def _runBench(operations, value, name, clazz, parallel_runs):
     """
     Runs the given benchmark.
     """
@@ -697,7 +697,7 @@ def _runBench(operations, value, name, clazz, parallelRuns):
 
     for i in xrange(_TESTRUNS):
         worker = []
-        for thread in xrange(parallelRuns):
+        for thread in xrange(parallel_runs):
             new_worker = clazz(key + '_' + str(i) + '_' + str(thread), value, operations)
             worker.append(new_worker) 
             new_worker.start()
@@ -708,11 +708,11 @@ def _runBench(operations, value, name, clazz, parallelRuns):
 
     return _getAvgSpeed(results)
 
-def _printResults(columns, rows, results, operations, parallelRuns):
+def _printResults(columns, rows, results, operations, parallel_runs):
     """
     Prints a result table.
     """
-    print 'Concurrent threads: ' + str(parallelRuns) + ', each using ' + str(operations) + ' transactions'
+    print 'Concurrent threads: ' + str(parallel_runs) + ', each using ' + str(operations) + ' transactions'
     colLen = 25
     emptyFirstColumn = ''.join([' ']*colLen)
     print emptyFirstColumn + '\tspeed (transactions / second)'
