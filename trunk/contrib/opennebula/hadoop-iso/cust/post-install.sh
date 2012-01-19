@@ -40,8 +40,8 @@ done
 
 for FILE in oca-1.1.2; do
   wget -nc --no-check-certificate https://rubygems.org/downloads/$FILE.gem
-  mv $FILE.gem /var/lib/sc-manager/$FILE.gem
-  (cd /var/lib/sc-manager ; gem install --local $FILE)
+  mv $FILE.gem /usr/lib/scalaris/contrib/opennebula/$FILE.gem
+  (cd /usr/lib/scalaris/contrib/opennebula ; gem install --local $FILE)
 done 
 
 # debian live user wants to be on UID 1000
@@ -49,7 +49,7 @@ groupmod -g 1001 xtreemfs
 usermod -u 1001 xtreemfs
 chown -R xtreemfs /var/lib/xtreemfs
 
-cat << EOT > /root/.bashrc
-export JAVA_HOME=/usr/lib/jvm/java-6-sun/jre
-export PATH=$PATH:/root/pig/bin
+cat << EOT > /etc/environment
+JAVA_HOME=/usr/lib/jvm/java-6-openjdk/jre
+PATH=$PATH:/root/pig/bin
 EOT

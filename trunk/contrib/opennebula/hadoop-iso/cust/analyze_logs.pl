@@ -10,7 +10,7 @@ exit if $pid;
 
 system("hadoop fs -rmr pigout");
 unlink ("/tmp/hadoop-output");
-$ret = system("JAVA_HOME=/usr/lib/jvm/java-6-sun pig -x mapreduce -f /root/analyze_logs.pig -param LOGS=/access_logs/* > /tmp/hadoop-output 2>&1");
+$ret = system("JAVA_HOME=/usr/lib/jvm/java-6-openjdk/jre pig -x mapreduce -f /root/analyze_logs.pig -param LOGS=/access_logs/* > /tmp/hadoop-output 2>&1");
 if($ret == 0) {
   unlink("/tmp/result.by_site");
   unlink("/tmp/result.by_date");
@@ -18,7 +18,7 @@ if($ret == 0) {
   system("hadoop fs -copyToLocal pigout/by_date/part-r-00000 /tmp/result.by_date");
 
   $time = localtime;
-  open(HTML, ">/var/lib/sc-manager/public/hadoop_result.html") or die "Can't open: $!";
+  open(HTML, ">/usr/lib/scalaris/contrib/opennebula/public/hadoop_result.html") or die "Can't open: $!";
   print HTML <<EOT;
   <html>
   <head>
