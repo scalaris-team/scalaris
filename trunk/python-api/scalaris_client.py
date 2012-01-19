@@ -200,9 +200,9 @@ if __name__ == "__main__":
         print '                            unsubscribe from a topic'
         print ' -h,--help'
         print '                            print this message'
-        print ' -b,--minibench [<runs> [<benchmarks>]]'
+        print ' -b,--minibench [<ops> [<threads_per_node> [<benchmarks>]]]'
         print '                            run selected mini benchmark(s)'
-        print '                            [1|...|9|all] (default: all benchmarks)'
-        print '                            <runs> times (default: 100 test runs)'
+        print '                            [1|...|9|all] (default: all benchmarks, 500'
+        print '                            operations each, 10 threads per Scalaris node)'
         if len(sys.argv) == 1 or (len(sys.argv) >= 2 and not sys.argv[1] in ["--help", "-h"]):
             sys.exit(1)
