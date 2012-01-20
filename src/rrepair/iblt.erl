@@ -16,9 +16,13 @@
 %% @doc    Invertible Bloom Lookup Table
 %%         Operations: Insert, Delete, Get, ListEntries
 %% @end
-%% @reference M. T. Goodrich, M. Mitzenmacher
+%% @reference 
+%%          1) M. T. Goodrich, M. Mitzenmacher
 %%          <em>Invertible Bloom Lookup Tables</em> 
 %%          2011 ArXiv e-prints. 1101.2245
+%%          2) D.Eppstein, M.T.Goodrich, F.Uyeda, G.Varghese
+%%          <em>Whats the Difference? Efficient Set Reconciliation without Prior Context</em>
+%%          2011 SIGCOMM'11 Vol.41(4)
 %% @version $Id$
 
 -module(iblt).
@@ -26,18 +30,23 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/2, insert/3, delete/3, get/2, list_entries/1]).
--export([get_fpr/1, get_item_count/1]).
+-export([new/2, new/3, insert/3, delete/3, get/2, list_entries/1]).
+-export([is_element/2]).
+-export([get_fpr/1, get_prop/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-define(Check_sum_fun(X), erlang:crc32(integer_to_list(X))). %hash function for checksum building
+
 -type key()     :: integer().
 -type value()   :: integer().
--type cell()    :: {Count   :: non_neg_integer(),
-                    KeySum  :: key(),
-                    ValSum  :: value()}.
+-type cell()    :: {Count       :: non_neg_integer(),
+                    KeySum      :: key(),
+                    KeyHashSum  :: integer(),   %sum c(x) of all inserted keys x, for c = any hashfunction not in hfs
+                    ValSum      :: value(),
+                    ValHashSum  :: integer()}.  %sum c(y) of all inserted values y, for c = any hashfunction not in hfs
 
 -type table() :: [] | [{ColNr :: pos_integer(), Cells :: [cell()]}].
 
@@ -51,21 +60,34 @@
 
 -opaque iblt() :: #iblt{}. 
 
+-type option()  :: prime.
+-type options() :: [] | [option()].
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec new(?REP_HFS:hfs(), pos_integer()) -> iblt().
 new(Hfs, CellCount) ->
+    new(Hfs, CellCount, [prime]).
+
+-spec new(?REP_HFS:hfs(), pos_integer(), options()) -> iblt().
+new(Hfs, CellCount, Options) ->
     K = ?REP_HFS:size(Hfs),
-    CCount = resize(CellCount, K), 
-    ColSize = erlang:round(CCount / K),
-    SubTable = [{0, 0 ,0} || _ <- lists:seq(1, ColSize)],
+    {Cells, ColSize} = case proplists:get_bool(prime, Options) of
+                            true ->
+                                CCS = prime:get_nearest(erlang:round(CellCount / K)),
+                                {CCS * K, CCS};
+                            false ->
+                                RCC = resize(CellCount, K),
+                                {RCC, erlang:round(RCC / K)}
+                        end,
+    SubTable = [{0, 0 ,0, 0, 0} || _ <- lists:seq(1, ColSize)],
     Table = [ {I, SubTable} || I <- lists:seq(1, K)],
     #iblt{
           hfs = Hfs, 
           table = Table, 
-          cell_count = CCount, 
+          cell_count = Cells, 
           col_size = ColSize,
           item_count = 0
           }.
@@ -89,7 +111,7 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
     NT = lists:foldl(
            fun({ColNr, Col}, NewT) ->
                    NCol = change_cell(Col, 
-                                      ?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize, 
+                                      ?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize,
                                       Key, Value, Operation),
                    [{ColNr, NCol} | NewT]
            end, [], T),
@@ -101,14 +123,27 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec change_cell([cell()], pos_integer(), key(), value(), add | remove) -> [cell()].
-change_cell(Column, CellNr, Key, Value, Operation) ->    
+change_cell(Column, CellNr, Key, Value, Operation) ->        
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
-    {Count, KeySum, ValSum} = Cell,
-    case Operation of
-        add -> lists:flatten([HeadL, {Count + 1, KeySum + Key, ValSum + Value}, TailL]);
-        remove when Count > 0 -> lists:flatten([HeadL, {Count - 1, KeySum - Key, ValSum - Value}, TailL]);
-        remove when Count =:= 0 -> lists:flatten([HeadL, {0, KeySum, ValSum}, TailL])
-    end.
+    {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
+    KeyCheck = ?Check_sum_fun(Key),
+    ValCheck = ?Check_sum_fun(Value),
+    R = case Operation of
+        add -> lists:flatten([HeadL, 
+                              {Count + 1, 
+                               KeySum + Key, KHSum + KeyCheck,
+                               ValSum + Value, VHSum + ValCheck}, 
+                              TailL]);
+        remove when Count > 0 -> lists:flatten([HeadL, 
+                                                {Count - 1, 
+                                                 KeySum - Key, KHSum - KeyCheck,
+                                                 ValSum - Value, VHSum - ValCheck}, 
+                                                TailL]);
+        remove when Count =:= 0 -> Column
+    end,
+    %ct:pal("ChangeCell Pos=~p ; Key=~p ; OLD Col=~w~nNEW Col=~p", 
+    %       [CellNr, Key, Column, R]),
+    R.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -123,16 +158,21 @@ get(#iblt{ table = T } = IBLT, Key) ->
     is_subtype(Result,    value() | not_found).
 p_get([], _, _) -> not_found;
 p_get([{ColNr, Col} | T], #iblt{ hfs = Hfs, col_size = ColSize} = IBLT, Key) ->
-    {Count, KeySum, ValSum} = 
+    {Count, KeySum, KHSum, ValSum, VHSum} = 
         lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
-    if
-        Count =:= 0 -> p_get(T, IBLT, Key);
-        Count =:= 1 andalso KeySum =:= Key -> ValSum;
-        true -> p_get(T, IBLT, Key)
+    case Count =:= 1 
+             andalso KeySum =:= Key 
+             andalso KHSum =:= ?Check_sum_fun(Key)
+             andalso VHSum =:= ?Check_sum_fun(ValSum) of
+        true -> ValSum;
+        false -> p_get(T, IBLT, Key)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc lists all correct entries of this structure
+%     correct entries can be retrieved out of pure cells
+%     a pure cell := count = 1 and check_sum(keySum)=keyHashSum and check_sum(valSum)=valHashSum
 -spec list_entries(iblt()) -> [{key(), value()}].
 list_entries(IBLT) ->
     p_list_entries(IBLT, []).
@@ -148,15 +188,31 @@ p_list_entries(#iblt{ table = T } = IBLT, Acc) ->
             p_list_entries(NewIBLT, lists:append([L, Acc]))
     end.
 
+% tries to find any pure entry 
 -spec get_any_entry(table(), [{key(), value()}]) -> [{key() | value()}].
 get_any_entry([], Acc) -> 
     Acc;
 get_any_entry([{_, Col} | T], Acc) ->
-    Result = [{Key, Val} || {Count, Key, Val} <- Col, Count =:= 1],
+    Result = [{Key, Val} || {Count, Key, KCheck, Val, VCheck} <- Col, 
+                            Count =:= 1,
+                            ?Check_sum_fun(Key) =:= KCheck,
+                            ?Check_sum_fun(Val) =:= VCheck],
     if 
         Result =:= [] -> get_any_entry(T, lists:append([Result, Acc]));
         true -> Result
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec is_element(iblt(), key()) -> boolean().
+is_element(#iblt{ hfs = Hfs, table = T, col_size = ColSize }, Key) ->
+    Found = lists:foldl(
+              fun({ColNr, Col}, Count) ->
+                      {C, _, _, _, _} = lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
+                      Count + if C > 0 -> 1; 
+                                 true -> 0 end
+                      end, 0, T),
+    Found =:= ?REP_HFS:size(Hfs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -168,9 +224,13 @@ get_fpr(#iblt{  hfs = Hfs, cell_count = M, item_count = N }) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_item_count(iblt()) -> non_neg_integer().
-get_item_count(#iblt{ item_count = C }) -> 
-    C.
+-spec get_prop(atom(), iblt()) -> any().
+get_prop(Prop, IBLT) ->
+    case Prop of
+        item_count -> IBLT#iblt.item_count;
+        col_size -> IBLT#iblt.col_size;
+        cell_count -> IBLT#iblt.cell_count
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helpers
