@@ -470,8 +470,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
 -spec add_to_tree(?DB:db_as_list(), merkle_tree:merkle_tree()) -> merkle_tree:merkle_tree().
 add_to_tree(DBItems, MTree) ->
     lists:foldl(fun(DBEntryEnc, Tree) -> merkle_tree:insert(DBEntryEnc, Tree) end, 
-                MTree, 
-                DBItems).
+                MTree, DBItems).
 
 -spec compareNodes([merkle_tree:mt_node()], 
                    [merkle_tree:mt_node_key()], 
@@ -577,10 +576,7 @@ build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
     {KeyBF, VerBF} = fill_bloom(DBItems, 
                                 ?REP_BLOOM:new(ElementNum, Fpr, Hfs), 
                                 ?REP_BLOOM:new(ElementNum, Fpr, Hfs)),
-    #bloom_recon_struct{ interval = I,
-                         keyBF = KeyBF,
-                         versBF = VerBF
-                       };
+    #bloom_recon_struct{ interval = I, keyBF = KeyBF, versBF = VerBF };
 
 build_recon_struct(merkle_tree, {I, DBItems}, _) ->
     Tree = merkle_tree:bulk_build(I, DBItems),
@@ -595,13 +591,9 @@ build_recon_struct(art, Chunk, _) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Create two bloom filter of a given database chunk.
 %%      One over all keys and one over all keys concatenated with their version.
--spec fill_bloom(DB, KeyBloom, VersionBloom) -> {KeyBloom2, VersionBloom2} when
-      is_subtype(DB,            db_as_list_enc()),
-      is_subtype(KeyBloom,      ?REP_BLOOM:bloom_filter()),
-      is_subtype(VersionBloom,  ?REP_BLOOM:bloom_filter()),
-      is_subtype(KeyBloom2,     ?REP_BLOOM:bloom_filter()),
-      is_subtype(VersionBloom2, ?REP_BLOOM:bloom_filter()).
-
+-spec fill_bloom(DB, Key::Bloom, Version::Bloom) -> {Key2::Bloom, Version2::Bloom} when
+      is_subtype(DB,    db_as_list_enc()),
+      is_subtype(Bloom, ?REP_BLOOM:bloom_filter()).
 fill_bloom([], KeyBF, VerBF) ->
     {KeyBF, VerBF};
 fill_bloom([DB_Entry_Enc | T], KeyBF, VerBF) ->
@@ -638,20 +630,24 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @ doc filter, partition and map items of a list in one run
--spec filterPartitionMap(fun((A) -> boolean()), fun((A) -> boolean()), fun((A) -> any()), [A]) -> {Satisfying::[any()], NonSatisfying::[any()]}.
+-spec filterPartitionMap(Filter::Fun, Partition::Fun, Map::Fun, List) -> {True::List, False::List} when
+     is_subtype(Fun,  fun((A) -> boolean())),
+     is_subtype(List, [A]).                                                                                                     
 filterPartitionMap(Filter, Pred, Map, List) ->
     filterPartitionMap(Filter, Pred, Map, List, [], []).
 
-filterPartitionMap(_, _, _, [], Satis, NonSatis) ->
-    {Satis, NonSatis};
-filterPartitionMap(Filter, Pred, Map, [H | T], Satis, NonSatis) ->
-    case Filter(H) of
-        true -> case Pred(H) of
-                     true -> filterPartitionMap(Filter, Pred, Map, T, [Map(H) | Satis], NonSatis);
-                     false -> filterPartitionMap(Filter, Pred, Map, T, Satis, [Map(H) | NonSatis])
-                 end;        
-        false -> filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis)
-    end.
+filterPartitionMap(_, _, _, [], TrueL, FalseL) ->
+    {TrueL, FalseL};
+filterPartitionMap(Filter, Pred, Map, [H | T], TrueL, FalseL) ->
+    {Satis, NonSatis} = 
+        case Filter(H) of
+            true -> case Pred(H) of
+                        true -> {[Map(H) | TrueL], FalseL};
+                        false -> {TrueL, [Map(H) | FalseL]}
+                    end;        
+            false -> {TrueL, FalseL}
+        end,
+    filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -695,8 +691,7 @@ get_interval_quadrant(I) ->
 
 -spec add_quadrants_to_key(?RT:key(), non_neg_integer(), pos_integer()) -> ?RT:key().
 add_quadrants_to_key(Key, Add, RepFactor) ->
-    Q = get_key_quadrant(Key),
-    Dest = Q + Add,
+    Dest = get_key_quadrant(Key) + Add,
     Rep = RepFactor + 1,
     case Dest div Rep of
         1 -> map_key_to_quadrant(Key, (Dest rem Rep) + 1);
