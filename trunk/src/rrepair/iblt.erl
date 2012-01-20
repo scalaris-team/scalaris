@@ -17,12 +17,12 @@
 %%         Operations: Insert, Delete, Get, ListEntries
 %% @end
 %% @reference 
-%%          1) M. T. Goodrich, M. Mitzenmacher
-%%          <em>Invertible Bloom Lookup Tables</em> 
-%%          2011 ArXiv e-prints. 1101.2245
-%%          2) D.Eppstein, M.T.Goodrich, F.Uyeda, G.Varghese
-%%          <em>Whats the Difference? Efficient Set Reconciliation without Prior Context</em>
-%%          2011 SIGCOMM'11 Vol.41(4)
+%%          1) M.T. Goodrich, M. Mitzenmacher
+%%             <em>Invertible Bloom Lookup Tables</em> 
+%%             2011 ArXiv e-prints. 1101.2245
+%%          2) D. Eppstein, M.T. Goodrich, F. Uyeda, G. Varghese
+%%             <em>Whats the Difference? Efficient Set Reconciliation without Prior Context</em>
+%%             2011 SIGCOMM'11 Vol.41(4)
 %% @version $Id$
 
 -module(iblt).
@@ -60,11 +60,10 @@
 
 -opaque iblt() :: #iblt{}. 
 
--type option()  :: prime.
--type options() :: [] | [option()].
+-type option()         :: prime.
+-type options()        :: [] | [option()].
+-type cell_operation() :: add | remove.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec new(?REP_HFS:hfs(), pos_integer()) -> iblt().
@@ -104,10 +103,13 @@ delete(IBLT, Key, Value) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec change_table(iblt(), add | remove, key(), value()) -> iblt().
+-spec operation_val(cell_operation()) -> 1 | -1.
+operation_val(add) -> 1;
+operation_val(remove) -> -1.
+
+-spec change_table(iblt(), cell_operation(), key(), value()) -> iblt().
 change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = ColSize } = IBLT, 
              Operation, Key, Value) ->
-    %TODO calculate each column in a separate process
     NT = lists:foldl(
            fun({ColNr, Col}, NewT) ->
                    NCol = change_cell(Col, 
@@ -115,58 +117,44 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
                                       Key, Value, Operation),
                    [{ColNr, NCol} | NewT]
            end, [], T),
-    IBLT#iblt{ table = NT, item_count = ItemCount + case Operation of
-                                                        add -> 1;
-                                                        remove -> -1
-                                                    end}.   
+    IBLT#iblt{ table = NT, item_count = ItemCount + operation_val(Operation)}.   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec change_cell([cell()], pos_integer(), key(), value(), add | remove) -> [cell()].
+-spec change_cell([cell()], pos_integer(), key(), value(), cell_operation()) -> [cell()].
 change_cell(Column, CellNr, Key, Value, Operation) ->        
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
-    KeyCheck = ?Check_sum_fun(Key),
-    ValCheck = ?Check_sum_fun(Value),
-    R = case Operation of
-        add -> lists:flatten([HeadL, 
-                              {Count + 1, 
-                               KeySum + Key, KHSum + KeyCheck,
-                               ValSum + Value, VHSum + ValCheck}, 
-                              TailL]);
-        remove when Count > 0 -> lists:flatten([HeadL, 
-                                                {Count - 1, 
-                                                 KeySum - Key, KHSum - KeyCheck,
-                                                 ValSum - Value, VHSum - ValCheck}, 
-                                                TailL]);
-        remove when Count =:= 0 -> Column
-    end,
-    %ct:pal("ChangeCell Pos=~p ; Key=~p ; OLD Col=~w~nNEW Col=~p", 
-    %       [CellNr, Key, Column, R]),
-    R.
+    lists:flatten([HeadL, 
+                   {Count + operation_val(Operation), 
+                    KeySum bxor Key, KHSum bxor ?Check_sum_fun(Key),
+                    ValSum bxor Value, VHSum bxor ?Check_sum_fun(Value)}, 
+                   TailL]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get(iblt(), key()) -> value() | not_found.
-get(#iblt{ table = T } = IBLT, Key) ->
-    p_get(T, IBLT, Key).
+get(#iblt{ table = T, hfs = Hfs, col_size = ColSize }, Key) ->
+    p_get(T, Hfs, ColSize, Key).
 
--spec p_get(Table, IBLT, Key) -> Result when
-    is_subtype(Table,     table()),
-    is_subtype(IBLT,      iblt()),
-    is_subtype(Key,       key()),
-    is_subtype(Result,    value() | not_found).
-p_get([], _, _) -> not_found;
-p_get([{ColNr, Col} | T], #iblt{ hfs = Hfs, col_size = ColSize} = IBLT, Key) ->
-    {Count, KeySum, KHSum, ValSum, VHSum} = 
-        lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
-    case Count =:= 1 
-             andalso KeySum =:= Key 
-             andalso KHSum =:= ?Check_sum_fun(Key)
-             andalso VHSum =:= ?Check_sum_fun(ValSum) of
-        true -> ValSum;
-        false -> p_get(T, IBLT, Key)
+-spec p_get(table(), ?REP_HFS:hfs(), non_neg_integer(), key()) -> value() | not_found.
+p_get([], _, _, _) -> not_found;
+p_get([{ColNr, Col} | T], Hfs, ColSize, Key) ->
+    Cell = lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
+    {_, _, _, Val, _} = Cell,
+    case is_pure(Cell) of
+        true -> Val;
+        false -> p_get(T, Hfs, ColSize, Key)
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc a cell is pure if count = -1 or 1, and checksum of key and value correspond to their checksums
+-spec is_pure(cell()) -> boolean().
+is_pure({Count, Key, KeyCheck, Val, ValCheck}) ->
+    (Count =:= 1 orelse Count =:= -1) andalso
+        ?Check_sum_fun(Key) =:= KeyCheck andalso
+        ?Check_sum_fun(Val) =:= ValCheck.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -193,10 +181,8 @@ p_list_entries(#iblt{ table = T } = IBLT, Acc) ->
 get_any_entry([], Acc) -> 
     Acc;
 get_any_entry([{_, Col} | T], Acc) ->
-    Result = [{Key, Val} || {Count, Key, KCheck, Val, VCheck} <- Col, 
-                            Count =:= 1,
-                            ?Check_sum_fun(Key) =:= KCheck,
-                            ?Check_sum_fun(Val) =:= VCheck],
+    Result = [{Key, Val} || {Count, Key, KCheck, Val, ValCheck} <- Col, 
+                            is_pure({Count, Key, KCheck, Val, ValCheck})],
     if 
         Result =:= [] -> get_any_entry(T, lists:append([Result, Acc]));
         true -> Result
