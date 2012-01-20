@@ -15,7 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,9 +102,10 @@ public class LinkedMultiHashMap<K, V> implements Map<K, List<V>> {
      *         previously associated null with key, if the implementation
      *         supports null values.)
      */
-    @SuppressWarnings("unchecked")
     public List<V> put(K key, V value) {
-        return put(key, Arrays.asList(value));
+        ArrayList<V> list = new ArrayList<V>();
+        list.add(value);
+        return put(key, list);
     }
 
     @Override
