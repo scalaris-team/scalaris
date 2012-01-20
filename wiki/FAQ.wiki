@@ -105,30 +105,31 @@ Exceptions are made for openSUSE-based and RHEL-based distributions as well as D
 
 === How to add our repository to openSUSE-based distributions (openSUSE, SLE)? ===
 
-For e.g. openSUSE 11.4 execute the following command as root:
+For e.g. openSUSE 12.1 execute the following command as root:
 {{{
-zypper addrepo --refresh http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/ scalaris
+zypper addrepo --refresh http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/ scalaris
 }}}
 You can then either install Scalaris through YaST or use the command-line tool zypper: `zypper install scalaris`.
 
 === How to add our repository to Fedora-based distributions (Fedora, RHEL, CentOS)? ===
 
-To add our repository to the list of repositories, yum uses, download its description file, e.g. for Fedora 15:
+To add our repository to the list of repositories, yum uses, download its description file and (as root) place it in `/etc/yum.repos.d/`, e.g. for Fedora 16:
 {{{
-http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/home:scalaris.repo
+sudo curl "http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/home:scalaris.repo" -o /etc/yum.repos.d/home\:scalaris.repo
 }}}
-and (as root) place it in `/etc/yum.repos.d/`. Afterwards you can install Scalaris using the usual `yum install scalaris` command (similarly for the other packages).
+. Afterwards you can install Scalaris using the usual `yum install scalaris` command (similarly for the other packages).
 
 === How to add our repository to Mandriva-based distributions (Mandriva)? ===
 
 This is currently not possible because the Open Build Service does not export a repository structure compatible with the Mandriva package management. You will need to manually download and install the RPMs.
+Additionally, currently the Open Build Service has problems creating packages for Mandriva 2011.
 
 === How to add our repository to Debian-based distributions (Debian, Ubuntu)? ===
 
-Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (probably in `/etc/apt/`). _Adapt the URL to the distribution you use (see above)._
+Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (mostly in `/etc/apt/`). _Adapt the URL to the distribution you use (see above)._
 
 {{{
-deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/ ./
+deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/ ./
 }}}
 
 Then download our package signing key and add it to your system (as root):
