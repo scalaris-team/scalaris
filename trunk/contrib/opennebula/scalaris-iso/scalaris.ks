@@ -8,8 +8,8 @@ part / --size 2048
 firstboot --disable
 bootloader --timeout=1 --append="3"
 
-repo --name=fedora-15 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-15&arch=$basearch
-repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/
+repo --name=fedora-16 --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-16&arch=$basearch
+repo --name=scalaris --baseurl=http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/
 
 %packages
 @core
@@ -51,6 +51,7 @@ anaconda
 -system-config-keyboard
 -system-config-users
 
+%end
 %post --nochroot
 
 cp scalaris-contrail.init.d $INSTALL_ROOT/etc/init.d/scalaris-contrail
@@ -67,6 +68,8 @@ rm $INSTALL_ROOT/var/lib/sc-manager/opennebula.db
 # prepare opennebula-ruby binding
 wget -nc --no-check-certificate https://rubygems.org/downloads/oca-1.1.2.gem
 cp oca-1.1.2.gem $INSTALL_ROOT/var/lib/sc-manager/oca-1.1.2.gem
+
+%end
 %post
 
 # We made firstboot a native systemd service, so it can no longer be turned
