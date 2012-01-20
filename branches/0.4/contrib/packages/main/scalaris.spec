@@ -25,6 +25,7 @@ BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-comp
 Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
+Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
 
 ##########################################################################################
@@ -36,6 +37,7 @@ BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-ed
 Requires:       erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
 Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  shadow-utils
+Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
 
 ###########################################################################################
@@ -47,6 +49,7 @@ Requires:       erlang >= R13B01
 BuildRequires:  pkg-config
 Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
+PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
 
 %description
@@ -93,7 +96,7 @@ make install-doc DESTDIR=$RPM_BUILD_ROOT
 
 %pre
 getent group %{scalaris_group} >/dev/null || groupadd --system %{scalaris_group}
-getent passwd %{scalaris_user} >/dev/null || useradd --system -g %{scalaris_group} -d %{scalaris_home} -m -s /sbin/nologin -c "user for scalaris" %{scalaris_user}
+getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd --system -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
 exit 0
 
 %post
