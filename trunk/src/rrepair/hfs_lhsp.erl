@@ -14,7 +14,8 @@
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Less hashing, same performance hash function set container
-%%
+%% @end
+%% @reference
 %%         Implementation of a hash function set proposed in 
 %%         2006 by A. Kirsch, M. Mitzenmacher - 
 %%         "Less Hashing, Same Performance: Building a Better Bloom Filter 
@@ -24,7 +25,6 @@
 %%         2000 - L.Fan, P. Cao., JA, ZB : 
 %%               "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol" 
 %%               (Counting Bloom Filters Paper)
-%% @end
 %% @version $Id$
 
 -module(hfs_lhsp).
@@ -35,7 +35,6 @@
 -type hfs_fun() :: fun((binary()) -> integer() | binary()).
 -type hfs_t()   :: {hfs_lhsp, Hf_count::integer(), H1_fun::hfs_fun(), H2_fun::hfs_fun()}.
 
-% include
 -include("hfs_beh.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
