@@ -98,6 +98,7 @@ public class Benchmark {
         cf.setConnectionPolicy(new RoundRobinConnectionPolicy(nodes));
         System.out.println("Number of available nodes: " + nodes.size());
         System.out.println("-> Using " + parallelRuns + " parallel instances per test run...");
+        System.out.flush();
         long[][] results;
         String[] columns;
         String[] rows;
@@ -109,6 +110,7 @@ public class Benchmark {
         String testGroup;
 
         System.out.println("Benchmark of de.zib.scalaris.TransactionSingleOp:");
+        System.out.flush();
         results = getResultArray(3, 2);
         testTypes = new Class[] {OtpErlangBinary.class, String.class};
         testTypesStr = new String[] {"OEB", "S"};
@@ -126,6 +128,7 @@ public class Benchmark {
 
         System.out.println("-----");
         System.out.println("Benchmark of de.zib.scalaris.Transaction:");
+        System.out.flush();
         results = getResultArray(3, 2);
         testTypes = new Class[] {OtpErlangBinary.class, String.class};
         testTypesStr = new String[] {"OEB", "S"};
@@ -143,6 +146,7 @@ public class Benchmark {
 
         System.out.println("-----");
         System.out.println("Benchmark incrementing an integer key (read+write):");
+        System.out.flush();
         results = getResultArray(3, 1);
         testTypes = new Class[] {null};
         testTypesStr = new String[] {"null"};
@@ -159,6 +163,7 @@ public class Benchmark {
 
         System.out.println("-----");
         System.out.println("Benchmark read 5 + write 5:");
+        System.out.flush();
         results = getResultArray(3, 2);
         testTypes = new Class[] {OtpErlangBinary.class, String.class};
         testTypesStr = new String[] {"OEB", "S"};
@@ -177,6 +182,7 @@ public class Benchmark {
 
         System.out.println("-----");
         System.out.println("Benchmark appending to a String list (read+write):");
+        System.out.flush();
         results = getResultArray(3, 1);
         testTypes = new Class[] {String.class};
         testTypesStr = new String[] {"S"};
