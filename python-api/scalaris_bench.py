@@ -54,8 +54,10 @@ def minibench(operations, threads_per_node, benchmarks):
     parallel_runs = len(DEFAULT_URLS) * threads_per_node;
     print 'Number of available nodes: ' + str(len(DEFAULT_URLS))
     print '-> Using ' + str(parallel_runs) + ' parallel instances per test run...'
+    sys.stdout.flush()
 
     print 'Benchmark of scalaris.TransactionSingleOp:'
+    sys.stdout.flush()
     test_types = ['binary', 'string']
     test_types_str = ['B', 'S']
     columns = ['TransactionSingleOp.write(string, bytearray)',
@@ -69,6 +71,7 @@ def minibench(operations, threads_per_node, benchmarks):
 
     print '-----'
     print 'Benchmark of scalaris.Transaction:'
+    sys.stdout.flush()
     test_types = ['binary', 'string']
     test_types_str = ['B', 'S']
     columns = ['Transaction.write(string, bytearray)',
@@ -82,6 +85,7 @@ def minibench(operations, threads_per_node, benchmarks):
 
     print '-----'
     print 'Benchmark incrementing an integer key (read+write):'
+    sys.stdout.flush()
     test_types = ['int']
     test_types_str = ['I']
     columns = ['Transaction.read(string) + Transaction.write(string, int)']
@@ -94,6 +98,7 @@ def minibench(operations, threads_per_node, benchmarks):
 
     print '-----'
     print 'Benchmark read 5 + write 5:'
+    sys.stdout.flush()
     test_types = ['binary', 'string']
     test_types_str = ['B', 'S']
     columns = ['Transaction.read(string) + Transaction.write(string, binary)',
@@ -107,6 +112,7 @@ def minibench(operations, threads_per_node, benchmarks):
 
     print '-----'
     print 'Benchmark appending to a String list (read+write):'
+    sys.stdout.flush()
     test_types = ['string']
     test_types_str = ['S']
     columns = ['Transaction.read(string) + Transaction.write(string, int)']
@@ -735,6 +741,7 @@ def _printResults(columns, rows, results, operations, parallel_runs):
     for column in columns:
         print '(' + str(i) + ') ' + column 
         i += 1
+    sys.stdout.flush()
 
 def _printException():
     mytype, message, trace = sys.exc_info()
