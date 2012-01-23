@@ -186,7 +186,7 @@ checkinstallation() {
         exit 1
     fi
 
-    $SCALARISCLIENT > /dev/null 2>/dev/null
+    $SCALARISCLIENT -h > /dev/null 2>/dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -n "INFO: could not find Scalaris' Java-API files. "
