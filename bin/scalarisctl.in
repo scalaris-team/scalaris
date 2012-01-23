@@ -192,7 +192,7 @@ checkinstallation() {
         echo -n "INFO: could not find Scalaris' Java-API files. "
         echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
         echo "  'make java' will build the Java-API"
-        echo "We were trying to run: $SCALARISCLIENT"
+        echo "We were trying to run: $SCALARISCLIENT -h"
     else
         HOSTNAME=`hostname -f`
         JAVAHOST=`$SCALARISCLIENT -lh`
