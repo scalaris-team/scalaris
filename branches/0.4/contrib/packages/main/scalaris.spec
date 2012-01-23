@@ -60,7 +60,6 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package doc
-Conflicts:  scalaris-doc
 Summary:    Documentation for scalaris
 Group:      Documentation/Other
 Requires:   %{name} == %{version}-%{release}
