@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type method()         :: bloom | merkle_tree | art | undefined.
+-type method()         :: bloom | merkle_tree | art | iblt | undefined.
 -type recon_stage()    :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
 -type exit_reason()    :: empty_interval | {ok, atom()}.
 
@@ -94,7 +94,6 @@
          }).
 -type state() :: #ru_recon_state{}.
 
--type build_args() :: {} | {Fpr::float()}.
 -type tree_cmp_response() :: ok_inner | ok_leaf |
                              fail_leaf | fail_node |
                              not_found.
@@ -148,7 +147,6 @@ on({get_state_response, MyInterval}, State =
     Intersection = intervals:intersection(MyIMapped, SrcIMapped),
     case intervals:is_empty(Intersection) of
         true ->
-            ?TRACE("SYNC CLIENT - INTERSECTION EMPTY", []),
             comm:send_local(self(), {shutdown, intersection_empty});
         false ->
             MyIntersec = mapInterval_to_range(Intersection, MyInterval, 2),
@@ -201,136 +199,40 @@ on({get_chunk_response, {_, []}}, State) ->
 
 on({get_chunk_response, {RestI, DBList}}, State =
        #ru_recon_state{ recon_stage = build_struct,
-                        recon_method = bloom,        
+                        recon_method = RMethod,        
                         recon_struct = Params,                    
                         sync_round = Round,
                         dhtNodePid = DhtNodePid,
-                        ownerRemotePid = MyRU_Pid,
                         sync_master = SyncMaster,
                         stats = Stats }) ->
     MyI = proplists:get_value(interval, Params),
-    %Get Interval of DBList/Chunk
-    %TODO: IMPROVEMENT getChunk should return ChunkInterval (db is traversed twice! - 1st getChunk, 2nd here)    
-    ChunkI = mapInterval(MyI, 1),
-    case intervals:is_empty(RestI) of
-        false ->
-            ?TRACE2("FORK RECON", []),
-            {ok, Pid} = fork_recon(State, Round),
-            send_chunk_req(DhtNodePid, Pid, RestI, 
-                           mapInterval(RestI, get_interval_quadrant(ChunkI)), 
-                           get_max_items(bloom));
-        _ -> ok
-    end,
-    {BuildTime, SyncStruct} = 
-        util:tc(fun() -> build_recon_struct(bloom, {ChunkI, DBList}, {get_fpr()}) end),
-    case SyncMaster of
-        true ->
-            DestKey = select_sync_node(MyI),
-            comm:send_local(DhtNodePid, 
-                            {lookup_aux, DestKey, 0, 
-                             {send_to_group_member, rep_upd, 
-                              {request_recon, MyRU_Pid, Round, false, reconciliation, bloom, SyncStruct}}}),
-            ?TRACE("BLOOM SEND RECON REQUEST TO Key: ~p", [DestKey]),
-            comm:send_local(self(), {shutdown, {ok, build_struct}});
-        _ -> ok
-    end,
-    State#ru_recon_state{ recon_struct = SyncStruct, 
-                          stats = ru_recon_stats:set([{build_time, BuildTime}], Stats) };
-
-on({get_chunk_response, {RestI, DBList}}, State = 
-       #ru_recon_state{ recon_stage = build_struct,
-                        recon_method = merkle_tree,
-                        sync_pid = SrcPid,
-                        recon_struct = Params,
-                        sync_master = IsMaster,
-                        dest_ru_pid = DestRU_Pid,
-                        ownerRemotePid = OwnerPid,
-                        dhtNodePid = DhtNodePid,
-                        sync_round = Round,
-                        stats = Stats })  ->
-    {BuildTime, MerkleTree} = 
+    SyncI = ?IIF(RMethod =:= bloom, mapInterval(MyI, 1), MyI),    
+    ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
+    {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
-            true -> %extend tree
+            true ->
                 {BTime, NTree} = util:tc(fun() -> add_to_tree(DBList, Params) end),
                 {ru_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
-            false -> %build new tree
-                Interval = proplists:get_value(interval, Params),
-                util:tc(fun() -> build_recon_struct(merkle_tree, 
-                                                    {Interval, DBList}, 
-                                                    {}) 
-                        end)
+            false ->                
+                util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
         end,
-    case intervals:is_empty(RestI) of
-        false ->
-            ?TRACE("TREE EXISTS - ADD REST - RestI=~p", [RestI]),
-            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(merkle_tree)),%MappedI is wrong
-            State#ru_recon_state{ recon_struct = MerkleTree, 
-                                  stats = 
-                                      ru_recon_stats:set([{build_time, BuildTime}], 
-                                                         Stats) };        
-        true ->
-            case IsMaster of
-                true ->
-                    ?TRACE("MASTER SENDS ROOT CHECK", []),
-                    comm:send(SrcPid, 
-                              {check_node, comm:this(), 
-                               merkle_tree:get_interval(MerkleTree), 
-                               merkle_tree:get_hash(MerkleTree)});
-                false -> 
-                    comm:send(DestRU_Pid, 
-                              {request_recon, OwnerPid, Round, true, 
-                               res_shared_interval, merkle_tree,
-                               [{interval, merkle_tree:get_interval(MerkleTree)},
-                                {senderPid, comm:this()}] 
-                              })
-            end,
-            NewStats = ru_recon_stats:set(
-                         [{tree_compareLeft, ?IIF(IsMaster, 1, 0)},
-                          {tree_size, merkle_tree:size_detail(MerkleTree)},
-                          {build_time, BuildTime}], Stats), 
-            State#ru_recon_state{ recon_stage = reconciliation, 
-                                  recon_struct = MerkleTree, 
-                                  stats = NewStats
-                                }          
-    end;
-
-on({get_chunk_response, {[], DBList}}, State = 
-       #ru_recon_state{ recon_stage = build_struct, 
-                        recon_method = art,
-                        recon_struct = Params,
-                        sync_master = IsMaster,
-                        ownerRemotePid = OwnerPid,
-                        dest_ru_pid = DestRU_Pid,
-                        sync_round = Round,
-                        stats = Stats })  ->
-    ToBuild = ?IIF(IsMaster, merkle_tree, art),
-    Interval = proplists:get_value(interval, Params),
-    {BuildTime, NewStruct} =
-        util:tc(fun() -> build_recon_struct(ToBuild, {Interval, DBList}, {}) end),    
-    NewStats = 
-        case IsMaster of
-            true -> 
-                %TODO measure sync time
-                {ok, ARStats} = 
-                    art_recon(NewStruct, proplists:get_value(art, Params), State),
-                comm:send_local(self(), {shutdown, sync_finished}),
-                ru_recon_stats:set([{build_time, BuildTime},
-                                    {tree_size, merkle_tree:size_detail(NewStruct)}], 
-                                   ARStats);
-            false ->
-                comm:send(DestRU_Pid, 
-                          {request_recon, OwnerPid, Round, true, 
-                           res_shared_interval, art,
-                           [{interval, art:get_interval(NewStruct)},
-                            {senderPid, comm:this()},
-                            {art, NewStruct}]
-                          }),
-                comm:send_local(self(), {shutdown, client_art_send}),
-                ru_recon_stats:set([{build_time, BuildTime}], Stats)
-        end,    
-    State#ru_recon_state{ recon_stage = reconciliation, 
-                          recon_struct = NewStruct, 
-                          stats = NewStats };
+    EmptyRest = intervals:is_empty(RestI),
+    if not EmptyRest ->
+            Pid = if RMethod =:= bloom -> {ok, P} = fork_recon(State, Round), P;
+                     true -> self()
+                  end,
+            send_chunk_req(DhtNodePid, Pid, RestI, 
+                           mapInterval(RestI, get_interval_quadrant(SyncI)), 
+                           get_max_items(RMethod));
+        true -> ok
+    end,
+    {NStage, NStats} = if EmptyRest orelse RMethod =:= bloom -> {reconciliation, begin_sync(SyncStruct, State)};
+                          not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
+                          true -> {reconciliation, Stats}
+                       end,
+    State#ru_recon_state{ recon_stage = NStage, 
+                          recon_struct = SyncStruct, 
+                          stats = ru_recon_stats:set([{build_time, BuildTime}], NStats) };    
     
 on({get_chunk_response, {RestI, DBList}}, State = 
        #ru_recon_state{ recon_stage = reconciliation,
@@ -463,7 +365,59 @@ on({check_node_response, Result, I, ChildHashs}, State =
        true -> ok
     end,
     State#ru_recon_state{ stats = FinalStats }.
-    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec begin_sync(recon_struct(), state()) -> ru_recon_stats:stats().
+begin_sync(SyncStruct, State = #ru_recon_state{recon_method = RMethod,
+                                               recon_struct = Params,
+                                               sync_round = Round,
+                                               sync_pid = SrcPid,
+                                               dhtNodePid = DhtNodePid,
+                                               ownerRemotePid = OwnerPid,
+                                               dest_ru_pid = DestRU_Pid,                                       
+                                               sync_master = IsMaster, 
+                                               stats = Stats }) ->
+     case RMethod of
+         merkle_tree -> 
+            case IsMaster of
+                true -> comm:send(SrcPid, 
+                                  {check_node, comm:this(), 
+                                   merkle_tree:get_interval(SyncStruct), 
+                                   merkle_tree:get_hash(SyncStruct)});            
+                false ->comm:send(DestRU_Pid, 
+                                  {request_recon, OwnerPid, Round, true, 
+                                   res_shared_interval, merkle_tree,
+                                   [{interval, merkle_tree:get_interval(SyncStruct)},
+                                    {senderPid, comm:this()}]})
+            end,
+            ru_recon_stats:set(
+              [{tree_compareLeft, ?IIF(IsMaster, 1, 0)},
+               {tree_size, merkle_tree:size_detail(SyncStruct)}], Stats);
+         bloom when IsMaster ->
+            DestKey = select_sync_node(proplists:get_value(interval, Params)),
+            comm:send_local(DhtNodePid, 
+                            {lookup_aux, DestKey, 0, 
+                             {send_to_group_member, rep_upd, 
+                              {request_recon, OwnerPid, Round, false, reconciliation, bloom, SyncStruct}}}),
+            comm:send_local(self(), {shutdown, {ok, build_struct}}),
+            Stats;
+         art ->
+            {AOk, ARStats} = case IsMaster of
+                true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
+                false ->
+                    comm:send(DestRU_Pid, 
+                              {request_recon, OwnerPid, Round, true, 
+                               res_shared_interval, art,
+                               [{interval, art:get_interval(SyncStruct)},
+                                {senderPid, comm:this()},
+                                {art, SyncStruct}]}),
+                    {no, Stats}
+            end,            
+            comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, client_art_send)}),
+            ARStats
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -563,13 +517,13 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_recon_struct(Method, DB_Chunk, Args) -> Recon_Struct when
+-spec build_recon_struct(Method, DB_Chunk) -> Recon_Struct when
       is_subtype(Method,       method()),
       is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
-      is_subtype(Args,         build_args()),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
 
-build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
+build_recon_struct(bloom, {I, DBItems}) ->
+    Fpr = get_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?REP_HFS:new(HFCount),    
@@ -578,12 +532,12 @@ build_recon_struct(bloom, {I, DBItems}, {Fpr}) ->
                                 ?REP_BLOOM:new(ElementNum, Fpr, Hfs)),
     #bloom_recon_struct{ interval = I, keyBF = KeyBF, versBF = VerBF };
 
-build_recon_struct(merkle_tree, {I, DBItems}, _) ->
+build_recon_struct(merkle_tree, {I, DBItems}) ->
     Tree = merkle_tree:bulk_build(I, DBItems),
     merkle_tree:gen_hash(Tree);
 
-build_recon_struct(art, Chunk, _) ->
-    Tree = build_recon_struct(merkle_tree, Chunk, {}),
+build_recon_struct(art, Chunk) ->
+    Tree = build_recon_struct(merkle_tree, Chunk),
     art:new(Tree).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -763,7 +717,7 @@ start(Round, SenderRUPid) ->
 
 -spec fork_recon(state(), rep_upd:round()) -> {ok, pid()}.
 fork_recon(Conf, {ReconRound, Fork}) ->
-    State = Conf#ru_recon_state{ sync_round = {ReconRound, Fork} },
+    State = Conf#ru_recon_state{ sync_round = {ReconRound, Fork + 1} },
     comm:send_local(Conf#ru_recon_state.ownerLocalPid, {recon_forked}),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State).
 
