@@ -1,14 +1,18 @@
 #!/bin/bash
 
 date=`date +"%Y%m%d"`
-name="scalaris-svn-examples-wiki" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
-package_url="http://scalaris.googlecode.com/svn/trunk/contrib/packages/examples-wiki"
+name="scalaris-examples-wiki" # folder base name (without version)
+rpmversion=${1:-"0.4.0"}
+debversion="${rpmversion}-1"
+branchversion=${2:-"0.4"}
+url="http://scalaris.googlecode.com/svn/branches/${branchversion}/contrib/wikipedia"
+package_url="http://scalaris.googlecode.com/svn/branches/${branchversion}/contrib/packages/examples-wiki"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
 
-folder="./${name}"
+result=0
+folder="./${name}-${rpmversion}"
 
 if [ ! -d ${folder} ]; then
   echo "checkout ${url} -> ${folder} ..."
@@ -33,45 +37,38 @@ else
 fi
 
 if [ ${result} -eq 0 ]; then
-  echo -n "get svn revision ..."
-  revision=`svn info ${folder} --xml | grep revision | cut -d '"' -f 2 | head -n 1`
-  result=$?
-  echo " ${revision}"
-  # not safe in other languages than English:
-  # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-fi
-
-if [ ${result} -eq 0 ]; then
-  tarfile="${folder}-${revision}.tar.gz"
-  newfoldername="${folder}-${revision}"
+  tarfile="${folder}.tar.gz"
   echo "making ${tarfile} ..."
-  mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs --exclude=${newfoldername}/contrib/jetty-libs/jsp/*.jar --exclude=${newfoldername}/contrib/jetty-libs/*.jar && mv "${newfoldername}" "${folder}"
+  tar -czf ${tarfile} ${folder} --exclude-vcs --exclude=${folder}/contrib/jetty-libs/jsp/*.jar --exclude=${folder}/contrib/jetty-libs/*.jar
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder=${package_folder}
-  sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
-      < ${sourcefolder}/scalaris-svn-examples-wiki.spec > ./scalaris-svn-examples-wiki.spec
+  sed -e "s/%define pkg_version .*/%define pkg_version ${rpmversion}/g" \
+      -e "s/scalaris-java >= 0.4.0/scalaris-java >= ${rpmversion}/g" \
+      < ${sourcefolder}/scalaris-examples-wiki.spec > ./scalaris-examples-wiki.spec
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder=${package_folder}
-  sed -e "s/Version: 1-1/Version: ${revision}-1/g" \
-      -e "s/scalaris-svn-examples-wiki\\.orig\\.tar\\.gz/scalaris-svn-examples-wiki-${revision}\\.orig\\.tar\\.gz/g" \
-      -e "s/scalaris-svn-examples-wiki\\.diff\\.tar\\.gz/scalaris-svn-examples-wiki-${revision}\\.diff\\.tar\\.gz/g" \
-      < ${sourcefolder}/scalaris-svn-examples-wiki.dsc  > ./scalaris-svn-examples-wiki.dsc && \
-  sed -e "s/(1-1)/(${revision}-1)/g" \
-      < ${sourcefolder}/debian.changelog                > ./debian.changelog && \
-  cp  ${sourcefolder}/debian.control                      ./debian.control && \
-  cp  ${sourcefolder}/debian.rules                        ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris-svn-examples-wiki-tomcat5.files \
-                                                          ./debian.scalaris-svn-examples-wiki-tomcat5.files && \
-  cp  ${sourcefolder}/debian.scalaris-svn-examples-wiki-tomcat6.files \
-                                                          ./debian.scalaris-svn-examples-wiki-tomcat6.files
+  sed -e "s/Version: 0.4.0-1/Version: ${debversion}/g" \
+      -e "s/scalaris-java (>= 0.4.0-1)/scalaris-java (>= ${debversion})/g" \
+      -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${rpmversion}\\.orig\\.tar\\.gz/g" \
+      -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${rpmversion}\\.diff\\.tar\\.gz/g" \
+      < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
+  sed -e "s/(0.4.0-1)/(${debversion})/g" \
+      < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
+  sed -e "s/scalaris-java (= 0.4.0-1)/scalaris-java (= ${debversion})/g" \
+      < ${sourcefolder}/debian.control              > ./debian.control && \
+  cp  ${sourcefolder}/debian.rules                    ./debian.rules && \
+  cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat5.files \
+                                                      ./debian.scalaris-examples-wiki-tomcat5.files && \
+  cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat6.files \
+                                                      ./debian.scalaris-examples-wiki-tomcat6.files
   result=$?
 fi
 

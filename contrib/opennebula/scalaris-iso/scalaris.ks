@@ -23,13 +23,13 @@ authconfig
 rootfiles
 
 # for scalaris
-scalaris-svn
-ruby-scalaris-svn
+scalaris
+ruby-scalaris
 screen
 
 # for manager interface
-scalaris-svn-one-manager
-scalaris-svn-one-client
+scalaris-one-manager
+scalaris-one-client
 ruby
 rubygem-oca
 rubygem-sequel
@@ -50,8 +50,8 @@ anaconda
 -system-config-date
 -system-config-keyboard
 -system-config-users
-
 %end
+
 %post --nochroot
 
 cp scalaris-contrail.init.d $INSTALL_ROOT/etc/init.d/scalaris-contrail
@@ -68,8 +68,8 @@ rm $INSTALL_ROOT/var/lib/sc-manager/opennebula.db
 # prepare opennebula-ruby binding
 wget -nc --no-check-certificate https://rubygems.org/downloads/oca-1.1.2.gem
 cp oca-1.1.2.gem $INSTALL_ROOT/var/lib/sc-manager/oca-1.1.2.gem
-
 %end
+
 %post
 
 # We made firstboot a native systemd service, so it can no longer be turned

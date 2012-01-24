@@ -1,14 +1,14 @@
 # norootforbuild
 
 %define pkg_version 2729
-Name:           scalaris-svn-one
+Name:           scalaris-one
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
 License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
-Source0:        scalaris-svn-one-%{version}.tar.gz
+Source0:        scalaris-one-%{version}.tar.gz
 #Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ruby >= 1.8
@@ -63,24 +63,22 @@ overlay with a non-blocking Paxos commit protocol for transaction
 processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
-%package -n scalaris-svn-one-manager
-Conflicts:  scalaris-one-manager
-Conflicts:  scalaris-one-frontend scalaris-svn-one-frontend
+%package -n scalaris-one-manager
+Conflicts:  scalaris-one-frontend
 Summary:    Manager for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
-Requires:   scalaris-svn
+Requires:   scalaris >= 0.4.0
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
 # once noarch, always noarch on SLE <= 11
 %else
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-svn-one-manager
+%description -n scalaris-one-manager
 Manager for scalaris on Opennebula
 
-%package -n scalaris-svn-one-frontend
-Conflicts:  scalaris-one-frontend
-Conflicts:  scalaris-svn-one-manager scalaris-one-manager
+%package -n scalaris-one-frontend
+Conflicts:  scalaris-one-manager
 Summary:    Frontend for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -89,11 +87,10 @@ Group:      Productivity/Databases/Clients
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-svn-one-frontend
+%description -n scalaris-one-frontend
 Frontend for scalaris on Opennebula
 
-%package -n scalaris-svn-one-client
-Conflicts:  scalaris-one-client
+%package -n scalaris-one-client
 Summary:    Client for scalaris on Opennebula
 Group:      Productivity/Databases/Clients
 %if 0%{?sles_version} == 10 || 0%{?sles_version} == 11
@@ -102,11 +99,11 @@ Group:      Productivity/Databases/Clients
 BuildArch:  noarch
 %endif
 
-%description -n scalaris-svn-one-client
+%description -n scalaris-one-client
 Client for scalaris on Opennebula
 
 %prep
-%setup -q -n scalaris-svn-one-%{version}
+%setup -q -n scalaris-one-%{version}
 
 %build
 ./configure --prefix=%{_prefix} \
@@ -135,7 +132,7 @@ make install-one DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files -n scalaris-svn-one-manager
+%files -n scalaris-one-manager
 %defattr(-,root,root)
 %dir %{_sysconfdir}/scalaris
 %dir %{_prefix}/lib/scalaris
@@ -158,7 +155,7 @@ rm -rf $RPM_BUILD_ROOT
 
 ## remove ts_*.rb !!!
 
-%files -n scalaris-svn-one-frontend
+%files -n scalaris-one-frontend
 %defattr(-,root,root)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
@@ -172,7 +169,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris/contrib/opennebula/*.erb
 %{_prefix}/lib/scalaris/contrib/opennebula/fe_views
 
-%files -n scalaris-svn-one-client
+%files -n scalaris-one-client
 %defattr(-,root,root)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib

@@ -1,13 +1,17 @@
 #!/bin/bash
 
 date=`date +"%Y%m%d"`
-name="scalaris-svn-one" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+name="scalaris-one" # folder base name (without version)
+rpmversion=${1:-"0.4.0"}
+debversion="${rpmversion}-1"
+branchversion=${2:-"0.4"}
+url="http://scalaris.googlecode.com/svn/branches/${branchversion}"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
 
-folder="./${name}"
+result=0
+folder="./${name}-${rpmversion}"
 
 if [ ! -d ${folder} ]; then
   echo "checkout ${url} -> ${folder} ..."
@@ -20,27 +24,17 @@ else
 fi
 
 if [ ${result} -eq 0 ]; then
-  echo -n "get svn revision ..."
-  revision=`svn info ${folder} --xml | grep revision | cut -d '"' -f 2 | head -n 1`
-  result=$?
-  echo " ${revision}"
-  # not safe in other languages than English:
-  # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-fi
-
-if [ ${result} -eq 0 ]; then
-  tarfile="${folder}-${revision}.tar.gz"
-  newfoldername="${folder}-${revision}"
+  tarfile="${folder}.tar.gz"
   echo "making ${tarfile} ..."
-  mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs --exclude="${newfoldername}/src" --exclude="${newfoldername}/test" --exclude="${newfoldername}/include" --exclude="${newfoldername}/contrib/benchmark" --exclude="${newfoldername}/contrib/compat" --exclude="${newfoldername}/contrib/contrail" --exclude="${newfoldername}/contrib/log4erl" --exclude="${newfoldername}/contrib/packages" --exclude="${newfoldername}/contrib/pubsub" --exclude="${newfoldername}/contrib/wikipedia" --exclude="${newfoldername}/contrib/yaws" --exclude="${newfoldername}/user-dev-guide" --exclude="${newfoldername}/java-api/*/*" --exclude="${newfoldername}/python-api" --exclude="${newfoldername}/ruby-api" --exclude="${newfoldername}/doc" --exclude="${newfoldername}/docroot" && mv "${newfoldername}" "${folder}"
+  tar -czf ${tarfile} ${folder} --exclude-vcs --exclude="${folder}/src" --exclude="${folder}/test" --exclude="${folder}/include" --exclude="${folder}/contrib/benchmark" --exclude="${folder}/contrib/compat" --exclude="${folder}/contrib/contrail" --exclude="${folder}/contrib/log4erl" --exclude="${folder}/contrib/packages" --exclude="${folder}/contrib/pubsub" --exclude="${folder}/contrib/wikipedia" --exclude="${folder}/contrib/yaws" --exclude="${folder}/user-dev-guide" --exclude="${folder}/java-api/*/*" --exclude="${folder}/python-api" --exclude="${folder}/ruby-api" --exclude="${folder}/doc" --exclude="${folder}/docroot"
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder=${folder}/contrib/packages/opennebula
-  sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
-      < ${sourcefolder}/scalaris-svn-one.spec     > ./scalaris-svn-one.spec
+  sed -e "s/%define pkg_version .*/%define pkg_version ${rpmversion}/g" \
+      < ${sourcefolder}/scalaris-one.spec     > ./scalaris-one.spec
   result=$?
 fi
 

@@ -93,7 +93,7 @@ class ScalarisHelper < OpenNebulaHelper
   end
 
   def get_scalaris_version()
-    result = %x[rpm -q scalaris-svn --qf "%{VERSION}"]
+    result = %x[rpm -q scalaris --qf "%{VERSION}"]
     result.to_s
   end
 
