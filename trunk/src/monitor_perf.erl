@@ -1,4 +1,4 @@
-%  @copyright 2011 Zuse Institute Berlin
+%  @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,12 +41,12 @@
     {bench} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
-    {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
+    {bulkowner, deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
     {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
     {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
-    {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
-    {bulkowner_reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
-    {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
+    {bulkowner, gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
+    {bulkowner, reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
+    {bulkowner, deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
     {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
@@ -95,7 +95,7 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
             {AllNodes, Leader1#state{id = NewId}}
     end;
 
-on({bulkowner_deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
+on({bulkowner, deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     This = comm:this_with_cookie({SourcePid, Id, Range, Parents}),
     comm:send_local(pid_groups:get_my(monitor),
@@ -120,7 +120,7 @@ on({{get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Ms
     end,
     State;
 
-on({bulkowner_gather, Id, Target, Msgs, Parents}, State) ->
+on({bulkowner, gather, Id, Target, Msgs, Parents}, State) ->
     {PerfRR, PerfLH, PerfTX} =
         lists:foldl(
              fun({gather_stats_response, Data1},
@@ -145,7 +145,7 @@ on({bulkowner_gather, Id, Target, Msgs, Parents}, State) ->
     bulkowner:send_reply(Id, Target, Msg, Parents, pid_groups:get_my(dht_node)),
     State;
 
-on({bulkowner_reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Leader} = _State)
+on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Leader} = _State)
   when Id =:= Leader#state.id ->
     ?TRACE1(_Msg, _State),
     Leader1 =
@@ -167,11 +167,11 @@ on({bulkowner_reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Lead
                   end
           end, Leader, DataL),
     {AllNodes, Leader1};
-on({bulkowner_reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
+on({bulkowner, reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     State;
 
-on({bulkowner_deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg, {AllNodes, Leader} = _State) ->
+on({bulkowner, deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg, {AllNodes, Leader} = _State) ->
     ?TRACE1(_Msg, _State),
     AllNodes1 = integrate_values(AllNodes, OtherState),
     {AllNodes1, Leader};

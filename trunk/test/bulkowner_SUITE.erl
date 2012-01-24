@@ -1,4 +1,4 @@
-%  Copyright 2008, 2011 Zuse Institute Berlin
+%  Copyright 2008, 2011, 2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,12 +58,12 @@ collect(Id, Sum) ->
         Sum < 68 ->
 %%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
             receive
-                {bulkowner_reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
+                {bulkowner, reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
                 collect(Id, Sum + reduce(Data))
             end;
         Sum == 68 ->
             receive
-                {bulkowner_reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
+                {bulkowner, reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
                     Sum + reduce(Data)
             after 1000 ->
                     Sum

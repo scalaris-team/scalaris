@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     receive
         {range_read_timeout, Id} ->
             {timeout, lists:flatten(Data)};
-        {bulkowner_reply, Id, {bulk_read_entry_response, NowDone, NewData}} ->
+        {bulkowner, reply, Id, {bulk_read_entry_response, NowDone, NewData}} ->
             Done2 = intervals:union(NowDone, Done),
             case intervals:is_subset(Interval, Done2) of
                 false ->

@@ -44,7 +44,7 @@ Infrastructure:
 
 Tests:
 
-added runtime type-checker for random testing extended unittests
+- added runtime type-checker for random testing extended unittests
 
 Documentation:
 

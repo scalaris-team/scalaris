@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,22 +31,14 @@
 -export_type([message/0]).
 -endif.
 
--type(bulkowner_message() ::
-      {start_bulk_owner, Id::util:global_uid(), I::intervals:interval(), Msg::comm:message()} |
-      {bulk_owner, Id::util:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid(),...]} |
-      {bulkowner_deliver, Id::util:global_uid(), Range::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid(),...]} |
-      {bulkowner_reply, Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()]} |
-      {bulkowner_reply_process_all} |
-      {bulkowner_gather, Id::util:global_uid(), Target::comm:mypid(), [comm:message()], Parents::[comm:mypid()]}).
-
 -type(database_message() ::
       {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
-      {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),  
+      {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any())} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
-      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),  
+      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer()} |
       {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
       % DB subscriptions:
@@ -68,7 +60,7 @@
 
 % accepted messages of dht_node processes
 -type message() ::
-    bulkowner_message() |
+    bulkowner:bulkowner_message() |
     database_message() |
     lookup_message() |
     dht_node_join:join_message() |
@@ -81,19 +73,20 @@
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
-on(Msg, State) when element(1, Msg) =:= join ->
+on(Msg, State) when join =:= element(1, Msg) ->
     dht_node_join:process_join_msg(Msg, State);
 % message with cookie for dht_node_join?
 on({Msg, Cookie} = FullMsg, State) when
-  is_tuple(Msg) andalso
-      (element(1, Msg) =:= join orelse
-           Cookie =:= join orelse
-           (is_tuple(Cookie) andalso element(1, Cookie) =:= join)) ->
+  is_tuple(Msg)
+      andalso (join =:= element(1, Msg))
+      orelse (join =:= Cookie)
+      orelse (is_tuple(Cookie)
+              andalso join =:= element(1, Cookie)) ->
     dht_node_join:process_join_msg(FullMsg, State);
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
-on(Msg, State) when element(1, Msg) =:= move ->
+on(Msg, State) when move =:= element(1, Msg) ->
     dht_node_move:process_move_msg(Msg, State);
 % message with cookie for dht_node_move?
 on({Msg, Cookie} = FullMsg, State) when
@@ -252,6 +245,13 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
                  State
     end;
 
+on({send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, State) ->
+    dht_node_lookup:lookup_aux_failed(State, Target, Message);
+on({{send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, {send_failed, _Pids}}, State) ->
+    dht_node_lookup:lookup_aux_failed(State, Target, Message);
+on({send_error, Target, {lookup_fin, _, _, _} = Message, _Reason}, State) ->
+    dht_node_lookup:lookup_fin_failed(State, Target, Message);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -288,28 +288,28 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
     State;
 
 % send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
-on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->    
+on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
     {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), HashedKey),
     EntryVersion = db_entry:get_version(Entry),
-    DoUpdate = Exists 
-                   andalso EntryVersion =/= -1 
-                   andalso EntryVersion < NewVersion
-                   andalso not db_entry:get_writelock(Entry)
-                   andalso dht_node_state:is_responsible(HashedKey, State),
-    DoRegen = not Exists 
-                  andalso dht_node_state:is_responsible(HashedKey, State), 
-    {NewState, NewEntry} = 
-        if 
+    DoUpdate = Exists
+        andalso EntryVersion =/= -1
+        andalso EntryVersion < NewVersion
+        andalso not db_entry:get_writelock(Entry)
+        andalso dht_node_state:is_responsible(HashedKey, State),
+    DoRegen = not Exists
+        andalso dht_node_state:is_responsible(HashedKey, State),
+    {NewState, NewEntry} =
+        if
             DoUpdate ->
                 UpdEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
-                NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry), 
+                NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry),
                 {dht_node_state:set_db(State, NewDB), UpdEntry};
             DoRegen ->
                 RegenEntry = db_entry:new(HashedKey, NewValue, NewVersion),
                 NewDB = ?DB:set_entry(dht_node_state:get(State, db), RegenEntry),
                 {dht_node_state:set_db(State, NewDB), RegenEntry};
             true -> {State, Entry}
-        end, 
+        end,
     comm:send(Source_PID, {update_key_entry_ack, NewEntry, Exists, DoUpdate orelse DoRegen}),
     NewState;
 
@@ -350,95 +350,16 @@ on({drop_data, Data, Sender}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bulk owner messages (see bulkowner.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({start_bulk_owner, Id, I, Msg}, State) ->
-    bulkowner:bulk_owner(State, Id, I, Msg, []),
-    State;
+on(Msg, State) when bulkowner =:= element(1, Msg)->
+    bulkowner:on(Msg, State);
 
-on({bulk_owner, Id, I, Msg, Parents}, State) ->
-    bulkowner:bulk_owner(State, Id, I, Msg, Parents),
-    State;
-
-on({bulkowner_deliver, Id, Range, Msg, Parents}, State) ->
-    MsgFwd = dht_node_state:get(State, msg_fwd),
-
-    F = fun({FwdInt, FwdPid}, AccI) ->
-                case intervals:is_subset(FwdInt, AccI) of
-                    true ->
-                        FwdRange = intervals:intersection(AccI, FwdInt),
-                        comm:send(FwdPid, {bulkowner_deliver, Id, FwdRange, Msg, Parents}),
-                        intervals:minus(AccI, FwdRange);
-                    _    -> AccI
-                end
-        end,
-    MyRange = lists:foldl(F, Range, MsgFwd),
-    case intervals:is_empty(MyRange) of
-        true -> ok;
-        _ ->
-            case Msg of
-                {bulk_read_entry, Issuer} ->
-                    Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
-                    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
-                    % for aggregation using a tree, activate this instead:
-                    % bulkowner:issue_send_reply(Id, Issuer, ReplyMsg, Parents);
-                    comm:send(Issuer, {bulkowner_reply, Id, ReplyMsg});
-                {send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
-                    comm:send_local(pid_groups:get_my(Proc),
-                                    {bulkowner_deliver, Id, Range, Msg1, Parents})
-            end
-    end,
-    State;
-
-on({bulkowner_reply, Id, Target, Msg, Parents}, State) ->
-    State1 =
-        case dht_node_state:get_bulkowner_reply_timer(State) =:= null of
-            true ->
-                Timer = comm:send_local_after(100, self(), {bulkowner_reply_process_all}),
-                dht_node_state:set_bulkowner_reply_timer(State, Timer);
-            false ->
-                State
-        end,
-    dht_node_state:add_bulkowner_reply_msg(State1, Id, Target, Msg, Parents);
-
-on({bulkowner_reply_process_all}, State) ->
-    {State1, Replies} = dht_node_state:take_bulkowner_reply_msgs(State),
-    _ = [begin
-             case Msgs of
-                 [] -> ok;
-                 [{bulk_read_entry_response, _HRange, _HData} | _] ->
-                     comm:send_local(self(),
-                                     {bulkowner_gather, Id, Target, Msgs, Parents});
-                 [{send_to_group_member, Proc, _Msg} | _] ->
-                     Msgs1 = [Msg1 || {send_to_group_member, _Proc, Msg1} <- Msgs],
-                     comm:send_local(pid_groups:get_my(Proc),
-                                     {bulkowner_gather, Id, Target, Msgs1, Parents})
-             end
-         end || {Id, Target, Msgs, Parents} <- Replies],
-    State1;
-
-on({bulkowner_gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HData} | T], Parents}, State) ->
-    Msg = lists:foldl(
-            fun({bulk_read_entry_response, Range, Data},
-                {bulk_read_entry_response, AccRange, AccData}) ->
-                    {bulk_read_entry_response,
-                     intervals:union(Range, AccRange),
-                     lists:append(Data, AccData)}
-            end, H, T),
-    bulkowner:send_reply(Id, Target, Msg, Parents, self()),
-    State;
+on({send_error, _FailedTarget, FailedMsg, _Reason} = Msg, State)
+  when bulkowner =:= element(1, FailedMsg) ->
+    bulkowner:on(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handling of failed sends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, State) ->
-    dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({{send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, {send_failed, _Pids}}, State) ->
-    dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({send_error, FailedTarget, {bulkowner_reply, Id, Target, Msg, Parents}, _Reason}, State) ->
-    bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
-    State;
-
-on({send_error, Target, {lookup_fin, _, _, _} = Message, _Reason}, State) ->
-    dht_node_lookup:lookup_fin_failed(State, Target, Message);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
