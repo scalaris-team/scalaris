@@ -105,7 +105,6 @@ on(Msg, State) when element(1, Msg) =:= rm_trigger ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:on(Msg, RMState),
     dht_node_state:set_rm(State, RMState1);
-% message with cookie for rm_loop?
 on({Msg, Cookie} = FullMsg, State) when
   is_tuple(Msg) andalso is_atom(element(1, Msg)) andalso
       (element(1, Msg) =:= rm orelse
@@ -115,26 +114,8 @@ on({Msg, Cookie} = FullMsg, State) when
     RMState1 = rm_loop:on(FullMsg, RMState),
     dht_node_state:set_rm(State, RMState1);
 
-%% Kill Messages
-on({kill}, _State) ->
-    kill;
-
 on({leave}, State) ->
     dht_node_move:make_slide_leave(State);
-
-on({churn}, _State) ->
-    kill;
-
-on({halt}, _State) ->
-    util:sleep_for_ever();
-
-on({die}, _State) ->
-    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-    SupDhtNode = pid_groups:get_my(sup_dht_node),
-    util:supervisor_terminate_childs(SupDhtNode),
-    ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
-    ok = supervisor:delete_child(main_sup, SupDhtNodeId),
-    kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance
@@ -145,12 +126,6 @@ on({rt_update, RoutingTable}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Transactions (see transactions/*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_process_in_group, Source_PID, Key, Process}, State) ->
-    Pid = pid_groups:get_my(Process),
-    GPid = comm:make_global(Pid),
-    comm:send(Source_PID, {get_process_in_group_reply, Key, GPid}),
-    State;
-
 on({get_rtm, Source_PID, Key, Process}, State) ->
     MyGroup = pid_groups:my_groupname(),
     Pid = pid_groups:get_my(Process),
