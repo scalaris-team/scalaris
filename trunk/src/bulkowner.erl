@@ -48,7 +48,7 @@
          [comm:message()], Parents::[comm:mypid()]}.
 
 -type bulkowner_send_error() ::
-        {send_error, comm:mypid(), bulkowner_msg(), atom() }.
+        {send_error, comm:mypid(), bulkowner_req(), atom() }.
 
 -type bulkowner_msg() :: bulkowner_req() | bulkowner_send_error().
 
