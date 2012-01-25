@@ -330,6 +330,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             int slashIndex = title.indexOf('/');
             if (slashIndex != (-1)) {
                 req_search = title.substring(slashIndex + 1);
+            } else {
+                req_search = "";
             }
         }
         // use default namespace (id 0) for invalid values
@@ -338,13 +340,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormTitle("Search results");
         page.setFormType(FormType.PageSearchForm);
         ValueResult<List<String>> result;
-        if (req_search == null) {
-            page.setTitle("Special:Search&namespace=" + nsId);
-            page.setSearch("");
+        page.setSearch(req_search);
+        page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
+        if (req_search.isEmpty()) {
             result = new ValueResult<List<String>>(new ArrayList<String>(0));
         } else {
-            page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
-            page.setSearch(req_search);
             if (nsId == 0) {
                 result = getArticleList(connection);
             } else {
