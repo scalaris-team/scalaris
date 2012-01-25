@@ -20,7 +20,7 @@
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
     <path refid="import.classpath"/>
-	<pathelement location="contrib/apache-tomcat-7.0.25/lib/servlet-api.jar"/>
+    <pathelement location="contrib/apache-tomcat-7.0.25/lib/servlet-api.jar"/>
   </path>
 
   <property name="jetty.home" value="contrib/jetty-hightide-8.0.4.v20111024" />
