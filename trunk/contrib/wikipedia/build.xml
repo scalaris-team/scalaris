@@ -20,11 +20,11 @@
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
     <path refid="import.classpath"/>
-	<pathelement location="contrib/apache-tomcat-7.0.22/lib/servlet-api.jar"/>
+	<pathelement location="contrib/apache-tomcat-7.0.25/lib/servlet-api.jar"/>
   </path>
 
   <property name="jetty.home" value="contrib/jetty-hightide-8.0.4.v20111024" />
-  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.22" />
+  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.25" />
 
   <!-- Create build directory and copy static files -->
   <macrodef name="scalaris.check.jars">
