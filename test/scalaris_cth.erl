@@ -29,7 +29,8 @@
 
 -record(state, { processes = [] :: [unittest_helper:process_info()] | undefined,
                  suite          :: atom() | undefined,
-                 tc_start       :: util:time() | undefined }).
+                 tc_start = []  :: [{comm:erl_local_pid(), util:time()}] | [] 
+               }).
 -type state() :: #state{} | {ok, #state{}}. % the latter for erlang =< R14B03
 -type id() :: atom().
 
@@ -60,7 +61,7 @@ pre_init_per_suite(Suite, Config, State) when is_record(State, state) ->
     randoms:start(),
     % note: on R14B02, post_end_per_testcase was also called for init_per_suite
     % -> we thus need a valid time
-    {Config, State#state{processes = Processes, suite = Suite, tc_start = os:timestamp()}}.
+    {Config, State#state{processes = Processes, suite = Suite, tc_start = [{self(), os:timestamp()}]}}.
 
 %% @doc Called after init_per_suite.
 -spec post_init_per_suite(SuiteName::atom(), Config::unittest_helper:kv_opts(), Return, CTHState::state())
@@ -95,7 +96,7 @@ post_end_per_suite(_Suite, _Config, Return, State) when is_record(State, state) 
     _ = inets:stop(),
     error_logger:tty(true),
     unittest_helper:kill_new_processes(State#state.processes),
-    {Return, State#state{processes = [], suite = undefined } }.
+    {Return, State#state{processes = [], suite = undefined, tc_start = [] } }.
 
 %% @doc Called before each test case.
 -spec pre_init_per_testcase(TestcaseName::atom(), Config::unittest_helper:kv_opts(), CTHState::state())
@@ -107,7 +108,7 @@ pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
     ct:pal("Start ~p:~p~n"
            "####################################################",
            [State#state.suite, TC]),
-    {Config, State#state{tc_start = os:timestamp()}}.
+    {Config, State#state{tc_start = [{self(), os:timestamp()} | State#state.tc_start]}}.
 
 %% @doc Called after each test case.
 -spec post_end_per_testcase(TestcaseName::atom(), Config::unittest_helper:kv_opts(), Return, CTHState::state())
@@ -116,7 +117,11 @@ pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
 post_end_per_testcase(TC, Config, Return, {ok, State}) ->
     post_end_per_testcase(TC, Config, Return, State);
 post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) ->
-    TCTime_us = timer:now_diff(os:timestamp(), State#state.tc_start),
+    {Start, NewTcStart} =  case lists:keytake(self(), 1, State#state.tc_start) of
+                               {value, {_, Val}, List} -> {Val, List};
+                               false -> { os:timestamp(), State#state.tc_start }
+                           end,
+    TCTime_us = timer:now_diff(os:timestamp(), Start),
     ct:pal("####################################################~n"
            "End ~p:~p -> ~.0p (after ~fs)",
            [State#state.suite, TC, Return, TCTime_us / 1000000]),
@@ -128,7 +133,7 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
             end;
         _ -> ok
     end,
-    {Return, State#state{tc_start = undefined} }.
+    {Return, State#state{tc_start = NewTcStart} }.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
 %% post_end_per_group and post_end_per_testcase if the suite, group or test case failed.
