@@ -29,8 +29,9 @@
 
 -include("unittest.hrl").
 -include("scalaris.hrl").
-
 -include("record_helpers.hrl").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -record(rrNodeStatus, {
                         nodeKey     = ?required(rrNodeStatus, nodeKey)      :: ?RT:key(), 
@@ -40,30 +41,30 @@
                       }).
 -type rrDBStatus() :: [#rrNodeStatus{}].
 
-% TEST CASE TYPES:
-%   simple - run one sync round
-%   times - measure sync time (building, protocol)
-%   parts - get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
-%   min_nodes - sync in an single node ring
-
-all() ->
+basic_tests() ->
     [get_symmetric_keys_test,
      blobCoding,
      mapInterval,
-     tester_minKeyInInterval,
-     bloomSync_simple,
-     bloomSync_FprCompare_check,
-     bloomSync_times,
-     bloomSync_parts,
-     bloomSync_min_nodes,
-     merkleSync_noOutdated,
-     merkleSync_simple,
-     merkleSync_parts,
-     merkleSync_min_nodes,
-     artSync_noOutdated,
-     artSync_simple,
-     artSync_min_nodes
+     tester_minKeyInInterval].
+
+upd_tests() ->
+    [upd_no_outdated,
+     upd_min_nodes,     % sync in an single node ring
+     upd_simple,        % run one sync round
+     upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
+
+all() ->
+    [{group, basic_tests},
+     {group, upd_tests},
+     bloomSync_times
      ].
+
+groups() ->
+    [{basic_tests,  [parallel], basic_tests()},
+     {upd_tests,    [sequence], [{upd_bloom,    [sequence], upd_tests()},
+                                 {upd_merkle,   [sequence], upd_tests()},
+                                 {upd_art,      [sequence], upd_tests()}]}
+    ].
 
 suite() ->
     [
@@ -87,50 +88,79 @@ end_per_testcase(_TestCase, _Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_rrepair_config_parameter() ->
+get_rep_upd_config(Method) ->
     [{rep_update_activate, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, bloom}, %bloom, merkle_tree, art
+     {rep_update_recon_method, Method},
      {rep_update_resolve_method, simple},
      {rep_update_recon_fpr, 0.1},
-     {rep_update_max_items, 1000},
-     {rep_update_negotiate_sync_interval, false}].
-
-get_bloom_RepUpd_config() ->
-    [{rep_update_activate, true},
-     {rep_update_interval, 100000000}, %stop trigger
-     {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, bloom}, %bloom, merkle_tree, art
-     {rep_update_resolve_method, simple},
-     {rep_update_recon_fpr, 0.1},
-     {rep_update_max_items, 10000},
-     {rep_update_negotiate_sync_interval, false}].
-
-get_merkle_tree_RepUpd_config() ->
-    [{rep_update_activate, true},
-     {rep_update_interval, 100000000}, %stop trigger
-     {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, merkle_tree}, %bloom, merkle_tree, art
-     {rep_update_resolve_method, simple},
-     {rep_update_recon_fpr, 0.1},
-     {rep_update_max_items, 100000},
-     {rep_update_negotiate_sync_interval, true}].
-
-get_art_RepUpd_config() ->
-    [{rep_update_activate, true},
-     {rep_update_interval, 100000000}, %stop trigger
-     {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, art}, %bloom, merkle_tree, art
-     {rep_update_resolve_method, simple},
-     {rep_update_recon_fpr, 0.1},
-     {rep_update_max_items, 100000},
-     {rep_update_sync_feedback, true},
-     {rep_update_negotiate_sync_interval, true}].
+     {rep_update_max_items, case Method of
+                                bloom -> 10000;
+                                _ -> 100000
+                            end},
+     {rep_update_negotiate_sync_interval, case Method of
+                                              bloom -> false;
+                                              _ -> true
+                                          end}].    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Test Functions
+% Replica Update tests
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+init_per_group(Group, Config) ->
+    ct:comment(io_lib:format("BEGIN ~p", [Group])),
+    case Group of
+        upd_bloom -> [{ru_method, bloom} | Config];
+        upd_merkle -> [{ru_method, merkle_tree} | Config];
+        upd_art -> [{ru_method, art} | Config];
+        _ -> Config
+    end.
+
+end_per_group(Group, Config) ->  
+    Method = proplists:get_value(ru_method, Config, undefined),
+    case Method of
+        undefined -> ct:comment(io_lib:format("END ~p", [Group]));
+        M -> ct:comment(io_lib:format("END ~p/~p", [Group, M]))
+    end,
+    proplists:delete(ru_method, Config).
+
+
+upd_no_outdated(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_rep_upd_config(Method)),
+    ?assert(Start =:= End).
+
+upd_min_nodes(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, get_rep_upd_config(Method)),
+    ?assert(Start =:= End).    
+
+upd_simple(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.1, get_rep_upd_config(Method)),
+    ?assert(Start < End).    
+
+upd_parts(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    OldConf = get_rep_upd_config(Method),
+    Conf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
+    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, Conf),
+    ?assert(Start < End).
+
+upd_fpr_compare(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    Conf = get_rep_upd_config(Method),    
+    Fpr1 = 0.2,
+    Fpr2 = 0.01,
+    R1 = start_sync(Config, 4, 1000, 100, 2, Fpr1, Conf),
+    R2 = start_sync(Config, 4, 1000, 100, 2, Fpr2, Conf),
+    ct:pal("Result FPR=~p - ~p~nFPR=~p - ~p", [Fpr1, R1, Fpr2, R2]),
+    ?assert(lists:nth(2, R1) < lists:nth(2, R2) orelse lists:last(R1) < lists:last(R2)).    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Basic Functions Group
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 get_symmetric_keys_test(Config) ->
     Config2 = unittest_helper:start_minimal_procs(Config, [], true),
@@ -182,36 +212,6 @@ tester_minKeyInInterval(_) ->
 % Bloom Filter Tests
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Bloom Synchronization should update at least one Item.
-bloomSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, get_bloom_RepUpd_config()),
-    ?assert(Start < End),
-    ok.
-
-% @doc Check rep upd with only one node
-bloomSync_min_nodes(Config) ->
-    BConf = get_bloom_RepUpd_config(),    
-    [Start1, End1] = start_sync(Config, 1, 1, 100, 1, 0.2, BConf),
-    [Start2, End2] = start_sync(Config, 1, 1000, 100, 1, 0.2, BConf),
-    ?assert(Start1 =:= End1),
-    ?assert(Start2 =:= End2),
-    ok.
-
-bloomSync_parts(Config) ->
-    OldConf = get_bloom_RepUpd_config(),
-    BConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 400}),
-    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, BConf),
-    ?assert(Start < End),
-    ok.    
-
-% @doc Better Fpr should result in a higher synchronization degree.
-bloomSync_FprCompare_check(Config) ->
-    BConf = get_bloom_RepUpd_config(),    
-    R1 = start_sync(Config, 4, 1000, 100, 2, 0.2, BConf),
-    R2 = start_sync(Config, 4, 1000, 100, 2, 0.1, BConf),
-    ?assert(lists:nth(2, R1) < lists:nth(2, R2) orelse lists:last(R1) < lists:last(R2)),
-    ok.
-
 bloomSync_times(Config) ->
     %Parameter
     NodeCount = 4,
@@ -223,7 +223,7 @@ bloomSync_times(Config) ->
     DestVersCount = NodeCount * 2 * DataCount,
     ItemCount = NodeCount * DataCount,
     %Build Ring
-    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_bloom_RepUpd_config()]),
+    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_rep_upd_config(bloom)]),
     config:write(rep_update_fpr, Fpr),
     {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount, 100]),
     %measure initial sync degree
@@ -246,52 +246,6 @@ bloomSync_times(Config) ->
     ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStatus = ~w~nGetVersionCount = ~w~nStopRing = ~w",
            [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
     ok.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Merkle Tree Tests
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-merkleSync_noOutdated(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_merkle_tree_RepUpd_config()),
-    ?assert(Start =:= End),
-    ok.    
-
-merkleSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_merkle_tree_RepUpd_config()),
-    ?assert(Start < End),
-    ok.
-
-merkleSync_min_nodes(Config) ->
-    MConf = get_merkle_tree_RepUpd_config(),
-    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, MConf),
-    ?assert(Start =:= End),
-    ok.
-
-merkleSync_parts(Config) ->
-    OldConf = get_merkle_tree_RepUpd_config(),
-    MConf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
-    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.2, MConf),
-    ?assert(Start < End),
-    ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ART Tests
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-artSync_noOutdated(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_art_RepUpd_config()),
-    ?assert(Start =:= End),
-    ok.
-
-artSync_simple(Config) ->
-    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.2, get_art_RepUpd_config()),
-    ?assert(Start < End),    
-    ok.
-
-artSync_min_nodes(Config) ->
-    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, get_art_RepUpd_config()),
-    ?assert(Start =:= End),
-    ok.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
@@ -332,7 +286,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],
-    SyncMethod = lists:keyfind(rep_update_sync_method, 1, RepUpdConfig),
+    SyncMethod = proplists:get_value(rep_update_recon_method, RepUpdConfig),
     ct:pal(">>[~p] SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [SyncMethod, Rounds, Fpr, Result]),
     %clean up
     unittest_helper:stop_ring(),
