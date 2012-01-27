@@ -83,7 +83,7 @@
          ownerRemotePid     = ?required(ru_recon_state, ownerRemotePid) :: comm:mypid(),
          dhtNodePid         = ?required(ru_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_ru_pid        = undefined                                 :: comm:mypid() | undefined,
-         recon_method       = undefined                                 :: method(),   %determines the build sync struct
+         recon_method       = undefined                                 :: method(),   %reconciliation method
          recon_struct       = {}                                        :: recon_struct() | {},
          recon_stage        = reconciliation                            :: recon_stage(),
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
@@ -205,8 +205,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         dhtNodePid = DhtNodePid,
                         sync_master = SyncMaster,
                         stats = Stats }) ->
-    MyI = proplists:get_value(interval, Params),
-    SyncI = ?IIF(RMethod =:= bloom, mapInterval(MyI, 1), MyI),    
+    SyncI = proplists:get_value(interval, Params),    
     ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
@@ -530,7 +529,7 @@ build_recon_struct(bloom, {I, DBItems}) ->
     {KeyBF, VerBF} = fill_bloom(DBItems, 
                                 ?REP_BLOOM:new(ElementNum, Fpr, Hfs), 
                                 ?REP_BLOOM:new(ElementNum, Fpr, Hfs)),
-    #bloom_recon_struct{ interval = I, keyBF = KeyBF, versBF = VerBF };
+    #bloom_recon_struct{ interval = mapInterval(I, 1), keyBF = KeyBF, versBF = VerBF };
 
 build_recon_struct(merkle_tree, {I, DBItems}) ->
     Tree = merkle_tree:bulk_build(I, DBItems),

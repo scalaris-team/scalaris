@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +13,11 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    rrepair_SUITE.erl
+%%% File    rep_upd_SUITE.erl
 %%% @author Maik Lange <malange@informatik.hu-berlin.de
 %%% @doc    Tests for rep update module.
 %%% @end
-%%% Created : 2011-05-27 by Maik Lange
+%%% Created : 2011-05-27
 %%%-------------------------------------------------------------------
 %% @version $Id $
 
@@ -61,7 +61,7 @@ all() ->
 
 groups() ->
     [{basic_tests,  [parallel], basic_tests()},
-     {upd_tests,    [sequence], [{upd_bloom,    [sequence], upd_tests()},
+     {upd_tests,    [sequence], [{upd_bloom,    [sequence], upd_tests()}, %{repeat_until_any_fail, 1000}
                                  {upd_merkle,   [sequence], upd_tests()},
                                  {upd_art,      [sequence], upd_tests()}]}
     ].

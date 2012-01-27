@@ -29,7 +29,7 @@
 -type key() :: binary() | integer() | float() | boolean() | atom() | tuple() | ?RT:key().
 
 -callback new(integer(), float()) -> bloom_filter().
--callback new(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter().
+-callback new(integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
 -callback add(bloom_filter(), key() | [key()]) -> bloom_filter().
 -callback is_element(bloom_filter(), key()) -> boolean().
 -callback equals(bloom_filter(), bloom_filter()) -> boolean().
