@@ -33,7 +33,7 @@
          is_merkle_tree/1,
          get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_bucket_size/1, get_branch_factor/1,
-         store_to_DOT/2]).
+         store_to_DOT/2, store_graph/2]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
@@ -74,7 +74,7 @@
                      Child_list  :: [mt_node()]
                     }.
 
--type mt_iter() :: [mt_node()].
+-type mt_iter()     :: [mt_node()].
 -type merkle_tree() :: {merkle_tree, mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -341,13 +341,19 @@ next([]) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc Stores the tree graph into a png file.
+-spec store_graph(merkle_tree(), string()) -> ok.
+store_graph(MerkleTree, FileName) ->
+    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree, FileName, true) end),
+    ok.    
+
 % @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
--spec store_to_DOT(merkle_tree(), [char()]) -> ok.
+-spec store_to_DOT(merkle_tree(), string()) -> ok.
 store_to_DOT(MerkleTree, FileName) ->
-    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree, FileName) end),
+    erlang:spawn(fun() -> store_to_DOT_p(MerkleTree, FileName, false) end),
     ok.
 
-store_to_DOT_p({merkle_tree, Conf, Root}, FileName) ->
+store_to_DOT_p({merkle_tree, Conf, Root}, FileName, ToPng) ->
     case file:open("../" ++ FileName ++ ".dot", [write]) of
         {ok, Fileid} ->
             io:fwrite(Fileid, "digraph merkle_tree { ~n", []),
@@ -356,6 +362,11 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName) ->
             io:fwrite(Fileid, "} ~n", []),
             _ = file:truncate(Fileid),
             _ = file:close(Fileid),
+            _ = if ToPng ->
+                       os:cmd(io_lib:format("dot ../~s.dot -Tpng > ../~s.png", [FileName, FileName])),
+                       os:cmd(io_lib:format("rm -f ../~s.dot", [FileName]));
+                   true -> ok 
+                end,
             ok;
         {_, _} ->
             io_error
