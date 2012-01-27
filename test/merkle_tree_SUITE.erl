@@ -229,8 +229,9 @@ prop_store_to_dot(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p", [ToAdd, Inner, Leafs]),
-    merkle_tree:store_to_DOT(Tree, "StoreToDotTest2"),
+    ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p
+            Saved to ..\MerkleTree.png", [ToAdd, Inner, Leafs]),
+    merkle_tree:store_graph(Tree, "MerkleTree"),
     true.
 
 tester_store_to_dot(_) ->
