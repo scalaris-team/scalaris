@@ -35,12 +35,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -record(bloom, {
-                size          = 0                             :: non_neg_integer(),%bit-length of the bloom filter - requirement: size rem 8 = 0
-                filter        = <<>>                          :: binary(),         %length = size div 8
-                target_fpr    = ?required(bloom, target_fpr)  :: float(),          %target false-positive-rate
-                hfs           = ?required(bloom, hfs)         :: ?REP_HFS:hfs(),   %HashFunctionSet
-                max_items     = ?required(bloom, max_items)   :: non_neg_integer(),%extected number of items
-                items_count   = 0                             :: non_neg_integer() %number of inserted items
+                size          = 0                     :: non_neg_integer(),%bit-length of the bloom filter - requirement: size rem 8 = 0
+                filter        = <<>>                  :: binary(),         %length = size div 8
+                hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
+                max_items     = undefined             :: non_neg_integer() | undefined, %extected number of items
+                items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
 -type bloom_filter_t() :: #bloom{}.
 
@@ -51,17 +50,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc creates a new bloom filter
--spec new_(integer(), float(), ?REP_HFS:hfs()) -> bloom_filter_t().
-new_(N, FPR, Hfs) ->
-    Size = resize(calc_least_size(N, FPR), 8), %BF bit size should fit into a number of bytes
+-spec new_(integer(), integer(), ?REP_HFS:hfs()) -> bloom_filter_t().
+new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
     #bloom{
-           size = Size,
-           filter = <<0:Size>>,
-           max_items = N, 
-           target_fpr = calc_FPR(Size, N, calc_HF_num(Size, N)),
+           size = BitSize,
+           filter = <<0:BitSize>>,
+           max_items = MaxItems,
            hfs = Hfs,
            items_count = 0
-          }.
+          };
+new_(_, _, _) ->
+    error("BitSize rem 8 has to be 0").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -100,9 +99,9 @@ is_element_(Bloom, Item) ->
 %% @doc joins two bloom filter, returned bloom filter represents their union
 -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
 join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1, 
-             target_fpr = Fpr1, filter = F1, hfs = Hfs}, 
+             filter = F1, hfs = Hfs}, 
       #bloom{size = Size2, max_items = ExpItem2, items_count = Items2, 
-             target_fpr = Fpr2, filter = F2}) ->
+             filter = F2}) ->
     NewSize = erlang:max(Size1, Size2),
     <<F1Val : Size1>> = F1,
     <<F2Val : Size2>> = F2,
@@ -111,7 +110,6 @@ join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1,
            size = NewSize,
            filter = <<NewFVal:NewSize>>,                            
            max_items = erlang:max(ExpItem1, ExpItem2), 
-           target_fpr = erlang:min(Fpr1, Fpr2),
            hfs = Hfs,                              
            items_count = Items1 + Items2 %approximation            
            }.
@@ -142,7 +140,6 @@ equals_(Bloom1, Bloom2) ->
 print_(Bloom) -> 
     #bloom{
            max_items = MaxItems, 
-           target_fpr = TargetFpr,
            size = Size,
            hfs = Hfs,
            items_count = NumItems
@@ -152,14 +149,16 @@ print_(Bloom) ->
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
      {hash_fun_num, HCount},
      {max_items, MaxItems},
-     {dest_fpr, TargetFpr},
      {items_inserted, NumItems},
-     {act_fpr, calc_FPR(Size, NumItems, HCount)},
+     {act_fpr, get_property(Bloom, fpr)},
      {compression_rate, Size / MaxItems}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_property(bloom_filter_t(), atom()) -> not_found | term().
+get_property(#bloom{ size = Size, hfs = Hfs, items_count = NumItems }, fpr) ->
+    HCount = apply(element(1, Hfs), size, [Hfs]),
+    calc_FPR(Size, NumItems, HCount);
 get_property(Bloom, Property) ->
     FieldNames = record_info(fields, bloom),
     {_, N} = lists:foldl(fun(I, {Nr, Res}) -> case I =:= Property of

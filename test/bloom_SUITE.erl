@@ -141,7 +141,7 @@ measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
     InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),    
     BF = ?BLOOM:add(InitBF, InList),
     
-    Count = trunc(10 / ?BLOOM:get_property(BF, target_fpr)),
+    Count = trunc(10 / ?BLOOM:get_property(BF, fpr)),
     _NotInList = random_list(ListItemType, Count),
     NotInList = lists:filter(fun(I) -> not lists:member(I, InList) end, _NotInList),    
     Found = lists:foldl(fun(I, Acc) -> 
