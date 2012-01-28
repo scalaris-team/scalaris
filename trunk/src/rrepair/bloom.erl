@@ -59,8 +59,8 @@ new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
            hfs = Hfs,
            items_count = 0
           };
-new_(_, _, _) ->
-    error("BitSize rem 8 has to be 0").
+new_(BitSize, MaxItems, Hfs) ->
+    new(resize(BitSize, 8), MaxItems, Hfs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
