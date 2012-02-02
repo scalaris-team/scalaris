@@ -25,7 +25,7 @@ rootfiles
 
 # for wikipedia
 tomcat6
-scalaris-svn-java
+scalaris-java
 scalaris-examples-wiki-tomcat6
 screen
 virt-what

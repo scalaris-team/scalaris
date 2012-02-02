@@ -23,7 +23,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.4.0+svn").
+-define(SCALARIS_VERSION, "0.4.0").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
@@ -81,10 +81,6 @@
 %-define(DEBUG_REGISTER(PROCESS,PID),erlang:register(PROCESS,PID)).
 % disable:
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
-
-% Replica Repair
--define(REP_BLOOM, bloom). % bloom filter implemenation selection 
--define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
 
 % Back-end of the pdb module
 -define(PDB_ERL, true). % erlang put and get (process dictionary)
