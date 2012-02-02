@@ -1,0 +1,365 @@
+\chapter{Basic Structured Overlay}
+
+\section{Ring Maintenance}
+
+\section{T-Man}
+
+\section{Routing Tables}
+\label{chapter.routing}
+\svnrev{r1453}
+\erlmoduleindex{rt\_beh}
+
+Each node of the ring can perform searches in the overlay.
+
+A search is done by a lookup in the overlay, but there are several
+other demands for communication between peers. \scalaris{} provides
+a general interface to route a message to the (other) peer, which is
+currently responsible for a given \code{key}.
+
+\codesnippet{api_dht_raw.erl}{api_dht_raw:lookup}{../src/api_dht_raw.erl}
+
+The message \code{Msg} could be a \code{get_key} which retrieves content from
+the responsible node or a \code{get_node} message, which returns a pointer
+to the node.
+
+All currently supported messages are listed in the file \code{dht_node.erl}.
+
+The message routing is implemented in \code{dht_node_lookup.erl}
+
+\codesnippet{dht_node_lookup.erl}{dht_node_lookup:routing}{../src/dht_node_lookup.erl}
+
+Each node is responsible for a certain key interval. The function
+\erlfun{intervals}{in}{/2} is used to decide, whether the key is between
+the current node and its successor. If that is the case, the final step is
+delivers a \code{lookup_fin} message to the local node. Otherwise, the message
+is forwarded to the next nearest known peer (listed in the routing table)
+determined by \erlfun{?RT}{next\_hop}{/2}.
+
+\code{rt_beh.erl} is a generic interface for routing tables. It
+can be compared to interfaces in Java. In Erlang interfaces can be
+defined using a so called `behaviour'.  The files \code{rt_simple} and
+\code{rt_chord} implement the behaviour `rt\_beh'.
+
+The macro \code{?RT} is used to select the current implementation of routing
+tables. It is defined in \code{include/scalaris.hrl}.
+
+\codesnippet{scalaris.hrl}{scalaris:rt}{../include/scalaris.hrl}
+
+The functions, that have to be implemented for a routing mechanism are
+defined in the following file:
+
+\codesnippet{rt_beh.erl}{rt_beh:behaviour}{../src/rt_beh.erl}
+
+\begin{description}
+\setlength{\parskip}{0pt}
+\setlength{\itemsep}{0pt}
+\erlfunindex{rt\_beh}{empty}
+\item \code{empty/1} gets a successor and generates an empty routing
+  table for use inside the routing table implementation. The data structure of
+  the routing table is undefined. It can be a list, a tree, a matrix \ldots
+
+\erlfunindex{rt\_beh}{empty\_ext}
+\item \code{empty_ext/1} similarly creates an empty external routing table
+  for use by the \erlmodule{dht\_node}. This process might not need all the
+  information a routing table implementation requires and can thus work with
+  less data.
+
+\erlfunindex{rt\_beh}{hash\_key}
+\item \code{hash_key/1} gets a key and maps it into the overlay's
+  identifier space.
+
+\erlfunindex{rt\_beh}{get\_random\_node\_id}
+\item \code{get_random_node_id/0} returns a random node id from the
+  overlay's identifier space. This is used for example when a new node
+  joins the system.
+
+\erlfunindex{rt\_beh}{next\_hop}
+\item \code{next_hop/2} gets a \erlmodule{dht\_node}'s state (including the
+  external routing table representation) and a key and returns the node, that
+  should be contacted next when searching for the key, i.e. the known node
+  nearest to the id.
+
+\erlfunindex{rt\_beh}{init\_stabilize}
+\item \code{init_stabilize/2} is called periodically to rebuild the
+  routing table. The parameters are the identifier of the node, its
+  successor and the old (internal) routing table state. This method may send
+  messages to the \code{routing_table} process which need to be handled by
+  the \code{handle_custom_message/2} handler since they are
+  implementation-specific.
+
+\erlfunindex{rt\_beh}{update}
+\item \code{update/7} is called when the node's ID, predecessor and/or
+  successor changes. It updates the (internal) routing table with the (new)
+  information.
+
+\erlfunindex{rt\_beh}{filter\_dead\_node}
+\item \code{filter_dead_node/2} is called by the failure detector and tells
+  the routing table about dead nodes. This function gets the (internal) routing
+  table and a node to remove from it. A new routing table state is returned.
+
+\erlfunindex{rt\_beh}{to\_pid\_list}
+\item \code{to_pid_list/1} get the PIDs of all (internal) routing table
+  entries.
+
+\erlfunindex{rt\_beh}{get\_size}
+\item \code{get_size/1} get the (internal or external) routing table's size.
+
+\erlfunindex{rt\_beh}{get\_replica\_keys}
+\item \code{get_replica_keys/1} Returns for a given (hashed)
+  \code{Key} the (hashed) keys of its replicas. This used for implementing
+  symmetric replication.
+
+\erlfunindex{rt\_beh}{n}
+\item \code{n/0} gets the number of available keys. An implementation may
+  throw \code{throw:not_supported} if the operation is unsupported by
+  the routing table.
+
+\erlfunindex{rt\_beh}{dump}
+\item \code{dump/1} dump the (internal) routing table state for debugging,
+  e.g. by using the web interface. Returns a list of
+  \code{\{Index, Node_as_String\}} tuples which may just as well be empty.
+
+\erlfunindex{rt\_beh}{to\_list}
+\item \code{to_list/1} convert the (external) representation of the routing
+  table inside a given \code{dht_node_state} to a sorted list of known nodes
+  from the routing table, i.e. first=succ, second=next known node on the ring,
+  \ldots This is used by bulk-operations to create a
+  broadcast tree.
+
+\erlfunindex{rt\_beh}{export\_rt\_to\_dht\_node}
+\item \code{export_rt_to_dht_node/2} convert the internal routing table state
+  to an external state. Gets the internal state and the node's neighborhood
+  for doing so.
+
+\erlfunindex{rt\_beh}{handle\_custom\_message}
+\item \code{handle_custom_message/2} handle messages specific to the routing
+  table implementation. \erlmodule{rt\_loop} will forward unknown messages
+  to this function.
+
+\erlfunindex{rt\_beh}{check}
+\item \code{check/5}, \code{check/6} check for routing table changes and send
+  an updated (external) routing table to the \erlmodule{dht\_node} process.
+
+\erlfunindex{rt\_beh}{check\_config}
+\item \code{check_config/0} check that all required configuration parameters
+  exist and satisfy certain restrictions.
+
+\end{description}
+
+\subsection{The routing table process (\texorpdfstring{\code{rt_loop}}{rt\_loop})}
+\erlmoduleindex{rt\_loop}
+
+The \erlmodule{rt\_loop} module implements the process for all routing tables.
+It processes messages and calls the appropriate methods in the specific routing
+table implementations.
+
+\codesnippet{rt_loop.erl}{rt_loop:state}{../src/rt_loop.erl}
+If initialized, the node's id, its predecessor, successor and the routing table
+state of the selected implementation (the macro \code{RT} refers to).
+
+\codesnippet{rt_loop.erl}{rt_loop:trigger}{../src/rt_loop.erl}
+Periodically (see \code{routingtable_trigger} and
+\code{pointer_base_stabilization_interval} config parameters) a \code{trigger}
+message is sent to the \code{rt_loop} process that starts the periodic
+stabilization implemented by each routing table.
+
+\codesnippet{rt_loop.erl}{rt_loop:update_rt}{../src/rt_loop.erl}
+Every time a node's neighborhood changes, the \erlmodule{dht\_node} sends an
+\code{update_rt} message to the routing table which will call
+\erlfun{?RT}{update}{/7} that decides whether the routing table should be
+re-build. If so, it will stop any waiting trigger and schedule an immideate
+(periodic) stabilization.
+
+\subsection{Simple routing table (\texorpdfstring{\code{rt_simple}}{rt\_simple})}
+\erlmoduleindex{rt\_simple}
+
+One implementation of a routing table is the \code{rt_simple}, which routes
+via the successor. Note that this is inefficient as it needs a linear number
+of hops to reach its goal. A more robust implementation, would use a successor
+list. This implementation is also not very efficient in the presence of churn.
+
+\subsubsection{Data types}
+First, the data structure of the routing table is defined:
+
+\codesnippet{rt_simple.erl}{rt_simple:types}{../src/rt_simple.erl}
+The routing table only consists of a node (the successor). Keys in the overlay
+are identified by integers $\geq 0$.
+
+\subsubsection{A simple \texorpdfstring{\erlmodule{rm\_beh}}{rm\_beh} behaviour}
+
+\erlfunindex{rt\_simple}{empty}
+\codesnippet{rt_simple.erl}{rt_simple:empty}{../src/rt_simple.erl}
+\erlfunindex{rt\_simple}{empty\_ext}
+\codesnippet{rt_simple.erl}{rt_simple:empty_ext}{../src/rt_simple.erl}
+The empty routing table (internal or external)  consists of the successor.
+
+\erlfunindex{rt\_simple}{hash\_key}
+\codesnippet{rt_simple.erl}{rt_simple:hash_key}{../src/rt_simple.erl}
+Keys are hashed using MD5 and have a length of 128 bits.
+
+\erlfunindex{rt\_simple}{get\_random\_node\_id}
+\codesnippet{rt_simple.erl}{rt_simple:get_random_node_id}{../src/rt_simple.erl}
+Random node id generation uses the helpers provided by the \erlmodule{randoms}
+module.
+
+\erlfunindex{rt\_simple}{next\_hop}
+\codesnippet{rt_simple.erl}{rt_simple:next_hop}{../src/rt_simple.erl}
+Next hop is always the successor.
+
+\erlfunindex{rt\_simple}{init\_stabilize}
+\codesnippet{rt_simple.erl}{rt_simple:init_stabilize}{../src/rt_simple.erl}
+\code{init_stabilize/2} resets its routing table to the current successor.
+
+\erlfunindex{rt\_simple}{update}
+\codesnippet{rt_simple.erl}{rt_simple:update}{../src/rt_simple.erl}
+\code{update/7} updates the routing table with the new successor.
+
+\erlfunindex{rt\_simple}{filter\_dead\_node}
+\codesnippet{rt_simple.erl}{rt_simple:filter_dead_node}{../src/rt_simple.erl}
+\code{filter_dead_node/2} does nothing, as only the successor is listed in
+the routing table and that is reset periodically in \code{init_stabilize/2}.
+
+\erlfunindex{rt\_simple}{to\_pid\_list}
+\codesnippet{rt_simple.erl}{rt_simple:to_pid_list}{../src/rt_simple.erl}
+\code{to_pid_list/1} returns the pid of the successor.
+
+\erlfunindex{rt\_simple}{get\_size}
+\codesnippet{rt_simple.erl}{rt_simple:get_size}{../src/rt_simple.erl}
+The size of the routing table is always \code{1}.
+
+\erlfunindex{rt\_simple}{get\_replica\_keys}
+\codesnippet{rt_simple.erl}{rt_simple:get_replica_keys}{../src/rt_simple.erl}
+This \code{get_replica_keys/1} implements symmetric replication.
+
+\erlfunindex{rt\_simple}{n}
+\codesnippet{rt_simple.erl}{rt_simple:n}{../src/rt_simple.erl}
+There are $2^{128}$ available keys.
+
+\erlfunindex{rt\_simple}{dump}
+\codesnippet{rt_simple.erl}{rt_simple:dump}{../src/rt_simple.erl}
+\code{dump/1} lists the successor.
+
+\erlfunindex{rt\_simple}{to\_list}
+\codesnippet{rt_simple.erl}{rt_simple:to_list}{../src/rt_simple.erl}
+\code{to_list/1} lists the successor from the external routing table state.
+
+\erlfunindex{rt\_simple}{export\_rt\_to\_dht\_node}
+\codesnippet{rt_simple.erl}{rt_simple:export_rt_to_dht_node}{../src/rt_simple.erl}
+\code{export_rt_to_dht_node/2} states that the external routing table is the
+same as the internal table.
+
+\erlfunindex{rt\_simple}{handle\_custom\_message}
+\codesnippet{rt_simple.erl}{rt_simple:handle_custom_message}{../src/rt_simple.erl}
+Custom messages could be send from a routing table process on one node to the
+routing table process on another node and are independent from any other
+implementation.
+
+\codesnippet{rt_simple.hrl}{rt_simple:check}{../src/rt_simple.erl}
+Checks whether the routing table changed and in this case sends the
+\erlmodule{dht\_node} an updated (external) routing table state. Optionally
+the failure detector is updated. This may not be necessary, e.g. if
+\code{check} is called after a crashed node has been reported by the failure
+detector (the failure detector already unsubscribes the node in this case).
+
+\subsection{Chord routing table (\texorpdfstring{\code{rt_chord}}{rt\_chord})}
+\erlmoduleindex{rt\_chord}
+
+The file \code{rt_chord.erl} implements Chord's routing.
+
+\subsubsection{Data types}
+
+\codesnippet{rt_chord.erl}{rt_chord:types}{../src/rt_chord.erl}
+
+The routing table is a \code{gb_tree}. Identifiers in the ring are
+integers. Note that in Erlang integer can be of arbitrary
+precision. For Chord, the identifiers are in $[0, 2^{128})$,
+i.e. 128-bit strings.
+
+\subsubsection{The \texorpdfstring{\erlmodule{rm\_beh}}{rm\_beh} behaviour for Chord (excerpt)}
+
+\erlfunindex{rt\_chord}{empty}
+\codesnippet{rt_chord.erl}{rt_chord:empty}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{empty\_ext}
+\codesnippet{rt_chord.erl}{rt_chord:empty_ext}{../src/rt_chord.erl}
+\code{empty/1} returns an empty \code{gb_tree}, same for \code{empty_ext/1}.
+
+\erlfun{rt\_chord}{hash\_key}{/1},
+\erlfun{rt\_chord}{get\_random\_node\_id}{/0},
+\erlfun{rt\_chord}{get\_replica\_keys}{/1} and
+\erlfun{rt\_chord}{n}{/0} are implemented like their counterparts in
+\code{rt_simple.erl}.
+
+\erlfunindex{rt\_chord}{next\_hop}
+\codesnippet{rt_chord.erl}{rt_chord:next_hop}{../src/rt_chord.erl}
+If the (external) routing table contains at least one item, the next hop is
+retrieved from the \code{gb_tree}. It will be the node with the largest id
+that is smaller than the id we are looking for. If the routing table is empty,
+the successor is chosen. However, if we haven't found the key in our routing
+table, the next hop will be our largest finger, i.e. entry.
+
+\erlfunindex{rt\_chord}{init\_stabilize}
+\codesnippet{rt_chord.erl}{rt_chord:init_stabilize}{../src/rt_chord.erl}
+The routing table stabilization is triggered for the first index and
+then runs asynchronously, as we do not want to block the
+\code{rt_loop} to perform other request while recalculating the
+routing table.
+
+We have to find the node responsible for the calculated finger and therefore
+perform a lookup for the node with a \code{rt_get_node} message, including
+a reference to ourselves as the reply-to address and the index to be set.
+
+The lookup performs an overlay routing by passing the message until
+the responsible node is found. There, the message is delivered to the
+\erlmodule{routing\_table} process
+The remote node sends the requested information back directly. It includes a
+reference to itself in a \code{rt_get_node_response} message. Both messages
+are handled by \erlfun{rt\_chord}{handle\_custom\_message}{/2}:
+
+\erlfunindex{rt\_chord}{handle\_custom\_message}
+\codesnippet{rt_chord.erl}{rt_chord:handle_custom_message}{../src/rt_chord.erl}
+\erlfunindex{rt\_chord}{stabilize}
+\codesnippet{rt_chord.erl}{rt_chord:stabilize}{../src/rt_chord.erl}
+
+\code{stabilize/5} assigns the received routing table entry and triggers the
+routing table stabilization for the the next shorter entry using the same
+mechanisms as described above.
+
+If the shortest finger is the successor, then filling the routing table is
+stopped, as no further new entries would occur. It is not necessary, that
+\code{Index} reaches 1 to make that happen. If less than $2^{128}$ nodes
+participate in the system, it may happen earlier.
+
+\erlfunindex{rt\_chord}{update}
+\codesnippet{rt_chord.erl}{rt_chord:update}{../src/rt_chord.erl}
+Tells the \erlmodule{rt\_loop} process to rebuild the routing table starting
+with an empty (internal) routing table state.
+
+\erlfunindex{rt\_chord}{filter\_dead\_node}
+\codesnippet{rt_chord.erl}{rt_chord:filter_dead_node}{../src/rt_chord.erl}
+\code{filter_dead_node} removes dead entries from the \code{gb_tree}.
+
+\erlfunindex{rt\_chord}{export\_rt\_to\_dht\_node}
+\codesnippet{rt_chord.erl}{rt_chord:export_rt_to_dht_node}{../src/rt_chord.erl}
+\code{export_rt_to_dht_node} converts the internal \code{gb_tree} structure
+based on indices into the external representation optimised for look-ups, i.e.
+a \code{gb_tree} with node ids and the nodes themselves.
+
+\codesnippet{rt_chord.hrl}{rt_chord:check}{../src/rt_chord.erl}
+Checks whether the routing table changed and in this case sends the
+\erlmodule{dht\_node} an updated (external) routing table state. Optionally
+the failure detector is updated. This may not be necessary, e.g. if
+\code{check} is called after a crashed node has been reported by the failure
+detector (the failure detector already unsubscribes the node in this case).
+
+
+\section{Local Datastore}
+
+\section{Cyclon}
+
+\section{Vivaldi Coordinates}
+
+\section{Estimated Global Information (Gossiping)}
+
+\section{Load Balancing}
+
+\section{Broadcast Trees}

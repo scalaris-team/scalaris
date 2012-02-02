@@ -1,0 +1,210 @@
+\chapter{Download and Installation}
+
+\section{Requirements}
+\label{sec.requirements}
+
+For building and running \scalaris{}, some third-party software is
+required which is not included in the \scalaris{} sources:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Erlang R13B01 or newer
+\item OpenSSL (required by Erlang's crypto module)
+\item GNU-like Make and autoconf (not required on Windows)
+\end{itemize}
+
+To build the Java API (and its command-line client) the following
+programs are also required:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Java Development Kit 6
+\item Apache Ant
+\end{itemize}
+
+Before building the Java API, make sure that \code{JAVA\_HOME} and
+\code{ANT\_HOME} are set. \code{JAVA\_HOME} has to point to a JDK
+installation, and \code{ANT\_HOME} has to point to an Ant installation.
+
+To build the Python API (and its command-line client) the following
+programs are also required:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item Python >= 2.6
+\end{itemize}
+
+\section{Download}
+
+The sources can be obtained from
+\url{http://code.google.com/p/scalaris}. RPM and DEB packages are available
+from \url{http://download.opensuse.org/repositories/home:/scalaris/} for
+various Linux distributions.
+
+\subsection{Development Branch}
+
+You find the latest development version in the svn repository:
+\begin{lstlisting}[language={}]
+# Non-members may check out a read-only working copy anonymously over HTTP.
+svn checkout http://scalaris.googlecode.com/svn/trunk/ scalaris-read-only
+\end{lstlisting}
+
+\subsection{Releases}
+
+Releases can be found under the 'Download' tab on the web-page.
+
+
+\section{Build}
+
+\subsection{Linux}
+
+\scalaris{} uses autoconf for configuring the build environment and
+GNU Make for building the code.
+
+\begin{lstlisting}[language=sh]
+%> ./configure
+%> make
+%> make docs
+\end{lstlisting}
+
+For more details read \code{README} in the main \scalaris{} checkout
+directory.
+
+\subsection{Windows}
+
+We are currently not supporting \scalaris{} on Windows. However, we
+have two small {\tt .bat} files for building and running \scalaris{}
+nodes. It seems to work but we make no guarantees.
+
+\begin{itemize}
+\item Install Erlang\\
+       \url{http://www.erlang.org/download.html}
+\item Install OpenSSL (for crypto module)\\
+       \url{http://www.slproweb.com/products/Win32OpenSSL.html}
+\item Checkout \scalaris{} code from SVN
+\item adapt the path to your Erlang installation in \code{build.bat}
+\item start a \code{cmd.exe}
+\item go to the \scalaris{} directory
+\item run \code{build.bat} in the cmd window
+\item check that there were no errors during the compilation;
+       warnings are fine
+\item go to the bin sub-directory
+\item adapt the path to your Erlang installation in \code{firstnode.bat},
+       \code{joining_node.bat}
+\item run \code{firstnode.bat} or one of the other start scripts in the cmd window
+\end{itemize}
+
+\code{build.bat} will generate a \code{Emakefile} if there is none yet.
+If you have Erlang $<$ R13B04, you will need to adapt the \code{Emakefile}.
+There will be empty lines in the first three blocks ending with
+``\code{ ]\}.}'': add the following to these lines and try to compile again.
+It should work now.
+
+\begin{lstlisting}[language=erlang]
+, {d, type_forward_declarations_are_not_allowed}
+, {d, forward_or_recursive_types_are_not_allowed}
+\end{lstlisting}
+
+For the most recent description please see the FAQ at
+\url{http://code.google.com/p/scalaris/wiki/FAQ}.
+
+\subsection{Java-API}
+
+The following commands will build the Java API for \scalaris{}:
+\begin{lstlisting}[language=sh]
+%> make java
+\end{lstlisting}
+
+This will build {\tt scalaris.jar}, which is the library for accessing
+the overlay network. Optionally, the documentation can be build:
+\begin{lstlisting}[language=sh]
+%> cd java-api
+%> ant doc
+\end{lstlisting}
+
+\subsection{Python-API}
+
+The Python API for Python 2.* (at least 2.6) is located in the \code{python-api}
+directory. Files for Python 3.* can be created using \code{2to3} from the files
+in \code{python-api}. The following command will use \code{2to3} to convert the
+modules and place them in \code{python3-api}. 
+\begin{lstlisting}[language=sh]
+%> make python3
+\end{lstlisting}
+Both versions of python will compile required modules on demand when executing
+the scripts for the first time. However, pre-compiled modules can be created
+with:
+\begin{lstlisting}[language=sh]
+%> make python
+%> make python3
+\end{lstlisting}
+
+\subsection{Ruby-API}
+
+The Ruby API for Ruby >= 1.8 is located in the \code{ruby-api}
+directory. Compilation is not necessary.
+
+\section{Installation}
+\label{sec:install}
+
+For simple tests, you do not need to install \scalaris{}. You can run it
+directly from the source directory. Note: \code{make install} will install
+\scalaris{} into \code{/usr/local} and place \code{scalarisctl} into
+\code{/usr/local/bin}, by default. But it is more convenient to build an RPM
+and install it.
+On openSUSE, for example, do the following:
+
+\begin{lstlisting}{language=sh}
+export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
+for package in main bindings; do
+  mkdir -p ${package}
+  cd ${package}
+  svn export ${SCALARIS_SVN}/contrib/packages/${package}/checkout.sh
+  ./checkout.sh
+  cp * /usr/src/packages/SOURCES/
+  rpmbuild -ba scalaris*.spec
+  cd ..
+done
+\end{lstlisting}
+
+If any additional packages are required in order to build an RPM,
+\code{rpmbuild} will print an error.
+
+Your source and binary RPMs will be generated in
+\code{/usr/src/packages/SRPMS} and \code{RPMS}. We build RPM and DEB packages
+using the latest tagged version as well as checkouts from svn and provide them
+using the Open Build Service at
+\url{http://download.opensuse.org/repositories/home:/scalaris/}. Packages
+are available for
+
+\begin{itemize}
+\item Fedora 14, 15
+\item Mandriva 2010, 2010.1,
+\item openSUSE 11.3, 11.4, Factory, Tumbleweed
+\item SLE 10, 11, 11SP1,
+\item CentOS 5.5,
+\item RHEL 5.5, 6,
+\item Debian 5.0, 6.0 and
+\item Ubuntu 10.04, 10.10, 11.04.
+\end{itemize}
+
+An up-to-date list of available repositories can be found at
+\url{https://code.google.com/p/scalaris/wiki/FAQ#Prebuild_packages}.
+
+For those distributions which provide a recent-enough Erlang version, we build
+the packages using their Erlang package and recommend using the same version
+that came with the distribution. In this case we do not provide Erlang packages
+in our repository.
+
+Exceptions are made for openSUSE-based and RHEL-based distributions as well as
+Debian~5.0:
+\begin{itemize}
+  \item For openSUSE, we provide the package from the \code{devel:languages:erlang}
+repository.
+  \item For RHEL-based distributions (CentOS~5, RHEL~5, RHEL~6) we included the Erlang
+package from the EPEL repository of RHEL~6.
+  \item For Debian~5.0 we included the Erlang package of Ubuntu 11.04.
+\end{itemize}

@@ -1,0 +1,105 @@
+% Copyright 2011 Zuse Institute Berlin
+
+% Licensed under the Apache License, Version 2.0 (the "License");
+% you may not use this file except in compliance with the License.
+% You may obtain a copy of the License at
+%
+%     http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS,
+% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+% See the License for the specific language governing permissions and
+% limitations under the License.
+
+\pdfminorversion=4 % PDF/A is based on PDF 1.4
+\pdfcompresslevel=9
+\pdfobjcompresslevel=0 % needed for PDF 1.4
+
+%***************************************************************************
+% \convertDate converts D:20080419103507+02'00' to 2008-04-19T10:35:07+02:00
+%___________________________________________________________________________
+\def\convertDate{%
+    \getYear
+}
+
+{\catcode`\D=12
+\gdef\getYear D:#1#2#3#4{\edef\xYear{#1#2#3#4}\getMonth}
+}
+\def\getMonth#1#2{\edef\xMonth{#1#2}\getDay}
+\def\getDay#1#2{\edef\xDay{#1#2}\getHour}
+\def\getHour#1#2{\edef\xHour{#1#2}\getMin}
+\def\getMin#1#2{\edef\xMin{#1#2}\getSec}
+\def\getSec#1#2{\edef\xSec{#1#2}\getTZh}
+\def\getTZh +#1#2{\edef\xTZh{#1#2}\getTZm}
+\def\getTZm '#1#2'{%
+    \edef\xTZm{#1#2}%
+    \edef\convDate{\xYear-\xMonth-\xDay T\xHour:\xMin:\xSec+\xTZh:\xTZm}%
+}
+
+\expandafter\convertDate\pdfcreationdate 
+
+%**************************
+% get pdftex version string
+%__________________________
+\newcount\countA
+\countA=\pdftexversion
+\advance \countA by -100
+\def\pdftexVersionStr{pdfTeX-1.\the\countA.\pdftexrevision}
+
+
+%********
+% pdfInfo
+%________
+\pdfinfo{%
+    /Title    (\doctitle)
+    /Author   (\docauthor)
+    /Subject  (\docsubject)
+    /Keywords (\dockeywords)
+    /ModDate  (\pdfcreationdate)
+    /Trapped  /False%
+}
+
+\usepackage{hyperxmp}
+\usepackage[%
+  %%% general options
+  pdfa,                    %% PDF/A-1b compliance
+  pdftex=true,             %% sets up hyperref for use with the pdftex program
+  %plainpages=false,       %% set it to false, if pdflatex complains: ``destination with same identifier already exists''
+  %
+  %%% extension options
+  backref=section,         %% adds a backlink text to the end of each item in the bibliography
+  pagebackref=false,       %% if true, creates backward references as a list of page numbers in the bibliography
+  colorlinks=true,         %% false: boxed links; true: colored links
+  linkcolor=rltblue,       %% color of internal links
+%  citecolor=rltblue,     %% color of links to bibliography
+  filecolor=rltblue,       %% color of file links
+  urlcolor=rltblue,        %% color of external links
+  unicode=false,           %% non-Latin characters in Acrobat's bookmarks (if enabled, causes garbled page numbers)
+  %
+  %%% PDF-specific display options
+  pdfnewwindow=true,       %% links in new window
+  pdftoolbar=true,         %% show Acrobat's toolbar?
+  pdfmenubar=true,         %% show Acrobat's menu?
+  pdffitwindow=true,       %% page fit to window when opened
+  bookmarks=true,          %% if true, generate PDF bookmarks (requires two passes of pdflatex)
+  bookmarksopen=false,     %% if true, show all PDF bookmarks expanded
+  bookmarksnumbered=true,  %% if true, add the section numbers to the bookmarks
+  %pdfstartpage={1},        %% determines, on which page the PDF file is opened
+  pdfpagemode=UseOutlines, %% UseNone, UseOutlines (=show bookmarks), UseThumbs (show thumbnails), FullScreen, UseOC (PDF 1.5), UseAttachments (PDF 1.6)
+  pdfusetitle=true
+]{hyperref} 
+
+%%% sets the PDF-Information options
+%%% (see fields in Acrobat Reader: ``File -> Document properties -> Summary'')
+%%% Note: this method is better than as options of the hyperref-package (options are expanded correctly)
+\hypersetup{
+  pdftitle={\doctitle},           % title
+  pdfauthor={\docauthor},         % author
+  pdfsubject={\docsubject},       % subject of the document
+  pdfcreator={\doccreator},       % creator of the document
+  pdfproducer={\docproducer},     % producer of the document
+  pdfkeywords={\dockeywords},     % list of keywords
+  pdfcopyright={\doccopyright},   % copyright text
+  pdflicenseurl={\doclicenseurl}  % URL pointing to the license text
+}
