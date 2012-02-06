@@ -1,4 +1,4 @@
-# Copyright 2007-2011 Zuse Institute Berlin
+# Copyright 2007-2012 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ REPLICA_KEY_2 = 85070591730234615865843651857942052864
 REPLICA_KEY_3 = 170141183460469231731687303715884105728
 REPLICA_KEY_4 = 255211775190703847597530955573826158592
 
-all: compile
+all: compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
@@ -429,6 +429,16 @@ clean:
 	-rm -rf doc/*.css
 	-rm -rf doc/edoc-info
 	-rm -rf docroot/graphs/*.png
+
+tags: TAGS.root TAGS.contrib
+	@$(ERL) -noinput -noshell -eval 'tags:subdirs(["src", "include", "test"]), halt(0).' ; true
+	@cat TAGS.contrib TAGS.root >> TAGS ; true
+
+TAGS.contrib:
+	@$(ERL) -noinput -noshell -eval 'tags:subdir("contrib", [{outfile, "TAGS.contrib"}]), halt(0).' ; true
+
+TAGS.root:
+	@$(ERL) -noinput -noshell -eval 'tags:root([{outfile, "TAGS.root"}]), halt(0).' ; true
 
 doc: .make-doc
 
