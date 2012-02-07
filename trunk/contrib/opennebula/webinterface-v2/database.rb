@@ -2,7 +2,7 @@ Sequel.extension :migration
 
 DB = Sequel.sqlite('opennebula.db')
 
-if settings.test?
+if Sinatra::Application.test?
   DB.drop_table(:vms)
   DB.drop_table(:services)
 end

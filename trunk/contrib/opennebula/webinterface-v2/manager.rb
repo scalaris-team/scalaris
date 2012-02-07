@@ -19,7 +19,7 @@ helper = nil
 instance = nil
 vmid = -1
 
-if settings.test?
+if Sinatra::Application.test?
   vmid = ENV['VMID']
   helper = ScalarisHelper.new
 
