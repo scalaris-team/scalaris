@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2011 Zuse Institute Berlin
+# Copyright 2007-2012 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -22,8 +22,14 @@ YAWSPORT=$((8000+$ID))
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
+if [ 1 -le $# ]; then
+ERLFLAGS="$@"
+else
+ERLFLAGS=" "
+fi
+
 # start a mgmt_server (-m)
 # start a dht node (-s)
 # start the first node (declared by -f)
 NODE_NAME_AND_PORTS="-n $NAME -p $PORT -y $YAWSPORT"
-$DIRNAME/scalarisctl -m $NODE_NAME_AND_PORTS -s -f "$@" start
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -m $NODE_NAME_AND_PORTS -s -f start
