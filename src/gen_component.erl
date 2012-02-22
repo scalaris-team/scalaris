@@ -83,6 +83,7 @@
       | {bp_cond, {module(), atom(), pos_integer()}, bp_name()}.
 
 -type user_state() :: term().
+-type handler() :: fun((comm:message(), user_state()) -> user_state()).
 -type gc_state() ::
         { module(),
           handler(),
@@ -107,8 +108,6 @@
 -define(BP_QUEUE,    8).
 -define(BP_STEPPED,  9).
 -define(BP_STEPPER,  10).
-
--type handler() :: fun((comm:message(), user_state()) -> user_state()).
 
 %% userdevguide-begin gen_component:behaviour
 -ifdef(have_callback_support).
