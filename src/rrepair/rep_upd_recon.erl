@@ -712,13 +712,13 @@ start(Round, SenderRUPid) ->
                              dhtNodePid = pid_groups:get_my(dht_node),
                              dest_ru_pid = SenderRUPid,
                              sync_round = Round },
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State).
+    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
 
 -spec fork_recon(state(), rep_upd:round()) -> {ok, pid()}.
 fork_recon(Conf, {ReconRound, Fork}) ->
     State = Conf#ru_recon_state{ sync_round = {ReconRound, Fork + 1} },
     comm:send_local(Conf#ru_recon_state.ownerLocalPid, {recon_forked}),
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State).
+    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
