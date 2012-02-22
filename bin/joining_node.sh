@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2011 Zuse Institute Berlin
+# Copyright 2007-2012 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -31,4 +31,10 @@ YAWSPORT=$((8000+$ID))
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 
-$DIRNAME/scalarisctl -n $NAME -p $CSPORT -y $YAWSPORT -s "$@" start
+if [ 1 -le $# ]; then
+ERLFLAGS="$@"
+else
+ERLFLAGS=" "
+fi
+
+$DIRNAME/scalarisctl -e "$ERLFLAGS" -n $NAME -p $CSPORT -y $YAWSPORT -s start
