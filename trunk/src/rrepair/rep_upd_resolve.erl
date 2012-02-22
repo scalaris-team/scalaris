@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -262,4 +262,4 @@ start(Round, Operation, Options) ->
                                feedback = {FBDest, []},
                                feedback_resp = FBResp,
                                send_stats = StatsDest },    
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State).
+    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
