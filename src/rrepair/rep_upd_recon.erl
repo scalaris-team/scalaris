@@ -210,7 +210,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
             true ->
-                {BTime, NTree} = util:tc(fun() -> add_to_tree(DBList, Params) end),
+                {BTime, NTree} = util:tc(fun() -> merkle_tree:insert_list(DBList, Params) end),
                 {ru_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
             false ->                
                 util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
@@ -420,10 +420,6 @@ begin_sync(SyncStruct, State = #ru_recon_state{recon_method = RMethod,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec add_to_tree(?DB:db_as_list(), merkle_tree:merkle_tree()) -> merkle_tree:merkle_tree().
-add_to_tree(DBItems, MTree) ->
-    lists:foldl(fun(DBEntryEnc, Tree) -> merkle_tree:insert(DBEntryEnc, Tree) end, 
-                MTree, DBItems).
 
 -spec compareNodes([merkle_tree:mt_node()], 
                    [merkle_tree:mt_node_key()], 

@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -73,8 +73,8 @@ add_list_(Bloom, Items) ->
            items_count = FilledCount,
            filter = Filter
           } = Bloom,
-    Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]), %TODO: USE FLATTEN???
-    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
+    Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]),
+    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),    
     Bloom#bloom{
                 filter = set_Bits(Filter, Positions),
                 items_count = FilledCount + length(Items)
@@ -118,17 +118,8 @@ join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1,
 
 %% @doc checks equality of two bloom filters
 -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
-equals_(Bloom1, Bloom2) ->
-    #bloom{
-           size = Size1, 
-           items_count = Items1,
-           filter = Filter1
-          } = Bloom1,
-    #bloom{
-           size = Size2, 
-           items_count = Items2,
-           filter = Filter2
-          } = Bloom2,
+equals_(#bloom{ size = Size1, items_count = Items1, filter = Filter1 }, 
+        #bloom{ size = Size2, items_count = Items2, filter = Filter2 }) ->
     Size1 =:= Size2 andalso
         Items1 =:= Items2 andalso
         Filter1 =:= Filter2.
