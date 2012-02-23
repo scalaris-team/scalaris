@@ -1,4 +1,4 @@
-%  @copyright 2011 Zuse Institute Berlin
+%  @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -137,11 +137,11 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
                comm:send(GlobalPid, {get_subset_rand, MaxVMs, self()},
                          [{group_member, cyclon}]),
                receive
-                   {cy_cache, Cache} ->
+                   ?SCALARIS_RECV({cy_cache, Cache}, %% ->
                        [{node:erlNode(Node),
                          comm:get_ip(node:pidX(Node)),
                          comm:get_port(node:pidX(Node)),
-                         node:yawsPort(Node)} || Node <- Cache]
+                         node:yawsPort(Node)} || Node <- Cache])
                end
            end || Pid <- pid_groups:find_all(dht_node),
                   DhtModule:is_alive_fully_joined(gen_component:get_state(Pid))]),

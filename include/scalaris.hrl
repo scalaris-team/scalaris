@@ -1,4 +1,4 @@
-%  @copyright 2008-2011 Zuse Institute Berlin
+%  @copyright 2008-2012 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -96,5 +96,15 @@
 % (process dictionary, key test_server_loc)
 %-compile({parse_transform, ct_line}).
 -endif.
+
+-define(SCALARIS_RECV(X,Y),
+       X -> Y;
+       {'$gen_component', trace_mpath,
+        _ScalLogger, _ScalFrom, _ScalTo, X = _ScalMsg} ->
+               trace_mpath:log_recv(_ScalLogger, _ScalFrom, _ScalTo, _ScalMsg),
+               ct:pal("Tracing ends at client process ~p in ~p line ~p~n",
+                      [_ScalTo, ?MODULE, ?LINE]),
+               Y
+       ).
 
 -include("types.hrl").

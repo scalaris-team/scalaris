@@ -59,23 +59,25 @@ delete_collect_results([], _ClientsId, Results) ->
     {ok, OKs, Results};
 delete_collect_results(ReplicaKeys, ClientsId, Results) ->
     receive
-        {delete_key_response, ClientsId, Key, Result} ->
+        ?SCALARIS_RECV({delete_key_response, ClientsId, Key, Result}, %% ->
             case lists:member(Key, ReplicaKeys) of
                 true ->
                     delete_collect_results(lists:delete(Key, ReplicaKeys),
                                            ClientsId, [Result | Results]);
                 false ->
                     delete_collect_results(ReplicaKeys, ClientsId, Results)
-            end;
-        {timeout, ClientsId} ->
-            OKs = length([ok || R <- Results, R =:= ok]),
-            {fail, timeout, OKs, Results};
-        {delete_key_response, _, _, _} ->
+            end);
+        ?SCALARIS_RECV({timeout, ClientsId}, %% ->
+            begin
+               OKs = length([ok || R <- Results, R =:= ok]),
+               {fail, timeout, OKs, Results}
+            end);
+        ?SCALARIS_RECV({delete_key_response, _, _, _}, %% ->
             %% probably an outdated message: drop it.
-            delete_collect_results(ReplicaKeys, ClientsId, Results);
-        {timeout, _} ->
+            delete_collect_results(ReplicaKeys, ClientsId, Results));
+        ?SCALARIS_RECV({timeout, _}, %% ->
             %% probably an outdated message: drop it.
-            delete_collect_results(ReplicaKeys, ClientsId, Results)
+            delete_collect_results(ReplicaKeys, ClientsId, Results))
     end.
 
 -spec get_replica_keys(client_key()) -> [?RT:key()].
