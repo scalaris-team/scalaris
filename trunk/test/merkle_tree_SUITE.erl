@@ -33,7 +33,8 @@ all() -> [
           tester_size,
           tester_store_to_dot,          
           tester_tree_hash,
-          tester_insert,
+          tester_insert_list,
+          tester_bulk_insert,
           tester_iter,
           tester_lookup,
           test_empty
@@ -43,7 +44,7 @@ all() -> [
 
 suite() ->
     [
-     {timetrap, {seconds, 10}}
+     {timetrap, {seconds, 20}}
     ].
 
 init_per_suite(Config) ->
@@ -169,11 +170,33 @@ tester_tree_hash(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_insert(intervals:key(), intervals:key(), 1..50) -> true.
-prop_insert(L, L, _) -> true;
-prop_insert(L, R, BucketSize) ->
+-spec prop_insert_list(intervals:key(), intervals:key(), 1..2500) -> true.
+prop_insert_list(L, L, _) -> true;
+prop_insert_list(L, R, Count) ->
     I = intervals:new('[', L, R, ']'),
-    DB = db_generator:get_db(I, BucketSize, uniform),    
+    DB = db_generator:get_db(I, Count, uniform),
+    Tree = merkle_tree:insert_list(DB, merkle_tree:new(I)),
+    ItemCount = iterate(merkle_tree:iterator(Tree), 
+                        fun(N, Acc) -> Acc + case merkle_tree:is_leaf(N) of
+                                                 true -> merkle_tree:get_item_count(N);
+                                                 false -> 0
+                                             end
+                        end, 
+                        0),
+    ?equals_w_note(Count, ItemCount, 
+                   io_lib:format("DB=~p~nTree=~p~nCount=~p; DBSize=~p; TreeCount=~p", 
+                                 [DB, Tree, Count, length(DB), ItemCount])).
+
+tester_insert_list(_) ->
+    tester:test(?MODULE, prop_insert_list, 3, 100, [{threads, 2}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_bulk_insert(intervals:key(), intervals:key(), 1..50) -> true.
+prop_bulk_insert(L, L, _) -> true;
+prop_bulk_insert(L, R, BucketSize) ->
+    I = intervals:new('[', L, R, ']'),
+    DB = db_generator:get_db(I, BucketSize, uniform),
     Tree1 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),
     Tree2 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),    
     Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),    
@@ -183,8 +206,8 @@ prop_insert(L, R, BucketSize) ->
     ?equals(Size1, Size2),
     ?assert(Size1 < Size3).
 
-tester_insert(_) ->
-    tester:test(?MODULE, prop_insert, 3, 100, [{threads, 2}]).
+tester_bulk_insert(_) ->
+    tester:test(?MODULE, prop_bulk_insert, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -195,12 +218,11 @@ prop_size(L, R, ToAdd) ->
     Tree = build_tree(I, ToAdd, uniform),
     Size = merkle_tree:size(Tree),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    ct:pal("TreeSize
-            ItemsAdded: ~p
-            Simple: ~p Nodes
-            InnerNodes: ~p   ;   Leafs: ~p",
-           [ToAdd, Size, Inner, Leafs]),
-    ?equals(Size, Inner + Leafs).
+    ?equals_w_note(Size, Inner + Leafs, 
+                   io_lib:format("TreeSize~nItemsAdded: ~p
+                                  Simple: ~p Nodes
+                                  InnerNodes: ~p   ;   Leafs: ~p",
+                                 [ToAdd, Size, Inner, Leafs])).
     
 tester_size(_) ->
   tester:test(?MODULE, prop_size, 3, 100, [{threads, 2}]).
@@ -212,10 +234,11 @@ prop_iter(L, L, _) -> true;
 prop_iter(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
     Tree = build_tree(I, ToAdd, uniform),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    Count = count_iter(merkle_tree:iterator(Tree), 0),
-    ct:pal("Args: Interval=[~p, ~p] - ToAdd =~p~n", [L, R, ToAdd]),
-    ?equals(Count, Inner + Leafs).
+    {Inner, Leafs} = merkle_tree:size_detail(Tree),    
+    Count = iterate(merkle_tree:iterator(Tree), fun(_, Acc) -> Acc + 1 end, 0),
+    ?equals_w_note(Count, Inner + Leafs,
+                   io_lib:format("Args: Interval=[~p, ~p] - ToAdd =~p~n", 
+                                 [L, R, ToAdd])).
 
 tester_iter(_Config) ->
     tester:test(?MODULE, prop_iter, 3, 100, [{threads, 2}]).
@@ -260,12 +283,11 @@ build_tree(Interval, Config, ToAdd, Distribution) ->
     T = merkle_tree:bulk_build(Interval, Config, Keys),
     merkle_tree:gen_hash(T).
 
-count_iter(none, Count) ->
-    Count;
-count_iter(Iter, Count) ->
+-spec iterate(merkle_tree:mt_iter(), fun((merkle_tree:mt_node(), T) -> T), T) -> T. 
+iterate(none, _, Acc) -> Acc;
+iterate(Iter, Fun, Acc) ->
     Next = merkle_tree:next(Iter),
     case Next of
-        none -> Count;
-        {_, Iter2} -> count_iter(Iter2, Count + 1)
+        none -> Acc;
+        {Node, Iter2} -> iterate(Iter2, Fun, Fun(Node, Acc))
     end.
-

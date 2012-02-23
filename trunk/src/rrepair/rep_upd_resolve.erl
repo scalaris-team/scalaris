@@ -168,13 +168,10 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                    not Done and not Exists -> Stats#resolve_stats{ regen_fail_count = RegenFail + 1 }
                end,
     NewFB = if
-                not Done 
-                    andalso Exists 
-                    andalso DoFB =/= nil -> 
-                    {DoFB,
-                     [{db_entry:get_key(Entry),
-                       db_entry:get_value(Entry),
-                       db_entry:get_version(Entry)} | FBItems]};
+                not Done andalso Exists andalso DoFB =/= nil -> 
+                    {DoFB, [{db_entry:get_key(Entry),
+                            db_entry:get_value(Entry),
+                            db_entry:get_version(Entry)} | FBItems]};
                 true -> FB
             end,
     if

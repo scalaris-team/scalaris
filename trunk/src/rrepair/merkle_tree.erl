@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -25,14 +25,13 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/2, insert/2, empty/0,
+-export([new/1, new/2, insert/2, insert_list/2, empty/0,
          bulk_build/2, bulk_build/3,
-         lookup/2, size/1, size_detail/1,
-         gen_hash/1, iterator/1, next/1,
-         is_empty/1, is_leaf/1, get_bucket/1,
-         is_merkle_tree/1,
-         get_hash/1, get_interval/1, get_childs/1, get_root/1,
-         get_bucket_size/1, get_branch_factor/1,
+         lookup/2, size/1, size_detail/1, gen_hash/1, 
+         iterator/1, next/1,
+         is_empty/1, is_leaf/1, is_merkle_tree/1, 
+         get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
+         get_item_count/1, get_bucket_size/1, get_branch_factor/1,
          store_to_DOT/2, store_graph/2]).
 
 -ifdef(with_export_type_support).
@@ -162,6 +161,13 @@ get_childs({_, _, _, _, Childs}) -> Childs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec get_item_count(merkle_tree() | mt_node()) -> non_neg_integer().
+get_item_count({merkle_tree, _, Node}) -> get_item_count(Node);
+get_item_count({_, C, _, _, []}) -> C;
+get_item_count({_, _, _, _, Childs}) -> 0.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec is_leaf(merkle_tree() | mt_node()) -> boolean().
 is_leaf({merkle_tree, _, Node}) -> is_leaf(Node);
 is_leaf({_, _, _, _, []}) -> true;
@@ -181,6 +187,12 @@ is_merkle_tree(_) -> false.
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
 get_bucket({_, C, Bucket, _, []}) when C > 0 -> Bucket;
 get_bucket(_) -> [].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec insert_list([term()], merkle_tree()) -> merkle_tree().
+insert_list(Terms, Tree) ->
+    lists:foldl(fun(Term, T) -> merkle_tree:insert(Term, T) end, Tree, Terms).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -269,10 +281,9 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
 gen_hash({merkle_tree, Config, Root}) ->
     {merkle_tree, Config, gen_hash_node(Root, Config)}.
 
--spec gen_hash_node(Node, Config) -> Node2 when
+-spec gen_hash_node(Node, Config) -> Node when
       is_subtype(Node,   mt_node()),
-      is_subtype(Config, mt_config()),
-      is_subtype(Node2,  mt_node()).
+      is_subtype(Config, mt_config()).
 gen_hash_node({_, Count, Bucket, I, []}, Config) ->
     LeafHf = Config#mt_config.leaf_hf,
     Hash = case Count > 0 of
@@ -321,19 +332,17 @@ size_detail_node([{_, _, _, _, Childs} | R], {Inner, Leafs}) ->
       is_subtype(Iter, mt_iter()).
 iterator({merkle_tree, _, Root}) -> [Root].
 
--spec iterator_node(Node, Iter1) -> Iter2 when
+-spec iterator_node(Node, Iter) -> Iter when
       is_subtype(Node,  mt_node()),
-      is_subtype(Iter1, mt_iter()),
-      is_subtype(Iter2, mt_iter()).
+      is_subtype(Iter, mt_iter()).
 iterator_node({_, _, _, _, []}, Iter1) ->
     Iter1;
 iterator_node({_, _, _, _, Childs}, Iter1) ->
     lists:flatten([Childs | Iter1]).
 
--spec next(Iter1) -> none | {Node, Iter2} when
-      is_subtype(Iter1, mt_iter()),
-      is_subtype(Node,  mt_node()),
-      is_subtype(Iter2, mt_iter()).
+-spec next(Iter) -> none | {Node, Iter} when
+      is_subtype(Iter, mt_iter()),
+      is_subtype(Node,  mt_node()).
 next([Node | Rest]) ->
         {Node, iterator_node(Node, Rest)};
 next([]) -> 
@@ -363,7 +372,7 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName, ToPng) ->
             _ = file:truncate(Fileid),
             _ = file:close(Fileid),
             _ = if ToPng ->
-                       os:cmd(io_lib:format("dot ../~s.dot -Tpng > ../~s.png", [FileName, FileName])),
+                       _ = os:cmd(io_lib:format("dot ../~s.dot -Tpng > ../~s.png", [FileName, FileName])),
                        os:cmd(io_lib:format("rm -f ../~s.dot", [FileName]));
                    true -> ok 
                 end,
