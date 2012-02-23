@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,7 +29,15 @@
 -spec send(mypid(), message() | group_message(), send_options()) -> ok.
 send(Pid, Message, Options) ->
     {RealPid, RealMsg1} = unpack_cookie(Pid, Message),
-    comm_layer:send(RealPid, pack_group_member(RealMsg1, Options), Options).
+    RealMessage = pack_group_member(RealMsg1, Options),
+    case erlang:get(trace_mpath) of
+        undefined ->
+            comm_layer:send(RealPid, RealMessage, Options);
+        Logger ->
+            LogEpidemicMsg =
+                trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
+            comm_layer:send(RealPid, LogEpidemicMsg, Options)
+    end.
 
 -spec make_global(erl_pid_plain()) -> mypid().
 %% @doc TCP_LAYER: Converts a local erlang pid to a global pid of type mypid()

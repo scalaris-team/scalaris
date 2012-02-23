@@ -513,26 +513,41 @@ commit(TLog) ->
             end,
             _Result =
                 receive
-                    {tx_tm_rtm_commit_reply, ClientsId, commit} ->
-                        {ok}; %% commit / abort;
-                    {tx_tm_rtm_commit_reply, ClientsId, abort} ->
-                        {fail, abort}; %% commit / abort;
-                    {tx_timeout, ClientsId} ->
-                        log:log(error, "No result for commit received!"),
-                        {fail, timeout}
+                    ?SCALARIS_RECV(
+                       {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
+                         {ok}  %% commit / abort;
+                      );
+                    ?SCALARIS_RECV(
+                       {tx_tm_rtm_commit_reply, ClientsId, abort}, %% ->
+                         {fail, abort} %% commit / abort;
+                       );
+                    ?SCALARIS_RECV(
+                       {tx_timeout, ClientsId}, %% ->
+                       begin
+                         log:log(error, "No result for commit received!"),
+                         {fail, timeout}
+                       end
+                      )
                 end
     end.
 
 -spec receive_answer() -> {tx_tlog:tx_op(), req_id(), tx_tlog:tlog_entry()}.
 receive_answer() ->
     receive
-        {tx_tm_rtm_commit_reply, _, _} ->
-            %% probably an outdated commit reply: drop it.
-            receive_answer();
-        {tx_timeout, _} ->
-            %% probably an outdated commit reply: drop it.
-            receive_answer();
-        {Op, RdhtId, RdhtTlog} -> {Op, RdhtId, RdhtTlog}
+        ?SCALARIS_RECV(
+           {tx_tm_rtm_commit_reply, _, _}, %%->
+           %% probably an outdated commit reply: drop it.
+             receive_answer()
+          );
+        ?SCALARIS_RECV(
+           {tx_timeout, _}, %% ->
+           %% probably an outdated commit reply: drop it.
+             receive_answer()
+          );
+        ?SCALARIS_RECV(
+           {Op, RdhtId, RdhtTlog}, %% ->
+             {Op, RdhtId, RdhtTlog}
+          )
     end.
 
 req_get_op(Request) -> element(1, Request).

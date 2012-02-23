@@ -53,6 +53,7 @@ start() ->
     _ = code:ensure_loaded(api_rdht),
     _ = code:ensure_loaded(api_tx),
     _ = code:ensure_loaded(api_vm),
+    _ = code:ensure_loaded(trace_mpath),
     application:start(scalaris).
 
 -spec stop() -> ok | {error, Reason::term()}.
