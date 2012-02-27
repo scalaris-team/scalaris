@@ -60,7 +60,7 @@
 
 % accepted messages of dht_node processes
 -type message() ::
-    bulkowner:bulkowner_message() |
+    bulkowner:bulkowner_msg() |
     database_message() |
     lookup_message() |
     dht_node_join:join_message() |
