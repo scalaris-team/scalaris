@@ -37,12 +37,12 @@
 all() ->
     [art,
      merkle_tree,
-     bloom,
-     comparison].
+     bloom].
+     %comparison].
 
 suite() ->
     [
-     {timetrap, {seconds, 30}}
+     {timetrap, {seconds, 90}}
     ].
 
 init_per_suite(Config) ->
@@ -149,7 +149,7 @@ merkle_tree(_) ->
            ExecTimes, []),
         
     IterateT = measure_util:time_avg(
-           fun() -> merkle_tree_SUITE:count_iter(merkle_tree:iterator(TestTree), 0) end, 
+           fun() -> merkle_tree_SUITE:iterate(merkle_tree:iterator(TestTree), fun(_, Acc) -> Acc + 1 end, 0) end, 
            ExecTimes, []),
     
     GenHashT = measure_util:time_avg(
@@ -192,7 +192,7 @@ bloom(_) ->
     BaseBF = bloom:new(ToAdd, Fpr, Hfs),
     List = random_list(ToAdd),
     TestBF = bloom:add(BaseBF, List),
-    
+
     AddT = measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
                                                     fun(I) -> I end,
                                                     fun(I, B) -> bloom:add(B, I) end,
@@ -202,7 +202,7 @@ bloom(_) ->
     
     AddListT = measure_util:time_avg(fun() -> bloom:add(BaseBF, List) end,
                                      ExecTimes, []),    
-    
+
     IsElemT = measure_util:time_avg(
                 fun() -> 
                         lists:foreach(fun(I) -> bloom:is_element(TestBF, I) end, List) 
