@@ -102,8 +102,7 @@
        {'$gen_component', trace_mpath,
         _ScalLogger, _ScalFrom, _ScalTo, X = _ScalMsg} ->
                trace_mpath:log_recv(_ScalLogger, _ScalFrom, _ScalTo, _ScalMsg),
-               ct:pal("Tracing ends at client process ~p in ~p line ~p~n",
-                      [_ScalTo, ?MODULE, ?LINE]),
+               trace_mpath:log_info(_ScalLogger, _ScalTo, {"Tracing ends at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
                Y
        ).
 

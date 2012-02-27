@@ -32,23 +32,32 @@
 
 -export([on/0, on/1, off/0]).
 -export([log_send/4]).
+-export([log_info/3]).
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
 
 -type logger() ::
-        ioformat
+        io_format
+      | {log_collector, comm:mypid()}.
 %% not yet supported
 %%      | ctpal
 %%      | {log, Level::term()}
-%%      | {log_collector, comm:mypid()}
-        .
+
+-type pidinfo() :: {comm:mypid(), {pid_groups:groupname(),
+                                   pid_groups:pidname()}}.
+-type anypid() :: pid() | comm:mypid() | pidinfo().
+
+-type gc_mpath_msg() ::
+        {'$gen_component', trace_mpath, logger(), pidinfo(), pidinfo(),
+         comm:message()}.
 
 -ifdef(with_export_type_support).
 -export_type([logger/0]).
+-export_type([pidinfo/0]).
 -endif.
 
 -spec on() -> ok.
-on() -> on(ioformat).
+on() -> on(io_format).
 -spec on(logger()) -> ok.
 on(Logger) ->
     erlang:put(trace_mpath, Logger), ok.
@@ -57,40 +66,78 @@ on(Logger) ->
 off() ->
     erlang:erase(trace_mpath), ok.
 
+-spec epidemic_reply_msg(logger(), anypid(), anypid(), comm:message()) ->
+                                gc_mpath_msg().
 epidemic_reply_msg(Logger, FromPid, ToPid, Msg) ->
-    From =
-        case is_pid(FromPid) of
-            true -> {comm:make_global(FromPid),
-                     pid_groups:group_and_name_of(FromPid)};
-            false -> {FromPid,
-                      pid_groups:group_and_name_of(comm:make_local(FromPid))}
-        end,
-    To = case is_pid(ToPid) of
-             true -> {comm:make_global(ToPid),
-                      pid_groups:group_and_name_of(ToPid)};
-             false ->
-                 case comm:is_local(ToPid) of
-                     true -> {ToPid, pid_groups:group_and_name_of(comm:make_local(ToPid))};
-                     false -> {ToPid, non_local_pid_name_unknown}
-                 end
-         end,
+    From = normalize_pidinfo(FromPid),
+    To = normalize_pidinfo(ToPid),
     {'$gen_component', trace_mpath, Logger, From, To, Msg}.
 
+-spec log_send(logger(), anypid(), anypid(), comm:message()) ->
+                      gc_mpath_msg().
 log_send(Logger, FromPid, ToPid, Msg) ->
-    EMsg = {'$gen_component', trace_mpath, Logger, From, To, Msg} =
-        epidemic_reply_msg(Logger, FromPid, ToPid, Msg),
+    From = normalize_pidinfo(FromPid),
+    To = normalize_pidinfo(ToPid),
     case Logger of
-        ioformat ->
+        io_format ->
             io:format("send ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [From, To, Msg])
+                      [From, To, Msg]);
+        {log_collector, LoggerPid} ->
+            %% don't log the sending of log messages ...
+            RestoreThis = erlang:get(trace_mpath),
+            off(),
+            comm:send(LoggerPid, {log_send, From, To, Msg}),
+            on(RestoreThis)
     end,
-    EMsg.
+    epidemic_reply_msg(Logger, From, To, Msg).
 
-log_recv(Logger, _From, _To, _Msg) ->
+-spec log_info(logger(), anypid(), term()) -> ok.
+log_info(Logger, FromPid, Info) ->
+    From = normalize_pidinfo(FromPid),
     case Logger of
-        ioformat ->
-%%            io:format("recv ~.0p -> ~.0p:~n  ~.0p.~n",
-%%                      [From, To, Msg])
-            ok
+        io_format ->
+            io:format("info ~.0p:~n  ~.0p.~n",
+                      [From, Info]);
+        {log_collector, LoggerPid} ->
+            %% don't log the sending of log messages ...
+            RestoreThis = erlang:get(trace_mpath),
+            off(),
+            comm:send(LoggerPid, {log_info, From, Info}),
+            on(RestoreThis)
     end,
     ok.
+
+-spec log_recv(logger(), anypid(), anypid(), comm:message()) -> ok.
+log_recv(Logger, FromPid, ToPid, Msg) ->
+    From = normalize_pidinfo(FromPid),
+    To = normalize_pidinfo(ToPid),
+    case Logger of
+        io_format ->
+            io:format("recv ~.0p -> ~.0p:~n  ~.0p.~n",
+                      [From, To, Msg]);
+        {log_collector, LoggerPid} ->
+            %% don't log the sending of log messages ...
+            RestoreThis = erlang:get(trace_mpath),
+            off(),
+            comm:send(LoggerPid, {log_recv, From, To, Msg}),
+            on(RestoreThis)
+    end,
+    ok.
+
+-spec normalize_pidinfo(anypid()) -> pidinfo().
+normalize_pidinfo(Pid) ->
+    case is_pid(Pid) of
+        true -> {comm:make_global(Pid), pid_groups:group_and_name_of(Pid)};
+        false ->
+            case comm:is_valid(Pid) of
+                true ->
+                    case comm:is_local(Pid) of
+                        true -> {Pid,
+                                 pid_groups:group_and_name_of(
+                                   comm:make_local(Pid))};
+                        false -> {Pid, non_local_pid_name_unknown}
+                    end;
+                false -> %% already a pidinfo()
+                    Pid
+            end
+    end.

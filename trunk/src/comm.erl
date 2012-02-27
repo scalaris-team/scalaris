@@ -119,14 +119,14 @@ send(Pid, Message) ->
 -spec send_local(erl_local_pid(), message()) -> ok.
 send_local(Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    case erlang:get(trace_mpath) of
-        undefined ->
-            RealPid ! RealMessage;
-        Logger ->
-            LogEpidemicMsg =
-                trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
-            RealPid ! LogEpidemicMsg
-    end,
+    _ = case erlang:get(trace_mpath) of
+            undefined ->
+                RealPid ! RealMessage;
+            Logger ->
+                LogEpidemicMsg =
+                    trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
+                RealPid ! LogEpidemicMsg
+        end,
     ok.
 
 %% @doc Sends a message to a local process given by its local pid
@@ -134,7 +134,14 @@ send_local(Pid, Message) ->
 -spec send_local_after(non_neg_integer(), erl_local_pid(), message()) -> reference().
 send_local_after(Delay, Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    erlang:send_after(Delay, RealPid, RealMessage).
+    case erlang:get(trace_mpath) of
+        undefined ->
+            erlang:send_after(Delay, RealPid, RealMessage);
+        Logger ->
+            LogEpidemicMsg =
+                trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
+            erlang:send_after(Delay, RealPid, LogEpidemicMsg)
+    end.
 
 %% @doc Returns the pid of the current process.
 -spec this() -> mypid().
