@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -88,23 +88,27 @@ load_stop() ->
                  Message::comm:message()) -> ok.
 manage_run(ThreadsPerVM, Iterations, Options, Message) ->
     Pid = self(),
+    TraceMPath = erlang:get(trace_mpath),
     spawn(fun() ->
+                  erlang:put(trace_mpath, TraceMPath),
                   Msg = setelement(5, Message, comm:this()),
                   Res = manage_run_internal(ThreadsPerVM, Iterations, Options,
                                             Msg),
-                  Pid ! Res
+                  comm:send_local(Pid, Res)
           end),
     receive
-        ok ->
-            ok;
-        X ->
-            io:format("unknown message ~p~n", [X]),
-            ok
+        ?SCALARIS_RECV({ok}, %% ->
+            ok);
+        ?SCALARIS_RECV(X, %% ->
+                       begin
+                           io:format("unknown message ~p~n", [X]),
+                           ok
+                       end)
     end.
 
 -spec manage_run_internal(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
                  Options::[locally | verbose | profile | {copies, non_neg_integer()}],
-                 Message::comm:message()) -> ok.
+                 Message::comm:message()) -> {ok}.
 manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = util:get_proc_in_vms(bench_server),
     %% io:format("~p~n", [ServerList]),
@@ -151,7 +155,7 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
             %io:format("Statistics: ~p~n", [ Statistics ]);
         false -> ok
     end,
-    ok.
+    {ok}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -176,14 +180,20 @@ collect(0, L) ->
     L;
 collect(Length, L) ->
     receive
-        {done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts} ->
-            io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
-            collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L]);
-        {crash, Pid} ->
-            io:format("ignoring ~p, because it crashed", [Pid]),
-            collect(Length - 1, L);
-        X ->
-            io:format("unknown message ~p~n", [X]),
-            collect(Length - 1, L)
+        ?SCALARIS_RECV({done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts}, %% ->
+         begin
+             io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
+             collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L])
+          end);
+        ?SCALARIS_RECV({crash, Pid}, %% ->
+           begin
+               io:format("ignoring ~p, because it crashed", [Pid]),
+               collect(Length - 1, L)
+           end);
+        ?SCALARIS_RECV(X, %% ->
+            begin
+                io:format("unknown message ~p~n", [X]),
+                collect(Length - 1, L)
+            end)
     end.
 

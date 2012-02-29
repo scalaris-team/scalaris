@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -413,7 +413,7 @@ get_proc_in_vms(Proc) ->
     mgmt_server:node_list(),
     Nodes =
         receive
-            {get_list_response, X} -> X
+            ?SCALARIS_RECV({get_list_response, X}, X)
         after 2000 ->
             log:log(error,"[ util ] Timeout getting node list from mgmt server"),
             throw('mgmt_server_timeout')
@@ -775,7 +775,7 @@ is_unittest() ->
                   end
           end),
     receive
-        {is_unittest, Result} -> Result
+        ?SCALARIS_RECV({is_unittest, Result}, Result)
     end.
 
 -spec make_filename(string()) -> string().
@@ -920,7 +920,7 @@ parallel_collect(0, _, Accumulator) ->
     Accumulator;
 parallel_collect(ExpectedResults, AccuFun, Accumulator) -> 
     Result = receive
-                {parallel_result, R} -> R
+                ?SCALARIS_RECV({parallel_result, R}, R)
              end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
 
