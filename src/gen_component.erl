@@ -747,7 +747,7 @@ gc_set_ustate(State, Val) ->    setelement(?USTATE, State, Val).
 -spec gc_bp_hold_back(gc_state(), bp_msg()) -> gc_state().
 gc_bp_hold_back(State, Msg) ->
     ?TRACE_BP("Enqueuing bp op ~p -> ~p~n", [Msg, State]),
-    NewQueue = lists:append(gc_bpqueue(State), [Msg]),
+    NewQueue = gc_bpqueue(State) ++ [Msg],
     gc_set_bpqueue(State, NewQueue).
 
 -spec gc_bp_set_cond(gc_state(), fun(), bp_name()) -> gc_state().

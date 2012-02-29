@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -87,7 +87,11 @@ start_link() ->
      Max::non_neg_integer(), Aborts::non_neg_integer()}.
 run_threads(Threads, Bench) ->
     Self = self(),
-    util:for_to(1, Threads, fun(_X) -> spawn(fun()->Bench(Self) end) end),
+    TraceMPath = erlang:get(trace_mpath),
+    util:for_to(1, Threads, fun(_X) -> spawn(fun()->
+                                                     erlang:put(trace_mpath, TraceMPath),
+                                                     Bench(Self)
+                                             end) end),
     collect(Threads).
 
 % @doc see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
@@ -95,22 +99,24 @@ run_threads(Threads, Bench) ->
     {Mean::float(), Variance::float(), Min::non_neg_integer(),
      Max::non_neg_integer(), Aborts::non_neg_integer()}.
 collect(1) ->
-    receive {done, Time, Aborts} ->
-            {Time, 0.0, Time, Time, Aborts}
+    receive ?SCALARIS_RECV({done, Time, Aborts}, %% ->
+            {Time, 0.0, Time, Time, Aborts})
     end;
 collect(Threads) ->
     {Mean, M2, Min, Max, Aborts} =
-        receive {done, Time, TAborts} ->
-                collect(Threads - 1, 1, Time, 0.0, Time, Time, TAborts)
+        receive ?SCALARIS_RECV({done, Time, TAborts}, %% ->
+                collect(Threads - 1, 1, Time, 0.0, Time, Time, TAborts))
         end,
     {Mean, M2 / (Threads - 1), Min, Max, Aborts}.
 
 collect(0, _N, Mean, M2, Min, Max, Aborts) ->
     {Mean, M2, Min, Max, Aborts};
 collect(ThreadsLeft, N, Mean, M2, Min, Max, AggAborts) ->
-    receive {done, Time, Aborts} ->
+    receive ?SCALARIS_RECV({done, Time, Aborts}, %% ->
+          begin
             Delta = Time - Mean,
             NewMean = Mean + Delta / (N + 1),
             collect(ThreadsLeft - 1, N + 1, NewMean, M2 + Delta*(Time - NewMean),
                     erlang:min(Time, Min), erlang:max(Time, Max), AggAborts + Aborts)
+          end)
     end.
