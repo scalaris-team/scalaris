@@ -72,6 +72,8 @@ parse_expression({record_field, _, Name, Value}, ParseState) ->
     parse_expression(Value, parse_expression(Name, ParseState));
 parse_expression({record_field, _, Name, _RecordType, Value}, ParseState) ->
     parse_expression(Value, parse_expression(Name, ParseState));
+parse_expression({record_index, _, _Name, Value}, ParseState) ->
+    parse_expression(Value, ParseState);
 parse_expression({'try', _, Body, CaseClauses, CatchClauses, AfterBody}, ParseState) ->
     ParseState2 = parse_expression(Body, ParseState),
     ParseState3 = lists:foldl(fun parse_expression/2, ParseState2, CaseClauses),
