@@ -58,9 +58,16 @@
 
 -spec on() -> ok.
 on() -> on(io_format).
--spec on(logger()) -> ok.
+
+-spec on(logger() | comm:mypid()) -> ok.
 on(Logger) ->
-    erlang:put(trace_mpath, Logger), ok.
+    case comm:is_valid(Logger) of
+        true -> %% just a pid was given
+            erlang:put(trace_mpath, {log_collector, Logger});
+        false ->
+            erlang:put(trace_mpath, Logger)
+    end,
+ ok.
 
 -spec off() -> ok.
 off() ->
@@ -78,15 +85,16 @@ epidemic_reply_msg(Logger, FromPid, ToPid, Msg) ->
 log_send(Logger, FromPid, ToPid, Msg) ->
     From = normalize_pidinfo(FromPid),
     To = normalize_pidinfo(ToPid),
+    Now = os:timestamp(),
     case Logger of
         io_format ->
-            io:format("send ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [From, To, Msg]);
+            io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
+                      [util:readable_utc_time(Now), From, To, Msg]);
         {log_collector, LoggerPid} ->
             %% don't log the sending of log messages ...
             RestoreThis = erlang:get(trace_mpath),
             off(),
-            comm:send(LoggerPid, {log_send, From, To, Msg}),
+            comm:send(LoggerPid, {log_send, Now, From, To, Msg}),
             on(RestoreThis)
     end,
     epidemic_reply_msg(Logger, From, To, Msg).
@@ -94,15 +102,16 @@ log_send(Logger, FromPid, ToPid, Msg) ->
 -spec log_info(logger(), anypid(), term()) -> ok.
 log_info(Logger, FromPid, Info) ->
     From = normalize_pidinfo(FromPid),
+    Now = os:timestamp(),
     case Logger of
         io_format ->
-            io:format("info ~.0p:~n  ~.0p.~n",
-                      [From, Info]);
+            io:format("~p info ~.0p:~n  ~.0p.~n",
+                      [util:readable_utc_time(Now), From, Info]);
         {log_collector, LoggerPid} ->
             %% don't log the sending of log messages ...
             RestoreThis = erlang:get(trace_mpath),
             off(),
-            comm:send(LoggerPid, {log_info, From, Info}),
+            comm:send(LoggerPid, {log_info, Now, From, Info}),
             on(RestoreThis)
     end,
     ok.
@@ -111,15 +120,16 @@ log_info(Logger, FromPid, Info) ->
 log_recv(Logger, FromPid, ToPid, Msg) ->
     From = normalize_pidinfo(FromPid),
     To = normalize_pidinfo(ToPid),
+    Now = os:timestamp(),
     case Logger of
         io_format ->
-            io:format("recv ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [From, To, Msg]);
+            io:format("~p recv ~.0p -> ~.0p:~n  ~.0p.~n",
+                      [util:readable_utc_time(Now), From, To, Msg]);
         {log_collector, LoggerPid} ->
             %% don't log the sending of log messages ...
             RestoreThis = erlang:get(trace_mpath),
             off(),
-            comm:send(LoggerPid, {log_recv, From, To, Msg}),
+            comm:send(LoggerPid, {log_recv, Now, From, To, Msg}),
             on(RestoreThis)
     end,
     ok.

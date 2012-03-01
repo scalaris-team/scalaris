@@ -43,6 +43,7 @@
          is_unittest/0, make_filename/1,
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
+         readable_utc_time/1,
          for_to/3, for_to_ex/3,
          collect_while/1]).
 -export([sup_worker_desc/3,
@@ -830,6 +831,11 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
 
+-spec readable_utc_time(erlang:timestamp()) -> tuple().
+readable_utc_time(TimeTriple) ->
+    DateTime = calendar:now_to_universal_time(TimeTriple),
+    erlang:append_element(DateTime, element(3, TimeTriple)).
+
 %% for(i; I<=n; i++) { fun(i) }
 -spec for_to(integer(), integer(), fun((integer()) -> any())) -> ok.
 for_to(I, N, Fun) when I =< N ->
@@ -936,7 +942,7 @@ collect_while(GatherFun, Count) ->
         true          -> GatherFun(Count + 1);
         false         -> []
     end.
-    
+
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
 empty(_) -> "".

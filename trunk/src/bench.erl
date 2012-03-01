@@ -98,12 +98,7 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
           end),
     receive
         ?SCALARIS_RECV({ok}, %% ->
-            ok);
-        ?SCALARIS_RECV(X, %% ->
-                       begin
-                           io:format("unknown message ~p~n", [X]),
-                           ok
-                       end)
+            ok)
     end.
 
 -spec manage_run_internal(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
@@ -189,11 +184,6 @@ collect(Length, L) ->
            begin
                io:format("ignoring ~p, because it crashed", [Pid]),
                collect(Length - 1, L)
-           end);
-        ?SCALARIS_RECV(X, %% ->
-            begin
-                io:format("unknown message ~p~n", [X]),
-                collect(Length - 1, L)
-            end)
+           end)
     end.
 
