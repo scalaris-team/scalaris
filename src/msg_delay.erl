@@ -87,7 +87,7 @@ on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
     Future = trunc(Counter + Seconds),
     EMsg = case erlang:get(trace_mpath) of
                undefined -> Msg;
-               Logger -> trace_mpath:epidemic_reply_msg(Logger, comm:this(), Dest, Msg)
+               PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), Dest, Msg)
            end,
     case pdb:get(Future, TimeTable) of
         undefined ->
@@ -104,9 +104,9 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
         undefined -> ok;
         {_, MsgQueue} ->
             _ = [ case Msg of
-                      {'$gen_component', trace_mpath, Logger, _From, _To, OrigMsg} ->
+                      {'$gen_component', trace_mpath, PState, _From, _To, OrigMsg} ->
                           Restore = erlang:get(trace_mpath),
-                          trace_mpath:on(Logger),
+                          trace_mpath:start(PState),
                           comm:send_local(Dest, OrigMsg),
                           erlang:put(trace_mpath, Restore);
                       _ -> comm:send_local(Dest, Msg)
@@ -116,7 +116,7 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
     ETrigger =
         case erlang:get(trace_mpath) of
             undefined -> Trigger;
-            Logger -> trace_mpath:epidemic_reply_msg(Logger, comm:this(), comm:this(), Trigger)
+            PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), comm:this(), Trigger)
         end,
     comm:send_local_after(1000, self(), ETrigger),
     {TimeTable, Counter + 1};

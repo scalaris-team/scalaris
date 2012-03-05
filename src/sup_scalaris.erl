@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -111,14 +111,19 @@ my_process_list(ServiceGroup, Options) ->
     Service =
         util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
+    TraceMPath =
+        util:sup_worker_desc(trace_mpath, trace_mpath, start_link,
+                             [ServiceGroup]),
     YAWS =
         util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
+
 
     ServicePaxosGroup = util:sup_supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
                           [ServiceGroup, []]),
     %% order in the following list is the start order
-    BasicServers = [Config,
+    BasicServers = [TraceMPath,
+                    Config,
                     Logger,
                     ClientsMonitor,
                     Monitor,

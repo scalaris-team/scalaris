@@ -85,7 +85,7 @@ range_read_loop(Interval, Id, Done, Data, TimerRef) ->
                     _ = erlang:cancel_timer(TimerRef),
                     % consume potential timeout message
                     receive
-                        ?SCALARIS_RECV({range_read_timeout}, ok) %% -> ok
+                        ?SCALARIS_RECV2({range_read_timeout, Id}, ok) %% -> ok
                     after 0 -> ok
                     end,
                     {ok, lists:flatten(Data, NewData)}
