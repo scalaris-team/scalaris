@@ -76,7 +76,7 @@
         | {'$gen_component', sleep, pos_integer()}
         | {'$gen_component', get_state, pid()}
         | {'$gen_component', get_component_state, pid()}
-        | {'$gen_component', trace_mpath, trace_mpath:logger(),
+        | {'$gen_component', trace_mpath, trace_mpath:passed_state(),
            From::term(), To::term(), comm:message()}.
 
 -type bp() ::
@@ -509,11 +509,11 @@ on_post_op(Msg, State) ->
     on(Msg, State).
 
 -spec on_gc_msg(gc_msg(), gc_state()) -> gc_state() | ok.
-on_gc_msg({'$gen_component', trace_mpath, Logger, From, To, Msg}, State) ->
-    trace_mpath:log_recv(Logger, From, To, Msg),
-    trace_mpath:on(Logger),
+on_gc_msg({'$gen_component', trace_mpath, PState, From, To, Msg}, State) ->
+    trace_mpath:log_recv(PState, From, To, Msg),
+    trace_mpath:start(PState),
     NewState = on(Msg, State),
-    trace_mpath:off(),
+    trace_mpath:stop(),
     NewState;
 on_gc_msg({'$gen_component', kill}, State) ->
     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
