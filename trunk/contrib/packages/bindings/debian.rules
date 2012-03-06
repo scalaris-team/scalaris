@@ -72,16 +72,6 @@ install: build
 	cp $(BUILD_DIR_JAVA)/etc/scalaris/scalaris.properties \
 	   $(BUILD_DIR_JAVA)/etc/scalaris/scalaris.properties.example
 
-# # 	for subpackage in `echo "client doc java"`
-# # 	do
-# # 	  pwd
-# # 	  ls $(BUILD_DIR)-${subpackage}.files
-# # # 	  cat $(BUILD_DIR)-${subpackage}.files | while read line; do
-# # # 		mkdir -p $(BUILD_DIR)-${subpackage}`dirname $line`
-# # # 		mv -t $(BUILD_DIR)-${subpackage}`dirname $line` $(BUILD_DIR)/$line
-# # # 	  done
-# # 	done
-
 # Build architecture-independent files here.
 binary-indep: build install
 	# We have nothing to do by default.
