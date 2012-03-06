@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,6 +45,14 @@ start() ->
             {applications, [kernel, stdlib]},
             {env, []}
            ]}),
+    %% preload at least the API modules (for Erlang shell usage)
+    code:ensure_loaded(api_dht),
+    code:ensure_loaded(api_dht_raw),
+    code:ensure_loaded(api_monitor),
+    code:ensure_loaded(api_pubsub),
+    code:ensure_loaded(api_rdht),
+    code:ensure_loaded(api_tx),
+    code:ensure_loaded(api_vm),
     application:start(scalaris).
 
 -spec stop() -> ok | {error, Reason::term()}.
