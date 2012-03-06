@@ -41,12 +41,14 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
+	# Tomcat 5:
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
 	mkdir -p $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps
 	cp -r scalaris-wiki $(BUILD_DIR_TOMCAT5)/usr/share/tomcat5/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/
 	echo "<Context path=\"/scalaris-wiki\" docBase=\"/usr/share/tomcat5/webapps/scalaris-wiki\" />" >  $(BUILD_DIR_TOMCAT5)/etc/tomcat5/Catalina/localhost/scalaris-wiki.xml
 
+	# Tomcat 6:
 	mkdir -p $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps
 	cp -r scalaris-wiki $(BUILD_DIR_TOMCAT6)/usr/share/tomcat6/webapps/scalaris-wiki
 	mkdir -p $(BUILD_DIR_TOMCAT6)/etc/tomcat6/Catalina/localhost/

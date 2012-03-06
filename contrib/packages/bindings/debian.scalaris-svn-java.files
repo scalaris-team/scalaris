@@ -1,7 +1,0 @@
-/usr/bin/scalaris
-/usr/share/java/scalaris/*
-/usr/share/doc/scalaris/java-api/*
-/etc/scalaris/scalaris-java.conf
-/etc/scalaris/scalaris-java.conf.sample
-/etc/scalaris/scalaris.properties
-/etc/scalaris/scalaris.properties.example

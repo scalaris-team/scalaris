@@ -46,7 +46,7 @@ clean:
 
 	dh_clean
 
-BUILD_DIR:=$(CURDIR)/debian/scalaris-svn
+BUILD_DIR:=$(CURDIR)/debian/tmp
 install: build
 	dh_testdir
 	dh_testroot
@@ -61,11 +61,8 @@ install: build
 	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
 	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
 
-	# move files of the scalaris-doc package
-	mkdir -p $(BUILD_DIR)-doc/usr/share/doc/scalaris
-	mv    -t $(BUILD_DIR)-doc/usr/share/doc/scalaris \
-	         $(BUILD_DIR)/usr/share/doc/scalaris/erlang \
-	         $(BUILD_DIR)/usr/share/doc/scalaris/user-dev-guide.pdf
+	# move sub-package files into the correct folders:
+	dh_install
 
 # Build architecture-independent files here.
 binary-indep: build install
