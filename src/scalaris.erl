@@ -46,13 +46,13 @@ start() ->
             {env, []}
            ]}),
     %% preload at least the API modules (for Erlang shell usage)
-    code:ensure_loaded(api_dht),
-    code:ensure_loaded(api_dht_raw),
-    code:ensure_loaded(api_monitor),
-    code:ensure_loaded(api_pubsub),
-    code:ensure_loaded(api_rdht),
-    code:ensure_loaded(api_tx),
-    code:ensure_loaded(api_vm),
+    _ = code:ensure_loaded(api_dht),
+    _ = code:ensure_loaded(api_dht_raw),
+    _ = code:ensure_loaded(api_monitor),
+    _ = code:ensure_loaded(api_pubsub),
+    _ = code:ensure_loaded(api_rdht),
+    _ = code:ensure_loaded(api_tx),
+    _ = code:ensure_loaded(api_vm),
     application:start(scalaris).
 
 -spec stop() -> ok | {error, Reason::term()}.
