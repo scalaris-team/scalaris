@@ -849,11 +849,18 @@ inform_tps(TxState, State, Result) ->
     tx_state:set_numinformed(TxState, length(Y)).
 
 -spec inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
-inform_rtms(_TxId, _State, _Result) ->
+inform_rtms(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
-    %%{ok, TxState} = get_tx_entry(_TxId, _State),
-    %% @TODO inform RTMs?
-    %% msg_commit_reply(Client, ClientsId, Result)
+    RTMs = state_get_RTMs(State),
+    _ = [ begin
+              Pid = get_rtmpid(RTM),
+              case Pid of
+                  unknown -> ok;
+                  {RTMPid} -> comm:send(RTMPid,
+                                        {tx_tm_rtm_delete, TxId, Result})
+              end
+          end
+          || RTM <- RTMs ],
     ok.
 
 -spec trigger_delete_if_done(tx_state:tx_state()) -> ok.
