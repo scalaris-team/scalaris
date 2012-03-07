@@ -106,14 +106,4 @@
        X -> Y
        ).
 
-%% for selective receive in a receive statement (see api_dht_raw:range_read_loop)
--define(SCALARIS_RECV2(X,Y),
-       {'$gen_component', trace_mpath,
-        _ScalPState2, _ScalFrom2, _ScalTo2, X = _ScalMsg2} ->
-               trace_mpath:log_recv(_ScalPState2, _ScalFrom2, _ScalTo2, _ScalMsg2),
-               trace_mpath:log_info(_ScalPState2, _ScalTo2, {"Tracing ends at client process (pid, module, line)~n", _ScalTo2, ?MODULE, ?LINE}),
-               Y;
-       X -> Y
-       ).
-
 -include("types.hrl").

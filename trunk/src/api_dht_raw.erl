@@ -81,14 +81,18 @@ range_read_loop(Interval, Id, Done, Data, TimerRef) ->
                 false ->
                     range_read_loop(Interval, Id, Done2, [NewData | Data], TimerRef);
                 true ->
-                    % cancel timeout
-                    _ = erlang:cancel_timer(TimerRef),
-                    % consume potential timeout message
-                    receive
-                        ?SCALARIS_RECV2({range_read_timeout, Id}, ok) %% -> ok
-                    after 0 -> ok
-                    end,
+                    delete_and_cleanup_timer(TimerRef, Id),
                     {ok, lists:flatten(Data, NewData)}
             end
            end)
+    end.
+
+-spec delete_and_cleanup_timer(reference(), util:global_uid()) -> ok.
+delete_and_cleanup_timer(TimerRef, Id) ->
+    %% cancel timeout
+    _ = erlang:cancel_timer(TimerRef),
+    %% consume potential timeout message
+    receive
+        ?SCALARIS_RECV({range_read_timeout, Id}, ok) %% -> ok
+    after 0 -> ok
     end.
