@@ -23,7 +23,6 @@
     <pathelement location="contrib/apache-tomcat-7.0.25/lib/servlet-api.jar"/>
   </path>
 
-  <property name="jetty.home" value="contrib/jetty-hightide-8.0.4.v20111024" />
   <property name="tomcat.home" value="contrib/apache-tomcat-7.0.25" />
 
   <!-- Create build directory and copy static files -->
@@ -84,35 +83,22 @@
     <echo message="Download Wiktionary dump:                'ant download'"/>
     <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
     <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
-    <echo message="Run jetty web server:                    'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
+    <echo message="Run tomcat web server:                   'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
     <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="scalaris-wiki/WEB-INF/classes" includeAntRuntime="false">
       <src path="src"/>
       <classpath refid="build.classpath"/>
     </javac>
   </target>
 
-  <!-- Deletes the generated class files and the temporary files created by jetty (compiled jsps, logs,...) -->
+  <!-- Deletes the generated class files and the temporary files (compiled classes, jsps, logs,...) -->
   <target name="clean">
     <delete dir="scalaris-wiki/WEB-INF/classes"/>
     <delete dir="scalaris-wiki/WEB-INF/lib"/>
-    <delete dir="bin/jetty-temp"/>
     <delete file="scalaris-wiki.war"/>
     <delete file="scalaris-wiki-plugin-api.jar"/>
   </target>
   
-  <target name="run" depends="run-jetty" />
-
-  <!-- starts a jetty server which provides the wiki website -->
-  <target name="run-jetty" depends="build,scalaris.properties">
-    <java classname="org.eclipse.jetty.start.Main" fork="true">
-      <classpath>
-        <pathelement location="${jetty.home}/start.jar"/>
-      </classpath>
-      <sysproperty key="jetty.home" value="${jetty.home}" />
-      <sysproperty key="scalaris.node" value="${scalaris.node}" />
-      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
-    </java>
-  </target>
+  <target name="run" depends="run-tomcat" />
 
   <!-- starts a tomcat server which provides the wiki website -->
   <target name="run-tomcat" depends="build,scalaris.properties">
