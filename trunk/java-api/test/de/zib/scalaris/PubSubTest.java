@@ -20,9 +20,12 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -32,13 +35,14 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.apache.catalina.Context;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.LifecycleState;
+import org.apache.catalina.startup.Tomcat;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.Test;
 
@@ -609,20 +613,66 @@ public class PubSubTest {
     }
 
     // unsubscribe() test methods end
+    private static class Server {
+        Tomcat tomcat;
+        SubscriptionServlet[] servlet;
+
+        Server(final Tomcat tomcat, final SubscriptionServlet[] servlet) {
+            this.tomcat = tomcat;
+            this.servlet = servlet;
+        }
+
+        String getHost() {
+            return ((Inet4Address) tomcat.getConnector().getProperty("address")).getHostAddress();
+        }
+
+        int getLocalPort() {
+            return tomcat.getConnector().getLocalPort();
+        }
+
+        void stop() throws LifecycleException {
+            if ((tomcat.getServer() != null)
+                    && (tomcat.getServer().getState() != LifecycleState.DESTROYED)) {
+                if (tomcat.getServer().getState() != LifecycleState.STOPPED) {
+                    tomcat.stop();
+                }
+
+                tomcat.destroy();
+            }
+        }
+    }
 
     /**
      * Creates a new subscription server and tries to start it at {@link #startPort}.
      */
-    private static Server newSubscriptionServer()
+    private static Server newSubscriptionServers(final int number)
             throws Exception {
+        final String tmpDir = System.getProperty("java.io.tmpdir");
+        final Tomcat tomcat = new Tomcat();
+        tomcat.setBaseDir(tmpDir);
+        // Listen only on localhost
+        tomcat.getConnector().setAttribute("address",
+                InetAddress.getByName("localhost").getHostAddress());
+        // Use random free port
+        tomcat.getConnector().setPort(0);
+        // prevent the usual startup information being logged
+        tomcat.setSilent(true);
+        final File docBase = new File(tmpDir);
+        final Context context = tomcat.addContext("", docBase.getAbsolutePath());
+        final SubscriptionServlet[] servlets = new SubscriptionServlet[number];
+        for (int i = 0; i < number; ++i) {
+            servlets[i] = new SubscriptionServlet("/" + i);
+            Tomcat.addServlet(context, "subscr" + i, servlets[i]);
+            context.addServletMapping(servlets[i].path + "/*", "subscr" + i);
+        }
+//        ((RealmBase) tomcat.getServer().getRealm()).setRealmPath("/realm" + tomcat.getConnector().getPort());
         do {
-            final Server server = new Server();
-            final SelectChannelConnector connector = new SelectChannelConnector();
-            connector.setHost("127.0.0.1");
-            server.addConnector(connector);
-            server.setHandler(new SubscriptionHandler());
-            server.start();
-            return server;
+            try {
+                tomcat.start();
+                return new Server(tomcat, servlets);
+            } catch (final LifecycleException e) {
+                // e.printStackTrace();
+            }
         } while (true);
     }
 
@@ -667,12 +717,12 @@ public class PubSubTest {
     public void testSubscription1() throws Exception {
         final String topic = testTime + "_Subscription1";
         final PubSub conn = new PubSub();
-        final Server server1 = newSubscriptionServer();
+        final Server server = newSubscriptionServers(1);
         final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic, new Vector<String>());
 
         try {
-            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[0].path);
 
             for (int i = 0; i < testData.length; ++i) {
                 conn.publish(topic, testData[i]);
@@ -681,19 +731,19 @@ public class PubSubTest {
 
             // wait max 'notifications_timeout' seconds for notifications:
             final Map<String, Vector<String>> notifications_server1 =
-                ((SubscriptionHandler) server1.getHandler()).notifications;
+                server.servlet[0].notifications;
             for (int i = 0; (i < notifications_timeout)
                     && ((notifications_server1.get(topic) == null) ||
                         (notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
-            server1.stop();
+            server.stop();
 
             // check that every notification arrived:
             checkNotifications(notifications_server1, notifications_server1_expected);
         } finally {
-            server1.stop();
+            server.stop();
             conn.closeConnection();
         }
     }
@@ -708,9 +758,7 @@ public class PubSubTest {
     public void testSubscription2() throws Exception {
         final String topic = testTime + "_Subscription2";
         final PubSub conn = new PubSub();
-        final Server server1 = newSubscriptionServer();
-        final Server server2 = newSubscriptionServer();
-        final Server server3 = newSubscriptionServer();
+        final Server server = newSubscriptionServers(3);
         final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic, new Vector<String>());
         final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
@@ -719,9 +767,9 @@ public class PubSubTest {
         notifications_server3_expected.put(topic, new Vector<String>());
 
         try {
-            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[0].path);
+            conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[1].path);
+            conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[2].path);
 
             for (int i = 0; i < testData.length; ++i) {
                 conn.publish(topic, testData[i]);
@@ -732,11 +780,11 @@ public class PubSubTest {
 
             // wait max 'notifications_timeout' seconds for notifications:
             final Map<String, Vector<String>> notifications_server1 =
-                ((SubscriptionHandler) server1.getHandler()).notifications;
+                server.servlet[0].notifications;
             final Map<String, Vector<String>> notifications_server2 =
-                ((SubscriptionHandler) server2.getHandler()).notifications;
+                server.servlet[1].notifications;
             final Map<String, Vector<String>> notifications_server3 =
-                ((SubscriptionHandler) server3.getHandler()).notifications;
+                server.servlet[2].notifications;
             for (int i = 0; (i < notifications_timeout)
                     && ((notifications_server1.get(topic) == null) ||
                         (notifications_server1.get(topic).size() < notifications_server1_expected.get(topic).size())||
@@ -747,18 +795,14 @@ public class PubSubTest {
                 TimeUnit.SECONDS.sleep(1);
             }
 
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
 
             // check that every notification arrived:
             checkNotifications(notifications_server1, notifications_server1_expected);
             checkNotifications(notifications_server2, notifications_server2_expected);
             checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
             conn.closeConnection();
         }
     }
@@ -776,9 +820,7 @@ public class PubSubTest {
         final String topic2 = testTime + "_Subscription3_2";
         final String topic3 = testTime + "_Subscription3_3";
         final PubSub conn = new PubSub();
-        final Server server1 = newSubscriptionServer();
-        final Server server2 = newSubscriptionServer();
-        final Server server3 = newSubscriptionServer();
+        final Server server = newSubscriptionServers(3);
         final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic1, new Vector<String>());
         final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
@@ -787,9 +829,9 @@ public class PubSubTest {
         notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
-            conn.subscribe(topic1, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic3, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic1, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[0].path);
+            conn.subscribe(topic2, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[1].path);
+            conn.subscribe(topic3, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[2].path);
 
             for (int i = 0; i < testData.length; ++i) {
                 if ((i % 2) == 0) {
@@ -808,11 +850,11 @@ public class PubSubTest {
 
             // wait max 'notifications_timeout' seconds for notifications:
             final Map<String, Vector<String>> notifications_server1 =
-                ((SubscriptionHandler) server1.getHandler()).notifications;
+                server.servlet[0].notifications;
             final Map<String, Vector<String>> notifications_server2 =
-                ((SubscriptionHandler) server2.getHandler()).notifications;
+                server.servlet[1].notifications;
             final Map<String, Vector<String>> notifications_server3 =
-                ((SubscriptionHandler) server3.getHandler()).notifications;
+                server.servlet[2].notifications;
             for (int i = 0; (i < notifications_timeout)
                     && ((notifications_server1.get(topic1) == null) ||
                         (notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size()) ||
@@ -823,18 +865,14 @@ public class PubSubTest {
                 TimeUnit.SECONDS.sleep(1);
             }
 
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
 
             // check that every notification arrived:
             checkNotifications(notifications_server1, notifications_server1_expected);
             checkNotifications(notifications_server2, notifications_server2_expected);
             checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
             conn.closeConnection();
         }
     }
@@ -852,9 +890,7 @@ public class PubSubTest {
         final String topic2 = testTime + "_Subscription4_2";
         final String topic3 = testTime + "_Subscription4_3";
         final PubSub conn = new PubSub();
-        final Server server1 = newSubscriptionServer();
-        final Server server2 = newSubscriptionServer();
-        final Server server3 = newSubscriptionServer();
+        final Server server = newSubscriptionServers(3);
         final Map<String, Vector<String>> notifications_server1_expected = new HashMap<String, Vector<String>>();
         notifications_server1_expected.put(topic1, new Vector<String>());
         final Map<String, Vector<String>> notifications_server2_expected = new HashMap<String, Vector<String>>();
@@ -863,10 +899,10 @@ public class PubSubTest {
         notifications_server3_expected.put(topic3, new Vector<String>());
 
         try {
-            conn.subscribe(topic1, "http://" + server1.getConnectors()[0].getHost() + ":" + server1.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
-            conn.subscribe(topic3, "http://" + server1.getConnectors()[0].getHost() + ":" + server3.getConnectors()[0].getLocalPort());
-            conn.unsubscribe(topic2, "http://" + server1.getConnectors()[0].getHost() + ":" + server2.getConnectors()[0].getLocalPort());
+            conn.subscribe(topic1, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[0].path);
+            conn.subscribe(topic2, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[1].path);
+            conn.subscribe(topic3, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[2].path);
+            conn.unsubscribe(topic2, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[1].path);
 
             for (int i = 0; i < testData.length; ++i) {
                 if ((i % 2) == 0) {
@@ -886,41 +922,42 @@ public class PubSubTest {
 
             // wait max 'notifications_timeout' seconds for notifications:
             final Map<String, Vector<String>> notifications_server1 =
-                ((SubscriptionHandler) server1.getHandler()).notifications;
+                server.servlet[0].notifications;
             final Map<String, Vector<String>> notifications_server2 =
-                ((SubscriptionHandler) server2.getHandler()).notifications;
+                server.servlet[1].notifications;
             final Map<String, Vector<String>> notifications_server3 =
-                ((SubscriptionHandler) server3.getHandler()).notifications;
+                server.servlet[2].notifications;
             for (int i = 0; (i < notifications_timeout)
                     && ((notifications_server1.get(topic1) == null) ||
                         (notifications_server1.get(topic1).size() < notifications_server1_expected.get(topic1).size()) ||
-(//                        notifications_server3.get(topic2) == null ||
+                        (
+//                        notifications_server3.get(topic2) == null ||
 //                        notifications_server3.get(topic2).size() < notifications_server2_expected.get(topic2).size() ||
-notifications_server3.get(topic3) == null) ||
-                        (notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size())); ++i) {
+                         notifications_server3.get(topic3) == null) ||
+                         (notifications_server3.get(topic3).size() < notifications_server3_expected.get(topic3).size())); ++i) {
                 TimeUnit.SECONDS.sleep(1);
             }
 
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
 
             // check that every notification arrived:
             checkNotifications(notifications_server1, notifications_server1_expected);
             checkNotifications(notifications_server2, notifications_server2_expected);
             checkNotifications(notifications_server3, notifications_server3_expected);
         } finally {
-            server1.stop();
-            server2.stop();
-            server3.stop();
+            server.stop();
             conn.closeConnection();
         }
     }
 
-    private static class SubscriptionHandler extends AbstractHandler {
+    private static class SubscriptionServlet extends HttpServlet {
+        private static final long serialVersionUID = 1L;
+        final String path;
+
         public Map<String, Vector<String>> notifications = new HashMap<String, Vector<String>>();
 
-        public SubscriptionHandler() {
+        public SubscriptionServlet(final String path) {
+            this.path = path;
         }
 
         private String[] getParametersFromJSON(final Reader reader)
@@ -949,9 +986,21 @@ notifications_server3.get(topic3) == null) ||
             }
         }
 
-        public void handle(final String target, final Request baseRequest,
-                final HttpServletRequest request, final HttpServletResponse response)
-                throws IOException, ServletException {
+        @Override
+        protected void doGet(final HttpServletRequest request,
+                final HttpServletResponse response) throws ServletException, IOException {
+            System.out.println(request.toString());
+        }
+
+        /*
+         * (non-Javadoc)
+         *
+         * @see javax.servlet.http.HttpServlet#doPost(HttpServletRequest request,
+         *      HttpServletResponse response)
+         */
+        @Override
+        protected void doPost(final HttpServletRequest request,
+                final HttpServletResponse response) throws ServletException, IOException {
             response.setContentType("text/html");
             response.setStatus(HttpServletResponse.SC_OK);
             final PrintWriter out = response.getWriter();
@@ -969,13 +1018,11 @@ notifications_server3.get(topic3) == null) ||
                     l.add(content);
                 }
 
-//              System.out.print(content + " ");
+//              System.out.print(path + "/" + content + " ");
 //                notifications.put(topic, content);
             }
 
             out.println("{}");
-
-            ((Request) request).setHandled(true);
         }
     }
 }
