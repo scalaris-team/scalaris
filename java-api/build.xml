@@ -27,8 +27,6 @@
   <property name="opterlang.version" value="1.5.4-custom" />
   <!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
   <property name="jakarta.commons.cli.version" value="1.2" />
-  <!-- version of the junit jar file to bundle and compile the tests against (junit-<version>.jar) -->
-  <property name="junit.version" value="4.8.2" />
   <!-- debug level to use during compilation -->
   <property name="debuglevel" value="source,lines" />
   <!-- ########## Build configuration (end) ########## -->
@@ -154,10 +152,8 @@
   <path id="scalaris.test.classpath">
     <path refid="scalaris.classpath" />
     <pathelement path="${scalaris.classes.dirname}" />
-    <pathelement path="test-lib/junit-${junit.version}.jar" />
     <path>
-      <fileset dir="test-lib" includes="jetty-*.jar"/>
-      <fileset dir="test-lib" includes="servlet-api-*.jar"/>
+      <fileset dir="test-lib" includes="*.jar"/>
     </path>
   </path>
 
