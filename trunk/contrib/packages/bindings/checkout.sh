@@ -29,10 +29,11 @@ if [ ${result} -eq 0 ]; then
 fi
 
 if [ ${result} -eq 0 ]; then
-  tarfile="${folder}-${revision}.tar.gz"
+  tarfile="${folder}-${revision}.tar"
+  targzfile="${tarfile}.gz"
   newfoldername="${folder}-${revision}"
-  echo "making ${tarfile} ..."
-  mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs --exclude=${newfoldername}/src --exclude=${newfoldername}/test --exclude=${newfoldername}/include --exclude=${newfoldername}/contrib --exclude=${newfoldername}/user-dev-guide --exclude=${newfoldername}/doc --exclude=${newfoldername}/docroot && mv "${newfoldername}" "${folder}"
+  echo "making ${targzfile} ..."
+  mv "${folder}" "${newfoldername}" && tar -cf ${tarfile} ${newfoldername} ${newfoldername}/contrib/wikipedia/contrib/apache-tomcat-7.0.26 --exclude-vcs --exclude="${newfoldername}/src" --exclude="${newfoldername}/test" --exclude="${newfoldername}/include" --exclude="${newfoldername}/contrib" --exclude="${newfoldername}/user-dev-guide" --exclude="${newfoldername}/doc" --exclude="${newfoldername}/docroot" && tar -rf ${tarfile} ${newfoldername}/contrib/wikipedia/contrib/apache-tomcat-* && gzip ${tarfile} && mv "${newfoldername}" "${folder}"
   result=$?
 fi
 
