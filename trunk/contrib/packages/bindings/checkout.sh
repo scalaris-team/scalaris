@@ -55,13 +55,9 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/debian.changelog                   > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                         ./debian.control && \
   cp  ${sourcefolder}/debian.rules                           ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris-svn-java.files         ./debian.scalaris-svn-java.files && \
   cp  ${sourcefolder}/debian.scalaris-svn-java.conffiles     ./debian.scalaris-svn-java.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-svn-java.postrm        ./debian.scalaris-svn-java.postrm && \
-  cp  ${sourcefolder}/debian.scalaris-svn-java.postinst      ./debian.scalaris-svn-java.postinst && \
-  cp  ${sourcefolder}/debian.python-scalaris-svn.files       ./debian.python-scalaris-svn.files && \
-  cp  ${sourcefolder}/debian.python3-scalaris-svn.files      ./debian.python3-scalaris-svn.files && \
-  cp  ${sourcefolder}/debian.scalaris-svn-ruby1.8.files      ./debian.scalaris-svn-ruby1.8.files
+  cp  ${sourcefolder}/debian.scalaris-svn-java.postinst      ./debian.scalaris-svn-java.postinst
   result=$?
 fi
 

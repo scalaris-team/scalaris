@@ -56,11 +56,11 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/debian.changelog               > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris-svn.files          ./debian.scalaris-svn.files && \
+  cp  ${sourcefolder}/debian.scalaris-svn.install        ./debian.scalaris-svn.install && \
   cp  ${sourcefolder}/debian.scalaris-svn.conffiles      ./debian.scalaris-svn.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-svn.postrm         ./debian.scalaris-svn.postrm && \
   cp  ${sourcefolder}/debian.scalaris-svn.postinst       ./debian.scalaris-svn.postinst && \
-  cp  ${sourcefolder}/debian.scalaris-svn-doc.files      ./debian.scalaris-svn-doc.files
+  cp  ${sourcefolder}/debian.scalaris-svn-doc.install    ./debian.scalaris-svn-doc.install
   result=$?
 fi
 
