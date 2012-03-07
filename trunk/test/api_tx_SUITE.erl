@@ -140,16 +140,16 @@ req_list_2(_Config) ->
 
     %% exec empty double commit
     ?equals_pattern(api_tx:req_list(EmptyTLog, [{commit}, {commit}]),
-                    {_TLog, [{fail, abort}, {fail, abort}]}),
+                    {_TLog, [{fail, abort, []}, {fail, abort, []}]}),
 
     %% try commit not as last operation in request list
     ?equals_pattern(api_tx:req_list(EmptyTLog, [{commit}, {read, "A"}]),
-                    {_TLog, [{fail, abort}, _]}),
+                    {_TLog, [{fail, abort, []}, _]}),
 
     %% try commit not as last operation in request list with longer list
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{commit}, {read, "A"}, {read, "B"}]),
-                    {_TLog, [{fail, abort}, _, _]}),
+                    {_TLog, [{fail, abort, []}, _, _]}),
 
     %% ops based on tlog
     {NonExistReadTLog, _Res1} = api_tx:read(EmptyTLog, "req_list_2_C"),
@@ -214,12 +214,12 @@ commit_1(_Config) ->
     %% commit a timedout TLog
     TimeoutReadTLog =
         [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- ReadTLog ],
-    ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort}),
+    ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort, ["commit_1_B"]}),
 
     {WriteTLog2, _} = api_tx:write(api_tx:new_tlog(), "commit_1_C", 7),
     TimeoutWriteTLog =
         [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- WriteTLog2 ],
-    ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort}),
+    ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort, ["commit_1_C"]}),
 
     %% commit a non-existing tlog
     {NonExistReadTLog, _} = api_tx:read(EmptyTLog, "non-existing"),
@@ -280,10 +280,10 @@ conflicting_tx(_Config) ->
     %% Tx1 tries to increases it atomically and fails
     ?equals_pattern(
        api_tx:req_list(Tx1TLog, [{write, "Account A", Bal1 + 100}, {commit}]),
-       {_, [_WriteRes = {ok}, _CommitRes = {fail, abort}]}),
-
+       {_, [_WriteRes = {ok}, _CommitRes = {fail, abort, ["Account A"]}]}),
+    io:format("DOne~n"),
     %% Tx3: try to commit the read and fail (value changed in the meantime)
-    ?equals_pattern(api_tx:commit(Tx3TLog), {fail, abort}),
+    ?equals_pattern(api_tx:commit(Tx3TLog), {fail, abort, ["Account A"]}),
 
     %% check that two reading transactions can coexist
     %% Tx4: read the balance and later try to commit the read
@@ -306,13 +306,14 @@ conflicting_tx2(_Config) ->
 
     _ = api_tx:write("conflicting_tx2_non-existing", "Value"),
     %% verify not_found of tlog in commit phase? key now exists!
-    ?equals(api_tx:commit(TLog1a), {fail, abort}),
+    ?equals(api_tx:commit(TLog1a),
+            {fail, abort, ["conflicting_tx2_non-existing"]}),
 
     ?equals_pattern(api_tx:req_list(TLog1a,
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
                                      {commit}]),
                     {_TLog, [_WriteRes = {ok},
-                             _CommitRes = {fail, abort}]}),
+                             _CommitRes = {fail, abort, ["conflicting_tx2_non-existing"]}]}),
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
 
 
@@ -578,7 +579,7 @@ prop_tlog_add_del_on_list2(TLog0, Key, Initial, OldExists, ToAdd, ToRemove) ->
               true      -> ?equals(Result2, {fail, not_found})
            end,
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort}),
+           ?equals(Result3, {fail, abort, [Key]}),
            if OldExists -> ?equals(api_tx:read(Key), {ok, Initial});
               true      -> ?equals(api_tx:read(Key), {fail, not_found})
            end;
@@ -631,7 +632,7 @@ prop_tlog_add_on_nr2(TLog0, Key, Existing, Initial, ToAdd) ->
               true     -> ?equals(Result2, {fail, not_found})
            end,
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort}),
+           ?equals(Result3, {fail, abort, [Key]}),
            if Existing -> ?equals(api_tx:read(Key), {ok, Initial});
               true     -> ?equals(api_tx:read(Key), {fail, not_found})
            end;
@@ -697,7 +698,7 @@ prop_tlog_test_and_set2(TLog0, Key, Existing, RealOldValue, OldValue, NewValue) 
            ?equals(Result1, {fail, {key_changed, RealOldValue}}),
            ?equals(Result2, {ok, RealOldValue}),
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort}),
+           ?equals(Result3, {fail, abort, [Key]}),
            ?equals(api_tx:read(Key), {ok, RealOldValue})
     end.
 
@@ -853,7 +854,7 @@ check_commit(TLog, CommitRes, RingVal) ->
                               tx_tlog:get_entry_value(TEntry)),
                             NewRingVal)
             end;
-        {fail, abort} ->
+        {fail, abort, _} ->
             ?equals({fail, abort}, tx_tlog:get_entry_status(TEntry)),
             NewRingVal = case api_tx:read(Key) of
                              {fail, not_found} -> none;

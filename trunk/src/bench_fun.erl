@@ -1,4 +1,4 @@
-% Copyright 2008-2011 Zuse Institute Berlin
+% Copyright 2008-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ increment_iter(Key, Iterations, Aborts) ->
     Result = inc(Key),
     case Result of
         {ok}              -> increment_iter(Key, Iterations - 1, Aborts);
-        {fail, abort}     ->
+        {fail, abort, [Key]}     ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_iter(Key, Iterations, Aborts + 1);
         {fail, timeout}   ->
@@ -128,7 +128,7 @@ increment_with_histo_iter(H, Key, Iterations, Aborts) ->
         {ok}              -> increment_with_histo_iter(
                                histogram:add(timer:now_diff(After, Before) / 1000, H),
                                Key, Iterations - 1, Aborts);
-        {fail, abort}     ->
+        {fail, abort, [Key]}     ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         {fail, timeout}   ->
@@ -197,7 +197,7 @@ get_and_init_key(Key, Count, TriedKeys) ->
     case api_tx:write(Key, 0) of
         {ok} ->
             Key;
-        {fail, abort} ->
+        {fail, abort, [Key]} ->
             SleepTime = randoms:rand_uniform(1, TriedKeys * 2000 * 11-Count),
             io:format("geT_and_init_key 1 failed, retrying in ~p ms~n",
                       [SleepTime]),

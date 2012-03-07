@@ -1,4 +1,4 @@
-%  Copyright 2008-2011 Zuse Institute Berlin
+%  Copyright 2008-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -60,9 +60,9 @@ process_iter(Parent, _Key, 0, AbortCount) ->
 process_iter(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
-        {ok}            -> process_iter(Parent, Key, Count - 1, AbortCount);
-        {fail, abort}   -> process_iter(Parent, Key, Count, AbortCount + 1);
-        {fail, timeout} -> process_iter(Parent, Key, Count, AbortCount + 1)
+        {ok}             -> process_iter(Parent, Key, Count - 1, AbortCount);
+        {fail, abort, _} -> process_iter(Parent, Key, Count, AbortCount + 1);
+        {fail, timeout}  -> process_iter(Parent, Key, Count, AbortCount + 1)
     end.
 
 increment_test_8(_Config) -> increment_test_n(_Config, 8).

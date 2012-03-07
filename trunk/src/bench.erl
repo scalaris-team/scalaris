@@ -165,7 +165,7 @@ init_key(Key, Count) ->
     case api_tx:write(Key, 0) of
         {ok} ->
             Key;
-        {fail, abort} ->
+        {fail, abort, [Key]} ->
             init_key(Key, Count - 1);
         {fail, timeout} ->
             init_key(Key, Count - 1)

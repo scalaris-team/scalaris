@@ -52,7 +52,9 @@
 -type result_entry_read() ::
         {ok, client_value()} | {fail, abort | timeout | not_found}.
 -type result_entry_write()  :: {ok} | {fail, abort | timeout}.
--type result_entry_commit() :: {ok} | {fail, abort | timeout}.
+-type result_entry_commit() ::  {ok}
+                              | {fail, timeout}
+                              | {fail, abort, [client_key()]}.
 -type result_entry() :: api_tx:result().
 -type results() :: [ result_entry() ].
 
@@ -141,7 +143,7 @@ tlog_and_results_to_abort(TLog, ReqList) ->
                     add_del_on_list -> {ok};
                     add_on_nr -> {ok};
                     test_and_set -> {ok};
-                    commit -> {fail, abort}
+                    commit -> {fail, abort, []}
                 end || X <- ReqList ]}.
 
 %% @doc Send requests to the DHT, gather replies and merge TLogs.
@@ -499,7 +501,7 @@ commit(TLog) ->
     %% some parameters are checked via the individual operations
     %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
     case tx_tlog:is_sane_for_commit(TLog) of
-        false -> {fail, abort};
+        false -> {fail, abort, tx_tlog:get_insane_keys(TLog)};
         true ->
             Client = comm:this(),
             ClientsId = {commit_client_id, util:get_global_uid()},
@@ -507,7 +509,7 @@ commit(TLog) ->
             case pid_groups:find_a(tx_tm) of
                 failed ->
                     Msg = io_lib:format("No tx_tm found.~n", []),
-                    tx_tm_rtm:msg_commit_reply(Client, ClientsId, {fail, Msg});
+                    tx_tm_rtm:msg_commit_reply(Client, ClientsId, {abort, Msg});
                 TM ->
                     tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
             end,
@@ -518,8 +520,10 @@ commit(TLog) ->
                          {ok}  %% commit / abort;
                       );
                     ?SCALARIS_RECV(
-                       {tx_tm_rtm_commit_reply, ClientsId, abort}, %% ->
-                         {fail, abort} %% commit / abort;
+                       {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
+                         begin
+                             {fail, abort, FailedKeys} %% commit / abort;
+                         end
                        );
                     ?SCALARIS_RECV(
                        {tx_timeout, ClientsId}, %% ->

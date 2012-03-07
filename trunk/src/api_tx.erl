@@ -50,15 +50,18 @@
 -type request_on_key() ::
           {read, client_key()}
         | {write, client_key(), client_value()}
-        | {add_del_on_list, client_key(), ToAdd::[client_value()], ToRemove::[client_value()]}
+        | {add_del_on_list, client_key(),
+           ToAdd::[client_value()], ToRemove::[client_value()]}
         | {add_on_nr, client_key(), number()}
-        | {test_and_set, client_key(), Old::client_value(), New::client_value()}.
+        | {test_and_set, client_key(),
+           Old::client_value(), New::client_value()}.
 -type request() :: request_on_key() | {commit}.
+
 -type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
 -type write_result() :: {ok} | {fail, timeout}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
--type commit_result() :: {ok} | {fail, abort | timeout}.
+-type commit_result() :: {ok} | {fail, timeout} | {fail, abort, [client_key()]}.
 -type testandset_result() :: write_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 -type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
 
@@ -138,7 +141,7 @@ write(Key, Value) ->
 
 %% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
 -spec add_del_on_list(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
-           -> listop_result() | {fail, abort}.
+           -> listop_result() | {fail, abort, [client_key()]}.
 add_del_on_list(Key, ToAdd, ToRemove) ->
     ReqList = [{add_del_on_list, Key, ToAdd, ToRemove}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -149,7 +152,7 @@ add_del_on_list(Key, ToAdd, ToRemove) ->
 
 %% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
 -spec add_on_nr(client_key(), ToAdd::number())
-           -> numberop_result() | {fail, abort}.
+           -> numberop_result() | {fail, abort, [client_key()]}.
 add_on_nr(Key, ToAdd) ->
     ReqList = [{add_on_nr, Key, ToAdd}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -162,7 +165,7 @@ add_on_nr(Key, ToAdd) ->
 %%      If the value stored at Key is the same as OldValue, then NewValue will
 %%      be stored.
 -spec test_and_set(Key::client_key(), OldValue::client_value(), NewValue::client_value())
-        -> testandset_result() | {fail, abort}.
+        -> testandset_result() | {fail, abort, [client_key()]}.
 test_and_set(Key, OldValue, NewValue) ->
     ReqList = [{test_and_set, Key, OldValue, NewValue}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -179,5 +182,5 @@ req_list_commit_each(ReqList) ->
           {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
           {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
           {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
-          _ -> {fail, abort}
+          _ -> {fail, abort, []}
       end || Req <- ReqList].
