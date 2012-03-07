@@ -53,7 +53,7 @@ init_per_suite(Config) ->
 
 end_per_suite(_Config) ->
     crypto:stop(),
-    ok.
+    ok.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -122,10 +122,12 @@ prop_fpr(ItemCount, ItemType) ->
     DestFPRList = [DestFpr, DestFpr*0.8, DestFpr*0.5],
     HFCount = ?BLOOM:calc_HF_numEx(ItemCount, DestFpr),
     
-    FPs = [{util:p_repeatAndAccumulate(
+    FPs = [{util:repeat(
               fun measure_fpr/3, [{Fpr, HFCount}, {InList, ItemCount}, ItemType],
-              ?Fpr_Test_NumTests, fun(X, Y) -> X + Y end, 
-              0) / ?Fpr_Test_NumTests, Fpr} 
+              ?Fpr_Test_NumTests, 
+              [parallel, {accumulate, fun(X, Y) -> X + Y end, 0}])
+               / ?Fpr_Test_NumTests, 
+            Fpr} 
            || Fpr <- DestFPRList],
     FPs2 = [{D, M, (1 - D/M) * 100, 
              if M-D =< 0 -> "ok"; true -> "fail" end } 
