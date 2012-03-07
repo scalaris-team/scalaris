@@ -20,8 +20,7 @@
 -export([new/2, new/3, add/2, is_element/2]).
 -export([equals/2, join/2, print/1]).
 
--export([calc_HF_num/2,
-         calc_HF_numEx/2,
+-export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
          calc_least_size/2,
          calc_FPR/3]).
 
@@ -71,21 +70,33 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 %       Definitions:
 %       N=BF maximum element number
 %       M=BF bit size
+%       C=Compression Rate M/N
 %       E=FPR 0<=E<=1 (FPR=false-positive rate)
 %       k=Number of hash functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc  Calculates optimal number of hash functions for
 %       an M-bit large BloomFilter with a maximum of N Elements.
--spec calc_HF_num(integer(), integer()) -> pos_integer().
-calc_HF_num(_, N) when N =:= 0 -> 1;
-calc_HF_num(M, N) when N > 0 ->
-    Result = ln(2) * (M / N),
-    if 
-        Result < 1 -> 1;
-        true -> trunc(Result + 1)
+-spec calc_HF_num(pos_integer(), pos_integer()) -> pos_integer().
+calc_HF_num(M, N) ->
+    calc_HF_num(util:ceil(M / N)).
+
+% @doc Calculates optimal number of hash functions for 
+%      a given compression rate of C.
+-spec calc_HF_num(pos_integer()) -> pos_integer().
+calc_HF_num(C) when C > 0 ->
+    K = C * ln(2),
+    K_Min = util:floor(K),
+    K_Max = util:ceil(K),
+    A = calc_FPR(C, K_Max),
+    B = calc_FPR(C, K_Min),
+    case util:min(A, B) =:= A of
+        true -> K_Max;
+        _ -> K_Min
     end.
 
+% @doc Calculates opt. number of hash functions to
+%      code N elements into a bloom filter with false positive rate of FPR.
 -spec calc_HF_numEx(integer(), float()) -> integer().
 calc_HF_numEx(N, FPR) ->
     M = calc_least_size(N, FPR),
@@ -93,16 +104,19 @@ calc_HF_numEx(N, FPR) ->
 
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate FPR up to N-Elements.
--spec calc_least_size(integer(), float()) -> integer().
-calc_least_size(N, FPR) when N =:= 0 orelse FPR =:= 0 -> 1;
-calc_least_size(N, FPR) when N > 0 ->
-    erlang:round((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
+-spec calc_least_size(pos_integer(), float()) -> pos_integer().
+calc_least_size(_, FPR) when FPR =:= 0 -> 1;
+calc_least_size(N, FPR) ->
+    util:ceil((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
 % @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
 %       and a maximum of N elements.
 %       FPR = (1-e^(-kn/m))^k
 %       M = number of BF-Bits
--spec calc_FPR(integer(), integer(), integer()) -> float().
-calc_FPR(M, _, _) when M =:= 0-> 1;
-calc_FPR(M, N, K) when M > 0-> 
+-spec calc_FPR(pos_integer(), pos_integer(), pos_integer()) -> float().
+calc_FPR(M, N, K) -> 
     math:pow(1 - math:pow(math:exp(1), (-K*N) / M), K).
+
+-spec calc_FPR(pos_integer(), pos_integer()) -> float().
+calc_FPR(C, K) ->
+    math:pow(1 - math:pow(math:exp(1), -K / C), K).
