@@ -17,13 +17,13 @@
     <pathelement location="contrib/stringtotime-1.0.4.jar"/>
   </path>
 
+  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.26" />
+
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
     <path refid="import.classpath"/>
-    <pathelement location="contrib/apache-tomcat-7.0.25/lib/servlet-api.jar"/>
+    <pathelement location="${tomcat.home}/lib/servlet-api.jar"/>
   </path>
-
-  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.25" />
 
   <!-- Create build directory and copy static files -->
   <macrodef name="scalaris.check.jars">
