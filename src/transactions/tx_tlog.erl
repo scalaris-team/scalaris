@@ -30,6 +30,7 @@
 -export([sort_by_key/1]).
 -export([find_entry_by_key/2]).
 -export([is_sane_for_commit/1]).
+-export([get_insane_keys/1]).
 
 %% Operations on entries of TLogs
 -export([new_entry/5]).
@@ -103,6 +104,14 @@ entry_is_sane_for_commit(Entry, Acc) ->
 is_sane_for_commit(TLog) ->
     lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
+-spec get_insane_keys(tlog()) -> [client_key()].
+get_insane_keys(TLog) ->
+    lists:foldl(fun(X, Acc) ->
+                        case entry_is_sane_for_commit(X, true) of
+                            true -> Acc;
+                            false -> [get_entry_key(X) | Acc]
+                        end
+                end, [], TLog).
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),

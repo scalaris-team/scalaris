@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -121,7 +121,7 @@ transactions_more_failures_4_nodes_read(FailedNodes) ->
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
     ?equals_w_note(api_tx:read("0"), {fail, not_found}, "read_0_b"),
-    ?equals_w_note(api_tx:write("0", 2), {fail, abort}, "write_0_b"),
+    ?equals_w_note(api_tx:write("0", 2), {fail, abort, ["0"]}, "write_0_b"),
     ?equals_w_note(api_tx:read("0"), {fail, not_found}, "read_0_c"),
     ok.
 
@@ -158,9 +158,9 @@ transactions_more_failures_4_nodes_networksplit_write(FailedNodes) ->
     unittest_helper:wait_for_stable_ring_deep(),
 
     ct:pal("attempting write_0_a~n"),
-    ?equals_w_note(api_tx:write("0", 1), {fail, abort}, "write_0_a"),
+    ?equals_w_note(api_tx:write("0", 1), {fail, abort, ["0"]}, "write_0_a"),
     ct:pal("attempting read_0_a~n"),
-    ?equals_w_note(api_tx:read("0"), {fail, abort}, "read_0_a"),
+    ?equals_w_note(api_tx:read("0"), {fail, abort, ["0"]}, "read_0_a"),
 
     _ = [unpause_node(PauseSpec) || PauseSpec <- PauseSpecs],
 

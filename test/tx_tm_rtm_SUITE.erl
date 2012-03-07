@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -105,7 +105,7 @@ abort_prepared_w(_) ->
     _ = [ begin
               Key = init_new_db_key("abort_prepared_w"),
               abort_prepared(Key, write, [MC1, MC2, MC3, MC4],
-                             calc_w_outcome([MC1, MC2, MC3, MC4]))
+                             calc_w_outcome(Key, [MC1, MC2, MC3, MC4]))
           end
           || MC1 <- causes(), MC2 <- causes(),
              MC3 <- causes(), MC4 <- causes()],
@@ -118,7 +118,7 @@ abort_prepared_rc(_) ->
     _ = [ begin
               Key = init_new_db_key("abort_prepared_rc"),
               abort_prepared(Key, read_commit, [MC1, MC2, MC3, MC4],
-                             calc_rc_outcome([MC1, MC2, MC3, MC4]))
+                             calc_rc_outcome(Key, [MC1, MC2, MC3, MC4]))
           end
           || MC1 <- causes(), MC2 <- causes(),
              MC3 <- causes(), MC4 <- causes()],
@@ -133,7 +133,7 @@ abort_prepared_rmc(_) ->
                   api_tx:req_list(api_tx:new_tlog(),
                                                [{read, Key}]),
               abort_prepared(Key, {commit_tlog, TLog}, [MC1, MC2, MC3, MC4],
-                             calc_rmc_outcome([MC1, MC2, MC3, MC4]))
+                             calc_rmc_outcome(Key, [MC1, MC2, MC3, MC4]))
           end
           || MC1 <- causes(), MC2 <- causes(),
              MC3 <- causes(), MC4 <- causes()],
@@ -149,7 +149,7 @@ abort_prepared_wmc(_) ->
                                                [{write, Key, "wmc"}]),
               Pattern = [MC1, MC2, MC3, MC4],
               abort_prepared(Key, {commit_tlog, TLog}, Pattern,
-                             calc_wmc_outcome(Pattern))
+                             calc_wmc_outcome(Key, Pattern))
           end
           || MC1 <- causes(), MC2 <- causes(),
              MC3 <- causes(), MC4 <- causes()],
@@ -198,7 +198,7 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
     end,
    ok.
 
-calc_w_outcome(PreOps) ->
+calc_w_outcome(Key, PreOps) ->
     NumReadlock =   length([ X || X <- PreOps, X =:= readlock ]),
     NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
     NumVersionDec = length([ X || X <- PreOps, X =:= versiondec ]),
@@ -222,10 +222,10 @@ calc_w_outcome(PreOps) ->
        (3 =:= NumVersionInc andalso 1 =:= NumNone) -> {ok};
        (3 =:= NumVersionInc andalso 1 =:= NumWritelock) -> {ok};
 
-       true -> {fail, abort}
+       true -> {fail, abort, [Key]}
     end.
 
-calc_rc_outcome(PreOps) ->
+calc_rc_outcome(Key, PreOps) ->
     %% DB is static over whole tx.
     %% Read phase and validation phase may operate on different
     %% replica subsets.
@@ -236,10 +236,10 @@ calc_rc_outcome(PreOps) ->
        (1 =:= NumWritelock andalso 1 =/= NumVersionInc) -> {ok};
        (1 =:= NumWritelock andalso 1 =:= NumVersionInc) -> ok_or_abort;
 
-       true -> {fail, abort}
+       true -> {fail, abort, [Key]}
     end.
 
-calc_rmc_outcome(PreOps) ->
+calc_rmc_outcome(Key, PreOps) ->
     NumReadlock =   length([ X || X <- PreOps, X =:= readlock ]),
     NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
     NumVersionDec = length([ X || X <- PreOps, X =:= versiondec ]),
@@ -251,30 +251,30 @@ calc_rmc_outcome(PreOps) ->
        (3 =:= NumReadlock + NumVersionDec + NumNone) -> {ok};
        (2 =< NumReadlock + NumNone)
        andalso (0 =:= NumWritelock + NumVersionInc) -> {ok};
-       (1 =:= NumWritelock) -> {fail, abort};
+       (1 =:= NumWritelock) -> {fail, abort, [Key]};
        (3 =:= NumVersionDec) -> {ok};
        (4 =:= NumVersionDec) -> {ok};
 
-       true -> {fail, abort}
+       true -> {fail, abort, [Key]}
     end.
 
-calc_wmc_outcome(PreOps) ->
+calc_wmc_outcome(Key, PreOps) ->
     NumReadlock =   length([ X || X <- PreOps, X =:= readlock ]),
     NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
     NumVersionDec = length([ X || X <- PreOps, X =:= versiondec ]),
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
     NumNone =       length([ X || X <- PreOps, X =:= none ]),
 
-    if (NumVersionInc >= 2) -> {fail, abort};
-       (NumVersionDec >= 2) -> {fail, abort};
-       (NumReadlock >= 2) -> {fail, abort};
+    if (NumVersionInc >= 2) -> {fail, abort, [Key]};
+       (NumVersionDec >= 2) -> {fail, abort, [Key]};
+       (NumReadlock >= 2) -> {fail, abort, [Key]};
        (NumReadlock =:= 1 andalso NumNone =:= 3) -> {ok};
        (NumWritelock =:= 1 andalso NumNone =:= 3) -> {ok};
        (NumVersionDec =:= 1 andalso NumNone =:= 3) -> {ok};
        (NumNone =:= 4) -> {ok};
        (NumVersionInc =:= 1 andalso NumNone =:= 3) -> {ok};
 
-       true -> {fail, abort}
+       true -> {fail, abort, [Key]}
     end.
 
 init_new_db_key(Value) ->
