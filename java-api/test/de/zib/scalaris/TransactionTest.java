@@ -20,6 +20,7 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.TreeSet;
 
 import org.junit.Test;
 
@@ -699,6 +700,11 @@ public class TransactionTest {
                 // an AbortException must be thrown
                 assertTrue(false);
             } catch (final AbortException e) {
+                final TreeSet<String> expFailKeys = new TreeSet<String>();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    expFailKeys.add(testTime + key + i);
+                }
+                assertEquals(expFailKeys, new TreeSet<String>(e.getFailedKeys()));
                 t.abort();
             }
             t = new Transaction();
@@ -848,6 +854,9 @@ public class TransactionTest {
                 // an AbortException must be thrown
                 assertTrue(false);
             } catch (final AbortException e) {
+                final TreeSet<String> expFailKeys = new TreeSet<String>();
+                expFailKeys.add(testTime + key);
+                assertEquals(expFailKeys, new TreeSet<String>(e.getFailedKeys()));
                 t.abort();
             }
             t = new Transaction();
@@ -1037,6 +1046,11 @@ public class TransactionTest {
                 // an AbortException must be thrown
                 assertTrue(false);
             } catch (final AbortException e) {
+                final TreeSet<String> expFailKeys = new TreeSet<String>();
+                for (int i = 0; i < (testData.length - 1); i += 2) {
+                    expFailKeys.add(testTime + key + i);
+                }
+                assertEquals(expFailKeys, new TreeSet<String>(e.getFailedKeys()));
                 t.abort();
             }
             t = new Transaction();
@@ -1168,6 +1182,9 @@ public class TransactionTest {
                 // an AbortException must be thrown
                 assertTrue(false);
             } catch (final AbortException e) {
+                final TreeSet<String> expFailKeys = new TreeSet<String>();
+                expFailKeys.add(testTime + key);
+                assertEquals(expFailKeys, new TreeSet<String>(e.getFailedKeys()));
                 t.abort();
             }
             t = new Transaction();

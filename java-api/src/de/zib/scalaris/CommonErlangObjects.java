@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris;
 
+import java.util.List;
+
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangTuple;
@@ -25,7 +27,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *
  * @author Nico Kruber, kruber@zib.de
  *
- * @version 3.8
+ * @version 3.12
  * @since 2.5
  */
 final class CommonErlangObjects {
@@ -261,7 +263,7 @@ final class CommonErlangObjects {
 
     /**
      * Processes the <tt>received_raw</tt> term from erlang and if it is a
-     * <tt>{fail, abort}</tt>, issues an {@link AbortException}.
+     * <tt>{fail, abort, KeyList}</tt>, issues an {@link AbortException}.
      *
      * @param received_raw
      *            the object to process
@@ -276,15 +278,39 @@ final class CommonErlangObjects {
     static final void checkResult_failAbort(final OtpErlangObject received_raw) throws AbortException, UnknownException {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
-                final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
-                }
-            }
+            checkResult_failAbort(received);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Processes the <tt>received_raw</tt> term from erlang and if it is a
+     * <tt>{fail, abort, KeyList}</tt>, issues an {@link AbortException}.
+     *
+     * @param received
+     *            the object to process
+     *
+     * @throws AbortException
+     *             if the commit of the write failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @since 3.12
+     */
+    static final void checkResult_failAbort(final OtpErlangTuple received) throws AbortException, UnknownException {
+        try {
+            if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
+                    && (received.arity() == 3)
+                    && received.elementAt(1).equals(CommonErlangObjects.abortAtom)) {
+                final List<String> responsibleKeys = new ErlangValue(
+                        received.elementAt(2)).stringListValue();
+                throw new AbortException(responsibleKeys);
+            }
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received);
         }
     }
 
@@ -305,18 +331,18 @@ final class CommonErlangObjects {
     static final void processResult_commit(final OtpErlangObject received_raw) throws TimeoutException, AbortException, UnknownException {
         /*
          * possible return values:
-         *  {ok} | {fail, timeout | abort}
+         *  {ok} | {fail, abort, KeyList} | {fail, timeout}
          */
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
-                final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
+            } else {
+                checkResult_failAbort(received);
+                if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
+                        && (received.arity() == 2)
+                        && received.elementAt(1).equals(CommonErlangObjects.timeoutAtom)) {
                     throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
                 }
             }
             throw new UnknownException(received_raw);
