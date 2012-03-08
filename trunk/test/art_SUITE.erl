@@ -59,10 +59,10 @@ end_per_suite(_Config) ->
 prop_new(L, L) -> true;
 prop_new(L, R) ->
     I = intervals:new('[', L, R, ']'),
-    Tree = merkle_tree:new(I),
-    Art1 = art:new(Tree),
+    DB = db_generator:get_db(I, 400, uniform),
+    Art1 = art:new(),
     Conf1 = art:get_config(Art1),
-    Art2 = art:new(Tree, 
+    Art2 = art:new(merkle_tree:bulk_build(I, DB), 
                    [{correction_factor, proplists:get_value(correction_factor, Conf1) + 1},
                     {inner_bf_fpr, proplists:get_value(inner_bf_fpr, Conf1) + 0.1},
                     {leaf_bf_fpr, proplists:get_value(leaf_bf_fpr, Conf1) + 0.1}]),
