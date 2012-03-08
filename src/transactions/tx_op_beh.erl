@@ -1,4 +1,5 @@
-%% @copyright 2009, 2010 onScale solutions GmbH
+%% @copyright 2012 Zuse Institute Berlin
+%%            2009, 2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,7 +31,7 @@
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
 -callback work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                     rdht_tx:request()) -> ok.
+                     api_tx:request()) -> ok.
 -callback validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
 -callback validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
 -callback commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().

@@ -36,16 +36,15 @@
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0, request/0]).
+-export_type([req_id/0]).
 -endif.
 
 -type req_id() :: util:global_uid().
 -type request_on_key() :: api_tx:request_on_key().
--type request() :: request_on_key() | {commit}.
 -type results() :: [ api_tx:result() ].
 
 %% @doc Perform several requests inside a transaction.
--spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), results()}.
+-spec req_list(tx_tlog:tlog(), [api_tx:request()]) -> {tx_tlog:tlog(), results()}.
 req_list([], [{commit}]) -> {[], [{ok}]};
 req_list(TLog, ReqList) ->
     %% PRE: TLog is sorted by key, implicitly given, as
@@ -105,7 +104,7 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
     end.
 
 %% @doc Fill all fields with {fail, abort} information.
--spec tlog_and_results_to_abort(tx_tlog:tlog(), [request()]) ->
+-spec tlog_and_results_to_abort(tx_tlog:tlog(), [api_tx:request()]) ->
                                        {tx_tlog:tlog(), results()}.
 tlog_and_results_to_abort(TLog, ReqList) ->
     NewTLog = lists:foldl(fun(Req, AccTLog) ->
