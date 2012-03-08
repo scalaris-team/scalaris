@@ -58,7 +58,8 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.rules                           ./debian.rules && \
   cp  ${sourcefolder}/debian.scalaris-svn-java.conffiles     ./debian.scalaris-svn-java.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-svn-java.postrm        ./debian.scalaris-svn-java.postrm && \
-  cp  ${sourcefolder}/debian.scalaris-svn-java.postinst      ./debian.scalaris-svn-java.postinst
+  cp  ${sourcefolder}/debian.scalaris-svn-java.postinst      ./debian.scalaris-svn-java.postinst && \
+  cp  ${sourcefolder}/debian.scalaris-svn-ruby1.8.postinst   ./debian.scalaris-svn-ruby1.8.postinst
   result=$?
 fi
 
