@@ -281,20 +281,21 @@ public class PubSub {
         try {
             /*
              * possible return values:
-             *   {ok} | {fail, abort | timeout | not_found}.
+             *   {ok} | {fail, abort, KeyList} | {fail, timeout | not_found}.
              */
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
-            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
-                // {fail, Reason}
-                final OtpErlangObject failReason = received.elementAt(1);
-                if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (failReason.equals(CommonErlangObjects.abortAtom)) {
-                    throw new AbortException(received_raw);
-                } else if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
-                    throw new NotFoundException(received_raw);
+            } else {
+                CommonErlangObjects.checkResult_failAbort(received);
+                if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                    // {fail, timeout | not_found}
+                    final OtpErlangObject failReason = received.elementAt(1);
+                    if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
+                        throw new TimeoutException(received_raw);
+                    } else if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
+                        throw new NotFoundException(received_raw);
+                    }
                 }
             }
             throw new UnknownException(received_raw);
