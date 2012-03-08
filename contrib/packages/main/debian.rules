@@ -62,7 +62,7 @@ install: build
 	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
 
 	# move sub-package files into the correct folders:
-	dh_install
+	dh_install --sourcedir=$(BUILD_DIR)
 
 # Build architecture-independent files here.
 binary-indep: build install
