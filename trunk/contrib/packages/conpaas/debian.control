@@ -1,0 +1,46 @@
+Source: conpaas-scalarix-svn
+Section: database
+Priority: optional
+Maintainer: Thorsten Schütt <schuett@zib.de>
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-common-test (>= 13.b.1), pkg-config, ruby, ruby1.8
+Homepage: http://code.google.com/p/scalaris
+
+Package: conpaas-scalarix-svn-one-manager
+Conflicts: scalaris-one-manager scalaris-svn-one-manager
+Conflicts: scalaris-one-frontend scalaris-svn-one-frontend
+Conflicts: conpaas-scalarix-svn-one-frontend
+Conflicts: conpaas-scalarix-one-manager
+Architecture: all
+Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev, scalaris (>= ${binary:Version})
+Description: Scalarix Manager daemon for ConPaaS
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
+Package: conpaas-scalarix-svn-one-frontend
+Conflicts: scalaris-one-frontend scalaris-svn-one-frontend
+Conflicts: scalaris-one-manager scalaris-svn-one-manager
+Conflicts: conpaas-scalarix-svn-one-manager
+Conflicts: conpaas-scalarix-one-frontend
+Architecture: all
+Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev
+Description: Scalarix Manager daemon for ConPaaS
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
+
+Package: conpaas-scalarix-svn-one-client
+Conflicts: scalaris-one-client scalaris-svn-one-client
+Conflicts: conpaas-scalarix-one-client
+Architecture: all
+Depends: ruby, ruby1.8, rubygems1.8
+Description: Scalarix Client for ConPaaS
+ Scalaris is a scalable, transactional, distributed key-value store. It
+ can be used for building scalable services. Scalaris uses a structured
+ overlay with a non-blocking Paxos commit protocol for transaction
+ processing with strong consistency over replicas. Scalaris is
+ implemented in Erlang.
