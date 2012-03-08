@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 1
 Homepage: http://code.google.com/p/scalaris
 
 Package: conpaas-scalarix-svn-one-manager
-Conflicts: scalaris-one-manager scalaris-svn-one-manager scalaris-one-frontend scalaris-svn-one-frontend conpaas-scalarix-svn-one-frontend conpaas-scalarix-one-manager
+Conflicts: scalaris-one-manager, scalaris-svn-one-manager, scalaris-one-frontend, scalaris-svn-one-frontend, conpaas-scalarix-svn-one-frontend, conpaas-scalarix-one-manager
 Architecture: all
 Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev, scalaris (>= ${binary:Version})
 Description: Scalarix Manager daemon for ConPaaS
@@ -17,7 +17,7 @@ Description: Scalarix Manager daemon for ConPaaS
  implemented in Erlang.
 
 Package: conpaas-scalarix-svn-one-frontend
-Conflicts: scalaris-one-frontend scalaris-svn-one-frontend scalaris-one-manager scalaris-svn-one-manager conpaas-scalarix-svn-one-manager conpaas-scalarix-one-frontend
+Conflicts: scalaris-one-frontend, scalaris-svn-one-frontend, scalaris-one-manager, scalaris-svn-one-manager, conpaas-scalarix-svn-one-manager, conpaas-scalarix-one-frontend
 Architecture: all
 Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev
 Description: Scalarix Manager daemon for ConPaaS
@@ -28,7 +28,7 @@ Description: Scalarix Manager daemon for ConPaaS
  implemented in Erlang.
 
 Package: conpaas-scalarix-svn-one-client
-Conflicts: scalaris-one-client scalaris-svn-one-client conpaas-scalarix-one-client
+Conflicts: scalaris-one-client, scalaris-svn-one-client, conpaas-scalarix-one-client
 Architecture: all
 Depends: ruby, ruby1.8, rubygems1.8
 Description: Scalarix Client for ConPaaS
