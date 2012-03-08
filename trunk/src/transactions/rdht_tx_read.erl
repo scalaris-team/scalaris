@@ -1,5 +1,6 @@
 %% @copyright 2009-2012 Zuse Institute Berlin
 %%            2009 onScale solutions GmbH
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -52,7 +53,7 @@ tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
 tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                 rdht_tx:request()) -> ok.
+                 api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog

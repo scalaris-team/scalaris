@@ -57,7 +57,7 @@ tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
 -spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
 tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
--spec work_phase(pid(), rdht_tx:req_id(), rdht_tx:request()) -> ok.
+-spec work_phase(pid(), rdht_tx:req_id(), api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_write:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -178,7 +178,7 @@ on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
     comm:send_local(ClientPid, Msg),
     State.
 
--spec update_tlog_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
+-spec update_tlog_entry(tx_tlog:tlog_entry(), api_tx:request()) ->
                                tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, Request) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
