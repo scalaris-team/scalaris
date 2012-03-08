@@ -157,7 +157,7 @@ on({tp_committed, ItemId} = _Msg, State) ->
                                 all_items_acked ->
                                     %% to inform, we do not need to know the new state
                                     Result = tx_state:is_decided(TmpTxState),
-                                    inform_client(TxId, State, Result),
+                                    inform_client(TmpTxState, State, Result),
                                     inform_rtms(TxId, State, Result),
                                     TmpTxState
                             end,
@@ -197,7 +197,7 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
 
                             %% client and rtms are informed, when
                             %% maj. of tps comitted
-                            %% inform_client(TxId, State, Result),
+                            %% inform_client(T1TxState, State, Result),
                             %% inform_rtms(TxId, State, Result),
                             T1TxState
                     end,
@@ -817,9 +817,8 @@ set_entry(NewEntry, State) ->
     State.
 
 -spec inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
-inform_client(TxId, State, Result) ->
+inform_client(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
-    {ok, TxState} = get_tx_entry(TxId, State),
     Client = tx_state:get_client(TxState),
     ClientsId = tx_state:get_clientsid(TxState),
     ClientResult = case Result of

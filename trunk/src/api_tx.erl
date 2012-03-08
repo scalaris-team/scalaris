@@ -39,8 +39,8 @@
          read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3]).
 
 -ifdef(with_export_type_support).
--export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0,
-              request_on_key/0]).
+-export_type([request/0, read_result/0, write_result/0, commit_result/0,
+              result/0, request_on_key/0]).
 -endif.
 
 -include("scalaris.hrl").
@@ -51,8 +51,10 @@
           {read, client_key()}
         | {write, client_key(), client_value()}
         | {add_del_on_list, client_key(),
-           ToAdd::[client_value()], ToRemove::[client_value()]}
-        | {add_on_nr, client_key(), number()}
+           client_value(),  %% abort when not ToAdd::[client_value()],
+           client_value()}  %% abort when not ToRemove::[client_value()]}
+        | {add_on_nr, client_key(),
+           client_value()} %% abort when not number()}
         | {test_and_set, client_key(),
            Old::client_value(), New::client_value()}.
 -type request() :: request_on_key() | {commit}.
