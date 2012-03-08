@@ -248,7 +248,7 @@ make_tlog_entry(Entry) ->
     {Val, Vers} = rdht_tx_read_state:get_result(Entry),
     Key = rdht_tx_read_state:get_key(Entry),
     Status = rdht_tx_read_state:get_decided(Entry),
-    tx_tlog:new_entry(?MODULE, Key, Vers, Status, Val).
+    tx_tlog:new_entry(read, Key, Vers, Status, Val).
 
 delete_if_all_replied(Entry, Reps, Table) ->
     Id = rdht_tx_read_state:get_id(Entry),

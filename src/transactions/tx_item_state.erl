@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin
+% @copyright 2009-2012 Zuse Institute Berlin
 %    and onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,9 +82,9 @@ new(ItemId, TxId, TLogEntry) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries =
         case tx_tlog:get_entry_operation(TLogEntry) of
-            rdht_tx_read ->
+            read ->
                 rdht_tx_read:validate_prefilter(TLogEntry);
-            rdht_tx_write ->
+            write ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
 %%    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],

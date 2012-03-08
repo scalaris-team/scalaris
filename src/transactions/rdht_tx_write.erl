@@ -172,7 +172,7 @@ init([]) ->
 -spec on(comm:message(), null) -> null.
 on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    Request = {?MODULE, Key, WriteValue},
+    Request = {write, Key, WriteValue},
     NewTLogEntry = update_tlog_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
@@ -189,11 +189,11 @@ update_tlog_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         value ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
+            tx_tlog:new_entry(write, Key, Version, value, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue)
+            tx_tlog:new_entry(write, Key, Version, value, WriteValue)
 %        {fail, timeout} ->
-%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
+%            tx_tlog:new_entry(write, Key, Version, {fail, timeout},
 %                               WriteValue)
     end.
 
