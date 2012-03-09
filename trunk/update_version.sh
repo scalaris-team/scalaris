@@ -13,9 +13,15 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-./update_version.sh
+VERSION=`cat VERSION`
 
-echo "Creating configure script"
-aclocal
-autoconf
+echo "Setting Scalaris version to ${VERSION}..."
+sed -e "s/-define(SCALARIS_VERSION, \".*\")\\./-define(SCALARIS_VERSION, \"${VERSION}\")./g" \
+    -i include/scalaris.hrl
+sed -e "s/AC_INIT(scalaris, .*, schuett@zib.de)/AC_INIT(scalaris, ${VERSION}, schuett@zib.de)/g" \
+    -i configure.ac
+sed -e "s/public static final String version = \".*\";/public static final String version = \"${VERSION}\";/g" \
+    -i contrib/wikipedia/src/de/zib/scalaris/examples/wikipedia/bliki/WikiServlet.java
+sed -e "s/version='.*',/version='${VERSION}',/g" \
+    -i python-api/setup.py
 echo "done"
