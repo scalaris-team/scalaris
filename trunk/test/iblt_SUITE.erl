@@ -19,7 +19,7 @@
 %%% @end
 %%% Created : 06/01/2012 by Maik Lange <MLange@informatik.hu-berlin.de>
 %%%-------------------------------------------------------------------
-%% @version $Id: $
+%% @version $Id$
 
 -module(iblt_SUITE).
 

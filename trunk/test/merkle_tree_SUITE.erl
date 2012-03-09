@@ -19,7 +19,7 @@
 %%% @end
 %%% Created : 06/04/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
 %%%-------------------------------------------------------------------
-%% @version $Id: $
+%% @version $Id$
 
 -module(merkle_tree_SUITE).
 
