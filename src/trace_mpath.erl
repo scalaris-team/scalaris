@@ -15,10 +15,10 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc Trace what a message triggers in the system by tracing all
 %% generated subsequent messages.
-%% @version $Id: tracer.erl 1445 2011-02-23 11:34:29Z kruber@zib.de $
+%% @version $Id$
 -module(trace_mpath).
 -author('schintke@zib.de').
--vsn('$Id:$').
+-vsn('$Id$').
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%

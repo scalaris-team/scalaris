@@ -15,10 +15,10 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Nico Kruber <kruber@zib.de>
-%% @version $Id: api_tx_SUITE.erl 2689 2012-01-11 10:15:52Z schintke $
+%% @version $Id$
 -module(type_check_SUITE).
 -author('schintke@zib.de').
--vsn('$Id: api_tx_SUITE.erl 2689 2012-01-11 10:15:52Z schintke $').
+-vsn('$Id$').
 
 -compile(export_all).
 

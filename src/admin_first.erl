@@ -16,10 +16,10 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc    determine if first vm in this deployment
 %% @end
-%% @version $Id: $
+%% @version $Id$
 -module(admin_first).
 -author('schuett@zib.de').
--vsn('$Id:$').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

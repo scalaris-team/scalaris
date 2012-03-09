@@ -19,7 +19,7 @@
 %%% @end
 %%% Created : 15/11/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
 %%%-------------------------------------------------------------------
-%% @version $Id: $
+%% @version $Id$
 
 -module(db_generator).
 

@@ -17,7 +17,7 @@
 %% @end
 -module(bench).
 -author('schuett@zib.de').
--vsn('$Id: bench.erl 1814 2011-06-21 15:01:58Z schuett $').
+-vsn('$Id$').
 
 %% public interface
 -export([increment/2, increment_with_histo/2, increment/3, quorum_read/2,
