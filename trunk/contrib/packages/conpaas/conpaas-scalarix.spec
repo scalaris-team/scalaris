@@ -1,14 +1,14 @@
 # norootforbuild
 
 %define pkg_version 2812
-Name:           conpaas-scalarix-svn
+Name:           conpaas-scalarix
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
 License:        ASL 2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
-Source0:        conpaas-scalarix-svn-%{version}.tar.gz
+Source0:        conpaas-scalarix-%{version}.tar.gz
 #Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ruby >= 1.8
@@ -52,12 +52,10 @@ overlay with a non-blocking Paxos commit protocol for transaction
 processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
-%package -n conpaas-scalarix-svn-one-manager
-Conflicts:  scalaris-one-manager scalaris-svn-one-manager
-Conflicts:  scalaris-one-frontend scalaris-svn-one-frontend
-Conflicts:  conpaas-scalarix-svn-one-frontend
-Conflicts:  conpaas-scalarix-one-manager
-Requires:   scalaris-svn >= %{version}
+%package -n conpaas-scalarix-one-manager
+Conflicts:  scalaris-one-manager scalaris-one-frontend
+Conflicts:  conpaas-scalarix-one-frontend
+Requires:   scalaris >= %{version}
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
@@ -78,14 +76,12 @@ Group:      Productivity/Databases/Clients
 BuildArch:  noarch
 %endif
 
-%description -n conpaas-scalarix-svn-one-manager
+%description -n conpaas-scalarix-one-manager
 Manager for scalaris on Opennebula
 
-%package -n conpaas-scalarix-svn-one-frontend
-Conflicts:  scalaris-one-frontend scalaris-svn-one-frontend
-Conflicts:  scalaris-one-manager scalaris-svn-one-manager
-Conflicts:  conpaas-scalarix-svn-one-manager
-Conflicts:  conpaas-scalarix-one-frontend
+%package -n conpaas-scalarix-one-frontend
+Conflicts:  scalaris-one-frontend scalaris-one-manager
+Conflicts:  conpaas-scalarix-one-manager
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
@@ -106,12 +102,11 @@ Group:      Productivity/Databases/Clients
 BuildArch:  noarch
 %endif
 
-%description -n conpaas-scalarix-svn-one-frontend
+%description -n conpaas-scalarix-one-frontend
 Frontend for scalaris on Opennebula
 
-%package -n conpaas-scalarix-svn-one-client
-Conflicts:  scalaris-one-client scalaris-svn-one-client
-Conflicts:  conpaas-scalarix-one-client
+%package -n conpaas-scalarix-one-client
+Conflicts:  scalaris-one-client
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
@@ -127,11 +122,11 @@ Group:      Productivity/Databases/Clients
 BuildArch:  noarch
 %endif
 
-%description -n conpaas-scalarix-svn-one-client
+%description -n conpaas-scalarix-one-client
 Client for scalaris on Opennebula
 
 %prep
-%setup -q -n conpaas-scalarix-svn-%{version}
+%setup -q -n conpaas-scalarix-%{version}
 
 %build
 ./configure --prefix=%{_prefix} \
@@ -160,7 +155,7 @@ make install-one DESTDIR=$RPM_BUILD_ROOT
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files -n conpaas-scalarix-svn-one-manager
+%files -n conpaas-scalarix-one-manager
 %defattr(-,root,root)
 %dir %{_sysconfdir}/scalaris
 %dir %{_prefix}/lib/scalaris
@@ -183,7 +178,7 @@ rm -rf $RPM_BUILD_ROOT
 
 ## remove ts_*.rb !!!
 
-%files -n conpaas-scalarix-svn-one-frontend
+%files -n conpaas-scalarix-one-frontend
 %defattr(-,root,root)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
@@ -197,7 +192,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris/contrib/opennebula/*.erb
 %{_prefix}/lib/scalaris/contrib/opennebula/fe_views
 
-%files -n conpaas-scalarix-svn-one-client
+%files -n conpaas-scalarix-one-client
 %defattr(-,root,root)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
