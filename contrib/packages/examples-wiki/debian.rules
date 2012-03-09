@@ -33,8 +33,8 @@ clean:
 
 	dh_clean
 
-BUILD_DIR_TOMCAT5:=$(CURDIR)/debian/scalaris-svn-examples-wiki-tomcat5
-BUILD_DIR_TOMCAT6:=$(CURDIR)/debian/scalaris-svn-examples-wiki-tomcat6
+BUILD_DIR_TOMCAT5:=$(CURDIR)/debian/scalaris-examples-wiki-tomcat5
+BUILD_DIR_TOMCAT6:=$(CURDIR)/debian/scalaris-examples-wiki-tomcat6
 install: build
 	dh_testdir
 	dh_testroot

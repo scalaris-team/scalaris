@@ -24,4 +24,6 @@ sed -e "s/public static final String version = \".*\";/public static final Strin
     -i contrib/wikipedia/src/de/zib/scalaris/examples/wikipedia/bliki/WikiServlet.java
 sed -e "s/version='.*',/version='${VERSION}',/g" \
     -i python-api/setup.py
+sed -e "s/SCALARIS_VERSION=\".*\"/SCALARIS_VERSION=\"${VERSION}\"/g" \
+    -i contrib/packages/*/checkout.sh
 echo "done"

@@ -1,7 +1,8 @@
 #!/bin/bash
 
+SCALARIS_VERSION="0.4.0+svn"
 date=`date +"%Y%m%d"`
-name="scalaris-svn-examples-wiki" # folder base name (without version)
+name="scalaris-examples-wiki" # folder base name (without version)
 url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
 package_url="http://scalaris.googlecode.com/svn/trunk/contrib/packages/examples-wiki"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
@@ -39,11 +40,12 @@ if [ ${result} -eq 0 ]; then
   echo " ${revision}"
   # not safe in other languages than English:
   # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
+  pkg_version="${SCALARIS_VERSION}${revision}"
 fi
 
 if [ ${result} -eq 0 ]; then
-  tarfile="${folder}-${revision}.tar.gz"
-  newfoldername="${folder}-${revision}"
+  tarfile="${folder}-${pkg_version}.tar.gz"
+  newfoldername="${folder}-${pkg_version}"
   echo "making ${tarfile} ..."
   mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs --exclude=${newfoldername}/contrib/jetty-libs/jsp/*.jar --exclude=${newfoldername}/contrib/jetty-libs/*.jar && mv "${newfoldername}" "${folder}"
   result=$?
@@ -52,22 +54,22 @@ fi
 if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder=${package_folder}
-  sed -e "s/%define pkg_version .*/%define pkg_version ${revision}/g" \
-      < ${sourcefolder}/scalaris-svn-examples-wiki.spec > ./scalaris-svn-examples-wiki.spec
+  sed -e "s/%define pkg_version .*/%define pkg_version ${pkg_version}/g" \
+      < ${sourcefolder}/scalaris-examples-wiki.spec > ./scalaris-examples-wiki.spec
   result=$?
 fi
 
 if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder=${package_folder}
-  sed -e "s/Version: 1-1/Version: ${revision}-1/g" \
-      -e "s/scalaris-svn-examples-wiki\\.orig\\.tar\\.gz/scalaris-svn-examples-wiki-${revision}\\.orig\\.tar\\.gz/g" \
-      -e "s/scalaris-svn-examples-wiki\\.diff\\.tar\\.gz/scalaris-svn-examples-wiki-${revision}\\.diff\\.tar\\.gz/g" \
-      < ${sourcefolder}/scalaris-svn-examples-wiki.dsc  > ./scalaris-svn-examples-wiki.dsc && \
-  sed -e "s/(1-1)/(${revision}-1)/g" \
-      < ${sourcefolder}/debian.changelog                > ./debian.changelog && \
-  cp  ${sourcefolder}/debian.control                      ./debian.control && \
-  cp  ${sourcefolder}/debian.rules                        ./debian.rules
+  sed -e "s/Version: 1-1/Version: ${pkg_version}-1/g" \
+      -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.orig\\.tar\\.gz/g" \
+      -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.diff\\.tar\\.gz/g" \
+      < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
+  sed -e "s/(1-1)/(${pkg_version}-1)/g" \
+      < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
+  cp  ${sourcefolder}/debian.control                  ./debian.control && \
+  cp  ${sourcefolder}/debian.rules                    ./debian.rules
   result=$?
 fi
 
