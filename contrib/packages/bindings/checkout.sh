@@ -55,7 +55,9 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.scalaris-java.postinst      ./debian.scalaris-java.postinst && \
   cp  ${sourcefolder}/debian.python-scalaris.files       ./debian.python-scalaris.files && \
   cp  ${sourcefolder}/debian.python3-scalaris.files      ./debian.python3-scalaris.files && \
-  cp  ${sourcefolder}/debian.scalaris-ruby1.8.files      ./debian.scalaris-ruby1.8.files
+  cp  ${sourcefolder}/debian.scalaris-ruby1.8.files      ./debian.scalaris-ruby1.8.files && \
+  cp  ${sourcefolder}/debian.scalaris-ruby1.8.postinst   ./debian.scalaris-ruby1.8.postinst
+
   result=$?
 fi
 
