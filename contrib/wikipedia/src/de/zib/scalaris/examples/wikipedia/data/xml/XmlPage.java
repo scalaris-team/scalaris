@@ -208,6 +208,8 @@ public class XmlPage extends DefaultHandler {
                     currentRevision.reset();
                     currentRevision.startRevision(uri, localName, qName, attributes);
                 }
+            } else if (localName.equals("ns")) {
+            } else if (localName.equals("sha1")) {
             } else {
                 System.err.println("unknown page tag: " + localName);
             }
@@ -339,6 +341,10 @@ public class XmlPage extends DefaultHandler {
             } else if (localName.equals("restrictions")) {
                 restrictions = currentString.toString();
             } else if (localName.equals("redirect")) {
+                // nothing to do
+            } else if (localName.equals("ns")) {
+                // nothing to do
+            } else if (localName.equals("sha1")) {
                 // nothing to do
             }
         }
