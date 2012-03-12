@@ -53,6 +53,11 @@ public class WikiPageBeanBase {
      * number of attempts of saving a wiki page
      */
     private int saveAttempts = 0;
+    /**
+     * In cases of failed page-save commits, contains a list of failed keys for
+     * each save attempt.
+     */
+    protected LinkedMultiHashMap<Integer, String> failedKeys = new LinkedMultiHashMap<Integer, String>();
 
     /**
      * Creates a new (empty) bean.
@@ -302,5 +307,19 @@ public class WikiPageBeanBase {
      */
     public void setSaveAttempts(int saveAttempts) {
         this.saveAttempts = saveAttempts;
+    }
+
+    /**
+     * @return the failedKeys
+     */
+    public LinkedMultiHashMap<Integer, String> getFailedKeys() {
+        return failedKeys;
+    }
+
+    /**
+     * @param failedKeys the failedKeys to set
+     */
+    public void setFailedKeys(LinkedMultiHashMap<Integer, String> failedKeys) {
+        this.failedKeys = failedKeys;
     }
 }

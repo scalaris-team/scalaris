@@ -1,6 +1,7 @@
 package de.zib.scalaris.examples.wikipedia;
 
 import java.math.BigInteger;
+import java.util.LinkedList;
 import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -28,6 +29,11 @@ public class SavePageResult extends Result {
      * New number of page edists (may be null).
      */
     public BigInteger pageEdits = null;
+
+    /**
+     * In cases of failed page-save commits, contains a list of failed keys.
+     */
+    public List<String> failedKeys = new LinkedList<String>();
     
     /**
      * Creates a new successful result.

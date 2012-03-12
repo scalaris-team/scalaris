@@ -24,6 +24,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -779,6 +780,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
         }
         page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
+        for (int i = 1; i <= Options.WIKI_SAVEPAGE_RETRIES; ++i) {
+            final String failedKeysPar = getParam(request, "failed_keys" + i);
+            if (!failedKeysPar.isEmpty()) {
+                final List<String> pageSaveFailedKeys = Arrays.asList(failedKeysPar.split(" # "));
+                page.getFailedKeys().put(i, pageSaveFailedKeys);
+            }
+        }
         final String[] pageRandomTimes = getParam(request, "random_times").split(",");
         for (String pageRandomTime : pageRandomTimes) {
             final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
@@ -1405,6 +1413,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             while (true) {
                 result = savePage(connection, title, newRev, oldVersion, null, siteinfo, "", namespace);
                 page.addStats(result.stats);
+                if (!result.failedKeys.isEmpty()) {
+                    page.getFailedKeys().put(retries + 1, result.failedKeys);
+                }
                 if (!result.success && retries < Options.WIKI_SAVEPAGE_RETRIES) {
                     // check for conflicting edit on same page, do not retry in this case
                     final Page oldPage = result.oldPage;
@@ -1438,6 +1449,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("&notice=successfully%20saved%20page");
                 redirectUrl.append("&save_times=" + StringUtils.join(times, "%2C"));
                 redirectUrl.append("&save_attempts=" + page.getSaveAttempts());
+                for (Entry<Integer, List<String>> failedKeys : page.getFailedKeys().entrySet()) {
+                    redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + StringUtils.join(failedKeys.getValue(), "%20%23%20"));
+                }
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {

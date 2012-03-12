@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
@@ -1007,12 +1008,17 @@ public class ScalarisDataHandler {
             results = scalaris_tx.req_list(requests);
             curOp = 0;
         } catch (Exception e) {
-            return new SavePageResult(false,
+            final SavePageResult result = new SavePageResult(false,
                     "unknown exception writing page or page lists for page \""
                             + title0 + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
+            if (e instanceof AbortException) {
+                AbortException e1 = (AbortException) e;
+                result.failedKeys = e1.getFailedKeys();
+            }
+            return result;
         }
 
         try {
@@ -1181,12 +1187,17 @@ public class ScalarisDataHandler {
             results = scalaris_tx.req_list(requests);
             curOp = 0;
         } catch (Exception e) {
-            return new SavePageResult(false,
+            final SavePageResult result = new SavePageResult(false,
                     "unknown exception writing page or page lists for page \""
                             + title0 + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
+            if (e instanceof AbortException) {
+                AbortException e1 = (AbortException) e;
+                result.failedKeys = e1.getFailedKeys();
+            }
+            return result;
         }
 
         try {
