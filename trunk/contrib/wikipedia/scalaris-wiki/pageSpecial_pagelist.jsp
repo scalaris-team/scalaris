@@ -307,11 +307,12 @@ ${ pageBean.page }
                 <ul id="footer-icons" class="noprint">
                 </ul>
                 <div style="clear:both"></div>
-                <pre id="db_timings" style="padding:0;line-height:0.7em;font-size:0.7em">
+                <div style="font-size:0.7em">DB Timings:
+                <pre id="db_timings" style="padding:0;line-height:0.7em">
 <% for (Map.Entry<String,List<Long>> stats : pageBean.getStats().entrySet()) { %>
 <%= stats.getKey() %>: <%= stats.getValue().toString() %>
 <% } %>
-                </pre>
+                </pre></div>
         </div>
         <!-- /footer -->
 </body>
