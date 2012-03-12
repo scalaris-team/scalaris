@@ -1425,7 +1425,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
                 ArrayList<Long> times = new ArrayList<Long>();
-                for (List<Long> time : result.stats.values()) {
+                for (List<Long> time : page.getStats().values()) {
                     times.addAll(time);
                 }
                 // do not include the UTF-8-title directly into encodeRedirectURL since that's not 
