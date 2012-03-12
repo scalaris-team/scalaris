@@ -778,6 +778,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 page.addStat("saving " + title, pageSaveTimeInt);
             }
         }
+        page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
         final String[] pageRandomTimes = getParam(request, "random_times").split(",");
         for (String pageRandomTime : pageRandomTimes) {
             final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
@@ -1419,6 +1420,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     break;
                 }
             }
+            page.setSaveAttempts(retries + 1);
             for (WikiEventHandler handler: eventHandlers) {
                 handler.onPageSaved(result);
             }
@@ -1435,6 +1437,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append(URLEncoder.encode(title, "UTF-8"));
                 redirectUrl.append("&notice=successfully%20saved%20page");
                 redirectUrl.append("&save_times=" + StringUtils.join(times, "%2C"));
+                redirectUrl.append("&save_attempts=" + page.getSaveAttempts());
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {

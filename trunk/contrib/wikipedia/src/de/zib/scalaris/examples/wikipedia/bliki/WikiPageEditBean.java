@@ -35,7 +35,7 @@ public class WikiPageEditBean extends WikiPageBeanBase {
      * the summary field of the site
      */
     private String summary = "";
-
+    
     /**
      * @return the preview
      */
