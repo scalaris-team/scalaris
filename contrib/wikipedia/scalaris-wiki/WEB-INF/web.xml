@@ -17,7 +17,7 @@
 		</init-param>
 		<init-param>
 			<param-name>WIKI_SAVEPAGE_RETRIES</param-name>
-			<param-value>2</param-value>
+			<param-value>3</param-value>
 		</init-param>
 		<init-param>
 			<param-name>WIKI_SAVEPAGE_RETRY_DELAY</param-name>
