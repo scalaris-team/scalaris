@@ -192,8 +192,8 @@ public class Main {
                 WikiDumpHandler.println(System.out, "wiki import from " + filename);
                 WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
                 WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
-                WikiDumpHandler.println(System.out, " min time      : " + minTime);
-                WikiDumpHandler.println(System.out, " max time      : " + maxTime);
+                WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : minTime.toString()));
+                WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : maxTime.toString()));
                 WikiDumpHandler handler = new WikiDumpToScalarisHandler(
                         blacklist, whitelist, maxRevisions, minTime, maxTime);
                 InputSource file = getFileReader(filename);
