@@ -49,13 +49,14 @@
 -type tx_op()     :: rdht_tx_read | rdht_tx_write.
 
 -type tlog_key() :: client_key().%% | ?RT:key().
-%% TLogEntry: {Operation, Key, Status, Value, Version}
-%% Sample: {read,"key3",value,"value3",0}
+%% TLogEntry: {Operation, Key, Version, Status, SnapshotNumber, Value}
+%% Sample: {read,"key3",0,value,1,"value3"}
 -type tlog_entry() ::
           { tx_op(),                  %% operation
             tlog_key(), %% key | hashed and replicated key
             integer(),                %% version
             tx_status(),              %% status
+            non_neg_integer(),        %% snapshot number
             any()                     %% value
           }.
 -type tlog() :: [tlog_entry()].
@@ -108,7 +109,7 @@ is_sane_for_commit(TLog) ->
 -spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),
                 tx_status(), any()) -> tlog_entry().
 new_entry(Op, Key, Vers, Status, Val) ->
-    {Op, Key, Vers, Status, Val}.
+    {Op, Key, Vers, Status, 0, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
@@ -132,8 +133,8 @@ get_entry_status(Element)    -> element(4, Element).
 set_entry_status(Element, Val)    -> setelement(4, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
-get_entry_value(Element)     -> element(5, Element).
+get_entry_value(Element)     -> element(6, Element).
 
 -spec set_entry_value(tlog_entry(), any()) -> tlog_entry().
-set_entry_value(Element, Val)     -> setelement(5, Element, Val).
+set_entry_value(Element, Val)     -> setelement(6, Element, Val).
 
