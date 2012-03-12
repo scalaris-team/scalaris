@@ -46,6 +46,7 @@
          readable_utc_time/1,
          for_to/3, for_to_ex/3,
          collect_while/1]).
+-export([debug_info/0, debug_info/1]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -935,6 +936,39 @@ collect_while(GatherFun, Count) ->
         true          -> GatherFun(Count + 1);
         false         -> []
     end.
+
+-spec debug_info() -> [[{string(), term()}]].
+debug_info() ->
+    [ [ debug_info(Y) || Y <- pid_groups:members(X)] || X <- pid_groups:groups()].
+
+-spec debug_info(pid()) -> [{string(), term()}];
+                (atom() | string()) -> [[{string(), term()}]].
+debug_info(PidName) when is_atom(PidName) ->
+    [ debug_info(X) || X <- pid_groups:find_all(PidName)];
+debug_info(Group) when is_list(Group) ->
+    [ debug_info(X) || X <- pid_groups:members(Group)];
+debug_info(Pid) when is_pid(Pid) ->
+    {GenCompDesc, GenCompInfo} =
+        case gen_component:is_gen_component(Pid) of
+            true ->
+                {Grp, Name} = pid_groups:group_and_name_of(Pid),
+                comm:send_local(Pid , {web_debug_info, self()}),
+                receive
+                    ?SCALARIS_RECV({web_debug_info_reply, LocalKVs}, %% ->
+                                   {[{"pidgroup", Grp}, {"pidname", Name}],
+                                    LocalKVs})
+                after 1000 -> {[], []}
+                end;
+            false -> {[], []}
+        end,
+    [{_, Memory}, {_, Reductions}, {_, QueueLen}] =
+        process_info(Pid, [memory, reductions, message_queue_len]),
+    [{"pid", pid_to_list(Pid)}]
+        ++   GenCompDesc
+        ++ [{"memory", Memory},
+            {"reductions", Reductions},
+            {"message_queue_len", QueueLen}]
+        ++ GenCompInfo.
 
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
