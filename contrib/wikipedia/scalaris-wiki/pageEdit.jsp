@@ -1,24 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,java.net.URLEncoder"%>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageEditBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
 <title>Changing ${ pageBean.title } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
 <% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
-<% /* 
-<meta name="generator" content="MediaWiki 1.17wmf1" />
-*/ %>
 <meta name="robots" content="noindex,nofollow" />
+<link rel="alternate" type="application/x-wiki" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
+<link rel="edit" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
 <% /*
-<link rel="alternate" type="application/x-wiki" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
-<link rel="edit" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
+<meta name="generator" content="MediaWiki 1.17wmf1" />
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
 */ %>
 <link rel="shortcut icon" href="favicon-wikipedia.ico" />
@@ -64,7 +63,7 @@
                 <!-- subtitle -->
                 <div id="contentSub">
           <% if (pageBean.isEditRestricted()) { %>
-                for <a href="wiki?title=${ pageBean.title }" title="${ pageBean.title }">${ pageBean.title }</a>
+                for <a href="wiki?title=<%= safePageTitle %>" title="<%= safePageTitle %>">${ pageBean.title }</a>
           <% } %>
                 
                 </div>
@@ -84,7 +83,7 @@
                 <p>You can view and copy the source of this page:</p>
                 <textarea id="wpTextbox1" name="wpTextbox1" cols="80" rows="25" readonly="readonly">${ pageBean.page }</textarea>
                 <div class="templatesUsed"></div>
-                <p id="mw-returnto">Return to <a href="wiki?title=${ pageBean.title }" title="${ pageBean.title }">${ pageBean.title }</a>.</p>
+                <p id="mw-returnto">Return to <a href="wiki?title=<%= safePageTitle %>" title="<%= safePageTitle %>">${ pageBean.title }</a>.</p>
           <% } else {%>
           <% if (pageBean.isNewPage()) { %>
 				<div class="mw-newarticletextanon">
@@ -96,7 +95,7 @@
           <% }%>
                 <div id="mw-anon-edit-warning">
           <% if (pageBean.getPreview().isEmpty()) { %>
-				You are not <a href="wiki?title=Special:UserLogin" title="Special:UserLogin">logged in</a>. Your <a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:What_is_an_IP_address%3F" title="<%= pageBean.getWikiNamespace().getMeta() %>:What is an IP address?">IP address</a> will be recorded in this page's <span class="plainlinks"> <a href="wiki?title=${ pageBean.title }&amp;action=history" class="external text" rel="nofollow">edit history</a></span>.
+				You are not <a href="wiki?title=Special:UserLogin" title="Special:UserLogin">logged in</a>. Your <a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:What_is_an_IP_address%3F" title="<%= pageBean.getWikiNamespace().getMeta() %>:What is an IP address?">IP address</a> will be recorded in this page's <span class="plainlinks"> <a href="wiki?title=<%= safePageTitle %>&amp;action=history" class="external text" rel="nofollow">edit history</a></span>.
           <% } else { %>
 				<i>You are not logged in. Saving will record your IP address in this page's edit history.</i>
           <% }%>
@@ -121,9 +120,9 @@ ${ pageBean.preview }
 				<div id='toolbar'></div>
 <% 
 // not supported (TODO: check if this is still the case):
-//<form id="editform" name="editform" method="post" action="wiki?title=${ pageBean.title }&action=submit" enctype="multipart/form-data">
+//<form id="editform" name="editform" method="post" action="wiki?title=safePageTitle&action=submit" enctype="multipart/form-data">
 %>
-				<form id="editform" name="editform" method="post" action="wiki?title=${ pageBean.title }&action=submit">
+				<form id="editform" name="editform" method="post" action="wiki?title=<%= safePageTitle %>&action=submit">
 				<div id="antispam-container" style="display: none;">
 				<label for="wpAntispam">Anti-spam check.
 				Do <b>NOT</b> fill this in!</label> <input type="text" name="wpAntispam" id="wpAntispam" value="" />
@@ -149,7 +148,7 @@ ${ pageBean.preview }
 				<input id="wpPreview" name="wpPreview" type="submit" tabindex="4" value="Show preview" accesskey="p" title="Preview your changes, please use this before saving! [p]" />
 				<input disabled="disabled" id="wpDiff" name="wpDiff" type="submit" tabindex="5" value="Show changes" accesskey="v" title="Show which changes you made to the text [v]" />
 				<span class='editHelp'>
-				<a href="wiki?title=${ pageBean.title }" title="${ pageBean.title }" id="mw-editform-cancel">Cancel</a> | 
+				<a href="wiki?title=<%= safePageTitle %>" title="<%= safePageTitle %>" id="mw-editform-cancel">Cancel</a> | 
 				<a target="helpwindow" href="wiki?title=Help:Editing">Editing help</a> (opens in new window)</span>
 				</div><!-- editButtons -->
 				</div><!-- editOptions -->
@@ -178,7 +177,7 @@ ${ pageBean.preview }
 				</div>
 				</form>
           <% } %>
-                <div class="printfooter">Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
+                <div class="printfooter">Retrieved from "<a href="wiki?title=<%= safePageTitle %>">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
                 <!-- catlinks -->
                 <div id='catlinks' class='catlinks catlinks-allhidden'></div>
@@ -195,7 +194,7 @@ ${ pageBean.preview }
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=${ pageBean.title }&amp;returntoquery=action%3Dedit" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=<%= safePageTitle %>&amp;returntoquery=action%3Dedit" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -210,8 +209,8 @@ ${ pageBean.preview }
     String mainSelected = pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     String talkSelected = !pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     %>
-                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle()) %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle()) %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle()), "UTF-8") %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
+                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle()), "UTF-8") %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
     </ul>
 </div>
 
@@ -235,15 +234,15 @@ ${ pageBean.preview }
     <h5>Views</h5>
     <ul>
           <% if (!pageBean.isNewPage()) { %>
-                    <li id="ca-view"><span><a href="wiki?title=${ pageBean.title }">Read</a></span></li>
+                    <li id="ca-view"><span><a href="wiki?title=<%= safePageTitle %>">Read</a></span></li>
           <% if (!pageBean.isEditRestricted()) { %>
-                    <li id="ca-edit" class="selected"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving">Change</a></span></li>
+                    <li id="ca-edit" class="selected"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving">Change</a></span></li>
           <% } else {%>
-                    <li id="ca-viewsource" class="selected"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="This page is protected. You can view its source [e]" accesskey="e">View source</a></span></li>
+                    <li id="ca-viewsource" class="selected"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="This page is protected. You can view its source [e]" accesskey="e">View source</a></span></li>
           <% } %>
-                    <li id="ca-history" class="collapsible "><span><a href="wiki?title=${ pageBean.title }&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
+                    <li id="ca-history" class="collapsible "><span><a href="wiki?title=<%= safePageTitle %>&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
           <% } else {%>
-                    <li id="ca-edit" class="selected"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
+                    <li id="ca-edit" class="selected"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
           <% } %>
     </ul>
 </div>
@@ -308,10 +307,12 @@ ${ pageBean.preview }
     <div style="display: block;" class="body">
         <ul>
           <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %>
-                    <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=${ pageBean.title }" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
+                    <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=<%= safePageTitle %>" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
           <% } %>
           <% if (!pageBean.isNewPage()) { %>
-<% /*               <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>*/ %>
+<% /*
+                    <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=safePageTitle" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>
+*/ %>
           <% } %>
                     <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
         </ul>
