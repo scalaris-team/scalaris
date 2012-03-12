@@ -382,6 +382,7 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
                 <ul id="footer-icons" class="noprint">
                 </ul>
                 <div style="clear:both"></div>
+                <div style="padding:0;line-height:0.7em;font-size:0.7em">Page save attempts: <span id="save_attempts">${ pageBean.saveAttempts }</span></div>
                 <pre id="db_timings" style="padding:0;line-height:0.7em;font-size:0.7em">
 <% for (Map.Entry<String,List<Long>> stats : pageBean.getStats().entrySet()) { %>
 <%= stats.getKey() %>: <%= stats.getValue().toString() %>

@@ -49,6 +49,10 @@ public class WikiPageBeanBase {
      * the content of the site
      */
     private String page = "";
+    /**
+     * number of attempts of saving a wiki page
+     */
+    private int saveAttempts = 0;
 
     /**
      * Creates a new (empty) bean.
@@ -284,5 +288,19 @@ public class WikiPageBeanBase {
      */
     public void setError(String error) {
         this.error = error;
+    }
+
+    /**
+     * @return the saveAttempts
+     */
+    public int getSaveAttempts() {
+        return saveAttempts;
+    }
+
+    /**
+     * @param saveAttempts the saveAttempts to set
+     */
+    public void setSaveAttempts(int saveAttempts) {
+        this.saveAttempts = saveAttempts;
     }
 }
