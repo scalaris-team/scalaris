@@ -169,8 +169,8 @@ public class Main {
             WikiDumpHandler.println(System.out, " wiki dump     : " + filename);
             WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
             WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
-            WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : minTime.toString()));
-            WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : maxTime.toString()));
+            WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : Revision.calendarToString(minTime)));
+            WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
             WikiDumpHandler handler = new WikiDumpPrepareSQLiteForScalarisHandler(
                     blacklist, whitelist, maxRevisions, minTime, maxTime,
                     dbFileName);
@@ -192,8 +192,8 @@ public class Main {
                 WikiDumpHandler.println(System.out, "wiki import from " + filename);
                 WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
                 WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
-                WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : minTime.toString()));
-                WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : maxTime.toString()));
+                WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : Revision.calendarToString(minTime)));
+                WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
                 WikiDumpHandler handler = new WikiDumpToScalarisHandler(
                         blacklist, whitelist, maxRevisions, minTime, maxTime);
                 InputSource file = getFileReader(filename);
