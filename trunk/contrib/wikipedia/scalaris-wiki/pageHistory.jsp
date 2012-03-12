@@ -1,25 +1,24 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.data.Revision,de.zib.scalaris.examples.wikipedia.data.ShortRevision,org.apache.commons.lang.StringEscapeUtils,java.util.Map,java.util.List"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.data.Revision,de.zib.scalaris.examples.wikipedia.data.ShortRevision,org.apache.commons.lang.StringEscapeUtils,java.util.Map,java.util.List,java.net.URLEncoder"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
 <title>Revision history of "${ pageBean.title }" - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
 <% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
+<meta name="robots" content="noindex,nofollow" />
+<link rel="alternate" type="application/x-wiki" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
+<link rel="edit" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
 <% /*
 <meta name="generator" content="MediaWiki 1.17wmf1" />
-*/ %>
-<meta name="robots" content="noindex,nofollow" />
-<% /*
-<link rel="alternate" type="application/x-wiki" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
-<link rel="edit" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
 */ %>
 <link rel="shortcut icon" href="favicon-wikipedia.ico" />
@@ -29,8 +28,8 @@
 */ %>
 <link rel="copyright" href="http://creativecommons.org/licenses/by-sa/3.0/" />
 <% /*
-<link rel="alternate" type="application/atom+xml" title="&quot;${ pageBean.title }&quot; Atom feed" href="/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;feed=atom&amp;action=history" />
-<link rel="alternate" type="application/atom+xml" title="Wiktionary Atom feed" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=Special:RecentChanges&amp;feed=atom">
+<link rel="alternate" type="application/atom+xml" title="&quot;safePageTitle&quot; Atom feed" href="wiki?title=safePageTitle&amp;feed=atom&amp;action=history" />
+<link rel="alternate" type="application/atom+xml" title="Wiktionary Atom feed" href="wiki?title=Special:RecentChanges&amp;feed=atom">
 */ %>
 <link rel="stylesheet" href="skins/load_002.css" type="text/css" media="all" />
 <style type="text/css" media="all">.suggestions{overflow:hidden;position:absolute;top:0px;left:0px;width:0px;border:none;z-index:99;padding:0;margin:-1px -1px 0 0} html > body .suggestions{margin:-1px 0 0 0}.suggestions-special{position:relative;background-color:Window;font-size:0.8em;cursor:pointer;border:solid 1px #aaaaaa;padding:0;margin:0;margin-top:-2px;display:none;padding:0.25em 0.25em;line-height:1.25em}.suggestions-results{background-color:white;background-color:Window;font-size:0.8em;cursor:pointer;border:solid 1px #aaaaaa;padding:0;margin:0}.suggestions-result{color:black;color:WindowText;margin:0;line-height:1.5em;padding:0.01em 0.25em;text-align:left}.suggestions-result-current{background-color:#4C59A6;background-color:Highlight;color:white;color:HighlightText}.suggestions-special .special-label{font-size:0.8em;color:gray;text-align:left}.suggestions-special .special-query{color:black;font-style:italic;text-align:left}.suggestions-special .special-hover{background-color:silver}.suggestions-result-current .special-label,.suggestions-result-current .special-query{color:white;color:HighlightText}.autoellipsis-matched,.highlight{font-weight:bold}</style>
@@ -58,7 +57,7 @@
                 <div id="siteSub">From <%= pageBean.getWikiNamespace().getMeta() %></div>
                 <!-- /tagline -->
                 <!-- subtitle -->
-                <div id="contentSub"><a href="wiki?title=Special:Log&amp;page=${ pageBean.title }" title="Special:Log">View logs for this page</a></div>
+                <div id="contentSub"><a href="wiki?title=Special:Log&amp;page=<%= safePageTitle %>" title="Special:Log">View logs for this page</a></div>
                 <!-- /subtitle -->
                 <!-- jumpto -->
                 <div id="jump-to-nav">
@@ -70,7 +69,7 @@
             <% if (!pageBean.isNotAvailable()) { %>
                 <form action="/wiktionary/simple/w/index.php" method="get" id="mw-history-searchform"><fieldset id="mw-history-search">
 <legend>Browse history</legend>
-<input type="hidden" value="${ pageBean.title }" name="title" />
+<input type="hidden" value="<%= safePageTitle %>" name="title" />
 <input type="hidden" value="history" name="action" />
 <label for="year">From year (and earlier):</label>
 <input disabled="disabled" name="year" size="4" value="" id="year" maxlength="4" />
@@ -133,7 +132,7 @@ if (req_render == null || !req_render.equals("0")) {
 	    }
 	    
 	    out.print("<li><span class=\"mw-history-histlinks\">(cur | prev) </span> ");
-	    out.print("<a href=\"wiki?title=" + pageBean.getTitle() + "&amp;oldid=" + rev.getId() + "\" title=\"" + pageBean.getTitle() + "\">" + dfm.format(Revision.stringToCalendar(rev.getTimestamp()).getTime()) + "</a> ");
+	    out.print("<a href=\"wiki?title=" + safePageTitle + "&amp;oldid=" + rev.getId() + "\" title=\"" + safePageTitle + "\">" + dfm.format(Revision.stringToCalendar(rev.getTimestamp()).getTime()) + "</a> ");
 	    out.print("<span class=\"history-user\">" + usertools + "</span> ");
 	    if (rev.isMinor()) {
 	        out.print("<abbr class=\"minor\" title=\"This is a minor edit\">m</abbr> ");
@@ -168,7 +167,7 @@ ${ pageBean.page }
             <p>There is no edit history for this page.</p> 
             <% } %>
 <div class="printfooter">
-Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
+Retrieved from "<a href="wiki?title=<%= safePageTitle %>">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
                 <!-- catlinks -->
                 <div id='catlinks' class='catlinks catlinks-allhidden'></div>
@@ -185,7 +184,7 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=${ pageBean.title }" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=<%= safePageTitle %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -200,8 +199,8 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
     String mainSelected = pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     String talkSelected = !pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     %>
-                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle()) %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle()) %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle()), "UTF-8") %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
+                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle()), "UTF-8") %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
     </ul>
 </div>
 
@@ -225,15 +224,15 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
     <h5>Views</h5>
     <ul>
           <% if (!pageBean.isNotAvailable()) { %>
-                    <li id="ca-view"><span><a href="wiki?title=${ pageBean.title }">Read</a></span></li>
+                    <li id="ca-view"><span><a href="wiki?title=<%= safePageTitle %>">Read</a></span></li>
           <% if (!pageBean.isEditRestricted()) { %>
-                    <li id="ca-edit"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Change</a></span></li>
+                    <li id="ca-edit"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Change</a></span></li>
           <% } else {%>
-                    <li id="ca-viewsource"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="This page is protected. You can view its source [e]" accesskey="e">View source</a></span></li>
+                    <li id="ca-viewsource"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="This page is protected. You can view its source [e]" accesskey="e">View source</a></span></li>
           <% } %>
-                    <li id="ca-history" class="collapsible selected"><span><a href="wiki?title=${ pageBean.title }&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
+                    <li id="ca-history" class="collapsible selected"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
           <% } else {%>
-                    <li id="ca-edit"><span><a href="wiki?title=${ pageBean.title }&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
+                    <li id="ca-edit"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
           <% } %>
     </ul>
 </div>
@@ -298,13 +297,15 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
     <div style="display: block;" class="body">
         <ul>
           <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %>
-                    <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=${ pageBean.title }" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
+                    <li id="t-whatlinkshere"><a href="wiki?title=Special:WhatLinksHere&target=<%= safePageTitle %>" title="List of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
           <% } %>
           <% if (!pageBean.isNotAvailable()) { %>
-<% /*               <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=${ pageBean.title }" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>*/ %>
+<% /*
+                    <li id="t-recentchangeslinked"><a href="wiki?title=Special:RecentChangesLinked&target=safePageTitle" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>
+*/ %>
           <% } %>
 <% /*
-<li id="feedlinks"><a id="feed-atom" href="/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;feed=atom&amp;action=history" rel="alternate" type="application/atom+xml" class="feedlink" title="Atom feed for this page">Atom</a></li>
+                    <li id="feedlinks"><a id="feed-atom" href="wiki?title=safePageTitle&amp;feed=atom&amp;action=history" rel="alternate" type="application/atom+xml" class="feedlink" title="Atom feed for this page">Atom</a></li>
 */ %>
                     <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
         </ul>
@@ -325,14 +326,14 @@ Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.
             <% if (req_render == null || req_render.equals("1")) { %>
                         Default
             <% } else { %>
-                        <a href="wiki?title=${ pageBean.title }&action=history&render=1" title="Default renderer (gwtwiki)">Default</a></li>
+                        <a href="wiki?title=<%= safePageTitle %>&action=history&render=1" title="Default renderer (gwtwiki)">Default</a></li>
             <% } %>
                     </li>
                     <li id="t-renderer-none">
             <% if (req_render != null && req_render.equals("0")) { %>
                         Plain
             <% } else { %>
-                        <a href="wiki?title=${ pageBean.title }&action=history&render=0" title="No renderer (plain wiki text)">Plain</a></li>
+                        <a href="wiki?title=<%= safePageTitle %>&action=history&render=0" title="No renderer (plain wiki text)">Plain</a></li>
             <% } %>
                     </li>
         </ul>

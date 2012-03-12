@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List,java.net.URLEncoder"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
 <% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
+<link rel="alternate" type="application/x-wiki" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
+<link rel="edit" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
 <% /* 
 <meta name="generator" content="MediaWiki 1.17wmf1" />
-<link rel="alternate" type="application/x-wiki" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
-<link rel="edit" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
 */ %>
 <link rel="shortcut icon" href="favicon-wikipedia.ico" />
@@ -73,7 +74,7 @@ ${ pageBean.page }
                     <td>
                       <div class="namespaceoptions">
                         <form method="get" action="wiki">
-                          <input type="hidden" value="${ pageBean.title }" name="title" />
+                          <input type="hidden" value="<%= safePageTitle %>" name="title" />
                           <fieldset>
                             <legend>${ pageBean.formTitle }</legend>
                             <table id="nsselect" class="allpages">
@@ -170,7 +171,7 @@ ${ pageBean.page }
                 <hr />
 <% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p> */ %>
                 <div class="printfooter">
-                Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
+                Retrieved from "<a href="wiki?title=<%= safePageTitle %>">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
 <% if (req_render == null || !req_render.equals("0")) { %>
                 <!-- catlinks -->
@@ -189,7 +190,7 @@ ${ pageBean.page }
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=${ pageBean.title }" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=<%= safePageTitle %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -200,7 +201,7 @@ ${ pageBean.page }
 <div id="p-namespaces" class="vectorTabs">
     <h5>Namespaces</h5>
     <ul>
-                    <li id="ca-special" class="selected"><span><a href="wiki?title=${ pageBean.title }" >Special page</a></span></li>
+                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= safePageTitle %>" >Special page</a></span></li>
     </ul>
 </div>
 
