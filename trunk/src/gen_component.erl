@@ -403,17 +403,19 @@ on(Msg, State) ->
     T1State = on_bp(Msg, State),
     Module  = gc_mod(T1State),
     Handler = gc_hand(T1State),
+    UState = gc_ustate(T1State),
     T2State =
-        try Handler(Msg, gc_ustate(T1State))
+        try Handler(Msg, UState)
         catch Level:Reason ->
                 Stacktrace = erlang:get_stacktrace(),
+                io:format("Stacktrace ~.0p~n", [Stacktrace]),
                 case Stacktrace of
                     %% erlang < R15 : {Module, Handler, [Msg, State]}
                     %% erlang >= R15: {Module, Handler, [Msg, State], _}
                     [T | _] when
                           erlang:element(1, T) =:= Module andalso
-                          erlang:element(2, T) =:= Handler andalso
-                          erlang:element(3, T) =:= [Msg, T1State] andalso
+                          %% erlang:element(2, T) =:= Handler andalso
+                          erlang:element(3, T) =:= [Msg, UState] andalso
                           Reason =:= function_clause andalso
                           Level =:= error ->
                         {'$gc_unknown_event',
@@ -451,6 +453,10 @@ on(Msg, State) ->
             end;
         {'$gc_unknown_event', NewState} -> NewState;
         {'$gc_exception', NewState} ->     NewState;
+        unknown_event ->
+            %% drop T2State, as it contains the error message
+            TmpState = on_unknown_event(Msg, T1State),
+            bp_step_done(Msg, TmpState);
         NewUState ->
             bp_step_done(Msg, gc_set_ustate(T1State, NewUState))
     end.
@@ -464,12 +470,17 @@ on_unknown_event({web_debug_info, Requestor}, State) ->
                                  {"state", State}]}),
     State;
 on_unknown_event(UnknownMessage, State) ->
-    log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p"
-            " in pid ~p ~.0p~n in State ~.0p",
+    log:log(error,
+            "~n** Unknown message:~n ~.0p~n"
+            "** Module:~n ~.0p~n"
+            "** Handler:~n ~.0p~n"
+            "** Pid:~n ~p ~.0p~n"
+            "** State:~n ~.0p~n",
             [UnknownMessage,
              gc_mod(State),
              gc_hand(State),
-             self(), pid_groups:group_and_name_of(self()), State]),
+             self(), pid_groups:group_and_name_of(self()),
+             State]),
     State.
 
 on_exception(Msg, Level, Reason, Stacktrace, State) ->
@@ -477,16 +488,18 @@ on_exception(Msg, Level, Reason, Stacktrace, State) ->
             "~n** Exception:~n ~.0p:~.0p~n"
             "** Current message:~n ~.0p~n"
             "** Module:~n ~.0p~n"
+            "** Handler:~n ~.0p~n"
+            "** Pid:~n ~p ~.0p~n"
             "** Source linetrace (enable in scalaris.hrl):~n ~.0p~n"
             "** State:~n ~.0p~n"
-            "** Handler:~n ~.0p~n"
             "** Stacktrace:~n ~.0p~n",
             [Level, Reason,
              Msg,
              gc_mod(State),
+             gc_hand(State),
+             self(), pid_groups:group_and_name_of(self()),
              erlang:get(test_server_loc),
              State,
-             gc_hand(State),
              Stacktrace]),
     State.
 
