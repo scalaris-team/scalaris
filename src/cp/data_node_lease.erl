@@ -32,7 +32,7 @@
          on/2
          ]).
 
--record(lease,                  {epoch, owner, range, aux, version, timeout}).
+-record(lease, {epoch, owner, range, aux, version, timeout}).
 -opaque lease() :: #lease{}.
 
 -type lease_id() :: ?RT:key().
@@ -84,7 +84,7 @@ on({renew_lease}, State) ->
 
 on(Msg, State) ->
     io:format("unknown lease message: ~p~n", [Msg]),
-    State.
+    unknown_event.
 
 %===============================================================================
 %
@@ -107,7 +107,7 @@ is_valid(#lease{timeout=Timeout}) ->
 
 % @doc returns the precise current time; could apply delta to erlang:now()
 precision_time() ->
-    erlang:now().
+    os:timestamp().
 
 % @doc precision of synchronized clocks in microsecs
 epsilon() ->
