@@ -49,19 +49,19 @@ on({read, SourcePid, SourceId, HashedKey}, State) ->
     State;
 
 % messages concerning leases
-on({lease_message, LeaseMessage}, State) ->
-    data_node_lease:on(LeaseMessage, State);
+on({lease_message, LeaseMsg}, State) ->
+    data_node_lease:on(LeaseMsg, State);
 
-on({lookup_fin, Key, Message}, State) ->
+on({lookup_fin, Key, Msg}, State) ->
     case data_node_state:is_owner(State, Key) of
         true ->
-            on(Message, State);
+            gen_component:post_op(State, Msg);
         false ->
             case pid_groups:get_my(router_node) of
                 failed ->
-                    ok;
+                    ok; %% TODO: Delete this case, as it should not happen...
                 Pid ->
-                    comm:send_local(Pid, {lookup_aux, Key, Message})
+                    comm:send_local(Pid, {lookup_aux, Key, Msg})
             end,
             State
     end.
