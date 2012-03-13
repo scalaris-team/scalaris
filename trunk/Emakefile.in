@@ -8,7 +8,7 @@
   @EMAKEFILEDEFINES@
  ]}.
 % now the source and all of its sub-directories:
-{["src/*", "src/comm_layer/*", "src/paxos/*", "src/pubsub/*", "src/simulation/*", "src/transactions/*", "src/rrepair/*", "src/json/*"],
+{["src/*", "src/cp/*", "src/comm_layer/*", "src/paxos/*", "src/pubsub/*", "src/simulation/*", "src/transactions/*", "src/rrepair/*", "src/json/*"],
  [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record,
   {outdir, "ebin"},
   {i, "ebin"},
