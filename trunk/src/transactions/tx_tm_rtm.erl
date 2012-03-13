@@ -816,7 +816,7 @@ set_entry(NewEntry, State) ->
     pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
--spec inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
+-spec inform_client(tx_state:tx_state(), state(), commit | abort) -> ok.
 inform_client(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
     Client = tx_state:get_client(TxState),
