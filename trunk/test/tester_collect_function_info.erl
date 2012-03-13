@@ -305,6 +305,10 @@ parse_type({type, _Line, identifier, L}, erlang, ParseState) when is_list(L) ->
     {{builtin_type, identifier}, ParseState};
 parse_type({type, _Line, timeout, L}, erlang, ParseState) when is_list(L) ->
     {{builtin_type, timeout}, ParseState};
+parse_type({type, _Line, bitstring, L}, erlang, ParseState) when is_list(L) ->
+    {{builtin_type, bitstring}, ParseState};
+parse_type({type, _Line, maybe_improper_list, L}, erlang, ParseState) when is_list(L) ->
+    {{builtin_type, maybe_improper_list}, ParseState};
 parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
