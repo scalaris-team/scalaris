@@ -408,7 +408,6 @@ on(Msg, State) ->
         try Handler(Msg, UState)
         catch Level:Reason ->
                 Stacktrace = erlang:get_stacktrace(),
-                io:format("Stacktrace ~.0p~n", [Stacktrace]),
                 case Stacktrace of
                     %% erlang < R15 : {Module, Handler, [Msg, State]}
                     %% erlang >= R15: {Module, Handler, [Msg, State], _}
