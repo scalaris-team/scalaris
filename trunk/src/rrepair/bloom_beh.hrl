@@ -22,7 +22,7 @@
 
 -export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
          calc_least_size/2,
-         calc_FPR/3]).
+         calc_FPR/2, calc_FPR/3]).
 
 %% types
 %-opaque bloom_filter() :: bloom_filter_t().
