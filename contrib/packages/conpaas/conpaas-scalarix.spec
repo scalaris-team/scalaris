@@ -5,7 +5,7 @@ Name:           conpaas-scalarix
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
-License:        ASL 2.0
+License:        BSD
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        conpaas-scalarix-%{version}.tar.gz
@@ -89,8 +89,6 @@ Requires:   ruby(abi) >= 1.8
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
-Requires:   rubygem-sequel
-Requires:   rubygem-sqlite3
 Requires:   rubygem-sinatra
 Requires:   rubygem-nokogiri
 Requires:   rubygem-oca
