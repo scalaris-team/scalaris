@@ -2,7 +2,7 @@
 
 set -e
 
-gem install json sequel sqlite3 sinatra nokogiri oca --no-rdoc --no-ri
+gem install json --no-rdoc --no-ri
 
 #DEBHELPER#
 
