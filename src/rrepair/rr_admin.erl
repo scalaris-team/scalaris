@@ -13,12 +13,18 @@
 %   limitations under the License.
 
 %% @author Maik Lange <lakedaimon300@googlemail.com>
-%% @doc Aministrative helper functions for replica repair
+%% @doc Administrative helper functions for replica repair evaluation
 %% @version $Id:  $
 -module(rr_admin).
 
 -export([make_ring/2, 
+         fill_ring/3,
+         start_sync/0,
          set_recon_method/1]).
+
+-export([test_upd/0,
+         test_regen/0,
+         test_man/0]). %TEST SETS
 
 -include("scalaris.hrl").
 
@@ -26,7 +32,35 @@
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type ring_type() :: symmetric | random.
+-type ring_type()    :: symmetric | random.
+-type failure_type() :: update | regen | mixed.
+-type db_type()      :: wiki | random.
+-type db_parameter() :: {ftype, failure_type()} |
+                        {fprob, 0..100} |            %failure probability
+                        {distribution, db_generator:distribution()}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Eval Quick Start
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec test_upd() -> ok.
+test_upd() ->
+    make_ring(symmetric, 10),
+    fill_ring(random, 10000, []),
+    ok.
+
+-spec test_regen() -> ok.
+test_regen() ->
+    make_ring(symmetric, 10),
+    fill_ring(random, 10000, [{ftype, regen}]),
+    start_sync(),
+    ok.
+
+-spec test_man() -> ok.
+test_man() ->
+    make_ring(symmetric, 10),
+    fill_ring(random, 10000, [{ftype, regen}]),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API Functions
@@ -34,7 +68,8 @@
 
 -spec make_ring(ring_type(), pos_integer()) -> ok.
 make_ring(Type, Size) ->
-    %if ring exists kill all
+    %if ring exists kill all   
+    set_recon_method(bloom), 
     case Type of
         random -> 
             admin:add_node([{first}]),
@@ -42,19 +77,129 @@ make_ring(Type, Size) ->
         symmetric ->
             Ids = get_symmetric_ids(Size),
             admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
-            [admin:add_node_at_id(Id) || Id <- Ids]
+            [admin:add_node_at_id(Id) || Id <- tl(Ids)]
     end,
     wait_for_stable_ring(),
     ok.
 
+% @doc  DBSize=Number of Data Entities in DB (without replicas)
+-spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> ok.
+fill_ring(random, DBSize, Params) ->    
+    Distr = proplists:get_value(distribution, Params, uniform),            
+    I = hd(intervals:split(intervals:all(), 4)),    %4=replication factor
+    Keys = db_generator:get_db(I, DBSize, Distr),    
+    insert_random_db(Keys, Params),
+    ok;
+fill_ring(wiki, DBSize, Params) ->
+    %TODO
+    ok.
+
+-spec start_sync() -> ok.
+start_sync() ->
+    Nodes = get_node_list(),
+    io:format("NodeS=~p", [Nodes]),
+    %start
+    lists:foreach(fun(Node) ->
+                          comm:send(Node, {send_to_group_member, rep_upd, {rep_update_trigger}})
+                  end, 
+                  Nodes),
+    %wait for end
+    lists:foreach(
+      fun(Node) -> 
+              util:wait_for(
+                fun() -> 
+                        comm:send(Node, {send_to_group_member, rep_upd, {get_state, comm:this(), open_sync}}),
+                        receive
+                            {get_state_response, Val} -> Val =:= 0
+                        end
+                end)
+      end, 
+      Nodes),
+    ok.
+
 -spec set_recon_method(rep_upd_recon:method()) -> ok | {error, term()}.
 set_recon_method(Method) ->
+    config:write(rep_update_activate, true),
+    config:write(rep_update_interval, 100000000),
+    config:write(rep_update_trigger, trigger_periodic),
     config:write(rep_update_recon_method, Method),
+    config:write(rep_update_resolve_method, simple),
+    config:write(rep_update_recon_fpr, 0.01),
+    config:write(rep_update_max_items, case Method of
+                                           bloom -> 10000;
+                                           _ -> 100000
+                                       end),
+    config:write(rep_update_negotiate_sync_interval, case Method of
+                                                         bloom -> false;
+                                                         _ -> true
+                                                     end),    
+    
     RM = config:read(rep_update_recon_method),
     case RM =:= Method of
         true -> ok;
         _ -> {error, set_failed}
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% DB Generation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Inserts a list of keys replicated into the ring
+-spec insert_random_db([?RT:key()], [db_parameter()]) -> ok.
+insert_random_db(Keys, Params) ->
+    FType = proplists:get_value(ftype, Params, update),
+    FProb = proplists:get_value(fprob, Params, 50),    
+    lists:foreach(
+      fun(Key) ->
+              RepKeys = ?RT:get_replica_keys(Key),
+              %insert error?
+              EKey = case FProb >= randoms:rand_uniform(1, 100) of
+                         true -> util:randomelem(RepKeys);
+                         _ -> null
+                     end,
+              %insert regen error
+              {EType, WKeys} = case EKey =/= null of
+                                   true ->
+                                       EEType = case FType of 
+                                                    mixed -> 
+                                                        case randoms:rand_uniform(1, 2) of
+                                                            1 -> update;
+                                                            _ -> regen
+                                                        end;
+                                                    _ -> FType
+                                                end,
+                                       {EEType, 
+                                        case EEType of
+                                            regen -> [X || X <- RepKeys, X =/= EKey];
+                                            _ -> RepKeys
+                                        end};
+                                   _ -> {FType, RepKeys}
+                               end,
+              %write replica group
+              lists:foreach(
+                fun(RKey) ->
+                        DBEntry = db_entry:new(RKey, "2", 2),
+                        api_dht_raw:unreliable_lookup(RKey, 
+                                                      {set_key_entry, comm:this(), DBEntry}),
+                        receive {set_key_entry_reply, _} -> ok end
+                end,
+                WKeys),
+              %insert update error
+              if EType =:= update andalso EKey =/= null ->
+                     Msg = {set_key_entry, comm:this(), db_entry:new(EKey, "old", 1)},
+                     api_dht_raw:unreliable_lookup(EKey, Msg),
+                     receive {set_key_entry_reply, _} -> ok end;
+                 true -> ok
+              end     
+      end, 
+      Keys),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Analysis Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
@@ -63,7 +208,10 @@ set_recon_method(Method) ->
 get_node_list() ->
     mgmt_server:node_list(),
     receive
-        {get_list_response, List} -> List
+        {get_list_response, N} -> N
+        after 2000 ->
+            log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
+            throw('mgmt_server_timeout')
     end.
 
 get_symmetric_ids(NodeCount) ->
