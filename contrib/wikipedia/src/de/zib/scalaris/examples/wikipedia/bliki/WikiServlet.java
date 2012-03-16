@@ -628,9 +628,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             handleViewPageNotExisting(request, response, title, connection, page);
             return;
         } else if (result.rev_not_existing) {
-            result = getRevision(connection, title, namespace);
-            page.addStats(result.stats);
-            page.getInvolvedKeys().addAll(result.involvedKeys);
+            if (result.page != null) {
+                result.revision = result.page.getCurRev();
+                result.success = true;
+            }
             addToParam_notice(request, "revision " + req_oldid + " not found - loaded current revision instead");
         }
         
