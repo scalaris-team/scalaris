@@ -20,6 +20,7 @@
 -export([make_ring/2, 
          fill_ring/3,
          start_sync/0,
+         db_stats/0,
          set_recon_method/1]).
 
 -export([test_upd/0,
@@ -38,6 +39,11 @@
 -type db_parameter() :: {ftype, failure_type()} |
                         {fprob, 0..100} |            %failure probability
                         {distribution, db_generator:distribution()}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
+-define(ReplicationFactor, 4).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Eval Quick Start
@@ -82,17 +88,28 @@ make_ring(Type, Size) ->
     wait_for_stable_ring(),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
 -spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> ok.
-fill_ring(random, DBSize, Params) ->    
+fill_ring(Type, DBSize, Params) ->
+    erlang:put(?DBSizeKey, ?ReplicationFactor * DBSize),
+    case Type of
+        random -> fill_random(DBSize, Params);
+        wiki -> fill_wiki(DBSize, Params)
+    end.
+
+fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),            
-    I = hd(intervals:split(intervals:all(), 4)),    %4=replication factor
+    I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
     Keys = db_generator:get_db(I, DBSize, Distr),    
     insert_random_db(Keys, Params),
-    ok;
-fill_ring(wiki, DBSize, Params) ->
+    ok.
+fill_wiki(DBSize, Params) ->
     %TODO
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec start_sync() -> ok.
 start_sync() ->
@@ -116,6 +133,19 @@ start_sync() ->
       end, 
       Nodes),
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec db_stats() -> ok.
+db_stats() ->
+    DBSize = erlang:get(?DBSizeKey),
+    Ring = statistics:get_ring_details(),
+    Stored = statistics:get_total_load(Ring),
+    io:format("Replica Status~nStored/Dest/Missing~n~p/~p/~p~n", 
+              [Stored, DBSize, DBSize - Stored]),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec set_recon_method(rep_upd_recon:method()) -> ok | {error, term()}.
 set_recon_method(Method) ->
