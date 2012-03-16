@@ -6,7 +6,6 @@ Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 1
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-java
-Conflicts: scalaris-client
 Section: java
 Architecture: all
 Depends: java6-runtime
