@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -53,6 +54,10 @@ public class WikiPageBeanBase {
      * number of attempts of saving a wiki page
      */
     private int saveAttempts = 0;
+    /**
+     * All keys that have been read or written during the current operation.
+     */
+    public List<String> involvedKeys = new ArrayList<String>();
     /**
      * In cases of failed page-save commits, contains a list of failed keys for
      * each save attempt.
@@ -321,5 +326,19 @@ public class WikiPageBeanBase {
      */
     public void setFailedKeys(LinkedMultiHashMap<Integer, String> failedKeys) {
         this.failedKeys = failedKeys;
+    }
+
+    /**
+     * @return the involvedKeys
+     */
+    public List<String> getInvolvedKeys() {
+        return involvedKeys;
+    }
+
+    /**
+     * @param involvedKeys the involvedKeys to set
+     */
+    public void setInvolvedKeys(List<String> involvedKeys) {
+        this.involvedKeys = involvedKeys;
     }
 }

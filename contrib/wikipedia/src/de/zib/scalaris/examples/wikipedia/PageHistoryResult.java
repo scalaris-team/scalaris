@@ -28,13 +28,15 @@ public class PageHistoryResult extends Result {
      * Creates a successful result with an empty message and the given
      * revisions.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param page
      *            the retrieved page
      * @param revisions
      *            the retrieved (short) revisions
      */
-    public PageHistoryResult(Page page, List<ShortRevision> revisions) {
-        super();
+    public PageHistoryResult(List<String> involvedKeys, Page page, List<ShortRevision> revisions) {
+        super(involvedKeys);
         this.page = page;
         this.revisions = revisions;
     }
@@ -43,6 +45,8 @@ public class PageHistoryResult extends Result {
      * Creates a successful result with an empty message and the given
      * revisions.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param page
      *            the retrieved page
      * @param revisions
@@ -52,9 +56,9 @@ public class PageHistoryResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public PageHistoryResult(Page page, List<ShortRevision> revisions,
+    public PageHistoryResult(List<String> involvedKeys, Page page, List<ShortRevision> revisions,
             String name, long time) {
-        super();
+        super(involvedKeys);
         this.page = page;
         this.revisions = revisions;
         addStat(name, time);
@@ -65,14 +69,16 @@ public class PageHistoryResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public PageHistoryResult(boolean success, String message,
-            boolean connectFailed) {
-        super(success, message, connectFailed);
+    public PageHistoryResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed) {
+        super(success, involvedKeys, message, connectFailed);
     }
 
     /**
@@ -80,6 +86,8 @@ public class PageHistoryResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
@@ -89,9 +97,9 @@ public class PageHistoryResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public PageHistoryResult(boolean success, String message,
-            boolean connectFailed, String name, long time) {
-        super(success, message, connectFailed);
+    public PageHistoryResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed, String name, long time) {
+        super(success, involvedKeys, message, connectFailed);
         addStat(name, time);
     }
 }

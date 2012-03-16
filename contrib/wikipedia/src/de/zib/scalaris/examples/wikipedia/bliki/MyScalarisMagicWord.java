@@ -161,6 +161,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
             RevisionResult getRevResult = ScalarisDataHandler.getRevision(
                     model.connection, parameter, model.getNamespace());
             model.addStats(getRevResult.stats);
+            model.addInvolvedKeys(getRevResult.involvedKeys);
             int size = 0;
             if (getRevResult.success) {
                 size = getRevResult.revision.unpackedText().getBytes().length;
@@ -193,6 +194,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
         } else if (name.equals(MAGIC_NUMBER_PAGES)) {
             ValueResult<BigInteger> pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
             model.addStats(pageCountResult.stats);
+            model.addInvolvedKeys(pageCountResult.involvedKeys);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.value);
             }
@@ -200,6 +202,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
             ValueResult<BigInteger> pageCountResult = ScalarisDataHandler
                     .getArticleCount(model.connection);
             model.addStats(pageCountResult.stats);
+            model.addInvolvedKeys(pageCountResult.involvedKeys);
             if (pageCountResult.success) {
                 return model.formatStatisticNumber(rawNumber, pageCountResult.value);
             }
@@ -219,6 +222,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
                     .getPagesInCategoryCount(model.connection, category,
                             model.getNamespace());
             model.addStats(catListResult.stats);
+            model.addInvolvedKeys(catListResult.involvedKeys);
             if (catListResult.success) {
                 return model.formatStatisticNumber(rawNumber, catListResult.value);
             }

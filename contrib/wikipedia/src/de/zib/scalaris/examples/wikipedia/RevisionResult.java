@@ -1,5 +1,7 @@
 package de.zib.scalaris.examples.wikipedia;
 
+import java.util.List;
+
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 
@@ -29,13 +31,16 @@ public class RevisionResult extends Result {
     /**
      * Creates a new successful result with the given revision.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param page
      *            the retrieved page
      * @param revision
      *            the retrieved revision
      */
-    public RevisionResult(Page page, Revision revision) {
-        super();
+    public RevisionResult(List<String> involvedKeys, Page page,
+            Revision revision) {
+        super(involvedKeys);
         this.page = page;
         this.revision = revision;
     }
@@ -43,6 +48,8 @@ public class RevisionResult extends Result {
     /**
      * Creates a new successful result with the given revision.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param page
      *            the retrieved page
      * @param revision
@@ -52,7 +59,9 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(Page page, Revision revision, String name, long time) {
+    public RevisionResult(List<String> involvedKeys, Page page,
+            Revision revision, String name, long time) {
+        super(involvedKeys);
         this.page = page;
         this.revision = revision;
         addStat(name, time);
@@ -63,6 +72,8 @@ public class RevisionResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
@@ -76,10 +87,11 @@ public class RevisionResult extends Result {
      * @param rev_not_existing
      *            whether the requested revision exists or not
      */
-    public RevisionResult(boolean success, String message,
-            boolean connectFailed, Page page, Revision revision,
-            boolean page_not_existing, boolean rev_not_existing) {
-        super(success, message, connectFailed);
+    public RevisionResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed, Page page,
+            Revision revision, boolean page_not_existing,
+            boolean rev_not_existing) {
+        super(success, involvedKeys, message, connectFailed);
         this.page = page;
         this.revision = revision;
         this.page_not_existing = page_not_existing;
@@ -91,6 +103,8 @@ public class RevisionResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
@@ -108,11 +122,11 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(boolean success, String message,
-            boolean connectFailed, Page page, Revision revision,
-            boolean page_not_existing, boolean rev_not_existing, String name,
-            long time) {
-        super(success, message, connectFailed);
+    public RevisionResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed, Page page,
+            Revision revision, boolean page_not_existing,
+            boolean rev_not_existing, String name, long time) {
+        super(success, involvedKeys, message, connectFailed);
         this.page = page;
         this.revision = revision;
         this.page_not_existing = page_not_existing;
