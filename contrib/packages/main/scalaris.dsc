@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris
-Version: 0.4.0-1
+Version: 1-1
 Binary: scalaris
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all

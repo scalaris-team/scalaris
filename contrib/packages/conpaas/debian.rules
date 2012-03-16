@@ -31,8 +31,6 @@ build-stamp:
 #    --mandir=%{_mandir} \
 #    --infodir=%{_infodir} \
 #    --docdir=%{_docdir}/scalaris
-	make all
-	make doc
 
 	touch build-stamp
 
@@ -54,14 +52,8 @@ install: build
 	dh_installdirs
 
 	# Add here commands to install the package into debian/gentoo.
-	make install DESTDIR=$(BUILD_DIR)
-	make install-doc DESTDIR=$(BUILD_DIR)
-	
-	# handle config files:
-	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
-	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
+	make install-one DESTDIR=$(BUILD_DIR)
 
-	# move sub-package files into the correct folders:
 	dh_install --sourcedir=$(BUILD_DIR)
 
 # Build architecture-independent files here.

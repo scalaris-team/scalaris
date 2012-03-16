@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.4.0
+%define pkg_version 1
 Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -109,7 +109,6 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package -n scalaris-java
-Conflicts:  scalaris-client
 Summary:    Java-API and Java-Client for scalaris
 Group:      Productivity/Databases/Clients
 Requires:   jre >= 1.6.0
