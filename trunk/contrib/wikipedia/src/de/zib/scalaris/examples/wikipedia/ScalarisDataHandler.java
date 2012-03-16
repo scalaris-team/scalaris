@@ -205,23 +205,28 @@ public class ScalarisDataHandler {
     public static ValueResult<String> getDbVersion(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "Scalaris version";
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new ValueResult<String>(false, "no connection to Scalaris",
-                    true, statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<String>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
 
         String node = connection.getRemote().toString();
         try {
             ScalarisVM scalarisVm = new ScalarisVM(node);
             String version = scalarisVm.getVersion();
-            return new ValueResult<String>(version, statName,
+            return new ValueResult<String>(involvedKeys, version, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (ConnectionException e) {
-            return new ValueResult<String>(false, "no connection to Scalaris node \"" + node + "\"",
-                    true, statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<String>(false, involvedKeys,
+                    "no connection to Scalaris node \"" + node + "\"", true,
+                    statName, System.currentTimeMillis() - timeAtStart);
         } catch (UnknownException e) {
-            return new ValueResult<String>(false, "unknown exception reading Scalaris version from node \"" + node + "\"",
-                    true, statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<String>(false, involvedKeys,
+                    "unknown exception reading Scalaris version from node \""
+                            + node + "\"", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
     }
     
@@ -241,8 +246,9 @@ public class ScalarisDataHandler {
             String title, final MyNamespace nsObject) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "history of " + title;
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new PageHistoryResult(false, "no connection to Scalaris",
+            return new PageHistoryResult(false, involvedKeys, "no connection to Scalaris",
                     true, statName, System.currentTimeMillis() - timeAtStart);
         }
         
@@ -252,13 +258,16 @@ public class ScalarisDataHandler {
         
         TransactionSingleOp.ResultList results;
         try {
+            involvedKeys.addAll(requests.keyList());
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \""
-                    + getPageKey(title, nsObject) + "\" or \""
-                    + getRevListKey(title, nsObject) + "\" from Scalaris: "
-                    + e.getMessage(), e instanceof ConnectionException,
-                    statName, System.currentTimeMillis() - timeAtStart);
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \""
+                            + getPageKey(title, nsObject) + "\" or \""
+                            + getRevListKey(title, nsObject)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
         
         Page page;
@@ -266,16 +275,18 @@ public class ScalarisDataHandler {
             page = results.processReadAt(0).jsonValue(Page.class);
         } catch (NotFoundException e) {
             PageHistoryResult result = new PageHistoryResult(
-                    false,
+                    false, involvedKeys,
                     "page not found at \"" + getPageKey(title, nsObject) + "\"",
                     false, statName, System.currentTimeMillis() - timeAtStart);
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \""
-                    + getPageKey(title, nsObject) + "\" from Scalaris: "
-                    + e.getMessage(), e instanceof ConnectionException,
-                    statName, System.currentTimeMillis() - timeAtStart);
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \""
+                            + getPageKey(title, nsObject)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
 
         List<ShortRevision> revisions;
@@ -283,18 +294,21 @@ public class ScalarisDataHandler {
             revisions = results.processReadAt(1).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
             PageHistoryResult result = new PageHistoryResult(false,
-                    "revision list \"" + getRevListKey(title, nsObject)
-                            + "\" does not exist", false,
-                            statName, System.currentTimeMillis() - timeAtStart);
+                    involvedKeys, "revision list \""
+                            + getRevListKey(title, nsObject)
+                            + "\" does not exist", false, statName,
+                    System.currentTimeMillis() - timeAtStart);
             result.not_existing = true;
             return result;
         } catch (Exception e) {
-            return new PageHistoryResult(false, "unknown exception reading \""
-                    + getRevListKey(title, nsObject) + "\" from Scalaris: "
-                    + e.getMessage(), e instanceof ConnectionException,
-                    statName, System.currentTimeMillis() - timeAtStart);
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \""
+                            + getRevListKey(title, nsObject)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
-        return new PageHistoryResult(page, revisions, statName,
+        return new PageHistoryResult(involvedKeys, page, revisions, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
 
@@ -335,10 +349,11 @@ public class ScalarisDataHandler {
         final long timeAtStart = System.currentTimeMillis();
         Page page = null;
         Revision revision = null;
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new RevisionResult(false, "no connection to Scalaris", true,
-                    page, revision, false, false, title,
-                    System.currentTimeMillis() - timeAtStart);
+            return new RevisionResult(false, involvedKeys,
+                    "no connection to Scalaris", true, page, revision, false,
+                    false, title, System.currentTimeMillis() - timeAtStart);
         }
         
         TransactionSingleOp scalaris_single;
@@ -348,14 +363,17 @@ public class ScalarisDataHandler {
 
         scalaris_key = getPageKey(title, nsObject);
         try {
+            involvedKeys.add(scalaris_key);
             page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
         } catch (NotFoundException e) {
-            return new RevisionResult(false, "page not found at \""
-                    + scalaris_key + "\"", false, page, revision, true, false,
-                    title, System.currentTimeMillis() - timeAtStart);
+            return new RevisionResult(false, involvedKeys,
+                    "page not found at \"" + scalaris_key + "\"", false, page,
+                    revision, true, false, title,
+                    System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
-            return new RevisionResult(false, "unknown exception reading \""
-                    + scalaris_key + "\" from Scalaris: " + e.getMessage(),
+            return new RevisionResult(false, involvedKeys,
+                    "unknown exception reading \"" + scalaris_key
+                            + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, page, revision, false,
                     false, title, System.currentTimeMillis() - timeAtStart);
         }
@@ -364,22 +382,26 @@ public class ScalarisDataHandler {
         if (id != page.getCurRev().getId() && id >= 0) {
             scalaris_key = getRevKey(title, id, nsObject);
             try {
+                involvedKeys.add(scalaris_key);
                 revision = scalaris_single.read(scalaris_key).jsonValue(Revision.class);
             } catch (NotFoundException e) {
-                return new RevisionResult(false, "revision not found at \""
-                        + scalaris_key + "\"", false, page, revision, false,
-                        true, title, System.currentTimeMillis() - timeAtStart);
+                return new RevisionResult(false, involvedKeys,
+                        "revision not found at \"" + scalaris_key + "\"",
+                        false, page, revision, false, true, title,
+                        System.currentTimeMillis() - timeAtStart);
             } catch (Exception e) {
-                return new RevisionResult(false, "unknown exception reading \""
-                        + scalaris_key + "\" from Scalaris: " + e.getMessage(),
+                return new RevisionResult(false, involvedKeys,
+                        "unknown exception reading \"" + scalaris_key
+                                + "\" from Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, page, revision,
-                        false, false, title, System.currentTimeMillis() - timeAtStart);
+                        false, false, title,
+                        System.currentTimeMillis() - timeAtStart);
             }
         } else {
             revision = page.getCurRev();
         }
 
-        return new RevisionResult(page, revision, title,
+        return new RevisionResult(involvedKeys, page, revision, title,
                 System.currentTimeMillis() - timeAtStart);
     }
 
@@ -463,7 +485,8 @@ public class ScalarisDataHandler {
             return getPageList2(connection,
                     getBackLinksPageListKey(title, nsObject), false, statName);
         } else {
-            return new ValueResult<List<String>>(new LinkedList<String>());
+            return new ValueResult<List<String>>(new ArrayList<String>(0),
+                    new ArrayList<String>(0));
         }
     }
 
@@ -485,29 +508,33 @@ public class ScalarisDataHandler {
     private static ValueResult<List<String>> getPageList2(Connection connection,
             String scalaris_key, boolean failNotFound, String statName) {
         final long timeAtStart = System.currentTimeMillis();
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new ValueResult<List<String>>(false, "no connection to Scalaris", true,
-                    statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<List<String>>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
+            involvedKeys.add(scalaris_key);
             List<String> pages = scalaris_single.read(scalaris_key).stringListValue();
-            return new ValueResult<List<String>>(pages, statName,
+            return new ValueResult<List<String>>(involvedKeys, pages, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new ValueResult<List<String>>(false,
+                return new ValueResult<List<String>>(false, involvedKeys,
                         "unknown exception reading page list at \""
                                 + scalaris_key + "\" from Scalaris: "
                                 + e.getMessage(), false, statName,
                         System.currentTimeMillis() - timeAtStart);
             } else {
-                return new ValueResult<List<String>>(new LinkedList<String>(), statName,
+                return new ValueResult<List<String>>(involvedKeys,
+                        new ArrayList<String>(0), statName,
                         System.currentTimeMillis() - timeAtStart);
             }
         } catch (Exception e) {
-            return new ValueResult<List<String>>(false,
+            return new ValueResult<List<String>>(false, involvedKeys,
                     "unknown exception reading page list at \"" + scalaris_key
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
@@ -589,29 +616,33 @@ public class ScalarisDataHandler {
     private static ValueResult<BigInteger> getInteger2(Connection connection,
             String scalaris_key, boolean failNotFound, String statName) {
         final long timeAtStart = System.currentTimeMillis();
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new ValueResult<BigInteger>(false, "no connection to Scalaris",
-                    true, statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<BigInteger>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
+            involvedKeys.add(scalaris_key);
             BigInteger number = scalaris_single.read(scalaris_key).bigIntValue();
-            return new ValueResult<BigInteger>(number, statName,
+            return new ValueResult<BigInteger>(involvedKeys, number, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new ValueResult<BigInteger>(false,
+                return new ValueResult<BigInteger>(false, involvedKeys,
                         "unknown exception reading (integral) number at \""
                                 + scalaris_key + "\" from Scalaris: "
                                 + e.getMessage(), false, statName,
                         System.currentTimeMillis() - timeAtStart);
             } else {
-                return new ValueResult<BigInteger>(BigInteger.valueOf(0), statName,
+                return new ValueResult<BigInteger>(involvedKeys,
+                        BigInteger.valueOf(0), statName,
                         System.currentTimeMillis() - timeAtStart);
             }
         } catch (Exception e) {
-            return new ValueResult<BigInteger>(false,
+            return new ValueResult<BigInteger>(false, involvedKeys,
                     "unknown exception reading (integral) number at \""
                             + scalaris_key + "\" from Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
@@ -632,19 +663,23 @@ public class ScalarisDataHandler {
     public static ValueResult<String> getRandomArticle(Connection connection, Random random) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "random article";
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new ValueResult<String>(false, "no connection to Scalaris",
-                    true, statName, System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<String>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
-            List<ErlangValue> pages = scalaris_single.read(getArticleListKey()).listValue();
+            final String scalaris_key = getArticleListKey();
+            involvedKeys.add(scalaris_key);
+            List<ErlangValue> pages = scalaris_single.read(scalaris_key).listValue();
             String randomTitle = pages.get(random.nextInt(pages.size())).stringValue();
-            return new ValueResult<String>(randomTitle, statName,
+            return new ValueResult<String>(involvedKeys, randomTitle, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
-            return new ValueResult<String>(false,
+            return new ValueResult<String>(false, involvedKeys,
                     "unknown exception reading page list at \"pages\" from Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);
@@ -685,9 +720,11 @@ public class ScalarisDataHandler {
         Page newPage = null;
         List<ShortRevision> newShortRevs = null;
         BigInteger pageEdits = null;
+        List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new SavePageResult(false, "no connection to Scalaris", true,
-                    oldPage, newPage, newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    "no connection to Scalaris", true, oldPage, newPage,
+                    newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         
@@ -704,9 +741,10 @@ public class ScalarisDataHandler {
         
         Transaction.ResultList results;
         try {
+            involvedKeys.addAll(requests.keyList());
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception getting page info (" + pageInfoKey
                             + ") from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
@@ -727,22 +765,23 @@ public class ScalarisDataHandler {
             newPage.setTitle(title0);
             newPage.setCurRev(newRev);
         } catch (Exception e) {
-            return new SavePageResult(false, "unknown exception reading \""
-                    + pageInfoKey + "\" from Scalaris: " + e.getMessage(),
+            return new SavePageResult(false, involvedKeys,
+                    "unknown exception reading \"" + pageInfoKey
+                            + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         
         if (!newPage.checkEditAllowed(username)) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "operation not allowed: edit is restricted", false,
-                    oldPage, newPage, newShortRevs, pageEdits, statName,
-                    System.currentTimeMillis() - timeAtStart);
+                    oldPage, newPage, newShortRevs, pageEdits,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
         
         if (prevRevId != oldRevId) {
-            return new SavePageResult(false, "curRev(" + oldRevId
+            return new SavePageResult(false, involvedKeys, "curRev(" + oldRevId
                     + ") != oldRev(" + prevRevId + ")", false, oldPage,
                     newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
@@ -835,12 +874,12 @@ public class ScalarisDataHandler {
         SavePageResult result;
         if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
             result = savePage2NewOps(title0, newRev, nsObject, timeAtStart,
-                    oldPage, newPage, newShortRevs, pageEdits, title,
+                    oldPage, newPage, newShortRevs, pageEdits, involvedKeys, title,
                     scalaris_tx, oldRevId, wikiModel, catDiff, tplDiff,
                     lnkDiff, statName);
         } else {
             result = savePage2(title0, newRev, nsObject, timeAtStart, oldPage,
-                    newPage, newShortRevs, pageEdits, title, scalaris_tx,
+                    newPage, newShortRevs, pageEdits, involvedKeys, title, scalaris_tx,
                     oldRevId, wikiModel, catDiff, tplDiff, lnkDiff, statName);
         }
         if (result != null) {
@@ -848,13 +887,13 @@ public class ScalarisDataHandler {
         }
 
         if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-            pageEdits = increasePageEditStat2NewOps(scalaris_tx);
+            pageEdits = increasePageEditStat2NewOps(scalaris_tx, involvedKeys);
         } else {
-            pageEdits = increasePageEditStat2(scalaris_tx);
+            pageEdits = increasePageEditStat2(scalaris_tx, involvedKeys);
         }
         
-        return new SavePageResult(oldPage, newPage, newShortRevs, pageEdits,
-                statName, System.currentTimeMillis() - timeAtStart);
+        return new SavePageResult(involvedKeys, oldPage, newPage, newShortRevs,
+                pageEdits, statName, System.currentTimeMillis() - timeAtStart);
     }
 
     /**
@@ -870,6 +909,8 @@ public class ScalarisDataHandler {
      * @param newPage
      * @param newShortRevs
      * @param pageEdits
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param title
      * @param scalaris_tx
      * @param oldRevId
@@ -884,8 +925,8 @@ public class ScalarisDataHandler {
             final Revision newRev, final MyNamespace nsObject,
             long timeAtStart, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
-            String title, Transaction scalaris_tx, int oldRevId,
-            final MyWikiModel wikiModel, Difference catDiff,
+            List<String> involvedKeys, String title, Transaction scalaris_tx,
+            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff, final String statName) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
@@ -916,15 +957,16 @@ public class ScalarisDataHandler {
         }
         results = null;
         try {
+            involvedKeys.addAll(requests.keyList());
             results = scalaris_tx.req_list(requests);
             curOp = 0;
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception reading page lists for page \"" + title0
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
-                    newShortRevs, pageEdits, statName, System.currentTimeMillis()
-                            - timeAtStart);
+                    newShortRevs, pageEdits, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
         //  PAGE LISTS UPDATE, step 2: prepare writes of new lists
         requests = new Transaction.RequestList();
@@ -936,14 +978,16 @@ public class ScalarisDataHandler {
             } else {
 //              e.printStackTrace();
                 // corrupt DB - don't save page
-                return new SavePageResult(false, "revision list for page \""
-                        + title0 + "\" not found at \"" + revListKey + "\"",
+                return new SavePageResult(false, involvedKeys,
+                        "revision list for page \"" + title0
+                                + "\" not found at \"" + revListKey + "\"",
                         false, oldPage, newPage, newShortRevs, pageEdits,
                         statName, System.currentTimeMillis() - timeAtStart);
             }
         } catch (Exception e) {
-            return new SavePageResult(false, "unknown exception reading \""
-                    + revListKey + "\" from Scalaris: " + e.getMessage(),
+            return new SavePageResult(false, involvedKeys,
+                    "unknown exception reading \"" + revListKey
+                            + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
@@ -952,32 +996,32 @@ public class ScalarisDataHandler {
         requests.addWrite(revListKey, newShortRevs);
         ValueResult<Integer> pageListResult;
         pageListResult = catDiff.updatePageLists_prepare_write(results,
-                requests, title, curOp, statName);
+                requests, title, curOp, statName, involvedKeys);
         curOp += catPageReads;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int catPageWrites = pageListResult.value;
         pageListResult = tplDiff.updatePageLists_prepare_write(results,
-                requests, title, curOp, statName);
+                requests, title, curOp, statName, involvedKeys);
         curOp += tplPageReads;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int tplPageWrites = pageListResult.value;
         pageListResult = lnkDiff.updatePageLists_prepare_write(results,
-                requests, title, curOp, statName);
+                requests, title, curOp, statName, involvedKeys);
         curOp += lnkPageReads;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int lnkPageWrites = pageListResult.value;
@@ -988,11 +1032,11 @@ public class ScalarisDataHandler {
             
             pageListResult = updatePageList_prepare_write(results, requests,
                     pageList_key, pageCount_key, new LinkedList<String>(),
-                    newPages, curOp, statName);
+                    newPages, curOp, statName, involvedKeys);
             if (!pageListResult.success) {
-                return new SavePageResult(false, pageListResult.message,
-                        pageListResult.connect_failed, oldPage, newPage,
-                        newShortRevs, pageEdits, statName,
+                return new SavePageResult(false, involvedKeys,
+                        pageListResult.message, pageListResult.connect_failed,
+                        oldPage, newPage, newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
             ++curOp; // processed one read op during each call of updatePageList_prepare_write
@@ -1005,10 +1049,11 @@ public class ScalarisDataHandler {
         //  PAGE LISTS UPDATE, step 3: execute and evaluate writes of new lists
         results = null;
         try {
+            involvedKeys.addAll(requests.keyList());
             results = scalaris_tx.req_list(requests);
             curOp = 0;
         } catch (Exception e) {
-            final SavePageResult result = new SavePageResult(false,
+            final SavePageResult result = new SavePageResult(false, involvedKeys,
                     "unknown exception writing page or page lists for page \""
                             + title0 + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
@@ -1016,7 +1061,7 @@ public class ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
             if (e instanceof AbortException) {
                 AbortException e1 = (AbortException) e;
-                result.failedKeys = e1.getFailedKeys();
+                result.failedKeys.addAll(e1.getFailedKeys());
             }
             return result;
         }
@@ -1024,35 +1069,35 @@ public class ScalarisDataHandler {
         try {
             results.processWriteAt(curOp++);
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception writing page \"" + title0
                     + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = catDiff.updatePageLists_check_writes(results, title, curOp, statName);
+        pageListResult = catDiff.updatePageLists_check_writes(results, title, curOp, statName, involvedKeys);
         curOp += catPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = tplDiff.updatePageLists_check_writes(results, title, curOp, statName);
+        pageListResult = tplDiff.updatePageLists_check_writes(results, title, curOp, statName, involvedKeys);
         curOp += tplPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = lnkDiff.updatePageLists_check_writes(results, title, curOp, statName);
+        pageListResult = lnkDiff.updatePageLists_check_writes(results, title, curOp, statName, involvedKeys);
         curOp += lnkPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         int pageList = 0;
@@ -1062,11 +1107,11 @@ public class ScalarisDataHandler {
 
             final Integer writeOps = pageListWrites.get(pageList);
             pageListResult = updatePageList_check_writes(results, pageList_key,
-                    pageCount_key, curOp, writeOps, statName);
+                    pageCount_key, curOp, writeOps, statName, involvedKeys);
             if (!pageListResult.success) {
-                return new SavePageResult(false, pageListResult.message,
-                        pageListResult.connect_failed, oldPage, newPage,
-                        newShortRevs, pageEdits, statName,
+                return new SavePageResult(false, involvedKeys,
+                        pageListResult.message, pageListResult.connect_failed,
+                        oldPage, newPage, newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
             curOp += writeOps;
@@ -1077,7 +1122,7 @@ public class ScalarisDataHandler {
             results.processWriteAt(curOp++);
             results.processWriteAt(curOp++);
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception writing page \"" + title0
                     + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
@@ -1102,6 +1147,8 @@ public class ScalarisDataHandler {
      * @param newPage
      * @param newShortRevs
      * @param pageEdits
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param title
      * @param scalaris_tx
      * @param oldRevId
@@ -1116,8 +1163,8 @@ public class ScalarisDataHandler {
             final Revision newRev, final MyNamespace nsObject,
             long timeAtStart, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
-            String title, Transaction scalaris_tx, int oldRevId,
-            final MyWikiModel wikiModel, Difference catDiff,
+            List<String> involvedKeys, String title, Transaction scalaris_tx,
+            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff, final String statName) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
@@ -1136,27 +1183,27 @@ public class ScalarisDataHandler {
         String revListKey = getRevListKey(title0, nsObject);
         requests.addAddDelOnList(revListKey, Arrays.asList(new ShortRevision(newRev)), null);
         ValueResult<Integer> pageListResult;
-        pageListResult = catDiff.updatePageLists_prepare_appends(requests, title, statName);
+        pageListResult = catDiff.updatePageLists_prepare_appends(requests, title, statName, involvedKeys);
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int catPageWrites = pageListResult.value;
-        pageListResult = tplDiff.updatePageLists_prepare_appends(requests, title, statName);
+        pageListResult = tplDiff.updatePageLists_prepare_appends(requests, title, statName, involvedKeys);
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int tplPageWrites = pageListResult.value;
-        pageListResult = lnkDiff.updatePageLists_prepare_appends(requests, title, statName);
+        pageListResult = lnkDiff.updatePageLists_prepare_appends(requests, title, statName, involvedKeys);
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         final int lnkPageWrites = pageListResult.value;
@@ -1167,11 +1214,11 @@ public class ScalarisDataHandler {
             
             pageListResult = updatePageList_prepare_appends(requests,
                     pageList_key, pageCount_key, new LinkedList<String>(),
-                    newPages, statName);
+                    newPages, statName, involvedKeys);
             if (!pageListResult.success) {
-                return new SavePageResult(false, pageListResult.message,
-                        pageListResult.connect_failed, oldPage, newPage,
-                        newShortRevs, pageEdits, statName,
+                return new SavePageResult(false, involvedKeys,
+                        pageListResult.message, pageListResult.connect_failed,
+                        oldPage, newPage, newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
             pageListWrites.add(pageListResult.value);
@@ -1184,10 +1231,11 @@ public class ScalarisDataHandler {
         int curOp;
         results = null;
         try {
+            involvedKeys.addAll(requests.keyList());
             results = scalaris_tx.req_list(requests);
             curOp = 0;
         } catch (Exception e) {
-            final SavePageResult result = new SavePageResult(false,
+            final SavePageResult result = new SavePageResult(false, involvedKeys,
                     "unknown exception writing page or page lists for page \""
                             + title0 + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
@@ -1195,7 +1243,7 @@ public class ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
             if (e instanceof AbortException) {
                 AbortException e1 = (AbortException) e;
-                result.failedKeys = e1.getFailedKeys();
+                result.failedKeys.addAll(e1.getFailedKeys());
             }
             return result;
         }
@@ -1203,35 +1251,35 @@ public class ScalarisDataHandler {
         try {
             results.processAddDelOnListAt(curOp++);
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception writing page \"" + title0
                     + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = catDiff.updatePageLists_check_appends(results, title, curOp, statName);
+        pageListResult = catDiff.updatePageLists_check_appends(results, title, curOp, statName, involvedKeys);
         curOp += catPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = tplDiff.updatePageLists_check_appends(results, title, curOp, statName);
+        pageListResult = tplDiff.updatePageLists_check_appends(results, title, curOp, statName, involvedKeys);
         curOp += tplPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        pageListResult = lnkDiff.updatePageLists_check_appends(results, title, curOp, statName);
+        pageListResult = lnkDiff.updatePageLists_check_appends(results, title, curOp, statName, involvedKeys);
         curOp += lnkPageWrites;
         if (!pageListResult.success) {
-            return new SavePageResult(false, pageListResult.message,
-                    pageListResult.connect_failed, oldPage, newPage,
-                    newShortRevs, pageEdits, statName,
+            return new SavePageResult(false, involvedKeys,
+                    pageListResult.message, pageListResult.connect_failed,
+                    oldPage, newPage, newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         int pageList = 0;
@@ -1241,11 +1289,11 @@ public class ScalarisDataHandler {
 
             final Integer writeOps = pageListWrites.get(pageList);
             pageListResult = updatePageList_check_appends(results, pageList_key,
-                    pageCount_key, curOp, writeOps, statName);
+                    pageCount_key, curOp, writeOps, statName, involvedKeys);
             if (!pageListResult.success) {
-                return new SavePageResult(false, pageListResult.message,
-                        pageListResult.connect_failed, oldPage, newPage,
-                        newShortRevs, pageEdits, statName,
+                return new SavePageResult(false, involvedKeys,
+                        pageListResult.message, pageListResult.connect_failed,
+                        oldPage, newPage, newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
             curOp += writeOps;
@@ -1256,7 +1304,7 @@ public class ScalarisDataHandler {
             results.processWriteAt(curOp++);
             results.processWriteAt(curOp++);
         } catch (Exception e) {
-            return new SavePageResult(false,
+            return new SavePageResult(false, involvedKeys,
                     "unknown exception writing page \"" + title0
                     + "\" to Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
@@ -1272,10 +1320,13 @@ public class ScalarisDataHandler {
      * 
      * @param scalaris_tx
      *            the transaction object to use
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
      * @return the new number of page edits
      */
-    private static BigInteger increasePageEditStat2(Transaction scalaris_tx) {
+    private static BigInteger increasePageEditStat2(Transaction scalaris_tx,
+            List<String> involvedKeys) {
         BigInteger pageEdits = null;
         // increase number of page edits (for statistics)
         // as this is not that important, use a separate transaction and do not
@@ -1283,6 +1334,7 @@ public class ScalarisDataHandler {
         try {
             String scalaris_key = getStatsPageEditsKey();
             try {
+                involvedKeys.add(scalaris_key);
                 pageEdits = scalaris_tx.read(scalaris_key).bigIntValue();
             } catch (NotFoundException e) {
                 pageEdits = BigInteger.valueOf(0);
@@ -1290,6 +1342,7 @@ public class ScalarisDataHandler {
             pageEdits = pageEdits.add(BigInteger.valueOf(1));
             Transaction.RequestList requests = new Transaction.RequestList();
             requests.addWrite(scalaris_key, pageEdits).addCommit();
+            involvedKeys.addAll(requests.keyList());
             scalaris_tx.req_list(requests);
         } catch (Exception e) {
         }
@@ -1302,10 +1355,13 @@ public class ScalarisDataHandler {
      * 
      * @param scalaris_tx
      *            the transaction object to use
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
-     * @return <tt>null</tt> (we do not retrieve the actual number of edits
+     * @return <tt>null</tt> (we do not retrieve the actual number of edits)
      */
-    private static BigInteger increasePageEditStat2NewOps(Transaction scalaris_tx) {
+    private static BigInteger increasePageEditStat2NewOps(
+            Transaction scalaris_tx, List<String> involvedKeys) {
         // increase number of page edits (for statistics)
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
@@ -1314,6 +1370,7 @@ public class ScalarisDataHandler {
             try {
                 Transaction.RequestList requests = new Transaction.RequestList();
                 requests.addAddOnNr(scalaris_key, 1).addCommit();
+                involvedKeys.addAll(requests.keyList());
                 scalaris_tx.req_list(requests).processAddOnNrAt(0);
             } catch (NotANumberException e) {
                 // internal error that should not occur!
@@ -1381,7 +1438,7 @@ public class ScalarisDataHandler {
         
         /**
          * Adds read operations to the given request list as required by
-         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, String, int, String)}.
+         * {@link #updatePageLists_prepare_write(ResultList, de.zib.scalaris.Transaction.RequestList, String, int, String, List)}.
          * 
          * @param readRequests
          *            list of requests, i.e. operations for Scalaris
@@ -1420,13 +1477,16 @@ public class ScalarisDataHandler {
          *            position of the first operation in the result list
          * @param statName
          *            name for the time measurement statistics
+         * @param involvedKeys
+         *            all keys that have been read or written during the
+         *            operation
          * 
          * @return the result of the operation
          */
         public ValueResult<Integer> updatePageLists_prepare_write(
                 Transaction.ResultList readResults,
                 Transaction.RequestList writeRequests, String title,
-                int firstOp, final String statName) {
+                int firstOp, final String statName, List<String> involvedKeys) {
             final long timeAtStart = System.currentTimeMillis();
             int writeOps = 0;
             String scalaris_key;
@@ -1444,7 +1504,7 @@ public class ScalarisDataHandler {
 //                } catch (NotFoundException e) {
 //                    // this is NOT ok
                 } catch (Exception e) {
-                    return new ValueResult<Integer>(false,
+                    return new ValueResult<Integer>(false, involvedKeys,
                             "unknown exception removing \"" + title
                                     + "\" from \"" + scalaris_key
                                     + "\" in Scalaris: " + e.getMessage(),
@@ -1468,10 +1528,11 @@ public class ScalarisDataHandler {
                     // this is ok
                     pageList = new LinkedList<String>();
                 } catch (Exception e) {
-                    return new ValueResult<Integer>(false, "unknown exception reading \""
-                            + scalaris_key + "\" in Scalaris: "
-                            + e.getMessage(), e instanceof ConnectionException,
-                            statName, System.currentTimeMillis() - timeAtStart);
+                    return new ValueResult<Integer>(false, involvedKeys,
+                            "unknown exception reading \"" + scalaris_key
+                                    + "\" in Scalaris: " + e.getMessage(),
+                            e instanceof ConnectionException, statName,
+                            System.currentTimeMillis() - timeAtStart);
                 }
                 pageList.add(title);
                 writeRequests.addWrite(scalaris_key, pageList);
@@ -1482,13 +1543,13 @@ public class ScalarisDataHandler {
                     ++writeOps;
                 }
             }
-            return new ValueResult<Integer>(writeOps, statName,
+            return new ValueResult<Integer>(involvedKeys, writeOps, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         
         /**
          * Checks whether all writes from
-         * {@link #updatePageLists_prepare_write(de.zib.scalaris.Transaction.ResultList, de.zib.scalaris.Transaction.RequestList, String, int, String)}
+         * {@link #updatePageLists_prepare_write(ResultList, de.zib.scalaris.Transaction.RequestList, String, int, String, List)}
          * were successful.
          * 
          * @param writeResults
@@ -1499,12 +1560,15 @@ public class ScalarisDataHandler {
          *            position of the first operation in the result list
          * @param statName
          *            name for the time measurement statistics
+         * @param involvedKeys
+         *            all keys that have been read or written during the
+         *            operation
          * 
          * @return the result of the operation
          */
         public ValueResult<Integer> updatePageLists_check_writes(
                 Transaction.ResultList writeResults, String title, int firstOp,
-                final String statName) {
+                final String statName, List<String> involvedKeys) {
             final long timeAtStart = System.currentTimeMillis();
             // beware: keep order of operations in sync with readPageLists_prepare!
             // evaluate results changing the old and new page lists
@@ -1513,7 +1577,7 @@ public class ScalarisDataHandler {
                     try {
                         writeResults.processWriteAt(firstOp++);
                     } catch (Exception e) {
-                        return new ValueResult<Integer>(false,
+                        return new ValueResult<Integer>(false, involvedKeys,
                                 "unknown exception validating the addition/removal of \""
                                         + title + "\" to/from \""
                                         + keyGen.getPageListKey(name)
@@ -1523,7 +1587,7 @@ public class ScalarisDataHandler {
                     }
                 }
             }
-            return new ValueResult<Integer>(null, statName,
+            return new ValueResult<Integer>(involvedKeys, null, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         
@@ -1538,12 +1602,15 @@ public class ScalarisDataHandler {
          *            (normalised) page name to update
          * @param statName
          *            name for the time measurement statistics
+         * @param involvedKeys
+         *            all keys that have been read or written during the
+         *            operation
          * 
          * @return the result of the operation
          */
         public ValueResult<Integer> updatePageLists_prepare_appends(
                 Transaction.RequestList writeRequests, String title,
-                final String statName) {
+                final String statName, List<String> involvedKeys) {
             final long timeAtStart = System.currentTimeMillis();
             int writeOps = 0;
             String scalaris_key;
@@ -1572,13 +1639,13 @@ public class ScalarisDataHandler {
                     ++writeOps;
                 }
             }
-            return new ValueResult<Integer>(writeOps, statName,
+            return new ValueResult<Integer>(involvedKeys, writeOps, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
         
         /**
          * Checks whether all appends from
-         * {@link #updatePageLists_prepare_appends(de.zib.scalaris.Transaction.RequestList, String, String)}
+         * {@link #updatePageLists_prepare_appends(de.zib.scalaris.Transaction.RequestList, String, String, List)}
          * were successful.
          * 
          * @param appendResults
@@ -1589,12 +1656,15 @@ public class ScalarisDataHandler {
          *            position of the first operation in the result list
          * @param statName
          *            name for the time measurement statistics
+         * @param involvedKeys
+         *            all keys that have been read or written during the
+         *            operation
          * 
          * @return the result of the operation
          */
         public ValueResult<Integer> updatePageLists_check_appends(
                 Transaction.ResultList appendResults, String title,
-                int firstOp, final String statName) {
+                int firstOp, final String statName, List<String> involvedKeys) {
             final long timeAtStart = System.currentTimeMillis();
             // beware: keep order of operations in sync with readPageLists_prepare!
             // evaluate results changing the old and new page lists
@@ -1603,7 +1673,7 @@ public class ScalarisDataHandler {
                     try {
                         appendResults.processAddDelOnListAt(firstOp++);
                     } catch (Exception e) {
-                        return new ValueResult<Integer>(false,
+                        return new ValueResult<Integer>(false, involvedKeys,
                                 "unknown exception validating the addition/removal of \""
                                         + title + "\" to/from \""
                                         + keyGen.getPageListKey(name)
@@ -1613,7 +1683,7 @@ public class ScalarisDataHandler {
                     }
                 }
             }
-            return new ValueResult<Integer>(null, statName,
+            return new ValueResult<Integer>(involvedKeys, null, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
     }
@@ -1655,6 +1725,8 @@ public class ScalarisDataHandler {
      *            number of the first operation in the result set
      * @param statName
      *            name for the time measurement statistics
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
      * @return the result of the operation
      */
@@ -1662,7 +1734,8 @@ public class ScalarisDataHandler {
             Transaction.ResultList readResults,
             Transaction.RequestList writeRequests, String pageList_key,
             String pageCount_key, Collection<String> entriesToRemove,
-            Collection<String> entriesToAdd, int firstOp, final String statName) {
+            Collection<String> entriesToAdd, int firstOp,
+            final String statName, List<String> involvedKeys) {
         final long timeAtStart = System.currentTimeMillis();
         List<String> pages;
         try {
@@ -1670,11 +1743,11 @@ public class ScalarisDataHandler {
         } catch (NotFoundException e) {
             pages = new LinkedList<String>();
         } catch (Exception e) {
-            return new ValueResult<Integer>(false, "unknown exception updating \""
-                    + pageList_key + "\" and \"" + pageCount_key
-                    + "\" in Scalaris: " + e.getMessage(),
-                    e instanceof ConnectionException, statName,
-                    System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<Integer>(false, involvedKeys,
+                    "unknown exception updating \"" + pageList_key
+                            + "\" and \"" + pageCount_key + "\" in Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
         // note: no need to read the old count - we already have a list of all pages and can calculate the count on our own
         int oldCount = pages.size();
@@ -1703,7 +1776,7 @@ public class ScalarisDataHandler {
                 ++writeOps;
             }
         }
-        return new ValueResult<Integer>(writeOps, statName,
+        return new ValueResult<Integer>(involvedKeys, writeOps, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
     
@@ -1725,26 +1798,28 @@ public class ScalarisDataHandler {
      *            number of supposed write operations
      * @param statName
      *            name for the time measurement statistics
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
      * @return the result of the operation
      */
     protected static ValueResult<Integer> updatePageList_check_writes(
             Transaction.ResultList writeResults, String pageList_key,
             String pageCount_key, int firstOp, int writeOps,
-            final String statName) {
+            final String statName, List<String> involvedKeys) {
         final long timeAtStart = System.currentTimeMillis();
         try {
             for (int i = firstOp; i < firstOp + writeOps; ++i) {
                 writeResults.processWriteAt(i);
             }
         } catch (Exception e) {
-            return new ValueResult<Integer>(false, "unknown exception updating \""
-                    + pageList_key + "\" and \"" + pageCount_key
-                    + "\" in Scalaris: " + e.getMessage(),
-                    e instanceof ConnectionException, statName,
-                    System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<Integer>(false, involvedKeys,
+                    "unknown exception updating \"" + pageList_key
+                            + "\" and \"" + pageCount_key + "\" in Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
-        return new ValueResult<Integer>(null, statName,
+        return new ValueResult<Integer>(involvedKeys, null, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
     
@@ -1769,13 +1844,15 @@ public class ScalarisDataHandler {
      *            (normalised) page names to add
      * @param statName
      *            name for the time measurement statistics
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
      * @return the result of the operation
      */
     protected static ValueResult<Integer> updatePageList_prepare_appends(
             Transaction.RequestList writeRequests, String pageList_key,
             String pageCount_key, List<String> entriesToRemove,
-            List<String> entriesToAdd, final String statName) {
+            List<String> entriesToAdd, final String statName, List<String> involvedKeys) {
         final long timeAtStart = System.currentTimeMillis();
         int writeOps = 0;
         writeRequests.addAddDelOnList(pageList_key, entriesToAdd, entriesToRemove);
@@ -1784,7 +1861,7 @@ public class ScalarisDataHandler {
             writeRequests.addWrite(pageCount_key, entriesToAdd.size() - entriesToRemove.size());
             ++writeOps;
         }
-        return new ValueResult<Integer>(writeOps, statName,
+        return new ValueResult<Integer>(involvedKeys, writeOps, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
     
@@ -1806,26 +1883,28 @@ public class ScalarisDataHandler {
      *            number of supposed write operations
      * @param statName
      *            name for the time measurement statistics
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * 
      * @return the result of the operation
      */
     protected static ValueResult<Integer> updatePageList_check_appends(
             Transaction.ResultList writeResults, String pageList_key,
             String pageCount_key, int firstOp, int writeOps,
-            final String statName) {
+            final String statName, List<String> involvedKeys) {
         final long timeAtStart = System.currentTimeMillis();
         try {
             for (int i = firstOp; i < firstOp + writeOps; ++i) {
                 writeResults.processAddDelOnListAt(i);
             }
         } catch (Exception e) {
-            return new ValueResult<Integer>(false, "unknown exception updating \""
+            return new ValueResult<Integer>(false, involvedKeys, "unknown exception updating \""
                     + pageList_key + "\" and \"" + pageCount_key
                     + "\" in Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        return new ValueResult<Integer>(null, statName,
+        return new ValueResult<Integer>(involvedKeys, null, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
     
@@ -1853,6 +1932,7 @@ public class ScalarisDataHandler {
             List<String> entriesToRemove, List<String> entriesToAdd,
             final String statName) {
         final long timeAtStart = System.currentTimeMillis();
+        List<String> involvedKeys = new ArrayList<String>();
         Transaction.RequestList requests;
         Transaction.ResultList results;
 
@@ -1862,42 +1942,45 @@ public class ScalarisDataHandler {
             if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
                 result = updatePageList_prepare_appends(requests,
                         pageList_key, pageCount_key, entriesToRemove,
-                        entriesToAdd, statName);
-                requests.addCommit();
-                results = scalaris_tx.req_list(requests);
+                        entriesToAdd, statName, involvedKeys);
                 if (!result.success) {
                     return result;
                 }
+                requests.addCommit();
+                involvedKeys.addAll(requests.keyList());
+                results = scalaris_tx.req_list(requests);
                 result = updatePageList_check_appends(results, pageList_key,
-                        pageCount_key, 0, result.value, statName);
+                        pageCount_key, 0, result.value, statName, involvedKeys);
             } else {
                 updatePageList_prepare_read(requests, pageList_key);
+                involvedKeys.addAll(requests.keyList());
                 results = scalaris_tx.req_list(requests);
 
                 requests = new Transaction.RequestList();
                 result = updatePageList_prepare_write(results, requests,
                         pageList_key, pageCount_key, entriesToRemove, entriesToAdd,
-                        0, statName);
+                        0, statName, involvedKeys);
                 if (!result.success) {
                     return result;
                 }
                 requests.addCommit();
+                involvedKeys.addAll(requests.keyList());
                 results = scalaris_tx.req_list(requests);
 
                 result = updatePageList_check_writes(results, pageList_key,
-                        pageCount_key, 0, result.value, statName);
+                        pageCount_key, 0, result.value, statName, involvedKeys);
             }
             if (!result.success) {
                 return result;
             }
         } catch (Exception e) {
-            return new ValueResult<Integer>(false, "unknown exception updating \""
-                    + pageList_key + "\" and \"" + pageCount_key
-                    + "\" in Scalaris: " + e.getMessage(),
-                    e instanceof ConnectionException, statName,
-                    System.currentTimeMillis() - timeAtStart);
+            return new ValueResult<Integer>(false, involvedKeys,
+                    "unknown exception updating \"" + pageList_key
+                            + "\" and \"" + pageCount_key + "\" in Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
-        return new ValueResult<Integer>(null, statName,
+        return new ValueResult<Integer>(involvedKeys, null, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
 }

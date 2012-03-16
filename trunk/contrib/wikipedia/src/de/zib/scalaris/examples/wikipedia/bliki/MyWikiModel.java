@@ -23,6 +23,7 @@ import info.bliki.wiki.model.WikiModel;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,6 +92,11 @@ public class MyWikiModel extends WikiModel {
     protected Set<String> includes = new HashSet<String>();
 
     protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
+    
+    /**
+     * All keys that have been read or written during the current operation.
+     */
+    protected final List<String> involvedKeys = new ArrayList<String>();
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -929,5 +935,35 @@ public class MyWikiModel extends WikiModel {
      */
     public void addStats(Map<String, List<Long>> values) {
         stats.putAll(values);
+    }
+    
+    /**
+     * Adds an involved key to the collected statistics.
+     * 
+     * @param key
+     *            the key to add
+     */
+    public void addInvolvedKey(String key) {
+        involvedKeys.add(key);
+    }
+    
+    /**
+     * Adds a number of involved keys to the collected statistics.
+     * 
+     * @param keys
+     *            the keys to add
+     */
+    public void addInvolvedKeys(Collection<? extends String> keys) {
+        involvedKeys.addAll(keys);
+    }
+
+    /**
+     * Gets the list of all keys that have been read or written during the
+     * current operation.
+     * 
+     * @return the involvedKeys
+     */
+    public List<String> getInvolvedKeys() {
+        return involvedKeys;
     }
 }

@@ -392,14 +392,20 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
                 <ul id="footer-icons" class="noprint">
                 </ul>
                 <div style="clear:both"></div>
-                <div style="font-size:0.7em">Page save attempts: <span id="save_attempts">${ pageBean.saveAttempts }</span></div>
                 <div style="font-size:0.7em">DB Timings:
                 <pre id="db_timings" style="padding:0;line-height:0.7em">
 <% for (Map.Entry<String,List<Long>> stats : pageBean.getStats().entrySet()) { %>
 <%= stats.getKey() %>: <%= stats.getValue().toString() %>
 <% } %>
                 </pre></div>
-                <div style="padding:0;line-height:0.7em;font-size:0.7em">Failed keys when saving page:
+                <div style="font-size:0.7em">Involved DB keys:
+                <pre id="involved_keys" style="padding:0;line-height:0.7em">
+<% for (String involvedKey : pageBean.getInvolvedKeys()) { %>
+<%= involvedKey %>
+<% } %>
+                </pre></div>
+                <div style="font-size:0.7em">Page save attempts: <span id="save_attempts">${ pageBean.saveAttempts }</span></div>
+                <div style="font-size:0.7em">Failed keys when saving page:
                 <pre id="save_failed_keys" style="padding:0;line-height:0.7em">
 <% for (Map.Entry<Integer,List<String>> failedKeys : pageBean.getFailedKeys().entrySet()) { %>
 <%= failedKeys.getKey() %>: <%= StringUtils.join(failedKeys.getValue(), " # ") %>

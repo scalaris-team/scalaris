@@ -313,6 +313,12 @@ ${ pageBean.page }
 <%= stats.getKey() %>: <%= stats.getValue().toString() %>
 <% } %>
                 </pre></div>
+                <div style="font-size:0.7em">Involved DB keys:
+                <pre id="involved_keys" style="padding:0;line-height:0.7em">
+<% for (String involvedKey : pageBean.getInvolvedKeys()) { %>
+<%= involvedKey %>
+<% } %>
+                </pre></div>
         </div>
         <!-- /footer -->
 </body>

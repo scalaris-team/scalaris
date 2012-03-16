@@ -1,7 +1,7 @@
 package de.zib.scalaris.examples.wikipedia;
 
 import java.math.BigInteger;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -29,15 +29,16 @@ public class SavePageResult extends Result {
      * New number of page edists (may be null).
      */
     public BigInteger pageEdits = null;
-
     /**
      * In cases of failed page-save commits, contains a list of failed keys.
      */
-    public List<String> failedKeys = new LinkedList<String>();
+    public List<String> failedKeys = new ArrayList<String>();
     
     /**
      * Creates a new successful result.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param oldPage
      *            old version of the page (may be null)
      * @param newPage
@@ -45,11 +46,11 @@ public class SavePageResult extends Result {
      * @param newShortRevs
      *            new list of (short) revisions (may be null)
      * @param pageEdits
-     *            new number of page edists (may be null)
+     *            new number of page edits (may be null)
      */
-    public SavePageResult(Page oldPage, Page newPage,
+    public SavePageResult(List<String> involvedKeys, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits) {
-        super();
+        super(involvedKeys);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;
@@ -59,6 +60,8 @@ public class SavePageResult extends Result {
     /**
      * Creates a new successful result.
      * 
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param oldPage
      *            old version of the page (may be null)
      * @param newPage
@@ -66,16 +69,16 @@ public class SavePageResult extends Result {
      * @param newShortRevs
      *            new list of (short) revisions (may be null)
      * @param pageEdits
-     *            new number of page edists (may be null)
+     *            new number of page edits (may be null)
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
-    public SavePageResult(Page oldPage, Page newPage,
+    public SavePageResult(List<String> involvedKeys, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             String name, long time) {
-        super();
+        super(involvedKeys);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;
@@ -88,6 +91,8 @@ public class SavePageResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
@@ -99,12 +104,12 @@ public class SavePageResult extends Result {
      * @param newShortRevs
      *            new list of (short) revisions (may be null)
      * @param pageEdits
-     *            new number of page edists (may be null)
+     *            new number of page edits (may be null)
      */
-    public SavePageResult(boolean success, String message,
-            boolean connectFailed, Page oldPage, Page newPage,
+    public SavePageResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits) {
-        super(success, message, connectFailed);
+        super(success, involvedKeys, message, connectFailed);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;
@@ -116,6 +121,8 @@ public class SavePageResult extends Result {
      * 
      * @param success
      *            the success status
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
@@ -127,17 +134,17 @@ public class SavePageResult extends Result {
      * @param newShortRevs
      *            new list of (short) revisions (may be null)
      * @param pageEdits
-     *            new number of page edists (may be null)
+     *            new number of page edits (may be null)
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
-    public SavePageResult(boolean success, String message,
-            boolean connectFailed, Page oldPage, Page newPage,
+    public SavePageResult(boolean success, List<String> involvedKeys,
+            String message, boolean connectFailed, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             String name, long time) {
-        super(success, message, connectFailed);
+        super(success, involvedKeys, message, connectFailed);
         this.oldPage = oldPage;
         this.newPage = newPage;
         this.newShortRevs = newShortRevs;

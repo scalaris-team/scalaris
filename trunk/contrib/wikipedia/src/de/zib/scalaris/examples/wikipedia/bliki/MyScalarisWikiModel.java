@@ -138,6 +138,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
                 // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
                 RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName, this.getNamespace());
                 addStats(getRevResult.stats);
+                addInvolvedKeys(getRevResult.involvedKeys);
                 if (getRevResult.success) {
                     text = getRevResult.revision.unpackedText();
                     final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
@@ -174,6 +175,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
         if (connection != null) {
             RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName, this.getNamespace());
             addStats(getRevResult.stats);
+            addInvolvedKeys(getRevResult.involvedKeys);
             if (getRevResult.success) {
                 // make PAGENAME in the redirected content work as expected
                 setPageName(pageName);
