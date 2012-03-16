@@ -30,7 +30,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * Generic request list.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.9
+ * @version 3.12
  * @since 3.5
  */
 public abstract class RequestList {
@@ -429,6 +429,27 @@ public abstract class RequestList {
      */
     public int size() {
         return requests.size();
+    }
+
+    /**
+     * Gets a list of all keys in the request list.
+     * Note: this parses through the requests to create the list of keys.
+     *
+     * @return involved keys
+     *
+     * @since 3.12
+     */
+    public List<String> keyList() {
+        final ArrayList<String> result = new ArrayList<String>(requests.size());
+        for (final OtpErlangObject request : requests) {
+            if (request instanceof OtpErlangTuple) {
+                final OtpErlangTuple reqTpl = (OtpErlangTuple) request;
+                if ((reqTpl.arity() >= 2) && (reqTpl.elementAt(1) instanceof OtpErlangString)) {
+                    result.add(((OtpErlangString)reqTpl.elementAt(1)).stringValue());
+                }
+            }
+        }
+        return result;
     }
 
     /**
