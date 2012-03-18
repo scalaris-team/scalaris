@@ -37,9 +37,9 @@
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
       {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any())} |
-      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer()} |
+      {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer() | all} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
-            ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer()} |
+            ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
       {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
       % DB subscriptions:
       {db_set_subscription, SubscrTuple::?DB:subscr_t()} |
