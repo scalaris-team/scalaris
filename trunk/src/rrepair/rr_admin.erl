@@ -75,16 +75,16 @@ test_man() ->
 -spec make_ring(ring_type(), pos_integer()) -> ok.
 make_ring(Type, Size) ->
     %if ring exists kill all   
-    set_recon_method(bloom), 
-    case Type of
-        random -> 
-            admin:add_node([{first}]),
-            admin:add_nodes(Size -1);
-        symmetric ->
-            Ids = get_symmetric_ids(Size),
-            admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
-            [admin:add_node_at_id(Id) || Id <- tl(Ids)]
-    end,
+    _ = set_recon_method(bloom), 
+    _ = case Type of
+            random -> 
+                _ = admin:add_node([{first}]),
+                admin:add_nodes(Size -1);
+            symmetric ->
+                Ids = get_symmetric_ids(Size),
+                _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
+                [admin:add_node_at_id(Id) || Id <- tl(Ids)]
+        end,
     wait_for_stable_ring(),
     ok.
 

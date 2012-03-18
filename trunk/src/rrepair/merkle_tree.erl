@@ -164,7 +164,7 @@ get_childs({_, _, _, _, Childs}) -> Childs.
 -spec get_item_count(merkle_tree() | mt_node()) -> non_neg_integer().
 get_item_count({merkle_tree, _, Node}) -> get_item_count(Node);
 get_item_count({_, C, _, _, []}) -> C;
-get_item_count({_, _, _, _, Childs}) -> 0.
+get_item_count({_, _, _, _, _}) -> 0.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
