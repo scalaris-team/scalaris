@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 2812
+%define pkg_version 0.4.1+svn
 Name:           conpaas-scalarix
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
