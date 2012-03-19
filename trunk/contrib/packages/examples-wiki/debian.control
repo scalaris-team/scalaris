@@ -2,19 +2,19 @@ Source: scalaris-examples-wiki
 Section: web
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, libservlet2.5-java, scalaris-java (>= 0.4.0+svn2525)
+Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, libservlet2.5-java, scalaris-java (>= 0.4.1+svn2875)
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-examples-wiki-tomcat5
 Architecture: all
-Depends: tomcat5, scalaris-java (>= 0.4.0+svn2525)
+Depends: tomcat5, scalaris-java (>= 0.4.1+svn2875)
 Description: Wikipedia on Scalaris example
  This web application demonstrates the use of Scalaris as a data-store
  back-end for a Wikipedia-like application.
 
 Package: scalaris-examples-wiki-tomcat6
 Architecture: all
-Depends: tomcat6, scalaris-java (>= 0.4.0+svn2525)
+Depends: tomcat6, scalaris-java (>= 0.4.1+svn2875)
 Description: Wikipedia on Scalaris example
  This web application demonstrates the use of Scalaris as a data-store
  back-end for a Wikipedia-like application.
