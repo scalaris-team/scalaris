@@ -198,5 +198,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris/contrib/opennebula/cli.rb
 
 %changelog
-* Thu Sep 22 2011 Thorsten Schuett <schuett@zib.de> - 1-1
+* Thu Sep 22 2011 Thorsten Schuett <schuett@zib.de> - 0.4.1-1
 - Initial package
