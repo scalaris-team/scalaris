@@ -62,11 +62,11 @@ fi
 if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder=${package_folder}
-  sed -e "s/Version: 1-1/Version: ${pkg_version}-1/g" \
+  sed -e "s/Version: .*-.*/Version: ${pkg_version}-1/g" \
       -e "s/scalaris-examples-wiki\\.orig\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
-  sed -e "s/(1-1)/(${pkg_version}-1)/g" \
+  sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
       < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                  ./debian.control && \
   cp  ${sourcefolder}/debian.rules                    ./debian.rules
