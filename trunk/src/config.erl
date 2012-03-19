@@ -27,7 +27,7 @@
          check_config/0,
 
          cfg_exists/1, cfg_is_atom/1, cfg_is_bool/1, cfg_is_mypid/1,
-         cfg_is_ip/1, cfg_is_port/1,
+         cfg_is_ip/1, cfg_is_ip/2, cfg_is_port/1,
          cfg_is_integer/1, cfg_is_float/1,
          cfg_is_tuple/2, cfg_is_tuple/4, cfg_is_list/1, cfg_is_list/3, cfg_is_string/1,
          cfg_is_in_range/3, cfg_is_greater_than/2, cfg_is_greater_than_equal/2,
@@ -266,6 +266,10 @@ cfg_is_mypid(Key) ->
 
 -spec cfg_is_ip(Key::atom()) -> boolean().
 cfg_is_ip(Key) ->
+    cfg_is_ip(Key, false).
+
+-spec cfg_is_ip(Key::atom(), AllowUnknown::boolean()) -> boolean().
+cfg_is_ip(Key, AllowUnknown) ->
     IsIp = fun(Value) ->
                    case Value of
                        {IP1, IP2, IP3, IP4} ->
@@ -273,6 +277,7 @@ cfg_is_ip(Key) ->
                             andalso (IP2 >= 0) andalso (IP2 =< 255)
                             andalso (IP3 >= 0) andalso (IP3 =< 255)
                             andalso (IP4 >= 0) andalso (IP4 =< 255));
+                       unknown when AllowUnknown -> true;
                        _X -> false
                    end
            end,
