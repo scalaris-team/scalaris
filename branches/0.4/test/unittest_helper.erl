@@ -313,40 +313,38 @@ check_ring_size_fully_joined(Size) ->
                                   DhtModule:is_alive_no_slide(State)
                           end).
 
+%% @doc Starts a process which executes the given function and then waits forever.
 -spec start_process(StartFun::fun(() -> any())) -> pid().
 start_process(StartFun) ->
     start_process(StartFun, fun() -> receive {done} -> ok end end).
 
 -spec start_process(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
 start_process(StartFun, RunFun) ->
+    start_process(StartFun, RunFun, false, spawn).
+
+-spec start_process(StartFun::fun(() -> any()), RunFun::fun(() -> any()),
+                    TrapExit::boolean(), Spawn::spawn | spawn_link) -> pid().
+start_process(StartFun, RunFun, TrapExit, Spawn) ->
+    process_flag(trap_exit, TrapExit),
     Owner = self(),
-    Node = spawn(
+    Node = erlang:Spawn(
              fun() ->
-                     StartFun(),
-                     Owner ! {started, self()},
+                     try StartFun()
+                     catch Level:Reason -> erlang:Level(Reason)
+                     after Owner ! {started, self()}
+                     end,
                      RunFun()
              end),
-    receive
-        {started, Node} -> Node
-    end.
+    receive {started, Node} -> Node end.
 
+%% @doc Starts a sub-process which executes the given function and then waits forever.
 -spec start_subprocess(StartFun::fun(() -> any())) -> pid().
 start_subprocess(StartFun) ->
     start_subprocess(StartFun, fun() -> receive {done} -> ok end end).
 
 -spec start_subprocess(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
 start_subprocess(StartFun, RunFun) ->
-    process_flag(trap_exit, true),
-    Owner = self(),
-    Node = spawn_link(
-             fun() ->
-                     StartFun(),
-                     Owner ! {started, self()},
-                     RunFun()
-             end),
-    receive
-        {started, Node} -> Node
-    end.
+    start_process(StartFun, RunFun, true, spawn_link).
 
 %% @doc Starts the minimal number of processes in order for non-ring unit tests
 %%      to be able to execute (pid_groups, config, log).

@@ -314,7 +314,8 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                                              ++ randoms:getRandomString()), self()),
                 ok
         end,
-    _ = case lists:member(wait_for_init, Options) of
+    WaitForInit = lists:member(wait_for_init, Options),
+    _ = case WaitForInit of
             true -> ok;
             false -> Supervisor ! {started, self()}
         end,
@@ -335,13 +336,22 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
         ?INITIALIZED(Module),
         try_loop(Module, Handler, InitialState, InitialComponentState)
     catch
-        % note: if init throws up, we will not send 'started' to the supervisor
-        % this process will die and the supervisor will try to restart it
+        % If init throws up, send 'started' to the supervisor but exit.
+        % The supervisor will try to restart the process as it is watching
+        % this PID.
+        % note: since try_loop/4 never throws an exception,
+        %       this only guards the initialisation
         Level:Reason ->
             log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
                     [Level, Reason, Module, erlang:get_stacktrace()]),
             erlang:Level(Reason)
+    after
+        case WaitForInit of
+            false -> ok;
+            true -> Supervisor ! {started, self()}, ok
+        end
     end.
+
 
 -spec try_loop(module(), handler(), term(), component_state()) -> no_return() | ok.
 try_loop(Module, Handler, State, {_Options, _Slowest, _BPState} = ComponentState) ->
