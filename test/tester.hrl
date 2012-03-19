@@ -63,6 +63,7 @@
 
 -type(type_spec() ::
       {'fun', any(), any()}
+    | {'union_fun', [{'fun', any(), any()}]}
     | {product, [any()]}
     | {tuple, [any()]}
     | {tuple, {typedef, tester, test_any}}
@@ -100,6 +101,7 @@
 
 -type(type_spec() ::
       {'fun', type_spec(), type_spec()}
+    | {'union_fun', [{'fun', type_spec(), type_spec()}]}
     | {product, [type_spec()]}
     | {tuple, [type_spec()]}
     | {tuple, {typedef, tester, test_any}}
