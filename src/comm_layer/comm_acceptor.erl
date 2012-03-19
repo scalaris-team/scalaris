@@ -26,34 +26,47 @@
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(GroupName) ->
-    Pid = spawn_link(comm_acceptor, init, [self(), GroupName]),
+    Pid = spawn_link(?MODULE, init, [self(), GroupName]),
     receive
-        {started} ->
-            {ok, Pid}
+        {started, Pid} -> {ok, Pid}
     end.
 
 -spec init(pid(), pid_groups:groupname()) -> any().
 init(Supervisor, GroupName) ->
-    erlang:register(comm_layer_acceptor, self()),
-    pid_groups:join_as(GroupName, comm_acceptor),
-
-    log:log(info,"[ CC ] listening on ~p:~p", [config:read(listen_ip), config:read(port)]),
-    case util:app_get_env(verbose, false) of
-        true -> io:format("Listening on ~p:~p.~n", [config:read(listen_ip), config:read(port)]);
-        false -> ok
-    end,
-
-    LS = case config:read(listen_ip) of
-             undefined ->
-                 open_listen_port(config:read(port), first_ip());
-             _ ->
-                 open_listen_port(config:read(port), config:read(listen_ip))
-         end,
-    {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
-    comm_server:set_local_address(undefined, LocalPort),
-    %io:format("this() == ~w~n", [{LocalAddress, LocalPort}]),
-    Supervisor ! {started},
-    server(LS).
+    Socket =
+        try
+            erlang:register(comm_layer_acceptor, self()),
+            pid_groups:join_as(GroupName, comm_acceptor),
+            
+            IP = case config:read(listen_ip) of
+                     undefined -> first_ip();
+                     X         -> X
+                 end,
+            Port = config:read(port),
+            
+            log:log(info,"[ CC ] listening on ~p:~p", [IP, Port]),
+            case util:app_get_env(verbose, false) of
+                true -> io:format("Listening on ~p:~p.~n", [IP, Port]);
+                false -> ok
+            end,
+            
+            LS = open_listen_port(Port, IP),
+            {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
+            comm_server:set_local_address(undefined, LocalPort),
+            %io:format("this() == ~w~n", [{LocalAddress, LocalPort}]),
+            LS
+        catch
+            % If init throws up, send 'started' to the supervisor but exit.
+            % The supervisor will try to restart the process as it is watching
+            % this PID.
+            Level:Reason ->
+                log:log(error,"Error: exception ~p:~p in ~p:init/2:  ~.0p",
+                        [Level, Reason, ?MODULE, erlang:get_stacktrace()]),
+                erlang:Level(Reason)
+        after
+            Supervisor ! {started, self()}
+        end,
+    server(Socket).
 
 server(LS) ->
     case gen_tcp:accept(LS) of
@@ -92,6 +105,8 @@ server(LS) ->
     end,
     server(LS).
 
+-spec open_listen_port([comm_server:tcp_port()] | {From::comm_server:tcp_port(), To::comm_server:tcp_port()},
+                       IP::inet:ip_address()) -> inet:socket() | abort.
 open_listen_port({From, To}, IP) ->
     open_listen_port(lists:seq(From, To), IP);
 open_listen_port([Port | Rest], IP) ->
