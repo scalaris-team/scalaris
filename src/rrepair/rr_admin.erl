@@ -244,6 +244,7 @@ get_node_list() ->
             throw('mgmt_server_timeout')
     end.
 
+-spec get_symmetric_ids(NodeCount::pos_integer()) -> [?RT:key(),...].
 get_symmetric_ids(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
