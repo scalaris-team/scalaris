@@ -49,11 +49,11 @@ fi
 if [ ${result} -eq 0 ]; then
   echo "extracting Debian package files ..."
   sourcefolder=${folder}/contrib/packages/conpaas
-  sed -e "s/Version: 1-1/Version: ${pkg_version}-1/g" \
+  sed -e "s/Version: .*-.*/Version: ${pkg_version}-1/g" \
       -e "s/conpaas-scalarix\\.orig\\.tar\\.gz/conpaas-scalarix-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/conpaas-scalarix\\.diff\\.tar\\.gz/conpaas-scalarix-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/conpaas-scalarix.dsc           > ./conpaas-scalarix.dsc && \
-  sed -e "s/(1-1)/(${pkg_version}-1)/g" \
+  sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
       < ${sourcefolder}/debian.changelog               > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
