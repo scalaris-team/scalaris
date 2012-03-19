@@ -28,10 +28,10 @@
 
 -export([check/3]).
 
-%-include("tester.hrl").
+-include("tester.hrl").
 %-include("unittest.hrl").
 
-%-spec check/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> bool().
+-spec check/3 :: (term(), type_spec(), tester_parse_state:state()) -> true | {false, term()}.
 check(true, {atom, true}, _ParseState) ->
     true;
 check(true, bool, _ParseState) ->

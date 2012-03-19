@@ -179,10 +179,7 @@ apply_args(Module, Func, Arity, Args, Iterations,
                 {false, ErrorMsg} ->
                     % @todo give good error message
                     {fail, Result, ResultType, test_case_failed, Module, Func,
-                     Args, ErrorMsg, no_stacktrace, util:get_linetrace()};
-                X ->
-                    ct:pal("~w", [X]),
-                    X
+                     Args, ErrorMsg, no_stacktrace, util:get_linetrace()}
             end
     catch
         exit:{test_case_failed, Reason} ->
