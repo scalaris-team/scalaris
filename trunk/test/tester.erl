@@ -137,9 +137,11 @@ run(Module, Func, Arity, Iterations, ParseState) ->
                                                       ParseState),
     run_helper(Module, Func, Arity, Iterations, FunType, ParseState).
 
--spec run_helper/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
-                       {'fun', type_spec(), type_spec()},
-                       tester_parse_state:state()) -> any().
+-spec run_helper/6 :: (Module::module(), Fun::atom(), Arity::non_neg_integer(),
+                       Iterations::non_neg_integer(),
+                       FunType | {union_fun, [FunType,...]},
+                       tester_parse_state:state()) -> any()
+        when is_subtype(FunType, {'fun', type_spec(), type_spec()}).
 run_helper(_Module, _Func, _Arity, 0, _FunType, _TypeInfos) ->
     ok;
 run_helper(Module, Func, 0, Iterations, {union_fun, FunTypes} = FunType,
