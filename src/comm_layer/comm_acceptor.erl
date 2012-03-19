@@ -135,4 +135,5 @@ first_ip() ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_port(port).
+    config:cfg_is_port(port) and
+    config:cfg_is_ip(listen_ip, true).
