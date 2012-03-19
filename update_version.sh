@@ -26,4 +26,17 @@ sed -e "s/version='.*',/version='${VERSION}',/g" \
     -i python-api/setup.py
 sed -e "s/SCALARIS_VERSION=\".*\"/SCALARIS_VERSION=\"${VERSION}\"/g" \
     -i contrib/packages/*/checkout.sh
+sed -e "s/%define pkg_version .*/%define pkg_version ${VERSION}/g" \
+    -i contrib/packages/*/*.spec
+sed -e "s/Version: .*-.*/Version: ${VERSION}-1/g" \
+    -i contrib/packages/*/*.dsc
+sed -e "s/(.*-.*)/(${VERSION}-1)/g" \
+    -i contrib/packages/*/debian.changelog
+if [[ "$VERSION" == *svn* ]]; then
+  RELEASE="unstable"
+else
+  RELEASE="stable"
+fi
+sed -e "s/u*n*stable;/${RELEASE};/g" \
+    -i contrib/packages/*/debian.changelog
 echo "done"
