@@ -323,36 +323,40 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                                              ++ randoms:getRandomString()), self()),
                 ok
         end,
-    _ = case lists:member(wait_for_init, Options) of
+    WaitForInit = lists:member(wait_for_init, Options),
+    _ = case WaitForInit of
             true -> ok;
             false -> Supervisor ! {started, self()}
         end,
-    try
-        T1State = gc_new(Module, DefaultHandler, Options),
-        Handler = case Module:init(Args) of
-                      {'$gen_component', Config, UState} ->
-                          {on_handler, NewHandler} =
-                              lists:keyfind(on_handler, 1, Config),
-                          NewHandler;
-                     UState ->
-                          DefaultHandler
-                  end,
-        T2State = gc_set_ustate(T1State, UState),
-        T3State = gc_set_hand(T2State, Handler),
-        case lists:member(wait_for_init, Options) of
-            false -> ok;
-            true -> Supervisor ! {started, self()}, ok
+    State =
+        try
+            T1State = gc_new(Module, DefaultHandler, Options),
+            Handler = case Module:init(Args) of
+                          {'$gen_component', Config, UState} ->
+                              {on_handler, NewHandler} =
+                                  lists:keyfind(on_handler, 1, Config),
+                              NewHandler;
+                          UState ->
+                              DefaultHandler
+                      end,
+            T2State = gc_set_ustate(T1State, UState),
+            gc_set_hand(T2State, Handler)
+        catch
+            % If init throws up, send 'started' to the supervisor but exit.
+            % The supervisor will try to restart the process as it is watching
+            % this PID.
+            Level:Reason ->
+                log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
+                        [Level, Reason, Module, erlang:get_stacktrace()]),
+                erlang:Level(Reason)
+        after
+            case WaitForInit of
+                false -> ok;
+                true -> Supervisor ! {started, self()}, ok
+            end
         end,
-        ?INITIALIZED(Module),
-        loop(T3State)
-    catch
-        % note: if init throws up, we will not send 'started' to the supervisor
-        % this process will die and the supervisor will try to restart it
-        Level:Reason ->
-            log:log(error,"Error: exception ~p:~p in init of ~p:  ~.0p",
-                    [Level, Reason, Module, erlang:get_stacktrace()]),
-            erlang:Level(Reason)
-    end.
+    ?INITIALIZED(Module),
+    loop(State).
 
 
 -spec loop(gc_state()) -> no_return() | ok.
