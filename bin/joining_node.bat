@@ -1,5 +1,5 @@
 @echo off
-:: Copyright 2010-2011 Zuse Institute Berlin
+:: Copyright 2010-2012 Zuse Institute Berlin
 ::
 ::    Licensed under the Apache License, Version 2.0 (the "License");
 ::    you may not use this file except in compliance with the License.
@@ -12,11 +12,14 @@
 ::    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ::    See the License for the specific language governing permissions and
 ::    limitations under the License.
+SETLOCAL
 
 :: Script to start a node, that joins a running Scalaris system.
 set SCRIPTDIR=%~dp0
-set params=%*
 set ID=1
+set params=%*
+
+:: extract node ID from first command line parameter
 IF [%1]==[] goto start
 set ID=%1
 set params=
@@ -36,8 +39,6 @@ set /a YAWSPORT=8000+%ID%
 set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %YAWSPORT%
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-:: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.5\bin"
 :: scalaris configuration parameters
 set SCALARIS_COOKIE=chocolate chip cookie
 set SCALARISDIR=%SCRIPTDIR%..
@@ -49,10 +50,14 @@ set TOKEFLAGS=
 set LOGDIR=%SCALARISDIR:\=\\%\\log
 set DOCROOTDIR=%SCALARISDIR:\=\\%\\docroot
 set ETCDIR=%SCALARISDIR:\=\\%\\bin
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:: set path to erlang installation
+call "%SCRIPTDIR%"\find_erlang.bat
 
 @echo on
 pushd %BEAMDIR%
-%ERLANG%\erl -setcookie "%SCALARIS_COOKIE%" ^
+%ERLANG_HOME%\bin\erl.exe -setcookie "%SCALARIS_COOKIE%" ^
   -pa "%SCALARISDIR%\contrib\yaws\ebin" ^
   -pa "%SCALARISDIR%\contrib\log4erl\ebin" ^
   -pa "%BEAMDIR%" %TOKEFLAGS% %BACKGROUND% ^
@@ -67,5 +72,3 @@ pushd %BEAMDIR%
   -s scalaris %params%
 popd
 @echo off
-
-:end
