@@ -563,8 +563,9 @@ install-erlang: compile
 	  touch $(ETCDIR)/scalaris.local.cfg ; \
 	fi
 	install -d $(DOCROOTDIR) \
-	           $(DOCROOTDIR)/icons \
+	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \
+	           $(DOCROOTDIR)/icons \
 	           $(DOCROOTDIR)/images/default \
 	           $(DOCROOTDIR)/images/default/dd \
 	           $(DOCROOTDIR)/images/default/panel \
@@ -575,6 +576,8 @@ install-erlang: compile
 	           docroot/*.css \
 	           docroot/*.js \
 	           docroot/*.gif
+	install -m 644 -t $(DOCROOTDIR)/api \
+	           docroot/api/*
 	install -m 644 -t $(DOCROOTDIR)/flot \
 	           docroot/flot/*
 	install -m 644 -t $(DOCROOTDIR)/icons \
