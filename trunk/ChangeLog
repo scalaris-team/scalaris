@@ -5,6 +5,8 @@ Packaging:
 
 - new official ConPaaS packages (http://www.conpaas.eu/)
 - install rubygem dependencies in Debian postinstall scripts for Ruby API
+- improved Windows start scripts (if set, uses the ERLANG_HOME environment
+  variable to find Erlang, otherwise searches for Erlang in common paths)
 
 Bugs:
 
