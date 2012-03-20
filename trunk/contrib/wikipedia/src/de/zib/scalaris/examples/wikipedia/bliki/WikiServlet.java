@@ -342,7 +342,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormType(FormType.PageSearchForm);
         ValueResult<List<String>> result;
         page.setSearch(req_search);
-        page.setTitle("Special:Search&search=" + req_search + "&namespace=" + nsId);
+        page.setTitle("Special:Search");
+        page.setShowAllPages(false);
         if (req_search.isEmpty()) {
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
         } else {
@@ -389,20 +390,21 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.FromToForm);
+        page.setTitle("Special:AllPages");
         ValueResult<List<String>> result;
         if (req_from == null && req_to == null) {
-            page.setTitle("Special:AllPages&namespace=" + nsId);
+            page.setShowAllPages(false);
             page.setFromPage("");
             page.setToPage("");
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
         } else {
+            page.setShowAllPages(true);
             if (req_from == null) {
                 req_from = ""; // start with first page
             }
             if (req_to == null) {
                 req_to = ""; // stop at last page
             }
-            page.setTitle("Special:AllPages&from=" + req_from + "&to=" + req_to + "&namespace=" + nsId);
             page.setFromPage(req_from);
             page.setToPage(req_to);
             if (nsId == 0) {
@@ -447,13 +449,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.PagePrefixForm);
+        page.setTitle("Special:PrefixIndex");
         ValueResult<List<String>> result;
         if (req_prefix == null) {
-            page.setTitle("Special:PrefixIndex&namespace=" + nsId);
+            page.setShowAllPages(false);
             page.setPrefix("");
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
         } else {
-            page.setTitle("Special:PrefixIndex&prefix=" + req_prefix + "&namespace=" + nsId);
+            page.setShowAllPages(true);
             page.setPrefix(req_prefix);
             if (nsId == 0) {
                 result = getArticleList(connection);
@@ -495,15 +498,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         page.setFormTitle("What links here");
         page.setFormType(FormType.TargetPageForm);
+        page.setTitle("Special:WhatLinksHere");
         ValueResult<List<String>> result;
         if (req_target == null) {
+            page.setShowAllPages(false);
             page.setPageHeading("Pages that link to a selected page");
-            page.setTitle("Special:WhatLinksHere");
             page.setTarget("");
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
         } else {
+            page.setShowAllPages(true);
             page.setPageHeading("Pages that link to \"" + req_target + "\"");
-            page.setTitle("Special:WhatLinksHere&target=" + req_target);
             page.setTarget(req_target);
             result = getPagesLinkingTo(connection, req_target, namespace);
         }
