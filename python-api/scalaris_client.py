@@ -163,18 +163,8 @@ if __name__ == "__main__":
         except UnknownError as instance:
             print 'get_subscribers(' + topic + ') failed with unknown: ' + str(instance)
             sys.exit(1)
-    elif ((len(sys.argv) == 2 or len(sys.argv) >= 4) and sys.argv[1] in ["--minibench", "-b"]):
-        if (len(sys.argv) == 2):
-            scalaris_bench.minibench(100, xrange(1, 10, 1))
-        elif (len(sys.argv) >= 4):
-            testruns = int(sys.argv[2])
-            benchmarks = []
-            for i in xrange(3, min(12, len(sys.argv))):
-                if sys.argv[i] == 'all':
-                    benchmarks = xrange(1, 10, 1)
-                else:
-                    benchmarks.append(int(sys.argv[i]))
-            scalaris_bench.minibench(testruns, benchmarks)
+    elif (len(sys.argv) >= 2 and sys.argv[1] in ["--minibench", "-b"]):
+        scalaris_bench.run_from_cmd(sys.argv[:1] + sys.argv[2:])
     else:
         print 'usage: ' + sys.argv[0] + ' [Options]'
         print ' -r,--read <key>'

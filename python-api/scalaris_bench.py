@@ -748,26 +748,29 @@ def _printException():
     print str(mytype) + str(message)
     traceback.print_tb(trace)
 
-if __name__ == "__main__":
+def run_from_cmd(argv):
     nr_operations = 500
     threads_per_node = 10
     allBenchs = False
-    if (len(sys.argv) == 1):
+    if (len(argv) == 1):
         allBenchs = True
-    elif (len(sys.argv) == 2):
-        nr_operations = int(sys.argv[1])
-    elif (len(sys.argv) == 3):
-        nr_operations = int(sys.argv[1])
-        threads_per_node = int(sys.argv[2])
-    elif (len(sys.argv) >= 4):
-        nr_operations = int(sys.argv[1])
-        threads_per_node = int(sys.argv[2])
+    elif (len(argv) == 2):
+        nr_operations = int(argv[1])
+    elif (len(argv) == 3):
+        nr_operations = int(argv[1])
+        threads_per_node = int(argv[2])
+    elif (len(argv) >= 4):
+        nr_operations = int(argv[1])
+        threads_per_node = int(argv[2])
         benchmarks = []
-        for i in xrange(3, len(sys.argv)):
-            if sys.argv[i] == 'all':
+        for i in xrange(3, len(argv)):
+            if argv[i] == 'all':
                 allBenchs = True
             else:
-                benchmarks.append(int(sys.argv[i]))
+                benchmarks.append(int(argv[i]))
     if allBenchs:
         benchmarks = xrange(1, 19, 1)
     minibench(nr_operations, threads_per_node, benchmarks)
+
+if __name__ == "__main__":
+    run_from_cmd(sys.argv)
