@@ -108,15 +108,21 @@ public class Main {
             final HashSet<Integer> benchmarks = new HashSet<Integer>(10);
             boolean all = false;
             if (optionValues != null) {
-                checkArguments(optionValues, 3, options, "b");
-                nrOperations = Integer.parseInt(optionValues[0]);
-                threadsPerNode = Integer.parseInt(optionValues[1]);
-                for (int i = 2; i < Math.min(20, optionValues.length); ++i) {
-                    final String benchmarks_str = optionValues[i];
-                    if (benchmarks_str.equals("all")) {
-                        all = true;
-                    } else {
-                        benchmarks.add(Integer.parseInt(benchmarks_str));
+                checkArguments(optionValues, 0, options, "b");
+                if (optionValues.length >= 1) {
+                    nrOperations = Integer.parseInt(optionValues[0]);
+                }
+                if (optionValues.length >= 2) {
+                    threadsPerNode = Integer.parseInt(optionValues[1]);
+                }
+                if (optionValues.length >= 3) {
+                    for (int i = 2; i < Math.min(20, optionValues.length); ++i) {
+                        final String benchmarks_str = optionValues[i];
+                        if (benchmarks_str.equals("all")) {
+                            all = true;
+                        } else {
+                            benchmarks.add(Integer.parseInt(benchmarks_str));
+                        }
                     }
                 }
             } else {
