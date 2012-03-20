@@ -1,6 +1,10 @@
 @echo off
+SETLOCAL
+
+for %%x in (%cmdcmdline%) do if %%~x==/c set DOUBLECLICKED=1
+
 :: set path to erlang installation
-set ERLANG="C:\Program Files\erl5.8.5\bin"
+call "%~dp0"\bin\find_erlang.bat
 
 ::replace @EMAKEFILEDEFINES@ from Emakefile.in and write Emakefile
 ::(this is what autoconf on *nix would do)
@@ -25,18 +29,20 @@ set ERLANG="C:\Program Files\erl5.8.5\bin"
 :: refer to configure.ac for the appropriate checks for necessity
 :: Note: Search & Replace functionality from http://www.dostips.com
 if not exist Emakefile (
-	@echo Creating Emakefile...
-	for /f "tokens=1,* delims=&&&" %%a in (Emakefile.in) do (
-		set "line=%%a"
-		if defined line (
-			call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_ctline_support}, {d, have_cthooks_support}, {d, with_export_type_support}%%"
-			call set "line=%%line:@EMAKEFILECOMPILECOMPAT@=%%"
-			for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
-		) ELSE echo.
-	)
-	@echo ...done!
+    echo Creating Emakefile...
+    for /f "tokens=1,* delims=&&&" %%a in (Emakefile.in) do (
+        set "line=%%a"
+        if defined line (
+            call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_ctline_support}, {d, have_cthooks_support}, {d, with_export_type_support}%%"
+            call set "line=%%line:@EMAKEFILECOMPILECOMPAT@=%%"
+            for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
+        ) ELSE echo.
+    )
+    echo ...done!
 )
 
 @echo on
-%ERLANG%\erl -pa contrib\yaws -pa ebin -noinput +B -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
+%ERLANG_HOME%\bin\erl.exe -pa contrib\yaws -pa ebin -noinput +B -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
 @echo off
+
+if defined DOUBLECLICKED PAUSE
