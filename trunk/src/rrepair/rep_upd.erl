@@ -62,11 +62,16 @@
 -type message() ::
     {?TRIGGER_NAME} |
     {get_state, Sender::comm:mypid(), Key::atom()} |
+    % API
     {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
         rep_upd_recon:method(), rep_upd_recon:recon_struct()} |
     {request_resolve, Round::round(), rep_upd_resolve:operation(), rep_upd_resolve:options()} |
-    {recon_forked} | 
+    {recon_forked} |
+    % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
+    % rr statistics
+    {rr_stats, rr_statistics:requests()} |
+    % report
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
         Master::boolean(), Stats::ru_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
@@ -120,6 +125,13 @@ on({request_resolve, Round, Operation, Options}, State = #rep_upd_state{ open_re
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+on({rr_stats, Msg}, State) ->
+    {ok, Pid} = rr_statistics:start(),
+    comm:send_local(Pid, Msg),
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
     State#rep_upd_state{ open_recon = Recon + 1 };
 
@@ -137,9 +149,10 @@ on({resolve_progress_report, _Sender, _Stats}, State) ->
             State#rep_upd_state.open_recon, OpenResolve]),    
     State#rep_upd_state{ open_resolve = OpenResolve };
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Web Debug Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Misc Info Messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 on({web_debug_info, Requestor}, State) ->
     #rep_upd_state{ sync_round = Round, 
                     open_recon = OpenRecon, 

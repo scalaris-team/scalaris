@@ -24,8 +24,7 @@
          set_recon_method/1]).
 
 -export([test_upd/0,
-         test_regen/0,
-         test_man/0]). %TEST SETS
+         test_regen/0]). %TEST SETS
 
 -include("scalaris.hrl").
 
@@ -39,11 +38,21 @@
 -type db_parameter() :: {ftype, failure_type()} |
                         {fprob, 0..100} |            %failure probability
                         {distribution, db_generator:distribution()}.
+-record(db_status, {entries    = 0  :: non_neg_integer(),
+                    existing   = 0  :: non_neg_integer(),
+                    missing    = 0  :: non_neg_integer(),
+                    outdated   = 0  :: non_neg_integer()}).
+-type db_status() :: #db_status{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
 -define(ReplicationFactor, 4).
+
+-define(IIF(C, A, B), case C of
+                          true -> A;
+                          _ -> B
+                      end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Eval Quick Start
@@ -52,20 +61,16 @@
 -spec test_upd() -> ok.
 test_upd() ->
     make_ring(symmetric, 10),
-    fill_ring(random, 10000, []),
-    ok.
+    R = fill_ring(random, 1000, [{ftype, mixed}]),
+    print_db_status(R),
+    db_stats().
 
 -spec test_regen() -> ok.
 test_regen() ->
     make_ring(symmetric, 10),
-    fill_ring(random, 10000, [{ftype, regen}]),
+    R = fill_ring(random, 10000, [{ftype, regen}]),
+    print_db_status(R),
     start_sync(),
-    ok.
-
--spec test_man() -> ok.
-test_man() ->
-    make_ring(symmetric, 10),
-    fill_ring(random, 10000, [{ftype, regen}]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -91,7 +96,7 @@ make_ring(Type, Size) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
--spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> ok.
+-spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> db_status().
 fill_ring(Type, DBSize, Params) ->
     erlang:put(?DBSizeKey, ?ReplicationFactor * DBSize),
     case Type of
@@ -103,11 +108,10 @@ fill_random(DBSize, Params) ->
     Distr = proplists:get_value(distribution, Params, uniform),            
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
     Keys = db_generator:get_db(I, DBSize, Distr),    
-    insert_random_db(Keys, Params),
-    ok.
+    insert_random_db(Keys, Params).
 fill_wiki(DBSize, Params) ->
     %TODO
-    ok.
+    #db_status{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -138,11 +142,8 @@ start_sync() ->
 
 -spec db_stats() -> ok.
 db_stats() ->
-    DBSize = erlang:get(?DBSizeKey),
-    Ring = statistics:get_ring_details(),
-    Stored = statistics:get_total_load(Ring),
-    io:format("Replica Status~nStored/Dest/Missing~n~p/~p/~p~n", 
-              [Stored, DBSize, DBSize - Stored]),
+    S = get_db_status(),
+    print_db_status(S),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -175,61 +176,100 @@ set_recon_method(Method) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Inserts a list of keys replicated into the ring
--spec insert_random_db([?RT:key()], [db_parameter()]) -> ok.
+-spec insert_random_db([?RT:key()], [db_parameter()]) -> db_status().
 insert_random_db(Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
     FProb = proplists:get_value(fprob, Params, 50),    
-    lists:foreach(
-      fun(Key) ->
-              RepKeys = ?RT:get_replica_keys(Key),
-              %insert error?
-              EKey = case FProb >= randoms:rand_uniform(1, 100) of
-                         true -> util:randomelem(RepKeys);
-                         _ -> null
-                     end,
-              %insert regen error
-              {EType, WKeys} = case EKey =/= null of
-                                   true ->
-                                       EEType = case FType of 
-                                                    mixed -> 
-                                                        case randoms:rand_uniform(1, 2) of
-                                                            1 -> update;
-                                                            _ -> regen
-                                                        end;
-                                                    _ -> FType
-                                                end,
-                                       {EEType, 
-                                        case EEType of
-                                            regen -> [X || X <- RepKeys, X =/= EKey];
-                                            _ -> RepKeys
-                                        end};
-                                   _ -> {FType, RepKeys}
-                               end,
-              %write replica group
-              lists:foreach(
-                fun(RKey) ->
-                        DBEntry = db_entry:new(RKey, "2", 2),
-                        api_dht_raw:unreliable_lookup(RKey, 
-                                                      {set_key_entry, comm:this(), DBEntry}),
-                        receive {set_key_entry_reply, _} -> ok end
-                end,
-                WKeys),
-              %insert update error
-              if EType =:= update andalso EKey =/= null ->
-                     Msg = {set_key_entry, comm:this(), db_entry:new(EKey, "old", 1)},
-                     api_dht_raw:unreliable_lookup(EKey, Msg),
-                     receive {set_key_entry_reply, _} -> ok end;
-                 true -> ok
-              end     
-      end, 
-      Keys),
-    ok.
+    {I, M, O} = 
+        lists:foldl(
+          fun(Key, {Ins, Mis, Out}) ->
+                  RepKeys = ?RT:get_replica_keys(Key),
+                  %insert error?
+                  EKey = case FProb >= randoms:rand_uniform(1, 100) of
+                             true -> util:randomelem(RepKeys);
+                             _ -> null
+                         end,
+                  %insert regen error
+                  {EType, WKeys} = case EKey =/= null of
+                                       true ->
+                                           EEType = case FType of 
+                                                        mixed -> 
+                                                            case randoms:rand_uniform(1, 3) of
+                                                                1 -> update;
+                                                                _ -> regen
+                                                            end;
+                                                        _ -> FType
+                                                    end,
+                                           {EEType, 
+                                            case EEType of
+                                                regen -> [X || X <- RepKeys, X =/= EKey];
+                                                _ -> RepKeys
+                                            end};
+                                       _ -> {FType, RepKeys}
+                                   end,
+                  %write replica group
+                  lists:foreach(
+                    fun(RKey) ->
+                            DBEntry = db_entry:new(RKey, val, 2),
+                            api_dht_raw:unreliable_lookup(RKey, 
+                                                          {set_key_entry, comm:this(), DBEntry}),
+                            receive {set_key_entry_reply, _} -> ok end
+                    end,
+                    WKeys),
+                  %insert update error
+                  NewOut = if EType =:= update andalso EKey =/= null ->
+                                  Msg = {set_key_entry, comm:this(), db_entry:new(EKey, old, 1)},
+                                  api_dht_raw:unreliable_lookup(EKey, Msg),
+                                  receive {set_key_entry_reply, _} -> ok end,
+                                  Out + 1;
+                              true -> Out
+                           end,
+                  {Ins + length(WKeys), Mis + 4 - length(WKeys), NewOut}
+          end, 
+          {0, 0, 0}, Keys),
+    #db_status{ entries = length(Keys) * ?ReplicationFactor, 
+                existing = I, 
+                missing = M, 
+                outdated = O}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Analysis Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec print_db_status(db_status()) -> ok.
+print_db_status(#db_status{ entries = Items,
+                            existing = Inserted,
+                            missing = Missing,
+                            outdated = Outdated }) ->
+    io:format("Items=~p
+               Existing=~p
+               Missing=~p
+               Outdated=~p~n", 
+              [Items, Inserted, Missing, Outdated]),
+    ok.
 
+-spec get_db_status() -> db_status().
+get_db_status() ->
+    DBSize = erlang:get(?DBSizeKey),
+    Ring = statistics:get_ring_details(),
+    Stored = statistics:get_total_load(Ring),
+    #db_status{ entries = DBSize,
+                existing = Stored,
+                missing = DBSize - Stored,
+                outdated = count_outdated()
+              }.
+
+-spec count_outdated() -> non_neg_integer().
+count_outdated() ->
+    Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
+    lists:foldl(
+      fun(Node, Acc) -> 
+              comm:send(Node, {send_to_group_member, rep_upd, Req}),
+              receive
+                  {count_old_replicas_reply, O} -> Acc + O
+              end
+      end, 
+      0, get_node_list()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
