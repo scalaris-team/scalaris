@@ -8,14 +8,14 @@
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
+<% String pageTitleWithPars = pageBean.titleWithParameters(); %>
+<% String safePageTitleWithPars = URLEncoder.encode(pageTitleWithPars, "UTF-8"); %>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
 <% } %>-->
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="Content-Style-Type" content="text/css" />
-<link rel="alternate" type="application/x-wiki" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
-<link rel="edit" title="change this page" href="wiki?title=<%= safePageTitle %>&amp;action=edit">
 <% /* 
 <meta name="generator" content="MediaWiki 1.17wmf1" />
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
@@ -74,7 +74,7 @@ ${ pageBean.page }
                     <td>
                       <div class="namespaceoptions">
                         <form method="get" action="wiki">
-                          <input type="hidden" value="<%= safePageTitle %>" name="title" />
+                          <input type="hidden" value="${ pageBean.title }" name="title" />
                           <fieldset>
                             <legend>${ pageBean.formTitle }</legend>
                             <table id="nsselect" class="allpages">
@@ -109,7 +109,7 @@ ${ pageBean.page }
                                 <td class='mw-input'>
                                   <select id="namespace" name="namespace" class="namespaceselector">
                       <% for (int i = 0; i <= 15; ++i) {
-                          String namespace = (i == 0) ? "(Main)" : pageBean.getWikiNamespace().getNamespaceByNumber(i);
+                          String namespace = (i == 0) ? "Article" : pageBean.getWikiNamespace().getNamespaceByNumber(i);
                           String selected = (pageBean.getNamespaceId() == i) ? " selected=\"selected\"" : "";
                       %>
                                     <option value="<%= i %>"<%= selected %>><%= namespace %></option>
@@ -171,7 +171,7 @@ ${ pageBean.page }
                 <hr />
 <% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p> */ %>
                 <div class="printfooter">
-                Retrieved from "<a href="wiki?title=<%= safePageTitle %>">wiki?title=${ pageBean.title }</a>"</div>
+                Retrieved from "<a href="wiki?title=<%= pageTitleWithPars %>">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
 <% if (req_render == null || !req_render.equals("0")) { %>
                 <!-- catlinks -->
@@ -190,7 +190,7 @@ ${ pageBean.page }
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=<%= safePageTitle %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Special:UserLogin&amp;returnto=<%= safePageTitleWithPars %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -201,7 +201,7 @@ ${ pageBean.page }
 <div id="p-namespaces" class="vectorTabs">
     <h5>Namespaces</h5>
     <ul>
-                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= safePageTitle %>" >Special page</a></span></li>
+                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= pageTitleWithPars %>" >Special page</a></span></li>
     </ul>
 </div>
 
