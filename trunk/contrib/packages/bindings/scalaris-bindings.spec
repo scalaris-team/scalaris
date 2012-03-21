@@ -13,8 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-# will be re-defined for supported distros
-%define with_ruby 0
+BuildRequires:  ruby >= 1.8
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -22,24 +21,20 @@ BuildRequires:  java-devel >= 1.6.0
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 BuildRequires:  pkgconfig
+BuildRequires:  ruby(abi) >= 1.8
 %if 0%{?fedora_version} >= 12
 %define with_python 1
 %define with_python_doc_html 1
 %define with_python_doc_pdf 0
-%define with_ruby 1
 %endif
 %if 0%{?rhel_version} >= 600
 %define with_python 1
 %define with_python_doc_html 0
 %define with_python_doc_pdf 0
-%define with_ruby 1
 %endif
 %if 0%{?fedora_version} >= 13
 %define with_python3 1
 BuildRequires:  python3-setuptools python-tools
-%endif
-%if 0%{?with_ruby}
-BuildRequires:  ruby(abi) >= 1.8
 %endif
 %endif
 
@@ -53,7 +48,6 @@ BuildRequires:  pkgconfig
 %define with_python 1
 %define with_python_doc_html 0
 %define with_python_doc_pdf 0
-%define with_ruby 1
 %endif
 
 ###########################################################################################
@@ -84,11 +78,12 @@ BuildRequires:  pkg-config
 %if 0%{?suse_version} > 1210
 BuildRequires:  python3-2to3
 %endif
-%if 0%{?suse_version} >= 1130
-%define with_ruby 1
+%if 0%{?suse_version} >= 1130 
 BuildRequires:  ruby(abi) >= 1.8
 %endif
 %endif
+
+%{!?rb_sitelib: %global rb_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
 
 %if 0%{?with_python}
 %if 0%{?with_python_doc_html}
@@ -104,11 +99,6 @@ BuildRequires:  python-devel >= 2.6
 %if 0%{?with_python3}
 BuildRequires:  python3-devel
 %{!?python3_sitelib: %global python3_sitelib %(python3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())')}
-%endif
-
-%if 0%{?with_ruby}
-BuildRequires:  ruby >= 1.8
-%{!?rb_sitelib: %global rb_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
 %endif
 
 %description
@@ -131,7 +121,6 @@ BuildArch:  noarch
 %description -n scalaris-java
 Java Bindings and command line client for scalaris
 
-%if 0%{?with_ruby}
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
@@ -145,7 +134,6 @@ Requires:   rubygem-json >= 1.4.0
 
 %description -n ruby-scalaris
 Ruby bindings and Ruby command line client for scalaris
-%endif
 
 %if 0%{?with_python}
 %package -n python-scalaris
@@ -198,10 +186,7 @@ Python3 bindings and Python3 command line client for scalaris
 %if 0%{?with_python3}
     --with-python3-sitelibdir=%{python3_sitelib} \
 %endif
-%if 0%{?with_ruby}
-    --with-ruby-sitelibdir=%{rb_sitelib} \
-%endif
-    
+    --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
 %if 0%{?with_python}
@@ -217,9 +202,7 @@ export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
 make install-java DESTDIR=$RPM_BUILD_ROOT
 make install-java-doc DESTDIR=$RPM_BUILD_ROOT
-%if 0%{?with_ruby}
 make install-ruby DESTDIR=$RPM_BUILD_ROOT
-%endif
 %if 0%{?with_python}
 make install-python DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_python_doc_html}
@@ -247,12 +230,10 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
 
-%if 0%{?with_ruby}
 %files -n ruby-scalaris
 %defattr(-,root,root)
 %{_bindir}/scalaris-ruby
 %{rb_sitelib}/scalaris.rb
-%endif
 
 %if 0%{?with_python}
 %files -n python-scalaris
