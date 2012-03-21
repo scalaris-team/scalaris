@@ -1,0 +1,3 @@
+addFilter("non-standard-uid")
+addFilter("file-contains-current-date.*/usr/share/doc/packages/scalaris/erlang/.*\.html")
+addFilter("file-contains-date-and-time.*/usr/share/doc/packages/scalaris/erlang/.*\.html")

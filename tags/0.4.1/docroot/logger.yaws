@@ -1,0 +1,132 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body>
+
+    <div class="menubar">
+      <div class="nothighlighted">
+        <h2>Scalaris</h2>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="index.yaws">Home</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+      
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, ""};
+        _ ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>
+"}
+    end.
+</erl>
+
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="documentation.yaws">Docu</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
+      <div class="highlightedlast">
+        <a class="menua" href="logger.yaws">Message Stats</a>
+      </div>
+    </div><div class="middle">
+      <div class="middleleft">
+<h2>Message Statistics</h2>
+
+<erl>
+make_table([], _Map, Start, TotalBytes, TotalCount) ->
+    [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
+       [
+         {td, [], {p, [], "Total"}}, 
+         {td, [], {p, [], io_lib:format("~p", [TotalBytes])}}, 
+         {td, [], {p, [], io_lib:format("~p", [TotalCount])}}, 
+         {td, [], {p, [], io_lib:format("~p", [TotalBytes / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
+         {td, [], {p, [], io_lib:format("~p", [TotalCount / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
+         {td, [], {p, [], io_lib:format("~p", [TotalBytes / TotalCount])}}, 
+         {td, [], {p, [], "100.0"}}, 
+         {td, [], {p, [], "100.0"}}
+       ] }
+];
+make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
+    {Size, Count} = gb_trees:get(Tag, Map),
+    [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
+       [
+         {td, [], {p, [], io_lib:format("~p", [Tag])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Size])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Count])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Count / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
+         {td, [], {p, [], io_lib:format("~p", [Size / Count])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Size / TotalBytes * 100.0])}}, 
+         {td, [], {p, [], io_lib:format("~p", [Count / TotalCount * 100.0])}}
+       ] }
+       | make_table(Rest, Map, Start, TotalBytes, TotalCount)].
+
+get_totals(none, TotalBytes, TotalCount) ->
+    {TotalBytes, TotalCount};
+get_totals({_Tag, {Size, Count}, Iterator}, TotalBytes, TotalCount) ->
+    get_totals(gb_trees:next(Iterator), Size + TotalBytes, Count + TotalCount).
+
+get_tags(none) ->
+    [];
+get_tags({Tag, {Size, _Count}, Iterator}) ->
+    [{Tag, Size} | get_tags(gb_trees:next(Iterator))].
+
+out(Arg) ->
+    {Map, Start} = comm_logger:dump(),
+    case gb_trees:size(Map) of
+      0 ->
+        {ehtml, {p, [], "No messages logged. Enable logging in include/scalaris.hrl (LOG_MESSAGE macro)."}};
+      _ ->
+        SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
+        {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
+        TableHead = {tr, [{bgcolor, '#000099'}], 
+          [
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Message Tag"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Size"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Count"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Byte/s"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average 1/s"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Message Size"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
+            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
+          ]},
+        {ehtml, {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}}
+    end.
+</erl>
+
+</div>
+<div class="bottom">
+</div>
+</body>
+</html>
