@@ -755,7 +755,7 @@ public class ScalarisDataHandler {
         try {
             oldPage = results.processReadAt(0).jsonValue(Page.class);
             newPage = new Page(oldPage.getTitle(),
-                    oldPage.getId(), oldPage.isRedirect(),
+                    oldPage.getId() + 1, oldPage.isRedirect(),
                     new LinkedHashMap<String, String>(
                             oldPage.getRestrictions()), newRev);
             oldRevId = oldPage.getCurRev().getId();
@@ -764,6 +764,7 @@ public class ScalarisDataHandler {
             newPage = new Page();
             newPage.setTitle(title0);
             newPage.setCurRev(newRev);
+            newPage.setId(newRev.getId());
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
                     "unknown exception reading \"" + pageInfoKey

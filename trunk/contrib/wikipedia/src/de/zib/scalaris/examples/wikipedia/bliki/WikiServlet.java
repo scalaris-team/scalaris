@@ -1433,7 +1433,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             Contributor contributor = new Contributor();
             contributor.setIp(request.getRemoteAddr());
             String timestamp = Revision.calendarToString(Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            int newRevId = (oldVersion == -1) ? 1 : oldVersion + 1;
+            int newRevId = (oldVersion < 0) ? 1 : oldVersion + 1;
             Revision newRev = new Revision(newRevId, timestamp, minorChange, contributor, summary);
             newRev.setUnpackedText(content);
 
