@@ -13,7 +13,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %%%-------------------------------------------------------------------
-%%% File    rep_upd_SUITE.erl
+%%% File    rrepair_SUITE.erl
 %%% @author Maik Lange <malange@informatik.hu-berlin.de
 %%% @doc    Tests for rep update module.
 %%% @end
@@ -21,7 +21,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id $
 
--module(rep_upd_SUITE).
+-module(rrepair_SUITE).
 
 -author('malange@informatik.hu-berlin.de').
 
@@ -89,7 +89,7 @@ end_per_testcase(_TestCase, _Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_rep_upd_config(Method) ->
-    [{rep_update_activate, true},
+    [{rrepair_enabled, true},
      {rep_update_interval, 100000000}, %stop trigger
      {rep_update_trigger, trigger_periodic},
      {rep_update_recon_method, Method},
@@ -163,24 +163,21 @@ upd_fpr_compare(Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 get_symmetric_keys_test(Config) ->
-    Config2 = unittest_helper:start_minimal_procs(Config, [], true),
+    Conf2 = unittest_helper:start_minimal_procs(Config, [], true),
     ToTest = lists:sort(get_symmetric_keys(4)),
     ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
-    unittest_helper:stop_minimal_procs(Config2),
-    ct:pal("GeneratedKeys = ~w~nRT-GetReplicaKeys = ~w", [ToTest, ToBe]),
-    ?equals(ToTest, ToBe),
+    unittest_helper:stop_minimal_procs(Conf2),
+    ?equals_w_note(ToTest, ToBe, 
+                   io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
     ok.
 
 blobCoding(_) ->
     A = 180000001,
     B = 4,
-    Coded = rep_upd_recon:encodeBlob(A, B),
-    {DA, DB} = rep_upd_recon:decodeBlob(Coded),
-    ct:pal("A=~p ; B=~p 
-            Coded=[~p] 
-            decoded A=[~p] B=[~p]", [A, B, Coded, DA, DB]),
-    ?equals(A, DA),
-    ?equals(B, DB),
+    Coded = rr_recon:encodeBlob(A, B),
+    {DA, DB} = rr_recon:decodeBlob(Coded),
+    ?equals_w_note(A, DA, io_lib:format("A=~p ; Coded=~p ; DecodedA=~p", [A, Coded, DA])),
+    ?equals_w_note(B, DB, io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])),
     ok.
 
 mapInterval(_) ->
@@ -188,9 +185,9 @@ mapInterval(_) ->
     I = intervals:new('[', K, ?MINUS_INFINITY ,']'),
     ct:pal("I1=~p", [I]),
     lists:foreach(fun(X) -> 
-                          MappedI = rep_upd_recon:mapInterval(I, X),
+                          MappedI = rr_recon:mapInterval(I, X),
                           ?equals(intervals:is_empty(intervals:intersection(I, MappedI)),true),
-                          ?equals(rep_upd_recon:get_interval_quadrant(MappedI), X)
+                          ?equals(rr_recon:get_interval_quadrant(MappedI), X)
                   end, 
                   [1,2,3]),
     ok.
@@ -201,7 +198,7 @@ prop_minKeyInInterval(LeftI, RightI) ->
     I = intervals:new('[', LeftI, RightI, ']'),    
     Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
     AnyK = util:randomelem(Keys),
-    MinLeft = rep_upd_recon:minKeyInInterval(AnyK, I),
+    MinLeft = rr_recon:minKeyInInterval(AnyK, I),
     ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
     ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
 
@@ -351,7 +348,7 @@ fill_symmetric_ring(DataCount, NodeCount, OutdatedProbability) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 startSyncRound(NodeKeys) ->
     lists:foreach(fun(X) ->
-                          api_dht_raw:unreliable_lookup(X, {send_to_group_member, rep_upd, {rep_update_trigger}})
+                          api_dht_raw:unreliable_lookup(X, {send_to_group_member, rrepair, {rr_trigger}})
                   end, 
                   NodeKeys),
     ok.
@@ -362,7 +359,7 @@ waitForSyncRoundEnd(NodeKeys) ->
               util:wait_for(
                 fun() -> 
                         api_dht_raw:unreliable_lookup(Node, 
-                                                      {send_to_group_member, rep_upd, 
+                                                      {send_to_group_member, rrepair, 
                                                        {get_state, comm:this(), open_sync}}),
                         receive
                             {get_state_response, Val} -> Val =:= 0

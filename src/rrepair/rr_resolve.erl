@@ -27,7 +27,7 @@
 %% @end
 %% @version $Id$
 
--module(rep_upd_resolve).
+-module(rr_resolve).
 
 -behaviour(gen_component).
 
@@ -37,11 +37,9 @@
 -export([init/1, on/2, start/3]).
 -export([print_resolve_stats/1]).
 
-
--ifdef(with_export_type_support).
--export_type([operation/0, options/0]).
--export_type([stats/0]).
--endif.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% debug
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -54,6 +52,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-ifdef(with_export_type_support).
+-export_type([operation/0, options/0]).
+-export_type([stats/0]).
+-endif.
 
 -type option()   :: feedback_response |
                     {feedback, comm:mypid()} | 
@@ -64,7 +66,7 @@
 
 -record(resolve_stats,
         {
-         round            = {0, 0} :: rep_upd:round(),
+         round            = {0, 0} :: rrepair:round(),
          diff_size        = 0      :: non_neg_integer(),
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
@@ -78,24 +80,23 @@
     {key_upd, ?DB:kvv_list()} |
     {key_sync, DestPid::comm:mypid(), [?RT:key()]}.
 
--record(ru_resolve_state,
+-record(rr_resolve_state,
         {
-         ownerLocalPid  = ?required(ru_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
-         ownerRemotePid = ?required(ru_resolve_state, ownerRemotePid)   :: comm:mypid(),         
-         dhtNodePid     = ?required(ru_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
-         operation      = ?required(ru_resolve_state, operation)        :: operation(),
+         ownerLocalPid  = ?required(rr_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
+         ownerRemotePid = ?required(rr_resolve_state, ownerRemotePid)   :: comm:mypid(),         
+         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
+         operation      = ?required(rr_resolve_state, operation)        :: operation(),
          stats          = #resolve_stats{}                              :: stats(),
          feedback       = {nil, []}                                     :: feedback(),
          feedback_resp  = false                                         :: boolean(),
          send_stats     = nil                                           :: nil | comm:mypid() 
          }).
--type state() :: #ru_resolve_state{}.
+-type state() :: #rr_resolve_state{}.
 
 -type message() ::
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {shutdown, {atom(), stats()}}.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -103,7 +104,7 @@
 -spec on(message(), state()) -> state().
 
 on({get_state_response, MyI}, State = 
-       #ru_resolve_state{ operation = {key_upd, KvvList},
+       #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtNodePid,
                           stats = Stats
                           }) ->
@@ -123,10 +124,10 @@ on({get_state_response, MyI}, State =
     ?TRACE("DetailSync START ToDo=~p", [ToUpdate]),
     ToUpdate =:= 0 andalso
         comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
-    State#ru_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
+    State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
-       #ru_resolve_state{ operation = {key_sync, _, KeyList},
+       #rr_resolve_state{ operation = {key_sync, _, KeyList},
                           dhtNodePid = DhtNodePid }) ->    
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
@@ -136,7 +137,7 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_entries_response, Entries}, State =
-       #ru_resolve_state{ operation = {key_sync, Dest, _},
+       #rr_resolve_state{ operation = {key_sync, Dest, _},
                           ownerRemotePid = MyNodePid,
                           stats = Stats }) ->
     ?TRACE("START GET ENTRIES - KEY SYNC", []),
@@ -151,7 +152,7 @@ on({get_entries_response, Entries}, State =
     State;
 
 on({update_key_entry_ack, Entry, Exists, Done}, State =
-       #ru_resolve_state{ operation = {key_upd, _},
+       #rr_resolve_state{ operation = {key_upd, _},
                           stats = #resolve_stats{ diff_size = Diff,
                                                   regen_count = RegenOk,
                                                   update_count = UpdOk, 
@@ -180,9 +181,9 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                 comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
         true -> ok
     end,
-    State#ru_resolve_state{ stats = NewStats, feedback = NewFB };
+    State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
-on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,   
+on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,   
                                      send_stats = SendStats,                                 
                                      stats = Stats } = State) ->
     NStats = build_comment(State, Stats),
@@ -194,7 +195,7 @@ on({shutdown, _}, #ru_resolve_state{ ownerLocalPid = Owner,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-build_comment(#ru_resolve_state{ operation = Operation,
+build_comment(#rr_resolve_state{ operation = Operation,
                                  feedback = {FBDest, _},
                                  feedback_resp = Resp 
                                }, Stats) ->
@@ -210,7 +211,7 @@ build_comment(#ru_resolve_state{ operation = Operation,
               end,
     Stats#resolve_stats{ comment = Comment }.
 
--spec send_feedback(feedback(), rep_upd:round()) -> ok.
+-spec send_feedback(feedback(), rrepair:round()) -> ok.
 send_feedback({nil, _}, _) -> ok;
 send_feedback({_, []}, _) -> ok;
 send_feedback({Dest, Items}, Round) ->
@@ -237,13 +238,13 @@ print_resolve_stats(Stats) ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
-    comm:send_local(State#ru_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec start(Round, Operation, Options) -> {ok, MyPid} when
-      is_subtype(Round,     rep_upd:round()),                                                        
+      is_subtype(Round,     rrepair:round()),                                                        
       is_subtype(Operation, operation()),
       is_subtype(Options,   options()),
       is_subtype(MyPid,     pid()).
@@ -251,7 +252,7 @@ start(Round, Operation, Options) ->
     FBDest = proplists:get_value(feedback, Options, nil),
     FBResp = proplists:get_value(feedback_response, Options, false),
     StatsDest = proplists:get_value(send_stats, Options, nil),
-    State = #ru_resolve_state{ ownerLocalPid = self(), 
+    State = #rr_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),
                                operation = Operation,
