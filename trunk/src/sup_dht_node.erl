@@ -80,11 +80,11 @@ init({DHTNodeGroup, Options}) ->
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     MonitorPerf =
         util:sup_worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
-    RepUpdate = case config:read(rep_update_activate) of
-                    true -> util:sup_worker_desc(rep_upd, rep_upd,
-                                                 start_link, [DHTNodeGroup]);
-                    _ -> []
-                end,
+    RepUpdate = 
+        case config:read(rrepair_enabled) of
+            true -> util:sup_worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
+            _ -> []
+        end,
     %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
           lists:flatten([

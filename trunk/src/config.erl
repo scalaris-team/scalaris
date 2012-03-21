@@ -212,7 +212,7 @@ check_config() ->
                          fun monitor:check_config/0,
                          fun monitor_perf:check_config/0,
                          fun rrd:check_config/0,
-                         fun rep_upd:check_config/0,
+                         fun rrepair:check_config/0,
                          fun sup_yaws:check_config/0 ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
 

@@ -13,14 +13,14 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica update module 
+%% @doc    replica repair module 
 %%         Replica sets will be synchronized in two steps.
 %%          I) reconciliation - find set differences  (rep_upd_recon.erl)
 %%         II) resolution - resolve found differences (rep_upd_resolve.erl)
 %% @end
 %% @version $Id$
 
--module(rep_upd).
+-module(rrepair).
 
 -behaviour(gen_component).
 
@@ -29,17 +29,23 @@
 
 -export([start_link/1, init/1, on/2, check_config/0]).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% debug
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE_RECON(X,Y), ok).
--define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+
+-define(TRACE_RECON(X,Y), ok).
+%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+
 -define(TRACE_RESOLVE(X,Y), ok).
 %-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--define(TRIGGER_NAME, rep_update_trigger).
+-define(TRIGGER_NAME, rr_trigger).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -50,22 +56,22 @@
 
 -type round() :: {non_neg_integer(), non_neg_integer()}.
 
--record(rep_upd_state,
+-record(rrepair_state,
         {
-         trigger_state  = ?required(rep_upd_state, trigger_state)   :: trigger:state(),
+         trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state(),
          sync_round     = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer()
          }).
--type state() :: #rep_upd_state{}.
+-type state() :: #rrepair_state{}.
 
 -type message() ::
     {?TRIGGER_NAME} |
     {get_state, Sender::comm:mypid(), Key::atom()} |
     % API
-    {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rep_upd_recon:recon_stage(), 
-        rep_upd_recon:method(), rep_upd_recon:recon_struct()} |
-    {request_resolve, Round::round(), rep_upd_resolve:operation(), rep_upd_resolve:options()} |
+    {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rr_recon:recon_stage(), 
+        rr_recon:method(), rr_recon:recon_struct()} |
+    {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -73,9 +79,9 @@
     {rr_stats, rr_statistics:requests()} |
     % report
     {recon_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
-        Master::boolean(), Stats::ru_recon_stats:stats()} |
+        Master::boolean(), Stats::rr_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
-        Stats::rep_upd_resolve:stats()}.
+        Stats::rr_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -84,7 +90,7 @@
 -spec on(message(), state()) -> state().
 
 on({get_state, Sender, Key}, State = 
-       #rep_upd_state{ open_recon = Recon,
+       #rrepair_state{ open_recon = Recon,
                        open_resolve = Resolve,
                        sync_round = Round }) ->
     ?TRACE_KILL("GET STATE - Recon=~p  - Resolve=~p", [Recon, Resolve]),
@@ -97,31 +103,31 @@ on({get_state, Sender, Key}, State =
     comm:send(Sender, {get_state_response, Value}),
     State;
 
-on({?TRIGGER_NAME}, State = #rep_upd_state{ sync_round = Round,
+on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round,
                                             open_recon = OpenRecon }) ->
-    {ok, Pid} = rep_upd_recon:start(Round, undefined),
+    {ok, Pid} = rr_recon:start(Round, undefined),
     RStage = case get_recon_method() of
                  bloom -> build_struct;
                  merkle_tree -> req_shared_interval;        
                  art -> req_shared_interval
              end,
     comm:send_local(Pid, {start_recon, get_recon_method(), RStage, {}, true}),
-    NewTriggerState = trigger:next(State#rep_upd_state.trigger_state),
+    NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
     {R, F} = Round,
-    State#rep_upd_state{ trigger_state = NewTriggerState, 
+    State#rrepair_state{ trigger_state = NewTriggerState, 
                          sync_round = {R + 1, F},
                          open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
-   State = #rep_upd_state{ open_recon = OpenRecon }) ->
-    {ok, Pid} = rep_upd_recon:start(Round, Sender),
+   State = #rrepair_state{ open_recon = OpenRecon }) ->
+    {ok, Pid} = rr_recon:start(Round, Sender),
     comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
-    State#rep_upd_state{ open_recon = OpenRecon + 1 };
+    State#rrepair_state{ open_recon = OpenRecon + 1 };
 
-on({request_resolve, Round, Operation, Options}, State = #rep_upd_state{ open_resolve = OpenResolve }) ->
-    _ = rep_upd_resolve:start(Round, Operation, Options),
-    State#rep_upd_state{ open_resolve = OpenResolve + 1 };
+on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+    _ = rr_resolve:start(Round, Operation, Options),
+    State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -132,29 +138,29 @@ on({rr_stats, Msg}, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({recon_forked}, State = #rep_upd_state{ open_recon = Recon }) ->
-    State#rep_upd_state{ open_recon = Recon + 1 };
+on({recon_forked}, State = #rrepair_state{ open_recon = Recon }) ->
+    State#rrepair_state{ open_recon = Recon + 1 };
 
 on({recon_progress_report, _Sender, _Round, _Master, Stats}, State) ->
-    OpenRecon = State#rep_upd_state.open_recon - 1,
-    ru_recon_stats:get(finish, Stats) andalso
+    OpenRecon = State#rrepair_state.open_recon - 1,
+    rr_recon_stats:get(finish, Stats) andalso
         ?TRACE_RECON("~nRECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
-                     [_Round, _Sender, _Master, ru_recon_stats:print(Stats), OpenRecon]),
-    State#rep_upd_state{ open_recon = OpenRecon };
+                     [_Round, _Sender, _Master, rr_recon_stats:print(Stats), OpenRecon]),
+    State#rrepair_state{ open_recon = OpenRecon };
 
 on({resolve_progress_report, _Sender, _Stats}, State) ->
-    OpenResolve = State#rep_upd_state.open_resolve - 1,
+    OpenResolve = State#rrepair_state.open_resolve - 1,
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
-           [_Sender, rep_upd_resolve:print_resolve_stats(_Stats),
-            State#rep_upd_state.open_recon, OpenResolve]),    
-    State#rep_upd_state{ open_resolve = OpenResolve };
+           [_Sender, rr_resolve:print_resolve_stats(_Stats),
+            State#rrepair_state.open_recon, OpenResolve]),    
+    State#rrepair_state{ open_resolve = OpenResolve };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc Info Messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({web_debug_info, Requestor}, State) ->
-    #rep_upd_state{ sync_round = Round, 
+    #rrepair_state{ sync_round = Round, 
                     open_recon = OpenRecon, 
                     open_resolve = OpenResol } = State,
     KeyValueList =
@@ -187,7 +193,7 @@ init(Trigger) ->
     monitor:proc_set_value(?MODULE, 'Recv-Sync-Req-Count', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
     monitor:proc_set_value(?MODULE, 'Send-Sync-Req', rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
     monitor:proc_set_value(?MODULE, 'Progress', rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
-    #rep_upd_state{trigger_state = trigger:next(TriggerState)}.
+    #rrepair_state{trigger_state = trigger:next(TriggerState)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
@@ -196,7 +202,7 @@ init(Trigger) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    case config:read(rep_update_activate) of
+    case config:read(rrepair_enabled) of
         true ->
             config:cfg_is_module(rep_update_trigger) andalso
             config:cfg_is_atom(rep_update_recon_method) andalso
@@ -205,7 +211,7 @@ check_config() ->
         _ -> true
     end.
 
--spec get_recon_method() -> rep_upd_recon:method().
+-spec get_recon_method() -> rr_recon:method().
 get_recon_method() -> 
 	config:read(rep_update_recon_method).
 

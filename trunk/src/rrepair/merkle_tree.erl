@@ -432,7 +432,7 @@ key_in_I(Key, Intervals) ->
 p_key_in_I(Key, Left, {Interval, C, L}) ->
     lists:append([Left, [{Interval, C+1, [Key | L]}]]);
 p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
-    CheckKey = case rep_upd_recon:decodeBlob(Key) of
+    CheckKey = case rr_recon:decodeBlob(Key) of
                    {K, _} -> K;
                    _ -> Key
                end,

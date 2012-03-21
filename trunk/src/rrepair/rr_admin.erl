@@ -61,7 +61,7 @@
 -spec test_upd() -> ok.
 test_upd() ->
     make_ring(symmetric, 10),
-    R = fill_ring(random, 1000, [{ftype, mixed}]),
+    R = fill_ring(random, 10000, [{ftype, mixed}]),
     print_db_status(R),
     db_stats().
 
@@ -118,7 +118,7 @@ fill_wiki(DBSize, Params) ->
 -spec start_sync() -> ok.
 start_sync() ->
     Nodes = get_node_list(),
-    io:format("NodeS=~p", [Nodes]),
+    io:format("--> START SYNC - ~p~n", [config:read(rep_update_recon_method)]),
     %start
     lists:foreach(fun(Node) ->
                           comm:send(Node, {send_to_group_member, rep_upd, {rep_update_trigger}})
@@ -148,9 +148,9 @@ db_stats() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec set_recon_method(rep_upd_recon:method()) -> ok | {error, term()}.
+-spec set_recon_method(rr_recon:method()) -> ok | {error, term()}.
 set_recon_method(Method) ->
-    config:write(rep_update_activate, true),
+    config:write(rrepair_enabled, true),
     config:write(rep_update_interval, 100000000),
     config:write(rep_update_trigger, trigger_periodic),
     config:write(rep_update_recon_method, Method),
@@ -264,7 +264,7 @@ count_outdated() ->
     Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
     lists:foldl(
       fun(Node, Acc) -> 
-              comm:send(Node, {send_to_group_member, rep_upd, Req}),
+              comm:send(Node, {send_to_group_member, rrepair, Req}),
               receive
                   {count_old_replicas_reply, O} -> Acc + O
               end
