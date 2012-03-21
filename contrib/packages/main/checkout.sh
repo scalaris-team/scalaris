@@ -1,9 +1,11 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.4.1+svn"
+SCALARIS_VERSION="0.4.1"
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+pkg_version=${1:-"$SCALARIS_VERSION"}
+branchversion=${2:-"0.4"}
+url="http://scalaris.googlecode.com/svn/branches/${branchversion}"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
@@ -18,16 +20,6 @@ else
   echo "update ${url} -> ${folder} ..."
   svn update ${folder}
   result=$?
-fi
-
-if [ ${result} -eq 0 ]; then
-  echo -n "get svn revision ..."
-  revision=`svn info ${folder} --xml | grep revision | cut -d '"' -f 2 | head -n 1`
-  result=$?
-  echo " ${revision}"
-  # not safe in other languages than English:
-  # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-  pkg_version="${SCALARIS_VERSION}${revision}"
 fi
 
 if [ ${result} -eq 0 ]; then

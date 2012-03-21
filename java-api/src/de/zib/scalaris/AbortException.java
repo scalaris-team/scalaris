@@ -15,17 +15,15 @@
  */
 package de.zib.scalaris;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.ericsson.otp.erlang.OtpErlangException;
+import com.ericsson.otp.erlang.OtpErlangObject;
 
 /**
- * Exception that is thrown if a the commit of a transaction on a
+ * Exception that is thrown if a the commit of a write operation on a
  * scalaris ring fails.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.12
+ * @version 2.5
  * @since 2.5
  */
 public class AbortException extends OtpErlangException {
@@ -35,19 +33,9 @@ public class AbortException extends OtpErlangException {
     private static final long serialVersionUID = 1L;
 
     /**
-     * List of keys responsible for the abort.
-     */
-    private final List<String> failedKeys;
-
-    /**
      * Creates the exception with no message.
-     *
-     * @deprecated abort failures always come with a list of responsible keys,
-     *             use {@link #AbortException(List)} instead
      */
-    @Deprecated
     public AbortException() {
-        this.failedKeys = new ArrayList<String>(0);
     }
 
     /**
@@ -55,57 +43,29 @@ public class AbortException extends OtpErlangException {
      *
      * @param msg
      *            message of the exception
-     *
-     * @deprecated abort failures always come with a list of responsible keys,
-     *             use {@link #AbortException(String, List)} instead
      */
-    @Deprecated
     public AbortException(final String msg) {
         super(msg);
-        this.failedKeys = new ArrayList<String>(0);
     }
 
     /**
      * Creates an exception taking the message of the given throwable.
      *
      * @param e the exception to "re-throw"
-     *
-     * @deprecated abort failures always come with a list of responsible keys,
-     *             use {@link #AbortException(Throwable, List)} instead
      */
-    @Deprecated
     public AbortException(final Throwable e) {
         super(e.getMessage());
         setStackTrace(e.getStackTrace());
-        this.failedKeys = new ArrayList<String>(0);
     }
 
     /**
      * Creates an exception including the message of the given erlang object.
      *
-     * @param responsibleKeys
-     *            list of keys responsible for the abort
-     *
-     * @since 3.12
+     * @param erlValue
+     *            the erlang message to include
      */
-    public AbortException(final List<String> responsibleKeys) {
-        super("Erlang message: {fail, abort, " + responsibleKeys.toString() + "}");
-        this.failedKeys = responsibleKeys;
-    }
-
-    /**
-     * Creates the exception with the given message.
-     *
-     * @param msg
-     *            message of the exception
-     * @param responsibleKeys
-     *            list of keys responsible for the abort
-     *
-     * @since 3.12
-     */
-    public AbortException(final String msg, final List<String> responsibleKeys) {
-        super(msg);
-        this.failedKeys = new ArrayList<String>(0);
+    public AbortException(final OtpErlangObject erlValue) {
+        super("Erlang message: " + erlValue.toString());
     }
 
     /**
@@ -113,21 +73,12 @@ public class AbortException extends OtpErlangException {
      *
      * @param e
      *            the exception to "re-throw"
-     * @param responsibleKeys
-     *            list of keys responsible for the abort
-     *
-     * @since 3.12
+     * @param erlValue
+     *            the string representation of this erlang value is included
+     *            into the message
      */
-    public AbortException(final Throwable e, final List<String> responsibleKeys) {
-        super(e.getMessage() + ",\n  Erlang message: {fail, abort, " + responsibleKeys.toString() + "}");
+    public AbortException(final Throwable e, final OtpErlangObject erlValue) {
+        super(e.getMessage() + ",\n  Erlang message: " + erlValue.toString());
         setStackTrace(e.getStackTrace());
-        this.failedKeys = responsibleKeys;
-    }
-
-    /**
-     * @return the responsibleKeys
-     */
-    public List<String> getFailedKeys() {
-        return failedKeys;
     }
 }

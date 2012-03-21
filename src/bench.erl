@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 %% @end
 -module(bench).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id: bench.erl 1814 2011-06-21 15:01:58Z schuett $').
 
 %% public interface
 -export([increment/2, increment_with_histo/2, increment/3, quorum_read/2,
@@ -88,22 +88,23 @@ load_stop() ->
                  Message::comm:message()) -> ok.
 manage_run(ThreadsPerVM, Iterations, Options, Message) ->
     Pid = self(),
-    TraceMPath = erlang:get(trace_mpath),
     spawn(fun() ->
-                  erlang:put(trace_mpath, TraceMPath),
                   Msg = setelement(5, Message, comm:this()),
                   Res = manage_run_internal(ThreadsPerVM, Iterations, Options,
                                             Msg),
-                  comm:send_local(Pid, Res)
+                  Pid ! Res
           end),
     receive
-        ?SCALARIS_RECV({ok}, %% ->
-            ok)
+        ok ->
+            ok;
+        X ->
+            io:format("unknown message ~p~n", [X]),
+            ok
     end.
 
 -spec manage_run_internal(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
                  Options::[locally | verbose | profile | {copies, non_neg_integer()}],
-                 Message::comm:message()) -> {ok}.
+                 Message::comm:message()) -> ok.
 manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     ServerList = util:get_proc_in_vms(bench_server),
     %% io:format("~p~n", [ServerList]),
@@ -150,7 +151,7 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
             %io:format("Statistics: ~p~n", [ Statistics ]);
         false -> ok
     end,
-    {ok}.
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -165,7 +166,7 @@ init_key(Key, Count) ->
     case api_tx:write(Key, 0) of
         {ok} ->
             Key;
-        {fail, abort, [Key]} ->
+        {fail, abort} ->
             init_key(Key, Count - 1);
         {fail, timeout} ->
             init_key(Key, Count - 1)
@@ -175,15 +176,14 @@ collect(0, L) ->
     L;
 collect(Length, L) ->
     receive
-        ?SCALARIS_RECV({done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts}, %% ->
-         begin
-             io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
-             collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L])
-          end);
-        ?SCALARIS_RECV({crash, Pid}, %% ->
-           begin
-               io:format("ignoring ~p, because it crashed", [Pid]),
-               collect(Length - 1, L)
-           end)
+        {done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts} ->
+            io:format("BS: ~p @ ~p~n",[WallClockTime, X]),
+            collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L]);
+        {crash, Pid} ->
+            io:format("ignoring ~p, because it crashed", [Pid]),
+            collect(Length - 1, L);
+        X ->
+            io:format("unknown message ~p~n", [X]),
+            collect(Length - 1, L)
     end.
 

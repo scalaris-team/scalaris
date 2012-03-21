@@ -13,10 +13,10 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @version $Id$
+%% @version $Id: api_tx_SUITE.erl 1697 2011-04-29 09:25:23Z schintke $
 -module(rrd_SUITE).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id: api_tx_SUITE.erl 1697 2011-04-29 09:25:23Z schintke $').
 
 -include("unittest.hrl").
 

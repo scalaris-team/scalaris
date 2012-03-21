@@ -36,15 +36,28 @@
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0]).
+-export_type([req_id/0, request/0, result_entry/0]).
 -endif.
 
 -type req_id() :: util:global_uid().
--type request_on_key() :: api_tx:request_on_key().
--type results() :: [ api_tx:result() ].
+-type request_on_key() ::
+        {rdht_tx_read,  client_key()}
+      | {rdht_tx_write, client_key(), client_value()}
+      | {test_and_set,  client_key(), client_value(), client_value()}
+      | {add_del_on_list,    client_key(), client_value(), client_value()}
+      | {add_on_nr,    client_key(), client_value()}.
+
+-type request() :: request_on_key() | {commit}.
+
+-type result_entry_read() ::
+        {ok, client_value()} | {fail, abort | timeout | not_found}.
+-type result_entry_write()  :: {ok} | {fail, abort | timeout}.
+-type result_entry_commit() :: {ok} | {fail, abort | timeout}.
+-type result_entry() :: api_tx:result().
+-type results() :: [ result_entry() ].
 
 %% @doc Perform several requests inside a transaction.
--spec req_list(tx_tlog:tlog(), [api_tx:request()]) -> {tx_tlog:tlog(), results()}.
+-spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), results()}.
 req_list([], [{commit}]) -> {[], [{ok}]};
 req_list(TLog, ReqList) ->
     %% PRE: TLog is sorted by key, implicitly given, as
@@ -54,8 +67,9 @@ req_list(TLog, ReqList) ->
     %% (0) Check TLog? Consts performance, may save some requests
 
     %% (1) Ensure commit is only at end of req_list (otherwise abort),
-    %% (2) encode write values to ?DB:value format
-    %% (3) drop {commit} request at end &and remember whether to
+    %% (2) transform native ops to module names
+    %% (3) encode write values to ?DB:value format
+    %% (4) drop {commit} request at end &and remember whether to
     %%     commit or not
     {ReqList1, OKorAbort, FoundCommitAtEnd} =
         rl_chk_and_encode(ReqList, [], ok),
@@ -82,6 +96,7 @@ req_list(TLog, ReqList) ->
 
 %% @doc Check whether commit is only at end (OKorAbort).
 %%      Encode all values of write requests.
+%%      Replace native operations by corresponding module names.
 %%      Cut commit at end and inform caller via boolean (CommitAtEnd).
 -spec rl_chk_and_encode(
         InTodo::[api_tx:request()], Acc::[api_tx:request()], ok|abort)
@@ -92,8 +107,10 @@ rl_chk_and_encode([{commit}], Acc, OKorAbort) ->
     {lists:reverse(Acc), OKorAbort, true};
 rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
     case Req of
+        {read, Key} ->
+            rl_chk_and_encode(RL, [{rdht_tx_read, Key} | Acc], OKorAbort);
         {write, Key, Value} ->
-            rl_chk_and_encode(RL, [{write, Key,
+            rl_chk_and_encode(RL, [{rdht_tx_write, Key,
                                     encode_value(Value)} | Acc],
                               OKorAbort);
         {commit} = Commit ->
@@ -104,7 +121,7 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
     end.
 
 %% @doc Fill all fields with {fail, abort} information.
--spec tlog_and_results_to_abort(tx_tlog:tlog(), [api_tx:request()]) ->
+-spec tlog_and_results_to_abort(tx_tlog:tlog(), [request()]) ->
                                        {tx_tlog:tlog(), results()}.
 tlog_and_results_to_abort(TLog, ReqList) ->
     NewTLog = lists:foldl(fun(Req, AccTLog) ->
@@ -119,10 +136,12 @@ tlog_and_results_to_abort(TLog, ReqList) ->
     {NewTLog, [ case element(1, X) of
                     read -> {fail, not_found};
                     write -> {ok};
+                    rdht_tx_read -> {fail, not_found};
+                    rdht_tx_write -> {ok};
                     add_del_on_list -> {ok};
                     add_on_nr -> {ok};
                     test_and_set -> {ok};
-                    commit -> {fail, abort, []}
+                    commit -> {fail, abort}
                 end || X <- ReqList ]}.
 
 %% @doc Send requests to the DHT, gather replies and merge TLogs.
@@ -166,14 +185,14 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
         true ->
             %% key is in TLog, rdht op not necessary
             case tx_tlog:get_entry_operation(TEntry) of
-                write ->
+                rdht_tx_write ->
                     first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
                 _ ->
                     case req_get_op(Req) of
                         %% when operation needs the value (read) and
                         %% TLog is optimized, we need the op anyway to
                         %% calculate the result entry.
-                        read ->
+                        rdht_tx_read ->
                             first_req_per_key_not_in_tlog_iter
                               (USTLog, RTail, [Req | Acc]);
                         test_and_set ->
@@ -209,8 +228,8 @@ initiate_rdht_ops(ReqList) ->
     [ begin
           NewReqId = util:get_global_uid(), % local id not sufficient
           OpModule = case req_get_op(Entry) of
-                         read -> rdht_tx_read;
-                         write -> rdht_tx_write;
+                         rdht_tx_read -> rdht_tx_read;
+                         rdht_tx_write -> rdht_tx_write;
                          test_and_set -> rdht_tx_read;
                          add_del_on_list -> rdht_tx_read;
                          add_on_nr -> rdht_tx_read
@@ -265,7 +284,7 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
             %% key was in TLog, new entry is newer and contains value
             %% for read?
             case tx_tlog:get_entry_operation(TEntry) of
-                read ->
+                rdht_tx_read ->
                     %% check versions: if mismatch -> change status to abort
                     NewTLogEntry =
                         case tx_tlog:get_entry_version(TEntry)
@@ -307,8 +326,8 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
-            {read, Key}           -> tlog_read(Entry, Key);
-            {write, Key, Value}   -> tlog_write(Entry, Key, Value);
+            {rdht_tx_read, Key}           -> tlog_read(Entry, Key);
+            {rdht_tx_write, Key, Value}   -> tlog_write(Entry, Key, Value);
             %% non-native functions:
             {add_del_on_list, Key, ToAdd, ToDel} -> tlog_add_del_on_list(Entry, Key, ToAdd, ToDel);
             {add_on_nr, Key, X}           -> tlog_add_on_nr(Entry, Key, X);
@@ -320,13 +339,13 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc) ->
 -spec tlog_cleanup(tx_tlog:tlog()) -> tx_tlog:tlog().
 tlog_cleanup(TLog) ->
     [ case tx_tlog:get_entry_operation(TLogEntry) of
-          read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
-          write -> TLogEntry
+          rdht_tx_read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
+          rdht_tx_write -> TLogEntry
       end || TLogEntry <- TLog ].
 
 %% @doc Get a result entry for a read from the given TLog entry.
 -spec tlog_read(tx_tlog:tlog_entry(), client_key()) ->
-                       {tx_tlog:tlog_entry(), api_tx:read_result()}.
+                       {tx_tlog:tlog_entry(), result_entry_read()}.
 tlog_read(Entry, _Key) ->
     Res = case tx_tlog:get_entry_status(Entry) of
               value -> {ok, tx_tlog:get_entry_value(Entry)};
@@ -339,15 +358,15 @@ tlog_read(Entry, _Key) ->
 %% @doc Get a result entry for a write from the given TLog entry.
 %%      Update the TLog entry accordingly.
 -spec tlog_write(tx_tlog:tlog_entry(), client_key(), client_value()) ->
-                       {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                       {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_write(Entry, _Key, Value) ->
     NewEntryAndResult =
         fun(FEntry, FValue) ->
                 case tx_tlog:get_entry_operation(FEntry) of
-                    write ->
+                    rdht_tx_write ->
                         {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
-                    read ->
-                        E1 = tx_tlog:set_entry_operation(FEntry, write),
+                    rdht_tx_read ->
+                        E1 = tx_tlog:set_entry_operation(FEntry, rdht_tx_write),
                         E2 = tx_tlog:set_entry_value(E1, FValue),
                         {E2, {ok}}
             end
@@ -356,7 +375,7 @@ tlog_write(Entry, _Key, Value) ->
         value ->
             NewEntryAndResult(Entry, Value);
         {fail, not_found} ->
-            E1 = tx_tlog:set_entry_operation(Entry, write),
+            E1 = tx_tlog:set_entry_operation(Entry, rdht_tx_write),
             E2 = tx_tlog:set_entry_value(E1, Value),
             E3 = tx_tlog:set_entry_status(E2, value),
             {E3, {ok}};
@@ -368,7 +387,7 @@ tlog_write(Entry, _Key, Value) ->
 %%      Update the TLog entry accordingly.
 -spec tlog_add_del_on_list(tx_tlog:tlog_entry(), client_key(),
                       client_value(), client_value()) ->
-                       {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                       {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->
@@ -402,8 +421,8 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel) ->
     end.
 
 -spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
-                     client_value()) ->
-                             {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                      client_value()) ->
+                             {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_add_on_nr(Entry, _Key, X) when (not erlang:is_number(X)) ->
     %% check type of input data
     {tx_tlog:set_entry_status(Entry, {fail, abort}),
@@ -435,7 +454,7 @@ tlog_add_on_nr(Entry, Key, X) ->
 
 -spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
                         client_value(), client_value()) ->
-                               {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                               {tx_tlog:tlog_entry(), result_entry_write()}.
 tlog_test_and_set(Entry, Key, Old, New) ->
     {_, Res0} = tlog_read(Entry, Key),
     case Res0 of
@@ -468,19 +487,19 @@ encode_value(Value) ->
 decode_value(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
 decode_value(Value)                       -> Value.
 
--spec decode_result(api_tx:result()) -> api_tx:result().
+-spec decode_result(result_entry()) -> api_tx:result().
 decode_result({ok, Value}) -> {ok, decode_value(Value)};
 decode_result(X)           -> X.
 
 %% commit phase
--spec commit(tx_tlog:tlog()) ->  api_tx:commit_result().
+-spec commit(tx_tlog:tlog()) ->  result_entry_commit().
 commit(TLog) ->
     %% set steering parameters, we need for the transactions engine:
     %% number of retries, etc?
     %% some parameters are checked via the individual operations
-    %% read, write which implement the behaviour tx_op_beh.
+    %% rdht_tx_read, rdht_tx_write which implement the behaviour tx_op_beh.
     case tx_tlog:is_sane_for_commit(TLog) of
-        false -> {fail, abort, tx_tlog:get_insane_keys(TLog)};
+        false -> {fail, abort};
         true ->
             Client = comm:this(),
             ClientsId = {commit_client_id, util:get_global_uid()},
@@ -488,49 +507,32 @@ commit(TLog) ->
             case pid_groups:find_a(tx_tm) of
                 failed ->
                     Msg = io_lib:format("No tx_tm found.~n", []),
-                    tx_tm_rtm:msg_commit_reply(Client, ClientsId, {abort, Msg});
+                    tx_tm_rtm:msg_commit_reply(Client, ClientsId, {fail, Msg});
                 TM ->
                     tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
             end,
             _Result =
                 receive
-                    ?SCALARIS_RECV(
-                       {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
-                         {ok}  %% commit / abort;
-                      );
-                    ?SCALARIS_RECV(
-                       {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
-                         begin
-                             {fail, abort, FailedKeys} %% commit / abort;
-                         end
-                       );
-                    ?SCALARIS_RECV(
-                       {tx_timeout, ClientsId}, %% ->
-                       begin
-                         log:log(error, "No result for commit received!"),
-                         {fail, timeout}
-                       end
-                      )
+                    {tx_tm_rtm_commit_reply, ClientsId, commit} ->
+                        {ok}; %% commit / abort;
+                    {tx_tm_rtm_commit_reply, ClientsId, abort} ->
+                        {fail, abort}; %% commit / abort;
+                    {tx_timeout, ClientsId} ->
+                        log:log(error, "No result for commit received!"),
+                        {fail, timeout}
                 end
     end.
 
 -spec receive_answer() -> {tx_tlog:tx_op(), req_id(), tx_tlog:tlog_entry()}.
 receive_answer() ->
     receive
-        ?SCALARIS_RECV(
-           {tx_tm_rtm_commit_reply, _, _}, %%->
-           %% probably an outdated commit reply: drop it.
-             receive_answer()
-          );
-        ?SCALARIS_RECV(
-           {tx_timeout, _}, %% ->
-           %% probably an outdated commit reply: drop it.
-             receive_answer()
-          );
-        ?SCALARIS_RECV(
-           {Op, RdhtId, RdhtTlog}, %% ->
-             {Op, RdhtId, RdhtTlog}
-          )
+        {tx_tm_rtm_commit_reply, _, _} ->
+            %% probably an outdated commit reply: drop it.
+            receive_answer();
+        {tx_timeout, _} ->
+            %% probably an outdated commit reply: drop it.
+            receive_answer();
+        {Op, RdhtId, RdhtTlog} -> {Op, RdhtId, RdhtTlog}
     end.
 
 req_get_op(Request) -> element(1, Request).

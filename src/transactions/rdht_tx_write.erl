@@ -57,7 +57,7 @@ tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
 -spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
 tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
--spec work_phase(pid(), rdht_tx:req_id(), api_tx:request()) -> ok.
+-spec work_phase(pid(), rdht_tx:req_id(), rdht_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_write:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -172,13 +172,13 @@ init([]) ->
 -spec on(comm:message(), null) -> null.
 on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    Request = {write, Key, WriteValue},
+    Request = {?MODULE, Key, WriteValue},
     NewTLogEntry = update_tlog_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
     State.
 
--spec update_tlog_entry(tx_tlog:tlog_entry(), api_tx:request()) ->
+-spec update_tlog_entry(tx_tlog:tlog_entry(), rdht_tx:request()) ->
                                tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, Request) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -189,11 +189,11 @@ update_tlog_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         value ->
-            tx_tlog:new_entry(write, Key, Version, value, WriteValue);
+            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(write, Key, Version, value, WriteValue)
+            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue)
 %        {fail, timeout} ->
-%            tx_tlog:new_entry(write, Key, Version, {fail, timeout},
+%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
 %                               WriteValue)
     end.
 

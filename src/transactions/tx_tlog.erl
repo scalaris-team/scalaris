@@ -30,7 +30,6 @@
 -export([sort_by_key/1]).
 -export([find_entry_by_key/2]).
 -export([is_sane_for_commit/1]).
--export([get_insane_keys/1]).
 
 %% Operations on entries of TLogs
 -export([new_entry/5]).
@@ -47,7 +46,7 @@
 -endif.
 
 -type tx_status() :: value | {fail, abort | not_found}.
--type tx_op()     :: read | write.
+-type tx_op()     :: rdht_tx_read | rdht_tx_write.
 
 -type tlog_key() :: client_key().%% | ?RT:key().
 %% TLogEntry: {Operation, Key, Status, Value, Version}
@@ -74,7 +73,7 @@ add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 add_or_update_status_by_key(TLog, Key, Status) ->
     case lists:keyfind(Key, 2, TLog) of
         false ->
-            Entry = new_entry(write, Key, _Vers = 0, Status, _Val = 0),
+            Entry = new_entry(rdht_tx_write, Key, _Vers = 0, Status, _Val = 0),
             add_entry(TLog, Entry);
         Entry ->
             NewEntry = set_entry_status(Entry, Status),
@@ -104,14 +103,6 @@ entry_is_sane_for_commit(Entry, Acc) ->
 is_sane_for_commit(TLog) ->
     lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
--spec get_insane_keys(tlog()) -> [client_key()].
-get_insane_keys(TLog) ->
-    lists:foldl(fun(X, Acc) ->
-                        case entry_is_sane_for_commit(X, true) of
-                            true -> Acc;
-                            false -> [get_entry_key(X) | Acc]
-                        end
-                end, [], TLog).
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),

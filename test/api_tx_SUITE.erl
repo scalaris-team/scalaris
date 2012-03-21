@@ -140,16 +140,16 @@ req_list_2(_Config) ->
 
     %% exec empty double commit
     ?equals_pattern(api_tx:req_list(EmptyTLog, [{commit}, {commit}]),
-                    {_TLog, [{fail, abort, []}, {fail, abort, []}]}),
+                    {_TLog, [{fail, abort}, {fail, abort}]}),
 
     %% try commit not as last operation in request list
     ?equals_pattern(api_tx:req_list(EmptyTLog, [{commit}, {read, "A"}]),
-                    {_TLog, [{fail, abort, []}, _]}),
+                    {_TLog, [{fail, abort}, _]}),
 
     %% try commit not as last operation in request list with longer list
     ?equals_pattern(api_tx:req_list(EmptyTLog,
                                     [{commit}, {read, "A"}, {read, "B"}]),
-                    {_TLog, [{fail, abort, []}, _, _]}),
+                    {_TLog, [{fail, abort}, _, _]}),
 
     %% ops based on tlog
     {NonExistReadTLog, _Res1} = api_tx:read(EmptyTLog, "req_list_2_C"),
@@ -214,12 +214,12 @@ commit_1(_Config) ->
     %% commit a timedout TLog
     TimeoutReadTLog =
         [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- ReadTLog ],
-    ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort, ["commit_1_B"]}),
+    ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort}),
 
     {WriteTLog2, _} = api_tx:write(api_tx:new_tlog(), "commit_1_C", 7),
     TimeoutWriteTLog =
         [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- WriteTLog2 ],
-    ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort, ["commit_1_C"]}),
+    ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort}),
 
     %% commit a non-existing tlog
     {NonExistReadTLog, _} = api_tx:read(EmptyTLog, "non-existing"),
@@ -280,10 +280,10 @@ conflicting_tx(_Config) ->
     %% Tx1 tries to increases it atomically and fails
     ?equals_pattern(
        api_tx:req_list(Tx1TLog, [{write, "Account A", Bal1 + 100}, {commit}]),
-       {_, [_WriteRes = {ok}, _CommitRes = {fail, abort, ["Account A"]}]}),
-    io:format("DOne~n"),
+       {_, [_WriteRes = {ok}, _CommitRes = {fail, abort}]}),
+
     %% Tx3: try to commit the read and fail (value changed in the meantime)
-    ?equals_pattern(api_tx:commit(Tx3TLog), {fail, abort, ["Account A"]}),
+    ?equals_pattern(api_tx:commit(Tx3TLog), {fail, abort}),
 
     %% check that two reading transactions can coexist
     %% Tx4: read the balance and later try to commit the read
@@ -306,14 +306,13 @@ conflicting_tx2(_Config) ->
 
     _ = api_tx:write("conflicting_tx2_non-existing", "Value"),
     %% verify not_found of tlog in commit phase? key now exists!
-    ?equals(api_tx:commit(TLog1a),
-            {fail, abort, ["conflicting_tx2_non-existing"]}),
+    ?equals(api_tx:commit(TLog1a), {fail, abort}),
 
     ?equals_pattern(api_tx:req_list(TLog1a,
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
                                      {commit}]),
                     {_TLog, [_WriteRes = {ok},
-                             _CommitRes = {fail, abort, ["conflicting_tx2_non-existing"]}]}),
+                             _CommitRes = {fail, abort}]}),
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
 
 
@@ -579,7 +578,7 @@ prop_tlog_add_del_on_list2(TLog0, Key, Initial, OldExists, ToAdd, ToRemove) ->
               true      -> ?equals(Result2, {fail, not_found})
            end,
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort, [Key]}),
+           ?equals(Result3, {fail, abort}),
            if OldExists -> ?equals(api_tx:read(Key), {ok, Initial});
               true      -> ?equals(api_tx:read(Key), {fail, not_found})
            end;
@@ -632,7 +631,7 @@ prop_tlog_add_on_nr2(TLog0, Key, Existing, Initial, ToAdd) ->
               true     -> ?equals(Result2, {fail, not_found})
            end,
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort, [Key]}),
+           ?equals(Result3, {fail, abort}),
            if Existing -> ?equals(api_tx:read(Key), {ok, Initial});
               true     -> ?equals(api_tx:read(Key), {fail, not_found})
            end;
@@ -698,7 +697,7 @@ prop_tlog_test_and_set2(TLog0, Key, Existing, RealOldValue, OldValue, NewValue) 
            ?equals(Result1, {fail, {key_changed, RealOldValue}}),
            ?equals(Result2, {ok, RealOldValue}),
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {fail, abort, [Key]}),
+           ?equals(Result3, {fail, abort}),
            ?equals(api_tx:read(Key), {ok, RealOldValue})
     end.
 
@@ -760,24 +759,14 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     ?equals(NRes, [{fail, not_found}]);
                 add_on_nr ->
                     %% Check value content
-                    case NRes of
-                        [{ok}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    value); %% will create the value
-                        [{fail, not_a_number}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort})
-                        end;
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            value), %% will create the value
+                    ?equals(NRes, [{ok}]);
                 add_del_on_list ->
                     %% Check value content
-                    case NRes of
-                        [{ok}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    value); %% will create the value
-                        [{fail, not_a_list}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort})
-                    end
+                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                            value), %% will create the value
+                    ?equals(NRes, [{ok}])
             end;
         {fail, abort} = Fail ->
             TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, value),
@@ -787,9 +776,9 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
             ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
         value ->
             case tx_tlog:get_entry_operation(OldEntry) of
-                read ->
+                rdht_tx_read ->
                     ?equals(NRes, element(2, api_tx:req_list([Req])));
-                write ->
+                rdht_tx_write ->
                     ?equals([{ok}, hd(NRes)], element(2, api_tx:req_list([{write, element(2, Req), rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))}, Req])))
             end,
             case element(1, Req) of
@@ -802,9 +791,9 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                 read ->
                     ?equals(TLog, NTLog),
                     case tx_tlog:get_entry_operation(OldEntry) of
-                        read ->
+                        rdht_tx_read ->
                             ?equals(NRes, [{ok, RingVal}]);
-                        write ->
+                        rdht_tx_write ->
                             ?equals(NRes, [{ok, rdht_tx:decode_value(tx_tlog:get_entry_value(NewEntry))}])
                     end;
                 test_and_set ->
@@ -851,20 +840,20 @@ check_commit(TLog, CommitRes, RingVal) ->
     case CommitRes of
         {ok} ->
             case tx_tlog:get_entry_operation(TEntry) of
-                read ->
+                rdht_tx_read ->
                     NewRingVal = case api_tx:read(Key) of
                                      {fail, not_found} -> none;
                                      {ok, NewVal} -> NewVal
                                  end,
                     ?equals(RingVal, NewRingVal);
-                write ->
+                rdht_tx_write ->
                     ?equals(value, tx_tlog:get_entry_status(TEntry)),
                     {ok, NewRingVal} = api_tx:read(Key),
                     ?equals(rdht_tx:decode_value(
                               tx_tlog:get_entry_value(TEntry)),
                             NewRingVal)
             end;
-        {fail, abort, _} ->
+        {fail, abort} ->
             ?equals({fail, abort}, tx_tlog:get_entry_status(TEntry)),
             NewRingVal = case api_tx:read(Key) of
                              {fail, not_found} -> none;

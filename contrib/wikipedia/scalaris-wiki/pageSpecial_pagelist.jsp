@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List,java.net.URLEncoder"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
-<% String pageTitleWithPars = pageBean.titleWithParameters(); %>
-<% String safePageTitleWithPars = URLEncoder.encode(pageTitleWithPars, "UTF-8"); %>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
@@ -18,6 +15,8 @@
 <meta http-equiv="Content-Style-Type" content="text/css" />
 <% /* 
 <meta name="generator" content="MediaWiki 1.17wmf1" />
+<link rel="alternate" type="application/x-wiki" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
+<link rel="edit" title="change this page" href="https://secure.wikimedia.org/wiktionary/simple/w/index.php?title=${ pageBean.title }&amp;action=edit">
 <link rel="apple-touch-icon" href="http://simple.wiktionary.org/apple-touch-icon.png">
 */ %>
 <link rel="shortcut icon" href="favicon-wikipedia.ico" />
@@ -109,7 +108,7 @@ ${ pageBean.page }
                                 <td class='mw-input'>
                                   <select id="namespace" name="namespace" class="namespaceselector">
                       <% for (int i = 0; i <= 15; ++i) {
-                          String namespace = (i == 0) ? "Article" : pageBean.getWikiNamespace().getNamespaceByNumber(i);
+                          String namespace = (i == 0) ? "(Main)" : pageBean.getWikiNamespace().getNamespaceByNumber(i);
                           String selected = (pageBean.getNamespaceId() == i) ? " selected=\"selected\"" : "";
                       %>
                                     <option value="<%= i %>"<%= selected %>><%= namespace %></option>
@@ -171,7 +170,7 @@ ${ pageBean.page }
                 <hr />
 <% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages" title="Special:AllPages">All pages</a></p> */ %>
                 <div class="printfooter">
-                Retrieved from "<a href="wiki?title=<%= pageTitleWithPars %>">wiki?title=${ pageBean.title }</a>"</div>
+                Retrieved from "<a href="wiki?title=${ pageBean.title }">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
 <% if (req_render == null || !req_render.equals("0")) { %>
                 <!-- catlinks -->
@@ -190,7 +189,7 @@ ${ pageBean.page }
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Special:UserLogin&amp;returnto=<%= safePageTitleWithPars %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Spezial:Special:UserLogin&amp;returnto=${ pageBean.title }" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -201,7 +200,7 @@ ${ pageBean.page }
 <div id="p-namespaces" class="vectorTabs">
     <h5>Namespaces</h5>
     <ul>
-                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= pageTitleWithPars %>" >Special page</a></span></li>
+                    <li id="ca-special" class="selected"><span><a href="wiki?title=${ pageBean.title }" >Special page</a></span></li>
     </ul>
 </div>
 
@@ -307,18 +306,11 @@ ${ pageBean.page }
                 <ul id="footer-icons" class="noprint">
                 </ul>
                 <div style="clear:both"></div>
-                <div style="font-size:0.7em">DB Timings:
-                <pre id="db_timings" style="padding:0;line-height:0.7em">
+                <pre id="db_timings" style="padding:0;line-height:0.7em;font-size:0.7em">
 <% for (Map.Entry<String,List<Long>> stats : pageBean.getStats().entrySet()) { %>
 <%= stats.getKey() %>: <%= stats.getValue().toString() %>
 <% } %>
-                </pre></div>
-                <div style="font-size:0.7em">Involved DB keys:
-                <pre id="involved_keys" style="padding:0;line-height:0.7em">
-<% for (String involvedKey : pageBean.getInvolvedKeys()) { %>
-<%= involvedKey %>
-<% } %>
-                </pre></div>
+                </pre>
         </div>
         <!-- /footer -->
 </body>

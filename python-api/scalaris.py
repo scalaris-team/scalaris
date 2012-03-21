@@ -156,8 +156,7 @@ class JSONConnection(object):
         raise UnknownError(result)
         
     # result: {'status': 'ok'} or
-    #         {'status': 'fail', 'reason': 'abort', 'keys': <list>} or
-    #         {'status': 'fail', 'reason': 'timeout'}
+    #         {'status': 'fail', 'reason': 'timeout' or 'abort'}
     @staticmethod
     def process_result_commit(result):
         """
@@ -167,11 +166,11 @@ class JSONConnection(object):
         if isinstance(result, dict) and 'status' in result:
             if result == {'status': 'ok'}:
                 return None
-            elif result['status'] == 'fail' and 'reason' in result:
-                if len(result) == 2 and result['reason'] == 'timeout':
+            elif result['status'] == 'fail' and 'reason' in result and len(result) == 2:
+                if result['reason'] == 'timeout':
                     raise TimeoutError(result)
-                elif len(result) == 3 and result['reason'] == 'abort' and 'keys' in result:
-                    raise AbortError(result, result['keys'])
+                elif result['reason'] == 'abort':
+                    raise AbortError(result)
         raise UnknownError(result)
         
     # results: {'status': 'ok'} or
@@ -256,8 +255,7 @@ class JSONConnection(object):
         JSONConnection.process_result_commit(result)
     
     # results: {'status': 'ok'} or
-    #          {'status': 'fail', 'reason': 'abort', 'keys': <list>} or
-    #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
+    #          {'status': 'fail', 'reason': 'timeout' or 'abort' or 'not_found'}
     @staticmethod
     def process_result_unsubscribe(result):
         """
@@ -267,14 +265,13 @@ class JSONConnection(object):
         if result == {'status': 'ok'}:
             return None
         elif isinstance(result, dict) and 'status' in result:
-            if result['status'] == 'fail' and 'reason' in result:
-                if len(result) == 2:
-                    if result['reason'] == 'timeout':
-                        raise TimeoutError(result)
-                    elif result['reason'] == 'not_found':
-                        raise NotFoundError(result)
-                elif len(result) == 3 and result['reason'] == 'abort' and 'keys' in result:
-                    raise AbortError(result, result['keys'])
+            if result['status'] == 'fail' and 'reason' in result and len(result) == 2:
+                if result['reason'] == 'timeout':
+                    raise TimeoutError(result)
+                elif result['reason'] == 'abort':
+                    raise AbortError(result)
+                elif result['reason'] == 'not_found':
+                    raise NotFoundError(result)
         raise UnknownError(result)
     
     # results: [urls=str()]
@@ -394,9 +391,8 @@ class AbortError(ScalarisError):
     ring fails.
     """
     
-    def __init__(self, raw_result, failed_keys):
+    def __init__(self, raw_result):
         self.raw_result = raw_result
-        self.failed_keys = failed_keys
     def __str__(self):
         return repr(self.raw_result)
 

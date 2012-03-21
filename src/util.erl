@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,10 +43,8 @@
          is_unittest/0, make_filename/1,
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
-         readable_utc_time/1,
          for_to/3, for_to_ex/3,
          collect_while/1]).
--export([debug_info/0, debug_info/1]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -60,7 +58,9 @@
          ets_tables_of/1]).
 
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
--export([repeat/3, repeat/4, parallel_run/4]).
+-export([s_repeat/3, s_repeatAndCollect/3, s_repeatAndAccumulate/5,
+         p_repeat/3, p_repeatAndCollect/3, p_repeatAndAccumulate/5,
+         parallel_run/4]).
 
 -export([empty/1]).
 
@@ -74,9 +74,11 @@
 
 -type args() :: [term()].
 -type accumulatorFun(T, U) :: fun((T, U) -> U).
--type repeat_params() :: parallel |
-                         collect |
-                         {accumulate, accumulatorFun(any(), R), R}. %{accumulate, fun, accumulator init value}
+%-type anyFun(T) :: fun((...) -> T). %will not work with R14B02 dialyzer
+-type anyFun(T) :: 
+    fun((any()) -> T) | 
+    fun((any(), any()) -> T).
+
 
 %% @doc Creates a worker description for a supervisor.
 -spec sup_worker_desc(Name::atom() | string(), Module::module(), Function::atom())
@@ -411,7 +413,7 @@ get_proc_in_vms(Proc) ->
     mgmt_server:node_list(),
     Nodes =
         receive
-            ?SCALARIS_RECV({get_list_response, X}, X)
+            {get_list_response, X} -> X
         after 2000 ->
             log:log(error,"[ util ] Timeout getting node list from mgmt server"),
             throw('mgmt_server_timeout')
@@ -773,7 +775,7 @@ is_unittest() ->
                   end
           end),
     receive
-        ?SCALARIS_RECV({is_unittest, Result}, Result)
+        {is_unittest, Result} -> Result
     end.
 
 -spec make_filename(string()) -> string().
@@ -828,11 +830,6 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
 
--spec readable_utc_time(erlang:timestamp()) -> tuple().
-readable_utc_time(TimeTriple) ->
-    DateTime = calendar:now_to_universal_time(TimeTriple),
-    erlang:append_element(DateTime, element(3, TimeTriple)).
-
 %% for(i; I<=n; i++) { fun(i) }
 -spec for_to(integer(), integer(), fun((integer()) -> any())) -> ok.
 for_to(I, N, Fun) when I =< N ->
@@ -853,58 +850,61 @@ for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% repeat
+% sequential repeat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Sequencial (default) or parallel run of function FUN with arguments ARGS TIMES-fold.
-%%      Options as list/propertylist: collect, parallel, accumulate
-%%          * collect (atom): all results of FUN will returned as a list
-%%          * accumulate (tuple): {accumulate, accFun, accInit}
-%%                                all results will be accumulated with accFun
-%%          * parallel (atom): FUN will be called TIMES-fold in parallel.
-%%                             Combination with collect and accumulate is supported.
-%% @end
--spec repeat(fun(), args(), pos_integer()) -> ok.
-repeat(Fun, Args, Times) ->
-    i_repeat(Fun, Args, Times, [], none).
--spec repeat(fun(), args(), pos_integer(), [repeat_params()]) -> ok | any().
-repeat(Fun, Args, Times, Params) ->
-    NewParams = case proplists:is_defined(collect, Params) of
-                    false -> Params;
-                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} | 
-                              proplists:delete(accumulate, Params)]
-                end,
-    Acc = lists:keyfind(accumulate, 1, NewParams),
-    case proplists:is_defined(parallel, NewParams) of
-        true -> 
-            repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false]], Times),
-            case Acc of
-                false -> ok;
-                {_, AccFun, AccInit} -> parallel_collect(Times, AccFun, AccInit)
-            end;
-        _ -> i_repeat(Fun, Args, Times, NewParams, case Acc of
-                                                       false -> none;
-                                                       {_, _, I} -> I
-                                                   end)
-    end.
+%% @doc Simple sequential function repetition
+-spec s_repeat(fun(), args(), pos_integer()) -> ok.
+s_repeat(Fun, Args, 1) ->    
+    apply(Fun, Args),
+    ok;
+s_repeat(Fun, Args, Times) ->
+    apply(Fun, Args),
+    s_repeat(Fun, Args, Times - 1).
 
-%-spec i_repeat(fun(), args(), non_neg_integer(), any()) -> ok | any().
-i_repeat(_, _, 0, Params, Acc) ->
-    case proplists:is_defined(accumulate, Params) of
-        true -> Acc;
-        _ -> ok
-    end;
-i_repeat(Fun, Args, Times, Params, Acc) ->    
-    R = apply(Fun, Args),
-    NewAcc = case lists:keyfind(accumulate, 1, Params) of
-                 false -> Acc;
-                 {_, AccFun, _} -> AccFun(R, Acc)
-             end,
-    i_repeat(Fun, Args, Times - 1, Params, NewAcc).
+%% @doc Simple sequential function repetiton with collection of their results
+%%      returns a list of results of "times" function calls
+%% @end
+-spec s_repeatAndCollect(fun(), args(), pos_integer()) -> [any()].
+s_repeatAndCollect(Fun, Args, Times) ->    
+    s_repeatAndAccumulate(Fun, Args, Times, fun(R, Y) -> [R | Y] end, []).
+
+%% @doc Sequential repetion of function FUN with arguments ARGS TIMES-fold.
+%%      Results will be accumulated with an accumulator function ACCUFUN 
+%%      in register ACCUMULATOR.
+%% @end
+-spec s_repeatAndAccumulate(anyFun(T), args(), pos_integer(), accumulatorFun(T, U), U) -> U.
+s_repeatAndAccumulate(Fun, Args, 1, AccuFun, Accumulator) ->
+    R1 = apply(Fun, Args),
+    AccuFun(R1, Accumulator);
+s_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
+    R1 = apply(Fun, Args),
+    s_repeatAndAccumulate(Fun, Args, Times - 1, AccuFun, AccuFun(R1, Accumulator)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% parallel repeat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec p_repeat(fun(), args(), pos_integer()) -> ok.
+p_repeat(Fun, Args, Times) ->
+    p_repeat(Fun, Args, Times, false).
+
+-spec p_repeatAndCollect(fun(), args(), pos_integer()) -> [any()].
+p_repeatAndCollect(Fun, Args, Times) ->
+    p_repeatAndAccumulate(Fun, Args, Times, fun(X,Y) -> [X|Y] end, []).
+
+-spec p_repeatAndAccumulate(anyFun(T), args(), pos_integer(), accumulatorFun(T, U), U) -> U.
+p_repeatAndAccumulate(Fun, Args, Times, AccuFun, Accumulator) ->
+    p_repeat(Fun, Args, Times, true),
+    parallel_collect(Times, AccuFun, Accumulator).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % parallel repeat helper functions 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec p_repeat(fun(), args(), pos_integer(), boolean()) -> ok.
+p_repeat(Fun, Args, Times, DoAnswer) ->
+    s_repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, DoAnswer]], Times).
 
 -spec parallel_run(pid(), fun(), args(), boolean()) -> ok.
 parallel_run(SrcPid, Fun, Args, DoAnswer) ->
@@ -920,7 +920,7 @@ parallel_collect(0, _, Accumulator) ->
     Accumulator;
 parallel_collect(ExpectedResults, AccuFun, Accumulator) -> 
     Result = receive
-                ?SCALARIS_RECV({parallel_result, R}, R)
+                {parallel_result, R} -> R
              end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
 
@@ -936,40 +936,7 @@ collect_while(GatherFun, Count) ->
         true          -> GatherFun(Count + 1);
         false         -> []
     end.
-
--spec debug_info() -> [[{string(), term()}]].
-debug_info() ->
-    [ [ debug_info(Y) || Y <- pid_groups:members(X)] || X <- pid_groups:groups()].
-
--spec debug_info(pid()) -> [{string(), term()}];
-                (atom() | string()) -> [[{string(), term()}]].
-debug_info(PidName) when is_atom(PidName) ->
-    [ debug_info(X) || X <- pid_groups:find_all(PidName)];
-debug_info(Group) when is_list(Group) ->
-    [ debug_info(X) || X <- pid_groups:members(Group)];
-debug_info(Pid) when is_pid(Pid) ->
-    {GenCompDesc, GenCompInfo} =
-        case gen_component:is_gen_component(Pid) of
-            true ->
-                {Grp, Name} = pid_groups:group_and_name_of(Pid),
-                comm:send_local(Pid , {web_debug_info, self()}),
-                receive
-                    ?SCALARIS_RECV({web_debug_info_reply, LocalKVs}, %% ->
-                                   {[{"pidgroup", Grp}, {"pidname", Name}],
-                                    LocalKVs})
-                after 1000 -> {[], []}
-                end;
-            false -> {[], []}
-        end,
-    [{_, Memory}, {_, Reductions}, {_, QueueLen}] =
-        process_info(Pid, [memory, reductions, message_queue_len]),
-    [{"pid", pid_to_list(Pid)}]
-        ++   GenCompDesc
-        ++ [{"memory", Memory},
-            {"reductions", Reductions},
-            {"message_queue_len", QueueLen}]
-        ++ GenCompInfo.
-
+    
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
 empty(_) -> "".

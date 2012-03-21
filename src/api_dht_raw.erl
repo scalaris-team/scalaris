@@ -1,4 +1,4 @@
-%% @copyright 2011, 2012 Zuse Institute Berlin
+%% @copyright 2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -71,28 +71,21 @@ range_read(Interval) ->
 -spec range_read_loop(Interval::intervals:interval(), Id::util:global_uid(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     receive
-        ?SCALARIS_RECV({range_read_timeout, Id}, %% ->
-            {timeout, lists:flatten(Data)});
-        ?SCALARIS_RECV(
-        {bulkowner, reply, Id, {bulk_read_entry_response, NowDone, NewData}}, %% ->
-           begin
+        {range_read_timeout, Id} ->
+            {timeout, lists:flatten(Data)};
+        {bulkowner_reply, Id, {bulk_read_entry_response, NowDone, NewData}} ->
             Done2 = intervals:union(NowDone, Done),
             case intervals:is_subset(Interval, Done2) of
                 false ->
                     range_read_loop(Interval, Id, Done2, [NewData | Data], TimerRef);
                 true ->
-                    delete_and_cleanup_timer(TimerRef, Id),
+                    % cancel timeout
+                    _ = erlang:cancel_timer(TimerRef),
+                    % consume potential timeout message
+                    receive
+                        {range_read_timeout} -> ok
+                    after 0 -> ok
+                    end,
                     {ok, lists:flatten(Data, NewData)}
             end
-           end)
-    end.
-
--spec delete_and_cleanup_timer(reference(), util:global_uid()) -> ok.
-delete_and_cleanup_timer(TimerRef, Id) ->
-    %% cancel timeout
-    _ = erlang:cancel_timer(TimerRef),
-    %% consume potential timeout message
-    receive
-        ?SCALARIS_RECV({range_read_timeout, Id}, ok) %% -> ok
-    after 0 -> ok
     end.

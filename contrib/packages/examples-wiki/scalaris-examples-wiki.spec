@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.4.1+svn
+%define pkg_version 0.4.1
 Name:           scalaris-examples-wiki
 Summary:        Wikipedia on Scalaris example
 Version:        %{pkg_version}
@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  scalaris-java >= 0.4.1+svn2875
+BuildRequires:  scalaris-java >= %{pkg_version}
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -73,7 +73,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
-Requires:   scalaris-java >= 0.4.1+svn2875
+Requires:   scalaris-java >= %{pkg_version}
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat5
@@ -86,7 +86,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6
-Requires:   scalaris-java >= 0.4.1+svn2875
+Requires:   scalaris-java >= %{pkg_version}
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat6

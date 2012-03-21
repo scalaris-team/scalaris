@@ -44,7 +44,9 @@
 %      the first measured value.
 -spec time_avg(fun(), pos_integer(), [measure_options()]) -> measure_result().
 time_avg(Fun, Iterations, Options) ->
-    L = util:repeat(fun() -> erlang:element(1, util:tc(Fun, [])) end, [], Iterations, [collect]),
+    L = util:s_repeatAndCollect(
+          fun() -> {Time, _} = util:tc(Fun, []), Time end,
+          [], Iterations),
     Times = case lists:member(skip_first_value, Options) of
                 true -> lists:nthtail(1, L);
                 _ -> L

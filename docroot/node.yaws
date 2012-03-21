@@ -75,7 +75,14 @@ out(A) ->
 <erl>
 get_web_debug_info(Group) ->
   Pid = pid_groups:pid_of(Group, dht_node),
-  util:debug_info(Pid).
+  comm:send_local(Pid, {web_debug_info, self()}),
+  receive
+    {web_debug_info_reply, Details} ->
+      Details
+  after
+    1000 ->
+      timeout
+  end.
 
 out(A) ->
   case lists:keyfind("group", 1, yaws_api:parse_query(A)) of

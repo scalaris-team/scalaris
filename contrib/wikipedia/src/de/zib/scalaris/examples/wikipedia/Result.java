@@ -1,8 +1,5 @@
 package de.zib.scalaris.examples.wikipedia;
 
-import java.util.ArrayList;
-import java.util.List;
-
 
 /**
  * Common result class with a public member containing the result and a
@@ -28,20 +25,12 @@ public class Result {
      * DB).
      */
     public LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
-    /**
-     * All keys that have been read or written during the operation.
-     */
-    public List<String> involvedKeys = new ArrayList<String>();
     
     /**
      * Creates a successful result with an empty message.
-     * 
-     * @param involvedKeys
-     *            all keys that have been read or written during the operation
      */
-    public Result(List<String> involvedKeys) {
+    public Result() {
         this.success = true;
-        this.involvedKeys = involvedKeys;
         this.message = "";
         this.connect_failed = false;
     }
@@ -51,16 +40,13 @@ public class Result {
      * 
      * @param success
      *            the success status
-     * @param involvedKeys
-     *            all keys that have been read or written during the operation
      * @param message
      *            the message to use
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public Result(boolean success, List<String> involvedKeys, String message, boolean connectFailed) {
+    public Result(boolean success, String message, boolean connectFailed) {
         this.success = success;
-        this.involvedKeys = involvedKeys;
         this.message = message;
         this.connect_failed = connectFailed;
     }

@@ -80,16 +80,7 @@ module Scalaris
   # Exception that is thrown if a the commit of a write operation on a Scalaris
   # ring fails.
   class AbortError < ScalarisError
-    attr_reader :raw_result
-    attr_reader :failed_keys
-    def initialize(raw_result, failed_keys)
-      @raw_result = raw_result
-      @failed_keys = failed_keys
-    end
-  
-    def to_s
-      @raw_result
-    end
+    include InternalScalarisSimpleError
   end
 
   # Exception that is thrown if an operation on a Scalaris ring fails because
@@ -281,17 +272,16 @@ module Scalaris
     # Raises the appropriate exception if the operation failed.
     # 
     # result: {'status' => 'ok'} or
-    #         {'status' => 'fail', 'reason' => 'abort', 'keys' => <list>} or
-    #         {'status' => 'fail', 'reason' => 'timeout'}
+    #         {'status' => 'fail', 'reason' => 'timeout' or 'abort'}
     def self.process_result_commit(result)
       if result.is_a?(Hash) and result.has_key?('status')
         if result == {'status' => 'ok'}
           return true
-        elsif result['status'] == 'fail' and result.has_key?('reason')
-          if result.length == 2 and result['reason'] == 'timeout'
+        elsif result['status'] == 'fail' and result.has_key?('reason') and result.length == 2
+          if result['reason'] == 'timeout'
             raise TimeoutError.new(result)
-          elsif result.length == 3 and result['reason'] == 'abort' and result.has_key?('keys')
-            raise AbortError.new(result, result['keys'])
+          elsif result['reason'] == 'abort'
+            raise AbortError.new(result)
           end
         end
       end
@@ -396,15 +386,13 @@ module Scalaris
       if result == {'status' => 'ok'}
         return nil
       elsif result.is_a?(Hash) and result.has_key?('status')
-        if result['status'] == 'fail' and result.has_key?('reason')
-          if result.length == 2
-            if result['reason'] == 'timeout'
-              raise TimeoutError.new(result)
-            elsif result['reason'] == 'not_found'
-              raise NotFoundError.new(result)
-            end
-          elsif result.length == 3 and result['reason'] == 'abort' and result.has_key?('keys')
-            raise AbortError.new(result, result['keys'])
+        if result['status'] == 'fail' and result.has_key?('reason') and result.length == 2
+          if result['reason'] == 'timeout'
+            raise TimeoutError.new(result)
+          elsif result['reason'] == 'abort'
+            raise AbortError.new(result)
+          elsif result['reason'] == 'not_found'
+            raise NotFoundError.new(result)
           end
         end
       end

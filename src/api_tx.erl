@@ -39,8 +39,8 @@
          read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3]).
 
 -ifdef(with_export_type_support).
--export_type([request/0, read_result/0, write_result/0, commit_result/0,
-              result/0, request_on_key/0]).
+-export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0,
+              request_on_key/0]).
 -endif.
 
 -include("scalaris.hrl").
@@ -50,20 +50,15 @@
 -type request_on_key() ::
           {read, client_key()}
         | {write, client_key(), client_value()}
-        | {add_del_on_list, client_key(),
-           client_value(),  %% abort when not ToAdd::[client_value()],
-           client_value()}  %% abort when not ToRemove::[client_value()]}
-        | {add_on_nr, client_key(),
-           client_value()} %% abort when not number()}
-        | {test_and_set, client_key(),
-           Old::client_value(), New::client_value()}.
+        | {add_del_on_list, client_key(), ToAdd::[client_value()], ToRemove::[client_value()]}
+        | {add_on_nr, client_key(), number()}
+        | {test_and_set, client_key(), Old::client_value(), New::client_value()}.
 -type request() :: request_on_key() | {commit}.
-
 -type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
 -type write_result() :: {ok} | {fail, timeout}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
--type commit_result() :: {ok} | {fail, timeout} | {fail, abort, [client_key()]}.
+-type commit_result() :: {ok} | {fail, abort | timeout}.
 -type testandset_result() :: write_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 -type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
 
@@ -143,7 +138,7 @@ write(Key, Value) ->
 
 %% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
 -spec add_del_on_list(client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
-           -> listop_result() | {fail, abort, [client_key()]}.
+           -> listop_result() | {fail, abort}.
 add_del_on_list(Key, ToAdd, ToRemove) ->
     ReqList = [{add_del_on_list, Key, ToAdd, ToRemove}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -154,7 +149,7 @@ add_del_on_list(Key, ToAdd, ToRemove) ->
 
 %% @doc Atomically perform a add_del_on_list operation and a commit (not as part of a transaction).
 -spec add_on_nr(client_key(), ToAdd::number())
-           -> numberop_result() | {fail, abort, [client_key()]}.
+           -> numberop_result() | {fail, abort}.
 add_on_nr(Key, ToAdd) ->
     ReqList = [{add_on_nr, Key, ToAdd}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -167,7 +162,7 @@ add_on_nr(Key, ToAdd) ->
 %%      If the value stored at Key is the same as OldValue, then NewValue will
 %%      be stored.
 -spec test_and_set(Key::client_key(), OldValue::client_value(), NewValue::client_value())
-        -> testandset_result() | {fail, abort, [client_key()]}.
+        -> testandset_result() | {fail, abort}.
 test_and_set(Key, OldValue, NewValue) ->
     ReqList = [{test_and_set, Key, OldValue, NewValue}, {commit}],
     {_TLog, [Res1, Res2]} = req_list(tx_tlog:empty(), ReqList),
@@ -184,5 +179,5 @@ req_list_commit_each(ReqList) ->
           {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
           {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
           {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
-          _ -> {fail, abort, []}
+          _ -> {fail, abort}
       end || Req <- ReqList].

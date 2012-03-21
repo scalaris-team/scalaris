@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -119,14 +119,7 @@ send(Pid, Message) ->
 -spec send_local(erl_local_pid(), message()) -> ok.
 send_local(Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    _ = case erlang:get(trace_mpath) of
-            undefined ->
-                RealPid ! RealMessage;
-            Logger ->
-                LogEpidemicMsg =
-                    trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
-                RealPid ! LogEpidemicMsg
-        end,
+    RealPid ! RealMessage,
     ok.
 
 %% @doc Sends a message to a local process given by its local pid
@@ -134,14 +127,7 @@ send_local(Pid, Message) ->
 -spec send_local_after(non_neg_integer(), erl_local_pid(), message()) -> reference().
 send_local_after(Delay, Pid, Message) ->
     {RealPid, RealMessage} = unpack_cookie(Pid, Message),
-    case erlang:get(trace_mpath) of
-        undefined ->
-            erlang:send_after(Delay, RealPid, RealMessage);
-        Logger ->
-            LogEpidemicMsg =
-                trace_mpath:log_send(Logger, self(), RealPid, RealMessage),
-            erlang:send_after(Delay, RealPid, LogEpidemicMsg)
-    end.
+    erlang:send_after(Delay, RealPid, RealMessage).
 
 %% @doc Returns the pid of the current process.
 -spec this() -> mypid().

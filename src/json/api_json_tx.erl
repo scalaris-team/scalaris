@@ -76,8 +76,7 @@ handler(AnyOp, AnyParams) ->
                   | {reason, string()} ]}. %% "timeout"
 -type commit_result() ::
         {struct, [{status, string()}       %% "ok", "fail"
-                  | {reason, string()}     %% "timeout"
-                  | {keys, {array, [string()]}} ]}. %% "abort"
+                  | {reason, string()} ]}. %% "abort", "timeout"
 
 -type result() :: read_result() | write_result() | commit_result().
 
@@ -162,10 +161,7 @@ result_to_json(Result) ->
                                         {reason, "key_changed"},
                                         value_to_json(Val)];
          {fail, Reason}             -> [{status, "fail"},
-                                        {reason, atom_to_list(Reason)}];
-         {fail, abort, Keys}        -> [{status, "fail"},
-                                        {reason, "abort"},
-                                        {keys,   {array, Keys}}]
+                                        {reason, atom_to_list(Reason)}]
      end
     }.
 

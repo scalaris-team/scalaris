@@ -26,8 +26,8 @@
 
 all() ->
     [min_max, largest_smaller_than, gb_trees_foldl,
-     repeat, repeat_collect, repeat_accumulate,
-     repeat_p, repeat_p_collect, repeat_p_accumulate,
+     s_repeat_test, s_repeatAndCollect_test, s_repeatAndAccumulate_test,
+     p_repeat_test, p_repeatAndCollect_test, p_repeatAndAccumulate_test,
      tester_minus_all, tester_minus_all_sort,
      tester_minus_first, tester_minus_first_sort].
 
@@ -76,50 +76,68 @@ gb_trees_foldl(_Config) ->
                                 0,
                                 Tree) =:= 127).
 
-repeat(_) ->
-    util:repeat(fun() -> io:format("#s_repeat#~n") end, [], 5),
-    io:format("s_repeat_test successful if #s_repeat# was printed 5 times~n"),    
+s_repeat_test(_) ->
+    util:s_repeat(fun() -> io:format("#s_repeat#~n") end, [], 5),
+    io:format("s_repeat_test successful if #s_repeat# was printed 5 times~n"),
     ok.
 
-repeat_collect(_) ->
+s_repeatAndCollect_test(_) ->
     Times = 3,
-    Result = util:repeat(fun(X) -> X * X end, [Times], Times, [collect]),
+    Result = util:s_repeatAndCollect(fun(X) -> X * X end, [Times], Times),
     ?equals(Result, [9, 9, 9]),
     ok.
-
-repeat_accumulate(_) ->
+    
+s_repeatAndAccumulate_test(_) ->
     Times = 5,
-    A = util:repeat(fun(X) -> X * X end, [Times], Times,
-                    [{accumulate, fun(X, Y) -> X + Y end, 0}]),
-    ?equals(A, Times*Times*Times),
-    B = util:repeat(fun(X) -> X * X end, [Times], Times,
-                    [{accumulate, fun(X, Y) -> X + Y end, 1000}]),
-    ?equals(B, 1000 + Times*Times*Times),      
+    Result = util:s_repeatAndAccumulate(fun(X) -> X * X end, 
+                                        [Times], 
+                                        Times,
+                                        fun(X, Y) -> X + Y end,
+                                        0),
+    ?equals(Result, Times*Times*Times),
+    Result2 = util:s_repeatAndAccumulate(fun(X) -> X * X end, 
+                                        [Times], 
+                                        Times,
+                                        fun(X, Y) -> X + Y end,
+                                        1000),
+    ?equals(Result2, 1000 + Times*Times*Times),    
     ok.
 
-repeat_p(_) ->
+p_repeat_test(_) ->
     Times = 5,
-    util:repeat(
-      fun(Caller) -> io:format("~w #p_repeat_test# called by ~w", [self(), Caller]) end, 
-      [self()], 
-      Times, [parallel]),
+    util:p_repeat(fun(Caller) -> 
+                              io:format("~w #p_repeat_test# called by ~w", 
+                                        [self(), Caller]) 
+                      end, 
+                      [self()], 
+                      Times),
     io:format("p_repeat_test successful if ~B different pids printed #p_repeat#.", [Times]),
     ok.
 
-repeat_p_collect(_) ->
-    Times = 3,
-    A = util:repeat(fun(X) -> X * X end, [Times], Times, [parallel, collect]),
-    ?equals(A, [9, 9, 9]),
-    ok.
+p_repeatAndCollect_test(_) ->
+   Times = 3,
+   Result = util:p_repeatAndCollect(fun(X) -> X * X end, [Times], Times),
+   ?equals(Result, [9, 9, 9]),
+   ok.
 
-repeat_p_accumulate(_) ->
+p_repeatAndAccumulate_test(_) ->
     Times = 15,
-    A = util:repeat(fun(X) -> X * X end, [Times], Times,
-                    [parallel, {accumulate, fun(X, Y) -> X + Y end, 0}]),     
-    ?equals(A, Times*Times*Times),
-    B = util:repeat(fun(X) -> X * X end, [Times], Times,
-                    [parallel, {accumulate, fun(X, Y) -> X + Y end, 1000}]),     
-    ?equals(B, 1000 + Times*Times*Times),   
+    Result = util:p_repeatAndAccumulate(fun(X) -> 
+                                                R = X * X, 
+                                                io:format("pid ~w result ~B", [self(), R]), 
+                                                R 
+                                        end, 
+                                        [Times], 
+                                        Times,
+                                        fun(X, Y) -> X + Y end,
+                                        0),     
+    ?equals(Result, Times*Times*Times),    
+    Result2 = util:p_repeatAndAccumulate(fun(X) -> X * X end, 
+                                        [Times], 
+                                        Times,
+                                        fun(X, Y) -> X + Y end,
+                                        1000),     
+    ?equals(Result2, 1000 + Times*Times*Times),    
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

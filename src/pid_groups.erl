@@ -298,7 +298,21 @@ get_web_debug_info(GrpName, PidNameString) ->
     KVs =
         case Pid of
             failed -> [{"process", "unknown"}];
-            _      -> util:debug_info(Pid)
+            _ ->
+                comm:send_local(Pid , {web_debug_info, self()}),
+                GenCompInfo =
+                    receive
+                        {web_debug_info_reply, LocalKVs} -> LocalKVs
+                    after 2000 -> []
+                    end,
+
+                [{_, Memory}, {_, Reductions}, {_, QueueLen}] =
+                    process_info(Pid, [memory, reductions, message_queue_len]),
+
+                [{"memory", Memory},
+                 {"reductions", Reductions},
+                 {"message_queue_len", QueueLen}
+                 | GenCompInfo]
         end,
     JsonKVs = [ {struct, [{key, K}, {value, toString(V)}]} || {K, V} <- KVs],
     {struct, [{pairs, {array, JsonKVs}}]}.

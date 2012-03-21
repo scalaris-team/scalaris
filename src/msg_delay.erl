@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
+% @copyright 2009-2011 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 % @end
 
@@ -85,15 +85,11 @@ on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
    {TimeTable, Counter} = State) ->
     ?TRACE("msg_delay:on(~.0p, ~.0p)~n", [_FullMsg, State]),
     Future = trunc(Counter + Seconds),
-    EMsg = case erlang:get(trace_mpath) of
-               undefined -> Msg;
-               PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), Dest, Msg)
-           end,
     case pdb:get(Future, TimeTable) of
         undefined ->
-            pdb:set({Future, [{Dest, EMsg}]}, TimeTable);
+            pdb:set({Future, [{Dest, Msg}]}, TimeTable);
         {_, MsgQueue} ->
-            pdb:set({Future, [{Dest, EMsg} | MsgQueue]}, TimeTable)
+            pdb:set({Future, [{Dest, Msg} | MsgQueue]}, TimeTable)
     end,
     State;
 
@@ -103,22 +99,10 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
     case pdb:get(Counter, TimeTable) of
         undefined -> ok;
         {_, MsgQueue} ->
-            _ = [ case Msg of
-                      {'$gen_component', trace_mpath, PState, _From, _To, OrigMsg} ->
-                          Restore = erlang:get(trace_mpath),
-                          trace_mpath:start(PState),
-                          comm:send_local(Dest, OrigMsg),
-                          erlang:put(trace_mpath, Restore);
-                      _ -> comm:send_local(Dest, Msg)
-                  end || {Dest, Msg} <- MsgQueue ],
+            _ = [ comm:send_local(Dest, Msg) || {Dest, Msg} <- MsgQueue ],
             pdb:delete(Counter, TimeTable)
     end,
-    ETrigger =
-        case erlang:get(trace_mpath) of
-            undefined -> Trigger;
-            PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), comm:this(), Trigger)
-        end,
-    comm:send_local_after(1000, self(), ETrigger),
+    comm:send_local_after(1000, self(), Trigger),
     {TimeTable, Counter + 1};
 
 on({web_debug_info, Requestor}, {TimeTable, Counter} = State) ->

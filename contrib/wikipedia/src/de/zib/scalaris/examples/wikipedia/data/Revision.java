@@ -135,7 +135,7 @@ public class Revision implements Serializable {
     }
 
     /**
-     * Gets the compressed revision text.
+     * Gets the un-compressed revision text.
      * 
      * @return the text
      */

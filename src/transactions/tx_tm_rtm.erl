@@ -29,7 +29,6 @@
 -define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 -include("scalaris.hrl").
--include("client_types.hrl").
 
 %% public interface for transaction validation using Paxos-Commit.
 -export([commit/4]).
@@ -157,8 +156,9 @@ on({tp_committed, ItemId} = _Msg, State) ->
                                 all_items_acked ->
                                     %% to inform, we do not need to know the new state
                                     Result = tx_state:is_decided(TmpTxState),
-                                    inform_client(TmpTxState, State, Result),
-                                    inform_rtms(TxId, State, Result),
+                                    inform_client(TxId, State, Result),
+                                    inform_rtms(TxId, State,
+                                                Result),
                                     TmpTxState
                             end,
                         _ = set_entry(NewTxState, State),
@@ -197,7 +197,7 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
 
                             %% client and rtms are informed, when
                             %% maj. of tps comitted
-                            %% inform_client(T1TxState, State, Result),
+                            %% inform_client(TxId, State, Result),
                             %% inform_rtms(TxId, State, Result),
                             T1TxState
                     end,
@@ -816,18 +816,15 @@ set_entry(NewEntry, State) ->
     pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
--spec inform_client(tx_state:tx_state(), state(), commit | abort) -> ok.
-inform_client(TxState, State, Result) ->
+-spec inform_client(tx_state:tx_id(), state(), commit | abort) -> ok.
+inform_client(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
+    {ok, TxState} = get_tx_entry(TxId, State),
     Client = tx_state:get_client(TxState),
     ClientsId = tx_state:get_clientsid(TxState),
-    ClientResult = case Result of
-                       commit -> commit;
-                       abort -> {abort, get_failed_keys(TxState, State)}
-                   end,
     case Client of
         unknown -> ok;
-        _       -> msg_commit_reply(Client, ClientsId, ClientResult)
+        _ -> msg_commit_reply(Client, ClientsId, Result)
     end,
     ok.
 
@@ -854,7 +851,6 @@ inform_tps(TxState, State, Result) ->
 -spec inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
 inform_rtms(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
-    %% TODO: better inform the rtms stored in the txid?!
     RTMs = state_get_RTMs(State),
     _ = [ begin
               Pid = get_rtmpid(RTM),
@@ -1032,32 +1028,6 @@ state_unsubscribe(State, Pid) ->
                       end
               end,
     state_set_subs(State, NewSubs).
-
--spec get_failed_keys(tx_state:tx_state(), state()) -> [client_key()].
-get_failed_keys(TxState, State) ->
-    Result =
-    case tx_state:get_numabort(TxState) of
-        0 -> [];
-        _ ->
-            TLogTxItemIds = tx_state:get_tlog_txitemids(TxState),
-            TLog_TxItems =
-                [ begin
-                      {_, TxItem} = get_item_entry(TxItemId, State),
-                      {TLogEntr, TxItem}
-                  end
-                  || {TLogEntr, TxItemId} <- TLogTxItemIds ],
-            [ tx_tlog:get_entry_key(TLogEntr)
-              || {TLogEntr, TxItem} <- TLog_TxItems,
-                 abort =:= tx_item_state:get_decided(TxItem)]
-    end,
-    case tx_state:get_numabort(TxState) =:= length(Result) of
-        true -> ok;
-        false ->
-            ct:pal("This should not happen: ~p =/= ~p~n",
-                   [tx_state:get_numabort(TxState), length(Result)])
-    end,
-    Result.
-
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.

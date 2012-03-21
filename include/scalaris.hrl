@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2011 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +23,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.4.1+svn").
+-define(SCALARIS_VERSION, "0.4.1").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
@@ -82,10 +82,6 @@
 % disable:
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
 
-% Replica Repair
--define(REP_BLOOM, bloom). % bloom filter implemenation selection 
--define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
-
 % Back-end of the pdb module
 -define(PDB_ERL, true). % erlang put and get (process dictionary)
 %-define(PDB_ETS, true). % may have performance issues with msg_delay
@@ -96,14 +92,5 @@
 % (process dictionary, key test_server_loc)
 %-compile({parse_transform, ct_line}).
 -endif.
-
--define(SCALARIS_RECV(X,Y),
-       {'$gen_component', trace_mpath,
-        _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
-               trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
-               trace_mpath:log_info(_ScalPState, _ScalTo, {"Tracing ends at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
-               Y;
-       X -> Y
-       ).
 
 -include("types.hrl").
