@@ -61,9 +61,14 @@
 -spec test_upd() -> ok.
 test_upd() ->
     make_ring(symmetric, 10),
-    R = fill_ring(random, 10000, [{ftype, mixed}]),
-    print_db_status(R),
-    db_stats().
+    _ = fill_ring(random, 10000, [{ftype, update}]),
+    db_stats(),
+    util:for_to(1, 10, 
+                fun(_) ->
+                        start_sync(),
+                        db_stats()
+                end),
+    ok.    
 
 -spec test_regen() -> ok.
 test_regen() ->
@@ -121,7 +126,7 @@ start_sync() ->
     io:format("--> START SYNC - ~p~n", [config:read(rep_update_recon_method)]),
     %start
     lists:foreach(fun(Node) ->
-                          comm:send(Node, {send_to_group_member, rep_upd, {rep_update_trigger}})
+                          comm:send(Node, {send_to_group_member, rrepair, {rr_trigger}})
                   end, 
                   Nodes),
     %wait for end
@@ -129,7 +134,7 @@ start_sync() ->
       fun(Node) -> 
               util:wait_for(
                 fun() -> 
-                        comm:send(Node, {send_to_group_member, rep_upd, {get_state, comm:this(), open_sync}}),
+                        comm:send(Node, {send_to_group_member, rrepair, {get_state, comm:this(), open_sync}}),
                         receive
                             {get_state_response, Val} -> Val =:= 0
                         end
