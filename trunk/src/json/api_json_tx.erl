@@ -206,7 +206,13 @@ value_to_json(Value) ->
 -spec json_to_value(value()) -> client_value().
 json_to_value({struct, [{"type", "as_bin"}, {"value", Value}]}) ->
     base64:decode(Value);
+json_to_value({struct, [{"value", Value}, {"type", "as_bin"}]}) ->
+    base64:decode(Value);
 json_to_value({struct, [{"type", "as_is"}, {"value", {array, List}}]}) ->
     List;
+json_to_value({struct, [{"value", {array, List}}, {"type", "as_is"}]}) ->
+    List;
 json_to_value({struct, [{"type", "as_is"}, {"value", Value}]}) ->
+    Value;
+json_to_value({struct, [{"value", Value}, {"type", "as_is"}]}) ->
     Value.
