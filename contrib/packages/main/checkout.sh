@@ -4,8 +4,8 @@ SCALARIS_VERSION="0.4.1"
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
 pkg_version=${1:-"$SCALARIS_VERSION"}
-branchversion=${2:-"0.4"}
-url="http://scalaris.googlecode.com/svn/branches/${branchversion}"
+branchversion=${2:-"0.4.1"}
+url="http://scalaris.googlecode.com/svn/tags/${branchversion}"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
