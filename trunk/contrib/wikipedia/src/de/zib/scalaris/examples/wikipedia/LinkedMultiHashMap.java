@@ -66,7 +66,12 @@ public class LinkedMultiHashMap<K, V> implements Map<K, List<V>> {
 
     @Override
     public boolean containsValue(Object value) {
-        return stats.containsValue(value);
+        for (Entry<? extends K, ? extends List<V>> stat : stats.entrySet()) {
+            if (stat.getValue().contains(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
