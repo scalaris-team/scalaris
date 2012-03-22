@@ -23,6 +23,10 @@
 			<param-name>WIKI_SAVEPAGE_RETRY_DELAY</param-name>
 			<param-value>10</param-value>
 		</init-param>
+		<init-param>
+			<param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
+			<param-value>600</param-value>
+		</init-param>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>WikiServletScalaris</servlet-name>

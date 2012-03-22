@@ -32,6 +32,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import com.skjegstad.utils.BloomFilter;
+
 import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 
 /**
@@ -97,6 +99,9 @@ public class MyWikiModel extends WikiModel {
      * All keys that have been read or written during the current operation.
      */
     protected final List<String> involvedKeys = new ArrayList<String>();
+    
+    public static final double existingPagesFPR = 0.1;
+    protected BloomFilter<String> existingPages = null;
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -660,17 +665,21 @@ public class MyWikiModel extends WikiModel {
      * @see info.bliki.wiki.model.WikiModel#appendInternalLink(java.lang.String, java.lang.String, java.lang.String, java.lang.String, boolean)
      */
     @Override
-    public void appendInternalLink(String topic, String hashSection, String topicDescription,
+    public void appendInternalLink(String topic0, String hashSection, String topicDescription,
             String cssClass, boolean parseRecursive) {
         /*
          * convert links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * external links if the link is an interwiki link
          */
-        String[] nsTitle = splitNsTitle(topic);
+        String[] nsTitle = splitNsTitle(topic0);
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
-            appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic));
+            appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
-            super.appendInternalLink(topic, hashSection, topicDescription, cssClass, parseRecursive);
+            String topic = normalisePageTitle(topic0);
+            if (cssClass == null && existingPages!= null && !existingPages.contains(topic)) {
+                cssClass = "new";
+            }
+            super.appendInternalLink(topic0, hashSection, topicDescription, cssClass, parseRecursive);
         }
     }
 
@@ -965,5 +974,25 @@ public class MyWikiModel extends WikiModel {
      */
     public List<String> getInvolvedKeys() {
         return involvedKeys;
+    }
+    
+    public static BloomFilter<String> createBloomFilter(Collection<? extends String> elements) {
+        BloomFilter<String> result = new BloomFilter<String>(existingPagesFPR, elements.size() + Math.min(10, elements.size() / 10));
+        result.addAll(elements);
+        return result;
+    }
+
+    /**
+     * @return the existingPages
+     */
+    public BloomFilter<String> getExistingPages() {
+        return existingPages;
+    }
+
+    /**
+     * @param existingPages the existingPages to set
+     */
+    public void setExistingPages(BloomFilter<String> existingPages) {
+        this.existingPages = existingPages;
     }
 }

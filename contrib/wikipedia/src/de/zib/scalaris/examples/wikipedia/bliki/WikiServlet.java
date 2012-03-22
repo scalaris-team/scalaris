@@ -36,6 +36,9 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +52,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+
+import com.skjegstad.utils.BloomFilter;
 
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
@@ -121,6 +126,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected WikiDump importHandler = null;
     
     protected List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
+    
+    protected BloomFilter<String> existingPages = new BloomFilter<String>(MyWikiModel.existingPagesFPR, 100);
 
     /**
      * Creates the servlet. 
@@ -151,6 +158,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String WIKI_SAVEPAGE_RETRY_DELAY = config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY");
         if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
             Options.WIKI_SAVEPAGE_RETRY_DELAY = parseInt(WIKI_SAVEPAGE_RETRY_DELAY, Options.WIKI_SAVEPAGE_RETRY_DELAY);
+        }
+        final String WIKI_REBUILD_PAGES_CACHE = config.getInitParameter("WIKI_REBUILD_PAGES_CACHE");
+        if (WIKI_REBUILD_PAGES_CACHE != null) {
+            Options.WIKI_REBUILD_PAGES_CACHE = parseInt(WIKI_SAVEPAGE_RETRY_DELAY, Options.WIKI_REBUILD_PAGES_CACHE);
         }
     }
     
@@ -193,6 +204,27 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             return false;
         }
         return true;
+    }
+
+    /**
+     * Starts the service updating the bloom filter for existing pages.
+     */
+    protected void startExistingPagesUpdate() {
+        if (Options.WIKI_REBUILD_PAGES_CACHE > 0) {
+            ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+            ses.scheduleWithFixedDelay(new Runnable() {
+                @Override
+                public void run() {
+                    Connection connection = getConnection(null);
+                    ValueResult<List<String>> result = getPageList(connection);
+                    if (result.success) {
+                        List<String> pages = result.value;
+                        BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
+                        existingPages = filter;
+                    }
+                }
+            }, 0, Options.WIKI_REBUILD_PAGES_CACHE, TimeUnit.SECONDS);
+        }
     }
 
     /**
@@ -1466,6 +1498,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
+                // also actively update the bloom filter of existing pages
+                existingPages.add(MyWikiModel.normalisePageTitle(title, namespace));
                 ArrayList<Long> times = new ArrayList<Long>();
                 for (List<Long> time : page.getStats().values()) {
                     times.addAll(time);
