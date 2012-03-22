@@ -85,15 +85,14 @@
          ownerLocalPid      = ?required(rr_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
          ownerRemotePid     = ?required(rr_recon_state, ownerRemotePid) :: comm:mypid(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
-         dest_ru_pid        = undefined                                 :: comm:mypid() | undefined,
+         dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
          recon_method       = undefined                                 :: method(),   %reconciliation method
          recon_struct       = {}                                        :: recon_struct() | {},
          recon_stage        = reconciliation                            :: recon_stage(),
          sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
          sync_master        = false                                     :: boolean(),               %true if process is sync leader
          sync_round         = 0                                         :: rrepair:round(),
-         stats              = rr_recon_stats:new()                      :: rr_recon_stats:stats(),
-         sync_start_time    = {0, 0, 0}                                 :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}
+         stats              = rr_recon_stats:new()                      :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
 
@@ -101,12 +100,17 @@
                              fail_leaf | fail_node |
                              not_found.
 
--type message() ::
-    {get_state_response, intervals:interval()} |
-    {get_chunk_response, db_chunk_enc()} |
+-type message() ::          
+    %API
+    {start_recon, method()} |
+    {start_recon, method(), recon_stage(), recon_struct(), Master::boolean()} |    
+    %tree sync msgs
     {check_node, MasterPid::comm:mypid(), intervals:interval(), merkle_tree:mt_node_key()} |
     {check_node_response, tree_cmp_response(), intervals:interval(), [merkle_tree:mt_node_key()]} |
-    {start_recon, method(), recon_stage(), recon_struct(), Master::boolean()} |
+    %dht node response
+    {get_state_response, intervals:interval()} |
+    {get_chunk_response, db_chunk_enc()} |          
+    %misc (internal)
     {shutdown, exit_reason()} | 
     {crash, DeadPid::comm:mypid()}.
 
@@ -142,7 +146,7 @@ on({get_state_response, MyInterval}, State =
                         recon_method = RMethod,
                         recon_struct = Params,                        
                         dhtNodePid = DhtNodePid,
-                        dest_ru_pid = DestRUPid }) ->
+                        dest_rr_pid = DestRUPid }) ->
     RMethod =:= merkle_tree andalso fd:subscribe(DestRUPid),
     SrcInterval = proplists:get_value(interval, Params),
     MyIMapped = mapInterval(MyInterval, 1),
@@ -163,13 +167,12 @@ on({get_state_response, MyI}, State =
                         recon_method = RMethod,
                         recon_struct = Params,
                         dhtNodePid = DhtNodePid,
-                        dest_ru_pid = ClientRU_Pid}) ->
+                        dest_rr_pid = ClientRU_Pid}) ->
     Interval = proplists:get_value(interval, Params),
     ClientPid = proplists:get_value(senderPid, Params),
     MyIntersec = mapInterval(Interval, get_interval_quadrant(MyI)),
     case intervals:is_subset(MyIntersec, MyI) of
         false ->
-            ?TRACE("SYNC MASTER - INTERSEC NOT IN MY I", []),
             comm:send_local(self(), {shutdown, negotiate_interval_master}),            
             comm:send(ClientPid, {shutdown, no_interval_intersection});
         true ->
@@ -241,7 +244,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         recon_method = bloom,
                         dhtNodePid = DhtNodePid,
                         ownerLocalPid = Owner,
-                        dest_ru_pid = DestRU_Pid,
+                        dest_rr_pid = DestRU_Pid,
                         recon_struct = #bloom_recon_struct{ interval = BloomI, 
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
@@ -274,6 +277,18 @@ on({get_chunk_response, {RestI, DBList}}, State =
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
     
+on({start_recon, ReconMethod}, State) ->
+    comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    Stage = case ReconMethod of
+                bloom -> build_struct;
+                merkle_tree -> req_shared_interval;        
+                art -> req_shared_interval
+            end,
+    State#rr_recon_state{ recon_stage = Stage, 
+                          recon_struct = {},
+                          recon_method = ReconMethod,
+                          sync_master = true };
+
 on({start_recon, ReconMethod, ReconStage, ReconStruct, Master}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
     State#rr_recon_state{ recon_stage = ReconStage, 
@@ -288,13 +303,10 @@ on({crash, Pid}, State) ->
 on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner, 
                                         sync_round = Round,
                                         stats = Stats,
-                                        sync_master = Master,
-                                        sync_start_time = SyncStartTime }) ->
+                                        sync_master = Master }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
-    NewStats = rr_recon_stats:set([{recon_time, timer:now_diff(erlang:now(), SyncStartTime)},
-                                   {finish, Reason =:= sync_finished}], Stats),
-    comm:send_local(Owner, 
-                    {recon_progress_report, self(), Round, Master, NewStats}),
+    NewStats = rr_recon_stats:set([{finish, Reason =:= sync_finished}], Stats),
+    comm:send_local(Owner, {recon_progress_report, self(), Round, Master, NewStats}),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -304,26 +316,26 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
 on({check_node, SrcPid, Interval, Hash}, State =
        #rr_recon_state{ recon_struct = Tree }) ->
     Node = merkle_tree:lookup(Interval, Tree),
-    case Node of
-        not_found ->
-            comm:send(SrcPid, {check_node_response, not_found, Interval, []});
-        _ ->
-            IsLeaf = merkle_tree:is_leaf(Node),
-            {Result, ChildHashs} = case merkle_tree:get_hash(Node) =:= Hash of
-                                       true when IsLeaf -> {ok_leaf, []};
-                                       true when not IsLeaf -> {ok_inner, []};
-                                       false when IsLeaf -> {fail_leaf, []};
-                                       false when not IsLeaf ->
-                                           {fail_inner, 
-                                            [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
-                                   end,
-            comm:send(SrcPid, {check_node_response, Result, Interval, ChildHashs})
-    end,
+    {Result, ChildHashs} = 
+        case Node of
+            not_found -> {not_found, []};
+            _ ->
+                IsLeaf = merkle_tree:is_leaf(Node),
+                case merkle_tree:get_hash(Node) =:= Hash of
+                    true when IsLeaf -> {ok_leaf, []};
+                    true when not IsLeaf -> {ok_inner, []};
+                    false when IsLeaf -> {fail_leaf, []};
+                    false when not IsLeaf ->
+                        {fail_inner, 
+                         [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
+                end
+        end,
+    comm:send(SrcPid, {check_node_response, Result, Interval, ChildHashs}),
     State#rr_recon_state{ sync_pid = SrcPid };
 
 on({check_node_response, Result, I, ChildHashs}, State = 
        #rr_recon_state{ sync_pid = SyncDest,
-                        dest_ru_pid = SrcNode,
+                        dest_rr_pid = SrcNode,
                         stats = Stats, 
                         ownerLocalPid = OwnerPid,
                         recon_struct = Tree,
@@ -377,7 +389,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{recon_method = RMethod,
                                                sync_pid = SrcPid,
                                                dhtNodePid = DhtNodePid,
                                                ownerRemotePid = OwnerPid,
-                                               dest_ru_pid = DestRU_Pid,                                       
+                                               dest_rr_pid = DestRU_Pid,                                       
                                                sync_master = IsMaster, 
                                                stats = Stats }) ->
      case RMethod of
@@ -472,7 +484,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
     is_subtype(State,  state()),
     is_subtype(Stats,  rr_recon_stats:stats()).
 art_recon(Tree, Art, #rr_recon_state{ sync_round = Round, 
-                                      dest_ru_pid = DestPid,
+                                      dest_rr_pid = DestPid,
                                       ownerLocalPid = OwnerPid,
                                       stats = Stats }) ->
     case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
@@ -698,7 +710,7 @@ decodeBlob(_) -> fail.
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
-    State#rr_recon_state{ sync_start_time = erlang:now() }.
+    State.
 
 -spec start(Round, Sender_RU_Pid) -> {ok, MyPid} when
       is_subtype(Round,         rrepair:round()),
@@ -709,7 +721,7 @@ start(Round, SenderRUPid) ->
     State = #rr_recon_state{ ownerLocalPid = self(), 
                              ownerRemotePid = comm:this(), 
                              dhtNodePid = pid_groups:get_my(dht_node),
-                             dest_ru_pid = SenderRUPid,
+                             dest_rr_pid = SenderRUPid,
                              sync_round = Round },
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
 

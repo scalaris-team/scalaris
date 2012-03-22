@@ -66,9 +66,9 @@
 -type state() :: #rrepair_state{}.
 
 -type message() ::
-    {?TRIGGER_NAME} |
-    {get_state, Sender::comm:mypid(), Key::atom()} |
+    {?TRIGGER_NAME} |    
     % API
+    {get_state, Sender::comm:mypid(), Key::atom()} |          
     {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rr_recon:recon_stage(), 
         rr_recon:method(), rr_recon:recon_struct()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
@@ -86,14 +86,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 -spec on(message(), state()) -> state().
 
 on({get_state, Sender, Key}, State = 
        #rrepair_state{ open_recon = Recon,
                        open_resolve = Resolve,
                        sync_round = Round }) ->
-    ?TRACE_KILL("GET STATE - Recon=~p  - Resolve=~p", [Recon, Resolve]),
     Value = case Key of
                 open_recon -> Recon;
                 open_resolve -> Resolve;
@@ -106,12 +104,7 @@ on({get_state, Sender, Key}, State =
 on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round,
                                             open_recon = OpenRecon }) ->
     {ok, Pid} = rr_recon:start(Round, undefined),
-    RStage = case get_recon_method() of
-                 bloom -> build_struct;
-                 merkle_tree -> req_shared_interval;        
-                 art -> req_shared_interval
-             end,
-    comm:send_local(Pid, {start_recon, get_recon_method(), RStage, {}, true}),
+    comm:send_local(Pid, {start_recon, get_recon_method()}),
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
     {R, F} = Round,
     State#rrepair_state{ trigger_state = NewTriggerState, 
