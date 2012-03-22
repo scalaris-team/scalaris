@@ -8,7 +8,7 @@ Homepage: http://code.google.com/p/scalaris
 Package: conpaas-scalarix-one-manager
 Conflicts: scalaris-one-manager, scalaris-one-frontend, conpaas-scalarix-one-frontend
 Architecture: all
-Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev, scalaris (>= ${binary:Version})
+Depends: ruby, ruby1.8, rubygems1.8, libsequel-ruby, libsqlite3-ruby, libsinatra-ruby, libnokogiri-ruby, scalaris (>= ${binary:Version})
 Description: Scalarix Manager daemon for ConPaaS
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
@@ -19,7 +19,7 @@ Description: Scalarix Manager daemon for ConPaaS
 Package: conpaas-scalarix-one-frontend
 Conflicts: scalaris-one-frontend, scalaris-one-manager, conpaas-scalarix-one-manager
 Architecture: all
-Depends: ruby, ruby1.8, rubygems1.8, libsqlite3-dev, libxml2-dev, libxslt1-dev
+Depends: ruby, ruby1.8, rubygems1.8, libsinatra-ruby, libnokogiri-ruby
 Description: Scalarix Manager daemon for ConPaaS
  Scalaris is a scalable, transactional, distributed key-value store. It
  can be used for building scalable services. Scalaris uses a structured
