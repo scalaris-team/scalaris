@@ -733,7 +733,6 @@ public class ScalarisDataHandler {
 
         // check that the current version is still up-to-date:
         // read old version first, then write
-        int oldRevId = -1;
         String pageInfoKey = getPageKey(title0, nsObject);
         
         Transaction.RequestList requests = new Transaction.RequestList();
@@ -751,20 +750,19 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        
+
+        int oldRevId;
         try {
             oldPage = results.processReadAt(0).jsonValue(Page.class);
-            newPage = new Page(oldPage.getTitle(),
-                    oldPage.getId() + 1, oldPage.isRedirect(),
-                    new LinkedHashMap<String, String>(
+            newPage = new Page(oldPage.getTitle(), oldPage.getId(),
+                    oldPage.isRedirect(), new LinkedHashMap<String, String>(
                             oldPage.getRestrictions()), newRev);
             oldRevId = oldPage.getCurRev().getId();
         } catch (NotFoundException e) {
             // this is ok and means that the page did not exist yet
-            newPage = new Page();
-            newPage.setTitle(title0);
-            newPage.setCurRev(newRev);
-            newPage.setId(newRev.getId());
+            newPage = new Page(title0, 1, false,
+                    new LinkedHashMap<String, String>(), newRev);
+            oldRevId = 0;
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
                     "unknown exception reading \"" + pageInfoKey
@@ -773,6 +771,7 @@ public class ScalarisDataHandler {
                     newShortRevs, pageEdits, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
+        newRev.setId(oldRevId + 1);
         
         if (!newPage.checkEditAllowed(username)) {
             return new SavePageResult(false, involvedKeys,
@@ -781,7 +780,11 @@ public class ScalarisDataHandler {
                     statName, System.currentTimeMillis() - timeAtStart);
         }
         
-        if (prevRevId != oldRevId) {
+        /*
+         * if prevRevId is greater than 0, it must match the old revision,
+         * if it is -1, then there should not be an old page
+         */
+        if ((prevRevId > 0 && prevRevId != oldRevId) || (prevRevId == -1 && oldPage != null)) {
             return new SavePageResult(false, involvedKeys, "curRev(" + oldRevId
                     + ") != oldRev(" + prevRevId + ")", false, oldPage,
                     newPage, newShortRevs, pageEdits, statName,
@@ -795,7 +798,7 @@ public class ScalarisDataHandler {
         Set<String> oldCats;
         Set<String> oldTpls;
         Set<String> oldLnks;
-        if (oldRevId != -1 && oldPage != null && oldPage.getCurRev() != null) {
+        if (oldPage != null && oldPage.getCurRev() != null) {
             // get a list of previous categories and templates:
             wikiModel.setUp();
             final long timeAtRenderStart = System.currentTimeMillis();
@@ -875,13 +878,13 @@ public class ScalarisDataHandler {
         SavePageResult result;
         if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
             result = savePage2NewOps(title0, newRev, nsObject, timeAtStart,
-                    oldPage, newPage, newShortRevs, pageEdits, involvedKeys, title,
-                    scalaris_tx, oldRevId, wikiModel, catDiff, tplDiff,
-                    lnkDiff, statName);
+                    oldPage, newPage, newShortRevs, pageEdits, involvedKeys,
+                    title, scalaris_tx, wikiModel, catDiff, tplDiff, lnkDiff,
+                    statName);
         } else {
             result = savePage2(title0, newRev, nsObject, timeAtStart, oldPage,
                     newPage, newShortRevs, pageEdits, involvedKeys, title, scalaris_tx,
-                    oldRevId, wikiModel, catDiff, tplDiff, lnkDiff, statName);
+                    wikiModel, catDiff, tplDiff, lnkDiff, statName);
         }
         if (result != null) {
             return result;
@@ -907,6 +910,7 @@ public class ScalarisDataHandler {
      * @param nsObject
      * @param timeAtStart
      * @param oldPage
+     *            the old Page object or <tt>null</tt> if there was no old page
      * @param newPage
      * @param newShortRevs
      * @param pageEdits
@@ -914,7 +918,6 @@ public class ScalarisDataHandler {
      *            all keys that have been read or written during the operation
      * @param title
      * @param scalaris_tx
-     * @param oldRevId
      * @param wikiModel
      * @param catDiff
      * @param tplDiff
@@ -927,13 +930,13 @@ public class ScalarisDataHandler {
             long timeAtStart, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             List<String> involvedKeys, String title, Transaction scalaris_tx,
-            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
+            final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff, final String statName) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
         final List<Integer> pageListWrites = new ArrayList<Integer>(2);
         final List<String> pageListKeys = new LinkedList<String>();
-        if (oldRevId == -1) {
+        if (oldPage == null) {
             pageListKeys.add(getPageListKey());
             pageListKeys.add(getPageCountKey());
             if (wikiModel.getNamespace(title0).isEmpty()) {
@@ -974,7 +977,7 @@ public class ScalarisDataHandler {
         try {
             newShortRevs = results.processReadAt(curOp++).jsonListValue(ShortRevision.class);
         } catch (NotFoundException e) {
-            if (oldRevId == -1) { // new page?
+            if (oldPage == null) { // new page?
                 newShortRevs = new LinkedList<ShortRevision>();
             } else {
 //              e.printStackTrace();
@@ -1145,6 +1148,7 @@ public class ScalarisDataHandler {
      * @param nsObject
      * @param timeAtStart
      * @param oldPage
+     *            the old Page object or <tt>null</tt> if there was no old page
      * @param newPage
      * @param newShortRevs
      * @param pageEdits
@@ -1152,7 +1156,6 @@ public class ScalarisDataHandler {
      *            all keys that have been read or written during the operation
      * @param title
      * @param scalaris_tx
-     * @param oldRevId
      * @param wikiModel
      * @param catDiff
      * @param tplDiff
@@ -1165,13 +1168,13 @@ public class ScalarisDataHandler {
             long timeAtStart, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             List<String> involvedKeys, String title, Transaction scalaris_tx,
-            int oldRevId, final MyWikiModel wikiModel, Difference catDiff,
+            final MyWikiModel wikiModel, Difference catDiff,
             Difference tplDiff, Difference lnkDiff, final String statName) {
         Transaction.RequestList requests;
         Transaction.ResultList results;
         final List<Integer> pageListWrites = new ArrayList<Integer>(2);
         final List<String> pageListKeys = new LinkedList<String>();
-        if (oldRevId == -1) {
+        if (oldPage == null) {
             pageListKeys.add(getPageListKey());
             pageListKeys.add(getPageCountKey());
             if (wikiModel.getNamespace(title0).isEmpty()) {
