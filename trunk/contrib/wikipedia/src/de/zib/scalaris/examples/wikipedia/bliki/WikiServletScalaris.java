@@ -115,6 +115,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         cPool = new ConnectionPool(cFactory, CONNECTION_POOL_SIZE);
         loadSiteInfo();
         loadPlugins();
+        startExistingPagesUpdate();
     }
     
     /**
@@ -154,7 +155,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
      * Sets up the connection to the Scalaris erlang node once on the server.
      * 
      * @param request
-     *            the request to the servlet
+     *            request to the servlet or <tt>null</tt> if there is none
      */
     @Override
     protected Connection getConnection(HttpServletRequest request) {
@@ -374,8 +375,10 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     
     @Override
     protected MyScalarisWikiModel getWikiModel(Connection connection) {
-        return new MyScalarisWikiModel(WikiServlet.imageBaseURL,
+        final MyScalarisWikiModel model = new MyScalarisWikiModel(WikiServlet.imageBaseURL,
                 WikiServlet.linkBaseURL, connection, namespace);
+        model.setExistingPages(existingPages);
+        return model;
     }
 
     @Override

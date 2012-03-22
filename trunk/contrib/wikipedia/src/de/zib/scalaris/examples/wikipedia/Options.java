@@ -49,4 +49,11 @@ public class Options {
      */
     public static int WIKI_SAVEPAGE_RETRY_DELAY = 10;
     
+    /**
+     * How often to re-create the bloom filter with the existing pages (in
+     * seconds). The bloom filter will be disabled if a value less than or equal
+     * to 0 is provided.
+     */
+    public static int WIKI_REBUILD_PAGES_CACHE = 10 * 60;
+    
 }
