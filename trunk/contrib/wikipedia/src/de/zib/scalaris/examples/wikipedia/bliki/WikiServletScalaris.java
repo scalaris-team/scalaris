@@ -49,6 +49,7 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
+import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.data.xml.SAXParsingInterruptedException;
@@ -186,7 +187,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
      * Releases the connection back into the Scalaris connection pool.
      * 
      * @param request
-     *            the request to the servlet
+     *            the request to the servlet or <tt>null</tt> if there is none
      * @param conn
      *            the connection to release
      */
@@ -447,6 +448,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
+    public String getContributionListKey(String contributor) {
+        return ScalarisDataHandler.getContributionListKey(contributor);
+    }
+
+    @Override
     public ValueResult<String> getDbVersion(Connection connection) {
         return ScalarisDataHandler.getDbVersion(connection);
     }
@@ -489,6 +495,12 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     @Override
     public ValueResult<List<String>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandler.getPagesLinkingTo(connection, title, nsObject);
+    }
+
+    @Override
+    public ValueResult<List<Contribution>> getContributions(
+            Connection connection, String contributor) {
+        return ScalarisDataHandler.getContributions(connection, contributor);
     }
 
     @Override

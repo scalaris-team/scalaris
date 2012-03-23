@@ -32,6 +32,7 @@ import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotANumberException;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.ScalarisVM;
@@ -39,8 +40,10 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.Transaction.ResultList;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
+import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -192,8 +195,19 @@ public class ScalarisDataHandler {
     public final static String getStatsPageEditsKey() {
         return "stats:pageedits";
     }
-
     
+    /**
+     * Gets the key to store the list of contributions of a user.
+     * 
+     * @param contributor  the user name or IP address of the user who created
+     *                     the revision
+     * 
+     * @return Scalaris key
+     */
+    public final static String getContributionListKey(String contributor) {
+        return contributor + ":user:contrib";
+    }
+
     /**
      * Retrieves the Scalaris version string.
      * 
@@ -491,6 +505,44 @@ public class ScalarisDataHandler {
     }
 
     /**
+     * Retrieves a list of pages linking to the given page from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param contributor
+     *            the user name or IP address of the user who created the
+     *            revision
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<Contribution>> getContributions(
+            Connection connection, String contributor) {
+        final String statName = "contributions of " + contributor;
+        if (Options.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
+            ValueResult<List<Contribution>> result = getPageList3(connection,
+                    getContributionListKey(contributor), false, statName,
+                    new ErlangConverter<List<Contribution>>() {
+                        @Override
+                        public List<Contribution> convert(ErlangValue v)
+                                throws ClassCastException {
+                            return v.jsonListValue(Contribution.class);
+                        }
+                    });
+            if (result.success && result.value == null) {
+                result.value = new ArrayList<Contribution>(0);
+            }
+            return result;
+        } else {
+            return new ValueResult<List<Contribution>>(
+                    new ArrayList<String>(0), new ArrayList<Contribution>(0));
+        }
+    }
+    
+    private interface ErlangConverter<T> {
+        public T convert(ErlangValue v) throws ClassCastException;
+    }
+
+    /**
      * Retrieves a list of pages from Scalaris.
      * 
      * @param connection
@@ -507,10 +559,43 @@ public class ScalarisDataHandler {
      */
     private static ValueResult<List<String>> getPageList2(Connection connection,
             String scalaris_key, boolean failNotFound, String statName) {
+        ValueResult<List<String>> result = getPageList3(connection,
+                scalaris_key, failNotFound, statName,
+                new ErlangConverter<List<String>>() {
+                    @Override
+                    public List<String> convert(ErlangValue v)
+                            throws ClassCastException {
+                        return v.stringListValue();
+                    }
+                });
+        if (result.success && result.value == null) {
+            result.value = new ArrayList<String>(0);
+        }
+        return result;
+    }
+
+    /**
+     * Retrieves a list of pages from Scalaris.
+     * @param <T>
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param scalaris_key
+     *            the key under which the page list is stored in Scalaris
+     * @param failNotFound
+     *            whether the operation should fail if the key is not found or
+     *            not (the value contains null if not failed!)
+     * @param statName
+     *            name for the time measurement statistics
+     * 
+     * @return a result object with the page list on success
+     */
+    private static <T> ValueResult<T> getPageList3(Connection connection,
+            String scalaris_key, boolean failNotFound, String statName, ErlangConverter<T> conv) {
         final long timeAtStart = System.currentTimeMillis();
         List<String> involvedKeys = new ArrayList<String>();
         if (connection == null) {
-            return new ValueResult<List<String>>(false, involvedKeys,
+            return new ValueResult<T>(false, involvedKeys,
                     "no connection to Scalaris", true, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
@@ -518,23 +603,22 @@ public class ScalarisDataHandler {
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         try {
             involvedKeys.add(scalaris_key);
-            List<String> pages = scalaris_single.read(scalaris_key).stringListValue();
-            return new ValueResult<List<String>>(involvedKeys, pages, statName,
+            T pages = conv.convert(scalaris_single.read(scalaris_key));
+            return new ValueResult<T>(involvedKeys, pages, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (NotFoundException e) {
             if (failNotFound) {
-                return new ValueResult<List<String>>(false, involvedKeys,
+                return new ValueResult<T>(false, involvedKeys,
                         "unknown exception reading page list at \""
                                 + scalaris_key + "\" from Scalaris: "
                                 + e.getMessage(), false, statName,
                         System.currentTimeMillis() - timeAtStart);
             } else {
-                return new ValueResult<List<String>>(involvedKeys,
-                        new ArrayList<String>(0), statName,
+                return new ValueResult<T>(involvedKeys, null, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
         } catch (Exception e) {
-            return new ValueResult<List<String>>(false, involvedKeys,
+            return new ValueResult<T>(false, involvedKeys,
                     "unknown exception reading page list at \"" + scalaris_key
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
@@ -889,6 +973,15 @@ public class ScalarisDataHandler {
         if (result != null) {
             return result;
         }
+        
+        // TODO: use the result?!
+        if (Options.WIKI_STORE_CONTRIBUTIONS == STORE_CONTRIB_TYPE.OUTSIDE_TX) {
+            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
+                addContributionNewOps2(scalaris_tx, oldPage, newPage, involvedKeys);
+            } else {
+                addContribution2(scalaris_tx, oldPage, newPage, involvedKeys);
+            }
+        }
 
         if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
             pageEdits = increasePageEditStat2NewOps(scalaris_tx, involvedKeys);
@@ -910,8 +1003,9 @@ public class ScalarisDataHandler {
      * @param nsObject
      * @param timeAtStart
      * @param oldPage
-     *            the old Page object or <tt>null</tt> if there was no old page
+     *            the old page object or <tt>null</tt> if there was no old page
      * @param newPage
+     *            the newly created page object
      * @param newShortRevs
      * @param pageEdits
      * @param involvedKeys
@@ -1148,8 +1242,9 @@ public class ScalarisDataHandler {
      * @param nsObject
      * @param timeAtStart
      * @param oldPage
-     *            the old Page object or <tt>null</tt> if there was no old page
+     *            the old page object or <tt>null</tt> if there was no old page
      * @param newPage
+     *            the newly created page object
      * @param newShortRevs
      * @param pageEdits
      * @param involvedKeys
@@ -1377,6 +1472,78 @@ public class ScalarisDataHandler {
                 involvedKeys.addAll(requests.keyList());
                 scalaris_tx.req_list(requests).processAddOnNrAt(0);
             } catch (NotANumberException e) {
+                // internal error that should not occur!
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+        }
+        return null;
+    }
+
+    /**
+     * Adds a contribution to the list of contributions of the user.
+     * 
+     * @param scalaris_tx
+     *            the transaction object to use
+     * @param oldPage
+     *            the old page object or <tt>null</tt> if there was no old page
+     * @param newPage
+     *            the newly created page object
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
+     * 
+     * @return the list of contributions
+     */
+    private static List<Contribution> addContribution2(Transaction scalaris_tx,
+            Page oldPage, Page newPage, List<String> involvedKeys) {
+        List<Contribution> contributions = null;
+        // as this is not that important, use a separate transaction and do not
+        // fail if updating the value fails
+        try {
+            String scalaris_key = getContributionListKey(newPage.getCurRev().getContributor().toString());
+            try {
+                involvedKeys.add(scalaris_key);
+                contributions = scalaris_tx.read(scalaris_key).jsonListValue(Contribution.class);
+            } catch (NotFoundException e) {
+                contributions = new LinkedList<Contribution>();
+            }
+            contributions.add(new Contribution(oldPage, newPage));
+            Transaction.RequestList requests = new Transaction.RequestList();
+            requests.addWrite(scalaris_key, contributions).addCommit();
+            involvedKeys.addAll(requests.keyList());
+            scalaris_tx.req_list(requests);
+        } catch (Exception e) {
+        }
+        return contributions;
+    }
+
+    /**
+     * Adds a contribution to the list of contributions of the user using the
+     * new {@link Transaction#addDelOnList(String, List, List)} operation.
+     * 
+     * @param scalaris_tx
+     *            the transaction object to use
+     * @param oldPage
+     *            the old page object or <tt>null</tt> if there was no old page
+     * @param newPage
+     *            the newly created page object
+     * @param involvedKeys
+     *            all keys that have been read or written during the operation
+     * 
+     * @return <tt>null</tt> (we do not retrieve the actual list of contributions)
+     */
+    private static List<Contribution> addContributionNewOps2(
+            Transaction scalaris_tx, Page oldPage, Page newPage, List<String> involvedKeys) {
+        // as this is not that important, use a separate transaction and do not
+        // fail if updating the value fails
+        try {
+            String scalaris_key = getContributionListKey(newPage.getCurRev().getContributor().toString());
+            try {
+                Transaction.RequestList requests = new Transaction.RequestList();
+                requests.addAddDelOnList(scalaris_key, Arrays.asList(new Contribution(oldPage, newPage)), null).addCommit();
+                involvedKeys.addAll(requests.keyList());
+                scalaris_tx.req_list(requests).processAddDelOnListAt(0);
+            } catch (NotAListException e) {
                 // internal error that should not occur!
                 e.printStackTrace();
             }

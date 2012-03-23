@@ -56,4 +56,57 @@ public class Options {
      */
     public static int WIKI_REBUILD_PAGES_CACHE = 10 * 60;
     
+    /**
+     * How often to re-create the bloom filter with the existing pages (in
+     * seconds). The bloom filter will be disabled if a value less than or equal
+     * to 0 is provided.
+     */
+    public static STORE_CONTRIB_TYPE WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.OUTSIDE_TX;
+    
+    /**
+     * Type of storing user contributions in the DB.
+     */
+    public static enum STORE_CONTRIB_TYPE {
+        /**
+         * Do not store user contributions.
+         */
+        NONE("NONE"),
+        /**
+         * Store user contributions outside the main transaction used during
+         * save.
+         */
+        OUTSIDE_TX("OUTSIDE_TX");
+
+        private final String text;
+
+        STORE_CONTRIB_TYPE(String text) {
+            this.text = text;
+        }
+
+        /**
+         * Converts the enum to text.
+         */
+        public String toString() {
+            return this.text;
+        }
+
+        /**
+         * Tries to convert a text to the according enum value.
+         * 
+         * @param text the text to convert
+         * 
+         * @return the according enum value
+         */
+        public static STORE_CONTRIB_TYPE fromString(String text) {
+            if (text != null) {
+                for (STORE_CONTRIB_TYPE b : STORE_CONTRIB_TYPE.values()) {
+                    if (text.equalsIgnoreCase(b.text)) {
+                        return b;
+                    }
+                }
+            }
+            throw new IllegalArgumentException("No constant with text " + text
+                    + " found");
+        }
+    }
 }
