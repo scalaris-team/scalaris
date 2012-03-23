@@ -976,8 +976,15 @@ public class MyWikiModel extends WikiModel {
         return involvedKeys;
     }
     
+    /**
+     * Creates a bloom filter containing all given elements.
+     * 
+     * @param elements the elements to put into the filter
+     * 
+     * @return the bloom filter
+     */
     public static BloomFilter<String> createBloomFilter(Collection<? extends String> elements) {
-        BloomFilter<String> result = new BloomFilter<String>(existingPagesFPR, elements.size() + Math.min(10, elements.size() / 10));
+        BloomFilter<String> result = new BloomFilter<String>(existingPagesFPR, Math.max(100, elements.size() + Math.max(10, elements.size() / 10)));
         result.addAll(elements);
         return result;
     }
