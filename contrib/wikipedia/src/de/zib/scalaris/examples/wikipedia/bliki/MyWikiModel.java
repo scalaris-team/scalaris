@@ -1002,4 +1002,9 @@ public class MyWikiModel extends WikiModel {
     public void setExistingPages(BloomFilter<String> existingPages) {
         this.existingPages = existingPages;
     }
+
+    @Override
+    public String getRedirectLink() {
+        return super.getRedirectLink().replaceFirst("#.*$", "");
+    }
 }
