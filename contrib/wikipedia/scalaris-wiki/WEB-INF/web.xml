@@ -27,6 +27,10 @@
 			<param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
 			<param-value>600</param-value>
 		</init-param>
+		<init-param>
+			<param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
+			<param-value>OUTSIDE_TX</param-value>
+		</init-param>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>WikiServletScalaris</servlet-name>
