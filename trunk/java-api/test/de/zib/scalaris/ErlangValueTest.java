@@ -19,7 +19,6 @@ import static org.junit.Assert.*;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,17 +46,17 @@ import com.ericsson.otp.erlang.OtpErlangString;
  * @author Nico Kruber, kruber@zib.de
  */
 public class ErlangValueTest {
-    private static BigInteger getRandomBigInt(Random random) {
+    private static BigInteger getRandomBigInt(final Random random) {
         return BigInteger.valueOf(random.nextLong()).multiply(BigInteger.valueOf(random.nextLong()));
     }
 
-    private static byte[] getRandomBytes(Random random, int size) {
-        byte[] bytes = new byte[size];
+    private static byte[] getRandomBytes(final Random random, final int size) {
+        final byte[] bytes = new byte[size];
         random.nextBytes(bytes);
         return bytes;
     }
 
-    private static String getRandomString(Random random, int length, boolean onlyChars) {
+    private static String getRandomString(final Random random, final int length, final boolean onlyChars) {
         if (onlyChars) {
             return getRandomCharString(random, length);
         } else {
@@ -80,9 +79,9 @@ public class ErlangValueTest {
         }
     }
 
-    private static String getRandomCharString(Random random, int length) {
+    private static String getRandomCharString(final Random random, final int length) {
         if(length > 0) {
-            char[] result = new char[length];
+            final char[] result = new char[length];
             // lets always start with a character:
             result[0] = chars[random.nextInt(chars.length)];
             for (int i = 1; i < result.length; ++i) {
@@ -93,16 +92,16 @@ public class ErlangValueTest {
         return "";
     }
 
-    private static List<Object> getRandomList(Random random, int capacity) {
+    private static List<Object> getRandomList(final Random random, final int capacity) {
         // note: we do not generate (recursive) maps -> so there won't be keys to worry about
         return getRandomListRecursive(random, capacity, 0, false);
     }
 
-    private static List<Object> getRandomListRecursive(Random random, int capacity, int maxDepth, boolean mapKeyOnlyChars) {
+    private static List<Object> getRandomListRecursive(final Random random, final int capacity, final int maxDepth, final boolean mapKeyOnlyChars) {
         List<Object> currentList = null;
         currentList = new ArrayList<Object>(capacity);
-        int curMaxDepth = maxDepth == 0 ? 0 : random.nextInt(maxDepth);
-        int maxType = curMaxDepth == 0 ? 6 : 8;
+        final int curMaxDepth = maxDepth == 0 ? 0 : random.nextInt(maxDepth);
+        final int maxType = curMaxDepth == 0 ? 6 : 8;
         switch (random.nextInt(maxType)) {
             case 0: // bool
                 currentList.add(random.nextBoolean());
@@ -134,15 +133,15 @@ public class ErlangValueTest {
         return currentList;
     }
 
-    private static Map<String, Object> getRandomMapRecursive(Random random, int capacity, int maxDepth, boolean keyOnlyChars) {
+    private static Map<String, Object> getRandomMapRecursive(final Random random, final int capacity, final int maxDepth, final boolean keyOnlyChars) {
         Map<String, Object> currentMap = null;
         currentMap = new LinkedHashMap<String, Object>(capacity);
         for (int i = 0; i < capacity; ++i) {
             // key:
-            String key = getRandomString(random, random.nextInt(10), keyOnlyChars);
+            final String key = getRandomString(random, random.nextInt(10), keyOnlyChars);
             // value:
-            int curMaxDepth = maxDepth == 0 ? 0 : random.nextInt(maxDepth);
-            int maxType = curMaxDepth == 0 ? 6 : 8;
+            final int curMaxDepth = maxDepth == 0 ? 0 : random.nextInt(maxDepth);
+            final int maxType = curMaxDepth == 0 ? 6 : 8;
             switch (random.nextInt(maxType)) {
                 case 0: // bool
                     currentMap.put(key, random.nextBoolean());
@@ -180,15 +179,19 @@ public class ErlangValueTest {
      */
     @Test
     public final void testBoolValue() {
-        ErlangValue trueVal = new ErlangValue(true);
-        ErlangValue trueValOtp = new ErlangValue(new OtpErlangBoolean(true));
-        ErlangValue falseVal = new ErlangValue(false);
-        ErlangValue falseValOtp = new ErlangValue(new OtpErlangBoolean(false));
+        final ErlangValue trueVal = new ErlangValue(true);
+        final ErlangValue trueValOtp = new ErlangValue(new OtpErlangBoolean(true));
+        final ErlangValue falseVal = new ErlangValue(false);
+        final ErlangValue falseValOtp = new ErlangValue(new OtpErlangBoolean(false));
 
         assertEquals(true, trueVal.boolValue());
         assertEquals(true, trueValOtp.boolValue());
         assertEquals(false, falseVal.boolValue());
         assertEquals(false, falseValOtp.boolValue());
+        assertTrue(trueVal.equals(trueValOtp));
+        assertTrue(trueValOtp.equals(trueVal));
+        assertTrue(falseVal.equals(falseValOtp));
+        assertTrue(falseValOtp.equals(falseVal));
     }
 
     /**
@@ -198,24 +201,26 @@ public class ErlangValueTest {
      */
     @Test
     public final void testIntValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             Integer currentInt = null;
             try {
                 currentInt = random.nextInt();
                 testIntValue(currentInt);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testIntValue(" + currentInt + ") failed", e);
             }
         }
     }
 
-    private final void testIntValue(int value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangInt(value));
+    private final void testIntValue(final int value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangInt(value));
 
         assertEquals(value, eVal.intValue());
         assertEquals(value, eValOtp.intValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -225,24 +230,26 @@ public class ErlangValueTest {
      */
     @Test
     public final void testLongValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             Long currentLong = null;
             try {
                 currentLong = random.nextLong();
                 testLongValue(currentLong);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testLongValue(" + currentLong + ") failed", e);
             }
         }
     }
 
-    private final void testLongValue(long value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
+    private final void testLongValue(final long value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
 
         assertEquals(value, eVal.longValue());
         assertEquals(value, eValOtp.longValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -252,24 +259,26 @@ public class ErlangValueTest {
      */
     @Test
     public final void testBigIntValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             BigInteger currentBigInt = null;
             try {
                 currentBigInt = getRandomBigInt(random);
                 testBigIntValue(currentBigInt);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testBigIntValue(" + currentBigInt + ") failed", e);
             }
         }
     }
 
-    private final void testBigIntValue(BigInteger value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
+    private final void testBigIntValue(final BigInteger value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangLong(value));
 
         assertEquals(value, eVal.bigIntValue());
         assertEquals(value, eValOtp.bigIntValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -279,24 +288,26 @@ public class ErlangValueTest {
      */
     @Test
     public final void testDoubleValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             Double currentDouble = null;
             try {
                 currentDouble = random.nextDouble();
                 testDoubleValue(currentDouble);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testDoubleValue(" + currentDouble + ") failed", e);
             }
         }
     }
 
-    private final void testDoubleValue(double value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangDouble(value));
+    private final void testDoubleValue(final double value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangDouble(value));
 
         assertEquals(value, eVal.doubleValue(), 0.0);
         assertEquals(value, eValOtp.doubleValue(), 0.0);
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -306,24 +317,26 @@ public class ErlangValueTest {
      */
     @Test
     public final void testStringValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             String currentString = null;
             try {
                 currentString = getRandomString(random, random.nextInt(1000), false);
                 testStringValue(currentString);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testStringValue(" + currentString + ") failed", e);
             }
         }
     }
 
-    private final void testStringValue(String value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangString(value));
+    private final void testStringValue(final String value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangString(value));
 
         assertEquals(value, eVal.stringValue());
         assertEquals(value, eValOtp.stringValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -333,23 +346,25 @@ public class ErlangValueTest {
      */
     @Test
     public final void testBinaryValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 5000; ++i) {
             try {
                 testBinaryValue(getRandomBytes(random, random.nextInt(1000)));
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 // do not print generated bytes (probably not useful)
                 throw new Exception("testBinaryValue(...) failed", e);
             }
         }
     }
 
-    private final void testBinaryValue(byte[] value) {
-        ErlangValue eVal = new ErlangValue(value);
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangBinary(value));
+    private final void testBinaryValue(final byte[] value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangBinary(value));
 
         assertArrayEquals(value, eVal.binaryValue());
         assertArrayEquals(value, eValOtp.binaryValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -361,25 +376,24 @@ public class ErlangValueTest {
      */
     @Test
     public final void testListValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             List<Object> currentList = null;
             try {
-                int capacity = random.nextInt(1000);
+                final int capacity = random.nextInt(1000);
                 currentList = getRandomList(random, capacity);
                 testListValue(currentList);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testListValue(" + currentList + ") failed", e);
             }
         }
     }
 
-    private final void testListValue(List<Object> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        OtpErlangObject[] valueOtp = new OtpErlangObject[value.size()];
+    private final void testListValue(final List<Object> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final OtpErlangObject[] valueOtp = new OtpErlangObject[value.size()];
         int i = 0;
-        for (Iterator<Object> iterator = value.iterator(); iterator.hasNext();) {
-            Object value_i = iterator.next();
+        for (final Object value_i : value) {
             OtpErlangObject valueOtp_i;
 
             if (value_i instanceof Boolean) {
@@ -400,29 +414,31 @@ public class ErlangValueTest {
             }
             valueOtp[i++] = valueOtp_i;
         }
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
 
         compareList(value, eVal.listValue());
         compareList(value, eValOtp.listValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
-    private static void compareList(List<Object> expected, List<ErlangValue> actual) {
+    private static void compareList(final List<Object> expected, final List<ErlangValue> actual) {
         assertEquals(expected.size(), actual.size());
         for (int j = 0; j < actual.size(); ++j) {
-            Object expected_j = expected.get(j);
-            ErlangValue actual_j = actual.get(j);
+            final Object expected_j = expected.get(j);
+            final ErlangValue actual_j = actual.get(j);
             if (expected_j instanceof Boolean) {
-                assertEquals((Boolean) expected_j, actual_j.boolValue());
+                assertEquals(expected_j, actual_j.boolValue());
             } else if (expected_j instanceof Integer) {
-                assertEquals((Integer) expected_j, new Integer(actual_j.intValue()));
+                assertEquals(expected_j, new Integer(actual_j.intValue()));
             } else if (expected_j instanceof Long) {
-                assertEquals((Long) expected_j, new Long(actual_j.longValue()));
+                assertEquals(expected_j, new Long(actual_j.longValue()));
             } else if (expected_j instanceof BigInteger) {
-                assertEquals((BigInteger) expected_j, actual_j.bigIntValue());
+                assertEquals(expected_j, actual_j.bigIntValue());
             } else if (expected_j instanceof Double) {
-                assertEquals((Double) expected_j, new Double(actual_j.doubleValue()));
+                assertEquals(expected_j, new Double(actual_j.doubleValue()));
             } else if (expected_j instanceof String) {
-                assertEquals((String) expected_j, actual_j.stringValue());
+                assertEquals(expected_j, actual_j.stringValue());
             } else {
                 fail("unsupported (expected) value: " + expected_j);
             }
@@ -436,34 +452,36 @@ public class ErlangValueTest {
      */
     @Test
     public final void testLongListValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             List<Long> currentList = null;
             try {
-                int capacity = random.nextInt(1000);
+                final int capacity = random.nextInt(1000);
                 currentList = new ArrayList<Long>(capacity);
                 for (int j = 0; j < capacity; ++j) {
                     currentList.add(random.nextLong());
                 }
                 testLongListValue(currentList);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testLongListValue(" + currentList + ") failed", e);
             }
         }
     }
 
-    private final void testLongListValue(List<Long> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        OtpErlangLong[] valueOtp = new OtpErlangLong[value.size()];
+    private final void testLongListValue(final List<Long> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final OtpErlangLong[] valueOtp = new OtpErlangLong[value.size()];
         int i = 0;
-        for (Iterator<Long> iterator = value.iterator(); iterator.hasNext();) {
-            Long long1 = (Long) iterator.next();
+        for (final Long long2 : value) {
+            final Long long1 = long2;
             valueOtp[i++] = new OtpErlangLong(long1);
         }
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
 
         assertEquals(value, eVal.longListValue());
         assertEquals(value, eValOtp.longListValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -473,34 +491,36 @@ public class ErlangValueTest {
      */
     @Test
     public final void testDoubleListValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             List<Double> currentList = null;
             try {
-                int capacity = random.nextInt(1000);
+                final int capacity = random.nextInt(1000);
                 currentList = new ArrayList<Double>(capacity);
                 for (int j = 0; j < capacity; ++j) {
                     currentList.add(random.nextDouble());
                 }
                 testDoubleListValue(currentList);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testDoubleListValue(" + currentList + ") failed", e);
             }
         }
     }
 
-    private final void testDoubleListValue(List<Double> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        OtpErlangDouble[] valueOtp = new OtpErlangDouble[value.size()];
+    private final void testDoubleListValue(final List<Double> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final OtpErlangDouble[] valueOtp = new OtpErlangDouble[value.size()];
         int i = 0;
-        for (Iterator<Double> iterator = value.iterator(); iterator.hasNext();) {
-            Double double1 = (Double) iterator.next();
+        for (final Double double2 : value) {
+            final Double double1 = double2;
             valueOtp[i++] = new OtpErlangDouble(double1);
         }
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
 
         assertEquals(value, eVal.doubleListValue());
         assertEquals(value, eValOtp.doubleListValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -510,34 +530,36 @@ public class ErlangValueTest {
      */
     @Test
     public final void testStringListValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             List<String> currentList = null;
             try {
-                int capacity = random.nextInt(10);
+                final int capacity = random.nextInt(10);
                 currentList = new ArrayList<String>(capacity);
                 for (int j = 0; j < capacity; ++j) {
                     currentList.add(getRandomString(random, random.nextInt(1000), false));
                 }
                 testStringListValue(currentList);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testStringListValue(" + currentList + ") failed", e);
             }
         }
     }
 
-    private final void testStringListValue(List<String> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        OtpErlangString[] valueOtp = new OtpErlangString[value.size()];
+    private final void testStringListValue(final List<String> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final OtpErlangString[] valueOtp = new OtpErlangString[value.size()];
         int i = 0;
-        for (Iterator<String> iterator = value.iterator(); iterator.hasNext();) {
-            String string1 = (String) iterator.next();
+        for (final String string : value) {
+            final String string1 = string;
             valueOtp[i++] = new OtpErlangString(string1);
         }
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
 
         assertEquals(value, eVal.stringListValue());
         assertEquals(value, eValOtp.stringListValue());
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -547,40 +569,42 @@ public class ErlangValueTest {
      */
     @Test
     public final void testBinaryListValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 1000; ++i) {
             try {
-                int capacity = random.nextInt(10);
-                List<byte[]> currentList = new ArrayList<byte[]>(capacity);
+                final int capacity = random.nextInt(10);
+                final List<byte[]> currentList = new ArrayList<byte[]>(capacity);
                 for (int j = 0; j < capacity; ++j) {
                     currentList.add(getRandomBytes(random, random.nextInt(1000)));
                 }
                 testBinaryListValue(currentList);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 // do not print generated bytes (probably not useful)
                 throw new Exception("testBinaryListValue(...) failed", e);
             }
         }
     }
 
-    private final void testBinaryListValue(List<byte[]> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        OtpErlangBinary[] valueOtp = new OtpErlangBinary[value.size()];
+    private final void testBinaryListValue(final List<byte[]> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final OtpErlangBinary[] valueOtp = new OtpErlangBinary[value.size()];
         int i = 0;
-        for (Iterator<byte[]> iterator = value.iterator(); iterator.hasNext();) {
-            byte[] binary1 = (byte[]) iterator.next();
+        for (final byte[] b : value) {
+            final byte[] binary1 = b;
             valueOtp[i++] = new OtpErlangBinary(binary1);
         }
-        ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
+        final ErlangValue eValOtp = new ErlangValue(new OtpErlangList(valueOtp));
 
-        List<byte[]> actual = eVal.binaryListValue();
-        List<byte[]> actualOtp = eValOtp.binaryListValue();
+        final List<byte[]> actual = eVal.binaryListValue();
+        final List<byte[]> actualOtp = eValOtp.binaryListValue();
         assertEquals(value.size(), actual.size());
         assertEquals(value.size(), actualOtp.size());
         for (int j = 0; j < actual.size(); ++j) {
             assertArrayEquals(value.get(j), actual.get(j));
             assertArrayEquals(value.get(j), actualOtp.get(j));
         }
+        assertTrue(eVal.equals(eValOtp));
+        assertTrue(eValOtp.equals(eVal));
     }
 
     /**
@@ -592,32 +616,35 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValue() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
         for (int i = 0; i < 10000; ++i) {
             Map<String, Object> currentMap = null;
             try {
                 currentMap = getRandomMapRecursive(random, random.nextInt(10), 3, false);
                 testJsonValue(currentMap);
-            } catch (ClassCastException e) {
+            } catch (final ClassCastException e) {
                 throw new Exception("testJsonValue(" + currentMap + ") failed", e);
             }
         }
     }
 
-    private final void testJsonValue(Map<String, Object> value) {
-        ErlangValue eVal = new ErlangValue(value);
-        Map<String, Object> actual = eVal.jsonValue();
+    private final void testJsonValue(final Map<String, Object> value) {
+        final ErlangValue eVal = new ErlangValue(value);
+        final Map<String, Object> actual = eVal.jsonValue();
         compareMap(value, actual);
+        final ErlangValue eVal2 = new ErlangValue(value);
+        assertTrue(eVal.equals(eVal2));
+        assertTrue(eVal2.equals(eVal));
     }
 
-    private final void compareMap(Map<String, Object> expected, Map<String, Object> actual) {
+    private final void compareMap(final Map<String, Object> expected, final Map<String, Object> actual) {
         assertEquals(expected.size(), actual.size());
-        for (Entry<String, Object> entry : expected.entrySet()) {
-            String expected_key_i = entry.getKey();
-            Object expected_value_i = entry.getValue();
+        for (final Entry<String, Object> entry : expected.entrySet()) {
+            final String expected_key_i = entry.getKey();
+            final Object expected_value_i = entry.getValue();
 
             assertTrue(actual.containsKey(expected_key_i));
-            Object actual_value_i = actual.get(expected_key_i);
+            final Object actual_value_i = actual.get(expected_key_i);
             assertEquals(expected_value_i, actual_value_i);
         }
     }
@@ -639,12 +666,12 @@ public class ErlangValueTest {
         public double getE() { return e; }
         public String getF() { return f; }
 
-        public void setA(boolean a_) { this.a = a_; }
-        public void setB(int b_) { this.b = b_; }
-        public void setC(long c_) { this.c = c_; }
-        public void setD(BigInteger d_) { this.d = d_; }
-        public void setE(double e_) { this.e = e_; }
-        public void setF(String f_) { this.f = f_; }
+        public void setA(final boolean a_) { this.a = a_; }
+        public void setB(final int b_) { this.b = b_; }
+        public void setC(final long c_) { this.c = c_; }
+        public void setD(final BigInteger d_) { this.d = d_; }
+        public void setE(final double e_) { this.e = e_; }
+        public void setF(final String f_) { this.f = f_; }
     }
 
     /**
@@ -657,25 +684,28 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean1a() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 5000; ++i) {
-            Map<String, Object> map = new LinkedHashMap<String, Object>(6);
+            final Map<String, Object> map = new LinkedHashMap<String, Object>(6);
             map.put("a", random.nextBoolean());
             map.put("b", random.nextInt());
             map.put("c", random.nextLong());
             map.put("d", getRandomBigInt(random));
             map.put("e", random.nextDouble());
             map.put("f", getRandomString(random, random.nextInt(100), false));
-            ErlangValue value = new ErlangValue(map);
+            final ErlangValue value = new ErlangValue(map);
 
-            JSONBeanTest1 actual = value.jsonValue(JSONBeanTest1.class);
+            final JSONBeanTest1 actual = value.jsonValue(JSONBeanTest1.class);
             assertEquals(map.get("a"), actual.getA());
             assertEquals(map.get("b"), actual.getB());
             assertEquals(map.get("c"), actual.getC());
             assertEquals(map.get("d"), actual.getD());
             assertEquals(map.get("e"), actual.getE());
             assertEquals(map.get("f"), actual.getF());
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 
@@ -689,25 +719,28 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean1b() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 5000; ++i) {
-            JSONBeanTest1 bean1 = new JSONBeanTest1();
+            final JSONBeanTest1 bean1 = new JSONBeanTest1();
             bean1.setA(random.nextBoolean());
             bean1.setB(random.nextInt());
             bean1.setC(random.nextLong());
             bean1.setD(getRandomBigInt(random));
             bean1.setE(random.nextDouble());
             bean1.setF(getRandomString(random, random.nextInt(100), false));
-            ErlangValue value = new ErlangValue(bean1);
+            final ErlangValue value = new ErlangValue(bean1);
 
-            JSONBeanTest1 actual = value.jsonValue(JSONBeanTest1.class);
+            final JSONBeanTest1 actual = value.jsonValue(JSONBeanTest1.class);
             assertEquals(bean1.getA(), actual.getA());
             assertEquals(bean1.getB(), actual.getB());
             assertEquals(bean1.getC(), actual.getC());
             assertEquals(bean1.getD(), actual.getD());
             assertEquals(bean1.getE(), actual.getE(), 0.0);
             assertEquals(bean1.getF(), actual.getF());
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 
@@ -734,15 +767,15 @@ public class ErlangValueTest {
         public JSONBeanTest1 getH2() { return h2; }
         public Map<String, Object> getI2() { return i2; }
 
-        public void setA2(boolean a_) { this.a2 = a_; }
-        public void setB2(int b_) { this.b2 = b_; }
-        public void setC2(long c_) { this.c2 = c_; }
-        public void setD2(BigInteger d_) { this.d2 = d_; }
-        public void setE2(double e_) { this.e2 = e_; }
-        public void setF2(String f_) { this.f2 = f_; }
-        public void setG2(List<Object> g_) { this.g2 = g_; }
-        public void setH2(JSONBeanTest1 h_) { this.h2 = h_; }
-        public void setI2(Map<String, Object> i_) { this.i2 = i_; }
+        public void setA2(final boolean a_) { this.a2 = a_; }
+        public void setB2(final int b_) { this.b2 = b_; }
+        public void setC2(final long c_) { this.c2 = c_; }
+        public void setD2(final BigInteger d_) { this.d2 = d_; }
+        public void setE2(final double e_) { this.e2 = e_; }
+        public void setF2(final String f_) { this.f2 = f_; }
+        public void setG2(final List<Object> g_) { this.g2 = g_; }
+        public void setH2(final JSONBeanTest1 h_) { this.h2 = h_; }
+        public void setI2(final Map<String, Object> i_) { this.i2 = i_; }
     }
 
     /**
@@ -755,10 +788,10 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean2a() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 10000; ++i) {
-            Map<String, Object> map = new LinkedHashMap<String, Object>(7);
+            final Map<String, Object> map = new LinkedHashMap<String, Object>(7);
             map.put("a2", random.nextBoolean());
             map.put("b2", random.nextInt());
             map.put("c2", random.nextLong());
@@ -766,7 +799,7 @@ public class ErlangValueTest {
             map.put("e2", random.nextDouble());
             map.put("f2", getRandomString(random, random.nextInt(100), false));
             map.put("g2", getRandomList(random, 100));
-            Map<String, Object> bean1 = new LinkedHashMap<String, Object>(6);
+            final Map<String, Object> bean1 = new LinkedHashMap<String, Object>(6);
             bean1.put("a", random.nextBoolean());
             bean1.put("b", random.nextInt());
             bean1.put("c", random.nextLong());
@@ -774,11 +807,11 @@ public class ErlangValueTest {
             bean1.put("e", random.nextDouble());
             bean1.put("f", getRandomString(random, 10, false));
             map.put("h2", bean1);
-            Map<String, Object> map2 = getRandomMapRecursive(random, 10, 3, true);
+            final Map<String, Object> map2 = getRandomMapRecursive(random, 10, 3, true);
             map.put("i2", map2);
-            ErlangValue value = new ErlangValue(map);
+            final ErlangValue value = new ErlangValue(map);
 
-            JSONBeanTest2 actual = value.jsonValue(JSONBeanTest2.class);
+            final JSONBeanTest2 actual = value.jsonValue(JSONBeanTest2.class);
             assertEquals(map.get("a2"), actual.getA2());
             assertEquals(map.get("b2"), actual.getB2());
             assertEquals(map.get("c2"), actual.getC2());
@@ -786,7 +819,7 @@ public class ErlangValueTest {
             assertEquals(map.get("e2"), actual.getE2());
             assertEquals(map.get("f2"), actual.getF2());
             assertEquals(map.get("g2"), actual.getG2());
-            JSONBeanTest1 bean1_act = actual.getH2();
+            final JSONBeanTest1 bean1_act = actual.getH2();
             assertEquals(bean1.get("a"), bean1_act.getA());
             assertEquals(bean1.get("b"), bean1_act.getB());
             assertEquals(bean1.get("c"), bean1_act.getC());
@@ -794,6 +827,9 @@ public class ErlangValueTest {
             assertEquals(bean1.get("e"), bean1_act.getE());
             assertEquals(bean1.get("f"), bean1_act.getF());
             compareMap(map2, actual.getI2());
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 
@@ -807,10 +843,10 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean2b() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 10000; ++i) {
-            JSONBeanTest2 bean2 = new JSONBeanTest2();
+            final JSONBeanTest2 bean2 = new JSONBeanTest2();
             bean2.setA2(random.nextBoolean());
             bean2.setB2(random.nextInt());
             bean2.setC2(random.nextLong());
@@ -818,7 +854,7 @@ public class ErlangValueTest {
             bean2.setE2(random.nextDouble());
             bean2.setF2(getRandomString(random, random.nextInt(100), false));
             bean2.setG2(getRandomList(random, 100));
-            JSONBeanTest1 bean1 = new JSONBeanTest1();
+            final JSONBeanTest1 bean1 = new JSONBeanTest1();
             bean1.setA(random.nextBoolean());
             bean1.setB(random.nextInt());
             bean1.setC(random.nextLong());
@@ -826,11 +862,11 @@ public class ErlangValueTest {
             bean1.setE(random.nextDouble());
             bean1.setF(getRandomString(random, 10, false));
             bean2.setH2(bean1);
-            Map<String, Object> map2 = getRandomMapRecursive(random, 10, 3, true);
+            final Map<String, Object> map2 = getRandomMapRecursive(random, 10, 3, true);
             bean2.setI2(map2);
-            ErlangValue value = new ErlangValue(bean2);
+            final ErlangValue value = new ErlangValue(bean2);
 
-            JSONBeanTest2 actual = value.jsonValue(JSONBeanTest2.class);
+            final JSONBeanTest2 actual = value.jsonValue(JSONBeanTest2.class);
             assertEquals(bean2.getA2(), actual.getA2());
             assertEquals(bean2.getB2(), actual.getB2());
             assertEquals(bean2.getC2(), actual.getC2());
@@ -838,7 +874,7 @@ public class ErlangValueTest {
             assertEquals(bean2.getE2(), actual.getE2(), 0.0);
             assertEquals(bean2.getF2(), actual.getF2());
             assertEquals(bean2.getG2(), actual.getG2());
-            JSONBeanTest1 bean1_act = actual.getH2();
+            final JSONBeanTest1 bean1_act = actual.getH2();
             assertEquals(bean1.getA(), bean1_act.getA());
             assertEquals(bean1.getB(), bean1_act.getB());
             assertEquals(bean1.getC(), bean1_act.getC());
@@ -846,6 +882,9 @@ public class ErlangValueTest {
             assertEquals(bean1.getE(), bean1_act.getE(), 0.0);
             assertEquals(bean1.getF(), bean1_act.getF());
             compareMap(map2, actual.getI2());
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 
@@ -859,8 +898,8 @@ public class ErlangValueTest {
         public List<JSONBeanTest1> getA3() { return a3; }
         public Map<String, JSONBeanTest1> getB3() { return b3; }
 
-        public void setA3(List<JSONBeanTest1> a_) { this.a3 = a_; }
-        public void setB3(Map<String, JSONBeanTest1> b_) { this.b3 = b_; }
+        public void setA3(final List<JSONBeanTest1> a_) { this.a3 = a_; }
+        public void setB3(final Map<String, JSONBeanTest1> b_) { this.b3 = b_; }
     }
 
     /**
@@ -873,36 +912,36 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean3a() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 10000; ++i) {
-            Map<String, Object> map = new LinkedHashMap<String, Object>(7);
-            Map<String, Object> bean1a = new LinkedHashMap<String, Object>(6);
+            final Map<String, Object> map = new LinkedHashMap<String, Object>(7);
+            final Map<String, Object> bean1a = new LinkedHashMap<String, Object>(6);
             bean1a.put("a", random.nextBoolean());
             bean1a.put("b", random.nextInt());
             bean1a.put("c", random.nextLong());
             bean1a.put("d", getRandomBigInt(random));
             bean1a.put("e", random.nextDouble());
             bean1a.put("f", getRandomString(random, 10, false));
-            Map<String, Object> bean1b = new LinkedHashMap<String, Object>(6);
+            final Map<String, Object> bean1b = new LinkedHashMap<String, Object>(6);
             bean1b.put("a", random.nextBoolean());
             bean1b.put("b", random.nextInt());
             bean1b.put("c", random.nextLong());
             bean1b.put("d", getRandomBigInt(random));
             bean1b.put("e", random.nextDouble());
             bean1b.put("f", getRandomString(random, 10, false));
-            List<Map<String, Object>> list1 = new LinkedList<Map<String,Object>>();
+            final List<Map<String, Object>> list1 = new LinkedList<Map<String,Object>>();
             list1.add(bean1a);
             list1.add(bean1b);
             map.put("a3", list1);
-            Map<String, Map<String, Object>> map1 = new LinkedHashMap<String, Map<String,Object>>();
+            final Map<String, Map<String, Object>> map1 = new LinkedHashMap<String, Map<String,Object>>();
             map1.put("a4", bean1a);
             map1.put("b4", bean1b);
             map.put("b3", map1);
-            ErlangValue value = new ErlangValue(map);
+            final ErlangValue value = new ErlangValue(map);
 
-            JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
-            List<JSONBeanTest1> actual_a3 = actual.getA3();
+            final JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
+            final List<JSONBeanTest1> actual_a3 = actual.getA3();
             assertEquals(list1.size(), actual_a3.size());
             for (int j = 0; j < list1.size(); ++j) {
                 assertEquals(list1.get(j).get("a"), actual_a3.get(j).getA());
@@ -912,9 +951,9 @@ public class ErlangValueTest {
                 assertEquals(list1.get(j).get("e"), actual_a3.get(j).getE());
                 assertEquals(list1.get(j).get("f"), actual_a3.get(j).getF());
             }
-            Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
+            final Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
             assertEquals(map1.size(), actual_b3.size());
-            for (String key : map1.keySet()) {
+            for (final String key : map1.keySet()) {
                 assertEquals(map1.get(key).get("a"), actual_b3.get(key).getA());
                 assertEquals(map1.get(key).get("b"), actual_b3.get(key).getB());
                 assertEquals(map1.get(key).get("c"), actual_b3.get(key).getC());
@@ -922,6 +961,9 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).get("e"), actual_b3.get(key).getE());
                 assertEquals(map1.get(key).get("f"), actual_b3.get(key).getF());
             }
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 
@@ -935,36 +977,36 @@ public class ErlangValueTest {
      */
     @Test
     public final void testJsonValueBean3b() throws Exception {
-        Random random = new Random();
+        final Random random = new Random();
 
         for (int i = 0; i < 10000; ++i) {
-            JSONBeanTest3 bean3 = new JSONBeanTest3();
-            JSONBeanTest1 bean1a = new JSONBeanTest1();
+            final JSONBeanTest3 bean3 = new JSONBeanTest3();
+            final JSONBeanTest1 bean1a = new JSONBeanTest1();
             bean1a.setA(random.nextBoolean());
             bean1a.setB(random.nextInt());
             bean1a.setC(random.nextLong());
             bean1a.setD(getRandomBigInt(random));
             bean1a.setE(random.nextDouble());
             bean1a.setF(getRandomString(random, 10, false));
-            JSONBeanTest1 bean1b = new JSONBeanTest1();
+            final JSONBeanTest1 bean1b = new JSONBeanTest1();
             bean1b.setA(random.nextBoolean());
             bean1b.setB(random.nextInt());
             bean1b.setC(random.nextLong());
             bean1b.setD(getRandomBigInt(random));
             bean1b.setE(random.nextDouble());
             bean1b.setF(getRandomString(random, 10, false));
-            List<JSONBeanTest1> list1 = new LinkedList<JSONBeanTest1>();
+            final List<JSONBeanTest1> list1 = new LinkedList<JSONBeanTest1>();
             list1.add(bean1a);
             list1.add(bean1b);
             bean3.setA3(list1);
-            Map<String, JSONBeanTest1> map1 = new LinkedHashMap<String, JSONBeanTest1>();
+            final Map<String, JSONBeanTest1> map1 = new LinkedHashMap<String, JSONBeanTest1>();
             map1.put("a4", bean1a);
             map1.put("b4", bean1b);
             bean3.setB3(map1);
-            ErlangValue value = new ErlangValue(bean3);
+            final ErlangValue value = new ErlangValue(bean3);
 
-            JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
-            List<JSONBeanTest1> actual_a3 = actual.getA3();
+            final JSONBeanTest3 actual = value.jsonValue(JSONBeanTest3.class);
+            final List<JSONBeanTest1> actual_a3 = actual.getA3();
             assertEquals(list1.size(), actual_a3.size());
             for (int j = 0; j < list1.size(); ++j) {
                 assertEquals(list1.get(j).getA(), actual_a3.get(j).getA());
@@ -974,9 +1016,9 @@ public class ErlangValueTest {
                 assertEquals(list1.get(j).getE(), actual_a3.get(j).getE(), 0.0);
                 assertEquals(list1.get(j).getF(), actual_a3.get(j).getF());
             }
-            Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
+            final Map<String, JSONBeanTest1> actual_b3 = actual.getB3();
             assertEquals(map1.size(), actual_b3.size());
-            for (String key : map1.keySet()) {
+            for (final String key : map1.keySet()) {
                 assertEquals(map1.get(key).getA(), actual_b3.get(key).getA());
                 assertEquals(map1.get(key).getB(), actual_b3.get(key).getB());
                 assertEquals(map1.get(key).getC(), actual_b3.get(key).getC());
@@ -984,6 +1026,9 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).getE(), actual_b3.get(key).getE(), 0.0);
                 assertEquals(map1.get(key).getF(), actual_b3.get(key).getF());
             }
+            final ErlangValue value2 = new ErlangValue(actual);
+            assertTrue(value.equals(value2));
+            assertTrue(value2.equals(value));
         }
     }
 }

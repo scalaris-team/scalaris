@@ -547,4 +547,17 @@ public class ErlangValue {
     public OtpErlangObject value() {
         return value;
     }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof ErlangValue)) {
+            return false;
+        }
+
+        final ErlangValue erlValue = (ErlangValue) obj;
+        return value.equals(erlValue.value);
+    }
 }
