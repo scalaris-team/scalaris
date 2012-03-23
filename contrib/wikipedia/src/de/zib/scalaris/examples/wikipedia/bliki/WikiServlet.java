@@ -58,6 +58,7 @@ import com.skjegstad.utils.BloomFilter;
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.Options;
+import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
@@ -162,6 +163,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String WIKI_REBUILD_PAGES_CACHE = config.getInitParameter("WIKI_REBUILD_PAGES_CACHE");
         if (WIKI_REBUILD_PAGES_CACHE != null) {
             Options.WIKI_REBUILD_PAGES_CACHE = parseInt(WIKI_REBUILD_PAGES_CACHE, Options.WIKI_REBUILD_PAGES_CACHE);
+        }
+        final String WIKI_STORE_CONTRIBUTIONS = config.getInitParameter("WIKI_STORE_CONTRIBUTIONS");
+        if (WIKI_STORE_CONTRIBUTIONS != null) {
+            try {
+                Options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_SAVEPAGE_RETRY_DELAY);
+            } catch (IllegalArgumentException e) {
+            }
         }
     }
     

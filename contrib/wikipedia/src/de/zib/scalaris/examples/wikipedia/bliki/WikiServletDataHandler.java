@@ -20,10 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
+import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -165,6 +167,16 @@ public interface WikiServletDataHandler<Connection> {
      * @return DB key
      */
     public String getStatsPageEditsKey();
+    
+    /**
+     * Gets the key to store the list of contributions of a user.
+     * 
+     * @param contributor  the user name or IP address of the user who created
+     *                     the revision
+     * 
+     * @return DB key
+     */
+    public String getContributionListKey(String contributor);
 
     
     /**
@@ -290,6 +302,20 @@ public interface WikiServletDataHandler<Connection> {
      */
     public ValueResult<List<String>> getPagesLinkingTo(Connection connection,
             String title, final MyNamespace nsObject);
+
+    /**
+     * Retrieves a list of pages linking to the given page from the DB.
+     * 
+     * @param connection
+     *            the connection to the DB
+     * @param contributor
+     *            the user name or IP address of the user who created the
+     *            revision
+     * 
+     * @return a result object with the page list on success
+     */
+    public ValueResult<List<Contribution>> getContributions(
+            Connection connection, String contributor);
     
     /**
      * Retrieves the number of available pages from the DB.
