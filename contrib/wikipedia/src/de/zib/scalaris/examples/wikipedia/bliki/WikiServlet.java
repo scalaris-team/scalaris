@@ -1525,7 +1525,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("&save_times=" + StringUtils.join(times, "%2C"));
                 redirectUrl.append("&save_attempts=" + page.getSaveAttempts());
                 for (Entry<Integer, List<String>> failedKeys : page.getFailedKeys().entrySet()) {
-                    redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + StringUtils.join(failedKeys.getValue(), "%20%23%20"));
+                    redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + URLEncoder.encode(StringUtils.join(failedKeys.getValue(), " # "), "UTF-8"));
                 }
                 redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
                 response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
