@@ -161,7 +161,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         final String WIKI_REBUILD_PAGES_CACHE = config.getInitParameter("WIKI_REBUILD_PAGES_CACHE");
         if (WIKI_REBUILD_PAGES_CACHE != null) {
-            Options.WIKI_REBUILD_PAGES_CACHE = parseInt(WIKI_SAVEPAGE_RETRY_DELAY, Options.WIKI_REBUILD_PAGES_CACHE);
+            Options.WIKI_REBUILD_PAGES_CACHE = parseInt(WIKI_REBUILD_PAGES_CACHE, Options.WIKI_REBUILD_PAGES_CACHE);
         }
     }
     
