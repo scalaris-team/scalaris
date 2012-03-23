@@ -103,7 +103,7 @@ public class ConnectionPool {
         Connection conn;
         while ((conn = getConnection()) == null) {
             try {
-                wait(timeout);
+                Thread.currentThread().wait(timeout);
             } catch (final InterruptedException e) {
             }
             final long timeAtEnd = System.currentTimeMillis();
