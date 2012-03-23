@@ -216,11 +216,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 @Override
                 public void run() {
                     Connection connection = getConnection(null);
-                    ValueResult<List<String>> result = getPageList(connection);
-                    if (result.success) {
-                        List<String> pages = result.value;
-                        BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
-                        existingPages = filter;
+                    try {
+                        ValueResult<List<String>> result = getPageList(connection);
+                        if (result.success) {
+                            List<String> pages = result.value;
+                            BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
+                            existingPages = filter;
+                        }
+                    } finally {
+                        releaseConnection(null, connection);
                     }
                 }
             }, 0, Options.WIKI_REBUILD_PAGES_CACHE, TimeUnit.SECONDS);
