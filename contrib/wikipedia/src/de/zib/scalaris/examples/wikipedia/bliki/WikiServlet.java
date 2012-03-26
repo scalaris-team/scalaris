@@ -167,7 +167,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String WIKI_STORE_CONTRIBUTIONS = config.getInitParameter("WIKI_STORE_CONTRIBUTIONS");
         if (WIKI_STORE_CONTRIBUTIONS != null) {
             try {
-                Options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_SAVEPAGE_RETRY_DELAY);
+                Options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_STORE_CONTRIBUTIONS);
             } catch (IllegalArgumentException e) {
             }
         }
