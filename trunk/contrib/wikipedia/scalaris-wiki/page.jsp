@@ -253,7 +253,9 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
           <% } %>
                     <li id="ca-history" class="collapsible "><span><a href="wiki?title=<%= safePageTitle %>&amp;action=history" title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
           <% } else {%>
+          <% if (!pageBean.isEditRestricted()) { %>
                     <li id="ca-edit"><span><a href="wiki?title=<%= safePageTitle %>&amp;action=edit&amp;oldid=${ pageBean.version }" title="You can edit this page. Please use the preview button before saving [e]" accesskey="e">Start</a></span></li>
+          <% }%>
           <% } %>
     </ul>
 </div>
