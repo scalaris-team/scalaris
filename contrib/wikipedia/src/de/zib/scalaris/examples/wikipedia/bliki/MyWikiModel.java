@@ -1005,6 +1005,10 @@ public class MyWikiModel extends WikiModel {
 
     @Override
     public String getRedirectLink() {
-        return super.getRedirectLink().replaceFirst("#.*$", "");
+        final String link = super.getRedirectLink();
+        if (link != null) {
+            return link.replaceFirst("#.*$", "");
+        }
+        return link;
     }
 }
