@@ -294,23 +294,25 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 showEmptyPage(request, response, new WikiPageBean());
                 return;
             }
+            
+            // if the "search" parameter exists, show the search
+            String req_search = request.getParameter("search");
+            if (req_search != null) {
+                handleSearch(request, response, null, req_search, connection, new WikiPageListBean());
+                return;
+            }
 
             // get parameters:
             String req_title = request.getParameter("title");
             if (req_title == null) {
                 req_title = MAIN_PAGE;
             }
-            
-            // if the "search" parameter exists, show the search
-            String req_search = request.getParameter("search");
-            if (req_search != null) {
-                handleSearch(request, response, req_title, req_search, connection, new WikiPageListBean());
-                return;
-            }
 
             String req_action = request.getParameter("action");
 
-            if (req_title.equals("Special:Random")) {
+            if (!MyWikiModel.isValidTitle(req_title)) {
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean());
+            } else if (req_title.equals("Special:Random")) {
                 handleViewRandomPage(request, response, req_title, connection, new WikiPageBean());
             } else if (req_title.startsWith("Special:AllPages") || req_title.startsWith("Special:Allpages")) {
                 handleSpecialAllPages(request, response, req_title, connection, new WikiPageListBean());
@@ -582,9 +584,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             request.setCharacterEncoding("UTF-8");
             response.setCharacterEncoding("UTF-8");
 
-            handleEditPageSubmitted(request, response,
-                    request.getParameter("title"), connection,
-                    new WikiPageEditBean());
+            String req_title = request.getParameter("title");
+            if (!MyWikiModel.isValidTitle(req_title)) {
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean());
+            } else {
+                handleEditPageSubmitted(request, response,
+                        request.getParameter("title"), connection,
+                        new WikiPageEditBean());
+            }
 
             // if the request has not been forwarded, print a general error
             response.setContentType("text/html");
@@ -912,6 +919,60 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         // re-set version (we are only showing this page due to a non-existing page)
         page.setVersion(-1);
+        page.setNotAvailable(true);
+        page.setNotice(getParam_notice(request));
+        page.setWikiTitle(siteinfo.getSitename());
+        page.setWikiNamespace(namespace);
+
+        // forward the request and the bean to the jsp:
+        request.setAttribute("pageBean", page);
+        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
+        dispatcher.forward(request, response);
+    }
+    
+    /**
+     * Shows the "Bad Title" message the wiki returns in case a page title is
+     * invalid.
+     * 
+     * @param request
+     *            the request of the current operation
+     * @param response
+     *            the response of the current operation
+     * @param connection
+     *            connection to the database
+     * @param page
+     *            the bean for the page
+     * 
+     * @throws IOException 
+     * @throws ServletException 
+     */
+    private void handleViewPageBadTitle(HttpServletRequest request,
+            HttpServletResponse response, Connection connection,
+            WikiPageBean page) throws ServletException, IOException {
+        final String title = "Bad title";
+        // get renderer
+        final int render = getParam_renderer(request);
+        final String badTitleKey = "MediaWiki:Badtitletext";
+
+        RevisionResult result = getRevision(connection, badTitleKey, namespace);
+        page.addStats(result.stats);
+        page.getInvolvedKeys().addAll(result.involvedKeys);
+        
+        if (result.success) {
+            renderRevision(title, result.revision, render, request, connection, page);
+        } else if (result.connect_failed) {
+            setParam_error(request, "ERROR: DB connection failed");
+            showEmptyPage(request, response, page);
+            return;
+        } else {
+//            addToParam_notice(request, "error: unknown error getting page " + badTitleTitle + ": <pre>" + result.message + "</pre>");
+            page.setPage("The requested page title is invalid. It may be empty, contain unsupported characters, or include a non-local or incorrectly linked interwiki prefix. You may be able to locate the desired page by searching for its name (with interwiki prefix, if any) in the search box.");
+            page.setError(getParam_error(request));
+            page.setTitle(title);
+        }
+        // re-set version (we are only showing this page due to a non-existing page)
+        page.setVersion(-1);
+        page.setEditRestricted(true);
         page.setNotAvailable(true);
         page.setNotice(getParam_notice(request));
         page.setWikiTitle(siteinfo.getSitename());

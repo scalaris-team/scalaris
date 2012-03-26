@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.skjegstad.utils.BloomFilter;
 
@@ -100,8 +102,14 @@ public class MyWikiModel extends WikiModel {
      */
     protected final List<String> involvedKeys = new ArrayList<String>();
     
+    /**
+     * False positive rate of the bloom filter for the existing pages checks.
+     */
     public static final double existingPagesFPR = 0.1;
     protected BloomFilter<String> existingPages = null;
+    
+    protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
+            Pattern.compile("^.*?([\\p{C}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -184,6 +192,10 @@ public class MyWikiModel extends WikiModel {
         if (getRedirectLink() != null) {
             // requesting a page from a redirect?
             return getRedirectContent(getRedirectLink());
+        }
+        
+        if (!isValidTitle(createFullPageName(namespace, articleName))) {
+            return null;
         }
         
         // set the corrected namespace and article name (see above)
@@ -1011,4 +1023,26 @@ public class MyWikiModel extends WikiModel {
         }
         return link;
     }
+    
+    /**
+     * The following characters are forbidden in page titles:
+     * <tt># &lt; &gt; [ ] | { }</tt>. Any line breaks and non-printable unicode
+     * characters are also forbidden here.
+     * 
+     * @param title
+     *            the title to check
+     * 
+     * @return <tt>true</tt> if the title contains a forbidden character,
+     *         <tt>false</tt> otherwise
+     * 
+     * @see #MATCH_WIKI_FORBIDDEN_TITLE_CHARS
+     */
+    public static boolean isValidTitle(String title) {
+        if (title == null || title.isEmpty() || title.length() >= 256) {
+            return false;
+        }
+        final Matcher matcher = MATCH_WIKI_FORBIDDEN_TITLE_CHARS.matcher(title);
+        return !matcher.matches();
+    }
+
 }
