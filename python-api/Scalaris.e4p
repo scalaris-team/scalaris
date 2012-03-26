@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE Project SYSTEM "Project-4.6.dtd">
-<!-- eric4 project file for project Scalaris -->
-<!-- Saved: 2011-04-14, 13:59:08 -->
-<!-- Copyright (C) 2011 Nico Kruber, kruber@zib.de -->
-<Project version="4.6">
+<!DOCTYPE Project SYSTEM "Project-5.1.dtd">
+<!-- eric5 project file for project Scalaris -->
+<!-- Saved: 2012-03-26, 10:40:53 -->
+<!-- Copyright (C) 2012 Nico Kruber, kruber@zib.de -->
+<Project version="5.1">
   <Language>en</Language>
-  <ProgLanguage mixed="0">Python</ProgLanguage>
+  <Hash>32ef564fa76bfa734e558228c0a08174613aa726</Hash>
+  <ProgLanguage mixed="0">Python2</ProgLanguage>
   <ProjectType>Console</ProjectType>
   <Description></Description>
   <Version>0.1</Version>
@@ -19,25 +20,20 @@
     <Source>scalaris_test.py</Source>
     <Source>scalaris_userdevguide_jsontrace.py</Source>
   </Sources>
-  <Forms>
-  </Forms>
-  <Translations>
-  </Translations>
-  <Resources>
-  </Resources>
-  <Interfaces>
-  </Interfaces>
-  <Others>
-  </Others>
+  <Forms/>
+  <Translations/>
+  <Resources/>
+  <Interfaces/>
+  <Others/>
   <MainScript>scalaris.py</MainScript>
   <Vcs>
     <VcsType>None</VcsType>
   </Vcs>
   <FiletypeAssociations>
-    <FiletypeAssociation pattern="*.pyw" type="SOURCES" />
-    <FiletypeAssociation pattern="*.idl" type="INTERFACES" />
-    <FiletypeAssociation pattern="*.py" type="SOURCES" />
-    <FiletypeAssociation pattern="*.ptl" type="SOURCES" />
+    <FiletypeAssociation pattern="*.idl" type="INTERFACES"/>
+    <FiletypeAssociation pattern="*.ptl" type="SOURCES"/>
+    <FiletypeAssociation pattern="*.py" type="SOURCES"/>
+    <FiletypeAssociation pattern="*.pyw" type="SOURCES"/>
   </FiletypeAssociations>
   <Checkers>
     <CheckersParams>
