@@ -106,4 +106,9 @@
        X -> Y
        ).
 
+-define(IIF(C, A, B), case C of
+                          true -> A;
+                          _ -> B
+                      end).
+
 -include("types.hrl").

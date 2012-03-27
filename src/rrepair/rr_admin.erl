@@ -49,11 +49,6 @@
 -define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
 -define(ReplicationFactor, 4).
 
--define(IIF(C, A, B), case C of
-                          true -> A;
-                          _ -> B
-                      end).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Eval Quick Start
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -28,11 +28,6 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
--define(IIF(C, A, B), case C of
-                          true -> A;
-                          _ -> B
-                      end).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() -> [
