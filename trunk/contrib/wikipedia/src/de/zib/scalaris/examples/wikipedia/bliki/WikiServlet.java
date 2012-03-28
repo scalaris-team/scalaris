@@ -237,17 +237,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             ses.scheduleWithFixedDelay(new Runnable() {
                 @Override
                 public void run() {
-                    Connection connection = getConnection(null);
-                    try {
-                        ValueResult<List<String>> result = getPageList(connection);
-                        if (result.success) {
-                            List<String> pages = result.value;
-                            BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
-                            existingPages = filter;
-                        }
-                    } finally {
-                        releaseConnection(null, connection);
-                    }
+                    updateExistingPages();
                 }
             }, 0, Options.WIKI_REBUILD_PAGES_CACHE, TimeUnit.SECONDS);
         }
@@ -1909,5 +1899,22 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     public synchronized void registerEventHandler(WikiEventHandler handler) {
         eventHandlers.add(handler);
+    }
+
+    /**
+     * Updates the bloom filter of existing pages for quick checks.
+     */
+    protected void updateExistingPages() {
+        Connection connection = getConnection(null);
+        try {
+            ValueResult<List<String>> result = getPageList(connection);
+            if (result.success) {
+                List<String> pages = result.value;
+                BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
+                existingPages = filter;
+            }
+        } finally {
+            releaseConnection(null, connection);
+        }
     }
 }
