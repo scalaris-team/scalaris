@@ -138,11 +138,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /**
-     * Servlet initialisation: creates the connection to the erlang node and
-     * imports site information.
+     * Servlet initialisation: imports options from the servlet info, and
+     * initialises it.
      */
     @Override
-    public void init(ServletConfig config) throws ServletException {
+    public final void init(ServletConfig config) throws ServletException {
         super.init(config);
         final String WIKI_USE_NEW_SCALARIS_OPS = config.getInitParameter("WIKI_USE_NEW_SCALARIS_OPS");
         if (WIKI_USE_NEW_SCALARIS_OPS != null) {
@@ -171,6 +171,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             } catch (IllegalArgumentException e) {
             }
         }
+        
+        init2(config);
+        
+        loadSiteInfo();
+        loadPlugins();
+        startExistingPagesUpdate();
+    }
+    
+    /**
+     * Servlet initialisation, phase 2: this is executed directly after
+     * importing the servlet config in {@link #init(ServletConfig)}. Overwrite
+     * in sub-classes if needed, e.g. to setup the DB connection.
+     */
+    protected void init2(ServletConfig config) throws ServletException {
     }
     
     /**
