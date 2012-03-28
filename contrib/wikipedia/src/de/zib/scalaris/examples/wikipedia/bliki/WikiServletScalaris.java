@@ -346,7 +346,6 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                             (WikiDumpPreparedSQLiteToScalaris) handler;
                     sqlHandler.writeToScalaris();
                     sqlHandler.new ReportAtShutDown().run();
-                    
                 }
             } catch (Exception e) {
                 if (e instanceof SAXParsingInterruptedException) {
@@ -367,6 +366,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             synchronized (WikiServletScalaris.this) {
                 WikiServletScalaris.this.currentImport = "";
                 WikiServletScalaris.this.importHandler = null;
+                WikiServletScalaris.this.updateExistingPages();
             }
         }
     }
