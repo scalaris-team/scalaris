@@ -1905,16 +1905,18 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * Updates the bloom filter of existing pages for quick checks.
      */
     protected void updateExistingPages() {
-        Connection connection = getConnection(null);
-        try {
-            ValueResult<List<String>> result = getPageList(connection);
-            if (result.success) {
-                List<String> pages = result.value;
-                BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
-                existingPages = filter;
+        if (initialized) {
+            Connection connection = getConnection(null);
+            try {
+                ValueResult<List<String>> result = getPageList(connection);
+                if (result.success) {
+                    List<String> pages = result.value;
+                    BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
+                    existingPages = filter;
+                }
+            } finally {
+                releaseConnection(null, connection);
             }
-        } finally {
-            releaseConnection(null, connection);
         }
     }
 }
