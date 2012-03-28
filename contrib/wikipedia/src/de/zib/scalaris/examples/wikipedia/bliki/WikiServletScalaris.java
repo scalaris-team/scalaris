@@ -83,8 +83,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
      * imports site information.
      */
     @Override
-    public void init(ServletConfig config) throws ServletException {
-        super.init(config);
+    public void init2(ServletConfig config) throws ServletException {
+        super.init2(config);
         Properties properties = new Properties();
         try {
             InputStream fis = config.getServletContext().getResourceAsStream("/WEB-INF/scalaris.properties");
@@ -114,9 +114,6 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
 //        cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
         cPool = new ConnectionPool(cFactory, CONNECTION_POOL_SIZE);
-        loadSiteInfo();
-        loadPlugins();
-        startExistingPagesUpdate();
     }
     
     /**
