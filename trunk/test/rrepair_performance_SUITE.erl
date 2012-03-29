@@ -37,12 +37,12 @@
 all() ->
     [art,
      merkle_tree,
-     bloom].
-     %comparison].
+     bloom,
+     comparison].
 
 suite() ->
     [
-     {timetrap, {seconds, 90}}
+     {timetrap, {seconds, 200}}
     ].
 
 init_per_suite(Config) ->
@@ -58,7 +58,7 @@ end_per_suite(Config) ->
 
 comparison(_) ->
     Iter = 100,
-    DBSize = 1000,
+    DBSize = 2000,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     DB = db_generator:get_db(I, DBSize, uniform),    
@@ -80,7 +80,7 @@ comparison(_) ->
            [DBSize, Iter,
             measure_util:get(BBuildT, avg, ms), 
             measure_util:get(MBuildT, avg, ms), 
-            measure_util:get(ABuildT, avg, ms) + TreeT / 1000, 
+            measure_util:get(ABuildT, avg, ms) + measure_util:get(TreeT, avg, ms), 
             measure_util:get(ABuildT, avg, ms)]),
     ok.
 
@@ -98,14 +98,14 @@ m_bloom(_I, DB, DBSize, Iterations) ->
 
 m_merkle(I, DB, _DBSize, Iterations) ->
     BuildT = 
-        measure_util:time_avg(fun() -> merkle_tree:bulk_build(I, DB) end, 
+        measure_util:time_avg(fun() -> merkle_tree:new(I, DB, []) end, 
                               Iterations, []),
     
     [{build_time, BuildT}].
 
 m_art(I, DB, _DBSize, Iterations) ->    
-    {TreeTime, Tree} = 
-        util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
+    {Tree, TreeTime} = 
+        measure_util:time_with_result(fun() -> merkle_tree:new(I, DB, []) end, Iterations, []),
     BuildTime = 
         measure_util:time_avg(fun() -> art:new(Tree) end, Iterations, []),
     
@@ -119,7 +119,7 @@ art(_) ->
     DB = db_generator:get_db(I, ToAdd, uniform),
 
     {TreeTime, Tree} = 
-        util:tc(fun() -> merkle_tree:bulk_build(I, DB) end, []),
+        util:tc(fun() -> merkle_tree:new(I, DB, []) end, []),
     BuildTime = 
         measure_util:time_avg(fun() -> art:new(Tree) end, ExecTimes, []),    
 
@@ -141,11 +141,11 @@ merkle_tree(_) ->
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     DB = db_generator:get_db(I, ToAdd, uniform),
     
-    TestTree = merkle_tree:bulk_build(I, DB),
+    TestTree = merkle_tree:new(I, DB, []),
     {Inner, Leafs} = merkle_tree:size_detail(TestTree),    
     
     BuildT = measure_util:time_avg(
-           fun() -> merkle_tree:bulk_build(I, DB) end, 
+           fun() -> merkle_tree:bulk_build(I, [], DB) end, 
            ExecTimes, []),
         
     IterateT = measure_util:time_avg(
@@ -169,7 +169,7 @@ merkle_tree(_) ->
             ------------------------
             PARAMETER: AddedItems=~p ; ExecTimes=~p
             TreeSize: InnerNodes=~p ; Leafs=~p,
-            BuildTime:      ~p
+            BuildTime:      ~p (without hashing)
             IterationTime : ~p
             GenHashTime:    ~p
             SimpleSizeTime: ~p
@@ -185,7 +185,7 @@ merkle_tree(_) ->
 bloom(_) ->
     %parameter
     ExecTimes = 100,
-    ToAdd = 2000, % req: mod 2 = 0
+    ToAdd = 5000, % req: mod 2 = 0
     Fpr = 0.1,
 
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),

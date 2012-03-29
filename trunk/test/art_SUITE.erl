@@ -57,7 +57,7 @@ prop_new(L, R) ->
     DB = db_generator:get_db(I, 400, uniform),
     Art1 = art:new(),
     Conf1 = art:get_config(Art1),
-    Art2 = art:new(merkle_tree:bulk_build(I, DB), 
+    Art2 = art:new(merkle_tree:new(I, DB, []), 
                    [{correction_factor, proplists:get_value(correction_factor, Conf1) + 1},
                     {inner_bf_fpr, proplists:get_value(inner_bf_fpr, Conf1) + 0.1},
                     {leaf_bf_fpr, proplists:get_value(leaf_bf_fpr, Conf1) + 0.1}]),
@@ -79,7 +79,7 @@ prop_lookup(L, L) -> true;
 prop_lookup(L, R) ->    
     I = intervals:new('[', L, R, ']'),
     DB = db_generator:get_db(I, 400, uniform),
-    Tree = merkle_tree:bulk_build(I, DB),
+    Tree = merkle_tree:new(I, DB, []),
     Art = art:new(Tree),
     Found = nodes_in_art(merkle_tree:iterator(Tree), Art, 0),
     ct:pal("TreeNodes=~p ; Found=~p", [merkle_tree:size(Tree), Found]),

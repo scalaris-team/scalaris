@@ -68,7 +68,7 @@ eprof(_) ->
     ct:pal("DB GEN OK"),
 
     eprof:start(),
-    Fun = fun() -> merkle_tree:bulk_build(I, [], Keys) end,
+    Fun = fun() -> merkle_tree:new(I, Keys, []) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),
     eprof:analyze(procs, [{sort, time}]),
@@ -86,7 +86,7 @@ fprof(_) ->
     Keys = db_generator:get_db(I, ToAdd, uniform),
     ct:pal("DB GEN OK"),
 
-    fprof:apply(merkle_tree, bulk_build, [I, [], Keys]),
+    fprof:apply(merkle_tree, new, [I, Keys, []]),
     fprof:profile(),
     fprof:analyse(),
     
@@ -153,8 +153,8 @@ prop_tree_hash(L, R, ToAdd) ->
     I = intervals:new('[', L, R, ']'),
     DB = db_generator:get_db(I, ToAdd, uniform),
     
-    Tree1 = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB)),
-    Tree2 = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB)),
+    Tree1 = merkle_tree:new(I, DB, []),
+    Tree2 = merkle_tree:new(I, DB, []),
     Tree3 = build_tree(I, ToAdd + 1, uniform),
     
     RootHash1 = merkle_tree:get_hash(Tree1),
@@ -197,8 +197,8 @@ prop_bulk_insert(L, L, _) -> true;
 prop_bulk_insert(L, R, BucketSize) ->
     I = intervals:new('[', L, R, ']'),
     DB = db_generator:get_db(I, BucketSize, uniform),
-    Tree1 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),
-    Tree2 = merkle_tree:bulk_build(I, [{bucket_size, BucketSize}], DB),    
+    Tree1 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),
+    Tree2 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),    
     Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),    
     Size1 = merkle_tree:size(Tree1),
     Size2 = merkle_tree:size(Tree2),
@@ -280,8 +280,7 @@ build_tree(Interval, ToAdd, Distribution) ->
     is_subtype(Tree,         merkle_tree:merkle_tree()).
 build_tree(Interval, Config, ToAdd, Distribution) ->
     Keys = db_generator:get_db(Interval, ToAdd, Distribution),
-    T = merkle_tree:bulk_build(Interval, Config, Keys),
-    merkle_tree:gen_hash(T).
+    merkle_tree:new(Interval, Keys, Config).
 
 -spec iterate(merkle_tree:mt_iter(), fun((merkle_tree:mt_node(), T) -> T), T) -> T. 
 iterate(none, _, Acc) -> Acc;
