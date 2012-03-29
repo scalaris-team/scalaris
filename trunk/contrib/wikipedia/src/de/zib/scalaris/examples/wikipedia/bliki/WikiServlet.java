@@ -144,16 +144,22 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected static final int SPECIAL_SPECIALPAGES_IDX = 6;
     protected static final int SPECIAL_STATS_IDX = 7;
     protected static final int SPECIAL_VERSION_IDX = 8;
+
+    /**
+     * Full list of normalised special page titles for {@link #existingPages}. 
+     */
+    protected static final List<String> specialPages;
     
     static {
+        // BEWARE: include normalised page titles!
         SPECIAL_SUFFIX.put("en", new String[] { "Random", "AllPages",
                 "Allpages", "PrefixIndex", "Search", "WhatLinksHere",
                 "SpecialPages", "Statistics", "Version" });
         SPECIAL_SUFFIX.put("simple", new String[] { "Random", "AllPages",
                 "Allpages", "PrefixIndex", "Search", "WhatLinksHere",
                 "SpecialPages", "Statistics", "Version" });
-        SPECIAL_SUFFIX.put("de", new String[] { "Zufällige_Seite", "Alle_Seiten",
-                "Alle_seiten", "Präfixindex", "Suche", "Linkliste",
+        SPECIAL_SUFFIX.put("de", new String[] { "Zufällige Seite", "Alle Seiten",
+                "Alle seiten", "Präfixindex", "Suche", "Linkliste",
                 "Spezialseiten", "Statistik", "Version" });
         SPECIAL_SUFFIX.put("bar", SPECIAL_SUFFIX.get("de"));
         SPECIAL_SUFFIX.put("es", new String[] { "Aleatoria", "Todas",
@@ -165,6 +171,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             SPECIAL_SUFFIX_EN[i] = specialSuffixEn[i];
         }
         SPECIAL_SUFFIX_LANG = SPECIAL_SUFFIX_EN;
+        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.length * 2);
     }
 
     /**
@@ -295,6 +302,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     }
                 }
             }
+            for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
+                // note: if non-english namespace, "Special" won't be recognised
+                // during normalisation -> leave is unnormalised
+                specialPages.add("Special:" +  SPECIAL_SUFFIX_EN[i]);
+            }
+            for (int i = 0; i < SPECIAL_SUFFIX_LANG.length; ++i) {
+                specialPages.add(MyNamespace.SPECIAL_NAMESPACE_KEY + ":" + SPECIAL_SUFFIX_LANG[i]);
+            }
+            existingPages.addAll(specialPages);
         }
     }
 
@@ -2001,6 +2017,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 ValueResult<List<String>> result = getPageList(connection);
                 if (result.success) {
                     List<String> pages = result.value;
+                    pages.addAll(specialPages);
                     BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
                     existingPages = filter;
                 }

@@ -781,7 +781,7 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Normalises the given page title by capitalising its first letter after
+     * Normalises the given page titles by capitalising their first letter after
      * the namespace.
      * 
      * @param <T>
