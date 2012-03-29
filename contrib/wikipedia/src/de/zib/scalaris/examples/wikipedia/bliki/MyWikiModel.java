@@ -149,6 +149,7 @@ public class MyWikiModel extends WikiModel {
     public MyWikiModel(String imageBaseURL, String linkBaseURL, MyNamespace namespace) {
         super(new MyConfiguration(namespace), null, namespace, imageBaseURL, linkBaseURL);
         this.fExternalWikiBaseFullURL = linkBaseURL;
+        addTemplateFunction("#ifexist", MyIfexistTemplateFun.CONST);
     }
     
     /* (non-Javadoc)
@@ -892,6 +893,18 @@ public class MyWikiModel extends WikiModel {
         // -> e.g. does not remove <noinclude> tags in ordinary pages 
         return true;
 //        return isTemplateNamespace(getNamespace(getPageName()));
+    }
+
+    /**
+     * Checks whether the given namespace is a valid media namespace.
+     * 
+     * @param namespace
+     *            the namespace to check
+     * 
+     * @return <tt>true</tt> if it is one of the two media namespace strings
+     */
+    public boolean isMediaNamespace(String namespace) {
+        return namespace.equalsIgnoreCase(fNamespace.getMedia()) || namespace.equalsIgnoreCase(fNamespace.getMedia2());
     }
 
     /**
