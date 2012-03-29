@@ -25,14 +25,17 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/1, new/2, insert/2, insert_list/2, empty/0,
-         bulk_build/2, bulk_build/3,
+-export([new/1, new/2, new/3,
+         insert/2, insert_list/2, empty/0,
          lookup/2, size/1, size_detail/1, gen_hash/1, 
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1, 
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1, get_bucket_size/1, get_branch_factor/1,
          store_to_DOT/2, store_graph/2]).
+
+% exports for tests
+-export([bulk_build/3]).
 
 -ifdef(with_export_type_support).
 -export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
@@ -65,6 +68,7 @@
          inner_hf       = get_XOR_fun()     :: inner_hash_fun() %hash function for inner node signature creation -          
          }).
 -type mt_config() :: #mt_config{}.
+-type mt_config_params() :: [{atom(), term()}] | [].    %only key value pairs of mt_config allowed
 
 -type mt_node() :: { Hash        :: mt_node_key(),       %hash of childs/containing items 
                      Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
@@ -107,14 +111,21 @@ is_empty(_) -> false.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec new(mt_interval()) -> merkle_tree().
-new(Interval) ->
-    new(Interval, []).
+new(I) ->
+    new(I, []).
 
 % @doc ConfParams = list of tuples defined by {config field name, value}
 %       e.g. [{branch_factor, 32}, {bucket_size, 16}]
--spec new(mt_interval(), [{atom(), term()}]) -> merkle_tree().
-new(Interval, ConfParams) ->
-    {merkle_tree, build_config(ConfParams), {nil, 0, [], Interval, []}}.
+-spec new(mt_interval(), mt_config_params()) -> merkle_tree().
+new(I, ConfParams) ->
+    {merkle_tree, build_config(ConfParams), {nil, 0, [], I, []}}.
+
+-spec new(mt_interval(), [term()], mt_config_params()) -> merkle_tree().
+new(I, KeyList, ConfParams) ->
+    InitNode = {nil, 1, [], I, []},
+    Config = build_config(ConfParams),
+    Root = p_bulk_build(InitNode, Config, KeyList),
+    {merkle_tree, Config, gen_hash_node(Root, Config)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -244,13 +255,9 @@ insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec bulk_build(mt_interval(), [term()]) -> merkle_tree().
-bulk_build(I, L) ->
-    bulk_build(I, [], L).
-
 -spec bulk_build(Interval, Params, KeyList) -> MerkleTree when
     is_subtype(Interval,   mt_interval()),
-    is_subtype(Params,     [{atom(), term()}]),
+    is_subtype(Params,     mt_config_params()),
     is_subtype(KeyList,    [term()]),
     is_subtype(MerkleTree, merkle_tree()).
 bulk_build(I, Params, KeyList) ->
@@ -410,7 +417,7 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
 
--spec build_config([{atom(), term()}]) -> mt_config().
+-spec build_config(mt_config_params()) -> mt_config().
 build_config(ParamList) ->
     lists:foldl(fun({Key, Val}, Conf) ->
                         case Key of

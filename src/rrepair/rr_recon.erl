@@ -538,8 +538,7 @@ build_recon_struct(bloom, {I, DBItems}) ->
     #bloom_recon_struct{ interval = mapInterval(I, 1), keyBF = KeyBF, versBF = VerBF };
 
 build_recon_struct(merkle_tree, {I, DBItems}) ->
-    Tree = merkle_tree:bulk_build(I, DBItems),
-    merkle_tree:gen_hash(Tree);
+    merkle_tree:new(I, DBItems, []);
 
 build_recon_struct(art, Chunk) ->
     Tree = build_recon_struct(merkle_tree, Chunk),
