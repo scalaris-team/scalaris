@@ -73,8 +73,7 @@ add_list_(Bloom, Items) ->
            items_count = FilledCount,
            filter = Filter
           } = Bloom,
-    Pos = lists:append([apply(element(1, Hfs), apply_val, [Hfs, Item]) || Item <- Items]),
-    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),    
+    Positions = lists:append([apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]) || Item <- Items]),
     Bloom#bloom{
                 filter = set_Bits(Filter, Positions),
                 items_count = FilledCount + length(Items)
@@ -90,8 +89,7 @@ is_element_(Bloom, Item) ->
            hfs = Hfs, 
            filter = Filter
           } = Bloom,
-    Pos = apply(element(1, Hfs), apply_val, [Hfs, Item]), 
-    Positions = lists:map(fun(X) -> X rem BFSize end, Pos),
+    Positions = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]), 
     check_Bits(Filter, Positions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
