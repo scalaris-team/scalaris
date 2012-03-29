@@ -60,6 +60,15 @@ apply_val_({hfs_lhsp, K, H1, H2}, Val) ->
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
+% @doc Applies Val to all hash functions in container HC and returns only remainders 
+-spec apply_val_rem_(hfs_t(), itemKey(), pos_integer()) -> [integer()].
+apply_val_rem_({hfs_lhsp, K, H1, H2}, Val, Rem) ->
+    ValBin = term_to_binary(Val),
+    HV1 = hash_value(ValBin, H1),
+    HV2 = hash_value(ValBin, H2),
+    util:for_to_ex(0, K - 1, fun(I) -> (HV1 + I * HV2) rem Rem end).
+
+% @doc Apply hash function I to given value
 -spec apply_val_(hfs_t(), pos_integer(), itemKey()) -> integer().
 apply_val_({hfs_lhsp, K, H1, H2}, I, Val) when I =< K-> 
     ValBin = term_to_binary(Val),

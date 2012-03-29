@@ -18,7 +18,7 @@
 %% @version $Id$
 
 % export
--export([new/1, new/2, apply_val/2, apply_val/3]).
+-export([new/1, new/2, apply_val/2, apply_val/3, apply_val_rem/3]).
 -export([size/1]).
 
 % types
@@ -43,6 +43,9 @@ apply_val(Hfs, Item) -> apply_val_(Hfs, Item).
 % @doc apply Item on hash function I of function set Hfs; I = 1..hfs_size
 -spec apply_val(hfs(), pos_integer(), itemKey()) -> integer().
 apply_val(Hfs, I, Item) -> apply_val_(Hfs, I, Item).
+
+-spec apply_val_rem(hfs(), itemKey(), pos_integer()) -> [integer()].
+apply_val_rem(Hfs, Item, Rem) -> apply_val_rem_(Hfs, Item, Rem).
 
 % @doc retruns numer ob hash functions in the set
 -spec size(hfs()) -> non_neg_integer().
