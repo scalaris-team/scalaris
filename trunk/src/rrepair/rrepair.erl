@@ -69,8 +69,7 @@
     {?TRIGGER_NAME} |    
     % API
     {get_state, Sender::comm:mypid(), Key::atom()} |          
-    {request_recon, SenderRUPid::comm:mypid(), Round::round(), SyncMaster::boolean(), rr_recon:recon_stage(), 
-        rr_recon:method(), rr_recon:recon_struct()} |
+    {request_recon, SenderRUPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
     % misc
@@ -101,10 +100,9 @@ on({get_state, Sender, Key}, State =
     comm:send(Sender, {get_state_response, Value}),
     State;
 
-on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round,
-                                            open_recon = OpenRecon }) ->
+on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round, open_recon = OpenRecon }) ->
     {ok, Pid} = rr_recon:start(Round, undefined),
-    comm:send_local(Pid, {start_recon, get_recon_method()}),
+    comm:send_local(Pid, {start, get_recon_method()}),
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
     {R, F} = Round,
     State#rrepair_state{ trigger_state = NewTriggerState, 
@@ -112,10 +110,10 @@ on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round,
                          open_recon = OpenRecon + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_recon, Sender, Round, Master, ReconStage, ReconMethod, ReconStruct}, 
+on({request_recon, Sender, Round, Msg}, 
    State = #rrepair_state{ open_recon = OpenRecon }) ->
     {ok, Pid} = rr_recon:start(Round, Sender),
-    comm:send_local(Pid, {start_recon, ReconMethod, ReconStage, ReconStruct, Master}),
+    comm:send_local(Pid, Msg),
     State#rrepair_state{ open_recon = OpenRecon + 1 };
 
 on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
