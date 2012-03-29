@@ -25,7 +25,7 @@
 -module(measure_util).
 
 
--export([time_avg/3]).
+-export([time_avg/3, time_with_result/3]).
 -export([print/1, print/2, get/3]).
 
 -type measure_result() :: { Min::non_neg_integer(), 
@@ -39,6 +39,12 @@
 
 -type time_unit() :: us | ms | s.
 -type mr_type() :: min | max | med | avg.
+
+
+time_with_result(Fun, Iterations, Options) ->
+    Time = time_avg(Fun, Iterations, Options),
+    Result = Fun(),
+    {Result, Time}.
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
