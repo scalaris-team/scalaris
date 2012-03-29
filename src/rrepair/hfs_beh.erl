@@ -29,7 +29,7 @@
 -callback new(integer()) -> hfs().
 -callback new([function()], integer()) -> hfs().
 -callback apply_val(hfs(), itemKey()) -> [integer()].
--callback apply_val(hfs(), pos_integer(), itemKey()) -> [integer()].
+-callback apply_val(hfs(), pos_integer(), itemKey()) -> integer().
 -callback apply_val_rem(hfs(), itemKey(), pos_integer()) -> [integer()].
 -callback size(hfs()) -> integer().
 -else.
