@@ -21,9 +21,8 @@
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
-%%         Examples: 
-%%            1) remote node D should get one kvv-pair (key,value,version),
-%%               >>comm:send(RemoteRepUpdPid, {request_resolve, {key_upd, [{Key, Value, Version}]}, []}).
+%%         Usage:
+%%           rrepair process provides API for resolve requests
 %% @end
 %% @version $Id$
 
@@ -89,6 +88,7 @@
 -type state() :: #rr_resolve_state{}.
 
 -type message() ::
+    % internal
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {shutdown, {atom(), stats()}}.
@@ -100,21 +100,21 @@
 
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
-                          dhtNodePid = DhtNodePid,
+                          dhtNodePid = DhtPid,
                           stats = Stats
                           }) ->
     ?TRACE("START GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p", [MyI, length(KvvList)]),
     MyPid = comm:this(),
-    ToUpdate = lists:foldl(
-                 fun({Key, Value, Vers}, Acc) ->
-                         UpdKeys = [X || X <- ?RT:get_replica_keys(Key), 
-                                         intervals:in(X, MyI)],
-                         lists:foreach(fun(UpdKey) ->
-                                               comm:send_local(DhtNodePid, 
-                                                               {update_key_entry, MyPid, UpdKey, Value, Vers})
-                                       end, UpdKeys),
-                         Acc + length(UpdKeys)
-                 end, 0, KvvList),
+    ToUpdate = 
+        lists:foldl(
+          fun({Key, Value, Vers}, Acc) ->
+                  UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
+                  lists:foreach(fun(UpdKey) ->
+                                        comm:send_local(DhtPid, 
+                                                        {update_key_entry, MyPid, UpdKey, Value, Vers})
+                                end, UpdKeys),
+                  Acc + length(UpdKeys)
+          end, 0, KvvList),
     %kill is done by update_key_entry_ack
     ?TRACE("DetailSync START ToDo=~p", [ToUpdate]),
     ToUpdate =:= 0 andalso
@@ -123,12 +123,11 @@ on({get_state_response, MyI}, State =
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_sync, _, KeyList},
-                          dhtNodePid = DhtNodePid }) ->    
+                          dhtNodePid = DhtPid }) ->    
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
                           intervals:in(K, MyI)],
-    comm:send_local(DhtNodePid, 
-                    {get_entries, self(), intervals:from_elements(FilterKeyList)}),
+    comm:send_local(DhtPid, {get_entries, self(), intervals:from_elements(FilterKeyList)}),
     State;
 
 on({get_entries_response, Entries}, State =
@@ -192,8 +191,7 @@ on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
 
 build_comment(#rr_resolve_state{ operation = Operation,
                                  feedback = {FBDest, _},
-                                 feedback_resp = Resp 
-                               }, Stats) ->
+                                 feedback_resp = Resp }, Stats) ->
     Comment = case Operation of 
                   {key_upd, _} when Resp ->
                       "key_upd by feedback";

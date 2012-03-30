@@ -15,8 +15,13 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    replica repair module 
 %%         Replica sets will be synchronized in two steps.
-%%          I) reconciliation - find set differences  (rep_upd_recon.erl)
-%%         II) resolution - resolve found differences (rep_upd_resolve.erl)
+%%          I) reconciliation - find set differences  (rr_recon.erl)
+%%         II) resolution - resolve found differences (rr_resolve.erl)
+%%
+%%         Examples:
+%%            1) remote node should get a single kvv-pair (key,value,version)
+%%               >>comm:send(RemoteRRepairPid, {request_resolve, {key_upd, [{Key, Value, Version}]}, []}).
+%%
 %% @end
 %% @version $Id$
 
@@ -59,7 +64,7 @@
 -record(rrepair_state,
         {
          trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state(),
-         sync_round     = {0, 0}                                    :: round(),
+         round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer()
          }).
@@ -68,9 +73,11 @@
 -type message() ::
     {?TRIGGER_NAME} |    
     % API
-    {get_state, Sender::comm:mypid(), Key::atom()} |          
-    {request_recon, SenderRUPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
+    {request_sync, Method::rr_recon:method(), DestNodePid::random | comm:mypid()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
+    {get_state, Sender::comm:mypid(), Key::atom()} |
+    % internal
+    {continue_recon, SenderRUPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
     {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -87,34 +94,36 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
+% @doc request replica repair status
 on({get_state, Sender, Key}, State = 
        #rrepair_state{ open_recon = Recon,
                        open_resolve = Resolve,
-                       sync_round = Round }) ->
+                       round = Round }) ->
     Value = case Key of
                 open_recon -> Recon;
                 open_resolve -> Resolve;
-                sync_round -> Round;
+                round -> Round;
                 open_sync -> Recon + Resolve
             end,
     comm:send(Sender, {get_state_response, Value}),
     State;
 
-on({?TRIGGER_NAME}, State = #rrepair_state{ sync_round = Round, open_recon = OpenRecon }) ->
-    {ok, Pid} = rr_recon:start(Round, undefined),
-    comm:send_local(Pid, {start, get_recon_method()}),
+on({?TRIGGER_NAME}, State = #rrepair_state{ round = Round, open_recon = OpenRecon }) ->
+    {ok, Pid} = rr_recon:start(Round),
+    comm:send_local(Pid, {start, get_recon_method(), random}),
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
-    {R, F} = Round,
     State#rrepair_state{ trigger_state = NewTriggerState, 
-                         sync_round = {R + 1, F},
+                         round = next_round(Round),
                          open_recon = OpenRecon + 1 };
 
-%% @doc receive sync request and spawn a new process which executes a sync protocol
-on({request_recon, Sender, Round, Msg}, 
-   State = #rrepair_state{ open_recon = OpenRecon }) ->
-    {ok, Pid} = rr_recon:start(Round, Sender),
-    comm:send_local(Pid, Msg),
-    State#rrepair_state{ open_recon = OpenRecon + 1 };
+% @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
+%      Random leads to sync with a node which is associated with this (e.g. symmetric partner)  
+on({request_sync, Method, DestPid}, State = #rrepair_state{ round = Round, 
+                                                            open_recon = OpenRecon }) ->
+    {ok, Pid} = rr_recon:start(Round),
+    comm:send_local(Pid, {start, Method, DestPid}),
+    State#rrepair_state{ round = next_round(Round),
+                         open_recon = OpenRecon + 1 };
 
 on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
     _ = rr_resolve:start(Round, Operation, Options),
@@ -122,12 +131,17 @@ on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_re
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc receive sync request and spawn a new process which executes a sync protocol
+on({continue_recon, Sender, Round, Msg}, 
+   State = #rrepair_state{ open_recon = OpenRecon }) ->
+    {ok, Pid} = rr_recon:start(Round, Sender),
+    comm:send_local(Pid, Msg),
+    State#rrepair_state{ open_recon = OpenRecon + 1 };
+
 on({rr_stats, Msg}, State) ->
     {ok, Pid} = rr_statistics:start(),
     comm:send_local(Pid, Msg),
     State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({recon_forked}, State = #rrepair_state{ open_recon = Recon }) ->
     State#rrepair_state{ open_recon = Recon + 1 };
@@ -151,7 +165,7 @@ on({resolve_progress_report, _Sender, _Stats}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({web_debug_info, Requestor}, State) ->
-    #rrepair_state{ sync_round = Round, 
+    #rrepair_state{ round = Round, 
                     open_recon = OpenRecon, 
                     open_resolve = OpenResol } = State,
     KeyValueList =
@@ -163,6 +177,13 @@ on({web_debug_info, Requestor}, State) ->
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% internal functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec next_round(round()) -> round().
+next_round({R, F}) -> {R + 1, F}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
