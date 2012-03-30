@@ -2029,7 +2029,7 @@ public class ScalarisDataHandler {
         writeRequests.addAddDelOnList(pageList_key, entriesToAdd, entriesToRemove);
         ++writeOps;
         if (pageCount_key != null && !pageCount_key.isEmpty()) {
-            writeRequests.addWrite(pageCount_key, entriesToAdd.size() - entriesToRemove.size());
+            writeRequests.addAddOnNr(pageCount_key, entriesToAdd.size() - entriesToRemove.size());
             ++writeOps;
         }
         return new ValueResult<Integer>(involvedKeys, writeOps, statName,
