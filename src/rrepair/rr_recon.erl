@@ -24,7 +24,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/2, check_config/0]).
+-export([init/1, on/2, start/1, start/2, check_config/0]).
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
@@ -47,7 +47,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, recon_struct/0, recon_stage/0, request/0]).
+-export_type([method/0, request/0]).
 -endif.
 
 -type method()         :: bloom | merkle_tree | art | iblt | undefined.
@@ -67,26 +67,28 @@
 -type bloom_recon_struct() :: #bloom_recon_struct{}.
 
 -type internal_params() :: {interval, intervals:interval()} |
-                           {senderPid, comm:mypid()} |
+                           {reconPid, comm:mypid()} |
                            {art, art:art()}.
 
 -type recon_struct() :: bloom_recon_struct() |
                         merkle_tree:merkle_tree() |
                         art:art() |                        
                         [internal_params()].
+-type recon_dest() :: comm:mypid() | random.
 
 -record(rr_recon_state,
         {
          ownerLocalPid      = ?required(rr_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
          ownerRemotePid     = ?required(rr_recon_state, ownerRemotePid) :: comm:mypid(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
+         dest_pid           = random                                    :: recon_dest(),             %dest dht node pid
          dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
+         dest_recon_pid     = undefined                                 :: comm:mypid() | undefined, %dest recon process pid
          recon_method       = undefined                                 :: method(),                 %reconciliation method
          recon_struct       = {}                                        :: recon_struct() | {},
          recon_stage        = reconciliation                            :: recon_stage(),
-         sync_pid           = undefined                                 :: comm:mypid() | undefined,%sync dest process
-         sync_master        = false                                     :: boolean(),               %true if process is sync leader
-         sync_round         = 0                                         :: rrepair:round(),
+         master             = false                                     :: boolean(),               %true if process is recon leader/initiator
+         round              = 0                                         :: rrepair:round(),
          stats              = rr_recon_stats:new()                      :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
@@ -96,8 +98,8 @@
                              not_found.
 
 -type request() :: 
-    {start, method()} |
-    {start, method(), recon_stage(), recon_struct(), Master::boolean()}.          
+    {start, method(), DestPid::recon_dest()} |
+    {continue, method(), recon_stage(), recon_struct(), Master::boolean()}.          
 
 -type message() ::          
     %API
@@ -116,46 +118,37 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
-on({get_state_response, MyInterval}, State = 
+on({get_state_response, MyI}, State = 
        #rr_recon_state{ recon_stage = build_struct,
                         recon_method = bloom,
                         dhtNodePid = DhtNodePid }) ->
-    send_chunk_req(DhtNodePid, self(), MyInterval, mapInterval(MyInterval, 1), get_max_items(bloom)),
-    State#rr_recon_state{ recon_struct = [{interval, MyInterval}] };
+    send_chunk_req(DhtNodePid, self(), MyI, mapInterval(MyI, 1), get_max_items(bloom)),
+    State#rr_recon_state{ recon_struct = [{interval, MyI}] };
 
-on({get_state_response, MyInterval}, State = 
+on({get_state_response, MyI}, State = 
        #rr_recon_state{ recon_stage = req_shared_interval,
-                        sync_master = true,
-                        sync_round = Round,
-                        recon_method = RMethod,
-                        dhtNodePid = DhtNodePid,
-                        ownerRemotePid = OwnerPid}) ->
-    ReconReq = {start, RMethod, req_shared_interval, [{interval, MyInterval}], false},
-    comm:send_local(DhtNodePid, 
-                    {lookup_aux, select_sync_node(MyInterval), 0, 
-                     {send_to_group_member, rrepair,
-                      {request_recon, OwnerPid, Round, ReconReq}}}),
+                        master = true,
+                        recon_method = RMethod }) ->
+    ReconReq = {continue, RMethod, req_shared_interval, [{interval, MyI}], false},
+    start_to_dest(MyI, ReconReq, State),
     comm:send_local(self(), {shutdown, negotiate_interval_master}),
     State;
 
-on({get_state_response, MyInterval}, State = 
+on({get_state_response, MyI}, State = 
        #rr_recon_state{ recon_stage = req_shared_interval,
-                        sync_master = false,
-                        recon_method = RMethod,
+                        master = false,
+                        recon_method = Method,
                         recon_struct = Params,                        
-                        dhtNodePid = DhtNodePid,
+                        dhtNodePid = DhtPid,
                         dest_rr_pid = DestRUPid }) ->
-    RMethod =:= merkle_tree andalso fd:subscribe(DestRUPid),
-    SrcInterval = proplists:get_value(interval, Params),
-    MyIMapped = mapInterval(MyInterval, 1),
-    SrcIMapped = mapInterval(SrcInterval, 1),
-    Intersection = intervals:intersection(MyIMapped, SrcIMapped),
+    Method =:= merkle_tree andalso fd:subscribe(DestRUPid),
+    SrcI = proplists:get_value(interval, Params),
+    Intersection = intervals:intersection(mapInterval(MyI, 1), mapInterval(SrcI, 1)),
     case intervals:is_empty(Intersection) of
-        true ->
-            comm:send_local(self(), {shutdown, intersection_empty});
+        true -> comm:send_local(self(), {shutdown, intersection_empty});
         false ->
-            MyIntersec = mapInterval_to_range(Intersection, MyInterval, 2),
-            send_chunk_req(DhtNodePid, self(), MyIntersec, Intersection, get_max_items(RMethod))
+            MyIntersec = mapInterval_to_range(Intersection, MyI, 2),
+            send_chunk_req(DhtPid, self(), MyIntersec, Intersection, get_max_items(Method))
     end,
     State#rr_recon_state{ recon_stage = build_struct,
                           recon_struct = [{interval, Intersection}] };
@@ -164,36 +157,33 @@ on({get_state_response, MyI}, State =
        #rr_recon_state{ recon_stage = res_shared_interval,
                         recon_method = RMethod,
                         recon_struct = Params,
-                        dhtNodePid = DhtNodePid,
-                        dest_rr_pid = ClientRU_Pid}) ->
+                        dhtNodePid = DhtPid,
+                        dest_rr_pid = DestRRPid}) ->
     Interval = proplists:get_value(interval, Params),
-    ClientPid = proplists:get_value(senderPid, Params),
+    DestReconPid = proplists:get_value(reconPid, Params),
     MyIntersec = mapInterval(Interval, get_interval_quadrant(MyI)),
     case intervals:is_subset(MyIntersec, MyI) of
         false ->
             comm:send_local(self(), {shutdown, negotiate_interval_master}),            
-            comm:send(ClientPid, {shutdown, no_interval_intersection});
+            comm:send(DestReconPid, {shutdown, no_interval_intersection});
         true ->
-            RMethod =:= merkle_tree andalso fd:subscribe(ClientRU_Pid),
-            send_chunk_req(DhtNodePid, self(), MyIntersec, Interval, get_max_items(RMethod))
+            RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
+            send_chunk_req(DhtPid, self(), MyIntersec, Interval, get_max_items(RMethod))
     end,    
-    State#rr_recon_state{ recon_stage = build_struct, 
-                          sync_pid = ClientPid };
+    State#rr_recon_state{ recon_stage = build_struct, dest_recon_pid = DestReconPid };
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ recon_stage = reconciliation,
                         recon_method = bloom,
-                        dhtNodePid = DhtNodePid,
+                        dhtNodePid = DhtPid,
                         recon_struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
     MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
     MySyncI = intervals:intersection(MyI, MyBloomI),
     case intervals:is_empty(MySyncI) of
-        true ->
-            comm:send_local(self(), {shutdown, empty_interval});
-        false ->
-            send_chunk_req(DhtNodePid, self(), MySyncI, 
-                           mapInterval(MySyncI, 1), get_max_items(bloom))
+        true -> comm:send_local(self(), {shutdown, empty_interval});
+        false -> send_chunk_req(DhtPid, self(), MySyncI, 
+                                mapInterval(MySyncI, 1), get_max_items(bloom))
     end,
     State;
 
@@ -205,9 +195,9 @@ on({get_chunk_response, {RestI, DBList}}, State =
        #rr_recon_state{ recon_stage = build_struct,
                         recon_method = RMethod,        
                         recon_struct = Params,                    
-                        sync_round = Round,
+                        round = Round,
                         dhtNodePid = DhtNodePid,
-                        sync_master = SyncMaster,
+                        master = SyncMaster,
                         stats = Stats }) ->
     SyncI = proplists:get_value(interval, Params),    
     ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
@@ -246,7 +236,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         recon_struct = #bloom_recon_struct{ interval = BloomI, 
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
-                        sync_round = Round }) ->
+                        round = Round }) ->
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
@@ -275,33 +265,34 @@ on({get_chunk_response, {RestI, DBList}}, State =
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
     
-on({start, ReconMethod}, State) ->
+on({start, Method, DestPid}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    Stage = case ReconMethod of
+    Stage = case Method of
                 bloom -> build_struct;
                 merkle_tree -> req_shared_interval;        
                 art -> req_shared_interval
             end,
     State#rr_recon_state{ recon_stage = Stage, 
                           recon_struct = {},
-                          recon_method = ReconMethod,
-                          sync_master = true };
+                          recon_method = Method,
+                          dest_pid = DestPid,
+                          master = true };
 
-on({start, ReconMethod, ReconStage, ReconStruct, Master}, State) ->
+on({continue, Method, Stage, Struct, Master}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rr_recon_state{ recon_stage = ReconStage, 
-                          recon_struct = ReconStruct,
-                          recon_method = ReconMethod,
-                          sync_master = Master orelse ReconStage =:= res_shared_interval };
+    State#rr_recon_state{ recon_stage = Stage, 
+                          recon_struct = Struct,
+                          recon_method = Method,
+                          master = Master orelse Stage =:= res_shared_interval };
 
 on({crash, Pid}, State) ->
     comm:send_local(self(), {shutdown, {fail, crash_of_recon_node, Pid}}),
     State;
 
 on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner, 
-                                        sync_round = Round,
+                                        round = Round,
                                         stats = Stats,
-                                        sync_master = Master }) ->
+                                        master = Master }) ->
     ?TRACE("SHUTDOWN Round=~p Reason=~p", [Round, Reason]),
     NewStats = rr_recon_stats:set([{finish, Reason =:= sync_finished}], Stats),
     comm:send_local(Owner, {recon_progress_report, self(), Round, Master, NewStats}),
@@ -311,7 +302,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_node, SrcPid, Interval, Hash}, State =
+on({check_node, SenderPid, Interval, Hash}, State =
        #rr_recon_state{ recon_struct = Tree }) ->
     Node = merkle_tree:lookup(Interval, Tree),
     {Result, ChildHashs} = 
@@ -328,16 +319,16 @@ on({check_node, SrcPid, Interval, Hash}, State =
                          [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
                 end
         end,
-    comm:send(SrcPid, {check_node_response, Result, Interval, ChildHashs}),
-    State#rr_recon_state{ sync_pid = SrcPid };
+    comm:send(SenderPid, {check_node_response, Result, Interval, ChildHashs}),
+    State#rr_recon_state{ dest_recon_pid = SenderPid };
 
 on({check_node_response, Result, I, ChildHashs}, State = 
-       #rr_recon_state{ sync_pid = SyncDest,
+       #rr_recon_state{ dest_recon_pid = DestReconPid,
                         dest_rr_pid = SrcNode,
                         stats = Stats, 
                         ownerLocalPid = OwnerPid,
                         recon_struct = Tree,
-                        sync_round = Round }) ->
+                        round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
     IncOps = 
         case Result of
@@ -358,7 +349,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                               end
                                 end, 0, Matched),
                 lists:foreach(fun(X) -> 
-                                      comm:send(SyncDest, 
+                                      comm:send(DestReconPid, 
                                                 {check_node,
                                                  comm:this(), 
                                                  merkle_tree:get_interval(X), 
@@ -372,7 +363,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                                {tree_nodesCompared, 1}], Stats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FinalStats),
     if CompLeft =< 1 ->
-           comm:send(SyncDest, {shutdown, sync_finished_remote_shutdown}),
+           comm:send(DestReconPid, {shutdown, sync_finished_remote_shutdown}),
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
     end,
@@ -381,38 +372,34 @@ on({check_node_response, Result, I, ChildHashs}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec begin_sync(recon_struct(), state()) -> rr_recon_stats:stats().
-begin_sync(SyncStruct, State = #rr_recon_state{recon_method = RMethod,
+begin_sync(SyncStruct, State = #rr_recon_state{recon_method = Method,
                                                recon_struct = Params,
-                                               sync_round = Round,
-                                               sync_pid = SrcPid,
-                                               dhtNodePid = DhtNodePid,
+                                               round = Round,
                                                ownerRemotePid = OwnerPid,
-                                               dest_rr_pid = DestRU_Pid,                                       
-                                               sync_master = IsMaster, 
+                                               dest_recon_pid = DestReconPid,
+                                               dest_rr_pid = DestRRPid,                                       
+                                               master = IsMaster, 
                                                stats = Stats }) ->
-    case RMethod of
+    case Method of
         merkle_tree -> 
             case IsMaster of
-                true -> comm:send(SrcPid, 
+                true -> comm:send(DestReconPid, 
                                   {check_node, comm:this(), 
                                    merkle_tree:get_interval(SyncStruct), 
                                    merkle_tree:get_hash(SyncStruct)});            
                 false ->
-                    IntParams = [{interval, merkle_tree:get_interval(SyncStruct)}, {senderPid, comm:this()}],
-                    comm:send(DestRU_Pid, 
-                              {request_recon, OwnerPid, Round, 
-                               {start, merkle_tree, res_shared_interval, IntParams, true}})
+                    IntParams = [{interval, merkle_tree:get_interval(SyncStruct)}, {reconPid, comm:this()}],
+                    comm:send(DestRRPid, 
+                              {continue_recon, OwnerPid, Round, 
+                               {continue, merkle_tree, res_shared_interval, IntParams, true}})
             end,
             rr_recon_stats:set(
               [{tree_compareLeft, ?IIF(IsMaster, 1, 0)},
                {tree_size, merkle_tree:size_detail(SyncStruct)}], Stats);
         bloom when IsMaster ->
-            DestKey = select_sync_node(proplists:get_value(interval, Params)),
-            ReconReq = {start, bloom, reconciliation, SyncStruct, false},
-            comm:send_local(DhtNodePid, 
-                            {lookup_aux, DestKey, 0, 
-                             {send_to_group_member, rrepair, 
-                              {request_recon, OwnerPid, Round, ReconReq}}}),
+            start_to_dest(proplists:get_value(interval, Params), 
+                          {continue, bloom, reconciliation, SyncStruct, false}, 
+                          State),
             comm:send_local(self(), {shutdown, {ok, build_struct}}),
             Stats;
         art ->
@@ -421,11 +408,11 @@ begin_sync(SyncStruct, State = #rr_recon_state{recon_method = RMethod,
                     true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
                     false ->
                         ArtParams = [{interval, art:get_interval(SyncStruct)},
-                                     {senderPid, comm:this()},
+                                     {reconPid, comm:this()},
                                      {art, SyncStruct}],
-                        comm:send(DestRU_Pid, 
-                                  {request_recon, OwnerPid, Round, 
-                                   {start, art, res_shared_interval, ArtParams, true}}),
+                        comm:send(DestRRPid, 
+                                  {continue_recon, OwnerPid, Round, 
+                                   {continue, art, res_shared_interval, ArtParams, true}}),
                         {no, Stats}
                 end,            
             comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, client_art_send)}),
@@ -487,7 +474,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
     is_subtype(Art,    art:art()),
     is_subtype(State,  state()),
     is_subtype(Stats,  rr_recon_stats:stats()).
-art_recon(Tree, Art, #rr_recon_state{ sync_round = Round, 
+art_recon(Tree, Art, #rr_recon_state{ round = Round, 
                                       dest_rr_pid = DestPid,
                                       ownerLocalPid = OwnerPid,
                                       stats = Stats }) ->
@@ -597,8 +584,7 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
 filterPartitionMap(Filter, Pred, Map, List) ->
     filterPartitionMap(Filter, Pred, Map, List, [], []).
 
-filterPartitionMap(_, _, _, [], TrueL, FalseL) ->
-    {TrueL, FalseL};
+filterPartitionMap(_, _, _, [], TrueL, FalseL) -> {TrueL, FalseL};
 filterPartitionMap(Filter, Pred, Map, [H | T], TrueL, FalseL) ->
     {Satis, NonSatis} = 
         case Filter(H) of
@@ -611,6 +597,25 @@ filterPartitionMap(Filter, Pred, Map, [H | T], TrueL, FalseL) ->
     filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec start_to_dest(MyI, Req, State) -> ok 
+when
+  is_subtype(MyI,     intervals:interval()),
+  is_subtype(Req,     request()),
+  is_subtype(State,   state()).
+start_to_dest(MyI, Req, #rr_recon_state{ dest_pid = DestPid,
+                                         dhtNodePid = DhtPid,
+                                         round = Round,
+                                         ownerRemotePid = OwnerPid }) ->   
+    case DestPid of
+        random ->
+            comm:send_local(DhtPid, 
+                            {lookup_aux, select_sync_node(MyI), 0, 
+                             {send_to_group_member, rrepair,
+                              {continue_recon, OwnerPid, Round, Req}}});
+        _ -> comm:send(DestPid, {send_to_group_member, rrepair,
+                                 {continue_recon, OwnerPid, Round, Req}})
+    end.
 
 % @doc selects a random associated key of an interval ending
 -spec select_sync_node(intervals:interval()) -> ?RT:key().
@@ -675,8 +680,7 @@ mapInterval(I, Q) ->
 
 % @doc Tries to map SrcI into a destination Interval (DestRange)
 -spec mapInterval_to_range(intervals:interval(), intervals:interval(), pos_integer()) -> intervals:interval() | error.
-mapInterval_to_range(I, I, _) ->
-    I;
+mapInterval_to_range(I, I, _) -> I;
 mapInterval_to_range(SrcI, DestRange, Q) ->
     {_, LKey, _, _} = intervals:get_bounds(SrcI),
     RepFactor = length(?RT:get_replica_keys(LKey)),
@@ -709,23 +713,25 @@ decodeBlob(_) -> fail.
 init(State) ->
     State.
 
--spec start(Round, Sender_RU_Pid) -> {ok, pid()} when
+-spec start(rrepair:round()) -> {ok, pid()}.
+start(Round) -> start(Round, undefined).
+
+-spec start(Round, SenderRRPid) -> {ok, pid()} when
       is_subtype(Round,         rrepair:round()),
-      is_subtype(Sender_RU_Pid, comm:mypid() | undefined).
-start(Round, SenderRUPid) ->
+      is_subtype(SenderRRPid,   comm:mypid() | undefined).
+start(Round, SenderRRPid) ->
     State = #rr_recon_state{ ownerLocalPid = self(), 
                              ownerRemotePid = comm:this(), 
                              dhtNodePid = pid_groups:get_my(dht_node),
-                             dest_rr_pid = SenderRUPid,
-                             sync_round = Round },
+                             dest_rr_pid = SenderRRPid,
+                             round = Round },
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
 
 -spec fork_recon(state(), rrepair:round()) -> {ok, pid()}.
 fork_recon(Conf, {ReconRound, Fork}) ->
-    State = Conf#rr_recon_state{ sync_round = {ReconRound, Fork + 1} },
+    State = Conf#rr_recon_state{ round = {ReconRound, Fork + 1} },
     comm:send_local(Conf#rr_recon_state.ownerLocalPid, {recon_forked}),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
@@ -749,8 +755,8 @@ get_fpr() ->
     config:read(rep_update_recon_fpr).
 
 -spec get_max_items(method()) -> pos_integer().
-get_max_items(ReconMethod) ->
-    case ReconMethod of
+get_max_items(Method) ->
+    case Method of
         merkle_tree -> all;
         art -> all;
         _ -> config:read(rep_update_max_items)
