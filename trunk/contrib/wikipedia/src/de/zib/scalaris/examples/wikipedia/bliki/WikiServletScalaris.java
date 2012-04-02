@@ -264,12 +264,12 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     }
                     importHandler.setMsgOut(ps);
                     this.new ImportThread(importHandler, fileName, ps).start();
-                    response.setHeader("Refresh", "2; url = wiki?import=" + currentImport);
+                    response.setHeader("Refresh", "2; url = wiki?import=" + currentImport + "#refresh");
                     content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
                     content.append("<pre>");
                     content.append("starting import...\n");
                     content.append("</pre>");
-                    content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+                    content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "#refresh\">refresh</a></p>");
                     content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
                 } catch (Exception e) {
                     setParam_error(request, "ERROR: import failed");
