@@ -1171,16 +1171,18 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (!nsPrefix.isEmpty()) {
                 nsPrefix += ":";
             }
-            String prefix = nsPrefix + page.getPrefix();
-            String from = page.getFromPage();
-            String fullFrom = nsPrefix + page.getFromPage();
-            String to = page.getToPage();
-            String fullTo = nsPrefix + page.getToPage();
-            String search = page.getSearch().toLowerCase();
+            final String prefix = nsPrefix + page.getPrefix();
+            final String from = page.getFromPage();
+            final String fullFrom = nsPrefix + page.getFromPage();
+            final String to = page.getToPage();
+            final String fullTo = nsPrefix + page.getToPage();
+            final String search = page.getSearch().toLowerCase();
+            final String searchTitle = MyWikiModel.normaliseName(page.getSearch());
+            boolean foundMatch = false;
             if (!prefix.isEmpty() || !from.isEmpty() || !to.isEmpty() || !search.isEmpty()) {
                 // only show pages with this prefix:
                 for (Iterator<String> it = pageList.iterator(); it.hasNext(); ) {
-                    String cur = it.next();
+                    final String cur = it.next();
                     // case-insensitive "startsWith" check:
                     if (!cur.regionMatches(true, 0, prefix, 0, prefix.length())) {
                         it.remove();
@@ -1190,10 +1192,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                         it.remove();
                     } else if (!search.isEmpty() && !cur.toLowerCase().contains(search)) {
                         it.remove();
+                    } else if (!search.isEmpty() && cur.equals(searchTitle)) {
+                        foundMatch = true;
                     }
                 }
             }
             page.setPages(pageList);
+            page.setFoundFullMatch(foundMatch);
             
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);

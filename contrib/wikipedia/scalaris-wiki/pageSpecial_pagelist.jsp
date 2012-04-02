@@ -7,9 +7,11 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
-<% String pageTitleWithPars = pageBean.titleWithParameters(); %>
-<% String safePageTitleWithPars = URLEncoder.encode(pageTitleWithPars, "UTF-8"); %>
+<%
+String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8");
+String pageTitleWithPars = pageBean.titleWithParameters();
+String safePageTitleWithPars = URLEncoder.encode(pageTitleWithPars, "UTF-8");
+%>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
@@ -129,6 +131,17 @@ ${ pageBean.page }
                 </table>
                 <% } %>
 
+<% if (pageBean.getFormType() == WikiPageListBean.FormType.PageSearchForm) { %>
+  <p class="mw-search-createlink">
+  <%
+      if (pageBean.isFoundFullMatch()) {
+  %>
+    <b>There is a page named "<a href="wiki?title=<%= pageBean.getSearch() %>" title="<%= pageBean.getSearch() %>"><%= pageBean.getSearch() %></a>" on this wiki.</b>
+  <% } else {%>
+    <b>Create the page "<a href="wiki?title=<%= pageBean.getSearch() %>&amp;action=edit" class="new" title="<%= pageBean.getSearch() %>"><%= pageBean.getSearch() %></a>" on this wiki!</b>
+  <% } %>
+  </p>
+<% } %>
                 <table class="mw-allpages-table-chunk">
 <% if (!pageBean.getPages().isEmpty()) {
     Iterator<String> iter = pageBean.getPages().iterator();

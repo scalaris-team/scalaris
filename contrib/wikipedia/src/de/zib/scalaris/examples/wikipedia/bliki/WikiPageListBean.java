@@ -67,6 +67,7 @@ public class WikiPageListBean extends WikiPageBeanBase {
     private String target = "";
     private String prefix = "";
     private String search = "";
+    private boolean foundFullMatch = false;
     private int namespaceId = 0;
     private boolean showAllPages = false;
 
@@ -274,5 +275,19 @@ public class WikiPageListBean extends WikiPageBeanBase {
         } catch (UnsupportedEncodingException e) {
             return "";
         }
+    }
+
+    /**
+     * @return the searchFoundMatch
+     */
+    public boolean isFoundFullMatch() {
+        return foundFullMatch;
+    }
+
+    /**
+     * @param foundFullMatch the foundFullMatch to set
+     */
+    public void setFoundFullMatch(boolean foundFullMatch) {
+        this.foundFullMatch = foundFullMatch;
     }
 }
