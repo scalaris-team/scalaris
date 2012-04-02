@@ -503,11 +503,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (req_search.isEmpty()) {
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
         } else {
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-            }
+            result = getPageList(nsId, connection);
         }
         page.setNamespaceId(nsId);
         page.addStats(result.stats);
@@ -563,11 +559,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setFromPage(req_from);
             page.setToPage(req_to);
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-            }
+            result = getPageList(nsId, connection);
         }
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
@@ -614,11 +606,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         } else {
             page.setShowAllPages(true);
             page.setPrefix(req_prefix);
-            if (nsId == 0) {
-                result = getArticleList(connection);
-            } else {
-                result = getPageList(connection);
-            }
+            result = getPageList(nsId, connection);
         }
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);

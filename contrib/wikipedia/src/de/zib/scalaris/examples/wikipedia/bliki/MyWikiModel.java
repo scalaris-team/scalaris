@@ -705,7 +705,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return a normalised string
      */
-    private static String normaliseName(final String value) {
+    public static String normaliseName(final String value) {
         StringBuilder sb = new StringBuilder(value.length());
         boolean whiteSpace = true;
         boolean first = true;
@@ -1058,4 +1058,28 @@ public class MyWikiModel extends WikiModel {
         return !matcher.matches();
     }
 
+    /**
+     * Determines whether a page with the given properties is an article.
+     * 
+     * A new page in the main namespace will be counted as an article if it
+     * contains at least one wiki link or is categorised to at least one
+     * category.
+     * 
+     * @param namespace
+     *            the ID of the namespace of the page
+     * @param links
+     *            the links in this page
+     * @param categories
+     *            categories of this page
+     * 
+     * @return whether the page is an article or not
+     * 
+     * @see <a
+     *      href="https://www.mediawiki.org/wiki/Manual:Article_count">MediaWiki
+     *      explanation</a>
+     */
+    public static boolean isArticle(int namespace, Collection<String> links,
+            Collection<String> categories) {
+        return (namespace == 0) && (!links.isEmpty() || !categories.isEmpty());
+    }
 }

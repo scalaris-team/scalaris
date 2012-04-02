@@ -37,6 +37,144 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
             new TreeMap<String, Integer>(String.CASE_INSENSITIVE_ORDER);
     
     /**
+     * Smallest namespace ID (for iterating over all namespaces).
+     */
+    public final static Integer MIN_NAMESPACE_ID = -2;
+    /**
+     * Highest namespace ID (for iterating over all namespaces).
+     */
+    public final static Integer MAX_NAMESPACE_ID = 15;
+    
+    /**
+     * Provides all namespace values as an enum type.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static enum NamespaceEnum {
+        /**
+         * Alias for direct links to media files.
+         */
+        MEDIA_NAMESPACE_KEY(MyNamespace.MEDIA_NAMESPACE_KEY),
+        /**
+         * Holds special pages.
+         */
+        SPECIAL_NAMESPACE_KEY(MyNamespace.SPECIAL_NAMESPACE_KEY),
+        /**
+         * "Real" content; articles. Has no prefix.
+         */
+        MAIN_NAMESPACE_KEY(MyNamespace.MAIN_NAMESPACE_KEY),
+        /**
+         * Talk pages of "Real" content
+         */
+        TALK_NAMESPACE_KEY(MyNamespace.TALK_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        USER_NAMESPACE_KEY(MyNamespace.USER_NAMESPACE_KEY),
+        /**
+         * Talk pages for User Pages
+         */
+        USER_TALK_NAMESPACE_KEY(MyNamespace.USER_TALK_NAMESPACE_KEY),
+        /**
+         * Information about the wiki. Prefix is the same as $wgSitename of the PHP
+         * installation.
+         */
+        PROJECT_NAMESPACE_KEY(MyNamespace.PROJECT_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        PROJECT_TALK_NAMESPACE_KEY(MyNamespace.PROJECT_TALK_NAMESPACE_KEY),
+        /**
+         * Media description pages.
+         */
+        FILE_NAMESPACE_KEY(MyNamespace.FILE_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        FILE_TALK_NAMESPACE_KEY(MyNamespace.FILE_TALK_NAMESPACE_KEY),
+        /**
+         * Site interface customisation. Protected.
+         */
+        MEDIAWIKI_NAMESPACE_KEY(MyNamespace.MEDIAWIKI_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        MEDIAWIKI_TALK_NAMESPACE_KEY(MyNamespace.MEDIAWIKI_TALK_NAMESPACE_KEY),
+        /**
+         * Template pages.
+         */
+        TEMPLATE_NAMESPACE_KEY(MyNamespace.TEMPLATE_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        TEMPLATE_TALK_NAMESPACE_KEY(MyNamespace.TEMPLATE_TALK_NAMESPACE_KEY),
+        /**
+         * Help pages.
+         */
+        HELP_NAMESPACE_KEY(MyNamespace.HELP_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        HELP_TALK_NAMESPACE_KEY(MyNamespace.HELP_TALK_NAMESPACE_KEY),
+        /**
+         * Category description pages.
+         */
+        CATEGORY_NAMESPACE_KEY(MyNamespace.CATEGORY_NAMESPACE_KEY),
+        /**
+         * 
+         */
+        CATEGORY_TALK_NAMESPACE_KEY(MyNamespace.CATEGORY_TALK_NAMESPACE_KEY);
+        
+        private final int id;
+        NamespaceEnum(int id) {
+            this.id = id;
+        }
+        
+        /**
+         * Returns the namespace's ID.
+         * 
+         * @return the ID of the namespace
+         */
+        public int getId() {
+            return id;
+        }
+
+        /**
+         * Tries to convert a namespace ID to the according enum value.
+         * 
+         * @param id  the ID to convert
+         * 
+         * @return the according enum value
+         */
+        public static NamespaceEnum fromId(int id) {
+            // manual 'switch' is less elegant but faster than going through all
+            // values and comparing the IDs
+            switch (id) {
+                case -2: return MEDIA_NAMESPACE_KEY;
+                case -1: return SPECIAL_NAMESPACE_KEY;
+                case 0:  return MAIN_NAMESPACE_KEY;
+                case 1:  return TALK_NAMESPACE_KEY;
+                case 2:  return USER_NAMESPACE_KEY;
+                case 3:  return USER_TALK_NAMESPACE_KEY;
+                case 4:  return PROJECT_NAMESPACE_KEY;
+                case 5:  return PROJECT_TALK_NAMESPACE_KEY;
+                case 6:  return FILE_NAMESPACE_KEY;
+                case 7:  return FILE_TALK_NAMESPACE_KEY;
+                case 8:  return MEDIAWIKI_NAMESPACE_KEY;
+                case 9:  return MEDIAWIKI_TALK_NAMESPACE_KEY;
+                case 10: return TEMPLATE_NAMESPACE_KEY;
+                case 11: return TEMPLATE_TALK_NAMESPACE_KEY;
+                case 12: return HELP_NAMESPACE_KEY;
+                case 13: return HELP_TALK_NAMESPACE_KEY;
+                case 14: return CATEGORY_NAMESPACE_KEY;
+                case 15: return CATEGORY_TALK_NAMESPACE_KEY;
+                default: throw new IllegalArgumentException(
+                        "No constant with id " + id + " found");
+            }
+        }
+    }
+    
+    /**
      * Resource bundle derived from a given {@link SiteInfo} object.
      * 
      * @author Nico Kruber, kruber@zib.de

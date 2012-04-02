@@ -25,6 +25,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
@@ -38,6 +39,7 @@ import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -245,8 +247,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     @Override
     public void tearDown() {
         super.tearDown();
-        updatePageLists1();
-        updatePageLists2();
+        updatePageList();
+        updateLinkLists();
         addSQLiteJob(new SQLiteConvertTmpPageLists2Job());
         sqliteWorker.stopWhenQueueEmpty = true;
         addSQLiteJob(new SQLiteNoOpJob());
@@ -268,23 +270,14 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         db.dispose();
     }
 
-    /**
-     * @param siteinfo
-     * @throws RuntimeException
-     */
     @Override
     protected void doExport(SiteInfo siteinfo) throws RuntimeException {
         addSQLiteJob(new SQLiteWriteSiteInfoJob(siteinfo, stWrite));
     }
 
-    /**
-     * @param page
-     * @param revisions
-     * @param revisions_short
-     * @throws UnsupportedOperationException
-     */
     @Override
-    protected void doExport(Page page, List<Revision> revisions, List<ShortRevision> revisions_short)
+    protected void doExport(Page page, List<Revision> revisions,
+            List<ShortRevision> revisions_short, NamespaceEnum namespace)
             throws UnsupportedOperationException {
         for (Revision rev : revisions) {
             addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
@@ -299,35 +292,26 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 page, stWrite));
 
         // note: do not normalise page titles (this will be done later)
-        newPages.add(page.getTitle());
-        // simple article filter: only pages in main namespace:
-        if (wikiModel.getNamespace(page.getTitle()).isEmpty()) {
-            newArticles.add(page.getTitle());
-        }
-        // export page/article list whenever the number of new pages is more
-        // than UPDATE_PAGELIST_EVERY,
-        // note: no need to check newArticles (is <= newPages)
-        if ((newPages.size() >= UPDATE_PAGELIST_EVERY)) {
-            updatePageLists1();
+        newPages.get(namespace).add(page.getTitle());
+        // only export page list every UPDATE_PAGELIST_EVERY pages:
+        if ((pageCount % UPDATE_PAGELIST_EVERY) == 0) {
+            updatePageList();
         }
         // limit the number of changes in SQLiteUpdatePageLists2Job to
         // UPDATE_PAGELIST_EVERY
         if ((newCategories.size() + newTemplates.size() + newBackLinks.size()) >= UPDATE_PAGELIST_EVERY) {
-            updatePageLists2();
+            updateLinkLists();
         }
     }
     
-    protected void updatePageLists1() {
-        addSQLiteJob(new SQLiteUpdatePageLists1Job(newPages, newArticles));
-        newPages = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
-        newArticles = new ArrayList<String>(UPDATE_PAGELIST_EVERY);
+    protected void updatePageList() {
+        addSQLiteJob(new SQLiteUpdatePageLists1Job(newPages, articleCount));
+        initNewPagesList();
     }
     
-    protected void updatePageLists2() {
+    protected void updateLinkLists() {
         addSQLiteJob(new SQLiteUpdateTmpPageLists2Job(newCategories, newTemplates, newBackLinks));
-        newCategories = new HashMap<String, List<String>>(NEW_CATS_HASH_DEF_SIZE);
-        newTemplates = new HashMap<String, List<String>>(NEW_TPLS_HASH_DEF_SIZE);
-        newBackLinks = new HashMap<String, List<String>>(NEW_BLNKS_HASH_DEF_SIZE);
+        initLinkLists();
     }
     
     protected class SQLiteWorker extends Thread {
@@ -454,7 +438,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
          * (temporary) page table.
          * 
          * @param pageTitle
-         *            (normalised) page title
+         *            (un-normalised) page title
          * 
          * @return the ID of the page
          * 
@@ -495,22 +479,25 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      * @author Nico Kruber, kruber@zib.de
      */
     protected class SQLiteUpdatePageLists1Job extends SQLiteUpdatePageListsJob {
-        List<String> newPages;
-        List<String> newArticles;
+        EnumMap<NamespaceEnum, ArrayList<String>> newPages;
+        int articleCount;
         
         /**
          * Writes the page and article list to the DB.
          * 
          * @param newPages
          *            (un-normalised) list of page titles
-         * @param newArticles
-         *            (un-normalised) list of page titles of articles
+         * @param articleCount
+         *            number of articles
          */
-        public SQLiteUpdatePageLists1Job(List<String> newPages, List<String> newArticles) {
-            this.newPages = new ArrayList<String>(newPages.size());
-            wikiModel.normalisePageTitles(newPages, this.newPages);
-            this.newArticles = new ArrayList<String>(newArticles.size());
-            wikiModel.normalisePageTitles(newArticles, this.newArticles);
+        public SQLiteUpdatePageLists1Job(EnumMap<NamespaceEnum, ArrayList<String>> newPages, int articleCount) {
+            // NOTE: can only use the wikiModel member here in order not to
+            // influence other parsing operations
+            this.newPages = createNewPagesList();
+            this.articleCount = articleCount;
+            for(NamespaceEnum ns : NamespaceEnum.values()) {
+                wikiModel.normalisePageTitles(newPages.get(ns), this.newPages.get(ns));
+            }
         }
         
         @Override
@@ -518,28 +505,22 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             String scalaris_key;
             
             // list of pages:
-            scalaris_key = ScalarisDataHandler.getPageListKey();
-            List<String> pageList;
-            try {
-                pageList = readObject(scalaris_key);
-                pageList.addAll(newPages);
-            } catch (FileNotFoundException e) {
-                pageList = new ArrayList<String>(newPages);
+            for(NamespaceEnum ns : NamespaceEnum.values()) {
+                scalaris_key = ScalarisDataHandler.getPageListKey(ns.getId());
+                final ArrayList<String> curNewPages = newPages.get(ns);
+                List<String> pageList;
+                try {
+                    pageList = readObject(scalaris_key);
+                    pageList.addAll(curNewPages);
+                } catch (FileNotFoundException e) {
+                    pageList = curNewPages;
+                }
+                writeObject(scalaris_key, pageList);
+                writeObject(ScalarisDataHandler.getPageCountKey(ns.getId()), pageList.size());
             }
-            writeObject(scalaris_key, pageList);
-            writeObject(ScalarisDataHandler.getPageCountKey(), pageList.size());
             
-            // list of articles:
-            scalaris_key = ScalarisDataHandler.getArticleListKey();
-            List<String> articleList;
-            try {
-                articleList = readObject(scalaris_key);
-                articleList.addAll(newArticles);
-            } catch (FileNotFoundException e) {
-                articleList = new ArrayList<String>(newArticles);
-            }
-            writeObject(scalaris_key, articleList);
-            writeObject(ScalarisDataHandler.getArticleCountKey(), articleList.size());
+            // number articles:
+            writeObject(ScalarisDataHandler.getArticleCountKey(), articleCount);
         }
     }
 
