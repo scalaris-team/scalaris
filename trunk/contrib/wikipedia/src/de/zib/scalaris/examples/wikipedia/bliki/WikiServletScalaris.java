@@ -385,18 +385,13 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public String getPageListKey() {
-        return ScalarisDataHandler.getPageListKey();
+    public String getPageListKey(int namespace) {
+        return ScalarisDataHandler.getPageListKey(namespace);
     }
 
     @Override
-    public String getPageCountKey() {
-        return ScalarisDataHandler.getPageCountKey();
-    }
-
-    @Override
-    public String getArticleListKey() {
-        return ScalarisDataHandler.getArticleListKey();
+    public String getPageCountKey(int namespace) {
+        return ScalarisDataHandler.getPageCountKey(namespace);
     }
 
     @Override
@@ -475,8 +470,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public ValueResult<List<String>> getArticleList(Connection connection) {
-        return ScalarisDataHandler.getArticleList(connection);
+    public ValueResult<List<String>> getPageList(int namespace, Connection connection) {
+        return ScalarisDataHandler.getPageList(namespace, connection);
     }
 
     @Override
@@ -503,6 +498,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     @Override
     public ValueResult<BigInteger> getPageCount(Connection connection) {
         return ScalarisDataHandler.getPageCount(connection);
+    }
+
+    @Override
+    public ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
+        return ScalarisDataHandler.getPageCount(namespace, connection);
     }
 
     @Override

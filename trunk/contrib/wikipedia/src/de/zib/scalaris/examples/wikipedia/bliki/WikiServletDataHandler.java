@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
@@ -46,26 +45,22 @@ public interface WikiServletDataHandler<Connection> {
     public String getSiteInfoKey();
     
     /**
-     * Gets the key to store the (complete) list of pages at.
+     * Gets the key to store the list of pages in the given namespace at.
+     * 
+     * @param namespace  the namespace ID
      * 
      * @return DB key
      */
-    public String getPageListKey();
+    public String getPageListKey(int namespace);
     
     /**
      * Gets the key to store the number of pages at.
      * 
-     * @return DB key
-     */
-    public String getPageCountKey();
-    
-    /**
-     * Gets the key to store the (complete) list of articles, i.e. pages in
-     * the main namespace) at.
+     * @param namespace  the namespace ID
      * 
      * @return DB key
      */
-    public String getArticleListKey();
+    public String getPageCountKey(int namespace);
     
     /**
      * Gets the key to store the number of articles, i.e. pages in the main
@@ -238,7 +233,7 @@ public interface WikiServletDataHandler<Connection> {
             int id, final MyNamespace nsObject);
     
     /**
-     * Retrieves a list of available pages from the DB.
+     * Retrieves a list of all available pages from the DB.
      * 
      * @param connection
      *            the connection to the DB
@@ -248,15 +243,16 @@ public interface WikiServletDataHandler<Connection> {
     public ValueResult<List<String>> getPageList(Connection connection);
     
     /**
-     * Retrieves a list of available articles, i.e. pages in the main
-     * namespace, from the DB.
+     * Retrieves a list of available pages in the given namespace from the DB.
      * 
+     * @param namespace
+     *            the namespace ID
      * @param connection
      *            the connection to the DB
      * 
      * @return a result object with the page list on success
      */
-    public ValueResult<List<String>> getArticleList(Connection connection);
+    public ValueResult<List<String>> getPageList(int namespace, Connection connection);
     
     /**
      * Retrieves a list of pages in the given category from the DB.
@@ -318,7 +314,7 @@ public interface WikiServletDataHandler<Connection> {
             Connection connection, String contributor);
     
     /**
-     * Retrieves the number of available pages from the DB.
+     * Retrieves the number of all available pages from the DB.
      * 
      * @param connection
      *            the connection to the DB
@@ -326,6 +322,19 @@ public interface WikiServletDataHandler<Connection> {
      * @return a result object with the number of pages on success
      */
     public ValueResult<BigInteger> getPageCount(Connection connection);
+    
+    /**
+     * Retrieves the number of available pages in the given namespace from the
+     * DB.
+     * 
+     * @param namespace
+     *            the namespace ID
+     * @param connection
+     *            the connection to the DB
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public ValueResult<BigInteger> getPageCount(int namespace, Connection connection);
     
     /**
      * Retrieves the number of available articles, i.e. pages in the main
