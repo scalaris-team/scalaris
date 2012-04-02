@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List,java.net.URLEncoder"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean,java.util.Map,java.util.List,org.apache.commons.lang.StringEscapeUtils"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
@@ -8,9 +8,15 @@
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <%
-String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8");
+String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle());
 String pageTitleWithPars = pageBean.titleWithParameters();
-String safePageTitleWithPars = URLEncoder.encode(pageTitleWithPars, "UTF-8");
+String safePageTitleWithPars = StringEscapeUtils.escapeHtml(pageTitleWithPars);
+
+String safeFromTitle = StringEscapeUtils.escapeHtml(pageBean.getFromPage());
+String safeToTitle = StringEscapeUtils.escapeHtml(pageBean.getToPage());
+String safeTargetTitle = StringEscapeUtils.escapeHtml(pageBean.getTarget());
+String safePrefixTitle = StringEscapeUtils.escapeHtml(pageBean.getPrefix());
+String safeSearchTitle = StringEscapeUtils.escapeHtml(pageBean.getSearch());
 %>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
@@ -83,26 +89,26 @@ ${ pageBean.page }
                       <% if (pageBean.getFormType() == WikiPageListBean.FormType.FromToForm ) { %>
                               <tr>
                                 <td class='mw-label'><label for="nsfrom">Display pages starting at:</label> </td>
-                                <td class='mw-input'><input name="from" size="30" value="${ pageBean.fromPage }" id="nsfrom" />  </td>
+                                <td class='mw-input'><input name="from" size="30" value="<%= safeFromTitle %>" id="nsfrom" />  </td>
                               </tr>
                               <tr>
                                 <td class='mw-label'><label for="nsto">Display pages ending at:</label> </td>
-                                <td class='mw-input'><input name="to" size="30" value="${ pageBean.toPage }" id="nsto" />      </td>
+                                <td class='mw-input'><input name="to" size="30" value="<%= safeToTitle %>" id="nsto" />      </td>
                               </tr>
                       <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.TargetPageForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="target">Page:</label> </td>
-                                <td class='mw-input'><input name="target" size="30" value="${ pageBean.target }" id="nstarget" /> <input type="submit" value="Go" />  </td>
+                                <td class='mw-input'><input name="target" size="30" value="<%= safeTargetTitle %>" id="nstarget" /> <input type="submit" value="Go" />  </td>
                               </tr>
                       <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.PagePrefixForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="prefix">Display pages with prefix:</label> </td>
-                                <td class='mw-input'><input name="prefix" size="30" value="${ pageBean.prefix }" id="nsprefix" />  </td>
+                                <td class='mw-input'><input name="prefix" size="30" value="<%= safePrefixTitle %>" id="nsprefix" />  </td>
                               </tr>
                       <% } else if (pageBean.getFormType() == WikiPageListBean.FormType.PageSearchForm) { %>
                               <tr>
                                 <td class='mw-label'><label for="search">Display pages containing:</label> </td>
-                                <td class='mw-input'><input name="search" size="30" value="${ pageBean.search }" id="nsprefix" />  </td>
+                                <td class='mw-input'><input name="search" size="30" value="<%= safeSearchTitle %>" id="nsprefix" />  </td>
                               </tr>
                       <% } %>
                       <% if (pageBean.getFormType() != WikiPageListBean.FormType.TargetPageForm) { %>
@@ -136,9 +142,9 @@ ${ pageBean.page }
   <%
       if (pageBean.isFoundFullMatch()) {
   %>
-    <b>There is a page named "<a href="wiki?title=<%= pageBean.getSearch() %>" title="<%= pageBean.getSearch() %>"><%= pageBean.getSearch() %></a>" on this wiki.</b>
+    <b>There is a page named "<a href="wiki?title=<%= safeSearchTitle %>" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki.</b>
   <% } else {%>
-    <b>Create the page "<a href="wiki?title=<%= pageBean.getSearch() %>&amp;action=edit" class="new" title="<%= pageBean.getSearch() %>"><%= pageBean.getSearch() %></a>" on this wiki!</b>
+    <b>Create the page "<a href="wiki?title=<%= safeSearchTitle %>&amp;action=edit" class="new" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki!</b>
   <% } %>
   </p>
 <% } %>

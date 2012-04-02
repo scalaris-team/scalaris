@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,java.net.URLEncoder,org.apache.commons.lang.StringUtils"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,org.apache.commons.lang.StringUtils,org.apache.commons.lang.StringEscapeUtils"%>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageEditBean" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<% String safePageTitle = URLEncoder.encode(pageBean.getTitle(), "UTF-8"); %>
+<% String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle()); %>
 <title>Changing ${ pageBean.title } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
 <error>${ pageBean.error }</error>
@@ -209,8 +209,8 @@ ${ pageBean.preview }
     String mainSelected = pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     String talkSelected = !pageBean.getWikiNamespace().isTalkPage(pageBean.getTitle()) ? "" : " class=\"selected\"";
     %>
-                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle()), "UTF-8") %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
-                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= URLEncoder.encode(pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle()), "UTF-8") %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
+                    <li id="ca-nstab-main"<%= mainSelected %>><span><a href="wiki?title=<%= StringEscapeUtils.escapeHtml(pageBean.getWikiNamespace().getPageNameFromTalkPage(pageBean.getTitle())) %>" title="View the content page [c]" accesskey="c">Page</a></span></li>
+                    <li id="ca-talk"<%= talkSelected %>><span><a href="wiki?title=<%= StringEscapeUtils.escapeHtml(pageBean.getWikiNamespace().getTalkPageFromPageName(pageBean.getTitle())) %>" title="Discussion about the content page [t]" accesskey="t">Talk</a></span></li>
     </ul>
 </div>
 
