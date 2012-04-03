@@ -120,8 +120,11 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      * @return whether the page should be imported or not
      */
     private boolean inWhiteList(String pageTitle) {
+        final String normalisePageTitle = wikiModel.normalisePageTitle(pageTitle);
         return WikiDumpHandler.this.whitelist.contains(pageTitle)
-                || WikiDumpHandler.this.whitelist.contains(wikiModel.normalisePageTitle(pageTitle));
+                || WikiDumpHandler.this.whitelist.contains(normalisePageTitle)
+                || pageTitle.startsWith("MediaWiki:")
+                || normalisePageTitle.startsWith(String.valueOf(MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()));
     }
 
     /**

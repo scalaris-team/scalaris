@@ -270,7 +270,6 @@ public class Main {
         
         Set<String> allowedPages = new HashSet<String>();
         allowedPages.add("Main Page");
-        allowedPages.add("MediaWiki:Noarticletext");
         String allowedPagesFileName = "";
         if (args.length > i && !args[i].isEmpty()) {
             allowedPagesFileName = args[i];
