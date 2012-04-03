@@ -542,7 +542,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "INNER JOIN currentPages AS cp ON categories.category == cp.id " +
                                     "INNER JOIN pages AS page ON categories.title == page.id " +
                                     // "INNER JOIN pages AS cat ON categories.category == cat.id" +
-                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getCategory() + ":", nsObject) + "%';");
+                                    "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
@@ -555,8 +555,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "INNER JOIN currentPages AS cp ON templates.template == cp.id " +
                                     "INNER JOIN pages AS page ON templates.title == page.id " +
                                     // "INNER JOIN pages AS tpl ON templates.template == tpl.id" +
-                                    "WHERE page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getCategory() + ":", nsObject) + "%' OR "
-                                    + "page.title LIKE '" + MyWikiModel.normalisePageTitle(nsObject.getTemplate() + ":", nsObject) + "%';");
+                                    "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%' OR "
+                                    + "page.title LIKE '" + MyNamespace.NamespaceEnum.TEMPLATE_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
                         String pageTemplate = stmt.columnString(0);
                         Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
@@ -676,7 +676,22 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         Set<String> newPages = new HashSet<String>();
         Set<String> pageLinks = new HashSet<String>();
         SQLiteStatement stmt = null;
+        final ArrayList<String> autoIncluded = new ArrayList<String>(10000);
         try {
+            println(msgOut, "adding all templates");
+            // add all auto-included pages
+            stmt = db
+                    .prepare("SELECT pages.title FROM pages WHERE pages.title LIKE '"
+                            + MyNamespace.NamespaceEnum.TEMPLATE_NAMESPACE_KEY.getId()
+                            + ":%' OR pages.title LIKE '"
+                            + MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()
+                            + ":%';");
+            while (stmt.step()) {
+                final String pageTemplate = stmt.columnString(0);
+                autoIncluded.add(pageTemplate);
+            }
+            currentPages.addAll(autoIncluded);
+            stmt.dispose();
             while(depth >= 0) {
                 println(msgOut, "recursion level: " + depth);
                 println(msgOut, " adding " + currentPages.size() + " pages");
@@ -701,19 +716,6 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     while (stmt.step()) {
                         String pageCategory = stmt.columnString(0);
                         addToPages(allPages, newPages, pageCategory, includeTree, referenceTree);
-                    }
-                    stmt.dispose();
-                    println(msgOut, "  adding templates of " + currentPages.size() + " pages");
-                    // add all templates (and their requirements) of the pages
-                    stmt = db
-                            .prepare("SELECT tpl.title FROM templates " +
-                                    "INNER JOIN currentPages AS cp ON templates.title == cp.id " +
-                                    // "INNER JOIN pages AS page ON templates.title == page.id " +
-                                    "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
-                    while (stmt.step()) {
-                        String pageTemplate = stmt.columnString(0);
-                        Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
-                        addToPages(allPages, newPages, tplChildren, includeTree, referenceTree);
                     }
                     stmt.dispose();
                     println(msgOut, "  adding links of " + currentPages.size() + " pages");
@@ -749,6 +751,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 stmt.dispose();
             }
         }
+        // these pages will be automatically included even if not in the page
+        // list -> do not include them for a smaller more readable page list
+        allPages.removeAll(autoIncluded);
         return allPages;
     }
     
