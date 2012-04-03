@@ -124,7 +124,9 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
         return WikiDumpHandler.this.whitelist.contains(pageTitle)
                 || WikiDumpHandler.this.whitelist.contains(normalisePageTitle)
                 || pageTitle.startsWith("MediaWiki:")
-                || normalisePageTitle.startsWith(String.valueOf(MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()));
+                || normalisePageTitle.startsWith(String.valueOf(MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()))
+                || pageTitle.startsWith("Template:")
+                || normalisePageTitle.startsWith(String.valueOf(MyNamespace.NamespaceEnum.TEMPLATE_NAMESPACE_KEY.getId()));
     }
 
     /**
