@@ -134,7 +134,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
     protected static final Map<String, String[]> SPECIAL_SUFFIX = new HashMap<String, String[]>();
     protected static final String[] SPECIAL_SUFFIX_EN;
-    protected static String[] SPECIAL_SUFFIX_LANG;
+    protected String[] SPECIAL_SUFFIX_LANG;
     protected static final int SPECIAL_RANDOM_IDX = 0;
     protected static final int SPECIAL_ALLPAGES1_IDX = 1;
     protected static final int SPECIAL_ALLPAGES2_IDX = 2;
@@ -148,16 +148,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * Full list of normalised special page titles for {@link #existingPages}. 
      */
-    protected static final List<String> specialPages;
+    protected final List<String> specialPages;
     
     static {
         // BEWARE: include normalised page titles!
         SPECIAL_SUFFIX.put("en", new String[] { "Random", "AllPages",
                 "Allpages", "PrefixIndex", "Search", "WhatLinksHere",
                 "SpecialPages", "Statistics", "Version" });
-        SPECIAL_SUFFIX.put("simple", new String[] { "Random", "AllPages",
-                "Allpages", "PrefixIndex", "Search", "WhatLinksHere",
-                "SpecialPages", "Statistics", "Version" });
+        SPECIAL_SUFFIX.put("simple", SPECIAL_SUFFIX.get("en"));
         SPECIAL_SUFFIX.put("de", new String[] { "Zufällige Seite", "Alle Seiten",
                 "Alle seiten", "Präfixindex", "Suche", "Linkliste",
                 "Spezialseiten", "Statistik", "Version" });
@@ -165,13 +163,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         SPECIAL_SUFFIX.put("es", new String[] { "Aleatoria", "Todas",
                 "Todas", "PáginasPorPrefijo", "Buscar", "LoQueEnlazaAquí",
                 "PáginasEspeciales", "Estadísticas", "Versión" });
-        String[] specialSuffixEn = SPECIAL_SUFFIX.get("en");
+        final String[] specialSuffixEn = SPECIAL_SUFFIX.get("en");
         SPECIAL_SUFFIX_EN = new String[specialSuffixEn.length];
         for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
             SPECIAL_SUFFIX_EN[i] = specialSuffixEn[i];
         }
-        SPECIAL_SUFFIX_LANG = SPECIAL_SUFFIX_EN;
-        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.length * 2);
     }
 
     /**
@@ -179,6 +175,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     public WikiServlet() {
         super();
+        SPECIAL_SUFFIX_LANG = SPECIAL_SUFFIX_EN;
+        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.length * 2);
+        // add English names here - the localised versions will be added when
+        // the siteinfo is loaded
+        for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
+            // note: if non-english namespace, "Special" won't be recognised
+            // during normalisation -> leave it unnormalised
+            specialPages.add("Special:" +  SPECIAL_SUFFIX_EN[i]);
+        }
     }
 
     /**
@@ -221,7 +226,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         loadSiteInfo();
         loadPlugins();
         startExistingPagesUpdate();
-        setSpecialPageNames();
+        existingPages.addAll(specialPages);
     }
     
     /**
@@ -288,7 +293,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
     }
     
-    protected void setSpecialPageNames() {
+    /**
+     * Sets localised special page names by using the information provided by
+     * the {@link #siteinfo} object.
+     * 
+     * Call this method inside {@link #loadSiteInfo()} in implementing classes.
+     */
+    protected void setLocalisedSpecialPageNames() {
         if (initialized) {
             String fullBaseUrl = siteinfo.getBase();
             Matcher matcher = MATCH_WIKI_SITE_LANG.matcher(fullBaseUrl);
@@ -301,11 +312,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                         SPECIAL_SUFFIX_LANG[i] = specialSuffixLang[i];
                     }
                 }
-            }
-            for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
-                // note: if non-english namespace, "Special" won't be recognised
-                // during normalisation -> leave is unnormalised
-                specialPages.add("Special:" +  SPECIAL_SUFFIX_EN[i]);
             }
             for (int i = 0; i < SPECIAL_SUFFIX_LANG.length; ++i) {
                 specialPages.add(MyNamespace.SPECIAL_NAMESPACE_KEY + ":" + SPECIAL_SUFFIX_LANG[i]);

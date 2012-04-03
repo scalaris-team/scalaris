@@ -137,6 +137,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                 // TODO: fix siteinfo's base url
                 namespace = new MyNamespace(siteinfo);
                 initialized = true;
+                setLocalisedSpecialPageNames();
             } catch (Exception e) {
                 // no warning here - this probably is an empty wiki
                 return false;
