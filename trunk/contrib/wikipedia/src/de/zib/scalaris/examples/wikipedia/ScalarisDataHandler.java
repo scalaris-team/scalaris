@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import com.ericsson.otp.erlang.OtpErlangException;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
@@ -54,6 +53,55 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public class ScalarisDataHandler {
+    
+    /**
+     * Different types of DB operations.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public enum ScalarisOpType {
+        /**
+         * Operation involving a (central) page list.
+         */
+        PAGE_LIST,
+        /**
+         * Operation involving a category page list.
+         */
+        CATEGORY_PAGE_LIST,
+        /**
+         * Operation involving a template page list.
+         */
+        TEMPLATE_PAGE_LIST,
+        /**
+         * Operation involving a backlink page list.
+         */
+        BACKLINK_PAGE_LIST,
+        /**
+         * Operation involving a list of (short) revisions.
+         */
+        SHORTREV_LIST,
+        /**
+         * Operation involving the article counter.
+         */
+        ARTICLE_COUNT,
+        /**
+         * Operation involving a wiki page.
+         */
+        PAGE,
+        /**
+         * Operation involving a wiki page revision.
+         */
+        REVISION,
+        /**
+         * Operation involving a contribution.
+         */
+        CONTRIBUTION,
+        /**
+         * Operation involving the edit stats.
+         */
+        EDIT_STAT;
+    }
+    
     /**
      * Gets the key to store {@link SiteInfo} objects at.
      * 
@@ -1081,8 +1129,8 @@ public class ScalarisDataHandler {
 
         // now save the changes:
         do {
-            ScalarisTxOpExecWrapper executor = new ScalarisTxOpExecWrapper(
-                    new ScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+            MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
+                    new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
 
             int articleCountChange = 0;
             final boolean wasArticle = (oldPage != null)
@@ -1141,131 +1189,6 @@ public class ScalarisDataHandler {
                 pageEdits, statName, System.currentTimeMillis() - timeAtStart);
     }
     
-    protected enum ScalarisOpType {
-        PAGE_LIST,
-        CATEGORY_PAGE_LIST,
-        TEMPLATE_PAGE_LIST,
-        BACKLINK_PAGE_LIST,
-        SHORTREV_LIST,
-        ARTICLE_COUNT,
-        PAGE,
-        REVISION,
-        CONTRIBUTION,
-        EDIT_STAT;
-    }
-    
-    /**
-     * Wraps {@link ScalarisTxOpExecutor} and adds the different operations
-     * based on the current configuration.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    protected static class ScalarisTxOpExecWrapper {
-        protected final ScalarisTxOpExecutor executor;
-        public ScalarisTxOpExecWrapper(ScalarisTxOpExecutor executor) {
-            this.executor = executor;
-        }
-
-        /**
-         * Creates a new write operation.
-         * 
-         * @param opType    the type of the operation
-         * @param key       the key to write the value to
-         * @param value     the value to write
-         * 
-         * @param <T>       type of the value
-         */
-        public <T> void addWrite(ScalarisOpType opType, String key, T value) {
-            switch (opType) {
-            default:
-                executor.addOp(new ScalarisWriteOp<T>(key, value));
-            }
-        }
-
-        /**
-         * Creates a new list append operation.
-         * 
-         * @param opType    the type of the operation
-         * @param key       the key to append the value to
-         * @param toAdd     the value to add
-         * @param countKey  the key for the counter of the entries in the list
-         *                  (may be <tt>null</tt>)
-         * 
-         * @param <T>       type of the value to add
-         */
-        public <T> void addAppend(ScalarisOpType opType, String key, T toAdd, String countKey) {
-            switch (opType) {
-            default:
-                if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                    executor.addOp(new ScalarisListAppendOp2<T>(key, toAdd, countKey));
-                } else {
-                    executor.addOp(new ScalarisListAppendOp1<T>(key, toAdd, countKey));
-                }
-            }
-        }
-
-        /**
-         * Creates a new list remove operation.
-         * 
-         * @param opType    the type of the operation
-         * @param key       the key to remove the value from
-         * @param toRemove  the value to remove
-         * @param countKey  the key for the counter of the entries in the list
-         *                  (may be <tt>null</tt>)
-         * 
-         * @param <T>       type of the value to remove
-         */
-        public <T> void addRemove(ScalarisOpType opType, String key, T toRemove, String countKey) {
-            switch (opType) {
-            default:
-                if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                    executor.addOp(new ScalarisListRemoveOp2<T>(key, toRemove, countKey));
-                } else {
-                    executor.addOp(new ScalarisListRemoveOp1<T>(key, toRemove, countKey));
-                }
-            }
-        }
-
-        /**
-         * Creates a new number increment operation.
-         * 
-         * @param opType    the type of the operation
-         * @param key       the key of the value to increment
-         * @param toAdd     the value to increment by
-         * 
-         * @param <T>       type of the value to add
-         */
-        public <T extends Number> void addIncrement(ScalarisOpType opType, String key, T toAdd) {
-            switch (opType) {
-            default:
-                if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                    executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
-                } else {
-                    executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
-                }
-            }
-        }
-        
-        /**
-         * Executes all operations previously added with one of the
-         * <tt>addXXX</tt> methods.
-         * 
-         * @param commitLast
-         *            whether to commit the requests in the last work phase
-         * 
-         * @throws OtpErlangException
-         *             if an error occurred verifying a result from previous
-         *             operations
-         * @throws UnknownException
-         *             if an error occurred verifying a result from previous
-         *             operations
-         */
-        public void run(boolean commitLast) throws OtpErlangException,
-                UnknownException {
-            executor.run(commitLast);
-        }
-    }
-
     /**
      * Increases the number of overall page edits statistic.
      * 
@@ -1279,8 +1202,8 @@ public class ScalarisDataHandler {
         // increase number of page edits (for statistics)
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
-        ScalarisTxOpExecWrapper executor = new ScalarisTxOpExecWrapper(
-                new ScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+        MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
+                new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
         
         executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1);
         try {
@@ -1305,8 +1228,8 @@ public class ScalarisDataHandler {
             Transaction scalaris_tx, Page oldPage, Page newPage, List<String> involvedKeys) {
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
-        ScalarisTxOpExecWrapper executor = new ScalarisTxOpExecWrapper(
-                new ScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+        MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
+                new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
 
         String scalaris_key = getContributionListKey(newPage.getCurRev().getContributor().toString());
         executor.addAppend(ScalarisOpType.CONTRIBUTION, scalaris_key,
@@ -1383,7 +1306,7 @@ public class ScalarisDataHandler {
          * @param executor  executor performing the Scalaris operations
          * @param title     (normalised) page name to update
          */
-        public void updatePageLists_addAppends(ScalarisTxOpExecWrapper executor,
+        public void updatePageLists_addAppends(MyScalarisOpExecWrapper executor,
                 String title) {
             String scalaris_key;
             GetPageListAndCountKey keyCountGen = null;

@@ -2,14 +2,14 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.Arrays;
 
-import de.zib.scalaris.Transaction.RequestList;
+import de.zib.scalaris.RequestList;
 
 /**
  * Implements a list append operation using the append operation of
  * Scalaris.
- * 
+ *
  * @param <T> the type of objects in the list
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  */
 public class ScalarisListAppendOp2<T> extends ScalarisListOp2<T> {
@@ -17,20 +17,20 @@ public class ScalarisListAppendOp2<T> extends ScalarisListOp2<T> {
 
     /**
      * Creates a new append operation.
-     * 
+     *
      * @param key       the key to append the value to
      * @param toAdd     the value to add
      * @param countKey  the key for the counter of the entries in the list
      *                  (may be <tt>null</tt>)
      */
-    public ScalarisListAppendOp2(String key, T toAdd, String countKey) {
+    public ScalarisListAppendOp2(final String key, final T toAdd, final String countKey) {
         super(key, countKey);
         this.toAdd = toAdd;
     }
 
     /**
      * Adds {@link #toAdd} to the list at {@link ScalarisListOp2#key}.
-     * 
+     *
      * @param requests
      *            the request list
      *
@@ -38,7 +38,7 @@ public class ScalarisListAppendOp2<T> extends ScalarisListOp2<T> {
      */
     @SuppressWarnings("unchecked")
     @Override
-    protected int changeList(RequestList requests) {
+    protected int changeList(final RequestList requests) {
         requests.addAddDelOnList(key, Arrays.asList(toAdd), null);
         if (countKey != null) {
             requests.addAddOnNr(countKey, 1);
@@ -46,9 +46,6 @@ public class ScalarisListAppendOp2<T> extends ScalarisListOp2<T> {
         return 0;
     }
 
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.ScalarisOp#toString()
-     */
     @Override
     public String toString() {
         return "Scalaris.append(" + key + ", " + toAdd + ", " + countKey + ")";

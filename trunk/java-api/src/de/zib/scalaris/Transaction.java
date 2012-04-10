@@ -204,6 +204,7 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
+        @Override
         public ErlangValue processReadAt(final int pos) throws TimeoutException,
                 NotFoundException, UnknownException {
             return new ErlangValue(
@@ -222,6 +223,7 @@ public class Transaction {
          * @throws UnknownException
          *             if any other error occurs
          */
+        @Override
         public void processWriteAt(final int pos) throws TimeoutException,
                 UnknownException {
             CommonErlangObjects.processResult_write(results.elementAt(pos));
@@ -243,6 +245,7 @@ public class Transaction {
          *
          * @since 3.9
          */
+        @Override
         public void processAddDelOnListAt(final int pos) throws TimeoutException,
                 NotAListException, UnknownException {
             CommonErlangObjects.processResult_addDelOnList(results.elementAt(pos));
@@ -264,6 +267,7 @@ public class Transaction {
          *
          * @since 3.9
          */
+        @Override
         public void processAddOnNrAt(final int pos) throws TimeoutException,
                 NotANumberException, UnknownException {
             CommonErlangObjects.processResult_addOnNr(results.elementAt(pos));
@@ -287,6 +291,7 @@ public class Transaction {
          *
          * @since 3.8
          */
+        @Override
         public void processTestAndSetAt(final int pos) throws TimeoutException,
                 NotFoundException, KeyChangedException, UnknownException {
             CommonErlangObjects.processResult_testAndSet(results.elementAt(pos));
@@ -295,6 +300,9 @@ public class Transaction {
         /**
          * Processes the result at the given position which originated from
          * a commit request.
+         *
+         * Note: it is not necessary to call this method manually! A commit at
+         * the end of a request list will be evaluated automatically!
          *
          * @param pos
          *            the position in the result list (starting at 0)

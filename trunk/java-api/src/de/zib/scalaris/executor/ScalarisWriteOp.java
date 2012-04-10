@@ -13,81 +13,79 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.executor;
 
 import com.ericsson.otp.erlang.OtpErlangException;
 
-import de.zib.scalaris.Transaction.RequestList;
-import de.zib.scalaris.Transaction.ResultList;
+import de.zib.scalaris.RequestList;
+import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
 
 /**
- * Implements an increment operation using the increment operation of
- * Scalaris.
- * 
+ * Implements a write operation.
+ *
  * @param <T> the type of the value to write
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.13
+ * @since 3.13
  */
-public class ScalarisIncrementOp2<T extends Number> implements
-        ScalarisOp<RequestList, ResultList> {
+public class ScalarisWriteOp<T> implements ScalarisOp {
     final protected String key;
     final protected T value;
-    
+
     /**
      * Creates a write operation.
-     * 
+     *
      * @param key
      *            the key to write to
      * @param value
      *            the value to write
      */
-    public ScalarisIncrementOp2(String key, T value) {
+    public ScalarisWriteOp(final String key, final T value) {
         this.key = key;
         this.value = value;
     }
 
-    @Override
     public int workPhases() {
         return 1;
     }
 
-    @Override
-    public final int doPhase(int phase, int firstOp, ResultList results,
-            RequestList requests) throws OtpErlangException, UnknownException,
+    public final int doPhase(final int phase, final int firstOp, final ResultList results,
+            final RequestList requests) throws OtpErlangException, UnknownException,
             IllegalArgumentException {
         switch (phase) {
-        case 0: return prepareIncrement(requests);
-        case 1: return checkIncrement(firstOp, results);
+        case 0: return prepareWrite(requests);
+        case 1: return checkWrite(firstOp, results);
         default:
             throw new IllegalArgumentException("No phase " + phase);
         }
     }
 
     /**
-     * Adds the increment operation to the request list.
-     * 
+     * Adds the write operation to the request list.
+     *
      * @param requests  the request list
-     * 
+     *
      * @return <tt>0</tt> (no operation processed)
      */
-    protected int prepareIncrement(final RequestList requests) throws OtpErlangException,
+    protected int prepareWrite(final RequestList requests) throws OtpErlangException,
             UnknownException {
-        requests.addAddOnNr(key, value);
+        requests.addWrite(key, value);
         return 0;
     }
 
     /**
-     * Verifies the increment operation.
-     * 
+     * Verifies the write operations.
+     *
      * @param firstOp   the first operation to process inside the result list
      * @param results   the result list
-     * 
+     *
      * @return <tt>1</tt> operation processed (the write)
      */
-    protected int checkIncrement(final int firstOp, final ResultList results)
+    protected int checkWrite(final int firstOp, final ResultList results)
             throws OtpErlangException, UnknownException {
-        results.processAddOnNrAt(firstOp);
+        results.processWriteAt(firstOp);
         return 1;
     }
 
@@ -96,7 +94,6 @@ public class ScalarisIncrementOp2<T extends Number> implements
      */
     @Override
     public String toString() {
-        return "Scalaris.increment(" + key + ", " + value + ")";
+        return "Scalaris.write(" + key + ", " + value + ")";
     }
-
 }

@@ -39,9 +39,6 @@ public class ScalarisListAppendOp1<T> extends ScalarisListOp1<T> {
         pageList.add(toAdd);
     }
 
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.ScalarisOp#toString()
-     */
     @Override
     public String toString() {
         return "Scalaris.append(" + key + ", " + toAdd + ", " + countKey + ")";
