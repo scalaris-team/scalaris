@@ -25,11 +25,13 @@ import java.net.URLEncoder;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -89,6 +91,55 @@ public class MyWikiModel extends WikiModel {
     protected static final Set<String> INTERLANGUAGE_KEYS;
     
     /**
+     * Localised prefixes for special pages, e.g. "Special". 
+     */
+    public static final Map<String, String> SPECIAL_PREFIX = new HashMap<String, String>();
+    /**
+     * Localised suffixes for special pages, e.g. "AllPages".
+     */
+    public static final Map<String, EnumMap<SpecialPage, String>> SPECIAL_SUFFIX = new HashMap<String, EnumMap<SpecialPage, String>>();
+
+    /**
+     * Enum for all available special pages.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static enum SpecialPage {
+        /**
+         * Redirect to random page.
+         */
+        SPECIAL_RANDOM,
+        /**
+         * List of all pages.
+         */
+        SPECIAL_ALLPAGES,
+        /**
+         * List of all pages with a given prefix.
+         */
+        SPECIAL_PREFIXINDEX,
+        /**
+         * Search for a page.
+         */
+        SPECIAL_SEARCH,
+        /**
+         * Pages linking to another page.
+         */
+        SPECIAL_WHATLINKSHERE,
+        /**
+         * List of available special pages.
+         */
+        SPECIAL_SPECIALPAGES,
+        /**
+         * Some statistics.
+         */
+        SPECIAL_STATS,
+        /**
+         * Version information.
+         */
+        SPECIAL_VERSION;
+    }
+    
+    /**
      * Cache of processed magic words.
      */
     protected Map<String, String> magicWordCache = new HashMap<String, String>();
@@ -131,6 +182,51 @@ public class MyWikiModel extends WikiModel {
                 Configuration.DEFAULT_CONFIGURATION.addInterwikiLink(lang, "http://" + lang + ".wiktionary.org/wiki/?${title}");
             }
         }
+        
+        // localised special pages titles (prefix + suffix)
+        // BEWARE: keep SPECIAL_PREFIX and SPECIAL_SUFFIX in sync!
+        SPECIAL_PREFIX.put("en", "Special");
+        SPECIAL_PREFIX.put("simple", "Special");
+        SPECIAL_PREFIX.put("de", "Spezial");
+        SPECIAL_PREFIX.put("bar", "Spezial");
+        SPECIAL_PREFIX.put("es", "Especial");
+        // BEWARE: include normalised page titles!
+
+        EnumMap<SpecialPage, String> SPECIAL_SUFFIX_EN = new EnumMap<SpecialPage, String>(SpecialPage.class);
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_RANDOM, "Random");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_ALLPAGES, "AllPages");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_PREFIXINDEX, "PrefixIndex");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_SEARCH, "Search");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_WHATLINKSHERE, "WhatLinksHere");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_SPECIALPAGES, "SpecialPages");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_STATS, "Statistics");
+        SPECIAL_SUFFIX_EN.put(SpecialPage.SPECIAL_VERSION, "Version");
+
+        EnumMap<SpecialPage, String> SPECIAL_SUFFIX_DE = new EnumMap<SpecialPage, String>(SpecialPage.class);
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_RANDOM, "Zufällige Seite");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_ALLPAGES, "Alle Seiten");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_PREFIXINDEX, "Präfixindex");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_SEARCH, "Suche");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_WHATLINKSHERE, "Linkliste");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_SPECIALPAGES, "Spezialseiten");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_STATS, "Statistik");
+        SPECIAL_SUFFIX_DE.put(SpecialPage.SPECIAL_VERSION, "Version");
+
+        EnumMap<SpecialPage, String> SPECIAL_SUFFIX_ES = new EnumMap<SpecialPage, String>(SpecialPage.class);
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_RANDOM, "Aleatoria");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_ALLPAGES, "Todas");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_PREFIXINDEX, "PáginasPorPrefijo");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_SEARCH, "Buscar");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_WHATLINKSHERE, "LoQueEnlazaAquí");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_SPECIALPAGES, "PáginasEspeciales");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_STATS, "Estadísticas");
+        SPECIAL_SUFFIX_ES.put(SpecialPage.SPECIAL_VERSION, "Versión");
+        
+        SPECIAL_SUFFIX.put("en", SPECIAL_SUFFIX_EN);
+        SPECIAL_SUFFIX.put("simple", SPECIAL_SUFFIX_EN);
+        SPECIAL_SUFFIX.put("de", SPECIAL_SUFFIX_DE);
+        SPECIAL_SUFFIX.put("bar", SPECIAL_SUFFIX_DE);
+        SPECIAL_SUFFIX.put("es", SPECIAL_SUFFIX_ES);
     }
     
     /**
@@ -1081,5 +1177,50 @@ public class MyWikiModel extends WikiModel {
     public static boolean isArticle(int namespace, Collection<String> links,
             Collection<String> categories) {
         return (namespace == 0) && (!links.isEmpty() || !categories.isEmpty());
+    }
+    
+    /**
+     * Gets all localised variants for the given special page.
+     * 
+     * @param page
+     *            the special page
+     * 
+     * @return localised variants including the English names
+     */
+    public static Collection<String> getLocalisedSpecialPageNames(SpecialPage page) {
+        ArrayList<String> result = new ArrayList<String>();
+        
+        for (Entry<String, String> prefix : SPECIAL_PREFIX.entrySet()) {
+            EnumMap<SpecialPage, String> localisedSuffix = SPECIAL_SUFFIX.get(prefix.getKey());
+            if (localisedSuffix != null) {
+                result.add(MyWikiModel.createFullPageName(prefix.getValue(), localisedSuffix.get(page)));
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Gets the localised variants for the given special page.
+     * 
+     * @param page
+     *            the special page
+     * @param language
+     *            the language to get the variants for
+     * 
+     * @return localised variants including the English names
+     */
+    public static Collection<String> getLocalisedSpecialPageNames(SpecialPage page, String language) {
+        ArrayList<String> result = new ArrayList<String>(4);
+        
+        String localisedPrefix = SPECIAL_PREFIX.get("en");
+        EnumMap<SpecialPage, String> localisedSuffix = SPECIAL_SUFFIX.get("en");
+        result.add(MyWikiModel.createFullPageName(localisedPrefix, localisedSuffix.get(page)));
+        
+        localisedPrefix = SPECIAL_PREFIX.get(language);
+        localisedSuffix = SPECIAL_SUFFIX.get(language);
+        if (localisedPrefix != null && localisedSuffix != null) {
+            result.add(MyWikiModel.createFullPageName(localisedPrefix, localisedSuffix.get(page)));
+        }
+        return result;
     }
 }

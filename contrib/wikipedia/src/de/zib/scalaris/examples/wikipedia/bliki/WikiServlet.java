@@ -26,8 +26,8 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.EnumMap;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -65,6 +65,7 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.SpecialPage;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -132,43 +133,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     
     protected BloomFilter<String> existingPages = new BloomFilter<String>(MyWikiModel.existingPagesFPR, 100);
 
-    protected static final Map<String, String[]> SPECIAL_SUFFIX = new HashMap<String, String[]>();
-    protected static final String[] SPECIAL_SUFFIX_EN;
-    protected String[] SPECIAL_SUFFIX_LANG;
-    protected static final int SPECIAL_RANDOM_IDX = 0;
-    protected static final int SPECIAL_ALLPAGES1_IDX = 1;
-    protected static final int SPECIAL_ALLPAGES2_IDX = 2;
-    protected static final int SPECIAL_PREFIXINDEX_IDX = 3;
-    protected static final int SPECIAL_SEARCH_IDX = 4;
-    protected static final int SPECIAL_WHATLINKSHERE_IDX = 5;
-    protected static final int SPECIAL_SPECIALPAGES_IDX = 6;
-    protected static final int SPECIAL_STATS_IDX = 7;
-    protected static final int SPECIAL_VERSION_IDX = 8;
+    protected static final EnumMap<SpecialPage, String> SPECIAL_SUFFIX_EN = MyWikiModel.SPECIAL_SUFFIX.get("en");
+    protected EnumMap<SpecialPage, String> SPECIAL_SUFFIX_LANG;
 
     /**
      * Full list of normalised special page titles for {@link #existingPages}. 
      */
     protected final List<String> specialPages;
-    
-    static {
-        // BEWARE: include normalised page titles!
-        SPECIAL_SUFFIX.put("en", new String[] { "Random", "AllPages",
-                "Allpages", "PrefixIndex", "Search", "WhatLinksHere",
-                "SpecialPages", "Statistics", "Version" });
-        SPECIAL_SUFFIX.put("simple", SPECIAL_SUFFIX.get("en"));
-        SPECIAL_SUFFIX.put("de", new String[] { "Zufällige Seite", "Alle Seiten",
-                "Alle seiten", "Präfixindex", "Suche", "Linkliste",
-                "Spezialseiten", "Statistik", "Version" });
-        SPECIAL_SUFFIX.put("bar", SPECIAL_SUFFIX.get("de"));
-        SPECIAL_SUFFIX.put("es", new String[] { "Aleatoria", "Todas",
-                "Todas", "PáginasPorPrefijo", "Buscar", "LoQueEnlazaAquí",
-                "PáginasEspeciales", "Estadísticas", "Versión" });
-        final String[] specialSuffixEn = SPECIAL_SUFFIX.get("en");
-        SPECIAL_SUFFIX_EN = new String[specialSuffixEn.length];
-        for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
-            SPECIAL_SUFFIX_EN[i] = specialSuffixEn[i];
-        }
-    }
 
     /**
      * Creates the servlet. 
@@ -176,13 +147,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     public WikiServlet() {
         super();
         SPECIAL_SUFFIX_LANG = SPECIAL_SUFFIX_EN;
-        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.length * 2);
+        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.size() * 2);
         // add English names here - the localised versions will be added when
         // the siteinfo is loaded
-        for (int i = 0; i < SPECIAL_SUFFIX_EN.length; ++i) {
+        for (String suffix : SPECIAL_SUFFIX_EN.values()) {
             // note: if non-english namespace, "Special" won't be recognised
             // during normalisation -> leave it unnormalised
-            specialPages.add("Special:" +  SPECIAL_SUFFIX_EN[i]);
+            specialPages.add(MyWikiModel.createFullPageName(
+                    MyWikiModel.SPECIAL_PREFIX.get("en"), suffix));
         }
     }
 
@@ -305,16 +277,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             Matcher matcher = MATCH_WIKI_SITE_LANG.matcher(fullBaseUrl);
             if (matcher.matches()) {
                 final String lang = matcher.group(1);
-                final String[] specialSuffixLang = SPECIAL_SUFFIX.get(lang);
+                final EnumMap<SpecialPage, String> specialSuffixLang = MyWikiModel.SPECIAL_SUFFIX.get(lang);
                 if (specialSuffixLang != null) {
-                    SPECIAL_SUFFIX_LANG = new String[SPECIAL_SUFFIX_EN.length];
-                    for (int i = 0; i < SPECIAL_SUFFIX_LANG.length; ++i) {
-                        SPECIAL_SUFFIX_LANG[i] = specialSuffixLang[i];
-                    }
+                    SPECIAL_SUFFIX_LANG = specialSuffixLang;
                 }
             }
-            for (int i = 0; i < SPECIAL_SUFFIX_LANG.length; ++i) {
-                specialPages.add(MyNamespace.SPECIAL_NAMESPACE_KEY + ":" + SPECIAL_SUFFIX_LANG[i]);
+            for (String suffix : SPECIAL_SUFFIX_LANG.values()) {
+                specialPages.add(MyWikiModel.createFullPageName(
+                        MyNamespace.SPECIAL_NAMESPACE_KEY.toString(), suffix));
             }
             existingPages.addAll(specialPages);
         }
@@ -441,23 +411,23 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, String req_search,
             int prefixLength, Connection connection)
             throws IOException, ServletException {
-        final String plainTitle= title.substring(prefixLength);
-        if (plainTitle.equals(SPECIAL_SUFFIX_EN[SPECIAL_RANDOM_IDX]) || plainTitle.equals(SPECIAL_SUFFIX_LANG[SPECIAL_RANDOM_IDX])) {
+        final String plainTitle = title.substring(prefixLength).toLowerCase();
+        if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_RANDOM)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM))) {
             handleViewRandomPage(request, response, title, connection, new WikiPageBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN[SPECIAL_ALLPAGES1_IDX]) || plainTitle.startsWith(SPECIAL_SUFFIX_EN[SPECIAL_ALLPAGES2_IDX])
-                || plainTitle.startsWith(SPECIAL_SUFFIX_LANG[SPECIAL_ALLPAGES1_IDX]) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG[SPECIAL_ALLPAGES2_IDX])) {
+        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_ALLPAGES))
+                || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES))) {
             handleSpecialAllPages(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN[SPECIAL_PREFIXINDEX_IDX]) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG[SPECIAL_PREFIXINDEX_IDX])) {
+        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_PREFIXINDEX)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX))) {
             handleSpecialPrefix(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN[SPECIAL_SEARCH_IDX]) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG[SPECIAL_SEARCH_IDX])) {
+        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SEARCH)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH))) {
             handleSearch(request, response, title, req_search, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN[SPECIAL_WHATLINKSHERE_IDX]) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG[SPECIAL_WHATLINKSHERE_IDX])) {
+        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_WHATLINKSHERE)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE))) {
             handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN[SPECIAL_SPECIALPAGES_IDX]) || plainTitle.equals(SPECIAL_SUFFIX_LANG[SPECIAL_SPECIALPAGES_IDX])) {
+        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SPECIALPAGES)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES))) {
             handleViewSpecialPages(request, response, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN[SPECIAL_STATS_IDX]) || plainTitle.equals(SPECIAL_SUFFIX_LANG[SPECIAL_STATS_IDX])) {
+        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_STATS)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS))) {
             handleViewSpecialStatistics(request, response, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN[SPECIAL_VERSION_IDX]) || plainTitle.equals(SPECIAL_SUFFIX_LANG[SPECIAL_VERSION_IDX])) {
+        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_VERSION)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION))) {
             handleViewSpecialVersion(request, response, connection, new WikiPageListBean());
         } else {
             // no such special page
@@ -504,7 +474,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormType(FormType.PageSearchForm);
         ValueResult<List<String>> result;
         page.setSearch(req_search);
-        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_SEARCH_IDX]));
+        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH)));
         page.setShowAllPages(false);
         if (req_search.isEmpty()) {
             result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
@@ -548,7 +518,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.FromToForm);
-        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_ALLPAGES1_IDX]));
+        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES)));
         ValueResult<List<String>> result;
         if (req_from == null && req_to == null) {
             page.setShowAllPages(false);
@@ -603,7 +573,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("All pages");
         page.setFormTitle("All pages");
         page.setFormType(FormType.PagePrefixForm);
-        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_PREFIXINDEX_IDX]));
+        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX)));
         ValueResult<List<String>> result;
         if (req_prefix == null) {
             page.setShowAllPages(false);
@@ -648,7 +618,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         page.setFormTitle("What links here");
         page.setFormType(FormType.TargetPageForm);
-        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_WHATLINKSHERE_IDX]));
+        page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE)));
         ValueResult<List<String>> result;
         if (req_target == null) {
             page.setShowAllPages(false);
@@ -1246,7 +1216,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewSpecialPages(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
             WikiPageListBean page) throws ServletException, IOException {
-        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_SPECIALPAGES_IDX]);
+        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES));
         page.setPageHeading("Special pages");
         page.setTitle(title);
         
@@ -1254,23 +1224,23 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         Map<String, String> curSpecialPages;
         // Lists of pages
         curSpecialPages = new LinkedHashMap<String, String>();
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_ALLPAGES1_IDX]), "All pages");
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_PREFIXINDEX_IDX]), "All pages with prefix");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES)), "All pages");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX)), "All pages with prefix");
         specialPages.put("Lists of pages", curSpecialPages);
         // Wiki data and tools
         curSpecialPages = new LinkedHashMap<String, String>();
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_STATS_IDX]), "Statistics");
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_VERSION_IDX]), "Version");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS)), "Statistics");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION)), "Version");
         specialPages.put("Wiki data and tools", curSpecialPages);
         // Redirecting special pages
         curSpecialPages = new LinkedHashMap<String, String>();
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_SEARCH_IDX]), "Search");
-        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_RANDOM_IDX]), "Show any page");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH)), "Search");
+        curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM)), "Show any page");
         specialPages.put("Redirecting special pages", curSpecialPages);
         // Page tools
         curSpecialPages = new LinkedHashMap<String, String>();
         if (Options.WIKI_USE_BACKLINKS) {
-            curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_WHATLINKSHERE_IDX]), "What links here");
+            curSpecialPages.put(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE)), "What links here");
         }
         specialPages.put("Page tools", curSpecialPages);
 
@@ -1333,7 +1303,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, Connection connection,
             WikiPageListBean page) throws ServletException, IOException {
         MyWikiModel wikiModel = getWikiModel(connection);
-        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_STATS_IDX]);
+        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS));
         page.setPageHeading("Statistics");
         page.setTitle(title);
 
@@ -1447,7 +1417,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewSpecialVersion(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
             WikiPageListBean page) throws ServletException, IOException {
-        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG[SPECIAL_VERSION_IDX]);
+        final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION));
         page.setPageHeading("Version");
         page.setTitle(title);
         String dbVersionStr;
