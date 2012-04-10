@@ -253,7 +253,7 @@
   <!-- ########## Scalaris targets (begin) ########## -->
   <target name='scalaris.compile' depends="tools.compile">
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java de/zib/scalaris/executor/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
   </target>
   <target name='scalaris.examples.compile' depends="scalaris.compile">
     <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
@@ -266,7 +266,7 @@
             resist so that the main program can access it
         -->
     <copy file="src/scalaris.properties" todir="." />
-    <jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
+    <jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/*.class de/zib/scalaris/executor/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
       <manifest>
         <attribute name="Built-By" value="${user.name}" />
         <attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />

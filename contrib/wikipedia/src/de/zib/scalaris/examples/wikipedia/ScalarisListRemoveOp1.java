@@ -39,9 +39,6 @@ public class ScalarisListRemoveOp1<T> extends ScalarisListOp1<T> {
         pageList.remove(toRemove);
     }
 
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.ScalarisOp#toString()
-     */
     @Override
     public String toString() {
         return "Scalaris.remove(" + key + ", " + toRemove + ", " + countKey + ")";

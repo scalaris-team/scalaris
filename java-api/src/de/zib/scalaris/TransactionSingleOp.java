@@ -218,6 +218,7 @@ public class TransactionSingleOp {
          * @throws UnknownException
          *             if any other error occurs
          */
+        @Override
         public ErlangValue processReadAt(final int pos) throws TimeoutException,
                 NotFoundException, UnknownException {
             return new ErlangValue(
@@ -238,6 +239,7 @@ public class TransactionSingleOp {
          * @throws UnknownException
          *             if any other error occurs
          */
+        @Override
         public void processWriteAt(final int pos) throws TimeoutException,
                 AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
@@ -262,7 +264,8 @@ public class TransactionSingleOp {
          *
          * @since 3.9
          */
-        public void processAddDelOnList(final int pos) throws TimeoutException,
+        @Override
+        public void processAddDelOnListAt(final int pos) throws TimeoutException,
                 NotAListException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
             CommonErlangObjects.processResult_addDelOnList(results.elementAt(pos));
@@ -286,6 +289,7 @@ public class TransactionSingleOp {
          *
          * @since 3.9
          */
+        @Override
         public void processAddOnNrAt(final int pos) throws TimeoutException,
                 NotANumberException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos));
@@ -312,6 +316,7 @@ public class TransactionSingleOp {
          *
          * @since 3.8
          */
+        @Override
         public void processTestAndSetAt(final int pos) throws TimeoutException,
                 NotFoundException, KeyChangedException, AbortException,
                 UnknownException {

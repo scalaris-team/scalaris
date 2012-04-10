@@ -2,14 +2,14 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.Arrays;
 
-import de.zib.scalaris.Transaction.RequestList;
+import de.zib.scalaris.RequestList;
 
 /**
  * Implements a list remove operation using the append operation of
  * Scalaris.
- * 
+ *
  * @param <T> the type of objects in the list
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
  */
 public class ScalarisListRemoveOp2<T> extends ScalarisListOp2<T> {
@@ -17,20 +17,20 @@ public class ScalarisListRemoveOp2<T> extends ScalarisListOp2<T> {
 
     /**
      * Creates a new append operation.
-     * 
+     *
      * @param key       the key to remove the value from
      * @param toRemove  the value to remove
      * @param countKey  the key for the counter of the entries in the list
      *                  (may be <tt>null</tt>)
      */
-    public ScalarisListRemoveOp2(String key, T toRemove, String countKey) {
+    public ScalarisListRemoveOp2(final String key, final T toRemove, final String countKey) {
         super(key, countKey);
         this.toRemove = toRemove;
     }
 
     /**
-     * Adds {@link #toRemove} to the list at {@link ScalarisListOp2#key}.
-     * 
+     * Removes {@link #toRemove} from the list at {@link ScalarisListOp2#key}.
+     *
      * @param requests
      *            the request list
      *
@@ -38,7 +38,7 @@ public class ScalarisListRemoveOp2<T> extends ScalarisListOp2<T> {
      */
     @SuppressWarnings("unchecked")
     @Override
-    protected int changeList(RequestList requests) {
+    protected int changeList(final RequestList requests) {
         requests.addAddDelOnList(key, null, Arrays.asList(toRemove));
         if (countKey != null) {
             requests.addAddOnNr(countKey, -1);
@@ -46,11 +46,8 @@ public class ScalarisListRemoveOp2<T> extends ScalarisListOp2<T> {
         return 0;
     }
 
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.ScalarisOp#toString()
-     */
     @Override
     public String toString() {
-        return "Scalaris.remove(" + key + ", " + toRemove + ", " + countKey + ")";
+        return "Scalaris.remove(" + key + ", " + toRemove.toString() + ", " + countKey + ")";
     }
 }

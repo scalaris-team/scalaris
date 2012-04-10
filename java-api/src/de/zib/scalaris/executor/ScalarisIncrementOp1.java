@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.executor;
 
 import java.math.BigInteger;
 import java.security.InvalidParameterException;
@@ -21,32 +21,33 @@ import java.security.InvalidParameterException;
 import com.ericsson.otp.erlang.OtpErlangException;
 
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.Transaction.RequestList;
-import de.zib.scalaris.Transaction.ResultList;
+import de.zib.scalaris.RequestList;
+import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
 
 /**
  * Implements an increment operation using the read and write operations of
  * Scalaris.
- * 
+ *
  * @param <T> the type of the value to write
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.13
+ * @since 3.13
  */
-public class ScalarisIncrementOp1<T extends Number> implements
-        ScalarisOp<RequestList, ResultList> {
+public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
     final protected String key;
     final protected BigInteger value;
-    
+
     /**
      * Creates a write operation.
-     * 
+     *
      * @param key
      *            the key to write to
      * @param value
      *            the value to write
      */
-    public ScalarisIncrementOp1(String key, T value) {
+    public ScalarisIncrementOp1(final String key, final T value) {
         this.key = key;
         if (value instanceof Integer) {
             this.value = BigInteger.valueOf((Integer) value);
@@ -59,14 +60,12 @@ public class ScalarisIncrementOp1<T extends Number> implements
         }
     }
 
-    @Override
     public int workPhases() {
         return 2;
     }
 
-    @Override
-    public final int doPhase(int phase, int firstOp, ResultList results,
-            RequestList requests) throws OtpErlangException, UnknownException,
+    public final int doPhase(final int phase, final int firstOp, final ResultList results,
+            final RequestList requests) throws OtpErlangException, UnknownException,
             IllegalArgumentException {
         switch (phase) {
         case 0: return prepareRead(requests);
@@ -76,15 +75,15 @@ public class ScalarisIncrementOp1<T extends Number> implements
             throw new IllegalArgumentException("No phase " + phase);
         }
     }
-    
+
     /**
      * Adds a read operation for the current value to the request list.
-     * 
+     *
      * @param requests the request list
-     * 
+     *
      * @return <tt>0</tt> (no operation processed since no results are used)
      */
-    protected int prepareRead(RequestList requests) {
+    protected int prepareRead(final RequestList requests) {
         requests.addRead(key);
         return 0;
     }
@@ -92,14 +91,14 @@ public class ScalarisIncrementOp1<T extends Number> implements
     /**
      * Verifies the read operation, increments the number and adds a write
      * operation to the request list.
-     * 
+     *
      * @param firstOp
      *            the first operation to process inside the result list
      * @param results
      *            the result list
      * @param requests
      *            the request list
-     * 
+     *
      * @return <tt>1</tt> operation processed (the read)
      */
     protected int prepareWrite(final int firstOp, final ResultList results,
@@ -108,7 +107,7 @@ public class ScalarisIncrementOp1<T extends Number> implements
         BigInteger currrentValue;
         try {
             currrentValue = results.processReadAt(firstOp).bigIntValue();
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             // this is ok
             currrentValue = BigInteger.ZERO;
         }
@@ -119,10 +118,10 @@ public class ScalarisIncrementOp1<T extends Number> implements
 
     /**
      * Verifies the write operation.
-     * 
+     *
      * @param firstOp   the first operation to process inside the result list
      * @param results   the result list
-     * 
+     *
      * @return <tt>1</tt> operation processed (the write)
      */
     protected int checkWrite(final int firstOp, final ResultList results)
