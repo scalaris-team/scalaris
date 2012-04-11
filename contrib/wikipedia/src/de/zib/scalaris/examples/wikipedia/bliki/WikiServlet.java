@@ -411,23 +411,32 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, String req_search,
             int prefixLength, Connection connection)
             throws IOException, ServletException {
-        final String plainTitle = title.substring(prefixLength).toLowerCase();
-        if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_RANDOM)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM))) {
+        final String plainTitle = title.substring(prefixLength);
+        // a "/" which separates the special page title from its parameters
+        final String plainTitleToSlash = plainTitle.split("/")[0];
+        if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_RANDOM))
+                || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM))) {
             handleViewRandomPage(request, response, title, connection, new WikiPageBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_ALLPAGES))
-                || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES))) {
+        } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_ALLPAGES))
+                || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES))) {
             handleSpecialAllPages(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_PREFIXINDEX)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX))) {
+        } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_PREFIXINDEX))
+                || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX))) {
             handleSpecialPrefix(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SEARCH)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH))) {
+        } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SEARCH))
+                || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH))) {
             handleSearch(request, response, title, req_search, connection, new WikiPageListBean());
-        } else if (plainTitle.startsWith(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_WHATLINKSHERE)) || plainTitle.startsWith(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE))) {
+        } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_WHATLINKSHERE))
+                || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE))) {
             handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SPECIALPAGES)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES))) {
+        } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SPECIALPAGES))
+                || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES))) {
             handleViewSpecialPages(request, response, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_STATS)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS))) {
+        } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_STATS))
+                || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS))) {
             handleViewSpecialStatistics(request, response, connection, new WikiPageListBean());
-        } else if (plainTitle.equals(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_VERSION)) || plainTitle.equals(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION))) {
+        } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_VERSION))
+                || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION))) {
             handleViewSpecialVersion(request, response, connection, new WikiPageListBean());
         } else {
             // no such special page
