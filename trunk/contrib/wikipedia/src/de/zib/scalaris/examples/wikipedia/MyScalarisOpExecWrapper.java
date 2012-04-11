@@ -1,13 +1,10 @@
 package de.zib.scalaris.examples.wikipedia;
 
-import com.ericsson.otp.erlang.OtpErlangException;
-
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
 import de.zib.scalaris.executor.ScalarisOpExecutor;
 import de.zib.scalaris.executor.ScalarisWriteOp;
-import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
 
 /**
  * Wraps {@link ScalarisOpExecutor} and adds the different operations
@@ -105,23 +102,11 @@ public class MyScalarisOpExecWrapper {
             }
         }
     }
-    
+
     /**
-     * Executes all operations previously added with one of the
-     * <tt>addXXX</tt> methods.
-     * 
-     * @param commitLast
-     *            whether to commit the requests in the last work phase
-     * 
-     * @throws OtpErlangException
-     *             if an error occurred verifying a result from previous
-     *             operations
-     * @throws UnknownException
-     *             if an error occurred verifying a result from previous
-     *             operations
+     * @return the executor
      */
-    public void run(boolean commitLast) throws OtpErlangException,
-            UnknownException {
-        executor.run(commitLast);
+    public ScalarisOpExecutor getExecutor() {
+        return executor;
     }
 }
