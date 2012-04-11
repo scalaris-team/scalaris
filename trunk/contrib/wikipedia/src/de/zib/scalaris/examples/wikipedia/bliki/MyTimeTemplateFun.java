@@ -38,10 +38,10 @@ public class MyTimeTemplateFun extends Time {
         if (list.size() > 0) {
             Date date;
             if (list.size() > 1) {
-                String dateTimeParameter = list.get(1);
+                String dateTimeParameter = parse(list.get(1), model);
 
 //                try {
-//                    DateFormat df = DateFormat.getDateInstance(DateFormat.MEDIUM, model.getLocale());
+//                    DateFormat df = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.ENGLISH);
 //                    date = df.parse(dateTimeParameter);
 //                } catch (ParseException e) {
 //                    return "<span class=\"error\">Error: invalid time</span>";
