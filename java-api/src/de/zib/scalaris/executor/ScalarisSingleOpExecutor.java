@@ -44,6 +44,7 @@ public class ScalarisSingleOpExecutor extends ScalarisOpExecutor {
      */
     public ScalarisSingleOpExecutor(final TransactionSingleOp scalaris_single) {
         this.scalaris_single = scalaris_single;
+        reset();
     }
 
     @Override

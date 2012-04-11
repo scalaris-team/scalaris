@@ -1129,8 +1129,11 @@ public class ScalarisDataHandler {
 
         // now save the changes:
         do {
+            final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(
+                    scalaris_tx, involvedKeys);
+            executor0.setCommitLast(true);
             MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
-                    new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+                    executor0);
 
             int articleCountChange = 0;
             final boolean wasArticle = (oldPage != null)
@@ -1168,7 +1171,7 @@ public class ScalarisDataHandler {
 
             //  PAGE LISTS UPDATE, step 2: execute and evaluate operations
             try {
-                executor.run(true);
+                executor.getExecutor().run();
             } catch (Exception e) {
                 return new SavePageResult(false, involvedKeys,
                         "unknown exception writing page \"" + title0
@@ -1202,12 +1205,15 @@ public class ScalarisDataHandler {
         // increase number of page edits (for statistics)
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
+        final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(
+                scalaris_tx, involvedKeys);
+        executor0.setCommitLast(true);
         MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
-                new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+                executor0);
         
         executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1);
         try {
-            executor.run(true);
+            executor.getExecutor().run();
         } catch (Exception e) {
         }
     }
@@ -1228,14 +1234,17 @@ public class ScalarisDataHandler {
             Transaction scalaris_tx, Page oldPage, Page newPage, List<String> involvedKeys) {
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
+        final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(
+                scalaris_tx, involvedKeys);
+        executor0.setCommitLast(true);
         MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
-                new MyScalarisTxOpExecutor(scalaris_tx, involvedKeys));
+                executor0);
 
         String scalaris_key = getContributionListKey(newPage.getCurRev().getContributor().toString());
         executor.addAppend(ScalarisOpType.CONTRIBUTION, scalaris_key,
                 Arrays.asList(new Contribution(oldPage, newPage)), null);
         try {
-            executor.run(true);
+            executor.getExecutor().run();
         } catch (Exception e) {
         }
     }

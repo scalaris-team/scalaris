@@ -41,12 +41,15 @@ public abstract class ScalarisOpExecutor {
     }
 
     /**
+     * Re-sets the executor as if created from scratch.
+     */
+    public void reset() {
+        ops.clear();
+        workPhases = 0;
+    }
+
+    /**
      * Executes all operations previously added with {@link #addOp(ScalarisOp)}.
-     *
-     * @param commitLast
-     *            whether to commit the requests in the last work phase (only
-     *            applied if a {@link de.zib.scalaris.Transaction.RequestList}
-     *            is used
      *
      * @throws OtpErlangException
      *             if an error occurred verifying a result from previous
@@ -55,7 +58,7 @@ public abstract class ScalarisOpExecutor {
      *             if an error occurred verifying a result from previous
      *             operations
      */
-    public void run(final boolean commitLast) throws OtpErlangException, UnknownException {
+    public void run() throws OtpErlangException, UnknownException {
         ResultList results = null;
         for (int phase = 0; phase <= workPhases; ++phase) {
             final RequestList requests = newRequestList();
@@ -68,14 +71,23 @@ public abstract class ScalarisOpExecutor {
                     curOp += op.doPhase(opPhase, curOp, results, requests);
                 }
             }
-
-            if ((phase == (workPhases - 1)) && commitLast && (requests instanceof de.zib.scalaris.Transaction.RequestList)) {
-                requests.addCommit();
-            }
+            endWorkPhase(phase, requests);
             if (phase != workPhases) {
                 results = executeRequests(requests);
             }
         }
+    }
+
+    /**
+     * This method is called at the end of each work phase and allows
+     * implementing sub-classes to add additional operations.
+     *
+     * @param phase
+     *            the current work phase
+     * @param requests
+     *            the requests
+     */
+    protected void endWorkPhase(final int phase, final RequestList requests) {
     }
 
     /**
@@ -108,5 +120,17 @@ public abstract class ScalarisOpExecutor {
      */
     public int getWorkPhases() {
         return workPhases;
+    }
+
+    /**
+     * Gets the current list of operations. This is backed by the operations in
+     * this executor - if it is reset, the list will be empty.
+     *
+     * Create a copy of this list if it should be retained.
+     *
+     * @return the ops the current list of operations
+     */
+    public ArrayList<ScalarisOp> getOps() {
+        return ops;
     }
 }

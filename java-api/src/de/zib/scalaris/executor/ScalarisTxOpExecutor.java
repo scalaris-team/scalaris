@@ -33,6 +33,10 @@ import de.zib.scalaris.UnknownException;
  */
 public class ScalarisTxOpExecutor extends ScalarisOpExecutor {
     protected final Transaction scalaris_tx;
+    /**
+     * Whether to commit the requests in the last work phase.
+     */
+    protected boolean commitLast;
 
     /**
      * Creates a new executor.
@@ -42,6 +46,22 @@ public class ScalarisTxOpExecutor extends ScalarisOpExecutor {
      */
     public ScalarisTxOpExecutor(final Transaction scalaris_tx) {
         this.scalaris_tx = scalaris_tx;
+        reset();
+    }
+
+    /**
+     * Adds a commit to the requests in the last work phase.
+     *
+     * @param phase
+     *            the current work phase
+     * @param requests
+     *            the requests
+     */
+    @Override
+    protected void endWorkPhase(final int phase, final RequestList requests) {
+        if ((phase == (workPhases - 1)) && commitLast) {
+            requests.addCommit();
+        }
     }
 
     @Override
@@ -54,5 +74,21 @@ public class ScalarisTxOpExecutor extends ScalarisOpExecutor {
     @Override
     protected RequestList newRequestList() {
         return new Transaction.RequestList();
+    }
+
+    /**
+     * @param commitLast the commitLast to set
+     */
+    public void setCommitLast(final boolean commitLast) {
+        this.commitLast = commitLast;
+    }
+
+    /* (non-Javadoc)
+     * @see de.zib.scalaris.executor.ScalarisOpExecutor#reset()
+     */
+    @Override
+    public void reset() {
+        super.reset();
+        commitLast = false;
     }
 }
