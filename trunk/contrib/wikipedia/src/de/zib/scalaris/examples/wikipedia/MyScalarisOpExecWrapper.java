@@ -1,5 +1,9 @@
 package de.zib.scalaris.examples.wikipedia;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
@@ -50,13 +54,14 @@ public class MyScalarisOpExecWrapper {
      * 
      * @param <T>       type of the value to add
      */
+    @SuppressWarnings("unchecked")
     public <T> void addAppend(ScalarisOpType opType, String key, T toAdd, String countKey) {
         switch (opType) {
         default:
             if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisListAppendOp2<T>(key, toAdd, countKey));
+                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey));
             } else {
-                executor.addOp(new ScalarisListAppendOp1<T>(key, toAdd, countKey));
+                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey));
             }
         }
     }
@@ -72,13 +77,14 @@ public class MyScalarisOpExecWrapper {
      * 
      * @param <T>       type of the value to remove
      */
+    @SuppressWarnings("unchecked")
     public <T> void addRemove(ScalarisOpType opType, String key, T toRemove, String countKey) {
         switch (opType) {
         default:
             if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisListRemoveOp2<T>(key, toRemove, countKey));
+                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey));
             } else {
-                executor.addOp(new ScalarisListRemoveOp1<T>(key, toRemove, countKey));
+                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey));
             }
         }
     }
@@ -108,5 +114,31 @@ public class MyScalarisOpExecWrapper {
      */
     public ScalarisOpExecutor getExecutor() {
         return executor;
+    }
+
+    /**
+     * Creates a new append+remove operation.
+     * 
+     * @param opType    the type of the operation
+     * @param key       the key to append/remove the values to/from
+     * @param toAdd     the values to add
+     * @param toRemove  the values to remove
+     * @param countKey  the key for the counter of the entries in the list
+     *                  (may be <tt>null</tt>)
+     * 
+     * @param <T>       type of the value to remove
+     */
+    public <T> void addAppendRemove(ScalarisOpType opType, String key,
+            List<T> toAdd, List<T> toRemove, String countKey) {
+        switch (opType) {
+        default:
+            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
+                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
+            } else {
+                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
+            }
+        }
+        // TODO Auto-generated method stub
+        
     }
 }
