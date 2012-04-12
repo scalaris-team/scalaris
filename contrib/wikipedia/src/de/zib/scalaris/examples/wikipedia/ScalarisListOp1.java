@@ -1,5 +1,6 @@
 package de.zib.scalaris.examples.wikipedia;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -21,8 +22,19 @@ import de.zib.scalaris.executor.ScalarisOp;
  * @author Nico Kruber, kruber@zib.de
  */
 public abstract class ScalarisListOp1<T> implements ScalarisOp {
-    final String key;
-    final String countKey;
+
+    protected final String key;
+    protected final String countKey;
+    /**
+     * Sub-classes need to set this variable in {@link #changeList(List)},
+     * otherwise the list is not written back.
+     */
+    protected boolean listChanged = false;
+    /**
+     * Sub-classes need to set this variable in {@link #changeList(List)},
+     * otherwise the list is not written back.
+     */
+    protected boolean listCountChanged = false;
 
     /**
      * Creates a new list change operation.
@@ -86,9 +98,11 @@ public abstract class ScalarisListOp1<T> implements ScalarisOp {
             pageList = new LinkedList<ErlangValue>();
         }
         changeList(pageList);
-        requests.addWrite(key, pageList);
-        if (countKey != null) {
-            requests.addWrite(countKey, pageList.size());
+        if (listChanged) {
+            requests.addWrite(key, pageList);
+            if (countKey != null && listCountChanged) {
+                requests.addWrite(countKey, pageList.size());
+            }
         }
         return 1;
     }
@@ -112,12 +126,33 @@ public abstract class ScalarisListOp1<T> implements ScalarisOp {
     protected int checkWrite(final int firstOp, final ResultList results)
             throws OtpErlangException, UnknownException {
         int checkedOps = 0;
-        results.processWriteAt(firstOp + checkedOps);
-        ++checkedOps;
-        if (countKey != null) {
+
+        if (listChanged) {
             results.processWriteAt(firstOp + checkedOps);
             ++checkedOps;
+            if (countKey != null && listCountChanged) {
+                results.processWriteAt(firstOp + checkedOps);
+                ++checkedOps;
+            }
         }
         return checkedOps;
     }
+    
+    /**
+     * Converts a list of <tt>T</tt> to a list of {@link ErlangValue} objects.
+     * 
+     * @param list
+     *            the list to convert
+     * 
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    protected static <T> List<ErlangValue> toErlangValueList(final List<T> list)
+            throws ClassCastException {
+                List<ErlangValue> result = new ArrayList<ErlangValue>(list.size());
+                for (T t : list) {
+                    result.add(new ErlangValue(t));
+                }
+                return result;
+            }
 }

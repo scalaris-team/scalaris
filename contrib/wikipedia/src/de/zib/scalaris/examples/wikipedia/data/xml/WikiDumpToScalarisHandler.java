@@ -35,6 +35,7 @@ import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -217,7 +218,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         for(NamespaceEnum ns : NamespaceEnum.values()) {
             scalaris_key = ScalarisDataHandler.getPageListKey(ns.getId());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
-                    newPages.get(ns), scalaris_tx,
+                    newPages.get(ns), scalaris_tx, ScalarisOpType.PAGE_LIST,
                     ScalarisDataHandler.getPageCountKey(ns.getId()));
             executor.execute(worker);
         }
@@ -234,7 +235,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             final String catName = category.getKey();
             scalaris_key = ScalarisDataHandler.getCatPageListKey(catName, wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
-                    category.getValue(), scalaris_tx,
+                    category.getValue(), scalaris_tx, ScalarisOpType.CATEGORY_PAGE_LIST,
                     ScalarisDataHandler.getCatPageCountKey(catName, wikiModel.getNamespace()));
             executor.execute(worker);
         }
@@ -242,14 +243,18 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         // list of pages a template is used in:
         for (Entry<String, List<String>> template: newTemplates.entrySet()) {
             scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey(), wikiModel.getNamespace());
-            worker = new MyScalarisAddToPageListRunnable(scalaris_key, template.getValue(), scalaris_tx);
+            worker = new MyScalarisAddToPageListRunnable(scalaris_key,
+                    template.getValue(), scalaris_tx,
+                    ScalarisOpType.TEMPLATE_PAGE_LIST, null);
             executor.execute(worker);
         }
         
         // list of pages linking to other pages:
         for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
             scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey(), wikiModel.getNamespace());
-            worker = new MyScalarisAddToPageListRunnable(scalaris_key, backlinks.getValue(), scalaris_tx);
+            worker = new MyScalarisAddToPageListRunnable(scalaris_key,
+                    backlinks.getValue(), scalaris_tx,
+                    ScalarisOpType.BACKLINK_PAGE_LIST, null);
             executor.execute(worker);
         }
         initLinkLists();
@@ -321,21 +326,20 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
      * @author Nico Kruber, kruber@zib.de
      */
     private static class MyScalarisAddToPageListRunnable implements Runnable {
-        private String scalaris_pageList_key;
-        private List<String> newEntries;
-        private ArrayBlockingQueue<Transaction> scalaris_tx;
-        private String scalaris_pageCount_key = null;
+        private final String scalaris_pageList_key;
+        private final List<String> newEntries;
+        private final ArrayBlockingQueue<Transaction> scalaris_tx;
+        private final String scalaris_pageCount_key;
+        private final ScalarisOpType opType;
         
-        public MyScalarisAddToPageListRunnable(String scalaris_key, List<String> newEntries, ArrayBlockingQueue<Transaction> scalaris_tx) {
-            this.scalaris_pageList_key = scalaris_key;
-            this.newEntries = newEntries;
-            this.scalaris_tx = scalaris_tx;
-        }
-        
-        public MyScalarisAddToPageListRunnable(String scalaris_pageList_key, List<String> newEntries, ArrayBlockingQueue<Transaction> scalaris_tx, String scalaris_pageCount_key) {
+        public MyScalarisAddToPageListRunnable(String scalaris_pageList_key,
+                List<String> newEntries,
+                ArrayBlockingQueue<Transaction> scalaris_tx,
+                ScalarisOpType opType, String scalaris_pageCount_key) {
             this.scalaris_pageList_key = scalaris_pageList_key;
             this.newEntries = newEntries;
             this.scalaris_tx = scalaris_tx;
+            this.opType = opType;
             this.scalaris_pageCount_key = scalaris_pageCount_key;
         }
         
@@ -350,8 +354,9 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             }
             
             ValueResult<Integer> result = ScalarisDataHandler.updatePageList(
-                    scalaris_tx, scalaris_pageList_key, scalaris_pageCount_key,
-                    new LinkedList<String>(), newEntries, "");
+                    scalaris_tx, opType, scalaris_pageList_key,
+                    scalaris_pageCount_key, newEntries,
+                    new LinkedList<String>(), "");
             if (!result.success) {
                 System.err.println(result.message);
             }
