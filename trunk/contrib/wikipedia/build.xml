@@ -15,7 +15,7 @@
     <pathelement location="contrib/commons-codec-1.4.jar"/>
     <pathelement location="contrib/java-bloomfilter-1.0.jar"/>
     <pathelement location="contrib/sqlite4java.jar"/>
-    <pathelement location="contrib/stringtotime-1.0.4.jar"/>
+    <pathelement location="contrib/stringtotime-1.0.6.jar"/>
   </path>
 
   <property name="tomcat.home" value="contrib/apache-tomcat-7.0.26" />
