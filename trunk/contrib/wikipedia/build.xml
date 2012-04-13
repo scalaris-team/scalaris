@@ -18,7 +18,7 @@
     <pathelement location="contrib/stringtotime-1.0.6.jar"/>
   </path>
 
-  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.26" />
+  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.27" />
 
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
