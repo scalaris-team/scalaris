@@ -268,7 +268,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     @Override
     public void setUp() {
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
+            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true, null);
             stRead = WikiDumpPrepareSQLiteForScalarisHandler.createReadStmt(db);
         } catch (SQLiteException e) {
             System.err.println("Cannot read database: " + dbFileName);

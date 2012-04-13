@@ -113,19 +113,40 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      *             if the connection fails or a pragma could not be set
      */
     static SQLiteConnection openDB(String fileName, boolean readOnly) throws SQLiteException {
+        // set 1GB cache_size:
+        return openDB(fileName, readOnly, 1024l*1024l*1024l);
+    }
+
+    /**
+     * Opens a connection to a database and sets some default PRAGMAs for better
+     * performance in our case.
+     * 
+     * @param fileName
+     *            the name of the DB file
+     * @param readOnly
+     *            whether to open the DB read-only or not
+     * 
+     * @return the DB connection
+     * 
+     * @throws SQLiteException
+     *             if the connection fails or a pragma could not be set
+     */
+    static SQLiteConnection openDB(String fileName, boolean readOnly, Long cacheSize) throws SQLiteException {
         SQLiteConnection db = new SQLiteConnection(new File(fileName));
         if (readOnly) {
             db.openReadonly();
         } else {
             db.open(true);
         }
-        // set 1GB cache_size:
-        final SQLiteStatement stmt = db.prepare("PRAGMA page_size;");
-        if (stmt.step()) {
-            long cacheSize = stmt.columnLong(0);
-            db.exec("PRAGMA cache_size = " + (1024l*1024l*1024l / cacheSize) + ";");
+        // set cache_size:
+        if (cacheSize != null) {
+            final SQLiteStatement stmt = db.prepare("PRAGMA page_size;");
+            if (stmt.step()) {
+                long pageSize = stmt.columnLong(0);
+                db.exec("PRAGMA cache_size = " + (cacheSize / pageSize) + ";");
+            }
+            stmt.dispose();
         }
-        stmt.dispose();
         db.exec("PRAGMA synchronous = OFF;");
         db.exec("PRAGMA journal_mode = OFF;");
 //        db.exec("PRAGMA locking_mode = EXCLUSIVE;");
