@@ -40,6 +40,13 @@ public interface WikiDump {
     public abstract void setMsgOut(PrintStream msgOut);
 
     /**
+     * Whether {@link #stopParsing()} is supported or not.
+     * 
+     * @return stop parsing support
+     */
+    public abstract boolean hasStopSupport();
+
+    /**
      * Tells the import to stop (may not be supported by an implementation!).
      */
     public abstract void stopParsing();
