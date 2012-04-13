@@ -35,7 +35,7 @@ import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
+import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -53,6 +53,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ArrayBlockingQueue<Transaction> scalaris_tx = new ArrayBlockingQueue<Transaction>(MAX_SCALARIS_CONNECTIONS);
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
+    private ExecutorService pageListExecutor = Executors.newFixedThreadPool(1);
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -220,7 +221,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     newPages.get(ns), scalaris_tx, ScalarisOpType.PAGE_LIST,
                     ScalarisDataHandler.getPageCountKey(ns.getId()));
-            executor.execute(worker);
+            pageListExecutor.execute(worker);
         }
         initNewPagesList();
         
@@ -228,7 +229,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         requests.addWrite(ScalarisDataHandler.getArticleCountKey(), articleCount);
         worker = new MyScalarisSingleRunnable(requests, scalaris_single, "article count");
-        executor.execute(worker);
+        pageListExecutor.execute(worker);
         
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
@@ -237,7 +238,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     category.getValue(), scalaris_tx, ScalarisOpType.CATEGORY_PAGE_LIST,
                     ScalarisDataHandler.getCatPageCountKey(catName, wikiModel.getNamespace()));
-            executor.execute(worker);
+            pageListExecutor.execute(worker);
         }
 
         // list of pages a template is used in:
@@ -246,7 +247,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     template.getValue(), scalaris_tx,
                     ScalarisOpType.TEMPLATE_PAGE_LIST, null);
-            executor.execute(worker);
+            pageListExecutor.execute(worker);
         }
         
         // list of pages linking to other pages:
@@ -255,19 +256,22 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     backlinks.getValue(), scalaris_tx,
                     ScalarisOpType.BACKLINK_PAGE_LIST, null);
-            executor.execute(worker);
+            pageListExecutor.execute(worker);
         }
         initLinkLists();
-        
+
         executor.shutdown();
+        pageListExecutor.shutdown();
         boolean shutdown = false;
         while (!shutdown) {
             try {
-                shutdown = executor.awaitTermination(1, TimeUnit.MINUTES);
+                shutdown = executor.awaitTermination(1, TimeUnit.MINUTES)
+                        && pageListExecutor.awaitTermination(1, TimeUnit.MINUTES);
             } catch (InterruptedException e) {
             }
         }
         executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
+        pageListExecutor = Executors.newFixedThreadPool(1);
     }
 
     /**
