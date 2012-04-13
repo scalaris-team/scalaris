@@ -285,7 +285,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             boolean stopImport;
             if (req_stop_import == null || req_stop_import.isEmpty()) {
                 stopImport = false;
-                response.setHeader("Refresh", IMPORT_REDIRECT_EVERY + "; url = wiki?import=" + currentImport);
+                response.setHeader("Refresh", IMPORT_REDIRECT_EVERY + "; url = wiki?import=" + currentImport + "#refresh");
                 content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
             } else {
                 stopImport = true;
@@ -300,7 +300,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             }
             content.append("</pre>");
             if (!stopImport) {
-                content.append("<p><a href=\"wiki?import=" + currentImport + "\">refresh</a></p>");
+                content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "#refresh\">refresh</a></p>");
                 content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
             } else {
                 content.append("<p>Import has been stopped by the user. Return to <a href=\"wiki?title=" + MAIN_PAGE + "\">" + MAIN_PAGE + "</a>.</p>");
