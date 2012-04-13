@@ -415,6 +415,16 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     }
 
     /**
+     * Whether {@link #stopParsing()} is supported or not.
+     * 
+     * @return stop parsing support
+     */
+    @Override
+    public boolean hasStopSupport() {
+        return true;
+    }
+
+    /**
      * Tells the parser to stop at the next starting element.
      */
     @Override

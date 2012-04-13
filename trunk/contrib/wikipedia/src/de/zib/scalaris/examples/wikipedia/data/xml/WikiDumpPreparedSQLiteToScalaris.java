@@ -178,6 +178,16 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     }
 
     /**
+     * Whether {@link #stopParsing()} is supported or not.
+     * 
+     * @return no stop parsing support
+     */
+    @Override
+    public boolean hasStopSupport() {
+        return false;
+    }
+
+    /**
      * Tells the import to stop (not supported since this may not result in a
      * consistent view).
      */
