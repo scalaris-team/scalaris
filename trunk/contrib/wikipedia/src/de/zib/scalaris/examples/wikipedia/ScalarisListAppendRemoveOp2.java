@@ -16,7 +16,7 @@ import de.zib.scalaris.RequestList;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class ScalarisListAppendRemoveOp2<T> extends ScalarisListOp2<T> {
+public class ScalarisListAppendRemoveOp2<T> extends ScalarisChangeListOp2 {
     final protected List<T> toAdd;
     final protected List<T> toRemove;
 

@@ -17,11 +17,9 @@ import de.zib.scalaris.executor.ScalarisOp;
  * Implements a list change operation using the read and write operations of
  * Scalaris.
  *
- * @param <T> the type of objects in the list
- *
  * @author Nico Kruber, kruber@zib.de
  */
-public abstract class ScalarisListOp1<T> implements ScalarisOp {
+public abstract class ScalarisChangeListOp1 implements ScalarisOp {
 
     protected final String key;
     protected final String countKey;
@@ -43,7 +41,7 @@ public abstract class ScalarisListOp1<T> implements ScalarisOp {
      * @param countKey  the key for the counter of the entries in the list
      *                  (may be <tt>null</tt>)
      */
-    public ScalarisListOp1(final String key, final String countKey) {
+    public ScalarisChangeListOp1(final String key, final String countKey) {
         this.key = key;
         this.countKey = countKey;
     }

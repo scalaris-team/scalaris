@@ -15,18 +15,14 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
+import java.util.EnumMap;
+
+
 /**
  * @author Nico Kruber, kruber@zib.de
  *
  */
 public class Options {
-    /**
-     * Use the
-     * {@link de.zib.scalaris.Transaction#addDelOnList(String, java.util.List, java.util.List)}
-     * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)} for page
-     * list updates.
-     */
-    public static boolean WIKI_USE_NEW_SCALARIS_OPS = true;
     
     /**
      * Whether to support back-links ("what links here?") or not.
@@ -107,6 +103,94 @@ public class Options {
             }
             throw new IllegalArgumentException("No constant with text " + text
                     + " found");
+        }
+    }
+    
+    /**
+     * Indicates a generic optimisation implementation.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static interface Optimisation {
+    }
+    
+    /**
+     * Indicates that the traditional read/write operations of Scalaris should
+     * be used, i.e. no append/increment.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class TRADITIONAL implements Optimisation {
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used, i.e.
+     * {@link de.zib.scalaris.Transaction#addDelOnList(String, java.util.List, java.util.List)}
+     * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)}.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT implements Optimisation {
+    }
+
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be split among several partions, i.e.
+     * buckets, depending on the value's hash.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_BUCKETS_WITH_HASH implements Optimisation {
+        final protected int buckets;
+        
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets) {
+            this.buckets = buckets;
+        }
+
+        /**
+         * Gets the number of available buckets
+         * 
+         * @return number of buckets
+         */
+        public int getBuckets() {
+            return buckets;
+        }
+        
+        /**
+         * Gets the string to append to the key in order to point to the bucket
+         * for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        public <T> String getBucketString(final T value) {
+            if (buckets > 1) {
+                return ":" + (value.hashCode() % buckets);
+            } else {
+                return "";
+            }
+        }
+    }
+    
+    /**
+     * Optimisations to use for the different Scalaris operations.
+     */
+    final public static EnumMap<ScalarisOpType, Optimisation> OPTIMISATIONS = new EnumMap<ScalarisOpType, Options.Optimisation>(
+            ScalarisOpType.class);
+    
+    static {
+        for (ScalarisOpType op : ScalarisOpType.values()) {
+            OPTIMISATIONS.put(op, new APPEND_INCREMENT());
         }
     }
 }
