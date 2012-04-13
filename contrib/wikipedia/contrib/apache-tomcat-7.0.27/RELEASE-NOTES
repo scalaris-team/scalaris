@@ -18,7 +18,7 @@
 $Id: RELEASE-NOTES 1189163 2011-10-26 12:19:26Z kkolinko $
 
 
-                     Apache Tomcat Version 7.0.26
+                     Apache Tomcat Version 7.0.27
                             Release Notes
 
 
@@ -105,7 +105,7 @@ for use by web applications (by placing them in "lib"):
 * catalina-ant.jar (Tomcat Catalina Ant tasks)
 * catalina-ha.jar (High availability package)
 * catalina-tribes.jar (Group communication)
-* ecj-3.7.1.jar (Eclipse JDT Java compiler)
+* ecj-3.7.2.jar (Eclipse JDT Java compiler)
 * el-api.jar (EL 2.2 API)
 * jasper.jar (Jasper 2 Compiler and Runtime)
 * jasper-el.jar (Jasper 2 EL implementation)

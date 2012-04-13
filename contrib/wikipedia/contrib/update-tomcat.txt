@@ -3,6 +3,7 @@
 3) move to new tomcat-dir:
 <old-tomcat-dir>/webapps/ROOT
 <old-tomcat-dir>/webapps/scalaris-wiki
+<old-tomcat-dir>/.gitignore
 <old-tomcat-dir>/logs/.gitignore
 <old-tomcat-dir>/work/.gitignore
 4) in <tomcat-dir>/conf/server.xml search for the active "Connector" tag and add the following to its properties:
