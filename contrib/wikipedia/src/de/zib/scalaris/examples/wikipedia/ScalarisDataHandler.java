@@ -51,54 +51,6 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 public class ScalarisDataHandler {
     
     /**
-     * Different types of DB operations.
-     * 
-     * @author Nico Kruber, kruber@zib.de
-     */
-    public enum ScalarisOpType {
-        /**
-         * Operation involving a (central) page list.
-         */
-        PAGE_LIST,
-        /**
-         * Operation involving a category page list.
-         */
-        CATEGORY_PAGE_LIST,
-        /**
-         * Operation involving a template page list.
-         */
-        TEMPLATE_PAGE_LIST,
-        /**
-         * Operation involving a backlink page list.
-         */
-        BACKLINK_PAGE_LIST,
-        /**
-         * Operation involving a list of (short) revisions.
-         */
-        SHORTREV_LIST,
-        /**
-         * Operation involving the article counter.
-         */
-        ARTICLE_COUNT,
-        /**
-         * Operation involving a wiki page.
-         */
-        PAGE,
-        /**
-         * Operation involving a wiki page revision.
-         */
-        REVISION,
-        /**
-         * Operation involving a contribution.
-         */
-        CONTRIBUTION,
-        /**
-         * Operation involving the edit stats.
-         */
-        EDIT_STAT;
-    }
-    
-    /**
      * Gets the key to store {@link SiteInfo} objects at.
      * 
      * @return Scalaris key
@@ -470,7 +422,8 @@ public class ScalarisDataHandler {
         for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
             scalaris_keys.add(getPageListKey(i));
         }
-        return getPageList2(connection, scalaris_keys, false, "page list");
+        return getPageList2(connection, ScalarisOpType.PAGE_LIST,
+                scalaris_keys, false, "page list");
     }
 
     /**
@@ -484,7 +437,8 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public static ValueResult<List<String>> getPageList(int namespace, Connection connection) {
-        return getPageList2(connection, getPageListKey(namespace), false, "page list:" + namespace);
+        return getPageList2(connection, ScalarisOpType.PAGE_LIST,
+                Arrays.asList(getPageListKey(namespace)), false, "page list:" + namespace);
     }
 
     /**
@@ -501,8 +455,9 @@ public class ScalarisDataHandler {
      */
     public static ValueResult<List<String>> getPagesInCategory(Connection connection,
             String title, final MyNamespace nsObject) {
-        return getPageList2(connection, getCatPageListKey(title, nsObject),
-                false, "pages in " + title);
+        return getPageList2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
+                Arrays.asList(getCatPageListKey(title, nsObject)), false,
+                "pages in " + title);
     }
 
     /**
@@ -519,8 +474,9 @@ public class ScalarisDataHandler {
      */
     public static ValueResult<List<String>> getPagesInTemplate(Connection connection,
             String title, final MyNamespace nsObject) {
-        return getPageList2(connection, getTplPageListKey(title, nsObject),
-                true, "pages in " + title);
+        return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
+                Arrays.asList(getTplPageListKey(title, nsObject)), true,
+                "pages in " + title);
     }
 
     /**
@@ -539,8 +495,9 @@ public class ScalarisDataHandler {
             String title, final MyNamespace nsObject) {
         final String statName = "links to " + title;
         if (Options.WIKI_USE_BACKLINKS) {
-            return getPageList2(connection,
-                    getBackLinksPageListKey(title, nsObject), false, statName);
+            return getPageList2(connection, ScalarisOpType.BACKLINK_PAGE_LIST,
+                    Arrays.asList(getBackLinksPageListKey(title, nsObject)),
+                    false, statName);
         } else {
             return new ValueResult<List<String>>(new ArrayList<String>(0),
                     new ArrayList<String>(0));
@@ -563,8 +520,9 @@ public class ScalarisDataHandler {
         final String statName = "contributions of " + contributor;
         if (Options.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
             ValueResult<List<Contribution>> result = getPageList3(connection,
-                    getContributionListKey(contributor), false, statName,
-                    new ErlangConverter<List<Contribution>>() {
+                    ScalarisOpType.CONTRIBUTION,
+                    Arrays.asList(getContributionListKey(contributor)), false,
+                    statName, new ErlangConverter<List<Contribution>>() {
                         @Override
                         public List<Contribution> convert(ErlangValue v)
                                 throws ClassCastException {
@@ -580,32 +538,14 @@ public class ScalarisDataHandler {
                     new ArrayList<String>(0), new ArrayList<Contribution>(0));
         }
     }
-    
-    /**
-     * Retrieves a list of pages from Scalaris.
-     * 
-     * @param connection
-     *            the connection to Scalaris
-     * @param scalaris_key
-     *            the key under which the page list is stored in Scalaris
-     * @param failNotFound
-     *            whether the operation should fail if the key is not found or
-     *            not
-     * @param statName
-     *            name for the time measurement statistics
-     * 
-     * @return a result object with the page list on success
-     */
-    private static ValueResult<List<String>> getPageList2(Connection connection,
-            String scalaris_key, boolean failNotFound, String statName) {
-        return getPageList2(connection, Arrays.asList(scalaris_key), failNotFound, statName);
-    }
 
     /**
      * Retrieves a list of pages from Scalaris.
      * 
      * @param connection
      *            the connection to Scalaris
+     * @param opType
+     *            operation type indicating what is being read
      * @param scalaris_keys
      *            the keys under which the page list is stored in Scalaris
      * @param failNotFound
@@ -616,9 +556,11 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the page list on success
      */
-    private static ValueResult<List<String>> getPageList2(Connection connection,
-            Collection<String> scalaris_keys, boolean failNotFound, String statName) {
-        ValueResult<List<String>> result = getPageList3(connection,
+    private static ValueResult<List<String>> getPageList2(
+            Connection connection, ScalarisOpType opType,
+            Collection<String> scalaris_keys, boolean failNotFound,
+            String statName) {
+        ValueResult<List<String>> result = getPageList3(connection, opType,
                 scalaris_keys, failNotFound, statName,
                 new ErlangConverter<List<String>>() {
                     @Override
@@ -639,28 +581,8 @@ public class ScalarisDataHandler {
      * 
      * @param connection
      *            the connection to Scalaris
-     * @param scalaris_key
-     *            the key under which the page list is stored in Scalaris
-     * @param failNotFound
-     *            whether the operation should fail if the key is not found or
-     *            not (the value contains null if not failed!)
-     * @param statName
-     *            name for the time measurement statistics
-     * 
-     * @return a result object with the page list on success
-     */
-    private static <T> ValueResult<List<T>> getPageList3(Connection connection,
-            String scalaris_key, boolean failNotFound, String statName,
-            ErlangConverter<List<T>> conv) {
-        return getPageList3(connection, Arrays.asList(scalaris_key), failNotFound, statName, conv);
-    }
-
-    /**
-     * Retrieves a list of pages from Scalaris.
-     * @param <T>
-     * 
-     * @param connection
-     *            the connection to Scalaris
+     * @param opType
+     *            operation type indicating what is being read
      * @param scalaris_keys
      *            the keys under which the page list is stored in Scalaris
      * @param failNotFound
@@ -672,60 +594,34 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     private static <T> ValueResult<List<T>> getPageList3(Connection connection,
-            Collection<String> scalaris_keys, boolean failNotFound,
-            String statName, ErlangConverter<List<T>> conv) {
+            ScalarisOpType opType, Collection<String> scalaris_keys,
+            boolean failNotFound, String statName, ErlangConverter<List<T>> conv) {
         final long timeAtStart = System.currentTimeMillis();
         List<String> involvedKeys = new ArrayList<String>();
+        
         if (connection == null) {
             return new ValueResult<List<T>>(false, involvedKeys,
                     "no connection to Scalaris", true, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
+        
+        final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
+                new TransactionSingleOp(connection), involvedKeys);
 
-        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
-        TransactionSingleOp.ResultList results;
+        final ScalarisReadListOp1<T> readOp = new ScalarisReadListOp1<T>(scalaris_keys,
+                Options.OPTIMISATIONS.get(opType), conv, failNotFound);
+        executor.addOp(readOp);
         try {
-            TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-            for (String scalaris_key : scalaris_keys) {
-                involvedKeys.add(scalaris_key);
-                requests.addRead(scalaris_key);
-            }
-            results = scalaris_single.req_list(requests);
+            executor.run();
         } catch (Exception e) {
             return new ValueResult<List<T>>(false, involvedKeys,
                     "unknown exception reading page list at \""
-                            + scalaris_keys.toString() + "\" from Scalaris: "
-                            + e.getMessage(), false, statName,
-                            System.currentTimeMillis() - timeAtStart);
+                            + involvedKeys.toString() + "\" from Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
         
-        List<T> pages = null;
-        int curOp = 0;
-        for (String scalaris_key : scalaris_keys) {
-            try {
-                List<T> pages2 = conv.convert(results.processReadAt(curOp++));
-                if (pages == null) {
-                    pages = pages2;
-                } else {
-                    pages.addAll(pages2);
-                }
-            } catch (NotFoundException e) {
-                if (failNotFound) {
-                    return new ValueResult<List<T>>(false, involvedKeys,
-                            "unknown exception reading page list at \""
-                                    + scalaris_key + "\" from Scalaris: "
-                                    + e.getMessage(), false, statName,
-                                    System.currentTimeMillis() - timeAtStart);
-                }
-            } catch (Exception e) {
-                return new ValueResult<List<T>>(false, involvedKeys,
-                        "unknown exception reading page list at \"" + scalaris_key
-                        + "\" from Scalaris: " + e.getMessage(),
-                        e instanceof ConnectionException, statName,
-                        System.currentTimeMillis() - timeAtStart);
-            }
-        }
-        return new ValueResult<List<T>>(involvedKeys, pages, statName,
+        return new ValueResult<List<T>>(involvedKeys, readOp.getValue(), statName,
                 System.currentTimeMillis() - timeAtStart);
     }
 
@@ -902,29 +798,23 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public static ValueResult<String> getRandomArticle(Connection connection, Random random) {
-        final long timeAtStart = System.currentTimeMillis();
-        final String statName = "random article";
-        List<String> involvedKeys = new ArrayList<String>();
-        if (connection == null) {
-            return new ValueResult<String>(false, involvedKeys,
-                    "no connection to Scalaris", true, statName,
-                    System.currentTimeMillis() - timeAtStart);
-        }
-        
-        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
-        try {
-            // retrieve pages in main namespace
-            final String scalaris_key = getPageListKey(0);
-            involvedKeys.add(scalaris_key);
-            List<ErlangValue> pages = scalaris_single.read(scalaris_key).listValue();
-            String randomTitle = pages.get(random.nextInt(pages.size())).stringValue();
-            return new ValueResult<String>(involvedKeys, randomTitle, statName,
-                    System.currentTimeMillis() - timeAtStart);
-        } catch (Exception e) {
-            return new ValueResult<String>(false, involvedKeys,
-                    "unknown exception reading page list at \"pages\" from Scalaris: "
-                            + e.getMessage(), e instanceof ConnectionException,
-                    statName, System.currentTimeMillis() - timeAtStart);
+        ValueResult<List<ErlangValue>> result = getPageList3(connection,
+                ScalarisOpType.PAGE_LIST, Arrays.asList(getPageListKey(0)),
+                true, "random article",
+                new ErlangConverter<List<ErlangValue>>() {
+                    @Override
+                    public List<ErlangValue> convert(ErlangValue v)
+                            throws ClassCastException {
+                        return v.listValue();
+                    }
+                });
+        if (result.success) {
+            String randomTitle = result.value.get(
+                    random.nextInt(result.value.size())).stringValue();
+            return new ValueResult<String>(result.involvedKeys, randomTitle);
+        } else {
+            return new ValueResult<String>(false, result.involvedKeys,
+                    result.message, result.connect_failed);
         }
     }
 
@@ -1358,7 +1248,7 @@ public class ScalarisDataHandler {
      */
     public static ValueResult<Integer> updatePageList(Transaction scalaris_tx,
             ScalarisOpType opType, String pageList_key, String pageCount_key,
-            List<String> entriesToRemove, List<String> entriesToAdd,
+            List<String> entriesToAdd, List<String> entriesToRemove,
             final String statName) {
         final long timeAtStart = System.currentTimeMillis();
         List<String> involvedKeys = new ArrayList<String>();

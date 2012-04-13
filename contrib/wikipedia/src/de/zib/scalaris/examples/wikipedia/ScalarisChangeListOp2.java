@@ -11,11 +11,9 @@ import de.zib.scalaris.executor.ScalarisOp;
  * Implements a list change operation using the append operation of
  * Scalaris.
  *
- * @param <T> the type of objects in the list
- *
  * @author Nico Kruber, kruber@zib.de
  */
-public abstract class ScalarisListOp2<T> implements ScalarisOp {
+public abstract class ScalarisChangeListOp2 implements ScalarisOp {
     final String key;
     final String countKey;
 
@@ -26,7 +24,7 @@ public abstract class ScalarisListOp2<T> implements ScalarisOp {
      * @param countKey  the key for the counter of the entries in the list
      *                  (may be <tt>null</tt>)
      */
-    public ScalarisListOp2(final String key, final String countKey) {
+    public ScalarisChangeListOp2(final String key, final String countKey) {
         this.key = key;
         this.countKey = countKey;
     }

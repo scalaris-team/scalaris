@@ -8,10 +8,6 @@
 		<servlet-name>WikiServletScalaris</servlet-name>
 		<servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
 		<init-param>
-			<param-name>WIKI_USE_NEW_SCALARIS_OPS</param-name>
-			<param-value>true</param-value>
-		</init-param>
-		<init-param>
 			<param-name>WIKI_USE_BACKLINKS</param-name>
 			<param-value>true</param-value>
 		</init-param>
@@ -27,9 +23,40 @@
 			<param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
 			<param-value>600</param-value>
 		</init-param>
+        <init-param>
+            <param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
+            <param-value>OUTSIDE_TX</param-value>
+        </init-param>
 		<init-param>
-			<param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
-			<param-value>OUTSIDE_TX</param-value>
+			<param-name>WIKI_OPTIMISATIONS</param-name>
+<!--
+optimisations are executed in the same order as mentioned
+format: "|"-separated list of the following (no spaces!): 
+ <operation>:<optimisation>([<parameter>[,<parameter>[,<parameter>]...]])
+available operations:
+ to set all to one optimisation, use:
+  ALL
+ otherwise use values from de.zib.scalaris.examples.wikipedia.ScalarisOpType:
+  PAGE_LIST,
+  CATEGORY_PAGE_LIST,
+  TEMPLATE_PAGE_LIST,
+  BACKLINK_PAGE_LIST,
+  SHORTREV_LIST,
+  ARTICLE_COUNT,
+  PAGE,
+  REVISION,
+  CONTRIBUTION,
+  EDIT_STAT
+available optimisations (parameter types depend on the implementation):
+ see implementations of de.zib.scalaris.examples.wikipedia.Options.ListOptimisation
+  TRADITIONAL
+  APPEND_INCREMENT
+  APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets)
+
+example:
+ <param-value>ALL:APPEND_INCREMENT|PAGE_LIST:APPEND_INCREMENT_BUCKETS_WITH_HASH(10)</param-value>
+-->
+			<param-value>ALL:APPEND_INCREMENT</param-value>
 		</init-param>
 	</servlet>
 	<servlet-mapping>

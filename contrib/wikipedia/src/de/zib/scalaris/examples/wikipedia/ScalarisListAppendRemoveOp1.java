@@ -15,7 +15,7 @@ import de.zib.scalaris.ErlangValue;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class ScalarisListAppendRemoveOp1<T> extends ScalarisListOp1<T> {
+public class ScalarisListAppendRemoveOp1<T> extends ScalarisChangeListOp1 {
     final protected List<ErlangValue> toAdd;
     final protected List<ErlangValue> toRemove;
 

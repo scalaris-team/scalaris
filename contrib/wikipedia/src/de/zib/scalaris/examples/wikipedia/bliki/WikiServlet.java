@@ -59,10 +59,13 @@ import com.skjegstad.utils.BloomFilter;
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.Options;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
+import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.SpecialPage;
@@ -116,6 +119,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     protected static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
     protected static final Pattern MATCH_WIKI_IMAGE_SVG_PNG = Pattern.compile("\\.svg\\.png$");
+    protected static final Pattern CONFIG_SINGLE_OPTIMISATION = Pattern.compile("([a-zA-Z_0-9]*):([a-zA-Z_0-9]*)\\(([a-zA-Z_0-9,]*)\\)");
     /*
      * http://simple.wiktionary.org/wiki/Main_Page
      * http://bar.wikipedia.org/wiki/Hauptseitn
@@ -165,33 +169,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     public final void init(ServletConfig config) throws ServletException {
         super.init(config);
-        final String WIKI_USE_NEW_SCALARIS_OPS = config.getInitParameter("WIKI_USE_NEW_SCALARIS_OPS");
-        if (WIKI_USE_NEW_SCALARIS_OPS != null) {
-            Options.WIKI_USE_NEW_SCALARIS_OPS = Boolean.parseBoolean(WIKI_USE_NEW_SCALARIS_OPS);
-        }
-        final String WIKI_USE_BACKLINKS = config.getInitParameter("WIKI_USE_BACKLINKS");
-        if (WIKI_USE_BACKLINKS != null) {
-            Options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
-        }
-        final String WIKI_SAVEPAGE_RETRIES = config.getInitParameter("WIKI_SAVEPAGE_RETRIES");
-        if (WIKI_SAVEPAGE_RETRIES != null) {
-            Options.WIKI_SAVEPAGE_RETRIES = parseInt(WIKI_SAVEPAGE_RETRIES, Options.WIKI_SAVEPAGE_RETRIES);
-        }
-        final String WIKI_SAVEPAGE_RETRY_DELAY = config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY");
-        if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
-            Options.WIKI_SAVEPAGE_RETRY_DELAY = parseInt(WIKI_SAVEPAGE_RETRY_DELAY, Options.WIKI_SAVEPAGE_RETRY_DELAY);
-        }
-        final String WIKI_REBUILD_PAGES_CACHE = config.getInitParameter("WIKI_REBUILD_PAGES_CACHE");
-        if (WIKI_REBUILD_PAGES_CACHE != null) {
-            Options.WIKI_REBUILD_PAGES_CACHE = parseInt(WIKI_REBUILD_PAGES_CACHE, Options.WIKI_REBUILD_PAGES_CACHE);
-        }
-        final String WIKI_STORE_CONTRIBUTIONS = config.getInitParameter("WIKI_STORE_CONTRIBUTIONS");
-        if (WIKI_STORE_CONTRIBUTIONS != null) {
-            try {
-                Options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_STORE_CONTRIBUTIONS);
-            } catch (IllegalArgumentException e) {
-            }
-        }
+        readOptionsFromConfig(config);
         
         init2(config);
         
@@ -199,6 +177,65 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         loadPlugins();
         startExistingPagesUpdate();
         existingPages.addAll(specialPages);
+    }
+
+    /**
+     * Extracts servlet parameters from its config into the {@link Options}
+     * class.
+     * 
+     * @param config
+     *            servlet config
+     */
+    protected void readOptionsFromConfig(ServletConfig config) {
+        final String WIKI_USE_BACKLINKS = config.getInitParameter("WIKI_USE_BACKLINKS");
+        if (WIKI_USE_BACKLINKS != null) {
+            Options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
+        }
+        final String WIKI_SAVEPAGE_RETRIES = config.getInitParameter("WIKI_SAVEPAGE_RETRIES");
+        if (WIKI_SAVEPAGE_RETRIES != null) {
+            Options.WIKI_SAVEPAGE_RETRIES = Integer.parseInt(WIKI_SAVEPAGE_RETRIES);
+        }
+        final String WIKI_SAVEPAGE_RETRY_DELAY = config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY");
+        if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
+            Options.WIKI_SAVEPAGE_RETRY_DELAY = Integer.parseInt(WIKI_SAVEPAGE_RETRY_DELAY);
+        }
+        final String WIKI_REBUILD_PAGES_CACHE = config.getInitParameter("WIKI_REBUILD_PAGES_CACHE");
+        if (WIKI_REBUILD_PAGES_CACHE != null) {
+            Options.WIKI_REBUILD_PAGES_CACHE = Integer.parseInt(WIKI_REBUILD_PAGES_CACHE);
+        }
+        final String WIKI_STORE_CONTRIBUTIONS = config.getInitParameter("WIKI_STORE_CONTRIBUTIONS");
+        if (WIKI_STORE_CONTRIBUTIONS != null) {
+            Options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_STORE_CONTRIBUTIONS);
+        }
+        final String WIKI_OPTIMISATIONS = config.getInitParameter("WIKI_OPTIMISATIONS");
+        if (WIKI_OPTIMISATIONS != null) {
+            for (String singleOpt : WIKI_OPTIMISATIONS.split("\\|")) {
+                final Matcher matcher = CONFIG_SINGLE_OPTIMISATION.matcher(singleOpt);
+                if (matcher.matches()) {
+                    final String operationStr = matcher.group(1);
+                    if (operationStr.equals("ALL")) {
+                        for (ScalarisOpType op : ScalarisOpType.values()) {
+                            Options.OPTIMISATIONS.put(op, new APPEND_INCREMENT());
+                        }
+                    } else {
+                        ScalarisOpType operation = ScalarisOpType.fromString(operationStr);
+                        String optimisationStr = matcher.group(2);
+                        String[] parameters = matcher.group(3).split(",");
+                        Optimisation optimisation = null;
+                        if (optimisationStr.equals("TRADITIONAL")) {
+                            optimisation = new Options.TRADITIONAL();
+                        } else if (optimisationStr.equals("APPEND_INCREMENT")) {
+                            optimisation = new Options.APPEND_INCREMENT();
+                        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH")) {
+                            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+                        }
+                        if (optimisation != null) {
+                            Options.OPTIMISATIONS.put(operation, optimisation);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     /**

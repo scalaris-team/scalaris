@@ -2,9 +2,13 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler.ScalarisOpType;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_HASH;
+import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
 import de.zib.scalaris.executor.ScalarisOpExecutor;
@@ -56,14 +60,7 @@ public class MyScalarisOpExecWrapper {
      */
     @SuppressWarnings("unchecked")
     public <T> void addAppend(ScalarisOpType opType, String key, T toAdd, String countKey) {
-        switch (opType) {
-        default:
-            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey));
-            } else {
-                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey));
-            }
-        }
+        addAppendRemove(opType, key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey);
     }
 
     /**
@@ -79,14 +76,7 @@ public class MyScalarisOpExecWrapper {
      */
     @SuppressWarnings("unchecked")
     public <T> void addRemove(ScalarisOpType opType, String key, T toRemove, String countKey) {
-        switch (opType) {
-        default:
-            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey));
-            } else {
-                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey));
-            }
-        }
+        addAppendRemove(opType, key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey);
     }
 
     /**
@@ -98,14 +88,17 @@ public class MyScalarisOpExecWrapper {
      * 
      * @param <T>       type of the value to add
      */
-    public <T extends Number> void addIncrement(ScalarisOpType opType, String key, T toAdd) {
-        switch (opType) {
-        default:
-            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
-            } else {
-                executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
-            }
+    public <T extends Number> void addIncrement(final ScalarisOpType opType,
+            final String key, final T toAdd) {
+        final Optimisation optimisation = Options.OPTIMISATIONS.get(opType);
+        if (optimisation instanceof APPEND_INCREMENT) {
+            executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
+            final APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_HASH) optimisation;
+            final String key2 = key + optimisation2.getBucketString(toAdd);
+            executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
+        } else {
+            executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
         }
     }
 
@@ -128,17 +121,46 @@ public class MyScalarisOpExecWrapper {
      * 
      * @param <T>       type of the value to remove
      */
-    public <T> void addAppendRemove(ScalarisOpType opType, String key,
-            List<T> toAdd, List<T> toRemove, String countKey) {
-        switch (opType) {
-        default:
-            if (Options.WIKI_USE_NEW_SCALARIS_OPS) {
-                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
-            } else {
-                executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
+    public <T> void addAppendRemove(final ScalarisOpType opType,
+            final String key, final List<T> toAdd, final List<T> toRemove,
+            final String countKey) {
+
+        final Optimisation optimisation = Options.OPTIMISATIONS.get(opType);
+        if (optimisation instanceof APPEND_INCREMENT) {
+            executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
+            final APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_HASH) optimisation;
+            final HashMap<String, String> countKeys = new HashMap<String, String>(toAdd.size() + toRemove.size());
+            final LinkedMultiHashMap<String, T> kvAdd = new LinkedMultiHashMap<String, T>();
+            final LinkedMultiHashMap<String, T> kvRemove = new LinkedMultiHashMap<String, T>();
+            for (T t : toAdd) {
+                final String bucketStr = optimisation2.getBucketString(t);
+                final String key2 = key + bucketStr;
+                final String countKey2 = countKey + bucketStr;
+                countKeys.put(key2, countKey2);
+                kvAdd.put(key2, t);
             }
+            for (T t : toRemove) {
+                final String bucketStr = optimisation2.getBucketString(t);
+                final String key2 = key + bucketStr;
+                final String countKey2 = countKey + bucketStr;
+                countKeys.put(key2, countKey2);
+                kvRemove.put(key2, t);
+            }
+            for (Entry<String, String> entry : countKeys.entrySet()) {
+                final String key2 = entry.getKey();
+                List<T> toAdd2 = kvAdd.get(key2);
+                if (toAdd2 == null) {
+                    toAdd2 = new ArrayList<T>(0);
+                }
+                List<T> toRemove2 = kvRemove.get(key2);
+                if (toRemove2 == null) {
+                    toRemove2 = new ArrayList<T>(0);
+                }
+                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd2, toRemove2, entry.getValue()));
+            }
+        } else {
+            executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
         }
-        // TODO Auto-generated method stub
-        
     }
 }
