@@ -47,7 +47,7 @@ if [ ${result} -eq 0 ]; then
   tarfile="${folder}-${pkg_version}.tar.gz"
   newfoldername="${folder}-${pkg_version}"
   echo "making ${tarfile} ..."
-  mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs --exclude=${newfoldername}/contrib/jetty-libs/jsp/*.jar --exclude=${newfoldername}/contrib/jetty-libs/*.jar && mv "${newfoldername}" "${folder}"
+  mv "${folder}" "${newfoldername}" && tar -czf ${tarfile} ${newfoldername} --exclude-vcs && mv "${newfoldername}" "${folder}"
   result=$?
 fi
 

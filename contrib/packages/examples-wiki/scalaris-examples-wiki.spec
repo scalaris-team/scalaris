@@ -57,13 +57,6 @@ BuildRequires:  scalaris-java >= 0.4.1+svn2990
 %endif
 %endif
 
-%if 0%{?with_tomcat5}
-BuildRequires:  tomcat5
-%endif
-%if 0%{?with_tomcat6}
-BuildRequires:  tomcat6
-%endif
-
 %description
 This web application demonstrates the use of Scalaris as a data-store back-end for a
 Wikipedia-like application.
@@ -100,8 +93,6 @@ Wikipedia-like application.
 %build
 export ANT_OPTS=-Dfile.encoding=utf8
 
-export SERVLET_APIS=$(build-classpath servlet servletapi5)
-ln -s ${SERVLET_APIS%%:*} ./contrib/jetty-libs/servlet-api-2.5.jar
 ln -s %{_javadir}/scalaris/scalaris.jar ./contrib/
 export JINTERFACE_VERSION=`ls %{_javadir}/scalaris/lib/ | grep ^OtpErlang- | sed "s|OtpErlang-||" | sed "s|.jar||"`
 ln -s %{_javadir}/scalaris/lib/OtpErlang-$JINTERFACE_VERSION.jar ./contrib/
@@ -127,12 +118,16 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{?with_tomcat5}
 %files -n scalaris-examples-wiki-tomcat5
 %defattr(-,root,root)
+%dir /usr/share/tomcat5
+%dir /usr/share/tomcat5/webapps
 /usr/share/tomcat5/webapps/scalaris-wiki
 %endif
 
 %if 0%{?with_tomcat6}
 %files -n scalaris-examples-wiki-tomcat6
 %defattr(-,root,root)
+%dir /usr/share/tomcat6
+%dir /usr/share/tomcat6/webapps
 /usr/share/tomcat6/webapps/scalaris-wiki
 %endif
 

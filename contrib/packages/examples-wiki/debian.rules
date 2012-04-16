@@ -15,7 +15,6 @@ build-stamp:
 	# Add here commands to compile the package.
 	export ANT_OPTS=-Dfile.encoding=utf8
 
-	ln -s /usr/share/java/servlet-api-2.5.jar ./contrib/jetty-libs/servlet-api-2.5.jar
 	ln -s /usr/share/java/scalaris/scalaris.jar ./contrib/
 	JINTERFACE_VERSION=`ls /usr/share/java/scalaris/lib/ | grep ^OtpErlang- | sed "s|OtpErlang-||" | sed "s|.jar||"`; \
 	ln -s /usr/share/java/scalaris/lib/OtpErlang-$$JINTERFACE_VERSION.jar ./contrib/
