@@ -32,29 +32,32 @@ public class MyFullurl extends Fullurl {
     }
 
     @Override
-    public String parseFunction(List<String> list, IWikiModel model, char[] src, int beginIndex, int endIndex) throws UnsupportedEncodingException {
+    public String parseFunction(List<String> list, IWikiModel model,
+            char[] src, int beginIndex, int endIndex, boolean isSubst)
+            throws UnsupportedEncodingException {
         if (model instanceof MyWikiModel) {
             MyWikiModel myModel = (MyWikiModel) model;
             if (list.size() > 0) {
-                String arg0 = parse(list.get(0), myModel);
+                String arg0 = isSubst ? list.get(0) : parse(list.get(0), model);
+                final String title = URLEncoder.encode(Character.toUpperCase(arg0.charAt(0)) + "", Connector.UTF8_CHARSET)
+                        + URLEncoder.encode(arg0.substring(1), Connector.UTF8_CHARSET);
                 if (arg0.length() > 0 && list.size() == 1) {
                     String result = myModel.getLinkBaseFullURL().replace(
-                            "${title}",
-                            URLEncoder.encode(arg0, Connector.UTF8_CHARSET));
+                            "${title}", title);
                     return result;
                 }
                 StringBuilder builder = new StringBuilder(arg0.length() + 64);
                 builder.append(myModel.getLinkBaseFullURL().replace("${title}",
-                        URLEncoder.encode(arg0, Connector.UTF8_CHARSET)));
+                        title));
                 for (int i = 1; i < list.size(); i++) {
                     builder.append("&");
-                    builder.append(parse(list.get(i), myModel));
+                    builder.append(isSubst ? list.get(i) : parse(list.get(i), model));
                 }
                 return builder.toString();
             }
             return null;
         } else {
-            return super.parseFunction(list, model, src, beginIndex, endIndex);
+            return super.parseFunction(list, model, src, beginIndex, endIndex, isSubst);
         }
     }
 }

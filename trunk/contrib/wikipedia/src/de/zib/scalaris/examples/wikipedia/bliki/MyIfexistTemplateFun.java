@@ -46,24 +46,24 @@ public class MyIfexistTemplateFun extends Ifexist {
 
     @Override
     public String parseFunction(List<String> list, IWikiModel model,
-            char[] src, int beginIndex, int endIndex) {
+            char[] src, int beginIndex, int endIndex, boolean isSubst) {
         if (model instanceof MyWikiModel) {
             MyWikiModel myModel = (MyWikiModel) model;
             if (list.size() > 1) {
-                final String[] wikiTopicName = myModel.splitNsTitle(parse(list.get(0), model));
+                final String[] wikiTopicName = myModel.splitNsTitle(isSubst ? list.get(0) : parse(list.get(0), model));
                 if (myModel.isImageNamespace(wikiTopicName[0])
                         || myModel.isMediaNamespace(wikiTopicName[0])
                         || model.getRawWikiContent(wikiTopicName[0], wikiTopicName[1], null) != null) {
-                    return parse(list.get(1), model);
+                    return isSubst ? list.get(1) : parse(list.get(1), model);
                 } else { // non-existing page
                     if (list.size() >= 3) {
-                        return parse(list.get(2), model);
+                        return isSubst ? list.get(2) : parse(list.get(2), model);
                     }
                 }
             }
             return null;
         } else {
-            return super.parseFunction(list, model, src, beginIndex, endIndex);
+            return super.parseFunction(list, model, src, beginIndex, endIndex, isSubst);
         }
     }
 }
