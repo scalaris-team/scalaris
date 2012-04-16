@@ -2,7 +2,7 @@ Source: scalaris-examples-wiki
 Section: web
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, libservlet2.5-java, scalaris-java (>= 0.4.1+svn2990)
+Build-Depends: debhelper (>= 4.1.16), ant, java6-sdk, default-jdk, scalaris-java (>= 0.4.1+svn2990)
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-examples-wiki-tomcat5
