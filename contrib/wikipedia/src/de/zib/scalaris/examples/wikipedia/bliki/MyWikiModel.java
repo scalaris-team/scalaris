@@ -166,7 +166,6 @@ public class MyWikiModel extends WikiModel {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("fullurl", MyFullurl.CONST);
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("localurl", MyLocalurl.CONST);
-        Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("#time", MyTimeTemplateFun.CONST);
         
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
