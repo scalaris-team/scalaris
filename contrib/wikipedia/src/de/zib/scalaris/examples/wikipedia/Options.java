@@ -16,6 +16,8 @@
 package de.zib.scalaris.examples.wikipedia;
 
 import java.util.EnumMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 /**
@@ -24,10 +26,13 @@ import java.util.EnumMap;
  */
 public class Options {
     
+    private final static Options instance = new Options();
+    protected static final Pattern CONFIG_SINGLE_OPTIMISATION = Pattern.compile("([a-zA-Z_0-9]*):([a-zA-Z_0-9]*)\\(([a-zA-Z_0-9,]*)\\)");
+    
     /**
      * Whether to support back-links ("what links here?") or not.
      */
-    public static boolean WIKI_USE_BACKLINKS = true;
+    public boolean WIKI_USE_BACKLINKS = true;
     
     /**
      * How often to re-try a "sage page" operation in case of failures, e.g.
@@ -35,7 +40,7 @@ public class Options {
      * 
      * @see #WIKI_SAVEPAGE_RETRY_DELAY
      */
-    public static int WIKI_SAVEPAGE_RETRIES = 0;
+    public int WIKI_SAVEPAGE_RETRIES = 0;
     
     /**
      * How long to wait after a failed "sage page" operation before trying
@@ -43,21 +48,45 @@ public class Options {
      * 
      * @see #WIKI_SAVEPAGE_RETRIES
      */
-    public static int WIKI_SAVEPAGE_RETRY_DELAY = 10;
+    public int WIKI_SAVEPAGE_RETRY_DELAY = 10;
     
     /**
      * How often to re-create the bloom filter with the existing pages (in
      * seconds). The bloom filter will be disabled if a value less than or equal
      * to 0 is provided.
      */
-    public static int WIKI_REBUILD_PAGES_CACHE = 10 * 60;
+    public int WIKI_REBUILD_PAGES_CACHE = 10 * 60;
     
     /**
      * How often to re-create the bloom filter with the existing pages (in
      * seconds). The bloom filter will be disabled if a value less than or equal
      * to 0 is provided.
      */
-    public static STORE_CONTRIB_TYPE WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.OUTSIDE_TX;
+    public STORE_CONTRIB_TYPE WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.OUTSIDE_TX;
+    
+    /**
+     * Optimisations to use for the different Scalaris operations.
+     */
+    final public EnumMap<ScalarisOpType, Optimisation> OPTIMISATIONS = new EnumMap<ScalarisOpType, Options.Optimisation>(
+            ScalarisOpType.class);
+    
+    /**
+     * Creates a new default option object.
+     */
+    public Options() {
+        for (ScalarisOpType op : ScalarisOpType.values()) {
+            OPTIMISATIONS.put(op, new APPEND_INCREMENT());
+        }
+    }
+
+    /**
+     * Gets the static instance used throughout the wiki implementation.
+     * 
+     * @return the instance
+     */
+    public static Options getInstance() {
+        return instance;
+    }
     
     /**
      * Type of storing user contributions in the DB.
@@ -183,14 +212,70 @@ public class Options {
     }
     
     /**
-     * Optimisations to use for the different Scalaris operations.
+     * Parses the given option strings into their appropriate properties.
+     * 
+     * @param options
+     *            the {@link Options} object to parse into
+     * @param WIKI_USE_BACKLINKS
+     *            {@link Options#WIKI_USE_BACKLINKS}
+     * @param WIKI_SAVEPAGE_RETRIES
+     *            {@link Options#WIKI_SAVEPAGE_RETRIES}
+     * @param WIKI_SAVEPAGE_RETRY_DELAY
+     *            {@link Options#WIKI_SAVEPAGE_RETRY_DELAY}
+     * @param WIKI_REBUILD_PAGES_CACHE
+     *            {@link Options#WIKI_REBUILD_PAGES_CACHE}
+     * @param WIKI_STORE_CONTRIBUTIONS
+     *            {@link Options#WIKI_STORE_CONTRIBUTIONS}
+     * @param OPTIMISATIONS
+     *            {@link Options#OPTIMISATIONS}
      */
-    final public static EnumMap<ScalarisOpType, Optimisation> OPTIMISATIONS = new EnumMap<ScalarisOpType, Options.Optimisation>(
-            ScalarisOpType.class);
-    
-    static {
-        for (ScalarisOpType op : ScalarisOpType.values()) {
-            OPTIMISATIONS.put(op, new APPEND_INCREMENT());
+    public static void parseOptions(Options options, final String WIKI_USE_BACKLINKS,
+            final String WIKI_SAVEPAGE_RETRIES, final String WIKI_SAVEPAGE_RETRY_DELAY,
+            final String WIKI_REBUILD_PAGES_CACHE,
+            final String WIKI_STORE_CONTRIBUTIONS,
+            final String OPTIMISATIONS) {
+        if (WIKI_USE_BACKLINKS != null) {
+            options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
+        }
+        if (WIKI_SAVEPAGE_RETRIES != null) {
+            options.WIKI_SAVEPAGE_RETRIES = Integer.parseInt(WIKI_SAVEPAGE_RETRIES);
+        }
+        if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
+            options.WIKI_SAVEPAGE_RETRY_DELAY = Integer.parseInt(WIKI_SAVEPAGE_RETRY_DELAY);
+        }
+        if (WIKI_REBUILD_PAGES_CACHE != null) {
+            options.WIKI_REBUILD_PAGES_CACHE = Integer.parseInt(WIKI_REBUILD_PAGES_CACHE);
+        }
+        if (WIKI_STORE_CONTRIBUTIONS != null) {
+            options.WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.fromString(WIKI_STORE_CONTRIBUTIONS);
+        }
+        if (OPTIMISATIONS != null) {
+            for (String singleOpt : OPTIMISATIONS.split("\\|")) {
+                final Matcher matcher = CONFIG_SINGLE_OPTIMISATION.matcher(singleOpt);
+                if (matcher.matches()) {
+                    final String operationStr = matcher.group(1);
+                    if (operationStr.equals("ALL")) {
+                        for (ScalarisOpType op : ScalarisOpType.values()) {
+                            options.OPTIMISATIONS.put(op, new APPEND_INCREMENT());
+                        }
+                    } else {
+                        ScalarisOpType operation = ScalarisOpType.fromString(operationStr);
+                        String optimisationStr = matcher.group(2);
+                        String[] parameters = matcher.group(3).split(",");
+                        Optimisation optimisation = null;
+                        if (optimisationStr.equals("TRADITIONAL")) {
+                            optimisation = new Options.TRADITIONAL();
+                        } else if (optimisationStr.equals("APPEND_INCREMENT")) {
+                            optimisation = new Options.APPEND_INCREMENT();
+                        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH")) {
+                            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+                        }
+                        if (optimisation != null) {
+                            options.OPTIMISATIONS.put(operation, optimisation);
+                        }
+                    }
+                }
+            }
         }
     }
 }
