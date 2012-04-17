@@ -62,7 +62,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     protected SQLiteStatement stWrite = null;
     protected long nextPageId = 0l;
     protected String dbFileName;
-    protected ArrayBlockingQueue<SQLiteJob> sqliteJobs = new ArrayBlockingQueue<SQLiteJob>(UPDATE_PAGELIST_EVERY);
+    protected ArrayBlockingQueue<Runnable> sqliteJobs = new ArrayBlockingQueue<Runnable>(UPDATE_PAGELIST_EVERY);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
     
     /**
@@ -174,13 +174,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     static <T> void writeObject(SQLiteStatement stWrite, String key, T value)
             throws RuntimeException {
         try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
-            oos.writeObject(value);
-            oos.flush();
-            oos.close();
             try {
-                stWrite.bind(1, key).bind(2, bos.toByteArray()).stepThrough();
+                stWrite.bind(1, key).bind(2, objectToBytes(value)).stepThrough();
             } finally {
                 stWrite.reset();
             }
@@ -189,6 +184,48 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         } catch (IOException e) {
             System.err.println("write of " + key + " failed");
         }
+    }
+
+    /**
+     * Converts an object to a (compressed) byte array.
+     * 
+     * @param value  the object to convert
+     * 
+     * @return the byte array
+     * 
+     * @throws IOException
+     * 
+     * @see {@link #objectFromBytes(byte[])}
+     */
+    static <T> byte[] objectToBytes(T value) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
+        oos.writeObject(value);
+        oos.flush();
+        oos.close();
+        return bos.toByteArray();
+    }
+
+    /**
+     * Reads an object from a (compressed) byte array.
+     * 
+     * @param value  the byte array to get the object from
+     * 
+     * @return the object
+     * 
+     * @throws IOException
+     * @throws ClassNotFoundException
+     * 
+     * @see #objectToBytes(Object)
+     */
+    static <T> T objectFromBytes(byte[] value) throws IOException,
+            ClassNotFoundException {
+        ObjectInputStream ois = new ObjectInputStream(
+                new GZIPInputStream(new ByteArrayInputStream(value)));
+        @SuppressWarnings("unchecked")
+        T result = (T) ois.readObject();
+        ois.close();
+        return result;
     }
 
     /**
@@ -210,12 +247,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 if (stRead.step()) {
                     // there should only be one result
                     byte[] value = stRead.columnBlob(0);
-                    ObjectInputStream ois = new ObjectInputStream(
-                            new GZIPInputStream(new ByteArrayInputStream(value)));
-                    @SuppressWarnings("unchecked")
-                    T result = (T) ois.readObject();
-                    ois.close();
-                    return result;
+                    return objectFromBytes(value);
                 } else {
                     throw new FileNotFoundException();
                 }
@@ -228,15 +260,15 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
-            System.err.println("read of " + key + " failed (class not found)");
+            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (IOException e) {
-            System.err.println("read of " + key + " failed");
+            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
     }
     
-    protected void addSQLiteJob(SQLiteJob job) throws RuntimeException {
+    protected void addSQLiteJob(Runnable job) throws RuntimeException {
         try {
             sqliteJobs.put(job);
         } catch (InterruptedException e) {
@@ -366,7 +398,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 // take jobs
 
                 while(!(sqliteJobs.isEmpty() && stopWhenQueueEmpty)) {
-                    SQLiteJob job;
+                    Runnable job;
                     try {
                         job = sqliteJobs.take();
                     } catch (InterruptedException e) {
@@ -413,20 +445,16 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         }
     }
     
-    protected static interface SQLiteJob {
-        public abstract void run();
-    }
-    
-    protected static class SQLiteNoOpJob implements SQLiteJob {
+    static class SQLiteNoOpJob implements Runnable {
         @Override
         public void run() {
         }
     }
     
-    protected static class SQLiteWriteObjectJob<T> implements SQLiteJob {
-        String key;
-        T value;
-        protected SQLiteStatement stWrite;
+    static class SQLiteWriteObjectJob<T> implements Runnable {
+        protected final String key;
+        protected final T value;
+        protected final SQLiteStatement stWrite;
         
         public SQLiteWriteObjectJob(String key, T value, SQLiteStatement stWrite) {
             this.key = key;
@@ -440,7 +468,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         }
     }
     
-    abstract protected class SQLiteUpdatePageListsJob implements SQLiteJob {
+    abstract protected class SQLiteUpdatePageListsJob implements Runnable {
 
         protected <T> T readObject(String key)
                 throws RuntimeException, FileNotFoundException {
@@ -769,7 +797,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         }
     }
     
-    protected static class SQLiteWriteSiteInfoJob implements SQLiteJob {
+    protected static class SQLiteWriteSiteInfoJob implements Runnable {
         SiteInfo siteInfo;
         protected SQLiteStatement stWrite;
         

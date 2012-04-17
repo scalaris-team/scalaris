@@ -261,6 +261,35 @@
     </java>
   </target>
 
+  <target name="import.get.db_read" unless="db_read">
+    <input addproperty="db_read" defaultvalue="simplewiktionary-latest-pages-meta-history.xml-1.db" message="prepared SQLite dump file to read from"/>
+  </target>
+
+  <target name="import.get.db_write" unless="db_write" depends="import.get.db_read">
+    <input addproperty="db_write" defaultvalue="${db_read}-new.db" message="prepared SQLite dump file to write to"/>
+  </target>
+
+  <target name="import.get.db_write_options" unless="db_write_options">
+    <input addproperty="db_write_options" defaultvalue="ALL:APPEND_INCREMENT|PAGE_LIST:APPEND_INCREMENT_BUCKETS_WITH_HASH(10)" message="new optimisation scheme"/>
+  </target>
+  
+  <target name="convert" depends="build,import.get.db_read,import.get.db_write,import.get.db_write_options">
+    <fail unless="db_read">You must specify the data property for 'ant convert'.</fail>
+    <fail unless="db_write">You must specify the db_write property for 'ant convert'.</fail>
+    <fail unless="db_write_options">You must specify the db_write_options property for 'ant convert'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <arg value="${db_read}"/>
+      <arg value="convert"/>
+      <arg value="${db_write}"/>
+      <arg value="${db_write_options}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
   <target name="dist" depends="build">
     <jar jarfile="scalaris-wiki.war" update="false">
       <fileset dir="scalaris-wiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
