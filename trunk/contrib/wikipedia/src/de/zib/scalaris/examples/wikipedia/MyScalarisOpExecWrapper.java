@@ -90,7 +90,7 @@ public class MyScalarisOpExecWrapper {
      */
     public <T extends Number> void addIncrement(final ScalarisOpType opType,
             final String key, final T toAdd) {
-        final Optimisation optimisation = Options.OPTIMISATIONS.get(opType);
+        final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
@@ -125,7 +125,7 @@ public class MyScalarisOpExecWrapper {
             final String key, final List<T> toAdd, final List<T> toRemove,
             final String countKey) {
 
-        final Optimisation optimisation = Options.OPTIMISATIONS.get(opType);
+        final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {

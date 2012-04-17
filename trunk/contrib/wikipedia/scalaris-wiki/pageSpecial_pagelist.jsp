@@ -157,7 +157,7 @@ ${ pageBean.page }
                   <tr>
                     <td style="width:33%">
                       <a href="wiki?title=<%= value %>"><%= value %></a>
-          <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %> 
+          <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %> 
                       <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
                     </td>
@@ -166,7 +166,7 @@ ${ pageBean.page }
             value = iter.next();
 %>
                       <a href="wiki?title=<%= value %>"><%= value %></a> 
-          <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %>
+          <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %>
                       <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
 <%      } %>
@@ -176,7 +176,7 @@ ${ pageBean.page }
             value = iter.next();
 %>
                       <a href="wiki?title=<%= value %>"><%= value %></a>
-          <% if (de.zib.scalaris.examples.wikipedia.Options.WIKI_USE_BACKLINKS) { %> 
+          <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %> 
                       <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
 <%      } %>

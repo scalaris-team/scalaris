@@ -494,7 +494,7 @@ public class ScalarisDataHandler {
     public static ValueResult<List<String>> getPagesLinkingTo(Connection connection,
             String title, final MyNamespace nsObject) {
         final String statName = "links to " + title;
-        if (Options.WIKI_USE_BACKLINKS) {
+        if (Options.getInstance().WIKI_USE_BACKLINKS) {
             return getPageList2(connection, ScalarisOpType.BACKLINK_PAGE_LIST,
                     Arrays.asList(getBackLinksPageListKey(title, nsObject)),
                     false, statName);
@@ -518,7 +518,7 @@ public class ScalarisDataHandler {
     public static ValueResult<List<Contribution>> getContributions(
             Connection connection, String contributor) {
         final String statName = "contributions of " + contributor;
-        if (Options.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
+        if (Options.getInstance().WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
             ValueResult<List<Contribution>> result = getPageList3(connection,
                     ScalarisOpType.CONTRIBUTION,
                     Arrays.asList(getContributionListKey(contributor)), false,
@@ -609,7 +609,7 @@ public class ScalarisDataHandler {
                 new TransactionSingleOp(connection), involvedKeys);
 
         final ScalarisReadListOp1<T> readOp = new ScalarisReadListOp1<T>(scalaris_keys,
-                Options.OPTIMISATIONS.get(opType), conv, failNotFound);
+                Options.getInstance().OPTIMISATIONS.get(opType), conv, failNotFound);
         executor.addOp(readOp);
         try {
             executor.run();
@@ -946,7 +946,7 @@ public class ScalarisDataHandler {
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
             oldTpls = wikiModel.getTemplates();
-            if (Options.WIKI_USE_BACKLINKS) {
+            if (Options.getInstance().WIKI_USE_BACKLINKS) {
                 oldLnks = wikiModel.getLinks();
             } else {
                 // use empty link lists to turn back-links off
@@ -1003,7 +1003,7 @@ public class ScalarisDataHandler {
                     }
                 }, ScalarisOpType.TEMPLATE_PAGE_LIST);
         // use empty link lists to turn back-links off
-        final Set<String> newLnks = Options.WIKI_USE_BACKLINKS ? wikiModel.getLinks() : new HashSet<String>();
+        final Set<String> newLnks = Options.getInstance().WIKI_USE_BACKLINKS ? wikiModel.getLinks() : new HashSet<String>();
         Difference lnkDiff = new Difference(oldLnks, newLnks,
                 new Difference.GetPageListKey() {
                     @Override
@@ -1068,7 +1068,7 @@ public class ScalarisDataHandler {
             }
         } while (false);
         
-        if (Options.WIKI_STORE_CONTRIBUTIONS == STORE_CONTRIB_TYPE.OUTSIDE_TX) {
+        if (Options.getInstance().WIKI_STORE_CONTRIBUTIONS == STORE_CONTRIB_TYPE.OUTSIDE_TX) {
             addContribution(scalaris_tx, oldPage, newPage, involvedKeys);
         }
         
