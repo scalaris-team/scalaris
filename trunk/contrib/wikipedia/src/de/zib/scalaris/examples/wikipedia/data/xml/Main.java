@@ -41,6 +41,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
 
+import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler.ReportAtShutDown;
 
@@ -74,6 +75,8 @@ public class Main {
                     doImport(filename, Arrays.copyOfRange(args, 2, args.length), false);
                 } else if (args[1].equals("prepare")) {
                     doImport(filename, Arrays.copyOfRange(args, 2, args.length), true);
+                } else if (args[1].equals("convert")) {
+                    doConvert(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
             }
         } catch (SAXException e) {
@@ -200,6 +203,58 @@ public class Main {
                 runXmlHandler(handler, file);
             }
         }
+    }
+
+    /**
+     * Converts the default prepared SQLite dump to a different optimisation scheme.
+     * 
+     * @param dbReadFileName
+     * @param args
+     * 
+     * @throws RuntimeException
+     * @throws IOException
+     * @throws SAXException
+     * @throws FileNotFoundException
+     */
+    private static void doConvert(String dbReadFileName, String[] args) throws RuntimeException, IOException,
+            FileNotFoundException {
+        
+        int i = 0;
+        String dbWriteFileName;
+        if (args.length > i) {
+            dbWriteFileName = args[i];
+        } else {
+            System.err.println("need an new DB file name for convert; arguments given: " + Arrays.toString(args));
+            System.exit(-1);
+            return;
+        }
+        ++i;
+        
+        String dbWriteOptionsStr;
+        Options dbWriteOptions = new Options();
+        if (args.length > i) {
+            dbWriteOptionsStr = args[i];
+            Options.parseOptions(dbWriteOptions, null, null, null, null, null, dbWriteOptionsStr);
+        } else {
+            System.err.println("need a new optimisation scheme for convert; arguments given: " + Arrays.toString(args));
+            System.exit(-1);
+            return;
+        }
+        ++i;
+
+        WikiDumpHandler.println(System.out, "converting");
+        WikiDumpHandler.println(System.out, " from    : " + dbReadFileName);
+        WikiDumpHandler.println(System.out, " to      : " + dbWriteFileName);
+        WikiDumpHandler.println(System.out, " options : " + dbWriteOptionsStr);
+        
+        WikiDumpConvertPreparedSQLite handler = new WikiDumpConvertPreparedSQLite(dbReadFileName, dbWriteFileName, dbWriteOptions);
+        handler.setUp();
+        WikiDumpConvertPreparedSQLite.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
+        handler.convertObjects();
+        handler.tearDown();
+        shutdownHook.run();
+        Runtime.getRuntime().removeShutdownHook(shutdownHook);
     }
 
     /**

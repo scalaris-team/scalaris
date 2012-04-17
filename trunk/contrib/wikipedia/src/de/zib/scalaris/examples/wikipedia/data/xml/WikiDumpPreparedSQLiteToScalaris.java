@@ -67,8 +67,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     
     protected boolean stop = false;
     
-    SQLiteConnection db;
-    SQLiteStatement stRead;
+    SQLiteConnection db = null;
+    SQLiteStatement stRead = null;
     
     String dbFileName;
     ConnectionFactory cFactory;
@@ -264,8 +264,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        stRead.dispose();
-        db.dispose();
+        tearDown();
     }
 
     /**
@@ -305,6 +304,12 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     @Override
     public void tearDown() {
+        if (stRead != null) {
+            stRead.dispose();
+        }
+        if (db != null) {
+            db.dispose();
+        }
     }
 
     /**
