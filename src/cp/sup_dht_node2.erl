@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc    Supervisor for each DHT node that is responsible for keeping
 %%         processes running that run for themselves.
 %%
@@ -22,6 +23,7 @@
 %% @version $Id$
 -module(sup_dht_node2).
 -author('schuett@zib.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -behaviour(supervisor).
@@ -52,7 +54,7 @@ init({DHTNodeGroup, Options}) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     mgmt_server:connect(),
 
-    Router =
+    _Router =
         util:sup_worker_desc(routing_table, router, start_link,
                              [DHTNodeGroup]),
 
