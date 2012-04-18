@@ -45,6 +45,7 @@ start_link() ->
                end,
     GconfList = [{max_connections, 800},
                  {logdir, config:read(log_path)},
+                 {include_dir, [Docroot ++ "/api"]},
                  {id, Id}
                 ],
     SconfList = [{docroot, Docroot},
