@@ -156,14 +156,14 @@ class TestTransactionSingleOp(unittest.TestCase):
         key = "_WriteList2"
         conn = TransactionSingleOp()
         
-        list = []
+        mylist = []
         for i in xrange(0, len(_TEST_DATA) - 1, 2):
-            list = [_TEST_DATA[i], _TEST_DATA[i + 1]]
-            conn.write(str(self._testTime) + key, list)
+            mylist = [_TEST_DATA[i], _TEST_DATA[i + 1]]
+            conn.write(str(self._testTime) + key, mylist)
         
         # now try to read the data:
         actual = conn.read(str(self._testTime) + key)
-        self.assertEqual(actual, list)
+        self.assertEqual(actual, mylist)
         conn.close_connection()
 
     # Test method for TransactionSingleOp.test_and_set(key, oldvalue=str(), newvalue=str()) with a closed connection.
@@ -598,12 +598,12 @@ class TestPubSub(unittest.TestCase):
     
     # checks if there are more elements in list than in expectedElements and returns one of those elements
     @staticmethod
-    def _getDiffElement(list, expectedElements):
+    def _getDiffElement(mylist, expectedElements):
         for e in expectedElements:
-            list.remove(e)
+            mylist.remove(e)
         
-        if len(list) > 0:
-            return list[0]
+        if len(mylist) > 0:
+            return mylist[0]
         else:
             return None
 
