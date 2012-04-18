@@ -20,9 +20,16 @@ import java.net.UnknownHostException;
 
 import com.ericsson.otp.erlang.OtpAuthException;
 import com.ericsson.otp.erlang.OtpConnection;
+import com.ericsson.otp.erlang.OtpErlangAtom;
+import com.ericsson.otp.erlang.OtpErlangBinary;
+import com.ericsson.otp.erlang.OtpErlangDecodeException;
 import com.ericsson.otp.erlang.OtpErlangExit;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangTuple;
+import com.ericsson.otp.erlang.OtpExternal;
+import com.ericsson.otp.erlang.OtpInputStream;
+import com.ericsson.otp.erlang.OtpOutputStream;
 import com.ericsson.otp.erlang.OtpSelf;
 
 /**
@@ -52,6 +59,11 @@ public class Connection {
      * reconnect on failures.
      */
     ConnectionPolicy connectionPolicy;
+
+    /**
+     * Whether to compress the request list before transferring it to Scalaris.
+     */
+    private boolean compressed = true;
 
     /**
      * Creates a new connection using the given nodes and a default connection
@@ -173,8 +185,8 @@ public class Connection {
             boolean success = false;
             while(!success) {
                 try {
-                    connection.sendRPC(mod, fun, args);
-                    final OtpErlangObject result = connection.receiveRPC();
+                    sendRPC2(mod, fun, args);
+                    final OtpErlangObject result = receiveRPC2();
                     success = true;
                     return result;
                 } catch (final OtpErlangExit e) {
@@ -209,7 +221,74 @@ public class Connection {
         } catch (final IOException e) {
             // e.printStackTrace();
             throw new ConnectionException(e);
+        } catch (final OtpErlangDecodeException e) {
+            // e.printStackTrace();
+            throw new ConnectionException(e);
         }
+    }
+
+    /**
+     * Sends the given RPC. If {@link #compressed} is set, the call will be
+     * compressed as well as the returned result.
+     *
+     * @param mod
+     *            the module of the function to call
+     * @param fun
+     *            the function to call
+     * @param args
+     *            the function's arguments
+     *
+     * @throws IOException
+     *             if the connection is not active, a communication error
+     *             occurs, an exit signal is received from a process on the peer
+     *             node or the remote node sends a message containing an invalid
+     *             cookie
+     */
+    protected void sendRPC2(final String mod, final String fun,
+            final OtpErlangList args) throws IOException {
+        if (compressed) {
+            final OtpOutputStream oos = new OtpOutputStream();
+            oos.write1(OtpExternal.versionTag);
+            final OtpErlangTuple parameters = new OtpErlangTuple(new OtpErlangObject[] {
+                    new OtpErlangAtom(mod), new OtpErlangAtom(fun), args });
+            oos.write_compressed(parameters);
+            connection.sendRPC(
+                    "api_bin",
+                    "apply",
+                    new OtpErlangList(
+                            new OtpErlangObject[] {
+                                    new OtpErlangBinary(oos.toByteArray()) }));
+        } else {
+            connection.sendRPC(mod, fun, args);
+        }
+    }
+
+    /**
+     * Receive an RPC reply from the remote Erlang node. If {@link #compressed}
+     * is set, tries to decode the returned result.
+     *
+     * @return the received value
+     *
+     * @exception java.io.IOException
+     *                if the connection is not active or a communication error
+     *                occurs
+     * @exception OtpErlangExit
+     *                if an exit signal is received from a process on the peer
+     *                node
+     * @exception OtpAuthException
+     *                if the remote node sends a message containing an invalid
+     *                cookie
+     * @throws OtpErlangDecodeException
+     *                if the next term in the stream is not a compressed term
+     */
+    protected OtpErlangObject receiveRPC2() throws IOException, OtpErlangExit,
+            OtpAuthException, OtpErlangDecodeException {
+        OtpErlangObject received = connection.receiveRPC();
+        if (compressed) {
+            final OtpInputStream ois = new OtpInputStream(((OtpErlangBinary) received).binaryValue());
+            received = ois.read_any();
+        }
+        return received;
     }
 
     /**
@@ -259,7 +338,7 @@ public class Connection {
             boolean success = false;
             while(!success) {
                 try {
-                    connection.sendRPC(mod, fun, args);
+                    sendRPC2(mod, fun, args);
                     success = true;
                     return;
                 } catch (final IOException e) {
@@ -346,5 +425,24 @@ public class Connection {
     protected void finalize() throws Throwable {
         close();
         super.finalize();
+    }
+
+    /**
+     * Checks whether the communication with Scalaris is compressed or not.
+     *
+     * @return <tt>true</tt> if compressed, otherwise <tt>false</tt>
+     */
+    public boolean isCompressed() {
+        return compressed;
+    }
+
+    /**
+     * Sets whether to compress the communication with Scalaris or not.
+     *
+     * @param compressed
+     *            <tt>true</tt> if compressed, otherwise <tt>false</tt>
+     */
+    public void setCompressed(final boolean compressed) {
+        this.compressed = compressed;
     }
 }
