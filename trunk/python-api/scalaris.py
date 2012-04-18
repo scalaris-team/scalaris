@@ -356,6 +356,80 @@ class JSONConnection(object):
             raise UnknownError(result)
         return result
     
+    # results: {'status': 'ok', 'value': xxx}
+    @staticmethod
+    def process_result_vm_get_version(result):
+        """
+        Processes the result of a api_vm/get_version operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'value' in result:
+            if result['status'] == 'ok':
+                return result['value']
+        raise UnknownError(result)
+    
+    # value: {'scalaris_version': xxx,
+    #         'erlang_version': xxx,
+    #         'mem_total': xxx,
+    #         'uptime': xxx,
+    #         'erlang_node': xxx,
+    #         'ip': xxx,
+    #         'port': xxx,
+    #         'yaws_port': xxx}
+    # results: {'status': 'ok', 'value': <value>
+    @staticmethod
+    def process_result_vm_get_info(result):
+        """
+        Processes the result of a api_vm/get_info operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'value' in result:
+            value = result['value']
+            if result['status'] == 'ok' and \
+               'scalaris_version' in value and 'erlang_version' in value and \
+               'mem_total' in value and 'uptime' in value and \
+               'erlang_node' in value and 'ip' in value and \
+               'port' in value and 'yaws_port' in value:
+                try:
+                    return ScalarisVM.GetInfoResult(value['scalaris_version'],
+                                                    value['erlang_version'],
+                                                    int(value['mem_total']),
+                                                    int(value['uptime']),
+                                                    value['erlang_node'],
+                                                    value['ip'],
+                                                    int(value['port']),
+                                                    int(value['yaws_port']))
+                except:
+                    pass
+        raise UnknownError(result)
+    
+    # results: {'status': 'ok', 'value': xxx}
+    @staticmethod
+    def process_result_vm_get_number_of_nodes(result):
+        """
+        Processes the result of a api_vm/number_of_nodes operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'value' in result:
+            if result['status'] == 'ok':
+                try:
+                    return int(result['value'])
+                except:
+                    pass
+        raise UnknownError(result)
+    
+    # results: {'status': 'ok', 'value': [xxx]}
+    @staticmethod
+    def process_result_vm_get_nodes(result):
+        """
+        Processes the result of a api_vm/number_of_nodes operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'value' in result:
+            if result['status'] == 'ok' and isinstance(result['value'], list):
+                return result['value']
+        raise UnknownError(result)
+    
     # result: 'ok'
     @staticmethod
     def process_result_nop(result):
@@ -1153,6 +1227,74 @@ class ReplicatedDHT(object):
         """
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/rdht.yaws', 'nop', [value])
+        self._conn.process_result_nop(result)
+    
+    def close_connection(self):
+        """
+        Close the connection to scalaris
+        (it will automatically be re-opened on the next request).
+        """
+        self._conn.close()
+
+class ScalarisVM(object):
+    """
+    Provides methods to interact with a specific Scalaris (Erlang) VM.
+    """
+    
+    class GetInfoResult(object):
+        def __init__(self, scalarisVersion, erlangVersion, memTotal, uptime,
+                     erlangNode, ip, port, yawsPort):
+            self.scalarisVersion = scalarisVersion
+            self.erlangVersion = erlangVersion
+            self.memTotal = memTotal
+            self.uptime = uptime
+            self.erlangNode = erlangNode
+            self.ip = ip
+            self.port = port
+            self.yawsPort = yawsPort
+    
+    def __init__(self, conn = None):
+        """
+        Create a new object using the given connection.
+        """
+        if conn is None:
+            conn = JSONConnection()
+        self._conn = conn
+
+    def getVersion(self):
+        """
+        Gets the version of the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'get_version', [])
+        return self._conn.process_result_vm_get_version(result)
+
+    def getInfo(self):
+        """
+        Gets some information about the VM and Scalaris.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'get_info', [])
+        return self._conn.process_result_vm_get_info(result)
+
+    def getNumberOfNodes(self):
+        """
+        Gets the number of nodes in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'number_of_nodes', [])
+        return self._conn.process_result_vm_get_number_of_nodes(result)
+
+    def getNodes(self):
+        """
+        Gets the names of the nodes in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'get_nodes', [])
+        return self._conn.process_result_vm_get_nodes(result)
+
+    def nop(self, value):
+        """
+        No operation (may be used for measuring the JSON overhead).
+        """
+        value = self._conn.encode_value(value)
+        result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
     def close_connection(self):
