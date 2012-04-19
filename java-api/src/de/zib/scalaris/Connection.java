@@ -63,7 +63,7 @@ public class Connection {
     /**
      * Whether to compress the request list before transferring it to Scalaris.
      */
-    private boolean compressed = true;
+    private boolean compressed = false;
 
     /**
      * Creates a new connection using the given nodes and a default connection
