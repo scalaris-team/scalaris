@@ -1251,7 +1251,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getVersion()."""
         vm = ScalarisVM()
         version = vm.getVersion()
-        self.assertIsInstance(version, basestring, msg = version)
+        self.assertTrue(isinstance(version, basestring), msg = version)
         self.assertTrue(len(version) > 0)
         vm.close_connection()
 
@@ -1267,19 +1267,19 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getInfo()."""
         vm = ScalarisVM()
         info = vm.getInfo()
-        self.assertIsInstance(info.scalarisVersion, basestring, msg = info.scalarisVersion)
+        self.assertTrue(isinstance(info.scalarisVersion, basestring), msg = info.scalarisVersion)
         self.assertTrue(len(info.scalarisVersion) > 0, msg = "scalaris_version (" + info.scalarisVersion + ") != \"\"");
-        self.assertIsInstance(info.erlangVersion, basestring, msg = info.erlangVersion)
+        self.assertTrue(isinstance(info.erlangVersion, basestring), msg = info.erlangVersion)
         self.assertTrue(len(info.erlangVersion) > 0, msg = "erlang_version (" + info.erlangVersion + ") != \"\"");
-        self.assertIsInstance(info.memTotal, int, msg = info.memTotal)
+        self.assertTrue(isinstance(info.memTotal, int), msg = info.memTotal)
         self.assertTrue(info.memTotal >= 0, msg = "mem_total (" + str(info.memTotal) + ") >= 0");
-        self.assertIsInstance(info.uptime, int, msg = info.uptime)
+        self.assertTrue(isinstance(info.uptime, int), msg = info.uptime)
         self.assertTrue(info.uptime >= 0, msg = "uptime (" + str(info.uptime) + ") >= 0");
-        self.assertIsInstance(info.erlangNode, basestring, msg = info.erlangNode)
+        self.assertTrue(isinstance(info.erlangNode, basestring), msg = info.erlangNode)
         self.assertTrue(len(info.erlangNode) > 0, msg = "erlang_node (" + info.erlangNode + ") != \"\"");
-        self.assertIsInstance(info.port, int, msg = info.port)
+        self.assertTrue(isinstance(info.port, int), msg = info.port)
         self.assertTrue(info.port >= 0 and info.port <= 65535, msg = "0 <= port (" + str(info.port) + ") <= 65535");
-        self.assertIsInstance(info.yawsPort, int, msg = info.yawsPort)
+        self.assertTrue(isinstance(info.yawsPort, int), msg = info.yawsPort)
         self.assertTrue(info.yawsPort >= 0 and info.yawsPort <= 65535, msg = "0 <= yaws_port (" + str(info.yawsPort) + ") <= 65535");
         vm.close_connection()
 
@@ -1295,7 +1295,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getVersion()."""
         vm = ScalarisVM()
         number = vm.getNumberOfNodes()
-        self.assertIsInstance(number, int, msg = number)
+        self.assertTrue(isinstance(number, int), msg = number)
         self.assertTrue(number >= 0)
         vm.close_connection()
 
@@ -1311,7 +1311,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getNodes()."""
         vm = ScalarisVM()
         nodes = vm.getNodes()
-        self.assertIsInstance(nodes, list, msg = nodes)
+        self.assertTrue(isinstance(nodes, list), msg = nodes)
         self.assertTrue(len(nodes) >= 0)
         self.assertEqual(len(nodes), vm.getNumberOfNodes())
         vm.close_connection()
