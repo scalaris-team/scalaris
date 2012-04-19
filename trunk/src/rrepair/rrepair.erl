@@ -73,11 +73,11 @@
 -type message() ::
     {?TRIGGER_NAME} |    
     % API
-    {request_sync, Method::rr_recon:method(), DestNodePid::random | comm:mypid()} |
+    {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
     {get_state, Sender::comm:mypid(), Key::atom()} |
     % internal
-    {continue_recon, SenderRUPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
+    {continue_recon, SenderRRPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
     {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -109,6 +109,7 @@ on({get_state, Sender, Key}, State =
     State;
 
 on({?TRIGGER_NAME}, State = #rrepair_state{ round = Round, open_recon = OpenRecon }) ->
+    ?TRACE_KILL("RR: SYNC TRIGGER", []),
     {ok, Pid} = rr_recon:start(Round),
     comm:send_local(Pid, {start, get_recon_method(), random}),
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
@@ -118,10 +119,11 @@ on({?TRIGGER_NAME}, State = #rrepair_state{ round = Round, open_recon = OpenReco
 
 % @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %      Random leads to sync with a node which is associated with this (e.g. symmetric partner)  
-on({request_sync, Method, DestPid}, State = #rrepair_state{ round = Round, 
+on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round, 
                                                             open_recon = OpenRecon }) ->
+    ?TRACE_KILL("RR: REQUEST SYNC WITH ~p", [DestKey]),
     {ok, Pid} = rr_recon:start(Round),
-    comm:send_local(Pid, {start, Method, DestPid}),
+    comm:send_local(Pid, {start, Method, DestKey}),
     State#rrepair_state{ round = next_round(Round),
                          open_recon = OpenRecon + 1 };
 
@@ -134,6 +136,7 @@ on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_re
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({continue_recon, Sender, Round, Msg}, 
    State = #rrepair_state{ open_recon = OpenRecon }) ->
+    ?TRACE_KILL("CONTINUE RECON FROM ~p", [Sender]),
     {ok, Pid} = rr_recon:start(Round, Sender),
     comm:send_local(Pid, Msg),
     State#rrepair_state{ open_recon = OpenRecon + 1 };

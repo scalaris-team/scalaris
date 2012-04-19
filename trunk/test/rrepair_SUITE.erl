@@ -51,6 +51,7 @@ upd_tests() ->
     [upd_no_outdated,
      upd_min_nodes,     % sync in an single node ring
      upd_simple,        % run one sync round
+     %upd_dest,          % run one sync with a specified dest node 
      upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
 
 all() ->
@@ -140,6 +141,40 @@ upd_simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
     [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.1, get_rep_upd_config(Method)),
     ?assert(Start < End).    
+
+upd_dest(Config) ->
+    %parameter
+    NodeCount = 10,
+    DataCount = 1000,
+    Fpr = 0.1,
+    Method = proplists:get_value(ru_method, Config),
+    %build and fill ring
+    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
+    config:write(rep_update_recon_fpr, Fpr),
+    db_generator:fill_ring(random, DataCount, [{ftype, update}, 
+                                               {fprob, 50}, 
+                                               {distribution, uniform}]),
+    %chose node pair    
+    SKey = ?RT:get_random_node_id(),
+    CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
+    %measure initial sync degree
+    SO = count_outdated(SKey),
+    CO = count_outdated(CKey),    
+    %server starts sync
+    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+                                              {request_sync, Method, CKey}}),
+    %waitForSyncRoundEnd(NodeKeys),
+    waitForSyncRoundEnd([SKey, CKey]),
+    %measure sync degree
+    SONew = count_outdated(SKey),
+    CONew = count_outdated(CKey),
+    ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p
+            Server outdated: [~p] -> [~p]~nClient outdated: [~p] -> [~p]", 
+           [Method, SKey, CKey, SO, SONew, CO, CONew]),
+    %clean up
+    unittest_helper:stop_ring(),
+    %?implies(SO > 0, ?assert(SONew < SO)) andalso ?implies(CO > 0, ?assert(CONew < CO)).
+    true.
 
 upd_parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -253,16 +288,13 @@ bloomSync_times(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_sync(Config, NodeCount, DataCount, 
-                 OutdatedP, Rounds, Fpr, RepConfig) -> [Fpr] when
+-spec start_sync(Config, NodeCount::Int, DataCount::Int, 
+                 OutdatedP, Rounds::Int, Fpr, RepConfig::Config) -> [Fpr] 
+when
     is_subtype(Config,      [tuple()]),
-    is_subtype(NodeCount,   pos_integer()),
-    is_subtype(DataCount,   pos_integer()),
+    is_subtype(Int,         pos_integer()),
     is_subtype(OutdatedP,   0..100),        %outdated probability in percent
-    is_subtype(Rounds,      pos_integer()),
-    is_subtype(Fpr,         float()),
-    is_subtype(RepConfig,   [tuple()]).
-          
+    is_subtype(Fpr,         float()).          
 start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     DestVersCount = NodeCount * 2 * DataCount,
@@ -288,6 +320,14 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
     %clean up
     unittest_helper:stop_ring(),
     Result.
+
+-spec count_outdated(?RT:key()) -> non_neg_integer().
+count_outdated(Key) ->
+    Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
+    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, rrepair, Req}),
+    receive
+        {count_old_replicas_reply, Old} -> Old
+    end.
 
 -spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
 get_symmetric_keys(NodeCount) ->
@@ -354,16 +394,13 @@ startSyncRound(NodeKeys) ->
     ok.
 
 waitForSyncRoundEnd(NodeKeys) ->
+    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sync}},
     lists:foreach(
-      fun(Node) -> 
+      fun(Key) -> 
               util:wait_for(
                 fun() -> 
-                        api_dht_raw:unreliable_lookup(Node, 
-                                                      {send_to_group_member, rrepair, 
-                                                       {get_state, comm:this(), open_sync}}),
-                        receive
-                            {get_state_response, Val} -> Val =:= 0
-                        end
+                        api_dht_raw:unreliable_lookup(Key, Req),
+                        receive {get_state_response, Val} -> Val =:= 0 end
                 end)
       end, 
       NodeKeys),

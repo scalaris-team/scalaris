@@ -73,14 +73,14 @@
                   merkle_tree:merkle_tree() |
                   art:art() |                        
                   [internal_params()].
--type recon_dest() :: comm:mypid() | random.
+-type recon_dest() :: ?RT:key() | random.
 
 -record(rr_recon_state,
         {
          ownerLocalPid      = ?required(rr_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
          ownerRemotePid     = ?required(rr_recon_state, ownerRemotePid) :: comm:mypid(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
-         dest_pid           = random                                    :: recon_dest(),             %dest dht node pid
+         dest_key           = random                                    :: recon_dest(),             %dest dht node pid
          dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
          dest_recon_pid     = undefined                                 :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                                 :: method(),                 %reconciliation method
@@ -97,7 +97,7 @@
                              not_found.
 
 -type request() :: 
-    {start, method(), DestPid::recon_dest()} |
+    {start, method(), DestKey::recon_dest()} |
     {continue, method(), stage(), struct(), Master::boolean()}.          
 
 -type message() ::          
@@ -139,14 +139,16 @@ on({get_state_response, MyI}, State =
                         method = Method,
                         struct = Params,                        
                         dhtNodePid = DhtPid,
-                        dest_rr_pid = DestRUPid }) ->
-    Method =:= merkle_tree andalso fd:subscribe(DestRUPid),
+                        dest_rr_pid = DestRRPid }) ->
+    ?TRACE("REQ SHARED INTERVAL", []),
+    Method =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SrcI = proplists:get_value(interval, Params),
     Intersection = intervals:intersection(mapInterval(MyI, 1), mapInterval(SrcI, 1)),
     case intervals:is_empty(Intersection) of
         true -> comm:send_local(self(), {shutdown, intersection_empty});
         false ->
             MyIntersec = mapInterval_to_range(Intersection, MyI, 2),
+            ?TRACE("REQ SHARED INTERVAL 2~nMyI=~p - SrcI=~p ~n Intersec=~p - MyIntersec=~p", [MyI, SrcI, Intersection, MyIntersec]),
             send_chunk_req(DhtPid, self(), MyIntersec, Intersection, get_max_items(Method))
     end,
     State#rr_recon_state{ stage = build_struct,
@@ -179,6 +181,7 @@ on({get_state_response, MyI}, State =
                        }) ->
     MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
     MySyncI = intervals:intersection(MyI, MyBloomI),
+    ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n SynI=~p", [MyI, MyBloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
         true -> comm:send_local(self(), {shutdown, empty_interval});
         false -> send_chunk_req(DhtPid, self(), MySyncI, 
@@ -187,6 +190,7 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_chunk_response, {_, []}}, State) ->
+    ?TRACE("BUILD STRUCT", []),
     comm:send_local(self(), {shutdown, req_chunk_is_empty}),
     State;
 
@@ -198,6 +202,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         dhtNodePid = DhtNodePid,
                         master = SyncMaster,
                         stats = Stats }) ->
+    ?TRACE("BUILD STRUCT", []),
     SyncI = proplists:get_value(interval, Params),    
     ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
@@ -222,6 +227,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
                           true -> {reconciliation, Stats}
                        end,
+    ?TRACE("BUILD STRUCT 2", []),
     State#rr_recon_state{ stage = NStage, 
                           struct = SyncStruct, 
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
@@ -236,6 +242,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
                         round = Round }) ->
+    ?TRACE("BUILD STRUCT", []),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
@@ -264,7 +271,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
     
-on({start, Method, DestPid}, State) ->
+on({start, Method, DestKey}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
     Stage = case Method of
                 bloom -> build_struct;
@@ -274,7 +281,7 @@ on({start, Method, DestPid}, State) ->
     State#rr_recon_state{ stage = Stage, 
                           struct = {},
                           method = Method,
-                          dest_pid = DestPid,
+                          dest_key = DestKey,
                           master = true };
 
 on({continue, Method, Stage, Struct, Master}, State) ->
@@ -563,6 +570,7 @@ fill_bloom([DB_Entry_Enc | T], KeyBF, VerBF) ->
     is_subtype(I,           intervals:interval()),
     is_subtype(MaxItems,    pos_integer()).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
+    ?TRACE("PRE SEND CHUNK REQ", []),
     comm:send_local(
       DhtPid, 
       {get_chunk, SrcPid, I, 
@@ -572,6 +580,7 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
                           db_entry:get_version(Item)) 
        end,
        MaxItems}),
+    ?TRACE("POST SEND CHUNK REQ", []),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -602,15 +611,17 @@ when
   is_subtype(MyI,     intervals:interval()),
   is_subtype(Req,     request()),
   is_subtype(State,   state()).
-start_to_dest(MyI, Req, #rr_recon_state{ dest_pid = DestPid,
+start_to_dest(MyI, Req, #rr_recon_state{ dest_key = DestKey,
                                          dhtNodePid = DhtPid,
                                          round = Round,
                                          ownerRemotePid = OwnerPid }) ->
-    Msg = {send_to_group_member, rrepair, {continue_recon, OwnerPid, Round, Req}},
-    case DestPid of
-        random -> comm:send_local(DhtPid, {lookup_aux, select_sync_node(MyI), 0, Msg});
-        _ -> comm:send(DestPid, Msg)
-    end.
+    Msg = {send_to_group_member, rrepair, {continue_recon, OwnerPid, Round, Req}},    
+    DKey = case DestKey of
+               random -> select_sync_node(MyI);        
+               _ -> DestKey
+           end,
+    ?TRACE("START_TO_DEST ~p", [DestKey]),
+    comm:send_local(DhtPid, {lookup_aux, DKey, 0, Msg}).
 
 % @doc selects a random associated key of an interval ending
 -spec select_sync_node(intervals:interval()) -> ?RT:key().
@@ -672,7 +683,7 @@ mapInterval(I, Q) ->
 % @doc Tries to map SrcI into a destination Interval (DestRange)
 -spec mapInterval_to_range(intervals:interval(), intervals:interval(), pos_integer()) -> intervals:interval() | error.
 mapInterval_to_range(I, I, _) -> I;
-mapInterval_to_range(SrcI, DestRange, Q) ->
+mapInterval_to_range(SrcI, DestRange, Q) ->    
     {_, LKey, _, _} = intervals:get_bounds(SrcI),
     RepFactor = length(?RT:get_replica_keys(LKey)),
     case Q > RepFactor of
