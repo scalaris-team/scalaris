@@ -25,6 +25,8 @@ import org.junit.Test;
 
 import de.zib.scalaris.TransactionSingleOp.RequestList;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Unit test for the {@link TransactionSingleOp} class.
@@ -780,10 +782,10 @@ public class TransactionSingleOpTest {
             final RequestList writeRequests = new RequestList();
             for (int i = 0; i < testData.length; ++i) {
                 if ((i % 2) == 0) {
-                    firstWriteRequests.addWrite(testTime + key + i, testData[i]);
+                    firstWriteRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
                 }
-                writeRequests.addWrite(testTime + key + i, testData[i]);
-                readRequests.addRead(testTime + key + i);
+                writeRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
+                readRequests.addOp(new ReadOp(testTime + key + i));
             }
 
             ResultList results = conn.req_list(firstWriteRequests);

@@ -35,6 +35,7 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Provides abilities to read an xml wiki dump file and write its contents to
@@ -234,7 +235,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     
     protected <T> void writeToScalaris(String key, T value) {
         ++importedKeys;
-        requests.addWrite(key, value);
+        requests.addOp(new WriteOp(key, value));
         // bundle requests:
         if (requests.size() >= REQUEST_BUNDLE_SIZE) {
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "keys up to " + key);

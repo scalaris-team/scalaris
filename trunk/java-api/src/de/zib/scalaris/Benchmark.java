@@ -33,6 +33,11 @@ import com.ericsson.otp.erlang.OtpErlangBinary;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.WriteOp;
+
 /**
  * Provides methods to run benchmarks and print the results.
  *
@@ -394,7 +399,7 @@ public class Benchmark {
 
         protected void operation(final Transaction tx, final int j) throws Exception {
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addAddOnNr(key, 1).addCommit();
+            reqs.addOp(new AddOnNrOp(key, 1)).addCommit();
 //            final int value_old = tx.read(key).intValue();
 //            reqs.addWrite(key, value_old + 1).addCommit();
             final Transaction.ResultList results = tx.req_list(reqs);
@@ -519,7 +524,7 @@ public class Benchmark {
             final Transaction tx_init = new Transaction();
             final Transaction.RequestList reqs = new Transaction.RequestList();
             for (int i = 0; i < keys.length; ++i) {
-                reqs.addWrite(keys[i], valueInit[i]);
+                reqs.addOp(new WriteOp(keys[i], valueInit[i]));
             }
             reqs.addCommit();
             final Transaction.ResultList results = tx_init.req_list(reqs);
@@ -536,9 +541,9 @@ public class Benchmark {
             // read old values into the transaction
             for (int i = 0; i < keys.length; ++i) {
                 if (value instanceof OtpErlangObject) {
-                    reqs.addRead(new OtpErlangString(keys[i]));
+                    reqs.addOp(new ReadOp(new OtpErlangString(keys[i])));
                 } else {
-                    reqs.addRead(keys[i]);
+                    reqs.addOp(new ReadOp(keys[i]));
                 }
             }
             reqs.addCommit();
@@ -556,9 +561,9 @@ public class Benchmark {
             for (int i = 0; i < keys.length; ++i) {
                 final T value = valueWrite[j % valueWrite.length];
                 if (value instanceof OtpErlangObject) {
-                    reqs.addWrite(new OtpErlangString(keys[i]), (OtpErlangObject) value);
+                    reqs.addOp(new WriteOp(new OtpErlangString(keys[i]), (OtpErlangObject) value));
                 } else {
-                    reqs.addWrite(keys[i], value);
+                    reqs.addOp(new WriteOp(keys[i], value));
                 }
             }
             reqs.addCommit();
@@ -689,7 +694,7 @@ public class Benchmark {
         protected void pre_init(final int j) throws Exception {
             final Transaction tx_init = new Transaction();
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addWrite(key + '_' + j, valueInit).addCommit();
+            reqs.addOp(new WriteOp(key + '_' + j, valueInit)).addCommit();
             final Transaction.ResultList results = tx_init.req_list(reqs);
             results.processWriteAt(0);
             tx_init.closeConnection();
@@ -697,7 +702,7 @@ public class Benchmark {
 
         protected void operation(final Transaction tx, final int j) throws Exception {
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addAddDelOnList(key + '_' + j, Arrays.asList(value), new ArrayList<String>(0));
+            reqs.addOp(new AddDelOnListOp(key + '_' + j, Arrays.asList(value), new ArrayList<String>(0)));
             reqs.addCommit();
 //            // read old list into the transaction
 //            final List<String> list = tx.read(key + '_' + j).stringListValue();

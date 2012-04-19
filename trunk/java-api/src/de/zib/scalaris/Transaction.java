@@ -25,6 +25,14 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.TestAndSetOp;
+import de.zib.scalaris.operations.TransactionOperation;
+import de.zib.scalaris.operations.WriteOp;
+
 /**
  * Provides means to realise a transaction with the scalaris ring using Java.
  *
@@ -156,6 +164,18 @@ public class Transaction {
          */
         public RequestList(final RequestList other) {
             super(other);
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.RequestList#addOp(de.zib.scalaris.operations.Operation)
+         */
+        @Override
+        public RequestList addOp(final Operation op)
+                throws UnsupportedOperationException {
+            if (!(op instanceof TransactionOperation)) {
+                throw new UnsupportedOperationException();
+            }
+            return (RequestList) super.addOp(op);
         }
 
         /**
@@ -457,7 +477,7 @@ public class Transaction {
             throws ConnectionException, TimeoutException, NotFoundException,
             UnknownException {
         try {
-            final ResultList result = req_list((RequestList) new RequestList().addRead(key));
+            final ResultList result = req_list(new RequestList().addOp(new ReadOp(key)));
             if (result.size() == 1) {
                 return result.processReadAt(0);
             }
@@ -517,7 +537,7 @@ public class Transaction {
     public void write(final OtpErlangString key, final OtpErlangObject value)
             throws ConnectionException, TimeoutException, UnknownException {
         try {
-            final ResultList result = req_list((RequestList) new RequestList().addWrite(key, value));
+            final ResultList result = req_list(new RequestList().addOp(new WriteOp(key, value)));
             if (result.size() == 1) {
                 result.processWriteAt(0);
             } else {
@@ -581,12 +601,12 @@ public class Transaction {
      *
      * @since 3.9
      */
-    public void addDelOnList(final OtpErlangObject key, final OtpErlangList toAdd,
+    public void addDelOnList(final OtpErlangString key, final OtpErlangList toAdd,
             final OtpErlangList toRemove) throws ConnectionException,
             TimeoutException, NotAListException, UnknownException {
         try {
             final RequestList reqs = new RequestList();
-            reqs.addAddDelOnList(key, toAdd, toRemove);
+            reqs.addOp(new AddDelOnListOp(key, toAdd, toRemove));
             final ResultList result = req_list(reqs);
             if (result.size() == 1) {
                 result.processAddDelOnListAt(0);
@@ -622,7 +642,7 @@ public class Transaction {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @see #addDelOnList(OtpErlangObject, OtpErlangList, OtpErlangList)
+     * @see #addDelOnList(OtpErlangString, OtpErlangList, OtpErlangList)
      * @since 3.9
      */
     public <T> void addDelOnList(final String key, final List<T> toAdd,
@@ -666,11 +686,11 @@ public class Transaction {
      * @see #addOnNr_(RequestList)
      * @since 3.9
      */
-    public void addOnNr(final OtpErlangObject key, final OtpErlangLong toAdd)
+    public void addOnNr(final OtpErlangString key, final OtpErlangLong toAdd)
             throws ConnectionException, TimeoutException, NotANumberException,
             UnknownException {
         final RequestList reqs = new RequestList();
-        reqs.addAddOnNr(key, toAdd);
+        reqs.addOp(new AddOnNrOp(key, toAdd));
         addOnNr_(reqs);
     }
 
@@ -698,11 +718,11 @@ public class Transaction {
      * @see #addOnNr_(RequestList)
      * @since 3.9
      */
-    public void addOnNr(final OtpErlangObject key, final OtpErlangDouble toAdd)
+    public void addOnNr(final OtpErlangString key, final OtpErlangDouble toAdd)
             throws ConnectionException, TimeoutException, NotANumberException,
             UnknownException {
         final RequestList reqs = new RequestList();
-        reqs.addAddOnNr(key, toAdd);
+        reqs.addOp(new AddOnNrOp(key, toAdd));
         addOnNr_(reqs);
     }
 
@@ -765,8 +785,8 @@ public class Transaction {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @see #addOnNr(OtpErlangObject, OtpErlangLong)
-     * @see #addOnNr(OtpErlangObject, OtpErlangDouble)
+     * @see #addOnNr(OtpErlangString, OtpErlangLong)
+     * @see #addOnNr(OtpErlangString, OtpErlangDouble)
      * @since 3.9
      */
     public <T> void addOnNr(final String key, final T toAdd)
@@ -814,7 +834,7 @@ public class Transaction {
             KeyChangedException, UnknownException {
         try {
             final RequestList reqs = new RequestList();
-            reqs.addTestAndSet(key, oldValue, newValue);
+            reqs.addOp(new TestAndSetOp(key, oldValue, newValue));
             final ResultList result = req_list(reqs);
             if (result.size() == 1) {
                 result.processTestAndSetAt(0);

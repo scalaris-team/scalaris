@@ -22,6 +22,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.operations.ReadOp;
 
 /**
  * Implements a read operation (tolerates "not found" and in this case contains
@@ -69,7 +70,7 @@ public class ScalarisReadOp implements ScalarisOp {
      */
     protected int prepareRead(final RequestList requests) throws OtpErlangException,
             UnknownException {
-        requests.addRead(key);
+        requests.addOp(new ReadOp(key));
         return 0;
     }
 

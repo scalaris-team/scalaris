@@ -30,29 +30,30 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * @version 3.12
  * @since 2.5
  */
-final class CommonErlangObjects {
-    static final OtpErlangAtom readAtom = new OtpErlangAtom("read");
-    static final OtpErlangAtom writeAtom = new OtpErlangAtom("write");
-    static final OtpErlangAtom addDelOnListAtom = new OtpErlangAtom("add_del_on_list");
-    static final OtpErlangAtom testAndSetAtom = new OtpErlangAtom("test_and_set");
-    static final OtpErlangAtom addOnNrAtom = new OtpErlangAtom("add_on_nr");
-    static final OtpErlangAtom okAtom = new OtpErlangAtom("ok");
-    static final OtpErlangAtom failAtom = new OtpErlangAtom("fail");
-    static final OtpErlangAtom abortAtom = new OtpErlangAtom("abort");
-    static final OtpErlangAtom timeoutAtom = new OtpErlangAtom("timeout");
-    static final OtpErlangAtom notFoundAtom = new OtpErlangAtom("not_found");
-    static final OtpErlangAtom keyChangedAtom = new OtpErlangAtom("key_changed");
-    static final OtpErlangAtom notAListAtom = new OtpErlangAtom("not_a_list");
-    static final OtpErlangAtom notANumberAtom = new OtpErlangAtom("not_a_number");
-    static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
-    static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
+@SuppressWarnings("javadoc")
+public final class CommonErlangObjects {
+    public static final OtpErlangAtom readAtom = new OtpErlangAtom("read");
+    public static final OtpErlangAtom writeAtom = new OtpErlangAtom("write");
+    public static final OtpErlangAtom addDelOnListAtom = new OtpErlangAtom("add_del_on_list");
+    public static final OtpErlangAtom testAndSetAtom = new OtpErlangAtom("test_and_set");
+    public static final OtpErlangAtom addOnNrAtom = new OtpErlangAtom("add_on_nr");
+    public static final OtpErlangAtom okAtom = new OtpErlangAtom("ok");
+    public static final OtpErlangAtom failAtom = new OtpErlangAtom("fail");
+    public static final OtpErlangAtom abortAtom = new OtpErlangAtom("abort");
+    public static final OtpErlangAtom timeoutAtom = new OtpErlangAtom("timeout");
+    public static final OtpErlangAtom notFoundAtom = new OtpErlangAtom("not_found");
+    public static final OtpErlangAtom keyChangedAtom = new OtpErlangAtom("key_changed");
+    public static final OtpErlangAtom notAListAtom = new OtpErlangAtom("not_a_list");
+    public static final OtpErlangAtom notANumberAtom = new OtpErlangAtom("not_a_number");
+    public static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
+    public static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
 
     // JSON
-    static final OtpErlangAtom structAtom = new OtpErlangAtom("struct");
-    static final OtpErlangAtom arrayAtom = new OtpErlangAtom("array");
-    static final OtpErlangAtom trueAtom = new OtpErlangAtom("true");
-    static final OtpErlangAtom falseAtom = new OtpErlangAtom("false");
-    static final OtpErlangAtom nullAtom = new OtpErlangAtom("null");
+    public static final OtpErlangAtom structAtom = new OtpErlangAtom("struct");
+    public static final OtpErlangAtom arrayAtom = new OtpErlangAtom("array");
+    public static final OtpErlangAtom trueAtom = new OtpErlangAtom("true");
+    public static final OtpErlangAtom falseAtom = new OtpErlangAtom("false");
+    public static final OtpErlangAtom nullAtom = new OtpErlangAtom("null");
 
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as

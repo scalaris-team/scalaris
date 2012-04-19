@@ -23,6 +23,9 @@ import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.TransactionSingleOpOperation;
+
 /**
  * Provides methods to read and write key/value pairs to/from a scalaris ring.
  *
@@ -156,6 +159,18 @@ public class TransactionSingleOp {
          */
         public RequestList(final RequestList other) {
             super(other);
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.RequestList#addOp(de.zib.scalaris.operations.Operation)
+         */
+        @Override
+        public RequestList addOp(final Operation op)
+                throws UnsupportedOperationException {
+            if (!(op instanceof TransactionSingleOpOperation)) {
+                throw new UnsupportedOperationException();
+            }
+            return (RequestList) super.addOp(op);
         }
 
         /**

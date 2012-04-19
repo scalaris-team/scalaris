@@ -20,6 +20,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.operations.AddOnNrOp;
 
 /**
  * Implements an increment operation using the increment operation of
@@ -72,7 +73,7 @@ public class ScalarisIncrementOp2<T extends Number> implements ScalarisOp {
      */
     protected int prepareIncrement(final RequestList requests) throws OtpErlangException,
             UnknownException {
-        requests.addAddOnNr(key, value);
+        requests.addOp(new AddOnNrOp(key, value));
         return 0;
     }
 
