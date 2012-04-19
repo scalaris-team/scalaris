@@ -28,4 +28,4 @@
 apply(Bin) when is_binary(Bin) ->
     {Module, Function, Parameters} = binary_to_term(Bin),
     Result = erlang:apply(Module, Function, Parameters),
-    term_to_binary(Result, [compressed, {minor_version, 1}]).
+    term_to_binary(Result, [{compressed, 2}, {minor_version, 1}]).
