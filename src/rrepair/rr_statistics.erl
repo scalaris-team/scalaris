@@ -86,9 +86,9 @@ on({get_chunk_response, {_, DBList}},
                          V1 = db_entry:get_version(receive {get_key_entry_reply, E1} -> E1 end),
                          V2 = db_entry:get_version(receive {get_key_entry_reply, E2} -> E2 end),
                          V3 = db_entry:get_version(receive {get_key_entry_reply, E3} -> E3 end),
-                         case Ver < lists:max([V1, V2, V3]) of
-                             true -> Acc + 1;
-                             false -> Acc
+                         case Ver =:= lists:max([V1, V2, V3]) of
+                             true -> Acc;
+                             false -> Acc + 1
                          end
                  end, 
                  0, DBList),
