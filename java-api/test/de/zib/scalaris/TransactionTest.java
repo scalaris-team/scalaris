@@ -26,6 +26,8 @@ import org.junit.Test;
 
 import de.zib.scalaris.Transaction.RequestList;
 import de.zib.scalaris.Transaction.ResultList;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.WriteOp;
 
 
 /**
@@ -1235,10 +1237,10 @@ public class TransactionTest {
             final RequestList writeRequests = new RequestList();
             for (int i = 0; i < testData.length; ++i) {
                 if ((i % 2) == 0) {
-                    firstWriteRequests.addWrite(testTime + key + i, testData[i]);
+                    firstWriteRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
                 }
-                writeRequests.addWrite(testTime + key + i, testData[i]);
-                readRequests.addRead(testTime + key + i);
+                writeRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
+                readRequests.addOp(new ReadOp(testTime + key + i));
             }
 
             ResultList results = conn.req_list(firstWriteRequests);
@@ -1317,7 +1319,7 @@ public class TransactionTest {
             }
             System.out.println(("[" + new Date()).toString() + "] 1b");
             final Transaction.RequestList reqs = new Transaction.RequestList();
-            reqs.addWrite(testTime + key, list).addCommit();
+            reqs.addOp(new WriteOp(testTime + key, list)).addCommit();
             System.out.println(("[" + new Date()).toString() + "] 2a");
             t.req_list(reqs);
             System.out.println(("[" + new Date()).toString() + "] 2b");

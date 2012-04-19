@@ -266,7 +266,7 @@
             resist so that the main program can access it
         -->
     <copy file="src/scalaris.properties" todir="." />
-    <jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/*.class de/zib/scalaris/executor/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
+    <jar destfile="${scalaris.dist.filename}.jar" basedir="${scalaris.classes.dirname}" includes="de/zib/scalaris/*.class de/zib/scalaris/executor/*.class de/zib/scalaris/operations/*.class de/zib/tools/*.class" excludes="**/examples** **/*Test.class **/*Test$*.class">
       <manifest>
         <attribute name="Built-By" value="${user.name}" />
         <attribute name="Bundle-Vendor" value="Zuse Institute Berlin" />

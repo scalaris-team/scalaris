@@ -3,6 +3,8 @@ package de.zib.scalaris.examples.wikipedia;
 import java.util.List;
 
 import de.zib.scalaris.RequestList;
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
 
 /**
  * Implements a list append operation using the append operation of Scalaris.
@@ -46,9 +48,9 @@ public class ScalarisListAppendRemoveOp2<T> extends ScalarisChangeListOp2 {
      */
     @Override
     protected int changeList(final RequestList requests) {
-        requests.addAddDelOnList(key, toAdd, toRemove);
+        requests.addOp(new AddDelOnListOp(key, toAdd, toRemove));
         if (countKey != null) {
-            requests.addAddOnNr(countKey, toAdd.size() - toRemove.size());
+            requests.addOp(new AddOnNrOp(countKey, toAdd.size() - toRemove.size()));
         }
         return 0;
     }

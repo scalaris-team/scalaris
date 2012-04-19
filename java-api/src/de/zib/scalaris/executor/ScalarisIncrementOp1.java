@@ -24,6 +24,8 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Implements an increment operation using the read and write operations of
@@ -84,7 +86,7 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
      * @return <tt>0</tt> (no operation processed since no results are used)
      */
     protected int prepareRead(final RequestList requests) {
-        requests.addRead(key);
+        requests.addOp(new ReadOp(key));
         return 0;
     }
 
@@ -112,7 +114,7 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
             currrentValue = BigInteger.ZERO;
         }
         currrentValue.add(value);
-        requests.addWrite(key, currrentValue);
+        requests.addOp(new WriteOp(key, currrentValue));
         return 1;
     }
 

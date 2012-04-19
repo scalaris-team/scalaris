@@ -12,6 +12,8 @@ import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.executor.ScalarisOp;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Implements a list change operation using the read and write operations of
@@ -71,7 +73,7 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
      * @return <tt>0</tt> (no operation processed since no results are used)
      */
     protected int prepareRead(final RequestList requests) {
-        requests.addRead(key);
+        requests.addOp(new ReadOp(key));
         return 0;
     }
 
@@ -97,9 +99,9 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
         }
         changeList(pageList);
         if (listChanged) {
-            requests.addWrite(key, pageList);
+            requests.addOp(new WriteOp(key, pageList));
             if (countKey != null && listCountChanged) {
-                requests.addWrite(countKey, pageList.size());
+                requests.addOp(new WriteOp(countKey, pageList.size()));
             }
         }
         return 1;

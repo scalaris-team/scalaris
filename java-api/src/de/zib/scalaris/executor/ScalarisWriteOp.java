@@ -20,6 +20,7 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Implements a write operation.
@@ -71,7 +72,7 @@ public class ScalarisWriteOp<T> implements ScalarisOp {
      */
     protected int prepareWrite(final RequestList requests) throws OtpErlangException,
             UnknownException {
-        requests.addWrite(key, value);
+        requests.addOp(new WriteOp(key, value));
         return 0;
     }
 

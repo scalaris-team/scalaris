@@ -41,6 +41,7 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Provides abilities to read an xml wiki dump file and write its contents to
@@ -188,10 +189,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         for (Revision rev : revisions) {
             String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
-            requests.addWrite(key, rev);
+            requests.addOp(new WriteOp(key, rev));
         }
-        requests.addWrite(ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short);
-        requests.addWrite(ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()), page);
+        requests.addOp(new WriteOp(ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short));
+        requests.addOp(new WriteOp(ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()), page));
         Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
         executor.execute(worker);
         newPages.get(namespace).add(wikiModel.normalisePageTitle(page.getTitle()));
@@ -227,7 +228,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         
         // articles count:
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-        requests.addWrite(ScalarisDataHandler.getArticleCountKey(), articleCount);
+        requests.addOp(new WriteOp(ScalarisDataHandler.getArticleCountKey(), articleCount));
         worker = new MyScalarisSingleRunnable(requests, scalaris_single, "article count");
         pageListExecutor.execute(worker);
         

@@ -24,18 +24,37 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
-import com.ericsson.otp.erlang.OtpErlangTuple;
+
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.TestAndSetOp;
+import de.zib.scalaris.operations.TransactionOperation;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Generic request list.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.12
+ * @version 3.14
  * @since 3.5
  */
 public abstract class RequestList {
-    protected final List<OtpErlangObject> requests = new ArrayList<OtpErlangObject>(10);
+    protected final List<Operation> requests = new ArrayList<Operation>(10);
     private boolean isCommit = false;
+
+    protected static class CommitOp implements TransactionOperation {
+        public CommitOp() {
+        }
+
+        public OtpErlangObject getErlang() {
+            return CommonErlangObjects.commitTupleAtom;
+        }
+        public OtpErlangString getKey() {
+            return null;
+        }
+    }
 
     /**
      * Default constructor.
@@ -53,10 +72,10 @@ public abstract class RequestList {
     }
 
     /**
-     * Adds a read operation to the list of requests.
+     * Adds a generic operation to the list of requests.
      *
-     * @param key
-     *            the key to read
+     * @param op
+     *            the operation to add
      *
      * @return this {@link RequestList} object
      *
@@ -64,14 +83,12 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      */
-    public RequestList addRead(final OtpErlangObject key)
-            throws UnsupportedOperationException {
+    public RequestList addOp(final Operation op) throws UnsupportedOperationException {
         if (isCommit) {
-            throw new UnsupportedOperationException("No further request supported after a commit!");
+            throw new UnsupportedOperationException(
+                    "No further request supported after a commit!");
         }
-        final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.readAtom, key });
-        requests.add(req);
+        requests.add(op);
         return this;
     }
 
@@ -87,9 +104,28 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      */
+    @Deprecated
+    public RequestList addRead(final OtpErlangString key)
+            throws UnsupportedOperationException {
+        return addOp(new ReadOp(key));
+    }
+
+    /**
+     * Adds a read operation to the list of requests.
+     *
+     * @param key
+     *            the key to read
+     *
+     * @return this {@link RequestList} object
+     *
+     * @throws UnsupportedOperationException
+     *             if the operation is unsupported, e.g. there may only be one
+     *             "commit" in a request list and no request after that
+     */
+    @Deprecated
     public RequestList addRead(final String key)
             throws UnsupportedOperationException {
-        return addRead(new OtpErlangString(key));
+        return addOp(new ReadOp(key));
     }
 
     /**
@@ -106,15 +142,10 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      */
-    public RequestList addWrite(final OtpErlangObject key, final OtpErlangObject value)
+    @Deprecated
+    public RequestList addWrite(final OtpErlangString key, final OtpErlangObject value)
             throws UnsupportedOperationException {
-        if (isCommit) {
-            throw new UnsupportedOperationException("No further request supported after a commit!");
-        }
-        final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.writeAtom, key, value });
-        requests.add(req);
-        return this;
+        return addOp(new WriteOp(key, value));
     }
 
     /**
@@ -133,9 +164,10 @@ public abstract class RequestList {
      *             if the operation is unsupported, e.g. there may only be one
      *             "commit" in a request list and no request after that
      */
+    @Deprecated
     public <T> RequestList addWrite(final String key, final T value)
             throws UnsupportedOperationException {
-        return addWrite(new OtpErlangString(key), ErlangValue.convertToErlang(value));
+        return addOp(new WriteOp(key, value));
     }
 
     /**
@@ -156,15 +188,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
-    public RequestList addAddDelOnList(final OtpErlangObject key, final OtpErlangList toAdd, final OtpErlangList toRemove)
+    @Deprecated
+    public RequestList addAddDelOnList(final OtpErlangString key, final OtpErlangList toAdd, final OtpErlangList toRemove)
             throws UnsupportedOperationException {
-        if (isCommit) {
-            throw new UnsupportedOperationException("No further request supported after a commit!");
-        }
-        final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.addDelOnListAtom, key, toAdd, toRemove });
-        requests.add(req);
-        return this;
+        return addOp(new AddDelOnListOp(key, toAdd, toRemove));
     }
 
     /**
@@ -187,11 +214,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
+    @Deprecated
     public <T> RequestList addAddDelOnList(final String key, final List<T> toAdd, final List<T> toRemove)
             throws UnsupportedOperationException {
-        final OtpErlangList toAddErl = (toAdd == null) ? new OtpErlangList() : (OtpErlangList) ErlangValue.convertToErlang(toAdd);
-        final OtpErlangList toRemoveErl = (toRemove == null) ? new OtpErlangList() : (OtpErlangList) ErlangValue.convertToErlang(toRemove);
-        return addAddDelOnList(new OtpErlangString(key), toAddErl, toRemoveErl);
+        return addOp(new AddDelOnListOp(key, toAdd, toRemove));
     }
 
     /**
@@ -210,9 +236,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
-    public RequestList addAddOnNr(final OtpErlangObject key, final OtpErlangLong toAdd)
+    @Deprecated
+    public RequestList addAddOnNr(final OtpErlangString key, final OtpErlangLong toAdd)
             throws UnsupportedOperationException {
-        return addAddOnNr_(key, toAdd);
+        return addOp(new AddOnNrOp(key, toAdd));
     }
 
     /**
@@ -231,36 +258,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
-    public RequestList addAddOnNr(final OtpErlangObject key, final OtpErlangDouble toAdd)
+    @Deprecated
+    public RequestList addAddOnNr(final OtpErlangString key, final OtpErlangDouble toAdd)
             throws UnsupportedOperationException {
-        return addAddOnNr_(key, toAdd);
-    }
-
-    /**
-     * Adds an add_on_nr operation to the list of requests.
-     *
-     * @param key
-     *            the key to write the value to
-     * @param toAdd
-     *            the number to add to the number stored at key
-     *
-     * @return this {@link RequestList} object
-     *
-     * @throws UnsupportedOperationException
-     *             if the operation is unsupported, e.g. there may only be one
-     *             "commit" in a request list and no request after that
-     *
-     * @since 3.9
-     */
-    protected RequestList addAddOnNr_(final OtpErlangObject key, final OtpErlangObject toAdd)
-            throws UnsupportedOperationException {
-        if (isCommit) {
-            throw new UnsupportedOperationException("No further request supported after a commit!");
-        }
-        final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.addOnNrAtom, key, toAdd });
-        requests.add(req);
-        return this;
+        return addOp(new AddOnNrOp(key, toAdd));
     }
 
     /**
@@ -284,10 +285,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
+    @Deprecated
     public <T extends Number> RequestList addAddOnNr(final String key, final T toAdd)
             throws UnsupportedOperationException {
-        return addAddOnNr_(new OtpErlangString(key),
-                ErlangValue.convertToErlang(toAdd));
+        return addOp(new AddOnNrOp(key, toAdd));
     }
 
     /**
@@ -306,10 +307,10 @@ public abstract class RequestList {
      *
      * @since 3.9
      */
+    @Deprecated
     public RequestList addAddOnNr(final String key, final Double toAdd)
             throws UnsupportedOperationException {
-        return addAddOnNr(new OtpErlangString(key),
-                (OtpErlangDouble) ErlangValue.convertToErlang(toAdd));
+        return addOp(new AddOnNrOp(key, toAdd));
     }
 
     /**
@@ -331,15 +332,10 @@ public abstract class RequestList {
      *
      * @since 3.8
      */
-    public RequestList addTestAndSet(final OtpErlangObject key, final OtpErlangObject oldValue, final OtpErlangObject newValue)
+    @Deprecated
+    public RequestList addTestAndSet(final OtpErlangString key, final OtpErlangObject oldValue, final OtpErlangObject newValue)
             throws UnsupportedOperationException {
-        if (isCommit) {
-            throw new UnsupportedOperationException("No further request supported after a commit!");
-        }
-        final OtpErlangTuple req = new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.testAndSetAtom, key, oldValue, newValue });
-        requests.add(req);
-        return this;
+        return addOp(new TestAndSetOp(key, oldValue, newValue));
     }
 
     /**
@@ -367,11 +363,10 @@ public abstract class RequestList {
      *
      * @since 3.8
      */
+    @Deprecated
     public <OldT, NewT> RequestList addTestAndSet(final String key, final OldT oldValue, final NewT newValue)
             throws UnsupportedOperationException {
-        return addTestAndSet(new OtpErlangString(key),
-                ErlangValue.convertToErlang(oldValue),
-                ErlangValue.convertToErlang(newValue));
+        return addOp(new TestAndSetOp(key, oldValue, newValue));
     }
 
     /**
@@ -384,11 +379,7 @@ public abstract class RequestList {
      *             "commit" in a request list and no request after that
      */
     public RequestList addCommit() throws UnsupportedOperationException {
-        if (isCommit) {
-            throw new UnsupportedOperationException("Only one commit per request list allowed!");
-        }
-        final OtpErlangTuple req = CommonErlangObjects.commitTupleAtom;
-        requests.add(req);
+        addOp(new CommitOp());
         isCommit = true;
         return this;
     }
@@ -396,11 +387,17 @@ public abstract class RequestList {
     /**
      * Gets the whole request list as erlang terms as required by
      * <code>api_tx:req_list/2</code>
+     * Note: this parses through the requests to create the erlang objects.
      *
      * @return an erlang list of requests
      */
     OtpErlangList getErlangReqList() {
-        return new OtpErlangList(requests.toArray(new OtpErlangObject[0]));
+        final OtpErlangObject[] result = new OtpErlangObject[requests.size()];
+        int i = 0;
+        for (final Operation op : requests) {
+            result[i++] = op.getErlang();
+        }
+        return new OtpErlangList(result);
     }
 
     /**
@@ -441,12 +438,10 @@ public abstract class RequestList {
      */
     public List<String> keyList() {
         final ArrayList<String> result = new ArrayList<String>(requests.size());
-        for (final OtpErlangObject request : requests) {
-            if (request instanceof OtpErlangTuple) {
-                final OtpErlangTuple reqTpl = (OtpErlangTuple) request;
-                if ((reqTpl.arity() >= 2) && (reqTpl.elementAt(1) instanceof OtpErlangString)) {
-                    result.add(((OtpErlangString)reqTpl.elementAt(1)).stringValue());
-                }
+        for (final Operation op : requests) {
+            final OtpErlangString key = op.getKey();
+            if (key != null) {
+                result.add(key.stringValue());
             }
         }
         return result;

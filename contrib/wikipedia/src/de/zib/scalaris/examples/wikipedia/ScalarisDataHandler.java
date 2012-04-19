@@ -42,6 +42,7 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.operations.ReadOp;
 
 /**
  * Retrieves and writes values from/to Scalaris.
@@ -257,7 +258,8 @@ public class ScalarisDataHandler {
         
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-        requests.addRead(getPageKey(title, nsObject)).addRead(getRevListKey(title, nsObject));
+        requests.addOp(new ReadOp(getPageKey(title, nsObject)));
+        requests.addOp(new ReadOp(getRevListKey(title, nsObject)));
         
         TransactionSingleOp.ResultList results;
         try {
@@ -752,7 +754,7 @@ public class ScalarisDataHandler {
             TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
             for (String scalaris_key : scalaris_keys) {
                 involvedKeys.add(scalaris_key);
-                requests.addRead(scalaris_key);
+                requests.addOp(new ReadOp(scalaris_key));
             }
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
@@ -875,7 +877,7 @@ public class ScalarisDataHandler {
         String pageInfoKey = getPageKey(title0, nsObject);
         
         Transaction.RequestList requests = new Transaction.RequestList();
-        requests.addRead(pageInfoKey);
+        requests.addOp(new ReadOp(pageInfoKey));
         
         Transaction.ResultList results;
         try {
