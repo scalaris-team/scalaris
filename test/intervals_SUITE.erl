@@ -50,7 +50,7 @@ all() ->
      tester_get_bounds_continuous, tester_get_bounds, tester_get_elements,
      tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids, tester_mk_from_node_ids_continuous,
      tester_mk_from_nodes,
-     tester_split_is_continuous, tester_split_is_well_formed, tester_split
+     tester_split_is_continuous, tester_split_is_well_formed, tester_split, split_bounds
      ].
 
 suite() ->
@@ -746,6 +746,12 @@ tester_split_is_well_formed(_Config) ->
 tester_split(_Config) ->
     tester:test(?MODULE, prop_split, 3, 5000, [{threads, 2}]).
 
+split_bounds(_) ->
+    Q = intervals:split(intervals:all(), 4), %4=ReplicationFactor
+    Min = lists:min(lists:map(fun(I) -> {_, L, _, _} = intervals:get_bounds(I), L end, Q)),
+    Max = lists:max(lists:map(fun(I) -> {_, _, R, _} = intervals:get_bounds(I), R end, Q)),
+    ?equals(Min, ?MINUS_INFINITY) andalso ?equals(Max, ?PLUS_INFINITY).
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % node:mk_interval_between_ids/2, intervals:in/2 and intervals:is_continuous/1

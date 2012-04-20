@@ -31,6 +31,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+-define(REP_FACTOR, 4).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -record(rrNodeStatus, {
@@ -44,20 +46,21 @@
 basic_tests() ->
     [get_symmetric_keys_test,
      blobCoding,
-     mapInterval,
+     tester_get_key_quadrant,
+     tester_mapInterval,
      tester_minKeyInInterval].
 
 upd_tests() ->
     [upd_no_outdated,
      upd_min_nodes,     % sync in an single node ring
      upd_simple,        % run one sync round
-     %upd_dest,          % run one sync with a specified dest node 
+     upd_dest,          % run one sync with a specified dest node 
      upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
 
 all() ->
     [{group, basic_tests},
-     {group, upd_tests},
-     bloomSync_times
+     {group, upd_tests}
+     %bloomSync_times
      ].
 
 groups() ->
@@ -173,8 +176,7 @@ upd_dest(Config) ->
            [Method, SKey, CKey, SO, SONew, CO, CONew]),
     %clean up
     unittest_helper:stop_ring(),
-    %?implies(SO > 0, ?assert(SONew < SO)) andalso ?implies(CO > 0, ?assert(CONew < CO)).
-    true.
+    ?implies(SO > 0, ?assert(SONew < SO)) andalso ?implies(CO > 0, ?assert(CONew < CO)).
 
 upd_parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -215,17 +217,45 @@ blobCoding(_) ->
     ?equals_w_note(B, DB, io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])),
     ok.
 
-mapInterval(_) ->
-    K = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7, 8}),
-    I = intervals:new('[', K, ?MINUS_INFINITY ,']'),
-    ct:pal("I1=~p", [I]),
-    lists:foreach(fun(X) -> 
-                          MappedI = rr_recon:mapInterval(I, X),
-                          ?equals(intervals:is_empty(intervals:intersection(I, MappedI)),true),
-                          ?equals(rr_recon:get_interval_quadrant(MappedI), X)
-                  end, 
-                  [1,2,3]),
-    ok.
+-spec prop_get_key_quadrant(?RT:key()) -> boolean().
+prop_get_key_quadrant(Key) ->
+    Q = rr_recon:get_key_quadrant(Key),
+    QI = intervals:split(intervals:all(), 4),
+    {TestStatus, TestQ} = 
+        lists:foldl(fun(I, {Status, Nr} = Acc) ->
+                            case intervals:in(Key, I) of
+                                true when Status =:= no -> {yes, Nr};
+                                false when Status =:= no -> {no, Nr + 1};
+                                _ -> Acc
+                            end
+                    end, {no, 1}, QI),
+    ?assert(Q > 0 andalso Q =< ?REP_FACTOR) andalso
+        ?equals(TestStatus, yes) andalso
+        ?equals_w_note(TestQ, Q, 
+                       io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
+                                     [QI, Key, Q, TestQ])).
+tester_get_key_quadrant(_) ->
+    tester:test(?MODULE, prop_get_key_quadrant, 1, 4, [{threads, 4}]).
+
+-spec prop_mapInterval(?RT:key(), ?RT:key(), 1..4) -> true.
+prop_mapInterval(A, B, Q) ->
+    I = case A < B of
+            true -> intervals:new('[', A, B, ']');
+            false -> intervals:new('[', B, A, ']')
+        end,
+    Mapped = rr_recon:mapInterval(I, Q),
+    {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
+    LQ = rr_recon:get_key_quadrant(L1),
+    RQ = rr_recon:get_key_quadrant(R1),    
+    ?implies(LBr =:= '(', LQ =/= Q) andalso
+        ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso
+        ?implies(RBr =:= ')', RQ =/= Q) andalso
+        ?implies(RBr =:= ']', ?equals(RQ, Q)) andalso
+        ?implies(LBr =:= '[' andalso RBr =:= LBr, ?equals(LQ, RQ) andalso ?equals(LQ, Q)) andalso
+        ?equals(rr_recon:get_interval_quadrant(Mapped), Q).
+    
+tester_mapInterval(_) ->
+    tester:test(?MODULE, prop_mapInterval, 3, 10, [{threads, 1}]).
 
 -spec prop_minKeyInInterval(?RT:key(), ?RT:key()) -> true.
 prop_minKeyInInterval(L, L) -> true;

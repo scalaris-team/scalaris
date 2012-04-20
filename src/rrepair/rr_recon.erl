@@ -36,8 +36,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %DETAIL DEBUG MESSAGES
 %-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -49,6 +49,8 @@
 -ifdef(with_export_type_support).
 -export_type([method/0, request/0]).
 -endif.
+
+-define(REP_FACTOR, 4).
 
 -type method()         :: bloom | merkle_tree | art | iblt | undefined.
 -type stage()          :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
@@ -147,7 +149,11 @@ on({get_state_response, MyI}, State =
     case intervals:is_empty(Intersection) of
         true -> comm:send_local(self(), {shutdown, intersection_empty});
         false ->
-            MyIntersec = mapInterval_to_range(Intersection, MyI, 2),
+            MyIntersec = lists:foldl(fun(I, Acc) -> 
+                                             intervals:union(Acc, intervals:intersection(MyI, mapInterval(Intersection, I))) 
+                                     end, 
+                                     intervals:intersection(MyI, Intersection), 
+                                     lists:seq(2, ?REP_FACTOR)),
             ?TRACE("REQ SHARED INTERVAL 2~nMyI=~p - SrcI=~p ~n Intersec=~p - MyIntersec=~p", [MyI, SrcI, Intersection, MyIntersec]),
             send_chunk_req(DhtPid, self(), MyIntersec, Intersection, get_max_items(Method))
     end,
@@ -643,19 +649,22 @@ map_key_to_quadrant(Key, N) ->
 get_key_quadrant(Key) ->
     Keys = lists:sort(?RT:get_replica_keys(Key)),
     {_, Q} = lists:foldl(fun(X, {Status, Nr} = Acc) ->
-                                     case X =:= Key of
-                                         true when Status =:= no -> {yes, Nr};
-                                         false when Status =/= yes -> {no, Nr + 1};
-                                         _ -> Acc
-                                     end
-                             end, {no, 1}, Keys),
+                                 case X =:= Key of
+                                     true when Status =:= no -> {yes, Nr};
+                                     false when Status =:= no -> {no, Nr + 1};
+                                     _ -> Acc
+                                 end
+                         end, {no, 1}, Keys),
     Q.
 
 % @doc Returns the quadrant in which a given interval begins.
 -spec get_interval_quadrant(intervals:interval()) -> pos_integer().
 get_interval_quadrant(I) ->
-    {_, LKey, _, _} = intervals:get_bounds(I),
-    get_key_quadrant(LKey).        
+    {LBr, LKey, RKey, _} = intervals:get_bounds(I),
+    case LBr of
+        '[' -> get_key_quadrant(LKey);
+        '(' -> get_key_quadrant(?RT:get_split_key(LKey, RKey, {1, 2}))               
+    end.
 
 -spec add_quadrants_to_key(?RT:key(), non_neg_integer(), pos_integer()) -> ?RT:key().
 add_quadrants_to_key(Key, Add, RepFactor) ->
@@ -667,29 +676,34 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
     end.            
 
 % @doc Maps an arbitrary Interval to an Interval laying or starting in 
-%      the given RepQuadrant. The replication degree of X divides the keyspace into X replication qudrants.
+%      the given RepQuadrant. The replication degree X divides the keyspace into X replication qudrants.
 %      Interval has to be continuous!
 -spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
 mapInterval(I, Q) ->
+    Quadrants = intervals:split(intervals:all(), ?REP_FACTOR),
+    IQ = lists:foldl(fun(QI, Acc) ->
+                             Sec = intervals:intersection(QI, I),
+                             case intervals:is_empty(Sec) of
+                                 true -> Acc;
+                                 false -> [Sec | Acc]
+                             end
+                     end, [], Quadrants),
+    lists:foldl(fun(IS, Acc) -> 
+                        ISMapped = case get_interval_quadrant(IS)  of
+                                       Q -> IS;
+                                       _ -> p_mapInterval(IS, Q)
+                                   end,
+                        intervals:union(ISMapped, Acc)
+                end, intervals:empty(), IQ).
+
+p_mapInterval(I, Q) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
-    RepFactor = length(?RT:get_replica_keys(LKey)),
-    QDiff = (RepFactor - LQ + Q) rem RepFactor,
+    QDiff = (?REP_FACTOR - LQ + Q) rem ?REP_FACTOR,
     intervals:new(LBr, 
-                  add_quadrants_to_key(LKey, QDiff, RepFactor), 
-                  add_quadrants_to_key(RKey, QDiff, RepFactor), 
+                  add_quadrants_to_key(LKey, QDiff, ?REP_FACTOR), 
+                  add_quadrants_to_key(RKey, QDiff, ?REP_FACTOR), 
                   RBr).
-
-% @doc Tries to map SrcI into a destination Interval (DestRange)
--spec mapInterval_to_range(intervals:interval(), intervals:interval(), pos_integer()) -> intervals:interval() | error.
-mapInterval_to_range(I, I, _) -> I;
-mapInterval_to_range(SrcI, DestRange, Q) ->    
-    {_, LKey, _, _} = intervals:get_bounds(SrcI),
-    RepFactor = length(?RT:get_replica_keys(LKey)),
-    case Q > RepFactor of
-        true -> error;
-        false -> mapInterval_to_range(mapInterval(SrcI, Q), DestRange, Q + 1)
-    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
