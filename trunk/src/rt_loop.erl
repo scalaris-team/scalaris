@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -143,10 +143,11 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, TriggerSt
             % trigger immediate rebuild
             NewTriggerState = trigger:now(TriggerState),
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            new_state(NewNeighbors, NewRT, NewTriggerState);
-        {ok, NewRT} ->
-            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            new_state(NewNeighbors, NewRT, TriggerState)
+            new_state(NewNeighbors, NewRT, NewTriggerState)
+%%        ;
+%%        {ok, NewRT} ->
+%%            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+%%            new_state(NewNeighbors, NewRT, TriggerState)
     end;
 %% userdevguide-end rt_loop:update_rt
 
@@ -212,7 +213,7 @@ set_rt({Neighbors, _OldRT, TriggerState}, NewRT) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Notifies the node's routing table of a changed node ID, predecessor
-%%      and/or successor. Used to subscribe to the ring maintenance. 
+%%      and/or successor. Used to subscribe to the ring maintenance.
 -spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
                      OldNeighbors::nodelist:neighborhood(),
                      NewNeighbors::nodelist:neighborhood()) -> ok.

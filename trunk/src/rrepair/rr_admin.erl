@@ -109,7 +109,7 @@ fill_random(DBSize, Params) ->
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
     Keys = db_generator:get_db(I, DBSize, Distr),    
     insert_random_db(Keys, Params).
-fill_wiki(DBSize, Params) ->
+fill_wiki(_DBSize, _Params) ->
     %TODO
     #db_status{}.
 

@@ -177,9 +177,11 @@ escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
 %% @doc Variant of erlang:max/2 also taking ?PLUS_INFINITY_TYPE and
 %%      ?MINUS_INFINITY_TYPE into account, e.g. for comparing keys.
--spec max(?PLUS_INFINITY_TYPE, any()) -> ?PLUS_INFINITY_TYPE;
-         (any(), ?PLUS_INFINITY_TYPE) -> ?PLUS_INFINITY_TYPE;
-         (T | ?MINUS_INFINITY_TYPE, T | ?MINUS_INFINITY_TYPE) -> T.
+%% @end
+%%-spec max(?PLUS_INFINITY_TYPE, any()) -> ?PLUS_INFINITY_TYPE;
+%%         (any(), ?PLUS_INFINITY_TYPE) -> ?PLUS_INFINITY_TYPE;
+%%         (T | ?MINUS_INFINITY_TYPE, T | ?MINUS_INFINITY_TYPE) -> T.
+-spec max(any(), any()) -> any().
 max(?PLUS_INFINITY, _) -> ?PLUS_INFINITY;
 max(_, ?PLUS_INFINITY) -> ?PLUS_INFINITY;
 max(?MINUS_INFINITY, X) -> X;
@@ -192,9 +194,11 @@ max(A, B) ->
 
 %% @doc Variant of erlang:min/2 also taking ?PLUS_INFINITY_TYPE and
 %%      ?MINUS_INFINITY_TYPE into account, e.g. for comparing keys.
--spec min(?MINUS_INFINITY_TYPE, any()) -> ?MINUS_INFINITY_TYPE;
-         (any(), ?MINUS_INFINITY_TYPE) -> ?MINUS_INFINITY_TYPE;
-         (T | ?PLUS_INFINITY_TYPE, T | ?PLUS_INFINITY_TYPE) -> T.
+%% @end
+%%-spec min(?MINUS_INFINITY_TYPE, any()) -> ?MINUS_INFINITY_TYPE;
+%%         (any(), ?MINUS_INFINITY_TYPE) -> ?MINUS_INFINITY_TYPE;
+%%         (T | ?PLUS_INFINITY_TYPE, T | ?PLUS_INFINITY_TYPE) -> T.
+-spec min(any(), any()) -> any().
 min(?MINUS_INFINITY, _) -> ?MINUS_INFINITY;
 min(_, ?MINUS_INFINITY) -> ?MINUS_INFINITY;
 min(?PLUS_INFINITY, X) -> X;

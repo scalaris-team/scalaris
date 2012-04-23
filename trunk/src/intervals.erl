@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 %             2008 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,10 +98,9 @@ new(X) -> normalize_simple({element, X}).
 %%      The special cases '(A,A)', '[A,A)', '(A,A]' and
 %%      '(?PLUS_INFINITY,?MINUS_INFINITY,)' translate to an empty interval.
 %%      '[?MINUS_INFINITY,?PLUS_INFINITY)' translates to 'all'.
-%% -spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval();
-%%          (LeftBr::left_bracket(), A::key(), B::?PLUS_INFINITY, RightBr::')') -> interval().
--spec new(LeftBr::left_bracket(), A::key(), B::key(), RightBr::right_bracket()) -> interval();
-         (LeftBr::left_bracket(), A::key(), B::?PLUS_INFINITY_TYPE, RightBr::')') -> interval().
+-spec new(left_bracket(), key(),
+          key() | ?PLUS_INFINITY_TYPE, %% then right_bracket is ')'
+          right_bracket()) -> interval().
 new(LeftBr, Begin, End, RightBr) when End =/= ?PLUS_INFINITY orelse RightBr =:= ')' ->
     normalize_simple({interval, LeftBr, Begin, End, RightBr}).
 
