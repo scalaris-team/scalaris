@@ -67,9 +67,11 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
         this.toRemove = (toRemove == null) ? new OtpErlangList() : (OtpErlangList) ErlangValue.convertToErlang(toRemove);
     }
 
-    public OtpErlangObject getErlang() {
+    public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.addDelOnListAtom, key, toAdd, toRemove });
+                CommonErlangObjects.addDelOnListAtom, key,
+                compressed ? CommonErlangObjects.encode(toAdd) : toAdd,
+                compressed ? CommonErlangObjects.encode(toRemove) : toRemove });
     }
     public OtpErlangString getKey() {
         return key;

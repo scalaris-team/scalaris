@@ -18,9 +18,16 @@ package de.zib.scalaris;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.codec.binary.Base64;
 import org.junit.Test;
 
 import de.zib.scalaris.TransactionSingleOp.RequestList;
@@ -827,6 +834,203 @@ public class TransactionSingleOpTest {
             for (int i = 0; i < readRequests.size(); ++i) {
                 final String actual = results.processReadAt(i).stringValue();
                 assertEquals(testData[i], actual);
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Tests how long it takes to read a large list without compression.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     */
+    @Test
+    public void testReadLargeList1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+        testReadLargeList(false, "_ReadLargeList1");
+    }
+
+    /**
+     * Tests how long it takes to read a large list with compression.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     */
+    @Test
+    public void testReadLargeList2() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+        testReadLargeList(true, "_ReadLargeList2");
+    }
+
+    /**
+     * Tests how long it takes to read a large list with or without compression.
+     *
+     * @param compressed
+     *            whether to compress or not
+     * @param key
+     *            the key to append to the {@link #testTime}
+     *
+     * @throws ConnectionException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws UnknownException
+     * @throws ClassCastException
+     * @throws NotFoundException
+     */
+    protected void testReadLargeList(final boolean compressed, final String key)
+            throws ConnectionException, TimeoutException, AbortException,
+            UnknownException, ClassCastException, NotFoundException {
+        final ArrayList<String> expected = new ArrayList<String>(testData.length * 100);
+        for (int i = 0; i < 100; ++i) {
+            expected.addAll(Arrays.asList(testData));
+        }
+
+        final TransactionSingleOp conn = new TransactionSingleOp();
+        conn.setCompressed(compressed);
+        conn.write(testTime + key, expected);
+
+        try {
+            for (int i = 0; i < 500; ++i) {
+                final List<String> actual = conn.read(testTime + key).stringListValue();
+                assertEquals(expected, actual);
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Tests how long it takes to read a large string without compression.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     * @throws IOException
+     */
+    @Test
+    public void testReadLargeString1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+        testReadLargeString(1, "_testReadLargeString1");
+    }
+
+    /**
+     * Tests how long it takes to read a large string with compression.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     * @throws IOException
+     */
+    @Test
+    public void testReadLargeString2() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+        testReadLargeString(2, "_testReadLargeString2");
+    }
+
+    /**
+     * Tests how long it takes to read a large string with manual compression,
+     * then encoding the string in base64.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     * @throws IOException
+     */
+    @Test
+    public void testReadLargeString3() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+        testReadLargeString(3, "_testReadLargeString3");
+    }
+
+    /**
+     * Tests how long it takes to read a large string with manual compression,
+     * then encoding the string in base64 and then using automatic compression.
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     * @throws IOException
+     */
+    @Test
+    public void testReadLargeString4() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+        testReadLargeString(4, "_testReadLargeString4");
+    }
+
+    /**
+     * Tests how long it takes to read a large string with different compression
+     * schemes.
+     *
+     * @param compressed
+     *            how to compress
+     * @param key
+     *            the key to append to the {@link #testTime}
+     *
+     * @throws ConnectionException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     * @throws NotFoundException
+     * @throws IOException
+     */
+    protected void testReadLargeString(final int compression, final String key) throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+        final StringBuilder sb = new StringBuilder(testData.length * 8 * 100);
+        for (int i = 0; i < 100; ++i) {
+            for (final String data : testData) {
+                sb.append(data);
+            }
+        }
+        final String expected = sb.toString();
+
+        final TransactionSingleOp conn = new TransactionSingleOp();
+        conn.setCompressed(true);
+        switch (compression) {
+            case 1:
+                conn.setCompressed(false);
+            case 2:
+                conn.write(testTime + key, expected);
+                break;
+            case 3:
+                conn.setCompressed(false);
+            case 4:
+                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                final GZIPOutputStream gos = new GZIPOutputStream(bos);
+                gos.write(expected.getBytes("UTF-8"));
+                gos.flush();
+                gos.close();
+                conn.write(testTime + key, new Base64(0).encodeToString(bos.toByteArray()));
+                break;
+            default:
+                return;
+        }
+
+        try {
+            for (int i = 0; i < 500; ++i) {
+                String actual = conn.read(testTime + key).stringValue();
+                if (compression >= 3) {
+                    final byte[] packed = new Base64(0).decode(actual);
+                    final ByteArrayOutputStream unpacked = new ByteArrayOutputStream();
+                    final ByteArrayInputStream bis = new ByteArrayInputStream(packed);
+                    final GZIPInputStream gis = new GZIPInputStream(bis);
+                    final byte[] bbuf = new byte[256];
+                    int read = 0;
+                    while ((read = gis.read(bbuf)) >= 0) {
+                        unpacked.write(bbuf, 0, read);
+                    }
+                    gis.close();
+                    actual = new String(unpacked.toString("UTF-8"));
+                }
+                assertEquals(expected, actual);
             }
         } finally {
             conn.closeConnection();

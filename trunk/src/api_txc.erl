@@ -1,4 +1,4 @@
-%% @copyright 2011, 2012 Zuse Institute Berlin
+%% @copyright 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -14,17 +14,12 @@
 
 %% @author Florian Schintke <schintke@zib.de>,
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc API for transactional access to replicated DHT items.
-%% For single request/single item operations, we provide read/1,
-%% write/2, and test_and_set/3 functions that directly commit.
-%%
-%% For compound transactions a transaction log has to be passed
-%% through all operations and finally has to be committed. This is
-%% supported by the functions new_tlog/0, read/2, write/3, req_list/2,
-%% and commit/1.
+%% @doc API for compressed transactional access to replicated DHT items.
+%% Same as api_tx but transmits compressed values in both request and result
+%% list.
 %% @end
 %% @version $Id$
--module(api_tx).
+-module(api_txc).
 -author('schintke@zib.de').
 -author('kruber@zib.de').
 -vsn('$Id$').
@@ -39,6 +34,6 @@
 %% @doc Perform several requests inside a transaction and monitors its
 %%      execution time.
 req_list(TLog, ReqList) ->
-    {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/3, [TLog, ReqList, true]),
+    {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/3, [TLog, ReqList, false]),
     monitor:client_monitor_set_value(api_tx, 'req_list', TimeInUs / 1000),
     Result.

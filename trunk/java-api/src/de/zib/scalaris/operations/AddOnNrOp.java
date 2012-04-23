@@ -83,9 +83,10 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
         this.toAdd = ErlangValue.convertToErlang(toAdd);
     }
 
-    public OtpErlangObject getErlang() {
+    public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.addOnNrAtom, key, toAdd });
+                CommonErlangObjects.addOnNrAtom, key,
+                compressed ? CommonErlangObjects.encode(toAdd) : toAdd });
     }
     public OtpErlangString getKey() {
         return key;

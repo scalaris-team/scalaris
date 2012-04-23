@@ -15,7 +15,6 @@
  */
 package de.zib.scalaris;
 
-import com.ericsson.otp.erlang.OtpErlangException;
 import com.ericsson.otp.erlang.OtpErlangList;
 
 /**
@@ -29,12 +28,22 @@ public abstract class ResultList {
     protected OtpErlangList results = new OtpErlangList();
 
     /**
+     * Whether to compress the transfer of values.
+     */
+    protected final boolean compressed;
+
+    /**
      * Default constructor.
      *
-     * @param results  the raw results list as returned by scalaris.
+     * @param results
+     *            the raw results list as returned by scalaris
+     * @param compressed
+     *            whether the value part in the term is encoded, i.e. compressed
+     *            into an Erlang binary, or not
      */
-    protected ResultList(final OtpErlangList results) {
+    protected ResultList(final OtpErlangList results, final boolean compressed) {
         this.results = results;
+        this.compressed = compressed;
     }
 
     /**
@@ -86,15 +95,15 @@ public abstract class ResultList {
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to write the value
-     * @throws OtpErlangException
-     *             if a (known) error occurs
+     * @throws AbortException
+     *             if the commit of the write failed (if there was a commit)
      * @throws UnknownException
      *             if any other error occurs
      *
      * @since 3.13
      */
     public abstract void processWriteAt(final int pos) throws TimeoutException,
-            OtpErlangException, UnknownException;
+            AbortException, UnknownException;
 
     /**
      * Processes the result at the given position which originated from
@@ -107,15 +116,15 @@ public abstract class ResultList {
      *             if a timeout occurred while trying to write the value
      * @throws NotAListException
      *             if the previously stored value was no list
-     * @throws OtpErlangException
-     *             if another (known) error occurs
+     * @throws AbortException
+     *             if the commit of the write failed (if there was a commit)
      * @throws UnknownException
      *             if any other error occurs
      *
      * @since 3.13
      */
     public abstract void processAddDelOnListAt(final int pos)
-            throws TimeoutException, NotAListException, OtpErlangException,
+            throws TimeoutException, NotAListException, AbortException,
             UnknownException;
 
     /**
@@ -129,15 +138,15 @@ public abstract class ResultList {
      *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was not a number
-     * @throws OtpErlangException
-     *             if another (known) error occurs
+     * @throws AbortException
+     *             if the commit of the write failed (if there was a commit)
      * @throws UnknownException
      *             if any other error occurs
      *
      * @since 3.13
      */
     public abstract void processAddOnNrAt(final int pos)
-            throws TimeoutException, NotANumberException, OtpErlangException,
+            throws TimeoutException, NotANumberException, AbortException,
             UnknownException;
 
     /**
@@ -153,8 +162,8 @@ public abstract class ResultList {
      *             if the requested key does not exist
      * @throws KeyChangedException
      *             if the key did not match <tt>old_value</tt>
-     * @throws OtpErlangException
-     *             if another (known) error occurs
+     * @throws AbortException
+     *             if the commit of the write failed (if there was a commit)
      * @throws UnknownException
      *             if any other error occurs
      *
@@ -162,5 +171,5 @@ public abstract class ResultList {
      */
     public abstract void processTestAndSetAt(final int pos)
             throws TimeoutException, NotFoundException, KeyChangedException,
-            OtpErlangException, UnknownException;
+            AbortException, UnknownException;
 }

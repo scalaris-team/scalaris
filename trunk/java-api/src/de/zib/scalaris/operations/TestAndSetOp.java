@@ -65,9 +65,11 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
         this.newValue = ErlangValue.convertToErlang(newValue);
     }
 
-    public OtpErlangObject getErlang() {
+    public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.testAndSetAtom, key, oldValue, newValue });
+                CommonErlangObjects.testAndSetAtom, key,
+                compressed ? CommonErlangObjects.encode(oldValue) : oldValue,
+                compressed ? CommonErlangObjects.encode(newValue) : newValue });
     }
     public OtpErlangString getKey() {
         return key;
