@@ -533,18 +533,18 @@ init_per_group(_Group, Config) -> Config.
 end_per_group(_Group, Config) ->
     Status = test_server:lookup_config(tc_group_result, Config),
     case proplists:get_value(failed, Status) of
-        [] ->                                   % no failed cases 
+        [] ->                                   % no failed cases
             {return_group_result, ok};
         _Failed ->                              % one or more failed
             {return_group_result, failed}
     end.
 
--spec get_ring_data() -> [{pid(), 
-                           {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()}, 
-                           ?DB:db_as_list(), 
-                           {pred, comm:erl_pid_plain()},
-                           {succ, comm:erl_pid_plain()},
-                           ok | timeout}] | 
+-spec get_ring_data() -> [{pid(),
+                           {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()},
+                           ?DB:db_as_list(),
+                           {pred, comm:erl_local_pid_plain()},
+                           {succ, comm:erl_local_pid_plain()},
+                           ok | timeout}] |
                          {exception, Level::throw | error | exit, Reason::term(), Stacktrace::term()}.
 get_ring_data() ->
     Self = self(),

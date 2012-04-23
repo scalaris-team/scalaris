@@ -68,7 +68,7 @@
         | {'$gen_component', bp, msg_in_bp_waiting, pid()}
         | {'$gen_component', bp, barrier}
         | {'$gen_component', bp, bp_set_cond, fun(), bp_name()}
-        | {'$gen_component', bp, bp_set, comm:message_tag(), bp_name()}
+        | {'$gen_component', bp, bp_set, comm:msg_tag(), bp_name()}
         | {'$gen_component', bp, bp_del, bp_name()}.
 
 -type gc_msg() ::
@@ -80,7 +80,7 @@
            From::term(), To::term(), comm:message()}.
 
 -type bp() ::
-        {bp, MsgTag :: comm:message_tag(), bp_name()}
+        {bp, MsgTag :: comm:msg_tag(), bp_name()}
       | {bp_cond, Condition :: fun(), bp_name()}
       | {bp_cond, {module(), atom(), pos_integer()}, bp_name()}.
 
@@ -222,7 +222,7 @@ post_op(UState, Msg) ->
     {'$gen_component', [{post_op, Msg}], UState}.
 
 %% requests regarding breakpoint processing
--spec bp_set(pid(), comm:message_tag(), bp_name()) -> ok.
+-spec bp_set(pid(), comm:msg_tag(), bp_name()) -> ok.
 bp_set(Pid, MsgTag, BPName) ->
     Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName},
     ok.
@@ -772,7 +772,7 @@ gc_bp_set_cond(State, Cond, BPName) ->
     NewBPs = [ {bp_cond, Cond, BPName} | gc_bps(State)],
     gc_set_bps(State, NewBPs).
 
--spec gc_bp_set(gc_state(),comm:message_tag(),atom()) -> gc_state().
+-spec gc_bp_set(gc_state(),comm:msg_tag(),atom()) -> gc_state().
 gc_bp_set(State, MsgTag, BPName) ->
     ?TRACE_BP("Set bp ~p with name ~p~n", [MsgTag, BPName]),
     NewBPs = [ {bp, MsgTag, BPName} | gc_bps(State)],

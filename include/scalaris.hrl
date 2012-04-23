@@ -65,11 +65,6 @@
 %-define(RM, rm_tmansharp).
 %% userdevguide-end scalaris:rm
 
-
--define(TCP_LAYER, true). % TCP communication
-%-define(BUILTIN, true).   % distributed Erlang native communication
-
-
 % enable logging of message statistics
 -define(LOG_MESSAGE(MESSAGE, SIZE), ok).
 %% -define(LOG_MESSAGE(MESSAGE, SIZE), comm_logger:log(comm:get_msg_tag(MESSAGE), SIZE).

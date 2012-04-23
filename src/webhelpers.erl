@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin,
+% @copyright 2007-2012 Zuse Institute Berlin,
 %            2008 onScale solutions
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -189,18 +189,10 @@ max_list(L1, L2) ->
     lists:zipwith(fun erlang:max/2, L1, L2).
 
 -spec pid_to_integer(comm:mypid()) -> integer().
--ifdef(TCP_LAYER).
 pid_to_integer(Pid) ->
     {A,B,C,D} = comm:get_ip(Pid),
     I = comm:get_port(Pid),
     A+B+C+D+I.
--endif.
-
--ifdef(BUILTIN).
-pid_to_integer(Pid) ->
-    X = comm:make_local(Pid),
-    list_to_integer(lists:nth(1, string:tokens(erlang:pid_to_list(X),"<>."))).
--endif.
 
 %%%-----------------------------Ring----------------------------------
 

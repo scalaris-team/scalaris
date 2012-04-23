@@ -1,4 +1,4 @@
-%  @copyright 2009-2011 Zuse Institute Berlin
+%  @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -33,11 +33,11 @@
 
 -export([init/4, now/1, next/2, stop/1]).
 
--opaque state() :: {trigger:interval_fun(), comm:message_tag(), reference() | ok}.
+-opaque state() :: {trigger:interval_fun(), comm:msg_tag(), reference() | ok}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag used for the trigger message.
--spec init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(), MaxIntervalFun::trigger:interval_fun(), comm:message_tag()) -> state().
+-spec init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(), MaxIntervalFun::trigger:interval_fun(), comm:msg_tag()) -> state().
 init(BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
     {BaseIntervalFun, MsgTag, ok}.
 
