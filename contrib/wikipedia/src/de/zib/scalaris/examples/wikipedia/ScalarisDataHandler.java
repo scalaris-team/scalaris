@@ -34,6 +34,7 @@ import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
@@ -209,7 +210,7 @@ public class ScalarisDataHandler {
     public static ValueResult<String> getDbVersion(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "Scalaris version";
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<String>(false, involvedKeys,
                     "no connection to Scalaris", true, statName,
@@ -250,7 +251,7 @@ public class ScalarisDataHandler {
             String title, final MyNamespace nsObject) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "history of " + title;
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new PageHistoryResult(false, involvedKeys, "no connection to Scalaris",
                     true, statName, System.currentTimeMillis() - timeAtStart);
@@ -263,7 +264,7 @@ public class ScalarisDataHandler {
         
         TransactionSingleOp.ResultList results;
         try {
-            involvedKeys.addAll(requests.keyList());
+            InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
             return new PageHistoryResult(false, involvedKeys,
@@ -354,7 +355,7 @@ public class ScalarisDataHandler {
         final long timeAtStart = System.currentTimeMillis();
         Page page = null;
         Revision revision = null;
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to Scalaris", true, page, revision, false,
@@ -368,7 +369,7 @@ public class ScalarisDataHandler {
 
         scalaris_key = getPageKey(title, nsObject);
         try {
-            involvedKeys.add(scalaris_key);
+            involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
             page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
         } catch (NotFoundException e) {
             return new RevisionResult(false, involvedKeys,
@@ -387,7 +388,7 @@ public class ScalarisDataHandler {
         if (id != page.getCurRev().getId() && id >= 0) {
             scalaris_key = getRevKey(title, id, nsObject);
             try {
-                involvedKeys.add(scalaris_key);
+                involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
                 revision = scalaris_single.read(scalaris_key).jsonValue(Revision.class);
             } catch (NotFoundException e) {
                 return new RevisionResult(false, involvedKeys,
@@ -501,7 +502,7 @@ public class ScalarisDataHandler {
                     Arrays.asList(getBackLinksPageListKey(title, nsObject)),
                     false, statName);
         } else {
-            return new ValueResult<List<String>>(new ArrayList<String>(0),
+            return new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0),
                     new ArrayList<String>(0));
         }
     }
@@ -537,7 +538,7 @@ public class ScalarisDataHandler {
             return result;
         } else {
             return new ValueResult<List<Contribution>>(
-                    new ArrayList<String>(0), new ArrayList<Contribution>(0));
+                    new ArrayList<InvolvedKey>(0), new ArrayList<Contribution>(0));
         }
     }
 
@@ -599,7 +600,7 @@ public class ScalarisDataHandler {
             ScalarisOpType opType, Collection<String> scalaris_keys,
             boolean failNotFound, String statName, ErlangConverter<List<T>> conv) {
         final long timeAtStart = System.currentTimeMillis();
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         
         if (connection == null) {
             return new ValueResult<List<T>>(false, involvedKeys,
@@ -741,7 +742,7 @@ public class ScalarisDataHandler {
     private static ValueResult<BigInteger> getInteger2(Connection connection,
             Collection<String> scalaris_keys, boolean failNotFound, String statName) {
         final long timeAtStart = System.currentTimeMillis();
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
                     "no connection to Scalaris", true, statName,
@@ -753,7 +754,7 @@ public class ScalarisDataHandler {
         try {
             TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
             for (String scalaris_key : scalaris_keys) {
-                involvedKeys.add(scalaris_key);
+                involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
                 requests.addOp(new ReadOp(scalaris_key));
             }
             results = scalaris_single.req_list(requests);
@@ -854,7 +855,7 @@ public class ScalarisDataHandler {
         Page newPage = null;
         List<ShortRevision> newShortRevs = null;
         BigInteger pageEdits = null;
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new SavePageResult(false, involvedKeys,
                     "no connection to Scalaris", true, oldPage, newPage,
@@ -881,7 +882,7 @@ public class ScalarisDataHandler {
         
         Transaction.ResultList results;
         try {
-            involvedKeys.addAll(requests.keyList());
+            InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
@@ -1089,7 +1090,7 @@ public class ScalarisDataHandler {
      *            all keys that have been read or written during the operation
      */
     private static void increasePageEditStat(
-            Transaction scalaris_tx, List<String> involvedKeys) {
+            Transaction scalaris_tx, List<InvolvedKey> involvedKeys) {
         // increase number of page edits (for statistics)
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
@@ -1119,7 +1120,7 @@ public class ScalarisDataHandler {
      *            all keys that have been read or written during the operation
      */
     private static void addContribution(
-            Transaction scalaris_tx, Page oldPage, Page newPage, List<String> involvedKeys) {
+            Transaction scalaris_tx, Page oldPage, Page newPage, List<InvolvedKey> involvedKeys) {
         // as this is not that important, use a separate transaction and do not
         // fail if updating the value fails
         final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(
@@ -1253,7 +1254,7 @@ public class ScalarisDataHandler {
             List<String> entriesToAdd, List<String> entriesToRemove,
             final String statName) {
         final long timeAtStart = System.currentTimeMillis();
-        List<String> involvedKeys = new ArrayList<String>();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
 
         try {
             final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(

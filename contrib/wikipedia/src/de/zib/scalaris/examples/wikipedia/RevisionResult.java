@@ -38,7 +38,7 @@ public class RevisionResult extends Result {
      * @param revision
      *            the retrieved revision
      */
-    public RevisionResult(List<String> involvedKeys, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, Page page,
             Revision revision) {
         super(involvedKeys);
         this.page = page;
@@ -59,7 +59,7 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(List<String> involvedKeys, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, Page page,
             Revision revision, String name, long time) {
         super(involvedKeys);
         this.page = page;
@@ -87,7 +87,7 @@ public class RevisionResult extends Result {
      * @param rev_not_existing
      *            whether the requested revision exists or not
      */
-    public RevisionResult(boolean success, List<String> involvedKeys,
+    public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing) {
@@ -122,7 +122,7 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(boolean success, List<String> involvedKeys,
+    public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing, String name, long time) {

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 
 /**
@@ -57,7 +58,7 @@ public class WikiPageBeanBase {
     /**
      * All keys that have been read or written during the current operation.
      */
-    public List<String> involvedKeys = new ArrayList<String>();
+    public List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
     /**
      * In cases of failed page-save commits, contains a list of failed keys for
      * each save attempt.
@@ -331,14 +332,14 @@ public class WikiPageBeanBase {
     /**
      * @return the involvedKeys
      */
-    public List<String> getInvolvedKeys() {
+    public List<InvolvedKey> getInvolvedKeys() {
         return involvedKeys;
     }
 
     /**
      * @param involvedKeys the involvedKeys to set
      */
-    public void setInvolvedKeys(List<String> involvedKeys) {
+    public void setInvolvedKeys(List<InvolvedKey> involvedKeys) {
         this.involvedKeys = involvedKeys;
     }
 }

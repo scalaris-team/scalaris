@@ -35,7 +35,7 @@ public class PageHistoryResult extends Result {
      * @param revisions
      *            the retrieved (short) revisions
      */
-    public PageHistoryResult(List<String> involvedKeys, Page page, List<ShortRevision> revisions) {
+    public PageHistoryResult(List<InvolvedKey> involvedKeys, Page page, List<ShortRevision> revisions) {
         super(involvedKeys);
         this.page = page;
         this.revisions = revisions;
@@ -56,7 +56,7 @@ public class PageHistoryResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public PageHistoryResult(List<String> involvedKeys, Page page, List<ShortRevision> revisions,
+    public PageHistoryResult(List<InvolvedKey> involvedKeys, Page page, List<ShortRevision> revisions,
             String name, long time) {
         super(involvedKeys);
         this.page = page;
@@ -76,7 +76,7 @@ public class PageHistoryResult extends Result {
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public PageHistoryResult(boolean success, List<String> involvedKeys,
+    public PageHistoryResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed) {
         super(success, involvedKeys, message, connectFailed);
     }
@@ -97,7 +97,7 @@ public class PageHistoryResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public PageHistoryResult(boolean success, List<String> involvedKeys,
+    public PageHistoryResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, String name, long time) {
         super(success, involvedKeys, message, connectFailed);
         addStat(name, time);

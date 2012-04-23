@@ -433,25 +433,6 @@ public abstract class RequestList {
     }
 
     /**
-     * Gets a list of all keys in the request list.
-     * Note: this parses through the requests to create the list of keys.
-     *
-     * @return involved keys
-     *
-     * @since 3.12
-     */
-    public List<String> keyList() {
-        final ArrayList<String> result = new ArrayList<String>(requests.size());
-        for (final Operation op : requests) {
-            final OtpErlangString key = op.getKey();
-            if (key != null) {
-                result.add(key.stringValue());
-            }
-        }
-        return result;
-    }
-
-    /**
      * Adds all requests of the other request list to the end of this list.
      *
      * Use in implementation in sub-classes with according types as different
@@ -464,5 +445,16 @@ public abstract class RequestList {
     protected RequestList addAll_(final RequestList other) {
         requests.addAll(other.requests);
         return this;
+    }
+
+    /**
+     * Gets all operations of the request list.
+     *
+     * @return the requests
+     *
+     * @since 3.14
+     */
+    public List<Operation> getRequests() {
+        return requests;
     }
 }

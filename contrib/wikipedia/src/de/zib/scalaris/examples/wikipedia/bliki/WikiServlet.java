@@ -57,6 +57,7 @@ import org.apache.commons.lang.StringUtils;
 import com.skjegstad.utils.BloomFilter;
 
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
+import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
@@ -476,7 +477,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH)));
         page.setShowAllPages(false);
         if (req_search.isEmpty()) {
-            result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         } else {
             result = getPageList(nsId, connection);
         }
@@ -523,7 +524,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setShowAllPages(false);
             page.setFromPage("");
             page.setToPage("");
-            result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         } else {
             page.setShowAllPages(true);
             if (req_from == null) {
@@ -577,7 +578,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (req_prefix == null) {
             page.setShowAllPages(false);
             page.setPrefix("");
-            result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         } else {
             page.setShowAllPages(true);
             page.setPrefix(req_prefix);
@@ -623,7 +624,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setShowAllPages(false);
             page.setPageHeading("Pages that link to a selected page");
             page.setTarget("");
-            result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         } else {
             page.setShowAllPages(true);
             page.setPageHeading("Pages that link to \"" + req_target + "\"");
@@ -929,8 +930,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         final String involvedKeysPar = getParam(request, "involved_keys");
         if (!involvedKeysPar.isEmpty()) {
-            page.getInvolvedKeys().add("");
-            page.getInvolvedKeys().addAll(Arrays.asList(involvedKeysPar.split(" # ")));
+            page.getInvolvedKeys().add(new InvolvedKey());
+            for (String text : involvedKeysPar.split(" # ")) {
+                page.getInvolvedKeys().add(InvolvedKey.fromString(text));
+            }
         }
         final String[] pageRandomTimes = getParam(request, "random_times").split(",");
         for (String pageRandomTime : pageRandomTimes) {
@@ -1279,7 +1282,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1394,7 +1397,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1473,7 +1476,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<String>(0), new ArrayList<String>(0));
+        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
     

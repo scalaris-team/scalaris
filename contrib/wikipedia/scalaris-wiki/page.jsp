@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@page import="java.net.URL"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
  import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,org.apache.commons.lang.StringUtils,org.apache.commons.lang.StringEscapeUtils"%>
@@ -402,8 +403,8 @@ Iterator<String> iter = pageBean.getCategoryPages().iterator();
                 </pre></div>
                 <div style="font-size:0.7em">Involved DB keys:
                 <pre id="involved_keys" style="padding:0;line-height:0.7em">
-<% for (String involvedKey : pageBean.getInvolvedKeys()) { %>
-<%= involvedKey %>
+<% for (InvolvedKey involvedKey : pageBean.getInvolvedKeys()) { %>
+<%= involvedKey.toString() %>
 <% } %>
                 </pre></div>
                 <div style="font-size:0.7em">Page save attempts: <span id="save_attempts">${ pageBean.saveAttempts }</span></div>
