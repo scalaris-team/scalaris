@@ -30,7 +30,8 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--type options() :: [locally | verbose | profile | {copies, non_neg_integer()}].
+-type options() :: [locally | print | verbose | profile
+                    | {copies, non_neg_integer()}].
 
 %% @doc run an increment benchmark (i++) on all nodes
 -spec increment(ThreadsPerVM::pos_integer(), Iterations::pos_integer()) -> {ok, [{atom(), term()},...]}.
@@ -134,8 +135,8 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
     end.
 
 -spec manage_run_internal(ThreadsPerVM::pos_integer(), Iterations::pos_integer(),
-                 Options::[locally | verbose | profile | {copies, non_neg_integer()}],
-                 Message::comm:message()) -> {ok, [{atom(), term()},...]}.
+                 Options::options(), Message::comm:message())
+                         -> {ok, [{atom(), term()},...]}.
 manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     Verbose = lists:member(verbose, Options),
     Print = lists:member(print, Options),
@@ -220,16 +221,12 @@ init_key(_Key, 0) ->
     failed;
 init_key(Key, Count) ->
     case api_tx:write(Key, 0) of
-        {ok} ->
-            Key;
-        {fail, abort, [Key]} ->
-            init_key(Key, Count - 1);
-        {fail, timeout} ->
-            init_key(Key, Count - 1)
+        {ok}                 -> Key;
+        {fail, abort, [Key]} -> init_key(Key, Count - 1);
+        {fail, timeout}      -> init_key(Key, Count - 1)
     end.
 
-collect(0, L, _Print) ->
-    L;
+collect(0, L, _Print)     -> L;
 collect(Length, L, Print) ->
     receive
         ?SCALARIS_RECV({done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts}, %% ->
