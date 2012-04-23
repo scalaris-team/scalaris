@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ get_size(_RT) -> 1.
 
 %% userdevguide-begin rt_simple:n
 %% @doc Returns the size of the address space.
--spec n() -> number().
+-spec n() -> integer().
 n() -> n_().
 %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
 -spec n_() -> 16#100000000000000000000000000000000.
@@ -226,7 +226,7 @@ empty_ext(Neighbors) -> empty(Neighbors).
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
 -spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, rt)).
+next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, succ)).
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
@@ -241,5 +241,5 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
-to_list(State) -> [dht_node_state:get(State, rt)].
+to_list(State) -> [dht_node_state:get(State, succ)].
 %% userdevguide-end rt_simple:to_list

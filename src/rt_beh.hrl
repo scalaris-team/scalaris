@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 %% @version $Id$
 
 % note: define key_t(), rt_t() and external_rt_t() in the RT-implementation!
--opaque key()::key_t().
+-type key()::key_t().
 -opaque rt()::rt_t().
 -type external_rt()::external_rt_t(). %% @todo: make opaque
 

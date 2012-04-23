@@ -28,7 +28,7 @@
 -type rt_t() :: gb_tree().
 -type external_rt_t() :: gb_tree().
 -type index() :: {pos_integer(), non_neg_integer()}.
--opaque custom_message() ::
+-type custom_message() ::
        {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
        {rt_get_node_response, Index::index(), Node::node:node_type()}.
 %% userdevguide-end rt_chord:types
@@ -110,11 +110,11 @@ get_size(RT) ->
     gb_trees:size(RT).
 
 %% @doc Keep a key in the address space. See n/0.
--spec normalize(Key::key_t()) -> key_t().
+-spec normalize(non_neg_integer()) -> key_t().
 normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Returns the size of the address space.
--spec n() -> number().
+-spec n() -> integer().
 n() -> n_().
 %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
 -spec n_() -> 16#100000000000000000000000000000000.
@@ -238,9 +238,8 @@ check_config() ->
 %% userdevguide-begin rt_chord:handle_custom_message
 %% @doc Chord reacts on 'rt_get_node_response' messages in response to its
 %%      'rt_get_node' messages.
--spec handle_custom_message
-        (custom_message(), rt_loop:state_active()) -> rt_loop:state_active();
-        (any(), rt_loop:state_active()) -> unknown_event.
+-spec handle_custom_message(custom_message(), rt_loop:state_active()) ->
+                                   rt_loop:state_active() | unknown_event.
 handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
     comm:send(Source_PID, {rt_get_node_response, Index, MyNode}, ?SEND_OPTIONS),
