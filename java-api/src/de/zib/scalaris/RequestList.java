@@ -48,7 +48,7 @@ public abstract class RequestList {
         public CommitOp() {
         }
 
-        public OtpErlangObject getErlang() {
+        public OtpErlangObject getErlang(final boolean compressed) {
             return CommonErlangObjects.commitTupleAtom;
         }
         public OtpErlangString getKey() {
@@ -389,13 +389,17 @@ public abstract class RequestList {
      * <code>api_tx:req_list/2</code>
      * Note: this parses through the requests to create the erlang objects.
      *
+     * @param compressed
+     *            whether the value part in the term should be encoded, i.e.
+     *            compressed into an Erlang binary, or not
+     *
      * @return an erlang list of requests
      */
-    OtpErlangList getErlangReqList() {
+    OtpErlangList getErlangReqList(final boolean compressed) {
         final OtpErlangObject[] result = new OtpErlangObject[requests.size()];
         int i = 0;
         for (final Operation op : requests) {
-            result[i++] = op.getErlang();
+            result[i++] = op.getErlang(compressed);
         }
         return new OtpErlangList(result);
     }

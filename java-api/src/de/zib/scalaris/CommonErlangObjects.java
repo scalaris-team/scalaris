@@ -18,8 +18,16 @@ package de.zib.scalaris;
 import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangAtom;
+import com.ericsson.otp.erlang.OtpErlangBinary;
+import com.ericsson.otp.erlang.OtpErlangBoolean;
+import com.ericsson.otp.erlang.OtpErlangDecodeException;
+import com.ericsson.otp.erlang.OtpErlangDouble;
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangTuple;
+import com.ericsson.otp.erlang.OtpExternal;
+import com.ericsson.otp.erlang.OtpInputStream;
+import com.ericsson.otp.erlang.OtpOutputStream;
 
 /**
  * Contains some often used objects as static objects as static members in
@@ -27,7 +35,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  *
  * @author Nico Kruber, kruber@zib.de
  *
- * @version 3.12
+ * @version 3.14
  * @since 2.5
  */
 @SuppressWarnings("javadoc")
@@ -56,11 +64,13 @@ public final class CommonErlangObjects {
     public static final OtpErlangAtom nullAtom = new OtpErlangAtom("null");
 
     /**
-     * Processes the <tt>received_raw</tt> term from erlang interpreting it as
-     * a result from a read operation.
+     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
+     * result from a read operation.
      *
      * @param received_raw
-     *             the object to process
+     *            the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @return the contained value
      *
@@ -71,7 +81,9 @@ public final class CommonErlangObjects {
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final OtpErlangObject processResult_read(final OtpErlangObject received_raw) throws TimeoutException, NotFoundException, UnknownException {
+    static final OtpErlangObject processResult_read(
+            final OtpErlangObject received_raw, final boolean compressed)
+            throws TimeoutException, NotFoundException, UnknownException {
         /*
          * possible return values:
          *  {ok, Value} | {fail, timeout | not_found}
@@ -83,7 +95,11 @@ public final class CommonErlangObjects {
                 throw new UnknownException(received_raw);
             }
             if (state.equals(CommonErlangObjects.okAtom)) {
-                return received.elementAt(1);
+                OtpErlangObject result = received.elementAt(1);
+                if (compressed) {
+                    result = decode(result);
+                }
+                return result;
             } else if (state.equals(CommonErlangObjects.failAtom)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
@@ -96,6 +112,65 @@ public final class CommonErlangObjects {
         } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
+        } catch (final OtpErlangDecodeException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Encoded the given erlang object to a binary the same way as
+     * <tt>rdht_tx:encode_value/1</tt>.
+     *
+     * @param value
+     *            the decoded value
+     *
+     * @return the encoded value
+     */
+    public static OtpErlangObject encode(final OtpErlangObject value) {
+        if (value instanceof OtpErlangAtom) {
+            return value;
+        } else if (value instanceof OtpErlangBoolean) {
+            return value;
+        } else if (value instanceof OtpErlangLong) {
+            return value;
+        } else if (value instanceof OtpErlangDouble) {
+            return value;
+        } else if (value instanceof OtpErlangBinary) {
+            final OtpOutputStream oos = new OtpOutputStream();
+            oos.write1(OtpExternal.versionTag);
+            oos.write_any(value);
+            final byte[] encoded = oos.toByteArray();
+            return new OtpErlangBinary(encoded);
+        } else {
+            final OtpOutputStream oos = new OtpOutputStream();
+            oos.write1(OtpExternal.versionTag);
+            oos.write_compressed(value);
+            final byte[] encoded = oos.toByteArray();
+            return new OtpErlangBinary(encoded);
+        }
+    }
+
+    /**
+     * Decodes the given Erlang object from a binary to the according
+     * {@link OtpErlangObject} the same way as <tt>rdht_tx:decode_value/1</tt>.
+     *
+     * @param value
+     *            the encoded value
+     *
+     * @return the decoded value
+     *
+     * @throws OtpErlangDecodeException
+     *             if decoding fails
+     */
+    public static OtpErlangObject decode(final OtpErlangObject value)
+            throws OtpErlangDecodeException {
+        if (value instanceof OtpErlangBinary) {
+            final OtpErlangBinary valueBin = (OtpErlangBinary) value;
+            final OtpInputStream ois = new OtpInputStream(valueBin.binaryValue());
+            return ois.read_any();
+        } else {
+            return value;
         }
     }
 
@@ -105,13 +180,16 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *             the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final void processResult_write(final OtpErlangObject received_raw) throws TimeoutException, UnknownException {
+    static final void processResult_write(final OtpErlangObject received_raw,
+            final boolean compressed) throws TimeoutException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout}
@@ -139,6 +217,8 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *             the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
@@ -149,7 +229,9 @@ public final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void processResult_addDelOnList(final OtpErlangObject received_raw) throws TimeoutException, NotAListException, UnknownException {
+    static final void processResult_addDelOnList(
+            final OtpErlangObject received_raw, final boolean compressed)
+            throws TimeoutException, NotAListException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout} | {fail, not_a_list}.
@@ -179,6 +261,8 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *             the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
@@ -189,7 +273,9 @@ public final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void processResult_addOnNr(final OtpErlangObject received_raw) throws TimeoutException, NotANumberException, UnknownException {
+    static final void processResult_addOnNr(final OtpErlangObject received_raw,
+            final boolean compressed) throws TimeoutException,
+            NotANumberException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout} | {fail, not_a_number}.
@@ -219,6 +305,8 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *             the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch/write the value
@@ -231,7 +319,10 @@ public final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void processResult_testAndSet(final OtpErlangObject received_raw) throws TimeoutException, NotFoundException, KeyChangedException, UnknownException {
+    static final void processResult_testAndSet(
+            final OtpErlangObject received_raw, final boolean compressed)
+            throws TimeoutException, NotFoundException, KeyChangedException,
+            UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, timeout | not_found | {key_changed, RealOldValue}
@@ -251,12 +342,19 @@ public final class CommonErlangObjects {
                     if (reason_tpl.elementAt(0).equals(
                             CommonErlangObjects.keyChangedAtom)
                             && (reason_tpl.arity() == 2)) {
-                        throw new KeyChangedException(new ErlangValue(reason_tpl.elementAt(1)));
+                        OtpErlangObject result = reason_tpl.elementAt(1);
+                        if (compressed) {
+                            result = decode(result);
+                        }
+                        throw new KeyChangedException(new ErlangValue(result));
                     }
                 }
             }
             throw new UnknownException(received_raw);
         } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received_raw);
+        } catch (final OtpErlangDecodeException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
         }
@@ -268,6 +366,8 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *            the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws AbortException
      *             if the commit of the write failed
@@ -276,10 +376,11 @@ public final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void checkResult_failAbort(final OtpErlangObject received_raw) throws AbortException, UnknownException {
+    static final void checkResult_failAbort(final OtpErlangObject received_raw,
+            final boolean compressed) throws AbortException, UnknownException {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            checkResult_failAbort(received);
+            checkResult_failAbort(received, compressed);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);
@@ -292,6 +393,8 @@ public final class CommonErlangObjects {
      *
      * @param received
      *            the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws AbortException
      *             if the commit of the write failed
@@ -300,7 +403,8 @@ public final class CommonErlangObjects {
      *
      * @since 3.12
      */
-    static final void checkResult_failAbort(final OtpErlangTuple received) throws AbortException, UnknownException {
+    static final void checkResult_failAbort(final OtpErlangTuple received,
+            final boolean compressed) throws AbortException, UnknownException {
         try {
             if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
                     && (received.arity() == 3)
@@ -321,6 +425,8 @@ public final class CommonErlangObjects {
      *
      * @param received_raw
      *             the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
      *
      * @throws TimeoutException
      *             if a timeout occurred while trying to fetch the value
@@ -329,7 +435,9 @@ public final class CommonErlangObjects {
      * @throws UnknownException
      *             if any other error occurs
      */
-    static final void processResult_commit(final OtpErlangObject received_raw) throws TimeoutException, AbortException, UnknownException {
+    static final void processResult_commit(final OtpErlangObject received_raw,
+            final boolean compressed) throws TimeoutException, AbortException,
+            UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, abort, KeyList} | {fail, timeout}
@@ -339,7 +447,7 @@ public final class CommonErlangObjects {
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
             } else {
-                checkResult_failAbort(received);
+                checkResult_failAbort(received, compressed);
                 if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
                         && (received.arity() == 2)
                         && received.elementAt(1).equals(CommonErlangObjects.timeoutAtom)) {

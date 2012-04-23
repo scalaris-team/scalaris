@@ -219,7 +219,7 @@ public class PubSub {
             TimeoutException, AbortException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_pubsub", "subscribe",
                 new OtpErlangObject[] { topic, url });
-        CommonErlangObjects.processResult_commit(received_raw);
+        CommonErlangObjects.processResult_commit(received_raw, false);
     }
 
     /**
@@ -287,7 +287,7 @@ public class PubSub {
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
                 return;
             } else {
-                CommonErlangObjects.checkResult_failAbort(received);
+                CommonErlangObjects.checkResult_failAbort(received, false);
                 if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                     // {fail, timeout | not_found}
                     final OtpErlangObject failReason = received.elementAt(1);

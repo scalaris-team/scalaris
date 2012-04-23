@@ -57,9 +57,10 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
         this.value = ErlangValue.convertToErlang(value);
     }
 
-    public OtpErlangObject getErlang() {
+    public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
-                CommonErlangObjects.writeAtom, key, value });
+                CommonErlangObjects.writeAtom, key,
+                compressed ? CommonErlangObjects.encode(value) : value });
     }
     public OtpErlangString getKey() {
         return key;

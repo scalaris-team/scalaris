@@ -49,7 +49,7 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
         this.key = new OtpErlangString(key);
     }
 
-    public OtpErlangObject getErlang() {
+    public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
                 CommonErlangObjects.readAtom, key });
     }

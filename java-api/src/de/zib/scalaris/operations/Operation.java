@@ -29,9 +29,13 @@ public interface Operation {
     /**
      * Gets the erlang representation of the operation.
      *
+     * @param compressed
+     *            whether the value part in the term should be encoded, i.e.
+     *            compressed into an Erlang binary, or not
+     *
      * @return erlang representation for api_tx:req_list
      */
-    abstract public OtpErlangObject getErlang();
+    abstract public OtpErlangObject getErlang(final boolean compressed);
      /**
       * Gets the key the operation is working on (if available)
       *
