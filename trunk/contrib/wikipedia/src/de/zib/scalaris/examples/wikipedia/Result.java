@@ -31,7 +31,7 @@ public class Result {
     /**
      * All keys that have been read or written during the operation.
      */
-    public List<String> involvedKeys = new ArrayList<String>();
+    public List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
     
     /**
      * Creates a successful result with an empty message.
@@ -39,7 +39,7 @@ public class Result {
      * @param involvedKeys
      *            all keys that have been read or written during the operation
      */
-    public Result(List<String> involvedKeys) {
+    public Result(List<InvolvedKey> involvedKeys) {
         this.success = true;
         this.involvedKeys = involvedKeys;
         this.message = "";
@@ -58,7 +58,7 @@ public class Result {
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public Result(boolean success, List<String> involvedKeys, String message, boolean connectFailed) {
+    public Result(boolean success, List<InvolvedKey> involvedKeys, String message, boolean connectFailed) {
         this.success = success;
         this.involvedKeys = involvedKeys;
         this.message = message;

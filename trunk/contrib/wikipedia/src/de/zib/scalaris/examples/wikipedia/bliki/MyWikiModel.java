@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 
 import com.skjegstad.utils.BloomFilter;
 
+import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 
 /**
@@ -151,7 +152,7 @@ public class MyWikiModel extends WikiModel {
     /**
      * All keys that have been read or written during the current operation.
      */
-    protected final List<String> involvedKeys = new ArrayList<String>();
+    protected final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
     
     /**
      * False positive rate of the bloom filter for the existing pages checks.
@@ -1072,7 +1073,7 @@ public class MyWikiModel extends WikiModel {
      * @param key
      *            the key to add
      */
-    public void addInvolvedKey(String key) {
+    public void addInvolvedKey(InvolvedKey key) {
         involvedKeys.add(key);
     }
     
@@ -1082,7 +1083,7 @@ public class MyWikiModel extends WikiModel {
      * @param keys
      *            the keys to add
      */
-    public void addInvolvedKeys(Collection<? extends String> keys) {
+    public void addInvolvedKeys(Collection<? extends InvolvedKey> keys) {
         involvedKeys.addAll(keys);
     }
 
@@ -1092,7 +1093,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the involvedKeys
      */
-    public List<String> getInvolvedKeys() {
+    public List<InvolvedKey> getInvolvedKeys() {
         return involvedKeys;
     }
     

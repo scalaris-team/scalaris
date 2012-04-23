@@ -39,7 +39,7 @@ import de.zib.scalaris.executor.ScalarisSingleOpExecutor;
  * @author Nico Kruber, kruber@zib.de
  */
 public class MyScalarisSingleOpExecutor extends ScalarisSingleOpExecutor {
-    protected final List<String> involvedKeys;
+    protected final List<InvolvedKey> involvedKeys;
 
     /**
      * Creates a new executor.
@@ -50,7 +50,7 @@ public class MyScalarisSingleOpExecutor extends ScalarisSingleOpExecutor {
      *            list of all involved keys
      */
     public MyScalarisSingleOpExecutor(TransactionSingleOp scalaris_single,
-            List<String> involvedKeys) {
+            List<InvolvedKey> involvedKeys) {
         super(scalaris_single);
         this.involvedKeys = involvedKeys;
     }
@@ -74,14 +74,14 @@ public class MyScalarisSingleOpExecutor extends ScalarisSingleOpExecutor {
     protected ResultList executeRequests(RequestList requests)
             throws ConnectionException, TimeoutException, AbortException,
             UnknownException {
-        involvedKeys.addAll(requests.keyList());
+        InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
         return super.executeRequests(requests);
     }
 
     /**
      * @return the involvedKeys
      */
-    public List<String> getInvolvedKeys() {
+    public List<InvolvedKey> getInvolvedKeys() {
         return involvedKeys;
     }
 }

@@ -23,7 +23,7 @@ public class ValueResult<T> extends Result {
      * @param number
      *            the retrieved number
      */
-    public ValueResult(List<String> involvedKeys, T number) {
+    public ValueResult(List<InvolvedKey> involvedKeys, T number) {
         super(involvedKeys);
         this.value = number;
     }
@@ -40,7 +40,7 @@ public class ValueResult<T> extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public ValueResult(List<String> involvedKeys, T value, String name,
+    public ValueResult(List<InvolvedKey> involvedKeys, T value, String name,
             long time) {
         super(involvedKeys);
         this.value = value;
@@ -59,7 +59,7 @@ public class ValueResult<T> extends Result {
      * @param connectFailed
      *            whether the connection to the DB failed or not
      */
-    public ValueResult(boolean success, List<String> involvedKeys,
+    public ValueResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed) {
         super(success, involvedKeys, message, connectFailed);
     }
@@ -80,7 +80,7 @@ public class ValueResult<T> extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public ValueResult(boolean success, List<String> involvedKeys,
+    public ValueResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, String name, long time) {
         super(success, involvedKeys, message, connectFailed);
         addStat(name, time);

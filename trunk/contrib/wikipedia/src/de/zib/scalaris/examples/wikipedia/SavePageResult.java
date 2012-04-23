@@ -48,7 +48,7 @@ public class SavePageResult extends Result {
      * @param pageEdits
      *            new number of page edits (may be null)
      */
-    public SavePageResult(List<String> involvedKeys, Page oldPage, Page newPage,
+    public SavePageResult(List<InvolvedKey> involvedKeys, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits) {
         super(involvedKeys);
         this.oldPage = oldPage;
@@ -75,7 +75,7 @@ public class SavePageResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public SavePageResult(List<String> involvedKeys, Page oldPage, Page newPage,
+    public SavePageResult(List<InvolvedKey> involvedKeys, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             String name, long time) {
         super(involvedKeys);
@@ -106,7 +106,7 @@ public class SavePageResult extends Result {
      * @param pageEdits
      *            new number of page edits (may be null)
      */
-    public SavePageResult(boolean success, List<String> involvedKeys,
+    public SavePageResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits) {
         super(success, involvedKeys, message, connectFailed);
@@ -140,7 +140,7 @@ public class SavePageResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public SavePageResult(boolean success, List<String> involvedKeys,
+    public SavePageResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, Page oldPage, Page newPage,
             List<ShortRevision> newShortRevs, BigInteger pageEdits,
             String name, long time) {
