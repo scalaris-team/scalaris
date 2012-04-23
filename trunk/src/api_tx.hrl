@@ -67,10 +67,6 @@ new_tlog() -> tx_tlog:empty().
 req_list(ReqList) ->
     req_list(new_tlog(), ReqList).
 
-%% @doc Perform several requests inside a transaction and monitors its
-%%      execution time.
--spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
-
 %% @doc Perform a read inside a transaction.
 -spec read(tx_tlog:tlog(), client_key())
           -> {tx_tlog:tlog(), read_result()}.

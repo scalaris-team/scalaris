@@ -33,6 +33,7 @@
 
 %% @doc Perform several requests inside a transaction and monitors its
 %%      execution time.
+-spec req_list(tx_tlog:tlog(), [request()]) -> {tx_tlog:tlog(), [result()]}.
 req_list(TLog, ReqList) ->
     {TimeInUs, Result} = util:tc(fun rdht_tx:req_list/3, [TLog, ReqList, false]),
     monitor:client_monitor_set_value(api_tx, 'req_list', TimeInUs / 1000),
