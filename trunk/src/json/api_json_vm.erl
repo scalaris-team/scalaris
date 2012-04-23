@@ -91,7 +91,7 @@ shutdown_node(Name) ->
 shutdown_nodes(Count) ->
     {struct, [{status, "ok"}, {ok, [api_vm:shutdown_nodes(Count)]}]}.
 
--spec shutdown_nodes_by_name(Names::{array, pid_groups:groupname()}) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec shutdown_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:shutdown_nodes_by_name(Names),
     {struct, [{status, "ok"}, {ok, Ok}, {not_found, NotFound}]}.
@@ -104,7 +104,7 @@ kill_node(Name) ->
 kill_nodes(Count) ->
     {struct, [{status, "ok"}, {ok, [api_vm:kill_nodes(Count)]}]}.
 
--spec kill_nodes_by_name(Names::{array, pid_groups:groupname()}) -> {struct, [{Key::atom(), Value::term()}]}.
+-spec kill_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:kill_nodes_by_name(Names),
     {struct, [{status, "ok"}, {ok, Ok}, {not_found, NotFound}]}.
@@ -120,10 +120,10 @@ get_other_vms(MaxVMs) ->
 
 -spec shutdown_vm() -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_vm() ->
-    api_vm:shutdown_vm(), % TODO: delay shutdown!
+    spawn(fun() -> timer:sleep(100), api_vm:shutdown_vm() end),
     {struct, [{status, "ok"}]}.
 
 -spec kill_vm() -> {struct, [{Key::atom(), Value::term()}]}.
 kill_vm() ->
-    api_vm:kill_vm(), % TODO: delay shutdown!
+    spawn(fun() -> timer:sleep(100), api_vm:kill_vm() end),
     {struct, [{status, "ok"}]}.
