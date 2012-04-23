@@ -239,7 +239,6 @@ checkinstallation() {
         echo " Use the ERL_SCHED_FLAGS environment variable to override the scheduler flags."
         echo " You may need to include the +sct flag to set the CPU topology manually."
         echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
-        exit 1
     fi
 
     exit 0
