@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ init(Trigger, Module) ->
 %% @doc Initializes the given trigger with the given base interval function
 %%      (also used for min and max interval) and the given message tag used for
 %%      the trigger message.
--spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MsgTag::comm:message_tag()) -> state().
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MsgTag::comm:msg_tag()) -> state().
 init(Trigger, BaseIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
     {Trigger, Trigger:init(BaseIntervalFun, BaseIntervalFun, BaseIntervalFun, MsgTag)}.
 
@@ -82,7 +82,7 @@ init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun)
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag.
--spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), MsgTag::comm:message_tag()) -> state().
+-spec init(Trigger::module(), BaseIntervalFun::interval_fun(), MinIntervalFun::interval_fun(), MaxIntervalFun::interval_fun(), MsgTag::comm:msg_tag()) -> state().
 init(Trigger, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag)
   when is_function(BaseIntervalFun, 0) and
            is_function(MinIntervalFun, 0) and

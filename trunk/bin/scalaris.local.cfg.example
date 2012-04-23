@@ -1,14 +1,3 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Settings for distributed Erlang
-% (see scalaris.hrl to switch)
-
-% {mgmt_server, {mgmt_server,'mgmt_server@foo.bar.com'}}.
-% {known_hosts, [{service_per_vm, 'firstnode@foo.bar.com'}]}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Settings for TCP mode.
-% (see scalaris.hrl to switch)
-
 %% userdevguide-begin local_cfg:distributed
 % Insert the appropriate IP-addresses for your setup
 % as comma separated integers:

@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -32,7 +32,9 @@
 
 -include("scalaris.hrl").
 
--type process_id() :: {inet:ip_address(), comm_server:tcp_port(), comm:erl_pid_plain()}.
+-type process_id() ::
+        {inet:ip_address(), comm_server:tcp_port(),
+         comm:erl_local_pid_plain()}.
 
 %% @doc send message via tcp, if target is not in same Erlang VM.
 -spec send(process_id(), comm:message(), comm:send_options()) -> ok.
@@ -104,9 +106,8 @@ is_local({IP, Port, _Pid}) ->
     {MyIP, MyPort} = comm_server:get_local_address_port(),
     {IP, Port} =:= {MyIP, MyPort}.
 
--spec make_local(process_id()) -> comm:erl_pid_plain().
-make_local({_IP, _Port, Pid}) ->
-    Pid.
+-spec make_local(process_id()) -> comm:erl_local_pid_plain().
+make_local({_IP, _Port, Pid}) -> Pid.
 
 %% @doc Gets the IP address of the given process id.
 -spec get_ip(process_id()) -> inet:ip_address().

@@ -1,4 +1,4 @@
-%  @copyright 2009-2011 Zuse Institute Berlin
+%  @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@
 -opaque state() :: {BaseIntervalFun::trigger:interval_fun(),
                     MinIntervalFun::trigger:interval_fun(),
                     MaxIntervalFun::trigger:interval_fun(),
-                    MsgTag::comm:message_tag(), TimerRef::ok | reference()}.
+                    MsgTag::comm:msg_tag(), TimerRef::ok | reference()}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag used for the trigger message.
--spec init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(), MaxIntervalFun::trigger:interval_fun(), comm:message_tag()) -> state().
+-spec init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(), MaxIntervalFun::trigger:interval_fun(), comm:msg_tag()) -> state().
 init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
     {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.
 
@@ -76,7 +76,7 @@ next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, Interv
                    BaseIntervalFun::trigger:interval_fun(),
                    MinIntervalFun::trigger:interval_fun(),
                    MaxIntervalFun::trigger:interval_fun(),
-                   MsgTag::comm:message_tag()) -> reference().
+                   MsgTag::comm:msg_tag()) -> reference().
 send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) ->
     case IntervalTag of
         max_interval ->

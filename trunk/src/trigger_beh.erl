@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin
+% @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 -type state() :: term().
 
 -callback init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(),
-               MaxIntervalFun::trigger:interval_fun(), comm:message_tag()) -> state().
+               MaxIntervalFun::trigger:interval_fun(), comm:msg_tag()) -> state().
 -callback now(state()) -> state().
 -callback next(state(), IntervalTag::trigger:interval()) -> state().
 -callback stop(state()) -> state().
