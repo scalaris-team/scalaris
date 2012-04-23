@@ -24,10 +24,12 @@
 
 -export([test/0]).
 
+-spec test() -> ok.
 test() ->
     DataNode = pid_groups:find_a(data_node),
     comm:send_local(DataNode, {lookup_fin, 42, {read, comm:this(), 5, 42}}),
     receive
         X ->
             io:format("~p~n", [X])
-    end.
+    end,
+    ok.
