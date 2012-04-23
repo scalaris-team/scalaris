@@ -72,7 +72,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 We build rpm and deb packages using checkouts from the latest tagged version as well as svn trunk and provide them using the Open Build Service at http://download.opensuse.org/repositories/home:/scalaris/. The available packages are listed in the following table:
 
 || *Distribution* || *Version* || *Download* ||
-|| ArchLinux || || [http://aur.archlinux.org/packages.php?ID=56694] (0.4.1) <br>[http://aur.archlinux.org/packages.php?ID=56695] (trunk) ||
+|| Arch Linux || || [http://aur.archlinux.org/packages.php?ID=56694] (0.4.1) <br>[http://aur.archlinux.org/packages.php?ID=56695] (trunk) ||
 || Fedora || 14 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/] ||
 || Fedora || 15 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/] ||
 || Fedora || 16 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/] ||
