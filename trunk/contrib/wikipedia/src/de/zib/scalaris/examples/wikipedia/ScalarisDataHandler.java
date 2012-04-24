@@ -1059,7 +1059,7 @@ public class ScalarisDataHandler {
             }
 
             executor.addWrite(ScalarisOpType.PAGE, getPageKey(title0, nsObject), newPage);
-            executor.addWrite(ScalarisOpType.REVISION, getRevKey(title0, newRev.getId(), nsObject), newRev);
+            executor.addWrite(ScalarisOpType.REVISION, getRevKey(title0, oldPage.getCurRev().getId(), nsObject), oldPage.getCurRev());
 
             //  PAGE LISTS UPDATE, step 2: execute and evaluate operations
             try {
