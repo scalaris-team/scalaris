@@ -2,14 +2,13 @@
 // Eclipse Public License 1.0
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import info.bliki.api.Connector;
+import info.bliki.wiki.model.IWikiModel;
+import info.bliki.wiki.template.Localurl;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.List;
-
-import info.bliki.api.Connector;
-import info.bliki.wiki.model.IWikiModel;
-import info.bliki.wiki.template.ITemplateFunction;
-import info.bliki.wiki.template.Localurl;
 
 /**
  * A template parser function for <code>{{localurl: ... }}</code> syntax
@@ -22,7 +21,7 @@ public class MyLocalurl extends Localurl {
     /**
      * Single static instance of a {@link MyFullurl} object.
      */
-    public final static ITemplateFunction CONST = new MyLocalurl();
+    public final static MyLocalurl CONST = new MyLocalurl();
 
     /**
      * Constructor

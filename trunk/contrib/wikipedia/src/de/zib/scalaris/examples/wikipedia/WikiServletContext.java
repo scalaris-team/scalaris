@@ -48,14 +48,6 @@ public interface WikiServletContext {
     public abstract String getVersion();
 
     /**
-     * Gets the base URL for the wiki servlet relative to the servlet's context
-     * path.
-     * 
-     * @return the wikibaseurl
-     */
-    public abstract String getWikibaseurl();
-
-    /**
      * Gets the base URL for links to articles relative to the servlet's context
      * path.
      * 

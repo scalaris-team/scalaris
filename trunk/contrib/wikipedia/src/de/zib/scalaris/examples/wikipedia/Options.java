@@ -28,6 +28,15 @@ public class Options {
     
     private final static Options instance = new Options();
     protected static final Pattern CONFIG_SINGLE_OPTIMISATION = Pattern.compile("([a-zA-Z_0-9]*):([a-zA-Z_0-9]*)\\(([a-zA-Z_0-9,]*)\\)");
+
+    /**
+     * The name of the server (part of the URL), e.g. <tt>en.wikipedia.org</tt>.
+     */
+    public String SERVERNAME = "localhost:8080";
+    /**
+     * The path on the server (part of the URL), e.g. <tt>/wiki</tt>.
+     */
+    public String SERVERPATH = "/scalaris-wiki/wiki";
     
     /**
      * Whether to support back-links ("what links here?") or not.
@@ -216,6 +225,10 @@ public class Options {
      * 
      * @param options
      *            the {@link Options} object to parse into
+     * @param SERVERNAME
+     *            {@link Options#SERVERNAME}
+     * @param SERVERPATH
+     *            {@link Options#SERVERPATH}
      * @param WIKI_USE_BACKLINKS
      *            {@link Options#WIKI_USE_BACKLINKS}
      * @param WIKI_SAVEPAGE_RETRIES
@@ -229,11 +242,18 @@ public class Options {
      * @param OPTIMISATIONS
      *            {@link Options#OPTIMISATIONS}
      */
-    public static void parseOptions(Options options, final String WIKI_USE_BACKLINKS,
-            final String WIKI_SAVEPAGE_RETRIES, final String WIKI_SAVEPAGE_RETRY_DELAY,
+    public static void parseOptions(Options options, final String SERVERNAME, final String SERVERPATH,
+            final String WIKI_USE_BACKLINKS,
+            final String WIKI_SAVEPAGE_RETRIES,
+            final String WIKI_SAVEPAGE_RETRY_DELAY,
             final String WIKI_REBUILD_PAGES_CACHE,
-            final String WIKI_STORE_CONTRIBUTIONS,
-            final String OPTIMISATIONS) {
+            final String WIKI_STORE_CONTRIBUTIONS, final String OPTIMISATIONS) {
+        if (SERVERNAME != null) {
+            options.SERVERNAME = SERVERNAME;
+        }
+        if (SERVERPATH != null) {
+            options.SERVERPATH = SERVERPATH;
+        }
         if (WIKI_USE_BACKLINKS != null) {
             options.WIKI_USE_BACKLINKS = Boolean.parseBoolean(WIKI_USE_BACKLINKS);
         }

@@ -49,8 +49,6 @@ import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
  */
 public class MyWikiModel extends WikiModel {
 
-    private String fExternalWikiBaseFullURL;
-
     /**
      * Interwiki links pointing to other wikis in the web
      */
@@ -244,7 +242,6 @@ public class MyWikiModel extends WikiModel {
      */
     public MyWikiModel(String imageBaseURL, String linkBaseURL, MyNamespace namespace) {
         super(new MyConfiguration(namespace), null, namespace, imageBaseURL, linkBaseURL);
-        this.fExternalWikiBaseFullURL = linkBaseURL;
         addTemplateFunction("#ifexist", MyIfexistTemplateFun.CONST);
     }
     
@@ -503,27 +500,6 @@ public class MyWikiModel extends WikiModel {
      */
     public String getLinkBaseURL() {
         return fExternalWikiBaseURL;
-    }
-
-    /**
-     * Gets the base URL for full links including "http://" (can contain ${title}
-     * for replacement).
-     * 
-     * @return the base url for links
-     */
-    public String getLinkBaseFullURL() {
-        return fExternalWikiBaseFullURL;
-    }
-
-    /**
-     * Sets the base URL for full links including "http://" (can contain ${title}
-     * for replacement).
-     * 
-     * @param linkBaseFullURL
-     *            the full link URL to set
-     */
-    public void setLinkBaseFullURL(String linkBaseFullURL) {
-        this.fExternalWikiBaseFullURL = linkBaseFullURL;
     }
 
     /* (non-Javadoc)

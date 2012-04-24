@@ -398,8 +398,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     
     @Override
     protected MyScalarisWikiModel getWikiModel(Connection connection) {
-        final MyScalarisWikiModel model = new MyScalarisWikiModel(WikiServlet.imageBaseURL,
-                WikiServlet.linkBaseURL, connection, namespace);
+        final MyScalarisWikiModel model = new MyScalarisWikiModel(getImagebaseurl(),
+                getLinkbaseurl(), connection, namespace);
         model.setExistingPages(existingPages);
         return model;
     }

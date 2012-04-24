@@ -8,6 +8,14 @@
 		<servlet-name>WikiServletScalaris</servlet-name>
 		<servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
 		<init-param>
+			<param-name>SERVERNAME</param-name>
+			<param-value>localhost:8080</param-value>
+		</init-param>
+		<init-param>
+			<param-name>SERVERPATH</param-name>
+			<param-value>/scalaris-wiki/wiki</param-value>
+		</init-param>
+		<init-param>
 			<param-name>WIKI_USE_BACKLINKS</param-name>
 			<param-value>true</param-value>
 		</init-param>
@@ -23,10 +31,10 @@
 			<param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
 			<param-value>600</param-value>
 		</init-param>
-        <init-param>
-            <param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
-            <param-value>OUTSIDE_TX</param-value>
-        </init-param>
+		<init-param>
+			<param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
+			<param-value>OUTSIDE_TX</param-value>
+		</init-param>
 		<init-param>
 			<param-name>WIKI_OPTIMISATIONS</param-name>
 <!--
