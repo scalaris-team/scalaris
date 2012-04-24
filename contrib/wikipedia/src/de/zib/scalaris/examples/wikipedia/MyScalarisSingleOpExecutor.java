@@ -74,7 +74,7 @@ public class MyScalarisSingleOpExecutor extends ScalarisSingleOpExecutor {
     protected ResultList executeRequests(RequestList requests)
             throws ConnectionException, TimeoutException, AbortException,
             UnknownException {
-        InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
+        ScalarisDataHandler.addInvolvedKeys(involvedKeys, requests.getRequests());
         return super.executeRequests(requests);
     }
 
