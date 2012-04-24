@@ -41,7 +41,7 @@ SCALARISCLIENT=${exec_prefix}/bin/scalaris
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
 # for best performance, especially on Erlang > R14B04:
-ERL_SCHED_FLAGS="+sbt db +swt low"
+ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
 
 # default values (commandline options change these parameters)
 NODE_NAME=node1
@@ -228,6 +228,20 @@ checkinstallation() {
         echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
         exit 1
     fi
+
+
+    CHECKCONFIGMSG=`$ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'`
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "$CHECKCONFIGMSG"
+        echo "WARNING: could not start erlang with $ERL_SCHED_FLAGS."
+        echo " These parameters are needed for erlang >= R15 to achieve a performance comparable with R14B04."
+        echo " Use the ERL_SCHED_FLAGS environment variable to override the scheduler flags."
+        echo " You may need to include the +sct flag to set the CPU topology manually."
+        echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
+        exit 1
+    fi
+
     exit 0
 }
 
