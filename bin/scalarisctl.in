@@ -40,6 +40,9 @@ SCALARISCLIENT=${exec_prefix}/bin/scalaris
 
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
+# for best performance, especially on Erlang > R14B04:
+ERL_SCHED_FLAGS="+sbt db +swt low"
+
 # default values (commandline options change these parameters)
 NODE_NAME=node1
 daemonize=0
@@ -239,6 +242,11 @@ scalarisstart(){
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
         echo "We were trying to run: erl -noinput -name $NODE_NAME -eval 'halt(0).'"
         exit 1
+    fi
+    $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
+    FAILED=$?
+    if [ $FAILED -eq 0 ]; then
+        erl_flags="$ERL_SCHED_FLAGS $erl_flags"
     fi
     if [ $daemonize -ne 0 ]; then
         BACKGROUND="-detached"
