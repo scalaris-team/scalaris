@@ -54,7 +54,7 @@ upd_tests() ->
     [upd_no_outdated,
      upd_min_nodes,     % sync in an single node ring
      upd_simple,        % run one sync round
-     upd_dest,          % run one sync with a specified dest node 
+     %upd_dest,          % run one sync with a specified dest node 
      upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
 
 all() ->
