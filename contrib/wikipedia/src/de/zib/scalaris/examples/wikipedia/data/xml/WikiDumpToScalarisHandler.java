@@ -188,8 +188,10 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         // ignore the (rest of the) page if a failure occured
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         for (Revision rev : revisions) {
-            String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
-            requests.addOp(new WriteOp(key, rev));
+            if (rev.getId() != page.getCurRev().getId()) {
+                String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
+                requests.addOp(new WriteOp(key, rev));
+            }
         }
         requests.addOp(new WriteOp(ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short));
         requests.addOp(new WriteOp(ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()), page));

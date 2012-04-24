@@ -333,9 +333,12 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             List<ShortRevision> revisions_short, NamespaceEnum namespace)
             throws UnsupportedOperationException {
         for (Revision rev : revisions) {
-            addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
-                    ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace()),
-                    rev, stWrite));
+            if (rev.getId() != page.getCurRev().getId()) {
+                addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
+                        ScalarisDataHandler.getRevKey(page.getTitle(),
+                                rev.getId(), wikiModel.getNamespace()), rev,
+                        stWrite));
+            }
         }
         addSQLiteJob(new SQLiteWriteObjectJob<List<ShortRevision>>(
                 ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()),
