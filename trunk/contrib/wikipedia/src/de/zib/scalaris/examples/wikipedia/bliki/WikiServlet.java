@@ -899,9 +899,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String involvedKeysPar = getParam(request, "involved_keys");
         if (!involvedKeysPar.isEmpty()) {
             page.getInvolvedKeys().add(new InvolvedKey());
-            for (String text : involvedKeysPar.split(" # ")) {
-                page.getInvolvedKeys().add(InvolvedKey.fromString(text));
-            }
+            InvolvedKey.addInvolvedKeys(page.getInvolvedKeys(), Arrays.asList(involvedKeysPar.split(" # ")), true);
         }
         final String[] pageRandomTimes = getParam(request, "random_times").split(",");
         for (String pageRandomTime : pageRandomTimes) {
