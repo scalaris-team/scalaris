@@ -135,7 +135,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         SQLiteStatement stmt = null;
         try {
             stmt = db.prepare("SELECT value FROM properties WHERE key == ?");
-            return WikiDumpPrepareSQLiteForScalarisHandler.readObject(stmt, "siteinfo");
+            return WikiDumpPrepareSQLiteForScalarisHandler.readObject2(stmt, "siteinfo").jsonValue(SiteInfo.class);
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         } catch (FileNotFoundException e) {

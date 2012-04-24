@@ -30,8 +30,8 @@ import de.zib.scalaris.ErlangValue;
  * @since 3.14
  */
 public class WriteOp implements TransactionOperation, TransactionSingleOpOperation {
-    final OtpErlangString key;
-    final OtpErlangObject value;
+    final protected OtpErlangString key;
+    final protected OtpErlangObject value;
     /**
      * Constructor
      *

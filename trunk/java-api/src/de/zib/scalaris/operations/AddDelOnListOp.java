@@ -33,9 +33,9 @@ import de.zib.scalaris.ErlangValue;
  * @since 3.14
  */
 public class AddDelOnListOp implements TransactionOperation, TransactionSingleOpOperation {
-    final OtpErlangString key;
-    final OtpErlangObject toAdd;
-    final OtpErlangObject toRemove;
+    final protected OtpErlangString key;
+    final protected OtpErlangObject toAdd;
+    final protected OtpErlangObject toRemove;
     /**
      * Constructor
      *

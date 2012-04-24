@@ -37,7 +37,11 @@ import java.util.zip.GZIPOutputStream;
 import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
+import com.ericsson.otp.erlang.OtpErlangDecodeException;
+import com.ericsson.otp.erlang.OtpErlangObject;
 
+import de.zib.scalaris.CommonErlangObjects;
+import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -187,9 +191,11 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     }
 
     /**
-     * Converts an object to a (compressed) byte array.
+     * Encodes the given object to the erlang value used by Scalaris and
+     * converts this value to bytes for use by SQLite.
      * 
-     * @param value  the object to convert
+     * @param value
+     *            the object to convert
      * 
      * @return the byte array
      * 
@@ -200,32 +206,54 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     static <T> byte[] objectToBytes(T value) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
-        oos.writeObject(value);
+        oos.writeObject(CommonErlangObjects.encode(ErlangValue.convertToErlang(value)));
         oos.flush();
         oos.close();
         return bos.toByteArray();
     }
 
     /**
-     * Reads an object from a (compressed) byte array.
+     * Reads an encoded Scalaris value from a (compressed) byte array.
      * 
      * @param value  the byte array to get the object from
      * 
-     * @return the object
+     * @return the encoded object
      * 
      * @throws IOException
      * @throws ClassNotFoundException
      * 
      * @see #objectToBytes(Object)
      */
-    static <T> T objectFromBytes(byte[] value) throws IOException,
+    static OtpErlangObject objectFromBytes(byte[] value) throws IOException,
             ClassNotFoundException {
         ObjectInputStream ois = new ObjectInputStream(
                 new GZIPInputStream(new ByteArrayInputStream(value)));
-        @SuppressWarnings("unchecked")
-        T result = (T) ois.readObject();
+        OtpErlangObject result = (OtpErlangObject) ois.readObject();
         ois.close();
         return result;
+    }
+
+    /**
+     * Reads an encoded Scalaris value from a (compressed) byte array.
+     * 
+     * @param value  the byte array to get the object from
+     * 
+     * @return the decoded object
+     * 
+     * @throws IOException
+     * @throws ClassNotFoundException
+     * 
+     * @see #objectToBytes(Object)
+     */
+    static ErlangValue objectFromBytes2(byte[] value) throws IOException,
+            ClassNotFoundException {
+        OtpErlangObject value2;
+        try {
+            value2 = CommonErlangObjects.decode(objectFromBytes(value));
+        } catch (OtpErlangDecodeException e) {
+            throw new RuntimeException(e);
+        }
+        return new ErlangValue(value2);
     }
 
     /**
@@ -233,13 +261,15 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
      * <tt>WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key)</tt>
      * 
-     * @param <T>
      * @param siteinfo
      * @param key
+     * 
+     * @return the encoded object
+     * 
      * @throws IOException
      * @throws FileNotFoundException
      */
-    static <T> T readObject(SQLiteStatement stRead, String key)
+    static OtpErlangObject readObject(SQLiteStatement stRead, String key)
             throws RuntimeException, FileNotFoundException {
         try {
             try {
@@ -264,6 +294,32 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             throw new RuntimeException(e);
         } catch (IOException e) {
             System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Note: may need to qualify static function call due to
+     *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+     * <tt>WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key)</tt>
+     * 
+     * @param siteinfo
+     * @param key
+     * 
+     * @return the decoded object
+     * 
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    static ErlangValue readObject2(SQLiteStatement stRead, String key)
+            throws RuntimeException, FileNotFoundException {
+        try {
+            OtpErlangObject value = CommonErlangObjects.decode(readObject(
+                    stRead, key));
+            return new ErlangValue(value);
+        } catch (FileNotFoundException e) {
+            throw e;
+        } catch (OtpErlangDecodeException e) {
             throw new RuntimeException(e);
         }
     }
@@ -473,11 +529,18 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     
     abstract protected class SQLiteUpdatePageListsJob implements Runnable {
 
-        protected <T> T readObject(String key)
+        protected OtpErlangObject readObject(String key)
                 throws RuntimeException, FileNotFoundException {
             // Note: need to qualify static function call due to
             // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
-            return WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key);
+            return WikiDumpPrepareSQLiteForScalarisHandler.readObject(stRead, key);
+        }
+
+        protected ErlangValue readObject2(String key)
+                throws RuntimeException, FileNotFoundException {
+            // Note: need to qualify static function call due to
+            // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+            return WikiDumpPrepareSQLiteForScalarisHandler.readObject2(stRead, key);
         }
 
         protected <T> void writeObject(String key, T value)
@@ -562,7 +625,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 final ArrayList<String> curNewPages = newPages.get(ns);
                 List<String> pageList;
                 try {
-                    pageList = readObject(scalaris_key);
+                    pageList = readObject2(scalaris_key).stringListValue();
                     pageList.addAll(curNewPages);
                 } catch (FileNotFoundException e) {
                     pageList = curNewPages;

@@ -32,6 +32,7 @@ import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
+import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_HASH;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
@@ -286,7 +287,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 if (countKey != null) {
                     try {
                         stWrite.reset();
-                        int listSize = WikiDumpPrepareSQLiteForScalarisHandler.<List<Object>>objectFromBytes(value).size();
+                        int listSize = WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue().size();
                         stWrite.bind(1, countKey).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(listSize)).stepThrough();
                     } catch (SQLiteException e) {
                         System.err.println("write of " + countKey + " failed (sqlite error: " + e.toString() + ")");
@@ -309,11 +310,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     static class SQLiteWriteBucketListWithHashJob implements Runnable {
         protected final String key;
         protected final String countKey;
-        protected final List<Object> value;
+        protected final List<ErlangValue> value;
         protected final SQLiteStatement stWrite;
         protected final Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation;
         
-        public SQLiteWriteBucketListWithHashJob(String key, List<Object> value, String countKey, SQLiteStatement stWrite, Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation) {
+        public SQLiteWriteBucketListWithHashJob(String key, List<ErlangValue> value, String countKey, SQLiteStatement stWrite, Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation) {
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -324,18 +325,18 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         @Override
         public void run() {
             // split lists:
-            HashMap<String, List<Object>> newLists = new HashMap<String, List<Object>>(optimisation.getBuckets());
-            for (Object obj : value) {
+            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(optimisation.getBuckets());
+            for (ErlangValue obj : value) {
                 final String keyAppend2 = optimisation.getBucketString(obj);
-                List<Object> valueAtKey2 = newLists.get(keyAppend2);
+                List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
                 if (valueAtKey2 == null) {
-                    valueAtKey2 = new ArrayList<Object>();
+                    valueAtKey2 = new ArrayList<ErlangValue>();
                     newLists.put(keyAppend2, valueAtKey2);
                 }
                 valueAtKey2.add(obj);
             }
 
-            for (Entry<String, List<Object>> newList : newLists.entrySet()) {
+            for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
                 try {
                     // write list
                     final String key2 = key + newList.getKey();
@@ -553,7 +554,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                             case LIST:
                                 addSQLiteJob(new SQLiteWriteBucketListWithHashJob(
                                         key,
-                                        WikiDumpPrepareSQLiteForScalarisHandler.<List<Object>> objectFromBytes(value),
+                                        WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue(),
                                         countKey,
                                         stWrite, optimisation2));
                                 break;
@@ -561,7 +562,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                                 if (optimisation2.getBuckets() > 1) {
                                     addSQLiteJob(new SQLiteWriteBucketCounterWithHashJob(
                                             key,
-                                            WikiDumpPrepareSQLiteForScalarisHandler.<Integer> objectFromBytes(value),
+                                            WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).intValue(),
                                             stWrite, optimisation2));
                                 } else {
                                     addSQLiteJob(new SQLiteWriteBytesJob(key, value, stWrite));

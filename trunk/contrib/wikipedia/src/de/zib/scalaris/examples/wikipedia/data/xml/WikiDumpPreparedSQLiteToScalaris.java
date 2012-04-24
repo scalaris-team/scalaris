@@ -29,7 +29,11 @@ import java.util.concurrent.TimeUnit;
 import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
+import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangString;
+import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
@@ -233,9 +237,9 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         }
     }
     
-    protected <T> void writeToScalaris(String key, T value) {
+    protected void writeToScalaris(String key, OtpErlangObject value) {
         ++importedKeys;
-        requests.addOp(new WriteOp(key, value));
+        requests.addOp(new WriteCompressedOp(key, value));
         // bundle requests:
         if (requests.size() >= REQUEST_BUNDLE_SIZE) {
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "keys up to " + key);
@@ -257,6 +261,49 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
             
             println("imported K/V pairs to Scalaris: " + importedKeys);
         }
+    }
+    
+    /**
+     * Similar to {@link WriteOp} but assumes that the value is already encoded
+     * by {@link CommonErlangObjects#encode(OtpErlangObject)} and that the
+     * connection to Scalaris which uses this operation uses compressed values.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class WriteCompressedOp extends WriteOp {
+        /**
+         * Constructor
+         *
+         * @param key
+         *            the key to write the value to
+         * @param value
+         *            the value to write
+         */
+        public WriteCompressedOp(OtpErlangString key, OtpErlangObject value) {
+            super(key, value);
+        }
+        /**
+         * Constructor
+         *
+         * @param key
+         *            the key to write the value to
+         * @param value
+         *            the value to write
+         */
+        public WriteCompressedOp(String key, OtpErlangObject value) {
+            super(new OtpErlangString(key), value);
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.operations.WriteOp#getErlang(boolean)
+         */
+        @Override
+        public OtpErlangObject getErlang(boolean compressed) {
+            assert compressed;
+            return new OtpErlangTuple(new OtpErlangObject[] {
+                    CommonErlangObjects.writeAtom, key, value });
+        }
+        
     }
 
     /* (non-Javadoc)
