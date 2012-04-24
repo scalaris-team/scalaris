@@ -32,8 +32,8 @@ import de.zib.scalaris.ErlangValue;
  * @since 3.14
  */
 public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOperation {
-    final OtpErlangString key;
-    final OtpErlangObject toAdd;
+    final protected OtpErlangString key;
+    final protected OtpErlangObject toAdd;
     /**
      * Constructor
      *

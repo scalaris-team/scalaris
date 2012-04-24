@@ -31,9 +31,9 @@ import de.zib.scalaris.ErlangValue;
  * @since 3.14
  */
 public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOperation {
-    final OtpErlangString key;
-    final OtpErlangObject oldValue;
-    final OtpErlangObject newValue;
+    final protected OtpErlangString key;
+    final protected OtpErlangObject oldValue;
+    final protected OtpErlangObject newValue;
     /**
      * Constructor
      *

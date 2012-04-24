@@ -29,7 +29,7 @@ import de.zib.scalaris.CommonErlangObjects;
  * @since 3.14
  */
 public class ReadOp implements TransactionOperation, TransactionSingleOpOperation {
-    final OtpErlangString key;
+    final protected OtpErlangString key;
     /**
      * Constructor
      *
