@@ -15,14 +15,10 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import com.ericsson.otp.erlang.OtpErlangString;
 
-import de.zib.scalaris.operations.Operation;
-import de.zib.scalaris.operations.ReadOp;
 
 /**
  * POD object for involved keys.
@@ -140,29 +136,6 @@ public class InvolvedKey {
             return new InvolvedKey(op, key);
         } else {
             throw new IllegalArgumentException("No valid involvedKey: " + text);
-        }
-    }
-    
-    /**
-     * Adds all keys from the given operation list to the list of involved keys.
-     * 
-     * @param involvedKeys
-     *            list of involved keys
-     * @param ops
-     *            new operations
-     */
-    public static void addInvolvedKeys(List<InvolvedKey> involvedKeys, Collection<? extends Operation> ops) {
-        assert involvedKeys != null;
-        assert ops != null;
-        for (Operation op : ops) {
-            final OtpErlangString key = op.getKey();
-            if (key != null) {
-                if (op instanceof ReadOp) {
-                    involvedKeys.add(new InvolvedKey(OP.READ, key.stringValue()));
-                } else {
-                    involvedKeys.add(new InvolvedKey(OP.WRITE, key.stringValue()));
-                }
-            }
         }
     }
     

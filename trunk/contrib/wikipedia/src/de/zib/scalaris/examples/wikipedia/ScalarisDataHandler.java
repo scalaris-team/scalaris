@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import com.ericsson.otp.erlang.OtpErlangString;
+
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
@@ -43,6 +45,7 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.scalaris.operations.Operation;
 import de.zib.scalaris.operations.ReadOp;
 
 /**
@@ -264,7 +267,7 @@ public class ScalarisDataHandler {
         
         TransactionSingleOp.ResultList results;
         try {
-            InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
+            ScalarisDataHandler.addInvolvedKeys(involvedKeys, requests.getRequests());
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
             return new PageHistoryResult(false, involvedKeys,
@@ -882,7 +885,7 @@ public class ScalarisDataHandler {
         
         Transaction.ResultList results;
         try {
-            InvolvedKey.addInvolvedKeys(involvedKeys, requests.getRequests());
+            ScalarisDataHandler.addInvolvedKeys(involvedKeys, requests.getRequests());
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
@@ -1275,6 +1278,29 @@ public class ScalarisDataHandler {
                             + "\" and \"" + pageCount_key + "\" in Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);
+        }
+    }
+
+    /**
+     * Adds all keys from the given operation list to the list of involved keys.
+     * 
+     * @param involvedKeys
+     *            list of involved keys
+     * @param ops
+     *            new operations
+     */
+    public static void addInvolvedKeys(List<InvolvedKey> involvedKeys, Collection<? extends Operation> ops) {
+        assert involvedKeys != null;
+        assert ops != null;
+        for (Operation op : ops) {
+            final OtpErlangString key = op.getKey();
+            if (key != null) {
+                if (op instanceof ReadOp) {
+                    involvedKeys.add(new InvolvedKey(InvolvedKey.OP.READ, key.stringValue()));
+                } else {
+                    involvedKeys.add(new InvolvedKey(InvolvedKey.OP.WRITE, key.stringValue()));
+                }
+            }
         }
     }
 }
