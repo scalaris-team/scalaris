@@ -100,19 +100,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     
     protected boolean initialized = false;
 
-    /**
-     * Name under which the servlet is available.
-     */
-    public static final String wikiBaseURL = "wiki";
-    /**
-     * URL for page links
-     */
-    public static final String linkBaseURL = wikiBaseURL + "?title=${title}";
-    /**
-     * URL for image links
-     */
-    public static final String imageBaseURL = wikiBaseURL + "?get_image=${image}";
-
     protected static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     protected static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
     protected static final Pattern MATCH_WIKI_IMAGE_SVG_PNG = Pattern.compile("\\.svg\\.png$");
@@ -184,6 +171,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     protected void readOptionsFromConfig(ServletConfig config) {
         Options.parseOptions(Options.getInstance(),
+                config.getInitParameter("SERVERNAME"),
+                config.getInitParameter("SERVERPATH"),
                 config.getInitParameter("WIKI_USE_BACKLINKS"),
                 config.getInitParameter("WIKI_SAVEPAGE_RETRIES"),
                 config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY"),
@@ -783,23 +772,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
     
     /**
-     * Extracts the full base URL from a requested URL.
-     * 
-     * @param requestUrl
-     *            the URL from the request
-     * 
-     * @return the first part of the URL preceding '/' + {@link #wikiBaseURL}
-     */
-    private static String extractFullUrl(String requestUrl) {
-        int colonIndex = requestUrl.indexOf('/' + wikiBaseURL);
-        if (colonIndex != (-1)) {
-            return requestUrl.substring(0, colonIndex + 1) + linkBaseURL;
-        }
-        return null;
-        
-    }
-    
-    /**
      * Creates a {@link WikiPageBean} object with the rendered content of a
      * given revision.
      * 
@@ -824,10 +796,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
         MyWikiModel wikiModel = getWikiModel(connection);
-        String fullUrl = extractFullUrl(request.getRequestURL().toString());
-        if (fullUrl != null) {
-            wikiModel.setLinkBaseFullURL(fullUrl);
-        }
         wikiModel.setPageName(title);
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.unpackedText());
@@ -1691,10 +1659,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         MyWikiModel wikiModel = getWikiModel(connection);
         wikiModel.setPageName(title);
-        String fullUrl = extractFullUrl(request.getRequestURL().toString());
-        if (fullUrl != null) {
-            wikiModel.setLinkBaseFullURL(fullUrl);
-        }
         page.setPreview(wikiModel.render(content));
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
@@ -1947,19 +1911,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getWikibaseurl()
-     */
-    @Override
-    public String getWikibaseurl() {
-        return wikiBaseURL;
-    }
-
-    /* (non-Javadoc)
      * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getLinkbaseurl()
      */
     @Override
     public String getLinkbaseurl() {
-        return linkBaseURL;
+        return Options.getInstance().SERVERPATH + "?title=${title}";
     }
 
     /* (non-Javadoc)
@@ -1967,7 +1923,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     @Override
     public String getImagebaseurl() {
-        return imageBaseURL;
+        return Options.getInstance().SERVERPATH + "?get_image=${image}";
     }
 
     /* (non-Javadoc)

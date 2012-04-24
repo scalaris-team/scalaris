@@ -20,6 +20,8 @@ import info.bliki.wiki.filter.MagicWord;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.zib.scalaris.examples.wikipedia.Options;
+
 /**
  * Gets values for magic words not handled by {@link MagicWord}.
  * 
@@ -235,12 +237,12 @@ public class MyMagicWord extends MagicWord {
          */
         if (name.equals(MAGIC_SITE_NAME)) {
             return model.getNamespace().getSiteinfo().getSitename();
-//        } else if (name.equals(MAGIC_SERVER)) {
-//            // TODO: implement
-//            return null;
-//        } else if (name.equals(MAGIC_SERVER_NAME)) {
-//            // TODO: implement
-//            return null;
+        } else if (name.equals(MAGIC_SERVER)) {
+            // {{SERVER}} (//en.wikipedia.org)
+            return "//" + Options.getInstance().SERVERNAME;
+        } else if (name.equals(MAGIC_SERVER_NAME)) {
+            // {{SERVERNAME}} (en.wikipedia.org)
+            return Options.getInstance().SERVERNAME;
 //            {{DIRMARK}}
 //            {{DIRECTIONMARK}}
 //        } else if (name.equals(MAGIC_SCRIPT_PATH)) {

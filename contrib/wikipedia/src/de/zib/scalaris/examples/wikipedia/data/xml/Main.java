@@ -234,7 +234,7 @@ public class Main {
         Options dbWriteOptions = new Options();
         if (args.length > i) {
             dbWriteOptionsStr = args[i];
-            Options.parseOptions(dbWriteOptions, null, null, null, null, null, dbWriteOptionsStr);
+            Options.parseOptions(dbWriteOptions, null, null, null, null, null, null, null, dbWriteOptionsStr);
         } else {
             System.err.println("need a new optimisation scheme for convert; arguments given: " + Arrays.toString(args));
             System.exit(-1);
