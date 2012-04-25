@@ -45,6 +45,9 @@ BuildRequires:  python3-setuptools python-tools
 # note: erlang is still needed for configure
 BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 BuildRequires:  pkgconfig
+%if 0%{?mandriva_version} >= 2011 || 0%{?mdkversion} >= 201100
+BuildConflicts: libpulseaudio0 lib64pulseaudio0 libalsa-plugins-pulseaudio lib64alsa-plugins-pulseaudio
+%endif
 %define with_python 1
 %define with_python_doc_html 0
 %define with_python_doc_pdf 0
