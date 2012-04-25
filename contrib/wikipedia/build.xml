@@ -9,10 +9,11 @@
   <path id="import.classpath">
     <pathelement location="contrib/scalaris.jar"/>
     <pathelement location="contrib/OtpErlang-${opterlang.version}.jar"/>
-    <pathelement location="contrib/bliki-core-3.0.18-SNAPSHOT.jar"/>
-    <pathelement location="contrib/commons-lang-2.6.jar"/>
     <pathelement location="contrib/commons-compress-1.1.jar"/>
     <pathelement location="contrib/commons-codec-1.4.jar"/>
+    <pathelement location="contrib/commons-lang-2.6.jar"/>
+    <pathelement location="contrib/commons-logging-1.1.1.jar"/>
+    <pathelement location="contrib/bliki-core-3.0.18-SNAPSHOT.jar"/>
     <pathelement location="contrib/java-bloomfilter-1.0.jar"/>
     <pathelement location="contrib/sqlite4java.jar"/>
   </path>
@@ -96,6 +97,9 @@
     <delete dir="scalaris-wiki/WEB-INF/lib"/>
     <delete file="scalaris-wiki.war"/>
     <delete file="scalaris-wiki-plugin-api.jar"/>
+    <delete>
+      <fileset dir="contrib" includes="scalaris.jar, OtpErlang-*.jar"/>
+    </delete>
   </target>
   
   <target name="run" depends="run-tomcat" />
