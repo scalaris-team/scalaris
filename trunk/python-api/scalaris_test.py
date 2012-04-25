@@ -13,11 +13,13 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-from scalaris import TransactionSingleOp, Transaction, PubSub, ReplicatedDHT, ScalarisVM
+from scalaris import TransactionSingleOp, Transaction, PubSub, ReplicatedDHT, ScalarisVM,\
+    JSONConnection
 import scalaris
 import time, threading, json
 from datetime import datetime
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from random import shuffle
 import unittest
 
 # wait that long for subscription notifications to arrive
@@ -1243,7 +1245,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getVersion() with a closed connection."""
         vm = ScalarisVM()
         vm.close_connection()
-        #self.assertRaises(scalaris.ConnectionError, vm.getVersion)
+        #self.assertRaises(scalaris.ConnectionError, vm.getVersion())
         vm.getVersion()
         vm.close_connection()
 
@@ -1259,7 +1261,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getInfo() with a closed connection."""
         vm = ScalarisVM()
         vm.close_connection()
-        #self.assertRaises(scalaris.ConnectionError, vm.getInfo)
+        #self.assertRaises(scalaris.ConnectionError, vm.getInfo())
         vm.getInfo()
         vm.close_connection()
 
@@ -1287,7 +1289,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getNumberOfNodes() with a closed connection."""
         vm = ScalarisVM()
         vm.close_connection()
-        #self.assertRaises(scalaris.ConnectionError, vm.getNumberOfNodes)
+        #self.assertRaises(scalaris.ConnectionError, vm.getNumberOfNodes())
         vm.getNumberOfNodes()
         vm.close_connection()
 
@@ -1303,7 +1305,7 @@ class TestScalarisVM(unittest.TestCase):
         """Test method for ScalarisVM.getNodes() with a closed connection."""
         vm = ScalarisVM()
         vm.close_connection()
-        #self.assertRaises(scalaris.ConnectionError, vm.getNodes)
+        #self.assertRaises(scalaris.ConnectionError, vm.getNodes())
         vm.getNodes()
         vm.close_connection()
 
@@ -1315,6 +1317,266 @@ class TestScalarisVM(unittest.TestCase):
         self.assertTrue(len(nodes) >= 0)
         self.assertEqual(len(nodes), vm.getNumberOfNodes())
         vm.close_connection()
+
+    def testAddNodes_NotConnected(self):
+        """Test method for ScalarisVM.addNodes() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.addNodes(0))
+        vm.addNodes(0)
+        vm.close_connection()
+
+    def testAddNodes0(self):
+        """Test method for ScalarisVM.addNodes(0)."""
+        self._testAddNodes(0)
+
+    def testAddNodes1(self):
+        """Test method for ScalarisVM.addNodes(1)."""
+        self._testAddNodes(1)
+
+    def testAddNodes3(self):
+        """Test method for ScalarisVM.addNodes(3)."""
+        self._testAddNodes(3)
+
+    def _testAddNodes(self, nodesToAdd):
+        """Test method for ScalarisVM.addNodes(nodesToAdd)."""
+        vm = ScalarisVM()
+        size = vm.getNumberOfNodes();
+        (ok, failed) = vm.addNodes(nodesToAdd)
+        size = size + nodesToAdd
+        self.assertEqual(nodesToAdd, len(ok))
+        self.assertEqual(len(failed), 0)
+        self.assertEqual(size, vm.getNumberOfNodes())
+        nodes = vm.getNodes()
+        for name in ok:
+            self.assertTrue(name in nodes, str(nodes) + " should contain " + name)
+        for name in ok:
+            vm.killNode(name)
+        size = size - nodesToAdd
+        self.assertEqual(size, vm.getNumberOfNodes())
+        vm.close_connection()
+
+    def testShutdownNode_NotConnected(self):
+        """Test method for ScalarisVM.shutdownNode() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.shutdownNode("test"))
+        vm.shutdownNode("test")
+        vm.close_connection()
+
+    def testShutdownNode1(self):
+        """Test method for ScalarisVM.shutdownNode()."""
+        self._testDeleteNode('shutdown')
+
+    def testKillNode_NotConnected(self):
+        """Test method for ScalarisVM.killNode() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.killNode("test"))
+        vm.killNode("test")
+        vm.close_connection()
+
+    def testKillNode1(self):
+        """Test method for ScalarisVM.killNode()."""
+        self._testDeleteNode('kill')
+
+    def _testDeleteNode(self, action):
+        """Test method for ScalarisVM.shutdownNode() and ScalarisVM.killNode()."""
+        vm = ScalarisVM()
+        size = vm.getNumberOfNodes();
+        (ok, _failed) = vm.addNodes(1)
+        name = ok[0]
+        self.assertEqual(size + 1, vm.getNumberOfNodes())
+        if action == 'shutdown':
+            result = vm.shutdownNode(name)
+        elif action == 'kill':
+            result = vm.killNode(name)
+        self.assertTrue(result)
+        self.assertEqual(size, vm.getNumberOfNodes())
+        nodes = vm.getNodes()
+        self.assertTrue(not name in nodes, str(nodes) + " should not contain " + name)
+        vm.close_connection()
+
+    def testShutdownNodes_NotConnected(self):
+        """Test method for ScalarisVM.shutdownNodes() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.shutdownNodes(0))
+        vm.shutdownNodes(0)
+        vm.close_connection()
+
+    def testShutdownNodes0(self):
+        """Test method for ScalarisVM.shutdownNodes(0)."""
+        self._testDeleteNodes(0, 'shutdown')
+
+    def testShutdownNodes1(self):
+        """Test method for ScalarisVM.shutdownNodes(1)."""
+        self._testDeleteNodes(1, 'shutdown')
+
+    def testShutdownNodes3(self):
+        """Test method for ScalarisVM.shutdownNodes(3)."""
+        self._testDeleteNodes(3, 'shutdown')
+
+    def testKillNodes_NotConnected(self):
+        """Test method for ScalarisVM.killNodes() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.killNodes(0))
+        vm.killNodes(0)
+        vm.close_connection()
+
+    def testKillNodes0(self):
+        """Test method for ScalarisVM.killNodes(0)."""
+        self._testDeleteNodes(0, 'kill')
+
+    def testKillNodes1(self):
+        """Test method for ScalarisVM.killNodes(1)."""
+        self._testDeleteNodes(1, 'kill')
+
+    def testKillNodes3(self):
+        """Test method for ScalarisVM.killNodes(3)."""
+        self._testDeleteNodes(3, 'kill')
+
+    def _testDeleteNodes(self, nodesToRemove, action):
+        """Test method for ScalarisVM.shutdownNode() and ScalarisVM.killNode()."""
+        vm = ScalarisVM()
+        size = vm.getNumberOfNodes();
+        if nodesToRemove >= 1:
+            vm.addNodes(nodesToRemove)
+            self.assertEqual(size + nodesToRemove, vm.getNumberOfNodes())
+        if action == 'shutdown':
+            result = vm.shutdownNodes(nodesToRemove)
+        elif action == 'kill':
+            result = vm.killNodes(nodesToRemove)
+        self.assertEqual(nodesToRemove, len(result))
+        self.assertEqual(size, vm.getNumberOfNodes())
+        nodes = vm.getNodes()
+        for name in result:
+            self.assertTrue(not name in nodes, str(nodes) + " should not contain " + name)
+        vm.close_connection()
+
+    def testShutdownNodesByName_NotConnected(self):
+        """Test method for ScalarisVM.shutdownNodesByName() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.shutdownNodesByName(["test"]))
+        vm.shutdownNodesByName(["test"])
+        vm.close_connection()
+
+    def testShutdownNodesByName0(self):
+        """Test method for ScalarisVM.shutdownNodesByName(0)."""
+        self._testDeleteNodes(0, 'shutdown')
+
+    def testShutdownNodesByName1(self):
+        """Test method for ScalarisVM.shutdownNodesByName(1)."""
+        self._testDeleteNodes(1, 'shutdown')
+
+    def testShutdownNodesByName3(self):
+        """Test method for ScalarisVM.shutdownNodesByName(3)."""
+        self._testDeleteNodes(3, 'shutdown')
+
+    def testKillNodesByName_NotConnected(self):
+        """Test method for ScalarisVM.killNodesByName() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.killNodesByName(["test"]))
+        vm.killNodesByName(["test"])
+        vm.close_connection()
+
+    def testKillNodesByName0(self):
+        """Test method for ScalarisVM.killNodesByName(0)."""
+        self._testDeleteNodes(0, 'kill')
+
+    def testKillNodesByName1(self):
+        """Test method for ScalarisVM.killNodesByName(1)."""
+        self._testDeleteNodes(1, 'kill')
+
+    def testKillNodesByName3(self):
+        """Test method for ScalarisVM.killNodesByName(3)."""
+        self._testDeleteNodes(3, 'shutdown')
+
+    def _testDeleteNodesByName(self, nodesToRemove, action):
+        """Test method for ScalarisVM.shutdownNode() and ScalarisVM.killNode()."""
+        vm = ScalarisVM()
+        size = vm.getNumberOfNodes();
+        if nodesToRemove >= 1:
+            vm.addNodes(nodesToRemove)
+            self.assertEqual(size + nodesToRemove, vm.getNumberOfNodes())
+        nodes = vm.getNodes()
+        shuffle(nodes)
+        removedNodes = nodes[:nodesToRemove]
+        if action == 'shutdown':
+            (ok, not_found) = vm.shutdownNodesByName(removedNodes)
+        elif action == 'kill':
+            (ok, not_found) = vm.killNodesByName(removedNodes)
+        self.assertEqual(nodesToRemove, len(ok))
+        self.assertEqual(nodesToRemove, len(not_found))
+        list.sort(removedNodes)
+        list.sort(ok)
+        self.assertEqual(removedNodes, ok)
+        self.assertEqual(size, vm.getNumberOfNodes())
+        nodes = vm.getNodes()
+        for name in ok:
+            self.assertTrue(not name in nodes, str(nodes) + " should not contain " + name)
+        vm.close_connection()
+        
+    def testGetOtherVMs_NotConnected(self):
+        """Test method for ScalarisVM.getOtherVMs() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.getOtherVMs(0))
+        vm.getOtherVMs(1)
+        
+    def testGetOtherVMs1(self):
+        """Test method for ScalarisVM.getOtherVMs(1)."""
+        self._testGetOtherVMs(1)
+        
+    def testGetOtherVMs2(self):
+        """Test method for ScalarisVM.getOtherVMs(2)."""
+        self._testGetOtherVMs(2)
+        
+    def testGetOtherVMs3(self):
+        """Test method for ScalarisVM.getOtherVMs(3)."""
+        self._testGetOtherVMs(3)
+        
+    def _testGetOtherVMs(self, maxVMs):
+        """Test method for ScalarisVM.getOtherVMs()."""
+        vm = ScalarisVM()
+        otherVMs = vm.getOtherVMs(maxVMs)
+        self.assertTrue(len(otherVMs) <= maxVMs, "list too long: " + str(otherVMs))
+        for otherVMUrl in otherVMs:
+            otherVM = ScalarisVM(JSONConnection(otherVMUrl))
+            otherVM.getInfo()
+            otherVM.close_connection()
+        vm.close_connection()
+        
+    # not tested because we still need the Scalaris Erlang VM:
+    def _testShutdownVM_NotConnected(self):
+        """Test method for ScalarisVM.shutdownVM() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.shutdownVM())
+        vm.shutdownVM()
+        
+    # not tested because we still need the Scalaris Erlang VM:
+    def _testShutdownVM1(self):
+        """Test method for ScalarisVM.shutdownVM()."""
+        vm = ScalarisVM()
+        vm.shutdownVM()
+
+    # not tested because we still need the Scalaris Erlang VM:
+    def _testKillVM_NotConnected(self):
+        """Test method for ScalarisVM.killVM() with a closed connection."""
+        vm = ScalarisVM()
+        vm.close_connection()
+        #self.assertRaises(scalaris.ConnectionError, vm.killVM())
+        vm.killVM()
+
+    # not tested because we still need the Scalaris Erlang VM:
+    def _testKillVM1(self):
+        """Test method for ScalarisVM.killVM()."""
+        vm = ScalarisVM()
+        vm.killVM()
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

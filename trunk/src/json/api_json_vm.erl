@@ -79,39 +79,39 @@ get_nodes() ->
 
 -spec add_nodes(Number::non_neg_integer()) -> {struct, [{Key::atom(), Value::term()}]}.
 add_nodes(Number) ->
-    {Ok, Failed} = api_vm:add_nodes(Number),
-    Status = ?IIF(Failed =:= [], "ok", "fail"),
-    {struct, [{status, Status}, {ok, Ok}, {failed, Failed}]}.
+    {Ok, Failed1} = api_vm:add_nodes(Number),
+    Failed = [lists:flatten(io_lib:format("~p", [Reason])) || {error, Reason} <- Failed1],
+    {struct, [{status, "ok"}, {ok, {array, Ok}}, {failed, {array, Failed}}]}.
 
 -spec shutdown_node(Name::pid_groups:groupname()) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_node(Name) ->
-    {struct, [{status, api_vm:shutdown_node(Name)}]}.
+    {struct, [{status, erlang:atom_to_list(api_vm:shutdown_node(Name))}]}.
 
 -spec shutdown_nodes(Count::non_neg_integer()) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_nodes(Count) ->
-    {struct, [{status, "ok"}, {ok, [api_vm:shutdown_nodes(Count)]}]}.
+    {struct, [{status, "ok"}, {ok, {array, api_vm:shutdown_nodes(Count)}}]}.
 
 -spec shutdown_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:shutdown_nodes_by_name(Names),
-    {struct, [{status, "ok"}, {ok, Ok}, {not_found, NotFound}]}.
+    {struct, [{status, "ok"}, {ok, {array, Ok}}, {not_found, {array, NotFound}}]}.
 
 -spec kill_node(Name::pid_groups:groupname()) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_node(Name) ->
-    {struct, [{status, api_vm:kill_node(Name)}]}.
+    {struct, [{status, erlang:atom_to_list(api_vm:kill_node(Name))}]}.
 
 -spec kill_nodes(Count::non_neg_integer()) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_nodes(Count) ->
-    {struct, [{status, "ok"}, {ok, [api_vm:kill_nodes(Count)]}]}.
+    {struct, [{status, "ok"}, {ok, {array, api_vm:kill_nodes(Count)}}]}.
 
 -spec kill_nodes_by_name(Names::{array, [pid_groups:groupname()]}) -> {struct, [{Key::atom(), Value::term()}]}.
 kill_nodes_by_name({array, Names}) ->
     {Ok, NotFound} = api_vm:kill_nodes_by_name(Names),
-    {struct, [{status, "ok"}, {ok, Ok}, {not_found, NotFound}]}.
+    {struct, [{status, "ok"}, {ok, {array, Ok}}, {not_found, {array, NotFound}}]}.
 
 -spec get_other_vms(MaxVMs::pos_integer()) -> {struct, [{Key::atom(), Value::term()}]}.
 get_other_vms(MaxVMs) ->
-    OtherVMs = [{struct, [{erlang_node, ErlNode},
+    OtherVMs = [{struct, [{erlang_node, erlang:atom_to_list(ErlNode)},
                           {ip, lists:flatten(io_lib:format("~B.~B.~B.~B", [IP1, IP2, IP3, IP4]))},
                           {port, Port},
                           {yaws_port, YawsPort}]}
