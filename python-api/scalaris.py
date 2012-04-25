@@ -422,12 +422,99 @@ class JSONConnection(object):
     @staticmethod
     def process_result_vm_get_nodes(result):
         """
-        Processes the result of a api_vm/number_of_nodes operation.
+        Processes the result of a api_vm/get_nodes operation.
         Raises the appropriate exception if the operation failed.
         """
         if isinstance(result, dict) and 'status' in result and 'value' in result:
             if result['status'] == 'ok' and isinstance(result['value'], list):
                 return result['value']
+        raise UnknownError(result)
+        
+    # results: {'status': 'ok', 'ok': [xxx], 'failed': [xxx]}
+    @staticmethod
+    def process_result_vm_add_nodes(result):
+        """
+        Processes the result of a api_vm/add_nodes operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'ok' in result and 'failed' in result:
+            if result['status'] == 'ok' and isinstance(result['ok'], list) and isinstance(result['failed'], list):
+                return (result['ok'], result['failed'])
+        raise UnknownError(result)
+        
+    # results: {'status': 'ok' | 'not_found'}
+    @staticmethod
+    def process_result_vm_delete_node(result):
+        """
+        Processes the result of a api_vm/shutdown_node and api_vm/kill_node operations.
+        Raises the appropriate exception if the operation failed.
+        """
+        if result == {'status': 'ok'}:
+            return True
+        if result == {'status': 'not_found'}:
+            return False
+        raise UnknownError(result)
+    
+    # results: {'status': 'ok', 'ok': [xxx]}
+    @staticmethod
+    def process_result_vm_delete_nodes(result):
+        """
+        Processes the result of a api_vm/shutdown_nodes and api_vm/kill_nodes operations.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'ok' in result and \
+           result['status'] == 'ok' and isinstance(result['ok'], list):
+            return result['ok']
+        raise UnknownError(result)
+    
+    # results: {'status': 'ok', 'ok': [xxx], 'not_found': [xxx]}
+    @staticmethod
+    def process_result_vm_delete_nodes_by_name(result):
+        """
+        Processes the result of a api_vm/shutdown_nodes_by_name and api_vm/kill_nodes_by_name operations.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'ok' in result and 'not_found' in result:
+            if result['status'] == 'ok' and isinstance(result['ok'], list) and isinstance(result['not_found'], list):
+                return (result['ok'], result['not_found'])
+        raise UnknownError(result)
+        
+    # results: {'status': 'ok'}
+    @staticmethod
+    def process_result_vm_delete_vm(result):
+        """
+        Processes the result of a api_vm/shutdown_vm and api_vm/kill_vm operations.
+        Raises the appropriate exception if the operation failed.
+        """
+        if result == {'status': 'ok'}:
+            return None
+        raise UnknownError(result)
+    
+    # VM: {'erlang_node': xxx,
+    #      'ip': xxx,
+    #      'port': xxx,
+    #      'yaws_port': xxx}
+    # results: {'status': 'ok', 'value': [<VM>]
+    @staticmethod
+    def process_result_vm_get_other_vms(result):
+        """
+        Processes the result of a api_vm/get_other_vms operation.
+        Raises the appropriate exception if the operation failed.
+        """
+        if isinstance(result, dict) and 'status' in result and 'value' in result:
+            value = result['value']
+            if result['status'] == 'ok' and isinstance(value, list):
+                vms = []
+                try:
+                    for vm in value:
+                        if 'erlang_node' in vm and 'ip' in vm and \
+                           'port' in vm and 'yaws_port' in vm:
+                            vms.append('http://' + vm['ip'] + ':' + str(int(vm['yaws_port'])))
+                        else:
+                            raise UnknownError(result)
+                    return vms
+                except:
+                    pass
         raise UnknownError(result)
     
     # result: 'ok'
@@ -1288,6 +1375,79 @@ class ScalarisVM(object):
         """
         result = self._conn.callp('/api/vm.yaws', 'get_nodes', [])
         return self._conn.process_result_vm_get_nodes(result)
+
+    def addNodes(self, number):
+        """
+        Adds Scalaris nodes to the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'add_nodes', [number])
+        return self._conn.process_result_vm_add_nodes(result)
+
+    def shutdownNode(self, name):
+        """
+        Shuts down the given node (graceful leave) in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'shutdown_node', [name])
+        return self._conn.process_result_vm_delete_node(result)
+
+    def killNode(self, name):
+        """
+        Kills the given node in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'kill_node', [name])
+        return self._conn.process_result_vm_delete_node(result)
+
+    def shutdownNodes(self, number):
+        """
+        Shuts down the given number of nodes (graceful leave) in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'shutdown_nodes', [number])
+        return self._conn.process_result_vm_delete_nodes(result)
+
+    def killNodes(self, number):
+        """
+        Kills the given number of nodes in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'kill_nodes', [number])
+        return self._conn.process_result_vm_delete_nodes(result)
+
+    def shutdownNodesByName(self, names):
+        """
+        Shuts down the given nodes (graceful leave) in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'shutdown_nodes_by_name', [names])
+        return self._conn.process_result_vm_delete_nodes(result)
+
+    def killNodesByName(self, names):
+        """
+        Kills the given nodes in the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'kill_nodes_by_name', [names])
+        return self._conn.process_result_vm_delete_nodes(result)
+
+    def getOtherVMs(self, maxVMs):
+        """
+        Retrieves additional nodes from the Scalaris VM of the current
+        connection for use as URLs in JSONConnection.
+        """
+        if maxVMs <= 0:
+            raise ValueError("max must be an integer > 0")
+        result = self._conn.callp('/api/vm.yaws', 'get_other_vms', [maxVMs])
+        return self._conn.process_result_vm_get_other_vms(result)
+
+    def shutdownVM(self):
+        """
+        Tells the Scalaris VM of the current connection to shut down gracefully.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'shutdown_vm', [])
+        return self._conn.process_result_vm_delete_vm(result)
+
+    def killVM(self):
+        """
+        Kills the Scalaris VM of the current connection.
+        """
+        result = self._conn.callp('/api/vm.yaws', 'kill_vm', [])
+        return self._conn.process_result_vm_delete_vm(result)
 
     def nop(self, value):
         """
