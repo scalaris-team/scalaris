@@ -161,7 +161,7 @@ public class InvolvedKey {
         
         for (String text : keysStr) {
             final InvolvedKey involvedKey = InvolvedKey.fromString(text);
-            if (includeNoops || (involvedKey.op == OP.NOOP && involvedKey.key.isEmpty())) {
+            if (includeNoops || !(involvedKey.op == OP.NOOP && involvedKey.key.isEmpty())) {
                 involvedKeys.add(involvedKey);
             }
         }
