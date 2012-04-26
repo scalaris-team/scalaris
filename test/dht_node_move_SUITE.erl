@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -250,11 +250,11 @@ reply_with_send_error(Msg, State) ->
                  null ->
                      case element(2, Msg) of
                          slide ->
-                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                             {node:pidX(element(5, Msg)), element(4, Msg)};
                          slide_get_mte ->
-                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                             {node:pidX(element(5, Msg)), element(4, Msg)};
                          slide_w_mte ->
-                             {node:pidX(element(5, Msg)), {move, element(4, Msg)}};
+                             {node:pidX(element(5, Msg)), element(4, Msg)};
                          _ ->
                              {null, ok}
                      end;
@@ -262,16 +262,11 @@ reply_with_send_error(Msg, State) ->
                      Target = node:pidX(slide_op:get_node(Slide)),
                      FailMsgCookie =
                          case element(2, Msg) of
-                             delta_ack ->
-                                 {move, timeouts, 0};
-                             slide ->
-                                 {move, element(4, Msg)};
-                             slide_get_mte ->
-                                 {move, element(4, Msg)};
-                             slide_w_mte ->
-                                 {move, element(4, Msg)};
-                             _ ->
-                                 {move, slide_op:get_id(Slide)}
+                             delta_ack     -> {timeouts, 0};
+                             slide         -> element(4, Msg);
+                             slide_get_mte -> element(4, Msg);
+                             slide_w_mte   -> element(4, Msg);
+                             _             -> slide_op:get_id(Slide)
                          end,
                      {Target, FailMsgCookie}
              end
@@ -279,7 +274,7 @@ reply_with_send_error(Msg, State) ->
     _ = [begin
              case {Target, FailMsgCookie} of
                  {null, ok} -> ok;
-                 _ -> comm:send(Target, {{send_error, comm:this(), Msg, unittest}, FailMsgCookie})
+                 _ -> comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, FailMsgCookie})
              end
          end|| {Target, FailMsgCookie} <- lists:usort(FailMsgs)],
     State.

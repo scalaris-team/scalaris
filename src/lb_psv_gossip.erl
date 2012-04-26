@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -51,10 +51,11 @@ get_number_of_samples({_, ContactNode} = Connection) ->
 -spec get_number_of_samples_remote(
         SourcePid::comm:mypid(), Conn::dht_node_join:connection()) -> ok.
 get_number_of_samples_remote(SourcePid, Connection) ->
-    MyPidWithCookie =
-        comm:self_with_cookie({join, ?MODULE, {get_samples, SourcePid, Connection}}),
+    SPid = comm:reply_as(self(), 3,
+                         {join, ?MODULE, '_',
+                          {get_samples, SourcePid, Connection}}),
     GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_best, MyPidWithCookie}).
+    comm:send_local(GossipPid, {get_values_best, SPid}).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
@@ -66,11 +67,11 @@ get_number_of_samples_remote(SourcePid, Connection) ->
 create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
     case dht_node_state:get(DhtNodeState, slide_pred) of
         null ->
-            MyPidWithCookie =
-                comm:self_with_cookie({join, ?MODULE,
-                                       {create_join, SelectedKey, SourcePid, Conn}}),
+            SPid = comm:reply_as(self(), 3,
+                                 {join, ?MODULE, '_',
+                                  {create_join, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
-            Msg = {get_values_best, MyPidWithCookie},
+            Msg = {get_values_best, SPid},
             ?TRACE_SEND(GossipPid, Msg),
             comm:send_local(GossipPid, Msg);
         _ ->
@@ -152,11 +153,11 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
             comm:send(SourcePid, Msg);
         _ ->
             % postpone message:
-            MyPidWithCookie =
-                comm:self_with_cookie({join, ?MODULE,
-                                       {create_join, SelectedKey, SourcePid, Conn}}),
+            SPid = comm:reply_as(self(), 3,
+                                 {join, ?MODULE, '_',
+                                  {create_join, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
-            Msg = {get_values_best, MyPidWithCookie},
+            Msg = {get_values_best, SPid},
             ?TRACE_SEND(GossipPid, Msg),
             _ = comm:send_local_after(100, GossipPid, Msg),
             ok

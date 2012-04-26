@@ -366,12 +366,13 @@ loop(State) ->
         receive Msg ->
                 try on(Msg, State)
                 catch Level:Reason ->
-                        log:log(error, "Error: exception ~p:~p in loop of ~.0p "
-                                "- stacktrace: ~.0p",
-                                [Level, Reason, State, erlang:get_stacktrace()]),
-                        State
-        end
-    end,
+                        Stacktrace = erlang:get_stacktrace(),
+                        log:log(error,
+                                "Error: exception ~p:~p in loop of ~.0p~n ",
+                                [Level, Reason, State]),
+                        on_exception(Msg, Level, Reason, Stacktrace, State)
+                end
+        end,
     case NewState of
         ok -> ok;
         _ -> loop(NewState)

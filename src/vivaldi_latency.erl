@@ -1,4 +1,4 @@
-%  @copyright 2009-2011 Zuse Institute Berlin
+%  @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 %%% @version $Id$
 -module(vivaldi_latency).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(gen_component).
 
@@ -52,7 +52,9 @@
 
 %% @doc message handler
 -spec on(Message::message(), State::state()) -> state().
-on({{pong}, Count}, {Owner, RemotePid, Token, Start, Count, Latencies}) when Start =/= unknown ->
+on({ping_reply, {pong}, Count},
+   {Owner, RemotePid, Token, Start, Count, Latencies})
+  when Start =/= unknown ->
     Stop = erlang:now(),
     NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
     case Count =:= config:read(vivaldi_count_measurements) of
@@ -65,13 +67,14 @@ on({{pong}, Count}, {Owner, RemotePid, Token, Start, Count, Latencies}) when Sta
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
 
-on({{pong}, _Count}, State) ->
+on({ping_reply, {pong}, _Count}, State) ->
     % ignore unrelated pong messages
     State;
 
 on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
     NewCount = Count + 1,
-    comm:send(RemotePid, {ping, comm:this_with_cookie(NewCount)}, ?SEND_OPTIONS),
+    SPid = comm:reply_as(comm:this(), 2, {ping_reply, '_', NewCount}),
+    comm:send(RemotePid, {ping, SPid}, ?SEND_OPTIONS),
     {Owner, RemotePid, Token, erlang:now(), NewCount, Latencies};
 
 on({shutdown}, _State) ->

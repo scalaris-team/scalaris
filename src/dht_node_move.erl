@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(dht_node_move).
 -author('kruber@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 
@@ -103,13 +103,13 @@
 -ifdef(forward_or_recursive_types_are_not_allowed).
 -type move_message() ::
     move_message1() |
-    {{send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {move, timeouts, Timeouts::non_neg_integer()}} |
-    {{send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {move, MoveFullId::slide_op:id()}}.
+    {move, {send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, {timeouts, Timeouts::non_neg_integer()}} |
+    {move, {send_error, Target::comm:mypid(), Message::comm:message(), Reason::atom()}, MoveFullId::slide_op:id()}.
 -else.
 -type move_message() ::
     move_message1() |
-    {{send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {move, timeouts, Timeouts::non_neg_integer()}} |
-    {{send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {move, MoveFullId::slide_op:id()}}.
+    {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, {timeouts, Timeouts::non_neg_integer()}} |
+    {move, {send_error, Target::comm:mypid(), Message::move_message1(), Reason::atom()}, MoveFullId::slide_op:id()}.
 -endif.
 
 %% @doc Processes move messages for the dht_node and implements the node move
@@ -401,7 +401,7 @@ process_move_msg({move, rm_db_range, MoveFullId} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     dht_node_state:rm_db_range(State, MoveFullId);
 
-process_move_msg({{send_error, Target, Message, _Reason}, {move, timeouts, Timeouts}} = _Msg, MyState) ->
+process_move_msg({move, {send_error, Target, Message, _Reason}, {timeouts, Timeouts}} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     NewTimeouts = Timeouts + 1,
     MaxRetries = get_send_msg_retries(),
@@ -414,7 +414,7 @@ process_move_msg({{send_error, Target, Message, _Reason}, {move, timeouts, Timeo
     end,
     MyState;
 
-process_move_msg({{send_error, Target, Message, _Reason}, {move, MoveFullId}} = _Msg, MyState) ->
+process_move_msg({move, {send_error, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
@@ -453,7 +453,7 @@ process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
 %%      broken connections.
 -spec send(Pid::comm:mypid(), Message::comm:message(), MoveFullId::slide_op:id()) -> ok.
 send(Pid, Message, MoveFullId) ->
-    Shepherd = comm:self_with_cookie({move, MoveFullId}),
+    Shepherd = comm:reply_as(self(), 2, {move, '_', MoveFullId}),
     ?TRACE_SEND(Pid, Message),
     comm:send(Pid, Message, [{shepherd, Shepherd}]).
 
@@ -463,7 +463,7 @@ send(Pid, Message, MoveFullId) ->
 %%      provided cookie.
 -spec send_no_slide(Pid::comm:mypid(), Message::comm:message(), Timeouts::non_neg_integer()) -> ok.
 send_no_slide(Pid, Message, Timeouts) ->
-    Shepherd = comm:self_with_cookie({move, timeouts, Timeouts}),
+    Shepherd = comm:reply_as(self(), 2, {move, '_', {timeouts, Timeouts}}),
     ?TRACE_SEND(Pid, Message),
     comm:send(Pid, Message, [{shepherd, Shepherd}]).
 

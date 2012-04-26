@@ -262,7 +262,8 @@ pids_to_names(Pids, Timeout) ->
                 case comm:is_local(Pid) of
                     true -> comm:make_local(Pid);
                     _    -> comm:send(comm:get(pid_groups, Pid),
-                                      {group_and_name_of, Pid, comm:this_with_cookie(Pid)}),
+                                      {group_and_name_of, Pid,
+                                       comm:reply_as(Pid, 2, {ok, '_', Pid})}),
                             comm:send_local_after(Timeout, self(), {timeout, Pid})
                 end
             end || Pid <- Pids],
@@ -270,7 +271,7 @@ pids_to_names(Pids, Timeout) ->
          case erlang:is_reference(Ref) of
              false -> pid_to_name(Ref);
              _     -> receive
-                          {{group_and_name_of_response, Name}, Pid} ->
+                          {ok, {group_and_name_of_response, Name}, Pid} ->
                               _ = erlang:cancel_timer(Ref),
                               receive {timeout, Pid} -> ok
                                   after 0 -> ok

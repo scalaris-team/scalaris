@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(dht_node_join).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -70,9 +70,10 @@
     {join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module(), Conn::connection()} |
     {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
     {join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
-    {Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() | 
+    {join, LbPsv::module(),
+     Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
           lb_psv_gossip:custom_message(),
-     {join, LbPsv::module(), LbPsvState::term()}}
+     LbPsvState::term()}
     ).
 
 -type phase2() ::
@@ -473,11 +474,11 @@ process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _Qu
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:self_with_cookie({send_failed, []}),
+            Self = comm:reply_as(self(), 3, {join, send_failed, '_', []}),
             comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}, _Reason}, {send_failed, FailedPids}}, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({join, send_failed, {send_error, Target, {lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
     case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
         failed ->
@@ -485,7 +486,7 @@ process_join_state({{send_error, Target, {lookup_aux, Key, Hops, Msg}, _Reason},
             ok;
         {ok, {_, Pid}} ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:self_with_cookie({send_failed, [Target | FailedPids]}),
+            Self = comm:reply_as(self(), 3, {join, send_failed, '_', [Target | FailedPids]}),
             comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
@@ -508,19 +509,6 @@ process_join_msg({join, get_candidate, Source_PID, Key, LbPsv, Conn} = _Msg, Sta
     ?TRACE1(_Msg, State),
     LbPsv:create_join(State, Key, Source_PID, Conn);
 %% userdevguide-end dht_node_join:get_candidate
-
-% messages send by the passive load balancing module
-% -> forward to the module
-process_join_msg({Msg, {join, LbPsv, LbPsvState}} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    case lists:member(LbPsv, ?VALID_PASSIVE_ALGORITHMS) of
-        true -> LbPsv:process_join_msg(Msg, LbPsvState, State);
-        _    -> MyLbPsv = config:read(join_lb_psv),
-                log:log(error, "[ Node ~.0p ] unknown passive load balancing "
-                               "algorithm requested: ~.0p - using ~.0p instead",
-                        [LbPsv, MyLbPsv]),
-                MyLbPsv:process_join_msg(Msg, LbPsvState, State)
-    end;
 
 %% userdevguide-begin dht_node_join:join_request1
 process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
@@ -588,6 +576,18 @@ process_join_msg({join, get_number_of_samples_timeout, _Conn, _JoinId} = _Msg, S
     State;
 process_join_msg({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _Msg, State) ->
     State;
+% messages send by the passive load balancing module
+% -> forward to the module
+process_join_msg({join, LbPsv, Msg, LbPsvState} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    case lists:member(LbPsv, ?VALID_PASSIVE_ALGORITHMS) of
+        true -> LbPsv:process_join_msg(Msg, LbPsvState, State);
+        _    -> MyLbPsv = config:read(join_lb_psv),
+                log:log(error, "[ Node ~.0p ] unknown passive load balancing "
+                               "algorithm requested: ~.0p - using ~.0p instead",
+                        [LbPsv, MyLbPsv]),
+                MyLbPsv:process_join_msg(Msg, LbPsvState, State)
+    end;
 process_join_msg({join, timeout, _JoinId} = _Msg, State) ->
     State.
 

@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -136,7 +136,7 @@ get_ring_details_neighbors(RecursionLvl, Ring, Nodes) ->
 -spec get_ring_details(Nodes::[comm:mypid()]) -> ring().
 get_ring_details(Nodes) ->
     _ = [begin
-             SourcePid = comm:this_with_cookie(Pid),
+             SourcePid = comm:reply_as(comm:this(), 2, {ok, '_', Pid}),
              comm:send(Pid, {get_node_details, SourcePid})
          end || Pid <- Nodes],
     get_node_details(Nodes, [], 0).
@@ -171,7 +171,7 @@ get_node_details(Pids, Ring, TimeInMS) ->
     case Continue of
         continue ->
             receive
-                {{get_node_details_response, Details}, Pid} ->
+                {ok, {get_node_details_response, Details}, Pid} ->
                     get_node_details(lists:delete(Pid, Pids),
                                      [{ok, Details} | Ring],
                                      TimeInMS)

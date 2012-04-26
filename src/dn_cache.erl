@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -83,18 +83,20 @@ init(Trigger) ->
 
 -spec on(message(), state()) -> state().
 on({trigger}, {Queue, Subscribers, TriggerState}) ->
-    _ = fix_queue:map(fun(X) ->
-                              Pid = case node:is_valid(X) of
-                                        true -> node:pidX(X);
-                                        _    -> X
-                                    end,
-                              comm:send(Pid, {ping, comm:this_with_cookie(X)},
-                                        ?SEND_OPTIONS ++ [{shepherd, self()}])
-                      end, Queue),
+    _ = fix_queue:map(
+          fun(X) ->
+                  Pid = case node:is_valid(X) of
+                            true -> node:pidX(X);
+                            _    -> X
+                        end,
+                  SPid = comm:reply_as(comm:this(), 2, {trigger_reply, '_', X}),
+                  comm:send(Pid, {ping, SPid},
+                            ?SEND_OPTIONS ++ [{shepherd, self()}])
+          end, Queue),
     NewTriggerState = trigger:next(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), Subscribers, NewTriggerState};
 
-on({{pong}, Zombie}, {Queue, Subscribers, TriggerState}) ->
+on({trigger_reply, {pong}, Zombie}, {Queue, Subscribers, TriggerState}) ->
     log:log(warn,"[ dn_cache ~p ] found zombie ~.0p", [comm:this(), Zombie]),
     report_zombie(Subscribers, Zombie),
     {Queue, Subscribers, TriggerState};
@@ -109,7 +111,7 @@ on({unsubscribe, Node}, {Queue, Subscribers, TriggerState}) ->
     {Queue, gb_sets:del_element(Node, Subscribers), TriggerState};
 
 on({send_error, _Target, {ping, ThisWithCookie}, _Reason}, {Queue, Subscribers, TriggerState}) ->
-    {_This, {{null}, Node}} = comm:unpack_cookie(ThisWithCookie, {null}),
+    {_This, {trigger_reply, {null}, Node}} = comm:unpack_cookie(ThisWithCookie, {null}),
     {add_to_queue(Queue, Node), Subscribers, TriggerState};
 
 on({web_debug_info, Requestor}, {Queue, Subscribers, _TriggerState} = State) ->

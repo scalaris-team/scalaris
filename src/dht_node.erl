@@ -75,26 +75,11 @@
 %% userdevguide-begin dht_node:join_message
 on(Msg, State) when join =:= element(1, Msg) ->
     dht_node_join:process_join_msg(Msg, State);
-% message with cookie for dht_node_join?
-on({Msg, Cookie} = FullMsg, State) when
-  is_tuple(Msg)
-      andalso (join =:= element(1, Msg))
-      orelse (join =:= Cookie)
-      orelse (is_tuple(Cookie)
-              andalso join =:= element(1, Cookie)) ->
-    dht_node_join:process_join_msg(FullMsg, State);
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
 on(Msg, State) when move =:= element(1, Msg) ->
     dht_node_move:process_move_msg(Msg, State);
-% message with cookie for dht_node_move?
-on({Msg, Cookie} = FullMsg, State) when
-  is_tuple(Msg) andalso
-      (element(1, Msg) =:= move orelse
-           Cookie =:= move orelse
-           (is_tuple(Cookie) andalso element(1, Cookie) =:= move)) ->
-    dht_node_move:process_move_msg(FullMsg, State);
 
 % RM messages (see rm_loop.erl)
 on(Msg, State) when element(1, Msg) =:= rm ->
@@ -104,14 +89,6 @@ on(Msg, State) when element(1, Msg) =:= rm ->
 on(Msg, State) when element(1, Msg) =:= rm_trigger ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:on(Msg, RMState),
-    dht_node_state:set_rm(State, RMState1);
-on({Msg, Cookie} = FullMsg, State) when
-  is_tuple(Msg) andalso is_atom(element(1, Msg)) andalso
-      (element(1, Msg) =:= rm orelse
-           Cookie =:= rm orelse
-           (is_tuple(Cookie) andalso element(1, Cookie) =:= rm)) ->
-    RMState = dht_node_state:get(State, rm_state),
-    RMState1 = rm_loop:on(FullMsg, RMState),
     dht_node_state:set_rm(State, RMState1);
 
 on({leave}, State) ->
@@ -222,8 +199,8 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
 
 on({send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({{send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, {send_failed, _Pids}}, State) ->
-    dht_node_lookup:lookup_aux_failed(State, Target, Message);
+%on({send_failed, {send_error, Target, {lookup_aux, _, _, _}} = Message, _Reason}, _Pids}}, State) ->
+%    dht_node_lookup:lookup_aux_failed(State, Target, Message);
 on({send_error, Target, {lookup_fin, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);
 

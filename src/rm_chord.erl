@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -74,7 +74,8 @@ on({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details, comm:this_with_cookie(rm), [pred]},
+                          {get_node_details,
+                           comm:reply_as(comm:this(), 2, {rm, '_'}), [pred]},
                           ?SEND_OPTIONS);
         _    -> ok
     end,
@@ -88,7 +89,7 @@ on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     State;
 
 % got node_details from our successor
-on({{get_node_details_response, NodeDetails}, rm},
+on({rm, {get_node_details_response, NodeDetails}},
    {OldNeighborhood, TriggerState})  ->
     SuccsPred = node_details:get(NodeDetails, pred),
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [SuccsPred],
