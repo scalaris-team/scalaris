@@ -19,6 +19,7 @@ import info.bliki.htmlcleaner.TagNode;
 import info.bliki.wiki.filter.Util;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
+import info.bliki.wiki.namespaces.Namespace;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -1198,5 +1199,14 @@ public class MyWikiModel extends WikiModel {
             result.add(MyWikiModel.createFullPageName(localisedPrefix, localisedSuffix.get(page)));
         }
         return result;
+    }
+
+    /* (non-Javadoc)
+     * @see info.bliki.wiki.model.AbstractWikiModel#isImageNamespace(java.lang.String)
+     */
+    @Override
+    public boolean isImageNamespace(String namespace) {
+        return super.isImageNamespace(namespace) ||
+                ((MyNamespace) fNamespace).getNumberByName(namespace) == Namespace.FILE_NAMESPACE_KEY;
     }
 }
