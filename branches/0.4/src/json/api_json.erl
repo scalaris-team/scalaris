@@ -21,6 +21,9 @@
 
 -export([handler/2]).
 
+%% for the api_json_* modules:
+-export([tuple_list_to_json/1]).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
@@ -58,3 +61,10 @@ handler(notify, [Topic, Value]) ->
 handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~s:~p(~p)~n", [?MODULE, AnyOp, AnyParams]),
     {struct, [{failure, "unknownreq"}]}.
+
+%% @doc Recursively converts 2-tuple lists to JSON objects.
+-spec tuple_list_to_json([{Key::atom(), Value::term()}]) -> {struct, [{Key::atom(), Value::term()}]}.
+tuple_list_to_json([]) -> [];
+tuple_list_to_json([{Key, _} | _] = List) when is_atom(Key) ->
+    {struct, [{KeyX, tuple_list_to_json(ValueX)} || {KeyX, ValueX} <- List]};
+tuple_list_to_json(X) -> X.
