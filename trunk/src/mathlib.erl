@@ -23,6 +23,8 @@
          vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,
         aggloClustering/3]).
 
+-export([factorial/1, binomial_coeff/2]).
+
 -type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
 
@@ -148,3 +150,17 @@ aggloClusteringHelper([_,_|_] = Centroids, [_,_|_] = Sizes, Radius, Min, I, J) w
                           Radius, Min1, I1, J1);
 aggloClusteringHelper(Centroids, Sizes, _Radius, _Min, _I, _J) ->
     {Centroids, Sizes}.
+
+% @doc Calculates the binomial coefficient of n over k for n >= k.
+-spec binomial_coeff(non_neg_integer(), non_neg_integer()) -> float().
+binomial_coeff(N, K) ->
+    factorial(N) / (factorial(K) * factorial(N - K)).
+
+% @doc calculates N!
+-spec factorial(non_neg_integer()) -> pos_integer().
+factorial(N) -> factorial(N, 1).
+
+-spec factorial(non_neg_integer(), pos_integer()) -> pos_integer().
+factorial(0, Acc) -> Acc;
+factorial(N, Acc) ->
+    factorial(N - 1, N * Acc).
