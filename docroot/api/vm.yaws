@@ -1,0 +1,8 @@
+<erl module=jsonrpc_api_monitor_mod>
+-compile(export_all).
+-include("yaws_handler.hrl").
+
+forward_to_handler(Operation, Params) ->
+  api_json_vm:handler(Operation, Params).
+
+</erl>
