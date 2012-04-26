@@ -16,22 +16,20 @@
 %% @doc    Message Sending.
 %%
 %%  Messages consist of a tuple of which the first element is the message's
-%%  tag, i.e. an atom. Process identifiers depend on the messaging back-end
-%%  being used but can also wrap up an arbitrary cookie that can be used to
-%%  tell messages with the same tag apart, e.g. when they are used for
-%%  different purposes.
+%%  tag, i.e. an atom. Process identifiers depend on local and global target
+%%  and can also wrap up an reply envelope that can be used to
+%%  rewrite reply messages.
 %%
-%%  Sending messages to so-tagged process identifiers works seamlessly, e.g.
-%%  a server receiving message {tag, SourcePid} can reply with
-%%  comm:send(SourcePid, {tag_response}). On the receiving side (a client),
-%%  a message of the form {Message, Cookie} will then be received, e.g.
-%%  {{tag_response}, Cookie}. Pids with cookies can be created using
-%%  this_with_cookie/1.
-%% @end
-%% @version $Id$
+%%  Sending messages to so-enveloped process identifiers works
+%%  seamlessly, e.g.  a server receiving message {tag, SourcePid} can
+%%  reply with comm:send(SourcePid, {tag_response}). On the receiving
+%%  side (a client), the reply message is embedded into the envelope
+%%  tuple at the specified position. Pids
+%%  with envelopes  can be created using reply_as/3.  @end
+%%  @version $Id$
 -module(comm).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 
@@ -40,7 +38,8 @@
 
 %% Pid manipulation
 -export([make_global/1, make_local/1]).
--export([this/0, get/2, this_with_cookie/1, self_with_cookie/1]).
+-export([this/0, get/2]).
+-export([reply_as/3]).
 -export([is_valid/1, is_local/1]).
 -export([get_ip/1, get_port/1]).
 
@@ -54,7 +53,7 @@
 
 -ifdef(with_export_type_support).
 -export_type([message/0, msg_tag/0, mypid/0,
-              erl_local_pid/0, erl_local_pid_with_cookie/0,
+              erl_local_pid/0, erl_local_pid_with_reply_as/0,
               send_options/0]).
 % for comm_layer and tester_scheduler
 -export_type([erl_local_pid_plain/0]).
@@ -62,20 +61,27 @@
 -export_type([mypid_plain/0]).
 -endif.
 
--type cookie()                    :: any().
+-type envelope()                  :: tuple().
 -type reg_name()                  :: atom().
 -type erl_local_pid_plain()       :: pid() | reg_name().
--type erl_local_pid_with_cookie() :: {erl_local_pid_plain(), c, cookie()}.
--type erl_local_pid()             :: erl_local_pid_plain() | erl_local_pid_with_cookie().
--type mypid_plain()               :: {inet:ip_address(), comm_server:tcp_port(), erl_local_pid_plain()}.
+-type mypid_plain() :: {inet:ip_address(),
+                        comm_server:tcp_port(),
+                        erl_local_pid_plain()}.
 
--type mypid_with_cookie() :: {mypid_plain(), c, cookie()}.
--type mypid() :: mypid_plain() | mypid_with_cookie().
+-type erl_local_pid_with_reply_as() ::
+        {erl_local_pid_plain(), e, pos_integer(), envelope()}.
+-type mypid_with_reply_as() ::
+        {mypid_plain(),         e, pos_integer(), envelope()}.
+
+-type erl_local_pid() :: erl_local_pid_plain() | erl_local_pid_with_reply_as().
+-type mypid()         :: mypid_plain() | mypid_with_reply_as().
+
+-type plain_pid() :: mypid_plain() | erl_local_pid_plain().
 
 -type msg_tag() :: atom().
 %% there is no variable length-tuple definition for types -> declare
 %% messages with up to 10 parameters here:
--type message_plain() ::
+-type message() ::
         {msg_tag()} |
         {msg_tag(), any()} |
         {msg_tag(), any(), any()} |
@@ -87,13 +93,11 @@
         {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any()} |
         {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
         {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
--type message_with_cookie() :: {message_plain(), any()}.
--type message() :: message_plain() | message_with_cookie().
+
 -type group_message() :: {send_to_group_member, atom(), message()}.
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
                          {group_member, Process::atom()} |
                          {channel, main | prio} | quiet].
-
 
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
@@ -163,28 +167,21 @@ this() -> comm_layer:this().
 
 %% @doc Create the PID a process with name Name would have on node _Node.
 -spec get(erl_local_pid_plain(), mypid()) -> mypid().
-get(Name, {Pid, c, Cookie} = _Node) -> {get(Name, Pid), c, Cookie};
+get(Name, {Pid, e, Nth, Envelope} = _Node) ->
+    {get(Name, Pid), e, Nth, Envelope};
 get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 
-%% @doc Encapsulates the current process' pid (as returned by this/0)
-%%      and the given cookie for seamless use of cookies with send/2.
-%%      A message Msg to the pid with cookie Cookie will be deliverd as:
-%%      {Msg, Cookie} to the Pid.
--spec this_with_cookie(any()) -> mypid().
-this_with_cookie(Cookie) -> {this(), c, Cookie}.
 
-%% @doc Encapsulates the current process' pid (as returned by self/0) and the
-%%      given cookie for seamless use of cookies with send_local/2 and
-%%      send_local_after/3.
-%%      A message Msg to the pid with cookie Cookie will be deliverd as:
-%%      {Msg, Cookie} to the Pid.
--spec self_with_cookie(any()) -> erl_local_pid_with_cookie().
-self_with_cookie(Cookie) -> {self(), c, Cookie}.
-
+%% @doc Encapsulates the given pid (local or global) with the reply_as
+%%      request, so a send/2 to the generated target will put a reply
+%%      message at the Nth position of the given envelope.
+-spec reply_as(plain_pid(), pos_integer(), tuple()) ->
+                      mypid_with_reply_as() | erl_local_pid_with_reply_as().
+reply_as(Target, Nth, Envelope) -> {Target, e, Nth, Envelope}.
 
 %% @doc Check whether the given pid is well formed.
 -spec is_valid(mypid() | any()) -> boolean().
-is_valid({Pid, c, _Cookie}) -> is_valid(Pid);
+is_valid({Pid, e, _Nth, _Cookie}) -> is_valid(Pid);
 is_valid(Pid) -> comm_layer:is_valid(Pid).
 
 %% @doc Check whether a global mypid() can be converted to a local
@@ -218,7 +215,8 @@ get_msg_tag(Msg)
 %-spec unpack_cookie(mypid(), message()) -> {mypid(), message()}.
 -spec unpack_cookie(mypid(), message()) -> {mypid_plain(), message()};
                    (erl_local_pid(), message()) -> {erl_local_pid_plain(), message()}.
-unpack_cookie({Pid, c, Cookie}, Msg) -> {Pid, {Msg, Cookie}};
+unpack_cookie({Pid, e, Nth, Envelope}, Msg) ->
+    {Pid, setelement(Nth, Envelope, Msg)};
 unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 
 %% @doc Creates a group member message and filter out the send options for the

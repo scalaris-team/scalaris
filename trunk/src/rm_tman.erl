@@ -1,4 +1,4 @@
-%  @copyright 2009-2011 Zuse Institute Berlin
+%  @copyright 2009-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(rm_tman).
 -author('hennig@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 
@@ -67,7 +67,7 @@ init(Me, Pred, Succ) ->
           fun get_max_interval/0, rm_trigger),
     TriggerState2 = trigger:now(TriggerState1),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
-    cyclon:get_subset_rand_next_interval(1, comm:self_with_cookie(rm)),
+    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
     {Neighborhood, config:read(cyclon_cache_size), min_interval, TriggerState2, [], true}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
@@ -123,14 +123,15 @@ on({rm_trigger},
     end;
 
 % got empty cyclon cache
-on({{cy_cache, []}, rm},
+on({rm, {cy_cache, []}},
    {_Neighborhood, RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State)  ->
     % ignore empty cache from cyclon
-    cyclon:get_subset_rand_next_interval(RandViewSize, comm:self_with_cookie(rm)),
+    cyclon:get_subset_rand_next_interval(RandViewSize,
+                                         comm:reply_as(self(), 2, {rm, '_'})),
     State;
 
 % got cyclon cache
-on({{cy_cache, NewCache}, rm},
+on({rm, {cy_cache, NewCache}},
    {Neighborhood, RandViewSize, Interval, TriggerState, _Cache, Churn}) ->
     % increase RandViewSize (no error detected):
     RandViewSizeNew =
@@ -139,7 +140,8 @@ on({{cy_cache, NewCache}, rm},
             false -> RandViewSize
         end,
     % trigger new cyclon cache request
-    cyclon:get_subset_rand_next_interval(RandViewSizeNew, comm:self_with_cookie(rm)),
+    cyclon:get_subset_rand_next_interval(RandViewSizeNew,
+                                         comm:reply_as(self(), 2, {rm, '_'})),
     MyRndView = get_RndView(RandViewSizeNew, NewCache),
     OtherNeighborhood =
         nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
@@ -188,7 +190,7 @@ on({rm, buffer_response, OtherNeighbors},
     {NewNeighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
 
 % we asked another node we wanted to add for its node object -> now add it
-on({{get_node_details_response, NodeDetails}, rm}, State) ->
+on({rm, {get_node_details_response, NodeDetails}}, State) ->
     update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
 
 on(_, _State) -> unknown_event.
@@ -321,7 +323,7 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
     
     % TODO: add a local cache of contacted nodes in order not to contact them again
-    ThisWithCookie = comm:this_with_cookie(rm),
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
     case comm:is_valid(ThisWithCookie) of
         true ->
             _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]}, ?SEND_OPTIONS)

@@ -97,20 +97,22 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
 
 on({bulkowner, deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    This = comm:this_with_cookie({SourcePid, Id, Range, Parents}),
+    This = comm:reply_as(comm:this(), 2, {collect, '_',
+                                          {SourcePid, Id, Range, Parents}}),
     comm:send_local(pid_groups:get_my(monitor),
                     {get_rrds, [{?MODULE, 'read_read'}, {dht_node, 'lookup_hops'}], This}),
     State;
 
-on({{get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
+on({collect, {get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     MyMonData = process_rrds(DBs),
-    This = comm:this_with_cookie({SourcePid, Id, Range, Parents, MyMonData}),
+    This = comm:reply_as(comm:this(), 2,
+                         {collect, '_', {SourcePid, Id, Range, Parents, MyMonData}}),
     comm:send_local(pid_groups:pid_of("clients_group", monitor),
                     {get_rrds, [{api_tx, 'req_list'}], This}),
     State;
 
-on({{get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Msg, State) ->
+on({collect, {get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     AllData = lists:append([MyMonData, process_rrds(DBs)]),
     case AllData of

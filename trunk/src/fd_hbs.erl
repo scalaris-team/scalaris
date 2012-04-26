@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ init([RemotePid]) ->
     RemoteFDPid = comm:get(fd, RemotePid),
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid},
-              ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]),
+              ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}]),
 
     %% no periodic alive check inside same vm (to succeed unittests)
     case comm:is_local(RemotePid) of
@@ -196,7 +196,7 @@ on({periodic_alive_check}, State) ->
                            %% the following is the reduction rate
                            %% when increased earlier
                            + failureDetectorInterval() div 3))},
-      ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]),
+      ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}]),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
                    true -> report_crash(State);
                    false -> State
@@ -206,25 +206,24 @@ on({periodic_alive_check}, State) ->
                           self(), {periodic_alive_check}),
     NewState;
 
-on({{send_error, Target, Message, Reason}, ShepherdCookie}, State) ->
+on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->
     NextOp =
-        case N = shepherd_retries(ShepherdCookie) of
+        case Count of
             1 -> {retry};
-            2 -> {delay, _Wait = 1, N + 1};
+            2 -> {delay, _Wait = 1};
             3 -> {retry};
-            4 -> {delay, _Wait = 2, N + 1};
+            4 -> {delay, _Wait = 2};
             5 -> {retry};
             6 -> {giveup}
         end,
     case NextOp of
         {retry} ->
             comm:send(Target, Message,
-                      ?SEND_OPTIONS ++ [{shepherd, shepherd_inc(ShepherdCookie)}]),
+                      ?SEND_OPTIONS ++ [{shepherd, shepherd_new(Count + 1)}]),
             State;
-        {delay, Sec, Retries} ->
+        {delay, Sec} ->
             msg_delay:send_local(
-              Sec, self(),
-              {{send_error, Target, Message, Reason}, {retries, Retries}}),
+              Sec, self(), {send_retry, Err, Count + 1}),
             State;
         {giveup} ->
             log:log(warn, "[ FD ] Sending ~.0p failed 3 times. "
@@ -426,10 +425,10 @@ state_add_watched_pid(State, WatchedPid) ->
             case comm:make_local(RemHBS) of
                 fd -> comm:send(
                         RemHBS, {add_watching_of_via_fd, comm:this(), WatchedPid},
-                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}]);
+                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}]);
                 _  -> comm:send(
                         RemHBS, {add_watching_of, WatchedPid},
-                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new()}])
+                        ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}])
             end,
             %% add to list
             state_set_rem_pids(
@@ -506,15 +505,6 @@ rempid_get_pending_demonitor(Entry) -> element(4, Entry).
 -spec rempid_set_pending_demonitor(rempid(), boolean()) -> rempid().
 rempid_set_pending_demonitor(Entry, Val) -> setelement(4, Entry, Val).
 
--spec shepherd_new() -> comm:erl_local_pid_with_cookie().
-shepherd_new() ->
-    comm:self_with_cookie({retries, 1}).
-
--spec shepherd_inc(tuple()) -> comm:erl_local_pid_with_cookie().
-shepherd_inc(ShepherdCookie) ->
-    comm:self_with_cookie(
-      {retries, 1 + shepherd_retries(ShepherdCookie)}).
-
--spec shepherd_retries(tuple()) -> pos_integer().
-shepherd_retries(ShepherdCookie) ->
-    element(2, ShepherdCookie).
+-spec shepherd_new(non_neg_integer()) -> comm:erl_local_pid_with_reply_as().
+shepherd_new(Count) ->
+    comm:reply_as(self(), 2, {send_retry, '_', Count + 1}).

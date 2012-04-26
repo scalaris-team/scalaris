@@ -77,10 +77,10 @@ getVivaldiMap() ->
             log:log(error,"[ WH ] Timeout getting node list from mgmt server"),
             throw('mgmt_server_timeout')
         end,
-    This = self(),
+    This = comm:this(),
     _ = [erlang:spawn(
            fun() ->
-                   SourcePid = comm:get(This, comm:this_with_cookie(Pid)),
+                   SourcePid = comm:reply_as(This, 1, {'_', Pid}),
                    comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
            end) || Pid <- Nodes],
     CC_list = get_vivaldi(Nodes, [], 0),
