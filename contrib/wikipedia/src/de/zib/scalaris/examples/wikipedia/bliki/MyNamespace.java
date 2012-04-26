@@ -338,6 +338,10 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
         NAMESPACE_INT_MAP.put("Project talk", Namespace.PROJECT_TALK_NAMESPACE_KEY);
         NAMESPACE_INT_MAP.put("Image", Namespace.FILE_NAMESPACE_KEY);
         NAMESPACE_INT_MAP.put("Image talk", Namespace.FILE_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Bild", Namespace.FILE_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Bild Diskussion", Namespace.FILE_TALK_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Imagen", Namespace.FILE_NAMESPACE_KEY);
+        NAMESPACE_INT_MAP.put("Imagen discusión", Namespace.FILE_TALK_NAMESPACE_KEY);
     }
 
     /* (non-Javadoc)
