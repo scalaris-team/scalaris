@@ -497,7 +497,7 @@ class TransAppendToListBench(BenchRunnable):
     def __init__(self, key, value, nr_keys, operations):
         BenchRunnable.__init__(self, key, value, operations)
         self._value_init = []
-        for i in xrange(nr_keys):
+        for _i in xrange(nr_keys):
             self._value_init.append(_getRandom(_BENCH_DATA_SIZE, 'string'))
     
     def pre_init(self, j = None):
