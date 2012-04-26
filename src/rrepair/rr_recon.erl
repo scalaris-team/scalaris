@@ -723,7 +723,7 @@ decodeBlob(_) -> fail.
 
 -spec rep_factor() -> pos_integer().
 rep_factor() ->
-    config:read(replication_factor).
+    4.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
