@@ -700,7 +700,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             redirectUrl.append(URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.value, namespace), "UTF-8"));
             redirectUrl.append("&random_times=" + StringUtils.join(times, "%2C"));
             redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
-            response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
+            response.sendRedirect("http://" + Options.getInstance().SERVERNAME
+                    + Options.getInstance().SERVERPATH
+                    + response.encodeRedirectURL(redirectUrl.toString()));
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, page);
@@ -1636,7 +1638,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + URLEncoder.encode(StringUtils.join(failedKeys.getValue(), " # "), "UTF-8"));
                 }
                 redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
-                response.sendRedirect(response.encodeRedirectURL(redirectUrl.toString()));
+                response.sendRedirect("http://"
+                        + Options.getInstance().SERVERNAME
+                        + Options.getInstance().SERVERPATH
+                        + response.encodeRedirectURL(redirectUrl.toString()));
                 return;
             } else {
                 // set error message and show the edit page again (see below)
