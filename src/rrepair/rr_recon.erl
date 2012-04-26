@@ -50,8 +50,6 @@
 -export_type([method/0, request/0]).
 -endif.
 
--define(REP_FACTOR, 4).
-
 -type method()         :: bloom | merkle_tree | art | iblt | undefined.
 -type stage()          :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
 -type exit_reason()    :: empty_interval | {ok, atom()}.
@@ -153,7 +151,7 @@ on({get_state_response, MyI}, State =
                                              intervals:union(Acc, intervals:intersection(MyI, mapInterval(Intersection, I))) 
                                      end, 
                                      intervals:intersection(MyI, Intersection), 
-                                     lists:seq(2, ?REP_FACTOR)),
+                                     lists:seq(2, rep_factor())),
             ?TRACE("REQ SHARED INTERVAL 2~nMyI=~p - SrcI=~p ~n Intersec=~p - MyIntersec=~p", [MyI, SrcI, Intersection, MyIntersec]),
             send_chunk_req(DhtPid, self(), MyIntersec, Intersection, get_max_items(Method))
     end,
@@ -196,7 +194,7 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_chunk_response, {_, []}}, State) ->
-    ?TRACE("BUILD STRUCT", []),
+    ?TRACE("BUILD STRUCT1", []),
     comm:send_local(self(), {shutdown, req_chunk_is_empty}),
     State;
 
@@ -208,7 +206,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         dhtNodePid = DhtNodePid,
                         master = SyncMaster,
                         stats = Stats }) ->
-    ?TRACE("BUILD STRUCT", []),
+    ?TRACE("BUILD STRUCT2", []),
     SyncI = proplists:get_value(interval, Params),    
     ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
@@ -233,7 +231,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
                           true -> {reconciliation, Stats}
                        end,
-    ?TRACE("BUILD STRUCT 2", []),
+    ?TRACE("BUILD STRUCT 2.1", []),
     State#rr_recon_state{ stage = NStage, 
                           struct = SyncStruct, 
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
@@ -248,7 +246,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
                         round = Round }) ->
-    ?TRACE("BUILD STRUCT", []),
+    ?TRACE("BUILD STRUCT3", []),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
@@ -680,7 +678,7 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 %      Interval has to be continuous!
 -spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
 mapInterval(I, Q) ->
-    Quadrants = intervals:split(intervals:all(), ?REP_FACTOR),
+    Quadrants = intervals:split(intervals:all(), rep_factor()),
     IQ = lists:foldl(fun(QI, Acc) ->
                              Sec = intervals:intersection(QI, I),
                              case intervals:is_empty(Sec) of
@@ -697,12 +695,13 @@ mapInterval(I, Q) ->
                 end, intervals:empty(), IQ).
 
 p_mapInterval(I, Q) ->
+    RepFactor = rep_factor(),
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
-    QDiff = (?REP_FACTOR - LQ + Q) rem ?REP_FACTOR,
+    QDiff = (RepFactor - LQ + Q) rem RepFactor,
     intervals:new(LBr, 
-                  add_quadrants_to_key(LKey, QDiff, ?REP_FACTOR), 
-                  add_quadrants_to_key(RKey, QDiff, ?REP_FACTOR), 
+                  add_quadrants_to_key(LKey, QDiff, RepFactor), 
+                  add_quadrants_to_key(RKey, QDiff, RepFactor), 
                   RBr).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -719,6 +718,12 @@ decodeBlob(Blob) when is_binary(Blob) ->
         _ -> fail
     end;
 decodeBlob(_) -> fail.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec rep_factor() -> pos_integer().
+rep_factor() ->
+    config:read(replication_factor).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
