@@ -358,31 +358,6 @@ public class ScalarisVM {
     }
 
     /**
-     * Plain old data object for results of
-     * {@link ScalarisVM#shutdownNodes(int)}, {@link ScalarisVM#shutdownNodesByName(List)},
-     * {@link ScalarisVM#killNodes(int)} and {@link ScalarisVM#killNodes(List)}.
-     *
-     * @author Nico Kruber, kruber@zib.de
-     * @version 3.6
-     * @since 3.6
-     */
-    public static class DeleteNodesByNameResult {
-        /**
-         * Names of successfully deleted nodes.
-         */
-        public final List<String> successful;
-        /**
-         * Nodes which do not exist (anymore) in the VM.
-         */
-        public final List<String> notFound;
-
-        protected DeleteNodesByNameResult(final List<String> successful, final List<String> notFound) {
-            this.successful = successful;
-            this.notFound = notFound;
-        }
-    }
-
-    /**
      * Shuts down the given number of nodes (graceful leave) inside the
      * Scalaris VM of the current connection.
      *
@@ -403,29 +378,6 @@ public class ScalarisVM {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes",
                     new OtpErlangObject[] { new OtpErlangInt(number) });
         return makeDeleteResult(received_raw);
-    }
-
-    /**
-     * Shuts down the given nodes (graceful leave) inside the Scalaris VM of the
-     * current connection.
-     *
-     * @param names
-     *            names of the nodes to shut down
-     *
-     * @return result of the operation
-     *
-     * @throws ConnectionException
-     *             if the connection is not active or a communication error
-     *             occurs or an exit signal was received or the remote node
-     *             sends a message containing an invalid cookie
-     * @throws UnknownException
-     *             if any other error occurs
-     */
-    public DeleteNodesByNameResult shutdownNodesByName(final List<String> names)
-            throws ConnectionException, UnknownException {
-        final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes_by_name",
-                    new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
-        return makeDeleteByNameResult(received_raw);
     }
 
     /**
@@ -452,6 +404,75 @@ public class ScalarisVM {
     }
 
     /**
+     * Transforms the given result from a "delete nodes"-operation into a
+     * {@link DeleteResult}.
+     *
+     * @param received_raw
+     *            raw erlang result
+     *
+     * @return {@link DeleteResult} object
+     *
+     * @throws UnknownException
+     *             if an error occurs during transformation
+     */
+    private final List<String> makeDeleteResult(
+            final OtpErlangObject received_raw) throws UnknownException {
+        try {
+            return new ErlangValue(received_raw).stringListValue();
+        } catch (final ClassCastException e) {
+            throw new UnknownException(e, received_raw);
+        }
+    }
+
+    /**
+     * Plain old data object for results of
+     * {@link ScalarisVM#shutdownNodes(int)}, {@link ScalarisVM#shutdownNodesByName(List)},
+     * {@link ScalarisVM#killNodes(int)} and {@link ScalarisVM#killNodes(List)}.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.6
+     * @since 3.6
+     */
+    public static class DeleteNodesByNameResult {
+        /**
+         * Names of successfully deleted nodes.
+         */
+        public final List<String> successful;
+        /**
+         * Nodes which do not exist (anymore) in the VM.
+         */
+        public final List<String> notFound;
+
+        protected DeleteNodesByNameResult(final List<String> successful, final List<String> notFound) {
+            this.successful = successful;
+            this.notFound = notFound;
+        }
+    }
+
+    /**
+     * Shuts down the given nodes (graceful leave) inside the Scalaris VM of the
+     * current connection.
+     *
+     * @param names
+     *            names of the nodes to shut down
+     *
+     * @return result of the operation
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public DeleteNodesByNameResult shutdownNodesByName(final List<String> names)
+            throws ConnectionException, UnknownException {
+        final OtpErlangObject received_raw = connection.doRPC("api_vm", "shutdown_nodes_by_name",
+                    new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
+        return makeDeleteByNameResult(received_raw);
+    }
+
+    /**
      * Kills the given nodes inside the Scalaris VM of the current connection.
      *
      * @param names
@@ -471,27 +492,6 @@ public class ScalarisVM {
         final OtpErlangObject received_raw = connection.doRPC("api_vm", "kill_nodes_by_name",
                     new OtpErlangObject[] { ErlangValue.convertToErlang(names) });
         return makeDeleteByNameResult(received_raw);
-    }
-
-    /**
-     * Transforms the given result from a "delete nodes"-operation into a
-     * {@link DeleteResult}.
-     *
-     * @param received_raw
-     *            raw erlang result
-     *
-     * @return {@link DeleteResult} object
-     *
-     * @throws UnknownException
-     *             if an error occurs during transformation
-     */
-    private final List<String> makeDeleteResult(
-            final OtpErlangObject received_raw) throws UnknownException {
-        try {
-            return new ErlangValue(received_raw).stringListValue();
-        } catch (final ClassCastException e) {
-            throw new UnknownException(e, received_raw);
-        }
     }
 
     /**
@@ -549,7 +549,7 @@ public class ScalarisVM {
                 if (connTuple.arity() != 4) {
                     throw new UnknownException(received_raw);
                 }
-                final OtpErlangAtom name_otp = (OtpErlangAtom) connTuple.elementAt(i);
+                final OtpErlangAtom name_otp = (OtpErlangAtom) connTuple.elementAt(0);
                 result.add(name_otp.atomValue());
             }
             return result;
