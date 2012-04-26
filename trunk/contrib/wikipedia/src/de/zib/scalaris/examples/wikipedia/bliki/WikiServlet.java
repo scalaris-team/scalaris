@@ -1729,8 +1729,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         Connector connector = new Connector();
         user = connector.login(user);
 
-        // set image width thumb size to 200px
-        List<info.bliki.api.Page> pages = user.queryImageinfo(new String[] { image }, 200);
+        // set image width thumb size to 400px
+        List<info.bliki.api.Page> pages = user.queryImageinfo(new String[] { image }, 400);
         if (pages.size() == 1) {
             info.bliki.api.Page imagePage = pages.get(0);
 //            System.out.println("IMG-THUMB-URL: " + imagePage.getImageThumbUrl());
