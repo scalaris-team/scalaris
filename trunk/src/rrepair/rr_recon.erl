@@ -125,7 +125,7 @@ on({get_state_response, MyI}, State =
     State#rr_recon_state{ struct = [{interval, MyI}] };
 
 on({get_state_response, MyI}, State = 
-       #rr_recon_state{ stage = req_shared_interval,
+       #rr_recon_state{ stage = req_shared_interval, 
                         master = true,
                         method = RMethod }) ->
     ReconReq = {continue, RMethod, req_shared_interval, [{interval, MyI}], false},
@@ -140,23 +140,15 @@ on({get_state_response, MyI}, State =
                         struct = Params,                        
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid }) ->
-    ?TRACE("REQ SHARED INTERVAL", []),
     Method =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SrcI = proplists:get_value(interval, Params),
-    Intersection = intervals:intersection(mapInterval(MyI, 1), mapInterval(SrcI, 1)),
-    case intervals:is_empty(Intersection) of
+    Intersec = find_intersection(MyI, SrcI),
+    case intervals:is_empty(Intersec) of
         true -> comm:send_local(self(), {shutdown, intersection_empty});
-        false ->
-            MyIntersec = lists:foldl(fun(I, Acc) -> 
-                                             intervals:union(Acc, intervals:intersection(MyI, mapInterval(Intersection, I))) 
-                                     end, 
-                                     intervals:intersection(MyI, Intersection), 
-                                     lists:seq(2, rep_factor())),
-            ?TRACE("REQ SHARED INTERVAL 2~nMyI=~p - SrcI=~p ~n Intersec=~p - MyIntersec=~p", [MyI, SrcI, Intersection, MyIntersec]),
-            send_chunk_req(DhtPid, self(), MyIntersec, Intersection, get_max_items(Method))
+        false -> send_chunk_req(DhtPid, self(), Intersec, Intersec, get_max_items(Method))
     end,
     State#rr_recon_state{ stage = build_struct,
-                          struct = [{interval, Intersection}] };
+                          struct = [{interval, Intersec}] };
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = res_shared_interval,
@@ -164,16 +156,16 @@ on({get_state_response, MyI}, State =
                         struct = Params,
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid}) ->
-    Interval = proplists:get_value(interval, Params),
+    DestI = proplists:get_value(interval, Params),
     DestReconPid = proplists:get_value(reconPid, Params),
-    MyIntersec = mapInterval(Interval, get_interval_quadrant(MyI)),
-    case intervals:is_subset(MyIntersec, MyI) of
+    MyIntersec = find_intersection(MyI, DestI),
+    case intervals:is_subset(MyIntersec, MyI) and not intervals:is_empty(MyIntersec) of
         false ->
             comm:send_local(self(), {shutdown, negotiate_interval_master}),            
             comm:send(DestReconPid, {shutdown, no_interval_intersection});
         true ->
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
-            send_chunk_req(DhtPid, self(), MyIntersec, Interval, get_max_items(RMethod))
+            send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod))
     end,    
     State#rr_recon_state{ stage = build_struct, dest_recon_pid = DestReconPid };
 
@@ -185,7 +177,7 @@ on({get_state_response, MyI}, State =
                        }) ->
     MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
     MySyncI = intervals:intersection(MyI, MyBloomI),
-    ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n SynI=~p", [MyI, MyBloomI, MySyncI]),
+    ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n BloomIMapped=~p ~n SynI=~p", [MyI, BloomI, MyBloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
         true -> comm:send_local(self(), {shutdown, empty_interval});
         false -> send_chunk_req(DhtPid, self(), MySyncI, 
@@ -194,7 +186,6 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_chunk_response, {_, []}}, State) ->
-    ?TRACE("BUILD STRUCT1", []),
     comm:send_local(self(), {shutdown, req_chunk_is_empty}),
     State;
 
@@ -206,7 +197,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         dhtNodePid = DhtNodePid,
                         master = SyncMaster,
                         stats = Stats }) ->
-    ?TRACE("BUILD STRUCT2", []),
     SyncI = proplists:get_value(interval, Params),    
     ToBuild = ?IIF(RMethod =:= art, ?IIF(SyncMaster, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
@@ -214,8 +204,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
             true ->
                 {BTime, NTree} = util:tc(fun() -> merkle_tree:insert_list(DBList, Params) end),
                 {rr_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
-            false ->                
-                util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
+            false -> util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
         end,
     EmptyRest = intervals:is_empty(RestI),
     if not EmptyRest ->
@@ -231,7 +220,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
                           true -> {reconciliation, Stats}
                        end,
-    ?TRACE("BUILD STRUCT 2.1", []),
     State#rr_recon_state{ stage = NStage, 
                           struct = SyncStruct, 
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
@@ -246,7 +234,6 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                             keyBF = KeyBF,
                                                             versBF = VersBF},
                         round = Round }) ->
-    ?TRACE("BUILD STRUCT3", []),
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
@@ -390,6 +377,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                                                 dest_rr_pid = DestRRPid,                                       
                                                 master = IsMaster, 
                                                 stats = Stats }) ->
+    ?TRACE("BEGIN SYNC", []),
     case Method of
         merkle_tree -> 
             case IsMaster of
@@ -529,7 +517,7 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
       is_subtype(Method,       method()),
       is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
-build_recon_struct(bloom, {I, DBItems}) ->
+build_recon_struct(bloom, {I, DBItems}) ->    
     Fpr = get_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
@@ -540,7 +528,10 @@ build_recon_struct(bloom, {I, DBItems}) ->
     #bloom_recon_struct{ interval = mapInterval(I, 1), keyBF = KeyBF, versBF = VerBF };
 
 build_recon_struct(merkle_tree, {I, DBItems}) ->
-    merkle_tree:new(I, DBItems, []);
+    ?TRACE("START BUILD MERKLE", []),
+    M = merkle_tree:new(I, DBItems, []),
+    ?TRACE("END BUILD MERKLE", []),
+    M;
 
 build_recon_struct(art, Chunk) ->
     Tree = build_recon_struct(merkle_tree, Chunk),
@@ -574,7 +565,6 @@ fill_bloom([DB_Entry_Enc | T], KeyBF, VerBF) ->
     is_subtype(I,           intervals:interval()),
     is_subtype(MaxItems,    pos_integer()).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
-    ?TRACE("PRE SEND CHUNK REQ", []),
     comm:send_local(
       DhtPid, 
       {get_chunk, SrcPid, I, 
@@ -584,7 +574,6 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
                           db_entry:get_version(Item)) 
        end,
        MaxItems}),
-    ?TRACE("POST SEND CHUNK REQ", []),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -678,31 +667,30 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 %      Interval has to be continuous!
 -spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
 mapInterval(I, Q) ->
-    Quadrants = intervals:split(intervals:all(), rep_factor()),
-    IQ = lists:foldl(fun(QI, Acc) ->
-                             Sec = intervals:intersection(QI, I),
-                             case intervals:is_empty(Sec) of
-                                 true -> Acc;
-                                 false -> [Sec | Acc]
-                             end
-                     end, [], Quadrants),
-    lists:foldl(fun(IS, Acc) -> 
-                        ISMapped = case get_interval_quadrant(IS)  of
-                                       Q -> IS;
-                                       _ -> p_mapInterval(IS, Q)
-                                   end,
-                        intervals:union(ISMapped, Acc)
-                end, intervals:empty(), IQ).
-
-p_mapInterval(I, Q) ->
-    RepFactor = rep_factor(),
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
+    RepFactor = rep_factor(),
     QDiff = (RepFactor - LQ + Q) rem RepFactor,
-    intervals:new(LBr, 
-                  add_quadrants_to_key(LKey, QDiff, RepFactor), 
-                  add_quadrants_to_key(RKey, QDiff, RepFactor), 
+    intervals:new(LBr,
+                  add_quadrants_to_key(LKey, QDiff, RepFactor),
+                  add_quadrants_to_key(RKey, QDiff, RepFactor),
                   RBr).
+
+% @doc Gets intersection of two associated intervals as sub interval of A.
+-spec find_intersection(intervals:interval(), intervals:interval()) -> intervals:interval().
+find_intersection(A, B) ->
+    I = lists:foldl(fun(Q, Acc) ->
+                            Sec = intervals:intersection(A, mapInterval(B, Q)),
+                            case intervals:is_empty(Acc) 
+                                     andalso not intervals:is_empty(Sec) of
+                                true -> Sec;
+                                false -> Acc
+                            end
+                    end, intervals:empty(), lists:seq(1, rep_factor())),
+    I.
+    %{_, RI} = intervals:get_elements(I),
+    %?TRACE("--->FIND INTERSEC<------~nI=~p~nR=~p", [I, RI]),
+    %RI.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

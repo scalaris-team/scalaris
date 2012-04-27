@@ -54,7 +54,7 @@ upd_tests() ->
     [upd_no_outdated,
      upd_min_nodes,     % sync in an single node ring
      upd_simple,        % run one sync round
-     %upd_dest,          % run one sync with a specified dest node 
+     upd_dest,          % run one sync with a specified dest node 
      upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
 
 all() ->
@@ -76,7 +76,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    _ = crypto:start(),
+    _ = crypto:start(),    
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
@@ -147,7 +147,7 @@ upd_simple(Config) ->
 
 upd_dest(Config) ->
     %parameter
-    NodeCount = 10,
+    NodeCount = 7,
     DataCount = 1000,
     Fpr = 0.1,
     Method = proplists:get_value(ru_method, Config),
