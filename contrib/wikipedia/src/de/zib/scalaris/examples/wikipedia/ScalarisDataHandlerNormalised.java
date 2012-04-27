@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import de.zib.scalaris.Connection;
@@ -30,6 +31,8 @@ import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
+import de.zib.scalaris.executor.ScalarisOp;
+import de.zib.scalaris.executor.ScalarisReadOp;
 import de.zib.scalaris.operations.ReadOp;
 
 /**
@@ -228,7 +231,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
-                    "no connection to Scalaris", true, page, revision, false,
+                    "no connection to Scalaris", true, title, page, revision, false,
                     false, title, System.currentTimeMillis() - timeAtStart);
         }
         
@@ -243,14 +246,14 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
         } catch (NotFoundException e) {
             return new RevisionResult(false, involvedKeys,
-                    "page not found at \"" + scalaris_key + "\"", false, page,
-                    revision, true, false, title,
+                    "page not found at \"" + scalaris_key + "\"", false, title,
+                    page, revision, true, false, title,
                     System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
             return new RevisionResult(false, involvedKeys,
                     "unknown exception reading \"" + scalaris_key
                             + "\" from Scalaris: " + e.getMessage(),
-                    e instanceof ConnectionException, page, revision, false,
+                    e instanceof ConnectionException, title, page, revision, false,
                     false, title, System.currentTimeMillis() - timeAtStart);
         }
 
@@ -263,22 +266,82 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             } catch (NotFoundException e) {
                 return new RevisionResult(false, involvedKeys,
                         "revision not found at \"" + scalaris_key + "\"",
-                        false, page, revision, false, true, title,
+                        false, title, page, revision, false, true, title,
                         System.currentTimeMillis() - timeAtStart);
             } catch (Exception e) {
                 return new RevisionResult(false, involvedKeys,
                         "unknown exception reading \"" + scalaris_key
                                 + "\" from Scalaris: " + e.getMessage(),
-                        e instanceof ConnectionException, page, revision,
-                        false, false, title,
+                        e instanceof ConnectionException, title, page,
+                        revision, false, false, title,
                         System.currentTimeMillis() - timeAtStart);
             }
         } else {
             revision = page.getCurRev();
         }
 
-        return new RevisionResult(involvedKeys, page, revision, title,
+        return new RevisionResult(involvedKeys, title, page, revision, title,
                 System.currentTimeMillis() - timeAtStart);
+    }
+
+    /**
+     * Retrieves the current version of all given pages from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param titles
+     *            the titles of the pages
+     * @param statName
+     *            name of the statistic to collect
+     * 
+     * @return a result object with the pages and revisions on success
+     */
+    public static ValueResult<List<RevisionResult>> getRevisions(Connection connection,
+            Collection<String> titles, final String statName) {
+        final long timeAtStart = System.currentTimeMillis();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<List<RevisionResult>>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        
+        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
+        final MyScalarisSingleOpExecutor executor0 = new MyScalarisSingleOpExecutor(
+                scalaris_single, involvedKeys);
+        for (String title : titles) {
+            ScalarisReadOp readOp = new ScalarisReadOp(getPageKey(title));
+            executor0.addOp(readOp);
+        }
+        try {
+            executor0.run();
+        } catch (Exception e) {
+            return new ValueResult<List<RevisionResult>>(false, involvedKeys,
+                    "unknown exception reading " + titles + " from Scalaris",
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        
+        List<RevisionResult> results = new ArrayList<RevisionResult>(titles.size());
+        for (ScalarisOp op : executor0.getOps()) {
+            if (op instanceof ScalarisReadOp) {
+                ScalarisReadOp readOp = (ScalarisReadOp) op;
+                RevisionResult curResult;
+                if (readOp.getValue() != null) {
+                    Page page = readOp.getValue().jsonValue(Page.class);
+                    curResult = new RevisionResult(involvedKeys,
+                            readOp.getKey(), page, page.getCurRev());
+                    
+                } else {
+                    curResult = new RevisionResult(false, involvedKeys,
+                            "page not found at \"" + readOp.getKey() + "\"",
+                            false, readOp.getKey(), null, null, true, false);
+                }
+                results.add(curResult);
+            }
+        }
+        return new ValueResult<List<RevisionResult>>(involvedKeys, results,
+                statName, System.currentTimeMillis() - timeAtStart);
     }
 
     /**
