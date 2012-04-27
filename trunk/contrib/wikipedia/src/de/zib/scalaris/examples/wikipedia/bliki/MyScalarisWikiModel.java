@@ -141,13 +141,15 @@ public class MyScalarisWikiModel extends MyWikiModel {
                 addInvolvedKeys(getRevResult.involvedKeys);
                 if (getRevResult.success) {
                     text = getRevResult.revision.unpackedText();
-                    final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
-                    if (getRevResult.page.isRedirect() && matcher.matches()) {
-                        // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
-                        String[] redirFullName = splitNsTitle(matcher.group(1));
-                        String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
-                        if (redirText != null && !redirText.isEmpty()) {
-                            text = redirText;
+                    if (followRedirect && getRevResult.page.isRedirect()) {
+                        final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
+                        if (matcher.matches()) {
+                            // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
+                            String[] redirFullName = splitNsTitle(matcher.group(1));
+                            String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
+                            if (redirText != null && !redirText.isEmpty()) {
+                                text = redirText;
+                            }
                         }
                     }
                 } else {
