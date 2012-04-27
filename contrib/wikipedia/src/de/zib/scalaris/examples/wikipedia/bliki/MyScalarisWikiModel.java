@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 
 /**
  * Wiki model using Scalaris to fetch (new) data, e.g. templates.
@@ -97,7 +97,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
      * @param namespace
      *            the namespace of the page
      * @param articleName
-     *            the page's name without the namespace
+     *            the (unnormalised) page's name without the namespace
      * @param templateParameters
      *            template parameters if the page is a template, <tt>null</tt>
      *            otherwise
@@ -114,10 +114,31 @@ public class MyScalarisWikiModel extends MyWikiModel {
      * Retrieves the contents of the given page from Scalaris. Caches retrieved
      * pages in {@link #pageCache}.
      * 
+     * @param pageName0
+     *            the unnormalised name of the page
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
+     * @param followRedirect
+     *            whether to follow a redirect or not (at most one redirect
+     *            should be followed)
+     * 
+     * @return the page's contents or <tt>null</tt> if no connection exists
+     */
+    protected String retrievePage(String pageName0,
+            Map<String, String> templateParameters, boolean followRedirect) {
+        String[] parts = splitNsTitle(pageName0);
+        return retrievePage(parts[0], parts[1], templateParameters, followRedirect);
+    }
+
+    /**
+     * Retrieves the contents of the given page from Scalaris. Caches retrieved
+     * pages in {@link #pageCache}.
+     * 
      * @param namespace
      *            the namespace of the page
      * @param articleName
-     *            the page's name without the namespace
+     *            the (unnormalised) page's name without the namespace
      * @param templateParameters
      *            template parameters if the page is a template, <tt>null</tt>
      *            otherwise
@@ -130,13 +151,14 @@ public class MyScalarisWikiModel extends MyWikiModel {
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters, boolean followRedirect) {
         if (connection != null) {
-            String pageName = createFullPageName(namespace, articleName);
+            // normalise page name:
+            String pageName = normalisePageTitle(createFullPageName(namespace, articleName));
             if (pageCache.containsKey(pageName)) {
                 return pageCache.get(pageName);
             } else {
                 String text = null;
                 // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
-                RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName, this.getNamespace());
+                RevisionResult getRevResult = ScalarisDataHandlerNormalised.getRevision(connection, pageName);
                 addStats(getRevResult.stats);
                 addInvolvedKeys(getRevResult.involvedKeys);
                 if (getRevResult.success) {
@@ -166,28 +188,24 @@ public class MyScalarisWikiModel extends MyWikiModel {
     /**
      * Gets the contents of the newest revision of the page redirected to.
      * 
-     * @param pageName
-     *            the name of the page redirected to
+     * @param pageName0
+     *            the name of the page redirected to (unnormalised)
      * 
      * @return the contents of the newest revision of that page or a placeholder
      *         string for the redirect
      */
     @Override
-    public String getRedirectContent(String pageName) {
-        if (connection != null) {
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(connection, pageName, this.getNamespace());
-            addStats(getRevResult.stats);
-            addInvolvedKeys(getRevResult.involvedKeys);
-            if (getRevResult.success) {
-                // make PAGENAME in the redirected content work as expected
-                setPageName(pageName);
-                return getRevResult.revision.unpackedText();
-            } else {
-//                System.err.println(getRevResult.message);
-//                return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
-            }
+    public String getRedirectContent(String pageName0) {
+        String redirText = retrievePage(pageName0, null, false);
+        if (redirText != null) {
+            // make PAGENAME in the redirected content work as expected
+            setPageName(pageName0);
+            return redirText;
+        } else {
+//            System.err.println(getRevResult.message);
+//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
         }
-        return "&#35;redirect [[" + pageName + "]]";
+        return "&#35;redirect [[" + pageName0 + "]]";
     }
 
     /* (non-Javadoc)

@@ -38,6 +38,7 @@ import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 
@@ -434,13 +435,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 assert ScalarisDataHandler.getPageListKey(0).equals("pages:0");
                 assert ScalarisDataHandler.getPageListKey(-2).equals("pages:-2");
                 assert ScalarisDataHandler.getPageCountKey(0).equals("pages:0:count");
-                assert ScalarisDataHandler.getRevKey("foobar", 0, new MyNamespace()).equals("foobar:rev:0");
-                assert ScalarisDataHandler.getPageKey("foobar", new MyNamespace()).equals("foobar:page");
-                assert ScalarisDataHandler.getRevListKey("foobar", new MyNamespace()).equals("foobar:revs");
-                assert ScalarisDataHandler.getCatPageListKey("foobar", new MyNamespace()).equals("foobar:cpages");
-                assert ScalarisDataHandler.getCatPageCountKey("foobar", new MyNamespace()).equals("foobar:cpages:count");
-                assert ScalarisDataHandler.getTplPageListKey("foobar", new MyNamespace()).equals("foobar:tpages");
-                assert ScalarisDataHandler.getBackLinksPageListKey("foobar", new MyNamespace()).equals("foobar:blpages");
+                assert ScalarisDataHandlerUnnormalised.getRevKey("foobar", 0, new MyNamespace()).equals("foobar:rev:0");
+                assert ScalarisDataHandlerUnnormalised.getPageKey("foobar", new MyNamespace()).equals("foobar:page");
+                assert ScalarisDataHandlerUnnormalised.getRevListKey("foobar", new MyNamespace()).equals("foobar:revs");
+                assert ScalarisDataHandlerUnnormalised.getCatPageListKey("foobar", new MyNamespace()).equals("foobar:cpages");
+                assert ScalarisDataHandlerUnnormalised.getCatPageCountKey("foobar", new MyNamespace()).equals("foobar:cpages:count");
+                assert ScalarisDataHandlerUnnormalised.getTplPageListKey("foobar", new MyNamespace()).equals("foobar:tpages");
+                assert ScalarisDataHandlerUnnormalised.getBackLinksPageListKey("foobar", new MyNamespace()).equals("foobar:blpages");
                 assert ScalarisDataHandler.getContributionListKey("foobar").equals("foobar:user:contrib");
                 
                 final Pattern pageListPattern = Pattern.compile("^pages:([+-]?[0-9]+)$", Pattern.DOTALL);

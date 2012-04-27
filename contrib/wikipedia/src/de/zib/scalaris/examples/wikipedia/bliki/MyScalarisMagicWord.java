@@ -19,8 +19,8 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 
 /**
@@ -158,13 +158,10 @@ public class MyScalarisMagicWord extends MyMagicWord {
          * Technical metadata / Latest revision to current page
          */
         if (name.equals(MAGIC_PAGE_SIZE)) {
-            RevisionResult getRevResult = ScalarisDataHandler.getRevision(
-                    model.connection, parameter, model.getNamespace());
-            model.addStats(getRevResult.stats);
-            model.addInvolvedKeys(getRevResult.involvedKeys);
+            final String revText = model.retrievePage(parameter, null, false);
             int size = 0;
-            if (getRevResult.success) {
-                size = getRevResult.revision.unpackedText().getBytes().length;
+            if (revText != null) {
+                size = revText.getBytes().length;
             }
             return model.formatStatisticNumber(rawNumber, size);
 //      } else if (name.equals(MAGIC_REVISION_ID)) {
@@ -216,10 +213,10 @@ public class MyScalarisMagicWord extends MyMagicWord {
             return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFACTIVEUSERS}}
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
-            String category = MyWikiModel.createFullPageName(
+            final String category0 = MyWikiModel.createFullPageName(
                     model.getCategoryNamespace(), parameter.trim());
-            ValueResult<BigInteger> catListResult = ScalarisDataHandler
-                    .getPagesInCategoryCount(model.connection, category,
+            ValueResult<BigInteger> catListResult = ScalarisDataHandlerUnnormalised
+                    .getPagesInCategoryCount(model.connection, category0,
                             model.getNamespace());
             model.addStats(catListResult.stats);
             model.addInvolvedKeys(catListResult.involvedKeys);

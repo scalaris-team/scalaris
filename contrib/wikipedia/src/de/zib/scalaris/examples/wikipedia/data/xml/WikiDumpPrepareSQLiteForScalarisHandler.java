@@ -42,7 +42,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -391,16 +391,16 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         for (Revision rev : revisions) {
             if (rev.getId() != page.getCurRev().getId()) {
                 addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
-                        ScalarisDataHandler.getRevKey(page.getTitle(),
+                        ScalarisDataHandlerUnnormalised.getRevKey(page.getTitle(),
                                 rev.getId(), wikiModel.getNamespace()), rev,
                         stWrite));
             }
         }
         addSQLiteJob(new SQLiteWriteObjectJob<List<ShortRevision>>(
-                ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()),
+                ScalarisDataHandlerUnnormalised.getRevListKey(page.getTitle(), wikiModel.getNamespace()),
                 revisions_short, stWrite));
         addSQLiteJob(new SQLiteWriteObjectJob<Page>(
-                ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()),
+                ScalarisDataHandlerUnnormalised.getPageKey(page.getTitle(), wikiModel.getNamespace()),
                 page, stWrite));
 
         // note: do not normalise page titles (this will be done later)
@@ -621,7 +621,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             
             // list of pages:
             for(NamespaceEnum ns : NamespaceEnum.values()) {
-                scalaris_key = ScalarisDataHandler.getPageListKey(ns.getId());
+                scalaris_key = ScalarisDataHandlerUnnormalised.getPageListKey(ns.getId());
                 final ArrayList<String> curNewPages = newPages.get(ns);
                 List<String> pageList;
                 try {
@@ -631,11 +631,11 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     pageList = curNewPages;
                 }
                 writeObject(scalaris_key, pageList);
-                writeObject(ScalarisDataHandler.getPageCountKey(ns.getId()), pageList.size());
+                writeObject(ScalarisDataHandlerUnnormalised.getPageCountKey(ns.getId()), pageList.size());
             }
             
             // number articles:
-            writeObject(ScalarisDataHandler.getArticleCountKey(), articleCount);
+            writeObject(ScalarisDataHandlerUnnormalised.getArticleCountKey(), articleCount);
         }
     }
 
@@ -829,9 +829,9 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         private void writeCatToScalaris(String category0,
                 List<String> catPageList) throws RuntimeException {
             String scalaris_key;
-            scalaris_key = ScalarisDataHandler.getCatPageListKey(category0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerUnnormalised.getCatPageListKey(category0, wikiModel.getNamespace());
             writeObject(scalaris_key, catPageList);
-            scalaris_key = ScalarisDataHandler.getCatPageCountKey(category0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerUnnormalised.getCatPageCountKey(category0, wikiModel.getNamespace());
             writeObject(scalaris_key, catPageList.size());
             catPageList.clear();
         }
@@ -844,7 +844,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         private void writeTplToScalaris(String template0,
                 List<String> tplPageList) throws RuntimeException {
             String scalaris_key;
-            scalaris_key = ScalarisDataHandler.getTplPageListKey(template0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerUnnormalised.getTplPageListKey(template0, wikiModel.getNamespace());
             writeObject(scalaris_key, tplPageList);
             tplPageList.clear();
         }
@@ -857,7 +857,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         private void writeLnkToScalaris(String linkDest0,
                 List<String> backLinksPageList) throws RuntimeException {
             String scalaris_key;
-            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerUnnormalised.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
             writeObject(scalaris_key, backLinksPageList);
             backLinksPageList.clear();
         }
@@ -874,7 +874,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         
         @Override
         public void run() {
-            String key = ScalarisDataHandler.getSiteInfoKey();
+            String key = ScalarisDataHandlerUnnormalised.getSiteInfoKey();
             writeObject(stWrite, key, siteInfo);
         }
     }
