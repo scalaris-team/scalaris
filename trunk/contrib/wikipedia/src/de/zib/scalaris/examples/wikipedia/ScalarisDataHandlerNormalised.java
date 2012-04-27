@@ -1,0 +1,409 @@
+/**
+ *  Copyright 2012 Zuse Institute Berlin
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+package de.zib.scalaris.examples.wikipedia;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import de.zib.scalaris.Connection;
+import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.Transaction;
+import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
+import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
+import de.zib.scalaris.examples.wikipedia.data.Page;
+import de.zib.scalaris.examples.wikipedia.data.Revision;
+import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
+import de.zib.scalaris.operations.ReadOp;
+
+/**
+ * @author Nico Kruber, kruber@zib.de
+ */
+public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
+    
+    /**
+     * Gets the key to store {@link Revision} objects at.
+     * 
+     * @param title     the title of the page
+     * @param id        the id of the revision
+     * 
+     * @return Scalaris key
+     */
+    public final static String getRevKey(String title, int id) {
+        return title + ":rev:" + id;
+    }
+    
+    /**
+     * Gets the key to store {@link Page} objects at.
+     * 
+     * @param title     the title of the page
+     * 
+     * @return Scalaris key
+     */
+    public final static String getPageKey(String title) {
+        return title + ":page";
+    }
+    
+    /**
+     * Gets the key to store the list of revisions of a page at.
+     * 
+     * @param title     the title of the page
+     * 
+     * @return Scalaris key
+     */
+    public final static String getRevListKey(String title) {
+        return title + ":revs";
+    }
+    
+    /**
+     * Gets the key to store the list of pages belonging to a category at.
+     * 
+     * @param title     the category title (including <tt>Category:</tt>)
+     * 
+     * @return Scalaris key
+     */
+    public final static String getCatPageListKey(String title) {
+        return title + ":cpages";
+    }
+    
+    /**
+     * Gets the key to store the number of pages belonging to a category at.
+     * 
+     * @param title     the category title (including <tt>Category:</tt>)
+     * 
+     * @return Scalaris key
+     */
+    public final static String getCatPageCountKey(String title) {
+        return title + ":cpages:count";
+    }
+    
+    /**
+     * Gets the key to store the list of pages using a template at.
+     * 
+     * @param title     the template title (including <tt>Template:</tt>)
+     * 
+     * @return Scalaris key
+     */
+    public final static String getTplPageListKey(String title) {
+        return title + ":tpages";
+    }
+    
+    /**
+     * Gets the key to store the list of pages linking to the given title.
+     * 
+     * @param title     the page's title
+     * 
+     * @return Scalaris key
+     */
+    public final static String getBackLinksPageListKey(String title) {
+        return title + ":blpages";
+    }
+    
+    /**
+     * Retrieves a page's history from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the page
+     * 
+     * @return a result object with the page history on success
+     */
+    public static PageHistoryResult getPageHistory(Connection connection,
+            String title) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "history of " + title;
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new PageHistoryResult(false, involvedKeys, "no connection to Scalaris",
+                    true, statName, System.currentTimeMillis() - timeAtStart);
+        }
+        
+        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
+        TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
+        requests.addOp(new ReadOp(getPageKey(title)));
+        requests.addOp(new ReadOp(getRevListKey(title)));
+        
+        TransactionSingleOp.ResultList results;
+        try {
+            addInvolvedKeys(involvedKeys, requests.getRequests());
+            results = scalaris_single.req_list(requests);
+        } catch (Exception e) {
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \"" + getPageKey(title)
+                            + "\" or \"" + getRevListKey(title)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        
+        Page page;
+        try {
+            page = results.processReadAt(0).jsonValue(Page.class);
+        } catch (NotFoundException e) {
+            PageHistoryResult result = new PageHistoryResult(false,
+                    involvedKeys, "page not found at \"" + getPageKey(title)
+                            + "\"", false, statName, System.currentTimeMillis()
+                            - timeAtStart);
+            result.not_existing = true;
+            return result;
+        } catch (Exception e) {
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \"" + getPageKey(title)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+
+        List<ShortRevision> revisions;
+        try {
+            revisions = results.processReadAt(1).jsonListValue(ShortRevision.class);
+        } catch (NotFoundException e) {
+            PageHistoryResult result = new PageHistoryResult(false,
+                    involvedKeys, "revision list \"" + getRevListKey(title)
+                            + "\" does not exist", false, statName,
+                    System.currentTimeMillis() - timeAtStart);
+            result.not_existing = true;
+            return result;
+        } catch (Exception e) {
+            return new PageHistoryResult(false, involvedKeys,
+                    "unknown exception reading \"" + getRevListKey(title)
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return new PageHistoryResult(involvedKeys, page, revisions, statName,
+                System.currentTimeMillis() - timeAtStart);
+    }
+
+    /**
+     * Retrieves the current, i.e. most up-to-date, version of a page from
+     * Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the page
+     * 
+     * @return a result object with the page and revision on success
+     */
+    public static RevisionResult getRevision(Connection connection,
+            String title) {
+        return getRevision(connection, title, -1);
+    }
+
+    /**
+     * Retrieves the given version of a page from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the page
+     * @param id
+     *            the id of the version
+     * 
+     * @return a result object with the page and revision on success
+     */
+    public static RevisionResult getRevision(Connection connection,
+            String title, int id) {
+        final long timeAtStart = System.currentTimeMillis();
+        Page page = null;
+        Revision revision = null;
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new RevisionResult(false, involvedKeys,
+                    "no connection to Scalaris", true, page, revision, false,
+                    false, title, System.currentTimeMillis() - timeAtStart);
+        }
+        
+        TransactionSingleOp scalaris_single;
+        String scalaris_key;
+        
+        scalaris_single = new TransactionSingleOp(connection);
+
+        scalaris_key = getPageKey(title);
+        try {
+            involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
+            page = scalaris_single.read(scalaris_key).jsonValue(Page.class);
+        } catch (NotFoundException e) {
+            return new RevisionResult(false, involvedKeys,
+                    "page not found at \"" + scalaris_key + "\"", false, page,
+                    revision, true, false, title,
+                    System.currentTimeMillis() - timeAtStart);
+        } catch (Exception e) {
+            return new RevisionResult(false, involvedKeys,
+                    "unknown exception reading \"" + scalaris_key
+                            + "\" from Scalaris: " + e.getMessage(),
+                    e instanceof ConnectionException, page, revision, false,
+                    false, title, System.currentTimeMillis() - timeAtStart);
+        }
+
+        // load requested version if it is not the current one cached in the Page object
+        if (id != page.getCurRev().getId() && id >= 0) {
+            scalaris_key = getRevKey(title, id);
+            try {
+                involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
+                revision = scalaris_single.read(scalaris_key).jsonValue(Revision.class);
+            } catch (NotFoundException e) {
+                return new RevisionResult(false, involvedKeys,
+                        "revision not found at \"" + scalaris_key + "\"",
+                        false, page, revision, false, true, title,
+                        System.currentTimeMillis() - timeAtStart);
+            } catch (Exception e) {
+                return new RevisionResult(false, involvedKeys,
+                        "unknown exception reading \"" + scalaris_key
+                                + "\" from Scalaris: " + e.getMessage(),
+                        e instanceof ConnectionException, page, revision,
+                        false, false, title,
+                        System.currentTimeMillis() - timeAtStart);
+            }
+        } else {
+            revision = page.getCurRev();
+        }
+
+        return new RevisionResult(involvedKeys, page, revision, title,
+                System.currentTimeMillis() - timeAtStart);
+    }
+
+    /**
+     * Retrieves a list of pages in the given category from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<String>> getPagesInCategory(Connection connection,
+            String title) {
+        return getPageList2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
+                Arrays.asList(getCatPageListKey(title)), false,
+                "pages in " + title);
+    }
+
+    /**
+     * Retrieves a list of pages using the given template from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the template
+     * @param nsObject
+     *            the namespace for page title normalisation
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<String>> getPagesInTemplate(Connection connection,
+            String title, final MyNamespace nsObject) {
+        return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
+                Arrays.asList(getTplPageListKey(title)), true,
+                "pages in " + title);
+    }
+
+    /**
+     * Retrieves a list of pages linking to the given page from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the page
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<String>> getPagesLinkingTo(Connection connection,
+            String title) {
+        final String statName = "links to " + title;
+        if (Options.getInstance().WIKI_USE_BACKLINKS) {
+            return getPageList2(connection, ScalarisOpType.BACKLINK_PAGE_LIST,
+                    Arrays.asList(getBackLinksPageListKey(title)),
+                    false, statName);
+        } else {
+            return new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0),
+                    new ArrayList<String>(0));
+        }
+    }
+
+    /**
+     * Retrieves the number of pages in the given category from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static ValueResult<BigInteger> getPagesInCategoryCount(
+            Connection connection, String title) {
+        return getInteger2(connection, getCatPageCountKey(title), false,
+                "page count in " + title);
+    }
+    
+    /**
+     * Updates a list of pages by removing and/or adding new page titles.
+     * 
+     * @param scalaris_tx
+     *            connection to Scalaris
+     * @param opType
+     *            operation type indicating what is being updated
+     * @param pageList_key
+     *            Scalaris key for the page list
+     * @param pageCount_key
+     *            Scalaris key for the number of pages in the list (may be null
+     *            if not used)
+     * @param entriesToAdd
+     *            list of (normalised) page names to add to the list
+     * @param entriesToRemove
+     *            list of (normalised) page names to remove from the list
+     * @param statName
+     *            name for the time measurement statistics
+     * 
+     * @return the result of the operation
+     */
+    public static ValueResult<Integer> updatePageList(Transaction scalaris_tx,
+            ScalarisOpType opType, String pageList_key, String pageCount_key,
+            List<String> entriesToAdd, List<String> entriesToRemove,
+            final String statName) {
+        final long timeAtStart = System.currentTimeMillis();
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+
+        try {
+            final MyScalarisTxOpExecutor executor0 = new MyScalarisTxOpExecutor(
+                    scalaris_tx, involvedKeys);
+            executor0.setCommitLast(true);
+            MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
+                    executor0);
+
+            executor.addAppendRemove(opType, pageList_key, entriesToAdd,
+                    entriesToRemove, pageCount_key);
+            
+            executor.getExecutor().run();
+            return new ValueResult<Integer>(involvedKeys, null, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        } catch (Exception e) {
+            return new ValueResult<Integer>(false, involvedKeys,
+                    "unknown exception updating \"" + pageList_key
+                            + "\" and \"" + pageCount_key + "\" in Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                    statName, System.currentTimeMillis() - timeAtStart);
+        }
+    }
+
+}

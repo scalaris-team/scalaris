@@ -34,6 +34,8 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
@@ -189,12 +191,12 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         for (Revision rev : revisions) {
             if (rev.getId() != page.getCurRev().getId()) {
-                String key = ScalarisDataHandler.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
+                String key = ScalarisDataHandlerUnnormalised.getRevKey(page.getTitle(), rev.getId(), wikiModel.getNamespace());
                 requests.addOp(new WriteOp(key, rev));
             }
         }
-        requests.addOp(new WriteOp(ScalarisDataHandler.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short));
-        requests.addOp(new WriteOp(ScalarisDataHandler.getPageKey(page.getTitle(), wikiModel.getNamespace()), page));
+        requests.addOp(new WriteOp(ScalarisDataHandlerUnnormalised.getRevListKey(page.getTitle(), wikiModel.getNamespace()), revisions_short));
+        requests.addOp(new WriteOp(ScalarisDataHandlerUnnormalised.getPageKey(page.getTitle(), wikiModel.getNamespace()), page));
         Runnable worker = new MyScalarisSingleRunnable(requests, scalaris_single, "revisions and page of " + page.getTitle());
         executor.execute(worker);
         newPages.get(namespace).add(wikiModel.normalisePageTitle(page.getTitle()));
@@ -236,17 +238,18 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         
         // list of pages in each category:
         for (Entry<String, List<String>> category: newCategories.entrySet()) {
-            final String catName = category.getKey();
-            scalaris_key = ScalarisDataHandler.getCatPageListKey(catName, wikiModel.getNamespace());
+            final String catName0 = category.getKey();
+            scalaris_key = ScalarisDataHandlerUnnormalised.getCatPageListKey(catName0, wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     category.getValue(), scalaris_tx, ScalarisOpType.CATEGORY_PAGE_LIST,
-                    ScalarisDataHandler.getCatPageCountKey(catName, wikiModel.getNamespace()));
+                    ScalarisDataHandlerUnnormalised.getCatPageCountKey(catName0, wikiModel.getNamespace()));
             pageListExecutor.execute(worker);
         }
 
         // list of pages a template is used in:
         for (Entry<String, List<String>> template: newTemplates.entrySet()) {
-            scalaris_key = ScalarisDataHandler.getTplPageListKey(template.getKey(), wikiModel.getNamespace());
+            final String tpmName0 = template.getKey();
+            scalaris_key = ScalarisDataHandlerUnnormalised.getTplPageListKey(tpmName0, wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     template.getValue(), scalaris_tx,
                     ScalarisOpType.TEMPLATE_PAGE_LIST, null);
@@ -255,7 +258,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         
         // list of pages linking to other pages:
         for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
-            scalaris_key = ScalarisDataHandler.getBackLinksPageListKey(backlinks.getKey(), wikiModel.getNamespace());
+            final String lnkName0 = backlinks.getKey();
+            scalaris_key = ScalarisDataHandlerUnnormalised.getBackLinksPageListKey(lnkName0, wikiModel.getNamespace());
             worker = new MyScalarisAddToPageListRunnable(scalaris_key,
                     backlinks.getValue(), scalaris_tx,
                     ScalarisOpType.BACKLINK_PAGE_LIST, null);
@@ -360,7 +364,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
                 throw new RuntimeException(e);
             }
             
-            ValueResult<Integer> result = ScalarisDataHandler.updatePageList(
+            ValueResult<Integer> result = ScalarisDataHandlerNormalised.updatePageList(
                     scalaris_tx, opType, scalaris_pageList_key,
                     scalaris_pageCount_key, newEntries,
                     new LinkedList<String>(), "");

@@ -47,7 +47,7 @@ import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -406,155 +406,155 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
 
     @Override
     public String getSiteInfoKey() {
-        return ScalarisDataHandler.getSiteInfoKey();
+        return ScalarisDataHandlerUnnormalised.getSiteInfoKey();
     }
 
     @Override
     public String getPageListKey(int namespace) {
-        return ScalarisDataHandler.getPageListKey(namespace);
+        return ScalarisDataHandlerUnnormalised.getPageListKey(namespace);
     }
 
     @Override
     public String getPageCountKey(int namespace) {
-        return ScalarisDataHandler.getPageCountKey(namespace);
+        return ScalarisDataHandlerUnnormalised.getPageCountKey(namespace);
     }
 
     @Override
     public String getArticleCountKey() {
-        return ScalarisDataHandler.getArticleCountKey();
+        return ScalarisDataHandlerUnnormalised.getArticleCountKey();
     }
 
     @Override
     public String getRevKey(String title, int id, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getRevKey(title, id, nsObject);
+        return ScalarisDataHandlerUnnormalised.getRevKey(title, id, nsObject);
     }
 
     @Override
     public String getPageKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPageKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPageKey(title, nsObject);
     }
 
     @Override
     public String getRevListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getRevListKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getRevListKey(title, nsObject);
     }
 
     @Override
     public String getCatPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getCatPageListKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getCatPageListKey(title, nsObject);
     }
 
     @Override
     public String getCatPageCountKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getCatPageCountKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getCatPageCountKey(title, nsObject);
     }
 
     @Override
     public String getTplPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getTplPageListKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getTplPageListKey(title, nsObject);
     }
 
     @Override
     public String getBackLinksPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getBackLinksPageListKey(title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getBackLinksPageListKey(title, nsObject);
     }
 
     @Override
     public String getStatsPageEditsKey() {
-        return ScalarisDataHandler.getStatsPageEditsKey();
+        return ScalarisDataHandlerUnnormalised.getStatsPageEditsKey();
     }
 
     @Override
     public String getContributionListKey(String contributor) {
-        return ScalarisDataHandler.getContributionListKey(contributor);
+        return ScalarisDataHandlerUnnormalised.getContributionListKey(contributor);
     }
 
     @Override
     public ValueResult<String> getDbVersion(Connection connection) {
-        return ScalarisDataHandler.getDbVersion(connection);
+        return ScalarisDataHandlerUnnormalised.getDbVersion(connection);
     }
 
     @Override
     public PageHistoryResult getPageHistory(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPageHistory(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPageHistory(connection, title, nsObject);
     }
 
     @Override
     public RevisionResult getRevision(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getRevision(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getRevision(connection, title, nsObject);
     }
 
     @Override
     public RevisionResult getRevision(Connection connection, String title, int id, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getRevision(connection, title, id, nsObject);
+        return ScalarisDataHandlerUnnormalised.getRevision(connection, title, id, nsObject);
     }
 
     @Override
     public ValueResult<List<String>> getPageList(Connection connection) {
-        return ScalarisDataHandler.getPageList(connection);
+        return ScalarisDataHandlerUnnormalised.getPageList(connection);
     }
 
     @Override
     public ValueResult<List<String>> getPageList(int namespace, Connection connection) {
-        return ScalarisDataHandler.getPageList(namespace, connection);
+        return ScalarisDataHandlerUnnormalised.getPageList(namespace, connection);
     }
 
     @Override
     public ValueResult<List<String>> getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPagesInCategory(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPagesInCategory(connection, title, nsObject);
     }
 
     @Override
     public ValueResult<List<String>> getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPagesInTemplate(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPagesInTemplate(connection, title, nsObject);
     }
 
     @Override
     public ValueResult<List<String>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPagesLinkingTo(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPagesLinkingTo(connection, title, nsObject);
     }
 
     @Override
     public ValueResult<List<Contribution>> getContributions(
             Connection connection, String contributor) {
-        return ScalarisDataHandler.getContributions(connection, contributor);
+        return ScalarisDataHandlerUnnormalised.getContributions(connection, contributor);
     }
 
     @Override
     public ValueResult<BigInteger> getPageCount(Connection connection) {
-        return ScalarisDataHandler.getPageCount(connection);
+        return ScalarisDataHandlerUnnormalised.getPageCount(connection);
     }
 
     @Override
     public ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
-        return ScalarisDataHandler.getPageCount(namespace, connection);
+        return ScalarisDataHandlerUnnormalised.getPageCount(namespace, connection);
     }
 
     @Override
     public ValueResult<BigInteger> getArticleCount(Connection connection) {
-        return ScalarisDataHandler.getArticleCount(connection);
+        return ScalarisDataHandlerUnnormalised.getArticleCount(connection);
     }
 
     @Override
     public ValueResult<BigInteger> getPagesInCategoryCount(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandler.getPagesInCategoryCount(connection, title, nsObject);
+        return ScalarisDataHandlerUnnormalised.getPagesInCategoryCount(connection, title, nsObject);
     }
 
     @Override
     public ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
-        return ScalarisDataHandler.getStatsPageEdits(connection);
+        return ScalarisDataHandlerUnnormalised.getStatsPageEdits(connection);
     }
 
     @Override
     public ValueResult<String> getRandomArticle(Connection connection, Random random) {
-        return ScalarisDataHandler.getRandomArticle(connection, random);
+        return ScalarisDataHandlerUnnormalised.getRandomArticle(connection, random);
     }
 
     @Override
     public SavePageResult savePage(Connection connection, String title,
             Revision newRev, int prevRevId, Map<String, String> restrictions,
             SiteInfo siteinfo, String username, final MyNamespace nsObject) {
-        return ScalarisDataHandler.savePage(connection, title, newRev,
+        return ScalarisDataHandlerUnnormalised.savePage(connection, title, newRev,
                 prevRevId, restrictions, siteinfo, username, nsObject);
     }
 }
