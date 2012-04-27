@@ -150,7 +150,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
      */
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters, boolean followRedirect) {
-        if (connection != null) {
+        if (connection != null && !articleName.isEmpty()) {
             // normalise page name:
             String pageName = normalisePageTitle(createFullPageName(namespace, articleName));
             if (pageCache.containsKey(pageName)) {
