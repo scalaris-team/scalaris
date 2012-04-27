@@ -12,6 +12,10 @@ import de.zib.scalaris.examples.wikipedia.data.Revision;
  */
 public class RevisionResult extends Result {
     /**
+     * Normalised page title.
+     */
+    public String normalisedTitle = "";
+    /**
      * Revision on success.
      */
     public Revision revision = null;
@@ -33,14 +37,17 @@ public class RevisionResult extends Result {
      * 
      * @param involvedKeys
      *            all keys that have been read or written during the operation
+     * @param normalisedTitle
+     *            normalised page title
      * @param page
      *            the retrieved page
      * @param revision
      *            the retrieved revision
      */
-    public RevisionResult(List<InvolvedKey> involvedKeys, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, String normalisedTitle, Page page,
             Revision revision) {
         super(involvedKeys);
+        this.normalisedTitle = normalisedTitle;
         this.page = page;
         this.revision = revision;
     }
@@ -50,6 +57,8 @@ public class RevisionResult extends Result {
      * 
      * @param involvedKeys
      *            all keys that have been read or written during the operation
+     * @param normalisedTitle
+     *            normalised page title
      * @param page
      *            the retrieved page
      * @param revision
@@ -59,9 +68,10 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(List<InvolvedKey> involvedKeys, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, String normalisedTitle, Page page,
             Revision revision, String name, long time) {
         super(involvedKeys);
+        this.normalisedTitle = normalisedTitle;
         this.page = page;
         this.revision = revision;
         addStat(name, time);
@@ -78,6 +88,8 @@ public class RevisionResult extends Result {
      *            the message to use
      * @param connectFailed
      *            whether the connection to the DB failed or not
+     * @param normalisedTitle
+     *            normalised page title
      * @param page
      *            page on success (if retrieved)
      * @param revision
@@ -88,10 +100,11 @@ public class RevisionResult extends Result {
      *            whether the requested revision exists or not
      */
     public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
-            String message, boolean connectFailed, Page page,
+            String message, boolean connectFailed, String normalisedTitle, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing) {
         super(success, involvedKeys, message, connectFailed);
+        this.normalisedTitle = normalisedTitle;
         this.page = page;
         this.revision = revision;
         this.page_not_existing = page_not_existing;
@@ -109,6 +122,8 @@ public class RevisionResult extends Result {
      *            the message to use
      * @param connectFailed
      *            whether the connection to the DB failed or not
+     * @param normalisedTitle
+     *            normalised page title
      * @param page
      *            page on success (if retrieved)
      * @param revision
@@ -123,10 +138,11 @@ public class RevisionResult extends Result {
      *            time in milliseconds for this operation
      */
     public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
-            String message, boolean connectFailed, Page page,
+            String message, boolean connectFailed, String normalisedTitle, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing, String name, long time) {
         super(success, involvedKeys, message, connectFailed);
+        this.normalisedTitle = normalisedTitle;
         this.page = page;
         this.revision = revision;
         this.page_not_existing = page_not_existing;

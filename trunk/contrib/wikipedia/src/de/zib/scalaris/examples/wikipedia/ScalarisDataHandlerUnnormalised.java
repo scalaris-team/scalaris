@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -181,6 +182,27 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
     public static RevisionResult getRevision(Connection connection,
             String title, int id, final MyNamespace nsObject) {
         return ScalarisDataHandlerNormalised.getRevision(connection, MyWikiModel.normalisePageTitle(title, nsObject), id);
+    }
+
+    /**
+     * Retrieves the current version of all given pages from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param titles
+     *            the titles of the pages
+     * @param nsObject
+     *            the namespace for page title normalisation
+     * @param statName
+     *            name of the statistic to collect
+     * 
+     * @return a result object with the pages and revisions on success
+     */
+    public static ValueResult<List<RevisionResult>> getRevisions(Connection connection,
+            Collection<String> titles, final String statName, final MyNamespace nsObject) {
+        final ArrayList<String> normalisedTitles = new ArrayList<String>(titles.size());
+        MyWikiModel.normalisePageTitles(titles, nsObject, normalisedTitles);
+        return ScalarisDataHandlerNormalised.getRevisions(connection, normalisedTitles, statName);
     }
 
     /**
