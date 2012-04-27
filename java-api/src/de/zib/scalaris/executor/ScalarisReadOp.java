@@ -98,4 +98,22 @@ public class ScalarisReadOp implements ScalarisOp {
     public String toString() {
         return "Scalaris.read(" + key + ", " + value + ")";
     }
+
+    /**
+     * Gets the key to read from.
+     *
+     * @return the key
+     */
+    public String getKey() {
+        return key;
+    }
+
+    /**
+     * Gets the value from the read.
+     *
+     * @return the value that has been read (may be <tt>null</tt>
+     */
+    public ErlangValue getValue() {
+        return value;
+    }
 }
