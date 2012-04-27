@@ -140,4 +140,22 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
         return "Scalaris.increment(" + key + ", " + value + ")";
     }
 
+    /**
+     * Gets the key to write to.
+     *
+     * @return the key
+     */
+    public String getKey() {
+        return key;
+    }
+
+    /**
+     * Gets the value to increment by.
+     *
+     * @return the value
+     */
+    public BigInteger getIncValue() {
+        return value;
+    }
+
 }

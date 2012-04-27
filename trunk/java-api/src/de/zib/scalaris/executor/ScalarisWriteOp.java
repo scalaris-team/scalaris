@@ -97,4 +97,22 @@ public class ScalarisWriteOp<T> implements ScalarisOp {
     public String toString() {
         return "Scalaris.write(" + key + ", " + value + ")";
     }
+
+    /**
+     * Gets the key to write to.
+     *
+     * @return the key
+     */
+    public String getKey() {
+        return key;
+    }
+
+    /**
+     * Gets the value to write.
+     *
+     * @return the value that will (or has been) be written
+     */
+    public T getValue() {
+        return value;
+    }
 }
