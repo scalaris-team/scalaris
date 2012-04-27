@@ -37,6 +37,33 @@ public class WikiPageEditBean extends WikiPageBeanBase {
     private String summary = "";
     
     /**
+     * Creates a new (empty) bean.
+     */
+    public WikiPageEditBean() {
+        super();
+    }
+
+    /**
+     * Creates a new (empty) bean with the given start time.
+     * 
+     * @param startTime
+     *            the time when the request reached the servlet (in ms)
+     */
+    public WikiPageEditBean(long startTime) {
+        super(startTime);
+    }
+
+    /**
+     * Creates a page bean from a given {@link WikiPageBeanBase}.
+     * 
+     * @param other
+     *            the page bean to copy properties from
+     */
+    public WikiPageEditBean(WikiPageBeanBase other) {
+        super(other);
+    }
+
+    /**
      * @return the preview
      */
     public String getPreview() {

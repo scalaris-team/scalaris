@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+ version="1.0" encoding="UTF-8" ?>
 <%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
  import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.data.Revision,de.zib.scalaris.examples.wikipedia.data.ShortRevision,org.apache.commons.lang.StringEscapeUtils,java.util.Map,java.util.List"%>
@@ -378,6 +378,14 @@ Retrieved from "<a href="wiki?title=<%= safePageTitle %>">wiki?title=${ pageBean
 <% for (InvolvedKey involvedKey : pageBean.getInvolvedKeys()) { %>
 <%= involvedKey.toString() %>
 <% } %>
+                </pre></div>
+<% long renderTime = (System.currentTimeMillis() - pageBean.getStartTime()); %>
+                <div style="clear:both"></div>
+                <div style="font-size:0.7em">More timings:
+                <pre id="other_timings" style="padding:0;line-height:0.7em">
+
+server: <%= renderTime %>
+
                 </pre></div>
         </div>
         <!-- /footer -->

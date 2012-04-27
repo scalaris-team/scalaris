@@ -496,7 +496,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             } catch (Exception e) {
                 return new SavePageResult(false, involvedKeys,
                         "unknown exception writing page \"" + title0
-                        + "\" to Scalaris: " + e.getMessage(),
+                                + "\" to Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, oldPage, newPage,
                         newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);

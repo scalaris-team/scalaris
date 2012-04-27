@@ -55,6 +55,16 @@ public class WikiPageBean extends WikiPageBeanBase {
     public WikiPageBean() {
         super();
     }
+
+    /**
+     * Creates a new (empty) bean with the given start time.
+     * 
+     * @param startTime
+     *            the time when the request reached the servlet (in ms)
+     */
+    public WikiPageBean(long startTime) {
+        super(startTime);
+    }
     
     /**
      * Creates a page bean from a given {@link WikiPageBeanBase}.

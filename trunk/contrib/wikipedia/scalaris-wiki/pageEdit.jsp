@@ -359,6 +359,14 @@ ${ pageBean.preview }
 <%= failedKeys.getKey() %>: <%= StringUtils.join(failedKeys.getValue(), " # ") %>
 <% } %>
                 </pre></div>
+<% long renderTime = (System.currentTimeMillis() - pageBean.getStartTime()); %>
+                <div style="clear:both"></div>
+                <div style="font-size:0.7em">More timings:
+                <pre id="other_timings" style="padding:0;line-height:0.7em">
+
+server: <%= renderTime %>
+
+                </pre></div>
         </div>
         <!-- /footer -->
 </body>
