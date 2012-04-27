@@ -72,6 +72,33 @@ public class WikiPageListBean extends WikiPageBeanBase {
     private boolean showAllPages = false;
 
     /**
+     * Creates a new (empty) bean.
+     */
+    public WikiPageListBean() {
+        super();
+    }
+
+    /**
+     * Creates a new (empty) bean with the given start time.
+     * 
+     * @param startTime
+     *            the time when the request reached the servlet (in ms)
+     */
+    public WikiPageListBean(long startTime) {
+        super(startTime);
+    }
+
+    /**
+     * Creates a page bean from a given {@link WikiPageBeanBase}.
+     * 
+     * @param other
+     *            the page bean to copy properties from
+     */
+    public WikiPageListBean(WikiPageBeanBase other) {
+        super(other);
+    }
+
+    /**
      * @return the subCategories
      */
     public Collection<String> getPages() {

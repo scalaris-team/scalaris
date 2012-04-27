@@ -301,6 +301,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     protected void doGet(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
+        long startTime = System.currentTimeMillis();
         String image = request.getParameter("get_image");
         if (image != null) {
             showImage(request, response, image);
@@ -309,7 +310,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         Connection connection = getConnection(request);
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean()); // should forward to another page
+            showEmptyPage(request, response, new WikiPageBean(startTime)); // should forward to another page
             return; // return just in case
         }
         try {
@@ -322,14 +323,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             // show empty page for testing purposes if a parameter called "test" exists:
             if (request.getParameter("test") != null) {
-                showEmptyPage(request, response, new WikiPageBean());
+                showEmptyPage(request, response, new WikiPageBean(startTime));
                 return;
             }
             
             // if the "search" parameter exists, show the search
             String req_search = request.getParameter("search");
             if (req_search != null) {
-                handleSearch(request, response, null, req_search, connection, new WikiPageListBean());
+                handleSearch(request, response, null, req_search, connection, new WikiPageListBean(startTime));
                 return;
             }
 
@@ -342,20 +343,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             String req_action = request.getParameter("action");
 
             if (!MyWikiModel.isValidTitle(req_title)) {
-                handleViewPageBadTitle(request, response, connection, new WikiPageBean());
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean(startTime));
             } else if (req_title.startsWith("Special:")) {
-                handleViewSpecialPage(request, response, req_title, req_search, "Special:".length(), connection);
+                handleViewSpecialPage(request, response, req_title, req_search, "Special:".length(), connection, startTime);
             } else if (req_title.startsWith(namespace.getSpecial() + ":")) {
-                handleViewSpecialPage(request, response, req_title, req_search, namespace.getSpecial().length() + 1, connection);
+                handleViewSpecialPage(request, response, req_title, req_search, namespace.getSpecial().length() + 1, connection, startTime);
             } else if (req_action == null || req_action.equals("view")) {
-                handleViewPage(request, response, req_title, connection, new WikiPageBean());
+                handleViewPage(request, response, req_title, connection, new WikiPageBean(startTime));
             } else if (req_action.equals("history")) {
-                handleViewPageHistory(request, response, req_title, connection, new WikiPageBean());
+                handleViewPageHistory(request, response, req_title, connection, new WikiPageBean(startTime));
             } else if (req_action.equals("edit")) {
-                handleEditPage(request, response, req_title, connection, new WikiPageEditBean());
+                handleEditPage(request, response, req_title, connection, new WikiPageEditBean(startTime));
             } else {
                 // default: show page
-                handleViewPage(request, response, req_title, connection, new WikiPageBean());
+                handleViewPage(request, response, req_title, connection, new WikiPageBean(startTime));
             }
 
             // if the request has not been forwarded, print a general error
@@ -383,44 +384,46 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            length of the (localised) "Special:" prefix string
      * @param connection
      *            connection to the database
+     * @param startTime
+     *            the time when the request reached the servlet (in ms)
      * 
      * @throws ServletException
      * @throws IOException
      */
     protected void handleViewSpecialPage(HttpServletRequest request,
             HttpServletResponse response, String title, String req_search,
-            int prefixLength, Connection connection)
+            int prefixLength, Connection connection, long startTime)
             throws IOException, ServletException {
         final String plainTitle = title.substring(prefixLength);
         // a "/" which separates the special page title from its parameters
         final String plainTitleToSlash = plainTitle.split("/")[0];
         if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_RANDOM))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM))) {
-            handleViewRandomPage(request, response, title, connection, new WikiPageBean());
+            handleViewRandomPage(request, response, title, connection, new WikiPageBean(startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_ALLPAGES))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES))) {
-            handleSpecialAllPages(request, response, title, connection, new WikiPageListBean());
+            handleSpecialAllPages(request, response, title, connection, new WikiPageListBean(startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_PREFIXINDEX))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX))) {
-            handleSpecialPrefix(request, response, title, connection, new WikiPageListBean());
+            handleSpecialPrefix(request, response, title, connection, new WikiPageListBean(startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SEARCH))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH))) {
-            handleSearch(request, response, title, req_search, connection, new WikiPageListBean());
+            handleSearch(request, response, title, req_search, connection, new WikiPageListBean(startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_WHATLINKSHERE))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE))) {
-            handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean());
+            handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean(startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SPECIALPAGES))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES))) {
-            handleViewSpecialPages(request, response, connection, new WikiPageListBean());
+            handleViewSpecialPages(request, response, connection, new WikiPageListBean(startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_STATS))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS))) {
-            handleViewSpecialStatistics(request, response, connection, new WikiPageListBean());
+            handleViewSpecialStatistics(request, response, connection, new WikiPageListBean(startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_VERSION))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION))) {
-            handleViewSpecialVersion(request, response, connection, new WikiPageListBean());
+            handleViewSpecialVersion(request, response, connection, new WikiPageListBean(startTime));
         } else {
             // no such special page
-            handleViewPageNotExisting(request, response, title, connection, new WikiPageBean());
+            handleViewPageNotExisting(request, response, title, connection, new WikiPageBean(startTime));
         }
     }
 
@@ -634,9 +637,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     protected void doPost(HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException {
+        long startTime = System.currentTimeMillis();
         Connection connection = getConnection(request);
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean()); // should forward to another page
+            showEmptyPage(request, response, new WikiPageBean(startTime)); // should forward to another page
             return; // return just in case
         }
         try {
@@ -649,11 +653,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             String req_title = request.getParameter("title");
             if (!MyWikiModel.isValidTitle(req_title)) {
-                handleViewPageBadTitle(request, response, connection, new WikiPageBean());
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean(startTime));
             } else {
                 handleEditPageSubmitted(request, response,
                         request.getParameter("title"), connection,
-                        new WikiPageEditBean());
+                        new WikiPageEditBean(startTime));
             }
 
             // if the request has not been forwarded, print a general error
@@ -889,6 +893,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (pageSaveTimeInt >= 0) {
                 page.addStat("saving " + title, pageSaveTimeInt);
             }
+        }
+        final int pageSaveServerTime = parseInt(getParam(request, "server_time"), -1);
+        if (pageSaveServerTime >= 0) {
+            page.addStat("server_time saving " + title, pageSaveServerTime);
         }
         page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
         for (int i = 1; i <= Options.getInstance().WIKI_SAVEPAGE_RETRIES; ++i) {
@@ -1634,6 +1642,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("&notice=successfully%20saved%20page");
                 redirectUrl.append("&save_times=" + StringUtils.join(times, "%2C"));
                 redirectUrl.append("&save_attempts=" + page.getSaveAttempts());
+                redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
                 for (Entry<Integer, List<String>> failedKeys : page.getFailedKeys().entrySet()) {
                     redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + URLEncoder.encode(StringUtils.join(failedKeys.getValue(), " # "), "UTF-8"));
                 }

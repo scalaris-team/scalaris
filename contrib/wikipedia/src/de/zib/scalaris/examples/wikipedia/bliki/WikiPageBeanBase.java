@@ -46,6 +46,7 @@ public class WikiPageBeanBase {
     protected String redirectedTo = "";
     private boolean isEditRestricted = false;
     protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
+    private long startTime;
     
     /**
      * the content of the site
@@ -70,6 +71,18 @@ public class WikiPageBeanBase {
      */
     public WikiPageBeanBase() {
         super();
+        startTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Creates a new (empty) bean with the given start time.
+     * 
+     * @param startTime
+     *            the time when the request reached the servlet (in ms)
+     */
+    public WikiPageBeanBase(long startTime) {
+        super();
+        this.startTime = startTime;
     }
     
     /**
@@ -91,6 +104,7 @@ public class WikiPageBeanBase {
         redirectedTo = other.redirectedTo;
         isEditRestricted = other.isEditRestricted;
         stats = new LinkedMultiHashMap<String, Long>(other.stats);
+        startTime = other.startTime;
     }
 
     /**
@@ -341,5 +355,19 @@ public class WikiPageBeanBase {
      */
     public void setInvolvedKeys(List<InvolvedKey> involvedKeys) {
         this.involvedKeys = involvedKeys;
+    }
+
+    /**
+     * @return the startTime
+     */
+    public long getStartTime() {
+        return startTime;
+    }
+
+    /**
+     * @param startTime the startTime to set
+     */
+    public void setStartTime(long startTime) {
+        this.startTime = startTime;
     }
 }
