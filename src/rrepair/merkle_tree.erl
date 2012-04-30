@@ -37,11 +37,6 @@
 % exports for tests
 -export([bulk_build/3]).
 
--ifdef(with_export_type_support).
--export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
--export_type([mt_iter/0]).
--endif.
-
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
@@ -51,6 +46,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-ifdef(with_export_type_support).
+-export_type([mt_config/0, merkle_tree/0, mt_node/0, mt_node_key/0, mt_size/0]).
+-export_type([mt_iter/0, mt_config_params/0]).
+-endif.
 
 -type mt_node_key()     :: binary() | nil.
 -type mt_interval()     :: intervals:interval(). 
