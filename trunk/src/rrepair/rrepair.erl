@@ -219,21 +219,21 @@ init(Trigger) ->
 check_config() ->
     case config:read(rrepair_enabled) of
         true ->
-            config:cfg_is_module(rep_update_trigger) andalso
-            config:cfg_is_atom(rep_update_recon_method) andalso
-            config:cfg_is_integer(rep_update_interval) andalso
-            config:cfg_is_greater_than(rep_update_interval, 0);
+            config:cfg_is_module(rr_trigger) andalso
+            config:cfg_is_atom(rr_recon_method) andalso
+            config:cfg_is_integer(rr_trigger_interval) andalso
+            config:cfg_is_greater_than(rr_trigger_interval, 0);
         _ -> true
     end.
 
 -spec get_recon_method() -> rr_recon:method().
 get_recon_method() -> 
-	config:read(rep_update_recon_method).
+	config:read(rr_recon_method).
 
 -spec get_update_trigger() -> Trigger::module().
 get_update_trigger() -> 
-	config:read(rep_update_trigger).
+	config:read(rr_trigger).
 
 -spec get_update_interval() -> pos_integer().
 get_update_interval() ->
-    config:read(rep_update_interval).
+    config:read(rr_trigger_interval).

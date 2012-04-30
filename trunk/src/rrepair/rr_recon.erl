@@ -36,8 +36,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %DETAIL DEBUG MESSAGES
 %-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -751,22 +751,22 @@ fork_recon(Conf, {ReconRound, Fork}) ->
 check_config() ->
     case config:read(rrepair_enabled) of
         true ->                
-            config:cfg_is_float(rep_update_recon_fpr) andalso
-            config:cfg_is_greater_than(rep_update_recon_fpr, 0) andalso
-            config:cfg_is_less_than(rep_update_recon_fpr, 1) andalso
-            config:cfg_is_integer(rep_update_max_items) andalso
-            config:cfg_is_greater_than(rep_update_max_items, 0);
+            config:cfg_is_float(rr_bloom_fpr) andalso
+            config:cfg_is_greater_than(rr_bloom_fpr, 0) andalso
+            config:cfg_is_less_than(rr_bloom_fpr, 1) andalso
+            config:cfg_is_integer(rr_max_items) andalso
+            config:cfg_is_greater_than(rr_max_items, 0);
         _ -> true
     end.
 
 -spec get_fpr() -> float().
 get_fpr() ->
-    config:read(rep_update_recon_fpr).
+    config:read(rr_bloom_fpr).
 
 -spec get_max_items(method()) -> pos_integer().
 get_max_items(Method) ->
     case Method of
         merkle_tree -> all;
         art -> all;
-        _ -> config:read(rep_update_max_items)
+        _ -> config:read(rr_max_items)
     end.
