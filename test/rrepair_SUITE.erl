@@ -94,19 +94,19 @@ end_per_testcase(_TestCase, _Config) ->
 
 get_rep_upd_config(Method) ->
     [{rrepair_enabled, true},
-     {rep_update_interval, 100000000}, %stop trigger
-     {rep_update_trigger, trigger_periodic},
-     {rep_update_recon_method, Method},
-     {rep_update_resolve_method, simple},
-     {rep_update_recon_fpr, 0.1},
-     {rep_update_max_items, case Method of
-                                bloom -> 10000;
-                                _ -> 100000
-                            end},
-     {rep_update_negotiate_sync_interval, case Method of
-                                              bloom -> false;
-                                              _ -> true
-                                          end}].    
+     {rr_trigger, trigger_periodic},
+     {rr_trigger_interval, 100000000}, %stop trigger
+     {rr_recon_method, Method},
+     {rr_resolve_method, simple},
+     {rr_bloom_fpr, 0.1},
+     {rr_max_items, case Method of
+                        bloom -> 10000;
+                        _ -> 100000
+                    end},
+     {rr_negotiate_sync_interval, case Method of
+                                      bloom -> false;
+                                      _ -> true
+                                  end}].    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Replica Update tests
@@ -153,7 +153,7 @@ upd_dest(Config) ->
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
-    config:write(rep_update_recon_fpr, Fpr),
+    config:write(rr_bloom_fpr, Fpr),
     db_generator:fill_ring(random, DataCount, [{ftype, update}, 
                                                {fprob, 50}, 
                                                {distribution, uniform}]),
@@ -181,7 +181,7 @@ upd_dest(Config) ->
 upd_parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
     OldConf = get_rep_upd_config(Method),
-    Conf = lists:keyreplace(rep_update_max_items, 1, OldConf, {rep_update_max_items, 500}),
+    Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),
     [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, Conf),
     ?assert(Start < End).
 
@@ -286,7 +286,7 @@ bloomSync_times(Config) ->
     ItemCount = NodeCount * DataCount,
     %Build Ring
     {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_rep_upd_config(bloom)]),
-    config:write(rep_update_fpr, Fpr),
+    config:write(rr_bloom_fpr, Fpr),
     {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount, 100]),
     %measure initial sync degree
     {DBStatusTime, DBStatus} = util:tc(?MODULE, getDBStatus, []),
@@ -331,7 +331,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
     ItemCount = NodeCount * DataCount,
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RepUpdConfig),
-    config:write(rep_update_recon_fpr, Fpr),
+    config:write(rr_bloom_fpr, Fpr),
     fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
     %measure initial sync degree
     InitialOutdated = DestVersCount - getVersionCount(getDBStatus()),
@@ -345,7 +345,7 @@ start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig
                                                        calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
                                                                         ItemCount)
                                                end))],
-    SyncMethod = proplists:get_value(rep_update_recon_method, RepUpdConfig),
+    SyncMethod = proplists:get_value(rr_recon_method, RepUpdConfig),
     ct:pal(">>[~p] SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [SyncMethod, Rounds, Fpr, Result]),
     %clean up
     unittest_helper:stop_ring(),
