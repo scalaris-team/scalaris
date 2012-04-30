@@ -34,6 +34,11 @@
 
 -export([]).
 
+-type result_pair() :: {build_time,     measure_util:result()} |
+                       {tree_time,      measure_util:result()} |
+                       {hash_fun_count, pos_integer()}.
+-type result() :: [result_pair()].
+
 all() ->
     [art,
      merkle_tree,
@@ -63,53 +68,52 @@ comparison(_) ->
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     DB = db_generator:get_db(I, DBSize, uniform),    
     
-    BloomT = m_bloom(I, DB, DBSize, Iter),
-    MerkleT = m_merkle(I, DB, DBSize, Iter),
-    ArtT = m_art(I, DB, DBSize, Iter),        
+    BBuildT = bloom_build_time(I, DB, DBSize, Iter, 0.1),
+    MBuildT = merkle_build_time(I, DB, DBSize, Iter, []),
+    ArtT = art_build_time(I, DB, DBSize, Iter, [], []),        
         
-    BBuildT = proplists:get_value(build_time, BloomT),
-    MBuildT = proplists:get_value(build_time, MerkleT),
     ABuildT = proplists:get_value(build_time, ArtT),
     TreeT = proplists:get_value(tree_time, ArtT),
     
     ct:pal("Performance Comparison
             DBSize=~p ; Iterations=~p
             -----------------------------------------------
-                                bloom|merkleTree|  art
+                                bloom |merkleTree|  art
             BuildTime Avg ms: ~f | ~f | ~f (~f ohne Merkle)", 
            [DBSize, Iter,
             measure_util:get(BBuildT, avg, ms), 
             measure_util:get(MBuildT, avg, ms), 
-            measure_util:get(ABuildT, avg, ms) + measure_util:get(TreeT, avg, ms), 
-            measure_util:get(ABuildT, avg, ms)]),
+            measure_util:get(ABuildT, avg, ms), 
+            measure_util:get(TreeT, avg, ms)]),
     ok.
 
-m_bloom(_I, DB, DBSize, Iterations) ->
-    Fpr= 0.1,
+-spec bloom_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), float()) -> measure_util:result().
+bloom_build_time(_, DB, DBSize, Iterations, Fpr) ->
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(DBSize, Fpr)),
     BaseBF = bloom:new(DBSize, Fpr, Hfs),
-    
-    %measure Build times    
-    BuildTime = measure_util:time_avg(
-                  fun() -> 
-                          lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
-                  end, Iterations, []),
-    [{build_time, BuildTime}].
+    measure_util:time_avg(
+      fun() -> 
+              lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
+      end, Iterations, []).    
 
-m_merkle(I, DB, _DBSize, Iterations) ->
-    BuildT = 
-        measure_util:time_avg(fun() -> merkle_tree:new(I, DB, []) end, 
-                              Iterations, []),
-    
-    [{build_time, BuildT}].
+-spec merkle_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), 
+            merkle_tree:mt_config_params()) -> measure_util:result().
+merkle_build_time(I, DB, _DBSize, Iterations, Config) ->
+    measure_util:time_avg(fun() -> merkle_tree:new(I, DB, Config) end, 
+                          Iterations, []).
 
-m_art(I, DB, _DBSize, Iterations) ->    
+-spec art_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), 
+            merkle_tree:mt_config_params(), art:art_config()) -> result().
+art_build_time(I, DB, _DBSize, Iterations, MerkleConfig, ArtConfig) ->    
     {Tree, TreeTime} = 
-        measure_util:time_with_result(fun() -> merkle_tree:new(I, DB, []) end, Iterations, []),
+        measure_util:time_with_result(fun() -> merkle_tree:new(I, DB, MerkleConfig) end, Iterations, []),
     BuildTime = 
-        measure_util:time_avg(fun() -> art:new(Tree) end, Iterations, []),
+        measure_util:time_avg(fun() -> art:new(Tree, ArtConfig) end, Iterations, []),
     
-    [{build_time, BuildTime}, {tree_time, TreeTime}].
+    [{build_time, measure_util:add(BuildTime, TreeTime)}, 
+     {tree_time, TreeTime}].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 art(_) ->    
     ToAdd = 2000,
