@@ -19,6 +19,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 
 import de.zib.scalaris.Connection;
@@ -309,9 +310,11 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
         TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
         final MyScalarisSingleOpExecutor executor0 = new MyScalarisSingleOpExecutor(
                 scalaris_single, involvedKeys);
+        HashMap<ScalarisReadOp, String> opToTitleN = new HashMap<ScalarisReadOp, String>(titles.size());
         for (String title : titles) {
             ScalarisReadOp readOp = new ScalarisReadOp(getPageKey(title));
             executor0.addOp(readOp);
+            opToTitleN.put(readOp, title);
         }
         try {
             executor0.run();
@@ -330,12 +333,12 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
                 if (readOp.getValue() != null) {
                     Page page = readOp.getValue().jsonValue(Page.class);
                     curResult = new RevisionResult(involvedKeys,
-                            readOp.getKey(), page, page.getCurRev());
+                            opToTitleN.get(readOp), page, page.getCurRev());
                     
                 } else {
                     curResult = new RevisionResult(false, involvedKeys,
                             "page not found at \"" + readOp.getKey() + "\"",
-                            false, readOp.getKey(), null, null, true, false);
+                            false, opToTitleN.get(readOp), null, null, true, false);
                 }
                 results.add(curResult);
             }
