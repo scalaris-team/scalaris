@@ -77,7 +77,7 @@ add({AMin, AMax, AMed, AAvg, AIt}, {BMin, BMax, BMed, BAvg, BIt}) ->
      AMax + BMax,
      AMed + BMed,
      AAvg + BAvg,
-     (AIt + BIt) / 2}.
+     erlang:round((AIt + BIt) / 2)}.
 
 -spec print(result()) -> [{atom(), any()}].
 print({Min, Max, Med, Avg, _} = Values) ->

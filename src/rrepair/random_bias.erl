@@ -28,6 +28,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-ifdef(with_export_type_support).
+-export_type([distribution_fun/0]).
+-endif.
 
 -record(binomial_state, { n = ?required(binomial_state, n) :: pos_integer(),
                           p = ?required(binomial_state, p) :: float(),
@@ -35,6 +38,7 @@
                         }).
 -type binomial_state() :: #binomial_state{}.
 
+-type distribution_fun() :: fun(() -> {ok, float()} | {last, float()}).
 
 -type distribution_state() :: #binomial_state{}. %or others
 -type generator_state() :: { State       :: distribution_state(),
@@ -46,7 +50,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % creates a new binomial distribution generation fun.
--spec binomial(pos_integer(), float()) -> fun().
+-spec binomial(pos_integer(), float()) -> distribution_fun().
 binomial(N, P) ->
     State = { #binomial_state{ n = N, p = P },
               fun calc_binomial/1,
