@@ -257,7 +257,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     ps.println("starting import...");
                     String fileName = dumpsPath + File.separator + req_import;
                     if (fileName.endsWith(".db")) {
-                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, cPool.getConnectionFactory());
+                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, 1, 1, cPool.getConnectionFactory());
                     } else {
                         importHandler = new WikiDumpToScalarisHandler(
                                 de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
