@@ -1172,6 +1172,11 @@ public class MyWikiModel extends WikiModel {
             if (localisedSuffix != null) {
                 result.add(MyWikiModel.createFullPageName(prefix.getValue(), localisedSuffix.get(page)));
             }
+            // Also add the English suffix for the localised prefix.
+            EnumMap<SpecialPage, String> englishSuffix = SPECIAL_SUFFIX.get("en");
+            if (englishSuffix != null) {
+                result.add(MyWikiModel.createFullPageName(prefix.getValue(), englishSuffix.get(page)));
+            }
         }
         return result;
     }
