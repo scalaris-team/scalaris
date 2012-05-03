@@ -39,8 +39,8 @@
 -export_type([distribution/0, db_type/0, db_parameter/0, db_status/0, failure_type/0]).
 -endif.
 
--type distribution() :: uniform.% |
-                        %{binomial, P::float()}.
+-type distribution() :: uniform |
+                        {non_uniform, random_bias:distribution_fun()}.
 -type result() :: ?RT:key() | 
                   {?RT:key(), ?DB:value()}.
 -type option() :: {output, list_key_val | list_key}.
@@ -68,7 +68,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
-        _ -> []
+        {non_uniform, Fun} -> non_uniform_key_list(Interval, Fun, [], OutputType)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,6 +99,27 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
 
 gen_value() ->
     tester_value_creator:create_value(integer, 0, tester_parse_state:new_parse_state()).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec non_uniform_key_list(Interval, Fun, Acc::Result, OutputType) -> Result when
+    is_subtype(Interval,    intervals:interval()),
+    is_subtype(Fun,         random_bias:distribution_fun()),
+    is_subtype(OutputType,  list_key_val | list_key),
+    is_subtype(Result,      [result()]).
+non_uniform_key_list(I, Fun, Acc, AccType) ->
+    case Fun() of
+        {ok, V} -> non_uniform_key_list(I, Fun, non_uniform_add(V, I, Acc, AccType), AccType);
+        {last, V} -> non_uniform_add(V, I, Acc, AccType)
+    end.
+
+non_uniform_add(Value, I, Acc, OutType) ->
+    {_, LKey, RKey, _} = intervals:get_bounds(I),    
+    X = LKey + erlang:round(Value * (RKey - LKey)),
+    lists:append(case OutType of
+                     list_key -> X;
+                     list_key_val -> {X, gen_value()}
+                 end, Acc).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
