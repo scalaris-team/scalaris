@@ -72,11 +72,13 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     
     protected boolean stop = false;
     
-    SQLiteConnection db = null;
-    SQLiteStatement stRead = null;
+    protected SQLiteConnection db = null;
+    protected SQLiteStatement stRead = null;
     
-    String dbFileName;
-    ConnectionFactory cFactory;
+    protected final String dbFileName;
+    protected final int numberOfImporters;
+    protected final int myNumber;
+    protected final ConnectionFactory cFactory;
     
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -84,11 +86,18 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      * 
      * @param dbFileName
      *            the name of the database file to read from
+     * @param numberOfImporters
+     *            number of (independent) import jobs
+     * @param myNumber
+     *            my own import job number (1 &lt;= <tt>myNumber</tt> &lt;= <tt>numberOfImporters</tt>)
      * 
      * @throws RuntimeException
      *             if the connection to Scalaris fails
+     * @throws IllegalArgumentException
+     *             if <tt>myNumber</tt> is not greater than 0 or is greater than
+     *             <tt>numberOfImporters</tt>
      */
-    public WikiDumpPreparedSQLiteToScalaris(String dbFileName) throws RuntimeException {
+    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, int numberOfImporters, int myNumber) throws RuntimeException {
         this.dbFileName = dbFileName;
         this.cFactory = new ConnectionFactory();
         Random random = new Random();
@@ -97,6 +106,11 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         this.cFactory.setClientNameAppendUUID(true);
         this.cFactory.setConnectionPolicy(
                 new RoundRobinConnectionPolicy(this.cFactory.getNodes()));
+        this.numberOfImporters = numberOfImporters;
+        this.myNumber = myNumber;
+        if (myNumber > numberOfImporters || myNumber < 1) {
+            throw new IllegalArgumentException("not 1 <= myNumber (" + myNumber + ") <= numberOfImporters (" + numberOfImporters + ")");
+        }
     }
 
     /**
@@ -105,15 +119,27 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      * 
      * @param dbFileName
      *            the name of the database file to read from
+     * @param numberOfImporters
+     *            number of (independent) import jobs
+     * @param myNumber
+     *            my own import job number (1 &lt;= <tt>myNumber</tt> &lt;= <tt>numberOfImporters</tt>)
      * @param cFactory
      *            the connection factory to use for creating new connections
      * 
      * @throws RuntimeException
      *             if the connection to Scalaris fails
+     * @throws IllegalArgumentException
+     *             if <tt>myNumber</tt> is not greater than 0 or is greater than
+     *             <tt>numberOfImporters</tt>
      */
-    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, ConnectionFactory cFactory) throws RuntimeException {
+    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, int numberOfImporters, int myNumber, ConnectionFactory cFactory) throws RuntimeException {
         this.dbFileName = dbFileName;
         this.cFactory = cFactory;
+        this.numberOfImporters = numberOfImporters;
+        this.myNumber = myNumber;
+        if (myNumber > numberOfImporters || myNumber < 1) {
+            throw new IllegalArgumentException("not 1 <= myNumber (" + myNumber + ") <= numberOfImporters (" + numberOfImporters + ")");
+        }
     }
 
     /**
@@ -211,7 +237,25 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         println("Importing key/value pairs to Scalaris...");
         try {
             importStart();
-            SQLiteStatement st = db.prepare("SELECT scalaris_key FROM objects;");
+            SQLiteStatement st;
+            if (numberOfImporters > 1) {
+                final SQLiteStatement countStmt = db.prepare("SELECT COUNT(*) FROM objects;");
+                try {
+                    if (countStmt.step()) {
+                        final long stepSize = countStmt.columnLong(0) / numberOfImporters;
+                        final long offset = (myNumber - 1) * stepSize;
+                        final long limit = (myNumber == numberOfImporters) ? -1 : stepSize;
+                        st = db.prepare("SELECT scalaris_key FROM objects LIMIT " + limit + " OFFSET " + offset + ";");
+                    } else {
+                        throw new RuntimeException("cannot count table objects");
+                    }
+                } finally {
+                    countStmt.dispose();
+                }
+                
+            } else {
+                st = db.prepare("SELECT scalaris_key FROM objects;");
+            }
             while (st.step()) {
                 String key = st.columnString(0);
                 writeToScalaris(key, WikiDumpPrepareSQLiteForScalarisHandler.readObject(stRead, key));
@@ -335,7 +379,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         try {
             for (int i = 0; i < MAX_SCALARIS_CONNECTIONS; ++i) {
                 Connection connection = cFactory.createConnection(
-                        "wiki_import", true);
+                        "wiki_import_" + myNumber, true);
                 scalaris_single.put(new TransactionSingleOp(connection));
             }
         } catch (ConnectionException e) {

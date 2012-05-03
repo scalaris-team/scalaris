@@ -57,6 +57,12 @@ public class Main {
      */
     public final static Set<String> blacklist = new HashSet<String>();
     
+    private static enum ImportType {
+        IMPORT_XML,
+        IMPORT_DB,
+        PREPARE_DB
+    }
+    
     /**
      * The main function of the application. Some articles are blacklisted and
      * will not be processed (see implementation for a list of them).
@@ -71,10 +77,12 @@ public class Main {
             if (args.length > 1) {
                 if (args[1].equals("filter")) {
                     doFilter(filename, Arrays.copyOfRange(args, 2, args.length));
-                } else if (args[1].equals("import")) {
-                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), false);
+                } else if (args[1].equals("import-xml")) {
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.IMPORT_XML);
+                } else if (args[1].equals("import-db")) {
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.IMPORT_DB);
                 } else if (args[1].equals("prepare")) {
-                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), true);
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.PREPARE_DB);
                 } else if (args[1].equals("convert")) {
                     doConvert(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
@@ -93,17 +101,60 @@ public class Main {
      * 
      * @param filename
      * @param args
-     * @param prepare
+     * @param type
      * 
      * @throws RuntimeException
      * @throws IOException
      * @throws SAXException
      * @throws FileNotFoundException
      */
-    private static void doImport(String filename, String[] args, boolean prepare) throws RuntimeException, IOException,
+    private static void doImport(String filename, String[] args, ImportType type) throws RuntimeException, IOException,
             SAXException, FileNotFoundException {
-        
         int i = 0;
+        
+        if (type == ImportType.IMPORT_DB) {
+            int numberOfImporters = 1;
+            if (args.length > i) {
+                try {
+                    numberOfImporters = Integer.parseInt(args[i]);
+                } catch (NumberFormatException e) {
+                    System.err.println("no number: " + args[i]);
+                    System.exit(-1);
+                }
+            }
+            ++i;
+            
+            int myNumber = 1;
+            if (args.length > i) {
+                try {
+                    myNumber = Integer.parseInt(args[i]);
+                } catch (NumberFormatException e) {
+                    System.err.println("no number: " + args[i]);
+                    System.exit(-1);
+                }
+            }
+            ++i;
+            
+            if (filename.endsWith(".db") && numberOfImporters > 0 && myNumber > 0) {
+                WikiDumpHandler.println(System.out, "wiki import from " + filename);
+                WikiDumpHandler.println(System.out, " importers   : " + numberOfImporters);
+                WikiDumpHandler.println(System.out, " my import nr: " + myNumber);
+                WikiDumpPreparedSQLiteToScalaris handler =
+                        new WikiDumpPreparedSQLiteToScalaris(filename, numberOfImporters, myNumber);
+                handler.setUp();
+                WikiDumpPreparedSQLiteToScalaris.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+                Runtime.getRuntime().addShutdownHook(shutdownHook);
+                handler.writeToScalaris();
+                handler.tearDown();
+                shutdownHook.run();
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } else {
+                System.err.println("incorrect command line parameters");
+                System.exit(-1);
+            }
+            return;
+        }
+        
         int maxRevisions = -1;
         if (args.length > i) {
             try {
@@ -158,7 +209,7 @@ public class Main {
         }
         ++i;
 
-        if (prepare) {
+        if (type == ImportType.PREPARE_DB) {
             // only prepare the import to Scalaris, i.e. pre-process K/V pairs?
             String dbFileName = "";
             if (args.length > i && !args[i].isEmpty()) {
@@ -179,29 +230,16 @@ public class Main {
                     dbFileName);
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
-        } else {
-            if (filename.endsWith(".db")) {
-                WikiDumpHandler.println(System.out, "wiki import from " + filename);
-                WikiDumpPreparedSQLiteToScalaris handler =
-                        new WikiDumpPreparedSQLiteToScalaris(filename);
-                handler.setUp();
-                WikiDumpPreparedSQLiteToScalaris.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
-                Runtime.getRuntime().addShutdownHook(shutdownHook);
-                handler.writeToScalaris();
-                handler.tearDown();
-                shutdownHook.run();
-                Runtime.getRuntime().removeShutdownHook(shutdownHook);
-            } else {
-                WikiDumpHandler.println(System.out, "wiki import from " + filename);
-                WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
-                WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
-                WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : Revision.calendarToString(minTime)));
-                WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
-                WikiDumpHandler handler = new WikiDumpToScalarisHandler(
-                        blacklist, whitelist, maxRevisions, minTime, maxTime);
-                InputSource file = getFileReader(filename);
-                runXmlHandler(handler, file);
-            }
+        } else if (type == ImportType.IMPORT_XML) {
+            WikiDumpHandler.println(System.out, "wiki import from " + filename);
+            WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
+            WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
+            WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : Revision.calendarToString(minTime)));
+            WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
+            WikiDumpHandler handler = new WikiDumpToScalarisHandler(
+                    blacklist, whitelist, maxRevisions, minTime, maxTime);
+            InputSource file = getFileReader(filename);
+            runXmlHandler(handler, file);
         }
     }
 

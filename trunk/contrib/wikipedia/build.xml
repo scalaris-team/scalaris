@@ -82,8 +82,10 @@
   <!-- Compile Servlets, Beans and other java files -->
   <target name="build" depends="init">
     <echo message="Download Wiktionary dump:                'ant download'"/>
-    <echo message="Import dump into Scalaris (interactive): 'ant import'"/>
-    <echo message="Import dump into Scalaris (batch):       'ant import -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Import dump into Scalaris (interactive): 'ant import-xml'"/>
+    <echo message="Import dump into Scalaris (batch):       'ant import-xml -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Import prepared DB into Scalaris (int.): 'ant import-db'"/>
+    <echo message="Import prepared DB into Scalaris (batch):'ant import-db' -Ddata=&lt;file&gt; -Dnumber_of_importers=&lt;number&gt; -Dmy_import_number=&lt;number&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;"/>
     <echo message="Run tomcat web server:                   'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
     <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="scalaris-wiki/WEB-INF/classes" includeAntRuntime="false">
       <src path="src"/>
@@ -186,20 +188,47 @@
 
   <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
 
-  <target name="import" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
-    <fail unless="data">You must specify the data property for 'ant import'.</fail>
-    <fail unless="max_revisions">You must specify the max_revisions property for 'ant import'.</fail>
-    <fail unless="max_time">You must specify the max_time property for 'ant import'.</fail>
-    <fail unless="whitelist">You must specify the whitelist property for 'ant import'.</fail>
+  <target name="import-xml" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
+    <fail unless="data">You must specify the data property for 'ant import-xml'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant import-xml'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant import-xml'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant import-xml'.</fail>
     <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
       <sysproperty key="scalaris.node" value="${scalaris.node}" />
       <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
       <arg value="${data}"/>
-      <arg value="import"/>
+      <arg value="import-xml"/>
       <arg value="${max_revisions}"/>
       <arg value="${min_time}"/>
       <arg value="${max_time}"/>
       <arg value="${whitelist}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="import.get.number_of_importers" unless="number_of_importers" depends="import.get.data">
+    <input addproperty="number_of_importers" defaultvalue="1" message="Total number of (independent) import jobs"/>
+  </target>
+
+  <target name="import.get.my_import_number" unless="my_import_number" depends="import.get.data">
+    <input addproperty="my_import_number" defaultvalue="1" message="This import's job number (1 &lt;= my_import_number &lt;= number_of_importers)"/>
+  </target>
+  
+  <target name="import-db" depends="build,import.get.data,import.get.number_of_importers,import.get.my_import_number,scalaris.properties">
+    <fail unless="data">You must specify the data property for 'ant import-db'.</fail>
+    <fail unless="number_of_importers">You must specify the number_of_importers property for 'ant import-db'.</fail>
+    <fail unless="my_import_number">You must specify the my_import_number property for 'ant import-db'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="import-db"/>
+      <arg value="${number_of_importers}"/>
+      <arg value="${my_import_number}"/>
       <classpath>
         <pathelement location="scalaris-wiki/WEB-INF/classes"/>
         <path refid="import.classpath"/>
