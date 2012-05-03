@@ -15,7 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
 import java.text.NumberFormat;
@@ -245,7 +245,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                         final long stepSize = countStmt.columnLong(0) / numberOfImporters;
                         final long offset = (myNumber - 1) * stepSize;
                         final long limit = (myNumber == numberOfImporters) ? -1 : stepSize;
-                        st = db.prepare("SELECT scalaris_key FROM objects LIMIT " + limit + " OFFSET " + offset + ";");
+                        st = db.prepare("SELECT scalaris_key, scalaris_value FROM objects LIMIT " + limit + " OFFSET " + offset + ";");
                     } else {
                         throw new RuntimeException("cannot count table objects");
                     }
@@ -254,11 +254,22 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 }
                 
             } else {
-                st = db.prepare("SELECT scalaris_key FROM objects;");
+                st = db.prepare("SELECT scalaris_key, scalaris_value FROM objects;");
             }
             while (st.step()) {
                 String key = st.columnString(0);
-                writeToScalaris(key, WikiDumpPrepareSQLiteForScalarisHandler.readObject(stRead, key));
+                byte[] value = stRead.columnBlob(1);
+                try {
+                    OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
+                            .objectFromBytes(value);
+                    writeToScalaris(key, valueOtp);
+                } catch (ClassNotFoundException e) {
+                    System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+                    throw new RuntimeException(e);
+                } catch (IOException e) {
+                    System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+                    throw new RuntimeException(e);
+                }
             }
             st.dispose();
             // some requests may be left over
@@ -274,8 +285,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 }
             }
             importEnd();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (SQLiteException e) {
             e.printStackTrace();
         }
