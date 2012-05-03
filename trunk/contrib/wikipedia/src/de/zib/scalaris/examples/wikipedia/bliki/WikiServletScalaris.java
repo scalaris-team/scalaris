@@ -66,7 +66,7 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
 public class WikiServletScalaris extends WikiServlet<Connection> {
 
     private static final long serialVersionUID = 1L;
-    private static final int CONNECTION_POOL_SIZE = 100;
+    private static final int CONNECTION_POOL_SIZE = 200;
     private static final int MAX_WAIT_FOR_CONNECTION = 10000; // 10s
     
     private ConnectionPool cPool;
