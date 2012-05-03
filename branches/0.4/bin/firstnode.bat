@@ -23,6 +23,8 @@ set NODE_NAME=firstnode
 set /a CSPORT=14195+%ID%
 set /a YAWSPORT=8000+%ID%
 set SCALARIS_ADDITIONAL_PARAMETERS=-scalaris port %CSPORT% -scalaris yaws_port %YAWSPORT%
+:: for best performance, especially on Erlang > R14B04:
+set ERL_SCHED_FLAGS=+sbt db +swt low
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 :: scalaris configuration parameters
@@ -57,6 +59,6 @@ pushd %BEAMDIR%
   -scalaris start_dht_node dht_node ^
   -connect_all false -hidden -name %NODE_NAME% ^
   %SCALARIS_ADDITIONAL_PARAMETERS% ^
-  -s scalaris %params%
+  -s scalaris %ERL_SCHED_FLAGS% %params%
 popd
 @echo off
