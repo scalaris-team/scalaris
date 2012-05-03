@@ -176,7 +176,7 @@ on({get_state_response, MyI}, State =
                         struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
     MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
-    MySyncI = intervals:intersection(MyI, MyBloomI),
+    MySyncI = find_intersection(MyI, MyBloomI),
     ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n BloomIMapped=~p ~n SynI=~p", [MyI, BloomI, MyBloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
         true -> comm:send_local(self(), {shutdown, empty_interval});
