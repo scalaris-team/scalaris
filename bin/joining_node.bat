@@ -14,6 +14,8 @@
 ::    limitations under the License.
 SETLOCAL
 
+for %%x in (%cmdcmdline%) do if %%~x==/c set DOUBLECLICKED=1
+
 :: Script to start a node, that joins a running Scalaris system.
 set SCRIPTDIR=%~dp0
 set ID=1
@@ -74,3 +76,5 @@ pushd %BEAMDIR%
   -s scalaris %ERL_SCHED_FLAGS% %params%
 popd
 @echo off
+
+if defined DOUBLECLICKED PAUSE
