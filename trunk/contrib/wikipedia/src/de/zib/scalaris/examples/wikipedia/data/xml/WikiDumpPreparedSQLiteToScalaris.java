@@ -73,7 +73,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     protected boolean stop = false;
     
     protected SQLiteConnection db = null;
-    protected SQLiteStatement stRead = null;
     
     protected final String dbFileName;
     protected final int numberOfImporters;
@@ -235,9 +234,9 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     public void writeToScalaris() {
         println("Importing key/value pairs to Scalaris...");
+        SQLiteStatement st = null;
         try {
             importStart();
-            SQLiteStatement st;
             if (numberOfImporters > 1) {
                 final SQLiteStatement countStmt = db.prepare("SELECT COUNT(*) FROM objects;");
                 try {
@@ -258,7 +257,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
             }
             while (st.step()) {
                 String key = st.columnString(0);
-                byte[] value = stRead.columnBlob(1);
+                byte[] value = st.columnBlob(1);
                 try {
                     OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
                             .objectFromBytes(value);
@@ -271,7 +270,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                     throw new RuntimeException(e);
                 }
             }
-            st.dispose();
             // some requests may be left over
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "");
             executor.execute(worker);
@@ -287,6 +285,10 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
             importEnd();
         } catch (SQLiteException e) {
             e.printStackTrace();
+        } finally {
+            if (st != null) {
+                st.dispose();
+            }
         }
     }
     
@@ -379,7 +381,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     public void setUp() {
         try {
             db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true, null);
-            stRead = WikiDumpPrepareSQLiteForScalarisHandler.createReadStmt(db);
         } catch (SQLiteException e) {
             System.err.println("Cannot read database: " + dbFileName);
             throw new RuntimeException(e);
@@ -405,9 +406,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     @Override
     public void tearDown() {
-        if (stRead != null) {
-            stRead.dispose();
-        }
         if (db != null) {
             db.dispose();
         }
