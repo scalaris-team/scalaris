@@ -258,6 +258,28 @@
       </classpath>
     </java>
   </target>
+  
+  <target name="xml2db" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+    <fail unless="data">You must specify the data property for 'ant xml2db'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant xml2db'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant xml2db'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant xml2db'.</fail>
+    <fail unless="prepare_db">You must specify the prepare_db property for 'ant xml2db'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <arg value="${data}"/>
+      <arg value="xml2db"/>
+      <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
+      <arg value="${max_time}"/>
+      <arg value="${whitelist}"/>
+      <arg value="${prepare_db}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
 
   <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
     <fail unless="data">You must specify the data property for 'ant filter'.</fail>

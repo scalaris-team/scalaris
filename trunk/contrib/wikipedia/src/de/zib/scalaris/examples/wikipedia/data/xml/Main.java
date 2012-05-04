@@ -60,7 +60,8 @@ public class Main {
     private static enum ImportType {
         IMPORT_XML,
         IMPORT_DB,
-        PREPARE_DB
+        PREPARE_DB,
+        XML_2_DB
     }
     
     /**
@@ -83,6 +84,8 @@ public class Main {
                     doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.IMPORT_DB);
                 } else if (args[1].equals("prepare")) {
                     doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.PREPARE_DB);
+                } else if (args[1].equals("xml2db")) {
+                    doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.XML_2_DB);
                 } else if (args[1].equals("convert")) {
                     doConvert(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
@@ -209,7 +212,7 @@ public class Main {
         }
         ++i;
 
-        if (type == ImportType.PREPARE_DB) {
+        if (type == ImportType.PREPARE_DB || type == ImportType.XML_2_DB) {
             // only prepare the import to Scalaris, i.e. pre-process K/V pairs?
             String dbFileName = "";
             if (args.length > i && !args[i].isEmpty()) {
@@ -225,9 +228,18 @@ public class Main {
             WikiDumpHandler.println(System.out, " max revisions : " + maxRevisions);
             WikiDumpHandler.println(System.out, " min time      : " + (minTime == null ? "null" : Revision.calendarToString(minTime)));
             WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
-            WikiDumpHandler handler = new WikiDumpPrepareSQLiteForScalarisHandler(
-                    blacklist, whitelist, maxRevisions, minTime, maxTime,
-                    dbFileName);
+            WikiDumpHandler handler = null;
+            switch (type) {
+                case PREPARE_DB:
+                    handler = new WikiDumpPrepareSQLiteForScalarisHandler(
+                            blacklist, whitelist, maxRevisions, minTime, maxTime,
+                            dbFileName);
+                    break;
+                case XML_2_DB:
+                    handler = new WikiDumpXml2SQLite(
+                            blacklist, whitelist, maxRevisions, minTime, maxTime,
+                            dbFileName);
+            }
             InputSource file = getFileReader(filename);
             runXmlHandler(handler, file);
         } else if (type == ImportType.IMPORT_XML) {
