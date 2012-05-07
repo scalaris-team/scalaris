@@ -69,33 +69,36 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 == Prebuild packages ==
 
-We build rpm and deb packages using checkouts from the latest tagged version as well as svn trunk and provide them using the Open Build Service at http://download.opensuse.org/repositories/home:/scalaris/. The available packages are listed in the following table:
+We build RPM and DEB packages for all tagged Scalaris versions as well as snapshots of svn trunk and provide them using the Open Build Service. The latest stable version is available at http://download.opensuse.org/repositories/home:/scalaris/. The latest svn snapshot as well as archives of previous versions are available in their respective folders below http://download.opensuse.org/repositories/home:/scalaris:/.
+
+Available packages are listed in the following table:
 
 || *Distribution* || *Version* || *Download* ||
-|| Arch Linux || || [http://aur.archlinux.org/packages.php?ID=56694] (0.4.1) <br>[http://aur.archlinux.org/packages.php?ID=56695] (trunk) ||
-|| Fedora || 14 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_14/] ||
-|| Fedora || 15 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/] ||
-|| Fedora || 16 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/] ||
-|| Mandriva || 2010 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010/] ||
-|| Mandriva || 2010.1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010.1/] ||
-|| openSUSE || 11.3 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.3/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| openSUSE || 11.4 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| openSUSE || 12.1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| openSUSE || Tumbleweed || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| openSUSE || Factory || Repository: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| SLE || 10 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/SLE_10/] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_10/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_10/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| SLE || 11 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| SLE || 11 SP1 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/scalaris.ymp 1-Click Install (stable)] <br> [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/scalaris-svn.ymp 1-Click Install (unstable)] ||
-|| CentOS || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_5/] ||
-|| CentOS || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_6/] ||
-|| RHEL || 5.5 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_5/] ||
-|| RHEL || 6 || Repository: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_6/] ||
-|| Debian || 5.0 (Lenny) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_5.0/] ||
-|| Debian || 6.0 (Squeeze) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/] ||
-|| Ubuntu || 10.04 (Lucid Lynx) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/] ||
-|| Ubuntu || 10.10 (Maverick Meerkat) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.10/] ||
-|| Ubuntu || 11.04 (Natty Narwhal) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/] ||
-|| Ubuntu || 11.10 (Oneiric Ocelot) || Repository: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/] ||
+|| Arch Linux || || stable: [http://aur.archlinux.org/packages.php?ID=56694]<br>unstable: [http://aur.archlinux.org/packages.php?ID=56695] ||
+|| Fedora || 15 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_15/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_15/] ||
+|| Fedora || 16 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_16/] ||
+|| Mandriva || 2010 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2010/] ||
+|| Mandriva || 2010.1 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010.1/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2010.1/] ||
+|| Mandriva || 2011 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2011/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2011/] ||
+|| openSUSE || 11.4 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_11.4/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_11.4/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_11.4/scalaris.ymp 1-Click Install]) ||
+|| openSUSE || 12.1 || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_12.1/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_12.1/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_12.1/scalaris.ymp 1-Click Install]) ||
+|| openSUSE || Tumbleweed || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Tumbleweed/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Tumbleweed/scalaris.ymp 1-Click Install]) ||
+|| openSUSE || Factory || stable: [http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/] ([http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Factory/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/openSUSE_Factory/scalaris.ymp 1-Click Install]) ||
+|| SLE || 10 || stable: [http://download.opensuse.org/repositories/home:/scalaris/SLE_10/] ([http://download.opensuse.org/repositories/home:/scalaris/SLE_10/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_10/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_10/scalaris.ymp 1-Click Install]) ||
+|| SLE || 11 || stable: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11/] ([http://download.opensuse.org/repositories/home:/scalaris/SLE_11/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11/scalaris.ymp 1-Click Install]) ||
+|| SLE || 11 SP1 || stable: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/] ([http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP1/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11_SP1/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11_SP1/scalaris.ymp 1-Click Install]) ||
+|| SLE || 11 SP2 || stable: [http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP2/] ([http://download.opensuse.org/repositories/home:/scalaris/SLE_11_SP2/scalaris.ymp 1-Click Install])<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11_SP2/] ([http://download.opensuse.org/repositories/home:/scalaris:/svn/SLE_11_SP2/scalaris.ymp 1-Click Install]) ||
+|| CentOS || 5.5 || stable: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_5/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/CentOS_5/] ||
+|| CentOS || 6 || stable: [http://download.opensuse.org/repositories/home:/scalaris/CentOS_6/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/CentOS_6/] ||
+|| RHEL || 5.5 || stable: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_5/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/RHEL_5/] ||
+|| RHEL || 6 || stable: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_6/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/RHEL_6/] ||
+|| Debian || 5.0 (Lenny) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_5.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_5.0/] ||
+|| Debian || 6.0 (Squeeze) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_6.0/] ||
+|| Ubuntu || 10.04 (Lucid Lynx) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_10.04/] ||
+|| Ubuntu || 10.10 (Maverick Meerkat) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_10.10/] ||
+|| Ubuntu || 11.04 (Natty Narwhal) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.04/] ||
+|| Ubuntu || 11.10 (Oneiric Ocelot) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.10/] ||
+|| Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
@@ -122,8 +125,7 @@ sudo curl "http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/ho
 
 === How to add our repository to Mandriva-based distributions (Mandriva)? ===
 
-This is currently not possible because the Open Build Service does not export a repository structure compatible with the Mandriva package management. You will need to manually download and install the RPMs.
-Additionally, currently the Open Build Service has problems creating packages for Mandriva 2011.
+This is currently not possible because the Open Build Service does not export a repository structure compatible with the Mandriva package management. You will need to manually download and install the RPMs from the repositories listed above.
 
 === How to add our repository to Debian-based distributions (Debian, Ubuntu)? ===
 
