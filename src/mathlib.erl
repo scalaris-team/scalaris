@@ -152,9 +152,16 @@ aggloClusteringHelper(Centroids, Sizes, _Radius, _Min, _I, _J) ->
     {Centroids, Sizes}.
 
 % @doc Calculates the binomial coefficient of n over k for n >= k.
+% @src http://rosettacode.org/wiki/Evaluate_binomial_coefficients#Erlang
 -spec binomial_coeff(non_neg_integer(), non_neg_integer()) -> float().
-binomial_coeff(N, K) ->
-    factorial(N) / (factorial(K) * factorial(N - K)).
+binomial_coeff(_, 0) -> 1;
+binomial_coeff(N, K) when N >= K ->
+  choose(N, K, 1, 1).
+
+choose(N, K, K, Acc) ->
+  (Acc * (N-K+1)) div K;
+choose(N, K, I, Acc) ->
+  choose(N, K, I+1, (Acc * (N-I+1)) div I).
 
 % @doc calculates N!
 -spec factorial(non_neg_integer()) -> pos_integer().
