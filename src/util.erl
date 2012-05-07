@@ -44,7 +44,7 @@
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          readable_utc_time/1,
-         for_to/3, for_to_ex/3,
+         for_to/3, for_to_ex/3, for_to_ex/4,
          collect_while/1]).
 -export([debug_info/0, debug_info/1]).
 -export([sup_worker_desc/3,
@@ -845,7 +845,8 @@ for_to(I, N, Fun) when I =< N ->
 for_to(_I, _N, _Fun) ->
     ok.
 
-%% for(i; I<=n; i++) { Acc = [fun(i)|Acc] }
+%% for(i; i<=n; i++) { Acc = [fun(i)|Acc] }
+-spec for_to_ex(integer(), integer(), fun((integer()) -> T), [T]) -> [T].
 for_to_ex(N, N, Fun, Acc) ->
     [Fun(N) | Acc];
 for_to_ex(I, N, Fun, Acc) ->
