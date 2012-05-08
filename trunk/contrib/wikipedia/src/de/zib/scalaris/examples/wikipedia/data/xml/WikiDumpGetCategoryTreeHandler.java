@@ -34,6 +34,7 @@ import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
+import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyParsingWikiModel;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
@@ -353,7 +354,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         SQLiteConnection db = null;
         SQLiteStatement stmt = null;
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
+            db = SQLiteDataHandler.openDB(dbFileName, true);
             SiteInfo siteInfo = readSiteInfo(db);
             MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
             stmt = db
@@ -437,7 +438,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             PrintStream msgOut, boolean normalised) throws RuntimeException {
         SQLiteConnection db = null;
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true);
+            // set 1GB cache_size:
+            db = SQLiteDataHandler.openDB(dbFileName, true, 1024l*1024l*1024l);
             db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
             SiteInfo siteInfo = readSiteInfo(db);
             MyNamespace namespace = new MyNamespace(siteInfo);
@@ -790,7 +792,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             try {
                 // set up DB:
                 try {
-                    db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, false);
+                    // set 1GB cache_size:
+                    db = SQLiteDataHandler.openDB(dbFileName, false, 1024l*1024l*1024l);
                     db.exec("CREATE TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
                     db.exec("CREATE INDEX page_titles ON pages(title);");
                     db.exec("CREATE TABLE categories(title INTEGER, category INTEGER);");

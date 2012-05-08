@@ -17,7 +17,6 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -42,6 +41,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -100,64 +100,6 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             Calendar maxTime, String dbFileName) throws RuntimeException {
         super(blacklist, whitelist, maxRevisions, minTime, maxTime);
         this.dbFileName = dbFileName;
-    }
-
-    /**
-     * Opens a connection to a database and sets some default PRAGMAs for better
-     * performance in our case.
-     * 
-     * @param fileName
-     *            the name of the DB file
-     * @param readOnly
-     *            whether to open the DB read-only or not
-     * 
-     * @return the DB connection
-     * 
-     * @throws SQLiteException
-     *             if the connection fails or a pragma could not be set
-     */
-    static SQLiteConnection openDB(String fileName, boolean readOnly) throws SQLiteException {
-        // set 1GB cache_size:
-        return openDB(fileName, readOnly, 1024l*1024l*1024l);
-    }
-
-    /**
-     * Opens a connection to a database and sets some default PRAGMAs for better
-     * performance in our case.
-     * 
-     * @param fileName
-     *            the name of the DB file
-     * @param readOnly
-     *            whether to open the DB read-only or not
-     * 
-     * @return the DB connection
-     * 
-     * @throws SQLiteException
-     *             if the connection fails or a pragma could not be set
-     */
-    static SQLiteConnection openDB(String fileName, boolean readOnly, Long cacheSize) throws SQLiteException {
-        SQLiteConnection db = new SQLiteConnection(new File(fileName));
-        if (readOnly) {
-            db.openReadonly();
-        } else {
-            db.open(true);
-        }
-        // set cache_size:
-        if (cacheSize != null) {
-            final SQLiteStatement stmt = db.prepare("PRAGMA page_size;");
-            if (stmt.step()) {
-                long pageSize = stmt.columnLong(0);
-                db.exec("PRAGMA cache_size = " + (cacheSize / pageSize) + ";");
-            }
-            stmt.dispose();
-        }
-        db.exec("PRAGMA synchronous = OFF;");
-        db.exec("PRAGMA journal_mode = OFF;");
-//        db.exec("PRAGMA locking_mode = EXCLUSIVE;");
-        db.exec("PRAGMA case_sensitive_like = true;"); 
-        db.exec("PRAGMA encoding = 'UTF-8';"); 
-        db.exec("PRAGMA temp_store = MEMORY;"); 
-        return db;
     }
 
     static SQLiteStatement createReadStmt(SQLiteConnection db) throws SQLiteException {
@@ -435,7 +377,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             try {
                 // set up DB:
                 try {
-                    db = openDB(dbFileName, false);
+                    // set 1GB cache_size:
+                    db = SQLiteDataHandler.openDB(dbFileName, false, 1024l*1024l*1024l);
                     db.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
                     db.exec("CREATE TEMPORARY TABLE pages(id INTEGER PRIMARY KEY ASC, title STRING);");
                     db.exec("CREATE INDEX page_titles ON pages(title);");

@@ -26,6 +26,7 @@ import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
+import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -43,7 +44,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
     protected SQLiteStatement stWritePage = null;
     protected SQLiteStatement stWriteRevision = null;
     protected SQLiteStatement stWriteText = null;
-    protected String dbFileName;
+    final protected String dbFileName;
     protected long nextPageId = 0l;
     protected ArrayBlockingQueue<SQLiteJob> sqliteJobs = new ArrayBlockingQueue<SQLiteJob>(10);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
@@ -179,7 +180,8 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
             try {
                 // set up DB:
                 try {
-                    db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, false);
+                    // set 1GB cache_size:
+                    db = SQLiteDataHandler.openDB(dbFileName, false, 1024l*1024l*1024l);
 
                     /**
                      * Table storing the siteinfo object.
