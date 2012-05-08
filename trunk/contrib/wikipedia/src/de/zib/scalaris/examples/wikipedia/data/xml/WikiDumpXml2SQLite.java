@@ -167,6 +167,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
 
     @Override
     protected void export(XmlPage page_xml) {
+        ++pageCount;
         addSQLiteJob(new SQLiteWritePageJob(page_xml.getPage(), page_xml.getRevisions()));
     }
     
@@ -327,6 +328,9 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
                 stmt.bind(1, normTitle.namespace).bind(2, normTitle.title);
                 if (stmt.step()) {
                     // exists
+                    System.err.println("duplicate page in dump: "
+                            + page.getTitle() + " (=" + normTitle.toString()
+                            + ")");
                     return;
                 }
                 stmt.dispose();
