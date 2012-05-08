@@ -57,12 +57,14 @@ public class MyParsingWikiModel extends MyWikiModel {
      *            the template's name without the namespace
      * @param parameter
      *            the parameters of the template
+     * @param followRedirect
+     *            whether to follow a redirect or not (ignored)
      * 
      * @return the template's contents
      */
     @Override
     protected String retrievePage(String namespace, String articleName,
-            Map<String, String> templateParameters) {
+            Map<String, String> templateParameters, boolean followRedirect) {
         if (isTemplateNamespace(namespace)) {
             int index = articleName.indexOf(':');
             if (index > 0) {
