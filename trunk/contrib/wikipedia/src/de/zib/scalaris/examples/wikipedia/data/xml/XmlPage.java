@@ -16,9 +16,9 @@
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.util.Calendar;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.xml.sax.Attributes;
@@ -263,20 +263,8 @@ public class XmlPage extends DefaultHandler {
          * <restrictions>edit=sysop:move=sysop</restrictions>
          * <restrictions>sysop</restrictions>
          */
-        LinkedHashMap<String, String> restrictions_map = new LinkedHashMap<String, String>();
-        if (!restrictions.isEmpty()) {
-            String[] restrictions_array = restrictions.split(":");
-            for (int i = 0; i < restrictions_array.length; ++i) {
-                String[] restriction = restrictions_array[i].split("=");
-                if (restriction.length == 2) {
-                    restrictions_map.put(restriction[0], restriction[1]);
-                } else if (restriction.length == 1) {
-                    restrictions_map.put("all", restriction[0]);
-                } else {
-                    System.err.println("Unknown restriction: " + restrictions_array[i]);
-                }
-            }
-        }
+        Map<String, String> restrictions_map = Page
+                .restrictionsFromString(restrictions);
         // get current revision (the largest one):
         Revision curRev = null;
         if (!revisions.isEmpty()) {

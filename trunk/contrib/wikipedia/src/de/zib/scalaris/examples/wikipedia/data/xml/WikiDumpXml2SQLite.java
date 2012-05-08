@@ -18,7 +18,6 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 import java.io.FileNotFoundException;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -345,22 +344,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
             }
             
             
-            String pageRestrictions;
-            do {
-                if (page.getRestrictions().isEmpty()) {
-                    pageRestrictions = "";
-                } else {
-                    StringBuilder sb = new StringBuilder();
-                    for (Entry<String, String> restr : page.getRestrictions().entrySet()) {
-                        sb.append(restr.getKey());
-                        sb.append('=');
-                        sb.append(restr.getValue());
-                        sb.append(',');
-                    }
-                    pageRestrictions = sb.substring(0, sb.length() - 1);
-                }
-            } while (false);
-            
+            String pageRestrictions = Page.restrictionsToString(page.getRestrictions());
             final int pageId = page.getId();
             try {
                 try {
