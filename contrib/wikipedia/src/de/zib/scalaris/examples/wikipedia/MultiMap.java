@@ -38,6 +38,24 @@ public class MultiMap<T extends Map<K, List<V>>, K, V> implements Map<K, List<V>
             throw new RuntimeException(e);
         }
     }
+
+    /**
+     * Constructs an empty map.
+     * 
+     * @param clazz
+     *            the {@link Map}-class to use for the internal representation
+     * @param initialCapacity
+     *            the initial capacity of the hash table
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public <U extends Map> MultiMap(Class<U> clazz, int initialCapacity) {
+        super();
+        try {
+            data = (T) clazz.getConstructor(int.class).newInstance(initialCapacity);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
     
     /**
      * Creates a map containing all values from another map.
