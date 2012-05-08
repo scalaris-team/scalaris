@@ -18,6 +18,7 @@ package de.zib.scalaris.examples.wikipedia.data;
 import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * Represents a page including its revisions.
@@ -193,5 +194,56 @@ public class Page implements Serializable {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Converts a restrictions map to its corresponding string.
+     * 
+     * @param restrictions
+     *            a map of restrictions
+     * 
+     * @return a string of the form <tt>key1=value1,key2=value2</tt>
+     */
+    public static String restrictionsToString(Map<String, String> restrictions) {
+        String restrictionsStr;
+        if (restrictions.isEmpty()) {
+            restrictionsStr = "";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (Entry<String, String> restr : restrictions.entrySet()) {
+                sb.append(restr.getKey());
+                sb.append('=');
+                sb.append(restr.getValue());
+                sb.append(',');
+            }
+            restrictionsStr = sb.substring(0, sb.length() - 1);
+        }
+        return restrictionsStr;
+    }
+
+    /**
+     * Converts a restrictions string to its corresponding map.
+     * 
+     * @param restrictionsStr
+     *            a string of the form <tt>key1=value1,key2=value2</tt>
+     * 
+     * @return a map of restrictions
+     */
+    public static Map<String, String> restrictionsFromString(String restrictionsStr) {
+        LinkedHashMap<String, String> restrictions_map = new LinkedHashMap<String, String>();
+        if (!restrictionsStr.isEmpty()) {
+            String[] restrictions_array = restrictionsStr.split(":");
+            for (int i = 0; i < restrictions_array.length; ++i) {
+                String[] restriction = restrictions_array[i].split("=");
+                if (restriction.length == 2) {
+                    restrictions_map.put(restriction[0], restriction[1]);
+                } else if (restriction.length == 1) {
+                    restrictions_map.put("all", restriction[0]);
+                } else {
+                    System.err.println("Unknown restriction: " + restrictions_array[i]);
+                }
+            }
+        }
+        return restrictions_map;
     }
 }
