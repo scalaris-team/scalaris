@@ -158,9 +158,13 @@ public class MyWikiModel extends WikiModel {
      */
     public static final double existingPagesFPR = 0.1;
     protected BloomFilter<String> existingPages = null;
+
+    protected Map<String, String> pageCache = new HashMap<String, String>();
     
     protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
             Pattern.compile("^.*?([\\p{C}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    protected static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^#REDIRECT[^\\[]?\\[\\[:?([^\\]]*)\\]\\]$", Pattern.CASE_INSENSITIVE);
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
@@ -301,9 +305,6 @@ public class MyWikiModel extends WikiModel {
         } else {
             addInclude(createFullPageName(namespace, articleName));
         }
-        
-        // note: cannot cache templates here since the implementation-specific
-        // retrievePage() method may depend in the exact parameters or not
 
         // (ugly) fix for template parameter replacement if no parameters given,
         // e.g. "{{noun}}" in the simple English Wiktionary
@@ -311,6 +312,9 @@ public class MyWikiModel extends WikiModel {
             templateParameters.put("", null);
         }
 
+        // note: cannot cache templates here since the text returned by the
+        // implementation-specific retrievePage() method may depend in the exact
+        // parameters or not
         String text = retrievePage(namespace, articleName, templateParameters);
         if (text != null && !text.isEmpty()) {
             text = removeNoIncludeContents(text);
@@ -381,16 +385,24 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Gets the contents of the newest revision of the page redirected to
-     * (override in sub-classes!).
+     * Gets the contents of the newest revision of the page redirected to.
      * 
-     * @param pageName
-     *            the name of the page redirected to
+     * @param pageName0
+     *            the name of the page redirected to (unnormalised)
      * 
-     * @return a placeholder string for the redirect
+     * @return the contents of the newest revision of that page or a placeholder
+     *         string for the redirect
      */
-    public String getRedirectContent(String pageName) {
-        return "&#35;redirect [[" + pageName + "]]";
+    public String getRedirectContent(String pageName0) {
+        String redirText = retrievePage(pageName0, null, false);
+        if (redirText != null) {
+            // make PAGENAME in the redirected content work as expected
+            setPageName(pageName0);
+            return redirText;
+        } else {
+//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed </b>";
+        }
+        return "&#35;redirect [[" + pageName0 + "]]";
     }
     
     /**
@@ -419,15 +431,56 @@ public class MyWikiModel extends WikiModel {
      * @param namespace
      *            the namespace of the page
      * @param articleName
-     *            the page's name without the namespace
+     *            the (unnormalised) page's name without the namespace
      * @param templateParameters
      *            template parameters if the page is a template, <tt>null</tt>
      *            otherwise
      * 
      * @return <tt>null</tt>
      */
-    protected String retrievePage(String namespace, String articleName,
+    final protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters) {
+        return retrievePage(namespace, articleName, templateParameters, true);
+    }
+
+    /**
+     * Retrieves the contents of the given page (override in sub-classes!).
+     * 
+     * @param pageName0
+     *            the unnormalised name of the page
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
+     * @param followRedirect
+     *            whether to follow a redirect or not (at most one redirect
+     *            should be followed)
+     * 
+     * @return the page's contents or <tt>null</tt> if no connection exists
+     */
+    final protected String retrievePage(String pageName0,
+            Map<String, String> templateParameters, boolean followRedirect) {
+        String[] parts = splitNsTitle(pageName0);
+        return retrievePage(parts[0], parts[1], templateParameters, followRedirect);
+    }
+
+    /**
+     * Retrieves the contents of the given page (override in sub-classes!).
+     * 
+     * @param namespace
+     *            the namespace of the page
+     * @param articleName
+     *            the (unnormalised) page's name without the namespace
+     * @param templateParameters
+     *            template parameters if the page is a template, <tt>null</tt>
+     *            otherwise
+     * @param followRedirect
+     *            whether to follow a redirect or not (at most one redirect
+     *            should be followed)
+     * 
+     * @return the page's contents or <tt>null</tt> if no connection exists
+     */
+    protected String retrievePage(String namespace, String articleName,
+            Map<String, String> templateParameters, boolean followRedirect) {
         return null;
     }
 
@@ -955,6 +1008,7 @@ public class MyWikiModel extends WikiModel {
         super.setUp();
         fRedirectLink = null;
         magicWordCache = new HashMap<String, String>();
+        pageCache = new HashMap<String, String>();
     }
 
     /* (non-Javadoc)

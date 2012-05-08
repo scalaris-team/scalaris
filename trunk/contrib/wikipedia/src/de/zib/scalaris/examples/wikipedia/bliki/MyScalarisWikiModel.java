@@ -15,10 +15,8 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
@@ -31,11 +29,6 @@ import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
  */
 public class MyScalarisWikiModel extends MyWikiModel {
     protected Connection connection;
-    protected Map<String, String> pageCache = new HashMap<String, String>();
-    // e.g. "#REDIRECT [[France]]", "#REDIRECT:[[France]]"
-    private static final Pattern MATCH_WIKI_REDIRECT =
-            Pattern.compile("^#REDIRECT[^\\[]?\\[\\[:?([^\\]]*)\\]\\]$", Pattern.CASE_INSENSITIVE);
-    
     /**
      * Creates a new wiki model to render wiki text using the given connection
      * to Scalaris.
@@ -91,47 +84,6 @@ public class MyScalarisWikiModel extends MyWikiModel {
     }
 
     /**
-     * Retrieves the contents of the given page from Scalaris.
-     * Caches retrieved pages in {@link #pageCache}.
-     * 
-     * @param namespace
-     *            the namespace of the page
-     * @param articleName
-     *            the (unnormalised) page's name without the namespace
-     * @param templateParameters
-     *            template parameters if the page is a template, <tt>null</tt>
-     *            otherwise
-     * 
-     * @return the page's contents or <tt>null</tt> if no connection exists
-     */
-    @Override
-    protected String retrievePage(String namespace, String articleName,
-            Map<String, String> templateParameters) {
-        return retrievePage(namespace, articleName, templateParameters, true);
-    }
-
-    /**
-     * Retrieves the contents of the given page from Scalaris. Caches retrieved
-     * pages in {@link #pageCache}.
-     * 
-     * @param pageName0
-     *            the unnormalised name of the page
-     * @param templateParameters
-     *            template parameters if the page is a template, <tt>null</tt>
-     *            otherwise
-     * @param followRedirect
-     *            whether to follow a redirect or not (at most one redirect
-     *            should be followed)
-     * 
-     * @return the page's contents or <tt>null</tt> if no connection exists
-     */
-    protected String retrievePage(String pageName0,
-            Map<String, String> templateParameters, boolean followRedirect) {
-        String[] parts = splitNsTitle(pageName0);
-        return retrievePage(parts[0], parts[1], templateParameters, followRedirect);
-    }
-
-    /**
      * Retrieves the contents of the given page from Scalaris. Caches retrieved
      * pages in {@link #pageCache}.
      * 
@@ -150,70 +102,40 @@ public class MyScalarisWikiModel extends MyWikiModel {
      */
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters, boolean followRedirect) {
-        if (connection != null && !articleName.isEmpty()) {
-            // normalise page name:
-            String pageName = normalisePageTitle(createFullPageName(namespace, articleName));
-            if (pageCache.containsKey(pageName)) {
-                return pageCache.get(pageName);
-            } else {
-                String text = null;
-                // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
-                RevisionResult getRevResult = ScalarisDataHandlerNormalised.getRevision(connection, pageName);
-                addStats(getRevResult.stats);
-                addInvolvedKeys(getRevResult.involvedKeys);
-                if (getRevResult.success) {
-                    text = getRevResult.revision.unpackedText();
-                    if (followRedirect && getRevResult.page.isRedirect()) {
-                        final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
-                        if (matcher.matches()) {
-                            // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
-                            String[] redirFullName = splitNsTitle(matcher.group(1));
-                            String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
-                            if (redirText != null && !redirText.isEmpty()) {
-                                text = redirText;
-                            }
+        if (articleName.isEmpty()) {
+            return null;
+        }
+        
+        // normalise page name:
+        String pageName = normalisePageTitle(createFullPageName(namespace, articleName));
+        if (pageCache.containsKey(pageName)) {
+            return pageCache.get(pageName);
+        } else if (connection != null) {
+            String text = null;
+            // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
+            RevisionResult getRevResult = ScalarisDataHandlerNormalised.getRevision(connection, pageName);
+            addStats(getRevResult.stats);
+            addInvolvedKeys(getRevResult.involvedKeys);
+            if (getRevResult.success) {
+                text = getRevResult.revision.unpackedText();
+                if (followRedirect && getRevResult.page.isRedirect()) {
+                    final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
+                    if (matcher.matches()) {
+                        // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
+                        String[] redirFullName = splitNsTitle(matcher.group(1));
+                        String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
+                        if (redirText != null && !redirText.isEmpty()) {
+                            text = redirText;
                         }
                     }
-                } else {
-                    // System.err.println(getRevResult.message);
-                    // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
                 }
-                pageCache.put(pageName, text);
-                return text;
+            } else {
+                // System.err.println(getRevResult.message);
+                // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
             }
+            pageCache.put(pageName, text);
+            return text;
         }
         return null;
-    }
-    
-    /**
-     * Gets the contents of the newest revision of the page redirected to.
-     * 
-     * @param pageName0
-     *            the name of the page redirected to (unnormalised)
-     * 
-     * @return the contents of the newest revision of that page or a placeholder
-     *         string for the redirect
-     */
-    @Override
-    public String getRedirectContent(String pageName0) {
-        String redirText = retrievePage(pageName0, null, false);
-        if (redirText != null) {
-            // make PAGENAME in the redirected content work as expected
-            setPageName(pageName0);
-            return redirText;
-        } else {
-//            System.err.println(getRevResult.message);
-//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed: " + getRevResult.message + "</b>";
-        }
-        return "&#35;redirect [[" + pageName0 + "]]";
-    }
-
-    /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel#setUp()
-     */
-    @Override
-    public void setUp() {
-        super.setUp();
-        pageCache = new HashMap<String, String>();
     }
 }
