@@ -560,4 +560,9 @@ public class ErlangValue {
         final ErlangValue erlValue = (ErlangValue) obj;
         return value.equals(erlValue.value);
     }
+    
+    @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
 }
