@@ -107,7 +107,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
         }
         
         // normalise page name:
-        String pageName = normalisePageTitle(createFullPageName(namespace, articleName));
+        NormalisedTitle pageName = normalisePageTitle(namespace, articleName);
         if (pageCache.containsKey(pageName)) {
             return pageCache.get(pageName);
         } else if (connection != null) {

@@ -49,6 +49,7 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -490,27 +491,27 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public ValueResult<List<String>> getPageList(Connection connection) {
+    public ValueResult<List<NormalisedTitle>> getPageList(Connection connection) {
         return ScalarisDataHandlerUnnormalised.getPageList(connection);
     }
 
     @Override
-    public ValueResult<List<String>> getPageList(int namespace, Connection connection) {
+    public ValueResult<List<NormalisedTitle>> getPageList(int namespace, Connection connection) {
         return ScalarisDataHandlerUnnormalised.getPageList(namespace, connection);
     }
 
     @Override
-    public ValueResult<List<String>> getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerUnnormalised.getPagesInCategory(connection, title, nsObject);
     }
 
     @Override
-    public ValueResult<List<String>> getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerUnnormalised.getPagesInTemplate(connection, title, nsObject);
     }
 
     @Override
-    public ValueResult<List<String>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
+    public ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerUnnormalised.getPagesLinkingTo(connection, title, nsObject);
     }
 
@@ -546,7 +547,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public ValueResult<String> getRandomArticle(Connection connection, Random random) {
+    public ValueResult<NormalisedTitle> getRandomArticle(Connection connection, Random random) {
         return ScalarisDataHandlerUnnormalised.getRandomArticle(connection, random);
     }
 

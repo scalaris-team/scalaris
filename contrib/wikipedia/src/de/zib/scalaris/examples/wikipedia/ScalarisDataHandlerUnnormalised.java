@@ -32,6 +32,7 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -200,7 +201,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<RevisionResult>> getRevisions(Connection connection,
             Collection<String> titles, final String statName, final MyNamespace nsObject) {
-        final ArrayList<String> normalisedTitles = new ArrayList<String>(titles.size());
+        final ArrayList<NormalisedTitle> normalisedTitles = new ArrayList<NormalisedTitle>(titles.size());
         MyWikiModel.normalisePageTitles(titles, nsObject, normalisedTitles);
         return ScalarisDataHandlerNormalised.getRevisions(connection, normalisedTitles, statName);
     }
@@ -217,7 +218,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * 
      * @return a result object with the page list on success
      */
-    public static ValueResult<List<String>> getPagesInCategory(Connection connection,
+    public static ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
             String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerNormalised.getPagesInCategory(connection, MyWikiModel.normalisePageTitle(title, nsObject));
     }
@@ -234,7 +235,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * 
      * @return a result object with the page list on success
      */
-    public static ValueResult<List<String>> getPagesInTemplate(Connection connection,
+    public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, MyWikiModel.normalisePageTitle(title, nsObject), nsObject);
     }
@@ -251,7 +252,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * 
      * @return a result object with the page list on success
      */
-    public static ValueResult<List<String>> getPagesLinkingTo(Connection connection,
+    public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection,
             String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerNormalised.getPagesLinkingTo(connection, MyWikiModel.normalisePageTitle(title, nsObject));
     }
@@ -315,14 +316,8 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         }
         
-        String title;
-        Integer namespace;
-        do {
-            String[] parts = MyWikiModel.splitNsTitle(title0, nsObject);
-            namespace = nsObject.getNumberByName(parts[0]);
-            title = MyWikiModel.createFullPageName(namespace.toString(),
-                    MyWikiModel.normaliseName(parts[1]));
-        } while (false);
+        final NormalisedTitle normTitle = MyWikiModel.normalisePageTitle(title0, nsObject);
+        final String normTitleStr = normTitle.toString();
         Transaction scalaris_tx = new Transaction(connection);
 
         // check that the current version is still up-to-date:
@@ -478,9 +473,9 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
 
             int articleCountChange = 0;
             final boolean wasArticle = (oldPage != null)
-                    && MyWikiModel.isArticle(namespace, oldLnks, oldCats);
-            final boolean isArticle = (namespace == 0)
-                    && MyWikiModel.isArticle(namespace, newLnks, newCats);
+                    && MyWikiModel.isArticle(normTitle.namespace, oldLnks, oldCats);
+            final boolean isArticle = (normTitle.namespace == 0)
+                    && MyWikiModel.isArticle(normTitle.namespace, newLnks, newCats);
             if (wasArticle == isArticle) {
                 articleCountChange = 0;
             } else if (!wasArticle) {
@@ -496,15 +491,15 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             }
 
             // write differences (categories, templates, backlinks)
-            catDiff.addScalarisOps(executor, title);
-            tplDiff.addScalarisOps(executor, title);
-            lnkDiff.addScalarisOps(executor, title);
+            catDiff.addScalarisOps(executor, normTitleStr);
+            tplDiff.addScalarisOps(executor, normTitleStr);
+            lnkDiff.addScalarisOps(executor, normTitleStr);
 
             // new page? -> add to page/article lists
             if (oldPage == null) {
-                final String pageListKey = getPageListKey(namespace);
-                final String pageCountKey = getPageCountKey(namespace);
-                executor.addAppend(ScalarisOpType.PAGE_LIST, pageListKey, title, pageCountKey);
+                final String pageListKey = getPageListKey(normTitle.namespace);
+                final String pageCountKey = getPageCountKey(normTitle.namespace);
+                executor.addAppend(ScalarisOpType.PAGE_LIST, pageListKey, normTitleStr, pageCountKey);
             }
 
             executor.addWrite(ScalarisOpType.PAGE, getPageKey(title0, nsObject), newPage);

@@ -35,9 +35,10 @@ import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
-import de.zib.scalaris.examples.wikipedia.bliki.MyParsingWikiModel;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
@@ -90,25 +91,6 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         this.dbFileName = dbFileName;
     }
     
-    static Set<String> readValues(SQLiteStatement stmt, String key)
-            throws RuntimeException {
-        try {
-            try {
-                HashSet<String> results = new HashSet<String>();
-                stmt.bind(1, key);
-                while (stmt.step()) {
-                    results.add(stmt.columnString(1));
-                }
-                return results;
-            } finally {
-                stmt.reset();
-            }
-        } catch (SQLiteException e) {
-            System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
-            throw new RuntimeException(e);
-        }
-    }
-    
     protected void addSQLiteJob(SQLiteJob job) throws RuntimeException {
         try {
             sqliteJobs.put(job);
@@ -117,12 +99,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         }
     }
 
-    protected void writeValue(SQLiteStatement stmt, String key, String value)
+    protected void writeValue(SQLiteStatement stmt, NormalisedTitle key, NormalisedTitle value)
             throws RuntimeException {
         addSQLiteJob(new SQLiteWriteValuesJob(stmt, key, value));
     }
 
-    protected void writeValues(SQLiteStatement stmt, String key, Collection<? extends String> values)
+    protected void writeValues(SQLiteStatement stmt, NormalisedTitle key, Collection<? extends NormalisedTitle> values)
             throws RuntimeException {
         addSQLiteJob(new SQLiteWriteValuesJob(stmt, key, values));
     }
@@ -148,23 +130,15 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         }
     }
     
-    protected static void updateMap(Map<String, Set<String>> map, String key, String addToValue) {
-        Set<String> oldValue = map.get(key);
+    protected static void updateMap(
+            Map<NormalisedTitle, Set<NormalisedTitle>> map,
+            NormalisedTitle key, NormalisedTitle addToValue) {
+        Set<NormalisedTitle> oldValue = map.get(key);
         if (oldValue == null) {
-            oldValue = new HashSet<String>();
+            oldValue = new HashSet<NormalisedTitle>();
             map.put(key, oldValue);
         }
         oldValue.add(addToValue);
-    }
-    
-    protected static void updateMap(Map<String, Set<String>> map, String key, Collection<? extends String> addToValues) {
-        Set<String> oldValue = map.get(key);
-        if (oldValue == null) {
-            oldValue = new HashSet<String>(addToValues);
-            map.put(key, oldValue);
-        } else {
-            oldValue.addAll(addToValues);
-        }
     }
 
     /**
@@ -190,38 +164,44 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
 
         if (page.getCurRev() != null && wikiModel != null) {
             wikiModel.setUp();
-            final String pageTitle = page.getTitle();
-            wikiModel.setPageName(pageTitle);
+            final NormalisedTitle normTitle = wikiModel.normalisePageTitle(page.getTitle());
+            wikiModel.setPageName(page.getTitle());
             wikiModel.render(null, page.getCurRev().unpackedText());
             
             // categories:
             do {
                 final Set<String> pageCategories_raw = wikiModel.getCategories().keySet();
-                ArrayList<String> pageCategories = new ArrayList<String>(pageCategories_raw.size());
+                ArrayList<NormalisedTitle> pageCategories = new ArrayList<NormalisedTitle>(pageCategories_raw.size());
                 for (String cat_raw: pageCategories_raw) {
-                    String category = (wikiModel.getCategoryNamespace() + ":" + cat_raw);
+                    NormalisedTitle category = new NormalisedTitle(
+                            MyNamespace.CATEGORY_NAMESPACE_KEY,
+                            MyWikiModel.normaliseName(cat_raw));
                     pageCategories.add(category);
                 }
-                writeValues(stWriteCategories, pageTitle, pageCategories);
+                writeValues(stWriteCategories, normTitle, pageCategories);
             } while(false);
             
             // templates:
             do {
                 final Set<String> pageTemplates_raw = wikiModel.getTemplates();
-                ArrayList<String> pageTemplates = new ArrayList<String>(pageTemplates_raw.size());
+                ArrayList<NormalisedTitle> pageTemplates = new ArrayList<NormalisedTitle>(pageTemplates_raw.size());
                 for (String tpl_raw: pageTemplates_raw) {
-                    String template = (wikiModel.getTemplateNamespace() + ":" + tpl_raw);
+                    NormalisedTitle template = new NormalisedTitle(
+                            MyNamespace.TEMPLATE_NAMESPACE_KEY,
+                            MyWikiModel.normaliseName(tpl_raw));
                     pageTemplates.add(template);
                 }
-                writeValues(stWriteTemplates, pageTitle, pageTemplates);
+                writeValues(stWriteTemplates, normTitle, pageTemplates);
             } while (false);
             
             // includes:
             do {
                 Set<String> pageIncludes = wikiModel.getIncludes();
                 if (!pageIncludes.isEmpty()) {
-                    // make sure, the set is not changed anymore (deferred processing in the thread):
-                    writeValues(stWriteIncludes, pageTitle, new ArrayList<String>(pageIncludes));
+                    // make sure, the pageIncludes set is not changed anymore (deferred processing in the thread taking place):
+                    ArrayList<NormalisedTitle> normPageIncludes = new ArrayList<NormalisedTitle>(pageIncludes.size());
+                    wikiModel.normalisePageTitles(pageIncludes, normPageIncludes);
+                    writeValues(stWriteIncludes, normTitle, normPageIncludes);
                 }
             } while (false);
             
@@ -229,7 +209,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             do {
                 String pageRedirLink = wikiModel.getRedirectLink();
                 if (pageRedirLink != null) {
-                    writeValue(stWriteRedirects, pageTitle, pageRedirLink);
+                    writeValue(stWriteRedirects, normTitle, wikiModel.normalisePageTitle(pageRedirLink));
                 }
             } while(false);
             
@@ -237,8 +217,10 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             do {
                 Set<String> pageLinks = wikiModel.getLinks();
                 if (!pageLinks.isEmpty()) {
-                    // make sure, the set is not changed anymore (deferred processing in the thread):
-                    writeValues(stWriteLinks, pageTitle, new ArrayList<String>(pageLinks));
+                    // make sure, the pageIncludes set is not changed anymore (deferred processing in the thread taking place):
+                    ArrayList<NormalisedTitle> normPageLinks = new ArrayList<NormalisedTitle>(pageLinks.size());
+                    wikiModel.normalisePageTitles(pageLinks, normPageLinks);
+                    writeValues(stWriteLinks, normTitle, normPageLinks);
                 }
             } while(false);
             
@@ -263,8 +245,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * 
      * @return a set of all sub categories/templates; also includes the root
      */
-    public static Set<String> getAllChildren(Map<String, Set<String>> tree, String root) {
-        return getAllChildren(tree, new LinkedList<String>(Arrays.asList(root)));
+    public static Set<NormalisedTitle> getAllChildren(Map<NormalisedTitle, Set<NormalisedTitle>> tree, NormalisedTitle root) {
+        return getAllChildren(tree, new LinkedList<NormalisedTitle>(Arrays.asList(root)));
     }
     
     /**
@@ -279,16 +261,16 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * 
      * @return a set of all sub categories; also includes the rootCats
      */
-    public static Set<String> getAllChildren(Map<String, Set<String>> tree, List<String> roots) {
-        HashSet<String> allChildren = new HashSet<String>(roots);
+    public static Set<NormalisedTitle> getAllChildren(Map<NormalisedTitle, Set<NormalisedTitle>> tree, List<NormalisedTitle> roots) {
+        HashSet<NormalisedTitle> allChildren = new HashSet<NormalisedTitle>(roots);
         while (!roots.isEmpty()) {
-            String curChild = roots.remove(0);
-            Set<String> subChilds = tree.get(curChild);
+            NormalisedTitle curChild = roots.remove(0);
+            Set<NormalisedTitle> subChilds = tree.get(curChild);
             if (subChilds != null) {
                 // only add new children to the root list
                 // (remove already processed ones)
                 // -> prevents endless loops in circles
-                Set<String> newChilds = new HashSet<String>(subChilds);
+                Set<NormalisedTitle> newChilds = new HashSet<NormalisedTitle>(subChilds);
                 newChilds.removeAll(allChildren);
                 allChildren.addAll(newChilds);
                 roots.addAll(newChilds);
@@ -347,24 +329,22 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      */
     public static void readTrees(
             String dbFileName,
-            Map<String, Set<String>> templateTree,
-            Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree)
+            Map<NormalisedTitle, Set<NormalisedTitle>> templateTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree)
             throws RuntimeException {
         SQLiteConnection db = null;
         SQLiteStatement stmt = null;
         try {
             db = SQLiteDataHandler.openDB(dbFileName, true);
-            SiteInfo siteInfo = readSiteInfo(db);
-            MyParsingWikiModel wikiModel = new MyParsingWikiModel("", "", new MyNamespace(siteInfo));
             stmt = db
                     .prepare("SELECT page.title, tpl.title FROM " +
                             "templates INNER JOIN pages AS page ON templates.title == page.id " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
-                            "WHERE page.title LIKE '" + wikiModel.normalisePageTitle(wikiModel.getTemplateNamespace() + ":") + "%';");
+                            "WHERE page.title LIKE '" + (new NormalisedTitle(MyNamespace.TEMPLATE_NAMESPACE_KEY, "")).toString() + "%';");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0);
-                String template = stmt.columnString(1);
+                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
+                NormalisedTitle template = NormalisedTitle.fromString(stmt.columnString(1));
                 updateMap(templateTree, pageTitle, template);
             }
             stmt.dispose();
@@ -373,8 +353,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "includes INNER JOIN pages AS page ON includes.title == page.id " +
                             "INNER JOIN pages AS incl ON includes.include == incl.id;");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0);
-                String include = stmt.columnString(1);
+                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
+                NormalisedTitle include = NormalisedTitle.fromString(stmt.columnString(1));
                 updateMap(includeTree, pageTitle, include);
             }
             stmt.dispose();
@@ -383,8 +363,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "redirects INNER JOIN pages AS page ON redirects.title == page.id " +
                             "INNER JOIN pages AS redir ON redirects.redirect == redir.id;");
             while (stmt.step()) {
-                String pageTitle = stmt.columnString(0);
-                String redirect = stmt.columnString(1);
+                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
+                NormalisedTitle redirect = NormalisedTitle.fromString(stmt.columnString(1));
                 updateMap(referenceTree, redirect, pageTitle);
             }
         } catch (SQLiteException e) {
@@ -432,9 +412,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      */
     public static SortedSet<String> getPagesInCategories(String dbFileName,
             Set<String> allowedCats0, Set<String> allowedPages0, int depth,
-            Map<String, Set<String>> templateTree,
-            Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> templateTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree,
             PrintStream msgOut, boolean normalised) throws RuntimeException {
         SQLiteConnection db = null;
         try {
@@ -443,21 +423,21 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             db.exec("CREATE TEMPORARY TABLE currentPages(id INTEGER PRIMARY KEY ASC);");
             SiteInfo siteInfo = readSiteInfo(db);
             MyNamespace namespace = new MyNamespace(siteInfo);
-            ArrayList<String> allowedCats = new ArrayList<String>(allowedCats0.size());
+            ArrayList<NormalisedTitle> allowedCats = new ArrayList<NormalisedTitle>(allowedCats0.size());
             MyWikiModel.normalisePageTitles(allowedCats0, namespace, allowedCats);
 
-            Set<String> allowedCatsFull = getSubCategories(allowedCats0, allowedCats, db,
+            Set<NormalisedTitle> allowedCatsFull = getSubCategories(allowedCats0, allowedCats, db,
                     templateTree, includeTree, referenceTree, msgOut, namespace);
 
-            ArrayList<String> allowedPages = new ArrayList<String>(allowedPages0.size());
+            ArrayList<NormalisedTitle> allowedPages = new ArrayList<NormalisedTitle>(allowedPages0.size());
             MyWikiModel.normalisePageTitles(allowedPages0, namespace, allowedPages);
 
-            Set<String> currentPages = new HashSet<String>();
+            Set<NormalisedTitle> currentPages = new HashSet<NormalisedTitle>();
             currentPages.addAll(allowedPages);
             currentPages.addAll(allowedCatsFull);
             currentPages.addAll(getPagesDirectlyInCategories(allowedCatsFull, db));
 
-            Set<String> normalisedPages = getRecursivePages(currentPages, depth, db,
+            Set<NormalisedTitle> normalisedPages = getRecursivePages(currentPages, depth, db,
                     templateTree, includeTree, referenceTree, msgOut);
             
             // no need to drop table - we set temporary tables to be in-memory only
@@ -466,7 +446,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             // note: need to sort case-sensitively (wiki is only case-insensitive at the first char)
             final TreeSet<String> pages = new TreeSet<String>();
             if (normalised) {
-                pages.addAll(normalisedPages);
+                pages.addAll(ScalarisDataHandlerNormalised.normList2normStringList(normalisedPages));
             } else {
                 MyWikiModel.denormalisePageTitles(normalisedPages, namespace, pages);
             }
@@ -509,15 +489,15 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * @throws SQLiteException
      *             if an error occurs
      */
-    private static Set<String> getSubCategories(Collection<? extends String> allowedCats0,
-            Collection<? extends String> allowedCats, SQLiteConnection db,
-            Map<String, Set<String>> templateTree,
-            Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree, PrintStream msgOut,
+    private static Set<NormalisedTitle> getSubCategories(Collection<? extends String> allowedCats0,
+            Collection<? extends NormalisedTitle> allowedCats, SQLiteConnection db,
+            Map<NormalisedTitle, Set<NormalisedTitle>> templateTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree, PrintStream msgOut,
             MyNamespace nsObject) throws SQLiteException {
-        Set<String> allowedCatsFull = new HashSet<String>();
-        Set<String> currentPages = new HashSet<String>();
-        Set<String> newPages = new HashSet<String>();
+        Set<NormalisedTitle> allowedCatsFull = new HashSet<NormalisedTitle>();
+        Set<NormalisedTitle> currentPages = new HashSet<NormalisedTitle>();
+        Set<NormalisedTitle> newPages = new HashSet<NormalisedTitle>();
         
         if (!allowedCats.isEmpty()) {
             SQLiteStatement stmt = null;
@@ -528,12 +508,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 println(msgOut, " determining sub-categories of " + allowedCats0.toString() + "");
                 do {
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
-                    for (String pageTitle : currentPages) {
+                    for (NormalisedTitle pageTitle : currentPages) {
                         addToPages(allowedCatsFull, newPages, pageTitle, includeTree, referenceTree);
                         // beware: add pageTitle to allowedCatsFull _AFTER_ adding its dependencies
                         // (otherwise the dependencies won't be added)
                         allowedCatsFull.add(pageTitle);
-                        stmt.bind(1, pageTitle).stepThrough().reset();
+                        stmt.bind(1, pageTitle.toString()).stepThrough().reset();
                     }
                     stmt.dispose();
 
@@ -546,7 +526,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS cat ON categories.category == cat.id" +
                                     "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
-                        String pageCategory = stmt.columnString(0);
+                        NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(0));
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -560,8 +540,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%' OR "
                                     + "page.title LIKE '" + MyNamespace.NamespaceEnum.TEMPLATE_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
-                        String pageTemplate = stmt.columnString(0);
-                        Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
+                        NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(0));
+                        Set<NormalisedTitle> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
                         addToPages(allowedCatsFull, newPages, tplChildren, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -571,7 +551,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     } else {
                         println(msgOut, " adding " + newPages.size() + " dependencies");
                         currentPages = newPages;
-                        newPages = new HashSet<String>();
+                        newPages = new HashSet<NormalisedTitle>();
                     }
                 } while (true);
             } finally {
@@ -599,9 +579,9 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * @throws SQLiteException
      *             if an error occurs
      */
-    private static Set<String> getPagesDirectlyInCategories(Set<String> allowedCats,
+    private static Set<NormalisedTitle> getPagesDirectlyInCategories(Set<NormalisedTitle> allowedCats,
             SQLiteConnection db) throws SQLiteException {
-        Set<String> currentPages = new HashSet<String>();
+        Set<NormalisedTitle> currentPages = new HashSet<NormalisedTitle>();
 
         // note: allowedCatsFull can contain categories or templates
         if (!allowedCats.isEmpty()) {
@@ -613,8 +593,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "categories INNER JOIN pages AS page ON categories.title == page.id " +
                                 "INNER JOIN pages AS cat ON categories.category == cat.id;");
                 while (stmt.step()) {
-                    String pageTitle = stmt.columnString(0);
-                    String pageCategory = stmt.columnString(1);
+                    NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
+                    NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(1));
                     if (allowedCats.contains(pageCategory)) {
                         currentPages.add(pageTitle);
                     }
@@ -626,8 +606,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "templates INNER JOIN pages AS page ON templates.title == page.id " +
                                 "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                 while (stmt.step()) {
-                    String pageTitle = stmt.columnString(0);
-                    String pageTemplate = stmt.columnString(1);
+                    NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
+                    NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(1));
                     if (allowedCats.contains(pageTemplate)) {
                         currentPages.add(pageTitle);
                     }
@@ -668,17 +648,17 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * @throws SQLiteException
      *             if an error occurs
      */
-    private static Set<String> getRecursivePages(Set<String> currentPages,
-            int depth, SQLiteConnection db, Map<String, Set<String>> templateTree,
-            Map<String, Set<String>> includeTree,
-            Map<String, Set<String>> referenceTree,
+    private static Set<NormalisedTitle> getRecursivePages(Set<NormalisedTitle> currentPages,
+            int depth, SQLiteConnection db, Map<NormalisedTitle, Set<NormalisedTitle>> templateTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree,
             PrintStream msgOut)
             throws SQLiteException {
-        Set<String> allPages = new HashSet<String>();
-        Set<String> newPages = new HashSet<String>();
-        Set<String> pageLinks = new HashSet<String>();
+        Set<NormalisedTitle> allPages = new HashSet<NormalisedTitle>();
+        Set<NormalisedTitle> newPages = new HashSet<NormalisedTitle>();
+        Set<NormalisedTitle> pageLinks = new HashSet<NormalisedTitle>();
         SQLiteStatement stmt = null;
-        final ArrayList<String> autoIncluded = new ArrayList<String>(10000);
+        final ArrayList<NormalisedTitle> autoIncluded = new ArrayList<NormalisedTitle>(10000);
         try {
             println(msgOut, "adding all mediawiki pages");
             // add all auto-included pages
@@ -686,7 +666,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                               + MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()
                               + ":%';");
             while (stmt.step()) {
-                autoIncluded.add(stmt.columnString(0));
+                autoIncluded.add(NormalisedTitle.fromString(stmt.columnString(0)));
             }
             currentPages.addAll(autoIncluded);
             stmt.dispose();
@@ -696,12 +676,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 println(msgOut, " adding " + currentPages.size() + " pages");
                 do {
                     stmt = db.prepare("INSERT INTO currentPages (id) SELECT pages.id FROM pages WHERE pages.title == ?;");
-                    for (String pageTitle : currentPages) {
+                    for (NormalisedTitle pageTitle : currentPages) {
                         addToPages(allPages, newPages, pageTitle, includeTree, referenceTree);
                         // beware: add pageTitle to pages _AFTER_ adding its dependencies
                         // (otherwise the dependencies won't be added)
                         allPages.add(pageTitle);
-                        stmt.bind(1, pageTitle).stepThrough().reset();
+                        stmt.bind(1, pageTitle.toString()).stepThrough().reset();
                     }
                     stmt.dispose();
 
@@ -713,7 +693,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS page ON categories.title == page.id " +
                                     "INNER JOIN pages AS cat ON categories.category == cat.id;");
                     while (stmt.step()) {
-                        String pageCategory = stmt.columnString(0);
+                        NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(0));
                         addToPages(allPages, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -725,8 +705,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS page ON templates.title == page.id " +
                                     "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                     while (stmt.step()) {
-                        String pageTemplate = stmt.columnString(0);
-                        Set<String> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
+                        NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(0));
+                        Set<NormalisedTitle> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
                         addToPages(allPages, newPages, tplChildren, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -740,7 +720,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     while (stmt.step()) {
                         String pageLink = stmt.columnString(0);
                         if (!pageLink.isEmpty()) { // there may be empty links
-                            pageLinks.add(pageLink);
+                            pageLinks.add(NormalisedTitle.fromString(pageLink));
                         }
                     }
                     stmt.dispose();
@@ -750,12 +730,12 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     } else {
                         println(msgOut, " adding " + newPages.size() + " dependencies");
                         currentPages = newPages;
-                        newPages = new HashSet<String>();
+                        newPages = new HashSet<NormalisedTitle>();
                     }
                 } while (true);
                 // for the next recursion:
                 currentPages = pageLinks;
-                pageLinks = new HashSet<String>();
+                pageLinks = new HashSet<NormalisedTitle>();
                 --depth;
             }
         } finally {
@@ -769,16 +749,26 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         return allPages;
     }
     
-    static protected void addToPages(Set<String> pages, Set<String> newPages, String title, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
+    static protected void addToPages(Set<NormalisedTitle> pages, Set<NormalisedTitle> newPages,
+            NormalisedTitle title,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree) {
         if (!pages.contains(title) && newPages.add(title)) {
             // title not yet in pages -> add includes, redirects and pages redirecting to this page
-            addToPages(pages, newPages, WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree, title), includeTree, referenceTree); // also has redirects
-            addToPages(pages, newPages, WikiDumpGetCategoryTreeHandler.getAllChildren(referenceTree, title), includeTree, referenceTree);
+            addToPages(pages, newPages,
+                    WikiDumpGetCategoryTreeHandler.getAllChildren(includeTree,
+                            title), includeTree, referenceTree); // also has redirects
+            addToPages(pages, newPages,
+                    WikiDumpGetCategoryTreeHandler.getAllChildren(
+                            referenceTree, title), includeTree, referenceTree);
         }
     }
     
-    static protected void addToPages(Set<String> pages, Set<String> newPages, Collection<? extends String> titles, Map<String, Set<String>> includeTree, Map<String, Set<String>> referenceTree) {
-        for (String title : titles) {
+    static protected void addToPages(Set<NormalisedTitle> pages, Set<NormalisedTitle> newPages,
+            Collection<? extends NormalisedTitle> titles,
+            Map<NormalisedTitle, Set<NormalisedTitle>> includeTree,
+            Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree) {
+        for (NormalisedTitle title : titles) {
             addToPages(pages, newPages, title, includeTree, referenceTree);
         }
     }
@@ -876,28 +866,28 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     
     protected class SQLiteWriteValuesJob implements SQLiteJob {
         SQLiteStatement stmt;
-        String key;
-        Collection<? extends String> values;
+        NormalisedTitle key;
+        Collection<? extends NormalisedTitle> values;
         
-        public SQLiteWriteValuesJob(SQLiteStatement stmt, String key, String value) {
+        public SQLiteWriteValuesJob(SQLiteStatement stmt, NormalisedTitle key, NormalisedTitle value) {
             this.stmt = stmt;
             this.key = key;
             this.values = Arrays.asList(value);
         }
         
-        public SQLiteWriteValuesJob(SQLiteStatement stmt, String key, Collection<? extends String> values) {
+        public SQLiteWriteValuesJob(SQLiteStatement stmt, NormalisedTitle key, Collection<? extends NormalisedTitle> values) {
             this.stmt = stmt;
             this.key = key;
             this.values = values;
         }
 
-        protected long pageToId(String origPageTitle) throws RuntimeException {
-            String pageTitle = wikiModel.normalisePageTitle(origPageTitle);
+        protected long pageToId(NormalisedTitle pageTitle) throws RuntimeException {
+            String pageTitle2 = pageTitle.toString();
             try {
                 long pageId = -1;
                 // try to find the page id in the pages table:
                 try {
-                    stGetPageId.bind(1, pageTitle);
+                    stGetPageId.bind(1, pageTitle2);
                     if (stGetPageId.step()) {
                         pageId = stGetPageId.columnLong(0);
                     }
@@ -908,14 +898,14 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 if (pageId == -1) {
                     pageId = nextPageId++;
                     try {
-                        stWritePages.bind(1, pageId).bind(2, pageTitle).stepThrough();
+                        stWritePages.bind(1, pageId).bind(2, pageTitle2).stepThrough();
                     } finally {
                         stWritePages.reset();
                     }
                 }
                 return pageId;
             } catch (SQLiteException e) {
-                System.err.println("write of " + pageTitle + " failed (sqlite error: " + e.toString() + ")");
+                System.err.println("write of " + pageTitle2 + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }
@@ -924,7 +914,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
         public void run() {
             long key_id = pageToId(key);
             ArrayList<Long> values_id = new ArrayList<Long>(values.size());
-            for (String value : values) {
+            for (NormalisedTitle value : values) {
                 values_id.add(pageToId(value));
             }
             try {

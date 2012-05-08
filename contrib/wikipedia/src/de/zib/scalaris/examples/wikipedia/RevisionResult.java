@@ -2,6 +2,7 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.List;
 
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 
@@ -14,7 +15,7 @@ public class RevisionResult extends Result {
     /**
      * Normalised page title.
      */
-    public String normalisedTitle = "";
+    final public NormalisedTitle normalisedTitle;
     /**
      * Revision on success.
      */
@@ -44,7 +45,7 @@ public class RevisionResult extends Result {
      * @param revision
      *            the retrieved revision
      */
-    public RevisionResult(List<InvolvedKey> involvedKeys, String normalisedTitle, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, NormalisedTitle normalisedTitle, Page page,
             Revision revision) {
         super(involvedKeys);
         this.normalisedTitle = normalisedTitle;
@@ -68,7 +69,7 @@ public class RevisionResult extends Result {
      * @param time
      *            time in milliseconds for this operation
      */
-    public RevisionResult(List<InvolvedKey> involvedKeys, String normalisedTitle, Page page,
+    public RevisionResult(List<InvolvedKey> involvedKeys, NormalisedTitle normalisedTitle, Page page,
             Revision revision, String name, long time) {
         super(involvedKeys);
         this.normalisedTitle = normalisedTitle;
@@ -100,7 +101,7 @@ public class RevisionResult extends Result {
      *            whether the requested revision exists or not
      */
     public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
-            String message, boolean connectFailed, String normalisedTitle, Page page,
+            String message, boolean connectFailed, NormalisedTitle normalisedTitle, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing) {
         super(success, involvedKeys, message, connectFailed);
@@ -138,7 +139,7 @@ public class RevisionResult extends Result {
      *            time in milliseconds for this operation
      */
     public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
-            String message, boolean connectFailed, String normalisedTitle, Page page,
+            String message, boolean connectFailed, NormalisedTitle normalisedTitle, Page page,
             Revision revision, boolean page_not_existing,
             boolean rev_not_existing, String name, long time) {
         super(success, involvedKeys, message, connectFailed);

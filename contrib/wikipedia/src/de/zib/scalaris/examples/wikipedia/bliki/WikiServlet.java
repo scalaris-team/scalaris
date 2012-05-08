@@ -65,6 +65,7 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.SpecialPage;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
@@ -118,7 +119,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     
     protected List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
     
-    protected BloomFilter<String> existingPages = new BloomFilter<String>(MyWikiModel.existingPagesFPR, 100);
+    protected BloomFilter<NormalisedTitle> existingPages = new BloomFilter<NormalisedTitle>(MyWikiModel.existingPagesFPR, 100);
 
     protected static final EnumMap<SpecialPage, String> SPECIAL_SUFFIX_EN = MyWikiModel.SPECIAL_SUFFIX.get("en");
     protected EnumMap<SpecialPage, String> SPECIAL_SUFFIX_LANG;
@@ -126,7 +127,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * Full list of normalised special page titles for {@link #existingPages}. 
      */
-    protected final List<String> specialPages;
+    protected final List<NormalisedTitle> specialPages;
 
     /**
      * Creates the servlet. 
@@ -134,14 +135,17 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     public WikiServlet() {
         super();
         SPECIAL_SUFFIX_LANG = SPECIAL_SUFFIX_EN;
-        specialPages = new ArrayList<String>(SPECIAL_SUFFIX_EN.size() * 2);
+        specialPages = new ArrayList<NormalisedTitle>(SPECIAL_SUFFIX_EN.size() * 2);
         // add English names here - the localised versions will be added when
         // the siteinfo is loaded
         for (String suffix : SPECIAL_SUFFIX_EN.values()) {
             // note: if non-english namespace, "Special" won't be recognised
             // during normalisation -> leave it unnormalised
-            specialPages.add(MyWikiModel.createFullPageName(
-                    MyWikiModel.SPECIAL_PREFIX.get("en"), suffix));
+            specialPages.add(new NormalisedTitle(
+                    MyNamespace.MAIN_NAMESPACE_KEY,
+                    MyWikiModel.createFullPageName(
+                            MyWikiModel.SPECIAL_PREFIX.get("en"),
+                            suffix)));
         }
     }
 
@@ -254,20 +258,23 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected void setLocalisedSpecialPageNames() {
         if (initialized) {
             String fullBaseUrl = siteinfo.getBase();
+            String lang = "en";
             Matcher matcher = MATCH_WIKI_SITE_LANG.matcher(fullBaseUrl);
             if (matcher.matches()) {
-                final String lang = matcher.group(1);
+                lang = matcher.group(1);
                 final EnumMap<SpecialPage, String> specialSuffixLang = MyWikiModel.SPECIAL_SUFFIX.get(lang);
                 if (specialSuffixLang != null) {
                     SPECIAL_SUFFIX_LANG = specialSuffixLang;
                 }
             }
-            for (String suffix : SPECIAL_SUFFIX_LANG.values()) {
-                specialPages.add(MyWikiModel.createFullPageName(
-                        MyNamespace.SPECIAL_NAMESPACE_KEY.toString(), suffix));
-            }
-            existingPages.addAll(specialPages);
         }
+        // note: we always need to add these suffixes, even if lang == "en"
+        // because English suffixes have only been added as un-normalised titles
+        // before!
+        for (String suffix : SPECIAL_SUFFIX_LANG.values()) {
+            specialPages.add(new NormalisedTitle(MyNamespace.SPECIAL_NAMESPACE_KEY, suffix));
+        }
+        existingPages.addAll(specialPages);
     }
 
     /**
@@ -464,12 +471,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPageHeading("Search");
         page.setFormTitle("Search results");
         page.setFormType(FormType.PageSearchForm);
-        ValueResult<List<String>> result;
+        ValueResult<List<NormalisedTitle>> result;
         page.setSearch(req_search);
         page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH)));
         page.setShowAllPages(false);
         if (req_search.isEmpty()) {
-            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0), new ArrayList<NormalisedTitle>(0));
         } else {
             result = getPageList(nsId, connection);
         }
@@ -511,12 +518,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormTitle("All pages");
         page.setFormType(FormType.FromToForm);
         page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES)));
-        ValueResult<List<String>> result;
+        ValueResult<List<NormalisedTitle>> result;
         if (req_from == null && req_to == null) {
             page.setShowAllPages(false);
             page.setFromPage("");
             page.setToPage("");
-            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0), new ArrayList<NormalisedTitle>(0));
         } else {
             page.setShowAllPages(true);
             if (req_from == null) {
@@ -566,11 +573,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormTitle("All pages");
         page.setFormType(FormType.PagePrefixForm);
         page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX)));
-        ValueResult<List<String>> result;
+        ValueResult<List<NormalisedTitle>> result;
         if (req_prefix == null) {
             page.setShowAllPages(false);
             page.setPrefix("");
-            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0), new ArrayList<NormalisedTitle>(0));
         } else {
             page.setShowAllPages(true);
             page.setPrefix(req_prefix);
@@ -611,12 +618,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setFormTitle("What links here");
         page.setFormType(FormType.TargetPageForm);
         page.setTitle(MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE)));
-        ValueResult<List<String>> result;
+        ValueResult<List<NormalisedTitle>> result;
         if (req_target == null) {
             page.setShowAllPages(false);
             page.setPageHeading("Pages that link to a selected page");
             page.setTarget("");
-            result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+            result = new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0), new ArrayList<NormalisedTitle>(0));
         } else {
             page.setShowAllPages(true);
             page.setPageHeading("Pages that link to \"" + req_target + "\"");
@@ -691,7 +698,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewRandomPage(HttpServletRequest request,
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws IOException, ServletException {
-        ValueResult<String> result = getRandomArticle(connection, new Random());
+        ValueResult<NormalisedTitle> result = getRandomArticle(connection, new Random());
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
         if (result.success) {
@@ -701,7 +708,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             StringBuilder redirectUrl = new StringBuilder(256);
             redirectUrl.append("?title=");
-            redirectUrl.append(URLEncoder.encode(MyWikiModel.denormalisePageTitle(result.value, namespace), "UTF-8"));
+            redirectUrl.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
             redirectUrl.append("&random_times=" + StringUtils.join(times, "%2C"));
             redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
             response.sendRedirect("http://" + Options.getInstance().SERVERNAME
@@ -806,7 +813,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.unpackedText());
             if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
-                ValueResult<List<String>> catPagesResult = getPagesInCategory(connection, title, namespace);
+                ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, title, namespace);
                 page.addStats(catPagesResult.stats);
                 page.getInvolvedKeys().addAll(catPagesResult.involvedKeys);
                 if (catPagesResult.success) {
@@ -820,7 +827,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                             subCategories.add(wikiModel.getTitleName(pageInCat));
                         } else if (wikiModel.isTemplateNamespace(pageNamespace)) {
                             // all pages using a template are in the category, too
-                            ValueResult<List<String>> tplResult = getPagesInTemplate(connection, pageInCat, namespace);
+                            ValueResult<List<NormalisedTitle>> tplResult = getPagesInTemplate(connection, pageInCat, namespace);
                             page.addStats(tplResult.stats);
                             page.getInvolvedKeys().addAll(tplResult.involvedKeys);
                             if (tplResult.success) {
@@ -1114,7 +1121,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @throws ServletException
      */
     private void handleViewSpecialPageList(HttpServletRequest request,
-            HttpServletResponse response, ValueResult<List<String>> result,
+            HttpServletResponse response, ValueResult<List<NormalisedTitle>> result,
             Connection connection, WikiPageListBean page)
             throws ServletException, IOException {
         if (result.success) {
@@ -1258,7 +1265,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+        ValueResult<List<NormalisedTitle>> result = new ValueResult<List<NormalisedTitle>>(
+                new ArrayList<InvolvedKey>(0),
+                new ArrayList<NormalisedTitle>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1373,7 +1382,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+        ValueResult<List<NormalisedTitle>> result = new ValueResult<List<NormalisedTitle>>(
+                new ArrayList<InvolvedKey>(0),
+                new ArrayList<NormalisedTitle>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
 
@@ -1452,7 +1463,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
-        ValueResult<List<String>> result = new ValueResult<List<String>>(new ArrayList<InvolvedKey>(0), new ArrayList<String>(0));
+        ValueResult<List<NormalisedTitle>> result = new ValueResult<List<NormalisedTitle>>(
+                new ArrayList<InvolvedKey>(0),
+                new ArrayList<NormalisedTitle>(0));
         handleViewSpecialPageList(request, response, result, connection, page);
     }
     
@@ -1953,11 +1966,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (initialized) {
             Connection connection = getConnection(null);
             try {
-                ValueResult<List<String>> result = getPageList(connection);
+                ValueResult<List<NormalisedTitle>> result = getPageList(connection);
                 if (result.success) {
-                    List<String> pages = result.value;
+                    List<NormalisedTitle> pages = result.value;
                     pages.addAll(specialPages);
-                    BloomFilter<String> filter = MyWikiModel.createBloomFilter(pages);
+                    BloomFilter<NormalisedTitle> filter = MyWikiModel.createBloomFilter(pages);
                     existingPages = filter;
                 }
             } finally {

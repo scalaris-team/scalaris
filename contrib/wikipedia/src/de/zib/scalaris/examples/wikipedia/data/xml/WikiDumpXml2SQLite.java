@@ -26,8 +26,8 @@ import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
-import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -320,19 +320,11 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
         
         @Override
         public void run() {
-            String pageName;
-            int pageNs;
-            do {
-                final MyNamespace nsObject = wikiModel.getNamespace();
-                String[] parts = MyWikiModel.splitNsTitle(page.getTitle(), nsObject);
-                pageNs = nsObject.getNumberByName(parts[0]);
-                pageName = MyWikiModel.normaliseName(parts[1]);
-            } while (false);
-            
+            NormalisedTitle normTitle = MyWikiModel.normalisePageTitle(page.getTitle(), wikiModel.getNamespace());
             // check if page exists:
             try {
                 final SQLiteStatement stmt = db.prepare("SELECT page_id FROM page WHERE page_namespace == ? AND page_title = ?;");
-                stmt.bind(1, pageNs).bind(2, pageName);
+                stmt.bind(1, normTitle.namespace).bind(2, normTitle.title);
                 if (stmt.step()) {
                     // exists
                     return;
@@ -348,8 +340,8 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
             final int pageId = page.getId();
             try {
                 try {
-                    stWritePage.bind(1, pageId).bind(2, pageNs)
-                            .bind(3, pageName).bind(4, pageRestrictions)
+                    stWritePage.bind(1, pageId).bind(2, normTitle.namespace)
+                            .bind(3, normTitle.title).bind(4, pageRestrictions)
                             .bind(5, page.isRedirect() ? 1 : 0)
                             .bind(6, page.getCurRev().getId())
                             .bind(7, page.getCurRev().unpackedText().getBytes().length);

@@ -157,9 +157,9 @@ public class MyWikiModel extends WikiModel {
      * False positive rate of the bloom filter for the existing pages checks.
      */
     public static final double existingPagesFPR = 0.1;
-    protected BloomFilter<String> existingPages = null;
+    protected BloomFilter<NormalisedTitle> existingPages = null;
 
-    protected Map<String, String> pageCache = new HashMap<String, String>();
+    protected Map<NormalisedTitle, String> pageCache = new HashMap<NormalisedTitle, String>();
     
     protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
             Pattern.compile("^.*?([\\p{C}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -814,7 +814,7 @@ public class MyWikiModel extends WikiModel {
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
             appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
-            String topic = normalisePageTitle(topic0);
+            NormalisedTitle topic = normalisePageTitle(topic0);
             if (cssClass == null && existingPages!= null && !existingPages.contains(topic)) {
                 cssClass = "new";
             }
@@ -860,6 +860,110 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
+     * Represents a normalised title, split into its two components: namespace
+     * and page title.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class NormalisedTitle {
+        /**
+         * The namespace number.
+         */
+        public final Integer namespace;
+        /**
+         * The page title without the namespace.
+         */
+        public final String title;
+        
+        /**
+         * Constructor.
+         * 
+         * @param namespace
+         *            namespace number
+         * @param title
+         *            page title without the namespace
+         */
+        public NormalisedTitle(Integer namespace, String title) {
+            assert (namespace != null);
+            assert (title != null);
+            this.namespace = namespace;
+            this.title = title;
+        }
+        
+        /**
+         * Creates the full page name with namespace and title.
+         * 
+         * @return <tt>namespace:title</tt>
+         */
+        @Override
+        public String toString() {
+            return namespace + ":" + title;
+        }
+        
+        /**
+         * Creates the full page name with namespace and title.
+         * 
+         * @param normTitleStr
+         *            a normalised title of the form <tt>namespace:title</tt>
+         * 
+         * @return a {@link NormalisedTitle} object
+         * 
+         * @throws IllegalArgumentException
+         *             if the parameter string was not a normalised title
+         */
+        public static NormalisedTitle fromString(String normTitleStr) throws IllegalArgumentException {
+            int colonIndex = normTitleStr.indexOf(':');
+            if (colonIndex == (-1)) {
+                throw new IllegalArgumentException(
+                        "no normalised title string: " + normTitleStr);
+            }
+
+            try {
+                final Integer ns = Integer.parseInt(normTitleStr.substring(0, colonIndex));
+                final String title = normTitleStr.substring(colonIndex + 1);
+                return new NormalisedTitle(ns, title);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "no normalised title string: " + normTitleStr);
+            }
+        }
+        
+        /**
+         * Gets a de-normalised version of the page title, including the
+         * namespace.
+         * 
+         * @param nsObject
+         *            the namespace object for determining the string of the
+         *            namespace id
+         * 
+         * @return de-normalised <tt>namespace:title</tt> or <tt>title</tt>
+         */
+        public String denormalise(final MyNamespace nsObject) {
+            return createFullPageName(nsObject.getNamespaceByNumber(namespace),
+                    title);
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof NormalisedTitle)) {
+                return false;
+            }
+            
+            NormalisedTitle obj2 = (NormalisedTitle) obj;
+            return this.namespace.equals(obj2.namespace) &&
+                    this.title.equals(obj2.title);
+        }
+        
+        @Override
+        public int hashCode() {
+            return toString().hashCode();
+        }
+    }
+    
+    /**
      * Normalises the given page title by capitalising its first letter after
      * the namespace.
      * 
@@ -868,8 +972,23 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page title
      */
-    public String normalisePageTitle(final String title) {
+    public NormalisedTitle normalisePageTitle(final String title) {
         return normalisePageTitle(title, getNamespace());
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param maybeNs
+     *            the namespace of the page
+     * @param articleName
+     *            the (unnormalised) page's name without the namespace
+     * 
+     * @return the normalised page title
+     */
+    public NormalisedTitle normalisePageTitle(final String maybeNs, final String articleName) {
+        return normalisePageTitle(maybeNs, articleName, getNamespace());
     }
     
     /**
@@ -883,11 +1002,32 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page title
      */
-    public static String normalisePageTitle(final String title, final MyNamespace nsObject) {
+    public static NormalisedTitle normalisePageTitle(final String title, final MyNamespace nsObject) {
         String[] parts = splitNsTitle(title, nsObject);
-        return createFullPageName(
-                nsObject.getNumberByName(parts[0]).toString(),
+        return new NormalisedTitle(
+                nsObject.getNumberByName(parts[0]),
                 normaliseName(parts[1]));
+    }
+    
+    /**
+     * Normalises the given page title by capitalising its first letter after
+     * the namespace.
+     * 
+     * @param maybeNs
+     *            the namespace of the page
+     * @param articleName
+     *            the (unnormalised) page's name without the namespace
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * 
+     * @return the normalised page title
+     */
+    public static NormalisedTitle normalisePageTitle(final String maybeNs, final String articleName, final MyNamespace nsObject) {
+        Integer nsNumber = nsObject.getNumberByName(maybeNs);
+        if (nsNumber == null) {
+            nsNumber = MyNamespace.MAIN_NAMESPACE_KEY;
+        }
+        return new NormalisedTitle(nsNumber, normaliseName(articleName));
     }
     
     /**
@@ -903,7 +1043,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page titles
      */
-    public <T extends Collection<String>> T normalisePageTitles(final Collection<String> titles, T normalisedTitles) {
+    public <T extends Collection<NormalisedTitle>> T normalisePageTitles(final Collection<String> titles, T normalisedTitles) {
         return MyWikiModel.<T>normalisePageTitles(titles, getNamespace(), normalisedTitles);
     }
     
@@ -922,42 +1062,11 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the normalised page titles
      */
-    public static <T extends Collection<String>> T normalisePageTitles(final Collection<String> titles, final MyNamespace nsObject, T normalisedTitles) {
+    public static <T extends Collection<NormalisedTitle>> T normalisePageTitles(final Collection<String> titles, final MyNamespace nsObject, T normalisedTitles) {
         for (String title: titles) {
             normalisedTitles.add(MyWikiModel.normalisePageTitle(title, nsObject));
         }
         return normalisedTitles;
-    }
-    
-    /**
-     * De-normalises the given page title by capitalising its first letter after
-     * the namespace.
-     * 
-     * @param title
-     *            the normalised page title
-     * 
-     * @return the original page title
-     */
-    public String denormalisePageTitle(final String title) {
-        return denormalisePageTitle(title, getNamespace());
-    }
-    
-    /**
-     * De-normalises the given page title by capitalising its first letter after
-     * the namespace.
-     * 
-     * @param title
-     *            the normalised page title
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * 
-     * @return the original page title
-     */
-    public static String denormalisePageTitle(final String title, final MyNamespace nsObject) {
-        String[] parts = splitNsTitle(title, nsObject, false);
-        return createFullPageName(
-                nsObject.getNamespaceByNumber(Integer.parseInt(parts[0])),
-                normaliseName(parts[1]));
     }
     
     /**
@@ -973,7 +1082,7 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the original page title
      */
-    public <T extends Collection<String>> T denormalisePageTitles(final Collection<String> titles, T denormalisedTitles) {
+    public <T extends Collection<String>> T denormalisePageTitles(final Collection<NormalisedTitle> titles, T denormalisedTitles) {
         return MyWikiModel.<T>denormalisePageTitles(titles, getNamespace(), denormalisedTitles);
     }
     
@@ -992,9 +1101,9 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the original page title
      */
-    public static <T extends Collection<String>> T denormalisePageTitles(final Collection<String> titles, final MyNamespace nsObject, T denormalisedTitles) {
-        for (String title: titles) {
-            denormalisedTitles.add(MyWikiModel.denormalisePageTitle(title, nsObject));
+    public static <T extends Collection<String>> T denormalisePageTitles(final Collection<NormalisedTitle> titles, final MyNamespace nsObject, T denormalisedTitles) {
+        for (NormalisedTitle title: titles) {
+            denormalisedTitles.add(title.denormalise(nsObject));
         }
         return denormalisedTitles;
     }
@@ -1008,7 +1117,7 @@ public class MyWikiModel extends WikiModel {
         super.setUp();
         fRedirectLink = null;
         magicWordCache = new HashMap<String, String>();
-        pageCache = new HashMap<String, String>();
+        pageCache = new HashMap<NormalisedTitle, String>();
     }
 
     /* (non-Javadoc)
@@ -1135,8 +1244,11 @@ public class MyWikiModel extends WikiModel {
      * 
      * @return the bloom filter
      */
-    public static BloomFilter<String> createBloomFilter(Collection<? extends String> elements) {
-        BloomFilter<String> result = new BloomFilter<String>(existingPagesFPR, Math.max(100, elements.size() + Math.max(10, elements.size() / 10)));
+    public static BloomFilter<NormalisedTitle> createBloomFilter(
+            Collection<? extends NormalisedTitle> elements) {
+        BloomFilter<NormalisedTitle> result = new BloomFilter<NormalisedTitle>(
+                existingPagesFPR,
+                Math.max(100, elements.size() + Math.max(10, elements.size() / 10)));
         result.addAll(elements);
         return result;
     }
@@ -1144,14 +1256,14 @@ public class MyWikiModel extends WikiModel {
     /**
      * @return the existingPages
      */
-    public BloomFilter<String> getExistingPages() {
+    public BloomFilter<NormalisedTitle> getExistingPages() {
         return existingPages;
     }
 
     /**
      * @param existingPages the existingPages to set
      */
-    public void setExistingPages(BloomFilter<String> existingPages) {
+    public void setExistingPages(BloomFilter<NormalisedTitle> existingPages) {
         this.existingPages = existingPages;
     }
 
