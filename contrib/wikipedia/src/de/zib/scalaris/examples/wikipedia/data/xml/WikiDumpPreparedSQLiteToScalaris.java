@@ -39,6 +39,7 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.operations.WriteOp;
 
 /**
@@ -380,7 +381,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     @Override
     public void setUp() {
         try {
-            db = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbFileName, true, null);
+            db = SQLiteDataHandler.openDB(dbFileName, true, null);
         } catch (SQLiteException e) {
             System.err.println("Cannot read database: " + dbFileName);
             throw new RuntimeException(e);

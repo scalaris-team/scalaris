@@ -37,6 +37,7 @@ import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_HASH;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
+import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
@@ -196,7 +197,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             try {
                 // set up DB:
                 try {
-                    dbWrite = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbWriteFileName, false);
+                    dbWrite = SQLiteDataHandler.openDB(dbWriteFileName, false);
                     dbWrite.exec("CREATE TABLE objects(scalaris_key STRING PRIMARY KEY ASC, scalaris_value);");
                     stWrite = WikiDumpPrepareSQLiteForScalarisHandler.createWriteStmt(dbWrite);
                 } catch (SQLiteException e) {
@@ -601,7 +602,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     @Override
     public void setUp() {
         try {
-            dbRead = WikiDumpPrepareSQLiteForScalarisHandler.openDB(dbReadFileName, true, null);
+            dbRead = SQLiteDataHandler.openDB(dbReadFileName, true, null);
             stRead = dbRead.prepare("SELECT scalaris_key, scalaris_value FROM objects");
         } catch (SQLiteException e) {
             System.err.println("Cannot read database: " + dbReadFileName);
