@@ -201,7 +201,8 @@ public class XmlPage extends DefaultHandler {
             } else if (localName.equals("revision")) {
                 inRevision = true;
                 // check whether all revisions of this page should be skipped
-                if (checkSkipRevisions != null && checkSkipRevisions.skipRevisions(title)) {
+                if (!skipRevisions && checkSkipRevisions != null
+                        && checkSkipRevisions.skipRevisions(title)) {
                     skipRevisions = true;
                 }
                 if (!skipRevisions) {
