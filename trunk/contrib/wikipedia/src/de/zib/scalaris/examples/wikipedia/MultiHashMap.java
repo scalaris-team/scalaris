@@ -15,13 +15,13 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Provides a multi-map, i.e. a map associating multiple values with a single
- * key. Wraps the {@link LinkedHashMap} class.
+ * key. Wraps the {@link HashMap} class.
  * 
  * @param <K>
  *            key type
@@ -30,12 +30,12 @@ import java.util.Map;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class LinkedMultiHashMap<K, V> extends MultiMap<LinkedHashMap<K, List<V>>, K, V> {
+public class MultiHashMap<K, V> extends MultiMap<HashMap<K, List<V>>, K, V> {
     /**
      * Constructs an empty map.
      */
-    public LinkedMultiHashMap() {
-        super(LinkedHashMap.class);
+    public MultiHashMap() {
+        super(HashMap.class);
     }
     
     /**
@@ -44,8 +44,8 @@ public class LinkedMultiHashMap<K, V> extends MultiMap<LinkedHashMap<K, List<V>>
      * @param initialCapacity
      *            the initial capacity of the hash table
      */
-    public LinkedMultiHashMap(int initialCapacity) {
-        super(LinkedHashMap.class, initialCapacity);
+    public MultiHashMap(int initialCapacity) {
+        super(HashMap.class, initialCapacity);
     }
     
     /**
@@ -56,7 +56,7 @@ public class LinkedMultiHashMap<K, V> extends MultiMap<LinkedHashMap<K, List<V>>
      * 
      * @see #putAll(Map)
      */
-    public LinkedMultiHashMap(Map<? extends K, ? extends List<V>> other) {
-        super(LinkedHashMap.class, other);
+    public MultiHashMap(Map<? extends K, ? extends List<V>> other) {
+        super(HashMap.class, other);
     }
 }
