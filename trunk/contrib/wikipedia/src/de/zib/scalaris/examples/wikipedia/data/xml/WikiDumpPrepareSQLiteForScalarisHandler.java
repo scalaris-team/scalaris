@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -41,9 +40,12 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.examples.wikipedia.MultiHashMap;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -328,25 +330,23 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
 
     @Override
     protected void doExport(Page page, List<Revision> revisions,
-            List<ShortRevision> revisions_short, NamespaceEnum namespace)
+            List<ShortRevision> revisions_short, NormalisedTitle title)
             throws UnsupportedOperationException {
         for (Revision rev : revisions) {
             if (rev.getId() != page.getCurRev().getId()) {
                 addSQLiteJob(new SQLiteWriteObjectJob<Revision>(
-                        ScalarisDataHandlerUnnormalised.getRevKey(page.getTitle(),
-                                rev.getId(), wikiModel.getNamespace()), rev,
-                        stWrite));
+                        ScalarisDataHandlerNormalised.getRevKey(title,
+                                rev.getId()), rev, stWrite));
             }
         }
         addSQLiteJob(new SQLiteWriteObjectJob<List<ShortRevision>>(
-                ScalarisDataHandlerUnnormalised.getRevListKey(page.getTitle(), wikiModel.getNamespace()),
+                ScalarisDataHandlerNormalised.getRevListKey(title),
                 revisions_short, stWrite));
         addSQLiteJob(new SQLiteWriteObjectJob<Page>(
-                ScalarisDataHandlerUnnormalised.getPageKey(page.getTitle(), wikiModel.getNamespace()),
-                page, stWrite));
+                ScalarisDataHandlerNormalised.getPageKey(title), page, stWrite));
 
         // note: do not normalise page titles (this will be done later)
-        newPages.get(namespace).add(page.getTitle());
+        newPages.get(NamespaceEnum.fromId(title.namespace)).add(title);
         // only export page list every UPDATE_PAGELIST_EVERY pages:
         if ((pageCount % UPDATE_PAGELIST_EVERY) == 0) {
             updatePageList();
@@ -496,18 +496,19 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
          * (temporary) page table.
          * 
          * @param pageTitle
-         *            (un-normalised) page title
+         *            page title
          * 
          * @return the ID of the page
          * 
          * @throws RuntimeException
          */
-        protected long pageToId(String pageTitle) throws RuntimeException {
+        protected long pageToId(NormalisedTitle pageTitle) throws RuntimeException {
+            String pageTitle2 = pageTitle.toString();
             try {
                 long pageId = -1;
                 // try to find the page id in the pages table:
                 try {
-                    stGetTmpPageId.bind(1, pageTitle);
+                    stGetTmpPageId.bind(1, pageTitle2);
                     if (stGetTmpPageId.step()) {
                         pageId = stGetTmpPageId.columnLong(0);
                     }
@@ -518,7 +519,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 if (pageId == -1) {
                     pageId = nextPageId++;
                     try {
-                        stWriteTmpPages.bind(1, pageId).bind(2, pageTitle).stepThrough();
+                        stWriteTmpPages.bind(1, pageId).bind(2, pageTitle2).stepThrough();
                     } finally {
                         stWriteTmpPages.reset();
                     }
@@ -537,25 +538,20 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      * @author Nico Kruber, kruber@zib.de
      */
     protected class SQLiteUpdatePageLists1Job extends SQLiteUpdatePageListsJob {
-        EnumMap<NamespaceEnum, ArrayList<String>> newPages;
+        EnumMap<NamespaceEnum, ArrayList<NormalisedTitle>> newPages;
         int articleCount;
         
         /**
          * Writes the page and article list to the DB.
          * 
          * @param newPages
-         *            (un-normalised) list of page titles
+         *            list of page titles
          * @param articleCount
          *            number of articles
          */
-        public SQLiteUpdatePageLists1Job(EnumMap<NamespaceEnum, ArrayList<String>> newPages, int articleCount) {
-            // NOTE: can only use the wikiModel member here in order not to
-            // influence other parsing operations
-            this.newPages = createNewPagesList();
+        public SQLiteUpdatePageLists1Job(EnumMap<NamespaceEnum, ArrayList<NormalisedTitle>> newPages, int articleCount) {
+            this.newPages = newPages;
             this.articleCount = articleCount;
-            for(NamespaceEnum ns : NamespaceEnum.values()) {
-                wikiModel.normalisePageTitles(newPages.get(ns), this.newPages.get(ns));
-            }
         }
         
         @Override
@@ -564,8 +560,9 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
             
             // list of pages:
             for(NamespaceEnum ns : NamespaceEnum.values()) {
-                scalaris_key = ScalarisDataHandlerUnnormalised.getPageListKey(ns.getId());
-                final ArrayList<String> curNewPages = newPages.get(ns);
+                scalaris_key = ScalarisDataHandler.getPageListKey(ns.getId());
+                final List<String> curNewPages = ScalarisDataHandlerNormalised
+                        .normList2normStringList(newPages.get(ns));
                 List<String> pageList;
                 try {
                     pageList = readObject2(scalaris_key).stringListValue();
@@ -574,11 +571,11 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     pageList = curNewPages;
                 }
                 writeObject(scalaris_key, pageList);
-                writeObject(ScalarisDataHandlerUnnormalised.getPageCountKey(ns.getId()), pageList.size());
+                writeObject(ScalarisDataHandler.getPageCountKey(ns.getId()), pageList.size());
             }
             
             // number articles:
-            writeObject(ScalarisDataHandlerUnnormalised.getArticleCountKey(), articleCount);
+            writeObject(ScalarisDataHandler.getArticleCountKey(), articleCount);
         }
     }
 
@@ -588,33 +585,33 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      * @author Nico Kruber, kruber@zib.de
      */
     protected class SQLiteUpdateTmpPageLists2Job extends SQLiteUpdatePageListsJob {
-        HashMap<String, List<String>> newCategories;
-        HashMap<String, List<String>> newTemplates;
-        HashMap<String, List<String>> newBackLinks;
+        MultiHashMap<NormalisedTitle, NormalisedTitle> newCategories;
+        MultiHashMap<NormalisedTitle, NormalisedTitle> newTemplates;
+        MultiHashMap<NormalisedTitle, NormalisedTitle> newBackLinks;
         
         /**
          * Writes (temporary) page list mappings to the DB.
          * 
          * @param newCategories
-         *            (un-normalised) category mappings
+         *            category mappings
          * @param newTemplates
-         *            (un-normalised) template mappings
+         *            template mappings
          * @param newBackLinks
-         *            (un-normalised) link mappings
+         *            link mappings
          */
         public SQLiteUpdateTmpPageLists2Job(
-                HashMap<String, List<String>> newCategories,
-                HashMap<String, List<String>> newTemplates,
-                HashMap<String, List<String>> newBackLinks) {
+                MultiHashMap<NormalisedTitle, NormalisedTitle> newCategories,
+                MultiHashMap<NormalisedTitle, NormalisedTitle> newTemplates,
+                MultiHashMap<NormalisedTitle, NormalisedTitle> newBackLinks) {
             this.newCategories = newCategories;
             this.newTemplates = newTemplates;
             this.newBackLinks = newBackLinks;
         }
         
-        protected void addToList(SQLiteStatement stmt, String key, Collection<? extends String> values) {
+        protected void addToList(SQLiteStatement stmt, NormalisedTitle key, Collection<? extends NormalisedTitle> values) {
             long key_id = pageToId(key);
             ArrayList<Long> values_id = new ArrayList<Long>(values.size());
-            for (String value : values) {
+            for (NormalisedTitle value : values) {
                 values_id.add(pageToId(value));
             }
             try {
@@ -635,20 +632,24 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         @Override
         public void run() {
             // list of pages in each category:
-            for (Entry<String, List<String>> category: newCategories.entrySet()) {
+            for (Entry<NormalisedTitle, List<NormalisedTitle>> category: newCategories.entrySet()) {
                 addToList(stWriteTmpCategories, category.getKey(), category.getValue());
             }
         
             // list of pages a template is used in:
-            for (Entry<String, List<String>> template: newTemplates.entrySet()) {
+            for (Entry<NormalisedTitle, List<NormalisedTitle>> template: newTemplates.entrySet()) {
                 addToList(stWriteTmpTemplates, template.getKey(), template.getValue());
             }
             
             // list of pages linking to other pages:
-            for (Entry<String, List<String>> backlinks: newBackLinks.entrySet()) {
+            for (Entry<NormalisedTitle, List<NormalisedTitle>> backlinks: newBackLinks.entrySet()) {
                 addToList(stWriteTmpLinks, backlinks.getKey(), backlinks.getValue());
             }
         }
+    }
+    
+    private static enum ListType {
+        CAT_LIST, TPL_LIST, LNK_LIST;
     }
 
     /**
@@ -671,27 +672,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT cat.title, page.title FROM categories as categories " +
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
                             "INNER JOIN pages AS page ON categories.page == page.id;");
-                    String category0 = null;
-                    List<String> catPageList = new ArrayList<String>(1000);
-                    while (stmt.step()) {
-                        final String stmtCat0 = stmt.columnString(0);
-                        final String stmtPage0 = stmt.columnString(1);
-                        final String stmtPage = wikiModel.normalisePageTitle(stmtPage0);
-                        if (category0 == null) {
-                            category0 = stmtCat0;
-                            catPageList.add(stmtPage);
-                        } else if (category0.equals(stmtCat0)) {
-                            catPageList.add(stmtPage);
-                        } else {
-                            // write old, accumulate new
-                            writeCatToScalaris(category0, catPageList);
-                            category0 = stmtCat0;
-                            catPageList.add(stmtPage);
-                        }
-                    }
-                    if (category0 != null && !catPageList.isEmpty()) {
-                        writeCatToScalaris(category0, catPageList);
-                    }
+                    writeToScalarisKV(stmt, ListType.CAT_LIST);
                     stmt.dispose();
                 } while (false);
 
@@ -701,27 +682,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT tpl.title, page.title FROM templates as templates " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
                             "INNER JOIN pages AS page ON templates.page == page.id;");
-                    String template0 = null;
-                    List<String> tplPageList = new ArrayList<String>(1000);
-                    while (stmt.step()) {
-                        final String stmtTpl0 = stmt.columnString(0);
-                        final String stmtPage0 = stmt.columnString(1);
-                        final String stmtPage = wikiModel.normalisePageTitle(stmtPage0);
-                        if (template0 == null) {
-                            template0 = stmtTpl0;
-                            tplPageList.add(stmtPage);
-                        } else if (template0.equals(stmtTpl0)) {
-                            tplPageList.add(stmtPage);
-                        } else {
-                            // write old, accumulate new
-                            writeTplToScalaris(template0, tplPageList);
-                            template0 = stmtTpl0;
-                            tplPageList.add(stmtPage);
-                        }
-                    }
-                    if (template0 != null && !tplPageList.isEmpty()) {
-                        writeTplToScalaris(template0, tplPageList);
-                    }
+                    writeToScalarisKV(stmt, ListType.TPL_LIST);
                     stmt.dispose();
                 } while (false);
 
@@ -731,27 +692,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt = db.prepare("SELECT lnkDest.title, lnkSrc.title FROM links as links " +
                             "INNER JOIN pages AS lnkDest ON links.lnkDest == lnkDest.id " +
                             "INNER JOIN pages AS lnkSrc ON links.lnkSrc == lnkSrc.id;");
-                    String linkDest0 = null;
-                    List<String> backLinksPageList = new ArrayList<String>(1000);
-                    while (stmt.step()) {
-                        final String stmtLnkDest0 = stmt.columnString(0);
-                        final String stmtLnkSrc0 = stmt.columnString(1);
-                        final String stmtLnkSrc = wikiModel.normalisePageTitle(stmtLnkSrc0);
-                        if (linkDest0 == null) {
-                            linkDest0 = stmtLnkDest0;
-                            backLinksPageList.add(stmtLnkSrc);
-                        } else if (linkDest0.equals(stmtLnkDest0)) {
-                            backLinksPageList.add(stmtLnkSrc);
-                        } else {
-                            // write old, accumulate new
-                            writeLnkToScalaris(linkDest0, backLinksPageList);
-                            linkDest0 = stmtLnkDest0;
-                            backLinksPageList.add(stmtLnkSrc);
-                        }
-                    }
-                    if (linkDest0 != null && !backLinksPageList.isEmpty()) {
-                        writeLnkToScalaris(linkDest0, backLinksPageList);
-                    }
+                    writeToScalarisKV(stmt, ListType.LNK_LIST);
                     stmt.dispose();
                 } while (false);
             } catch (SQLiteException e) {
@@ -763,44 +704,86 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 }
             }
         }
-
+        
         /**
-         * @param category0
-         * @param catPageList
+         * Aggregates page lists from a 2-column table mapping a list key to a
+         * list content.
+         * 
+         * @param stmt
+         *            the statement to read from
+         * @param listType
+         *            the type of list
+         * 
+         * @throws SQLiteException
          * @throws RuntimeException
          */
-        private void writeCatToScalaris(String category0,
+        private void writeToScalarisKV(SQLiteStatement stmt, ListType listType) throws SQLiteException, RuntimeException {
+            NormalisedTitle listKey = null;
+            List<String> pageList = new ArrayList<String>(1000);
+            while (stmt.step()) {
+                // note: both titles are already normalised!
+                final String stmtKey = stmt.columnString(0);
+                final String stmtPage = stmt.columnString(1);
+                if (listKey == null) {
+                    // first row
+                    listKey = NormalisedTitle.fromString(stmtKey);
+                    pageList.add(stmtPage);
+                } else if (listKey.equals(stmtKey)) {
+                    // next item with the same list key
+                    pageList.add(stmtPage);
+                } else {
+                    // new item, i.e. different list key
+                    // -> write old list, then accumulate new
+                    writeToScalarisKV(listKey, pageList, listType);
+                    listKey = NormalisedTitle.fromString(stmtKey);
+                    pageList.add(stmtPage);
+                }
+            }
+            if (listKey != null && !pageList.isEmpty()) {
+                writeToScalarisKV(listKey, pageList, listType);
+            }
+        }
+
+        private void writeToScalarisKV(NormalisedTitle listKey, List<String> pageList,
+                ListType listType) throws RuntimeException {
+            switch (listType) {
+            case CAT_LIST:
+                writeCatToScalarisKV(listKey, pageList);
+                break;
+            case TPL_LIST:
+                writeTplToScalarisKV(listKey, pageList);
+                break;
+            case LNK_LIST:
+                writeLnkToScalarisKV(listKey, pageList);
+                break;
+            }
+        }
+
+        private void writeCatToScalarisKV(NormalisedTitle category0,
                 List<String> catPageList) throws RuntimeException {
+            // note: titles in the page list are already normalised!
             String scalaris_key;
-            scalaris_key = ScalarisDataHandlerUnnormalised.getCatPageListKey(category0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerNormalised.getCatPageListKey(category0);
             writeObject(scalaris_key, catPageList);
-            scalaris_key = ScalarisDataHandlerUnnormalised.getCatPageCountKey(category0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerNormalised.getCatPageCountKey(category0);
             writeObject(scalaris_key, catPageList.size());
             catPageList.clear();
         }
 
-        /**
-         * @param template0
-         * @param tplPageList
-         * @throws RuntimeException
-         */
-        private void writeTplToScalaris(String template0,
+        private void writeTplToScalarisKV(NormalisedTitle template0,
                 List<String> tplPageList) throws RuntimeException {
+            // note: titles in the page list are already normalised!
             String scalaris_key;
-            scalaris_key = ScalarisDataHandlerUnnormalised.getTplPageListKey(template0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerNormalised.getTplPageListKey(template0);
             writeObject(scalaris_key, tplPageList);
             tplPageList.clear();
         }
 
-        /**
-         * @param linkDest0
-         * @param backLinksPageList
-         * @throws RuntimeException
-         */
-        private void writeLnkToScalaris(String linkDest0,
+        private void writeLnkToScalarisKV(NormalisedTitle linkDest0,
                 List<String> backLinksPageList) throws RuntimeException {
+            // note: titles in the page list are already normalised!
             String scalaris_key;
-            scalaris_key = ScalarisDataHandlerUnnormalised.getBackLinksPageListKey(linkDest0, wikiModel.getNamespace());
+            scalaris_key = ScalarisDataHandlerNormalised.getBackLinksPageListKey(linkDest0);
             writeObject(scalaris_key, backLinksPageList);
             backLinksPageList.clear();
         }
@@ -817,7 +800,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
         
         @Override
         public void run() {
-            String key = ScalarisDataHandlerUnnormalised.getSiteInfoKey();
+            String key = ScalarisDataHandler.getSiteInfoKey();
             writeObject(stWrite, key, siteInfo);
         }
     }

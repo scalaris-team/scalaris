@@ -42,6 +42,7 @@ import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.examples.wikipedia.Options;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler.ReportAtShutDown;
 
@@ -445,9 +446,9 @@ public class Main {
             Set<String> allowedPages, LinkedList<String> rootCategories,
             int recursionLvl) throws RuntimeException, FileNotFoundException,
             IOException, SAXException {
-        Map<String, Set<String>> templateTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> includeTree = new HashMap<String, Set<String>>();
-        Map<String, Set<String>> referenceTree = new HashMap<String, Set<String>>();
+        Map<NormalisedTitle, Set<NormalisedTitle>> templateTree = new HashMap<NormalisedTitle, Set<NormalisedTitle>>();
+        Map<NormalisedTitle, Set<NormalisedTitle>> includeTree = new HashMap<NormalisedTitle, Set<NormalisedTitle>>();
+        Map<NormalisedTitle, Set<NormalisedTitle>> referenceTree = new HashMap<NormalisedTitle, Set<NormalisedTitle>>();
 
         File trees = new File(filename + "-trees.db");
         if (trees.exists()) {
