@@ -156,6 +156,7 @@ public class XmlRevision extends DefaultHandler {
                 currentContributor.startContributor(uri, localName, qName, attributes);
             } else if (localName.equals("comment")) {
             } else if (localName.equals("text")) {
+            } else if (localName.equals("sha1")) {
             } else {
                 System.err.println("unknown revision tag: " + localName);
             }
