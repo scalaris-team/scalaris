@@ -201,6 +201,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
      * @throws FileNotFoundException
      */
     void processLinks() throws RuntimeException {
+        importStart();
         try {
             try {
                 SiteInfo siteInfo = WikiDumpXml2SQLite.readSiteInfo(connection.db);
@@ -364,26 +365,22 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
              */
             final String createPageLinksTable = "CREATE TABLE IF NOT EXISTS pagelinks ("
                     + "pl_from int unsigned NOT NULL default 0,"
-                    + "pl_namespace int NOT NULL default 0,"
-                    + "pl_title varchar(255) NOT NULL default ''"
+                    + "pl_to int unsigned NOT NULL default 0"
                     + ");";
             connection.db.exec(createPageLinksTable);
             // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS pl_from ON pagelinks (pl_from,pl_namespace,pl_title);");
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS pl_namespace ON pagelinks (pl_namespace,pl_title,pl_from);");
+            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS pl_from ON pagelinks (pl_from,pl_to);");
             
             /**
              * Track template inclusions.
              */
             final String createTemplateLinksTable = "CREATE TABLE IF NOT EXISTS templatelinks ("
                     + "tl_from int unsigned NOT NULL default 0,"
-                    + "tl_namespace int NOT NULL default 0,"
-                    + "tl_title varchar(255) NOT NULL default ''"
+                    + "tl_to int unsigned NOT NULL default 0"
                     + ");";
             connection.db.exec(createTemplateLinksTable);
             // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tl_from ON templatelinks (tl_from,tl_namespace,tl_title);");
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tl_namespace ON templatelinks (tl_namespace,tl_title,tl_from);");
+            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tl_from ON templatelinks (tl_from,tl_to);");
 
             /**
              * Track category inclusions *used inline*.
@@ -391,7 +388,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
              */
             final String createCategoryLinksTable = "CREATE TABLE IF NOT EXISTS categorylinks ("
                     + "cl_from int unsigned NOT NULL default 0,"
-                    + "cl_to varchar(255) NOT NULL default ''"
+                    + "cl_to int unsigned NOT NULL default 0"
                     + ");";
             connection.db.exec(createCategoryLinksTable);
             // create index here to check at insertion:
@@ -402,21 +399,24 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
              */
             final String createRedirectsTable = "CREATE TABLE IF NOT EXISTS redirect ("
                     + "rd_from int unsigned NOT NULL default 0 PRIMARY KEY,"
-                    + "rd_namespace int NOT NULL default 0,"
-                    + "rd_title varchar(255) NOT NULL default ''"
+                    + "rd_to int unsigned NOT NULL default 0"
                     + ");";
             connection.db.exec(createRedirectsTable);
-            // create index here to check at insertion:
-            connection.db.exec("CREATE INDEX IF NOT EXISTS rd_ns_title ON redirect (rd_namespace,rd_title,rd_from);");
             
             stWriteCat = connection.db.prepare("REPLACE INTO categorylinks "
-                    + "(cl_from, cl_to) VALUES (?, ?);");
+                    + "(cl_from, cl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == "
+                    + MyNamespace.CATEGORY_NAMESPACE_KEY
+                    + " AND page_title == ?;");
             stWriteTpl = connection.db.prepare("REPLACE INTO templatelinks "
-                    + "(tl_from, tl_namespace, tl_title) VALUES (?, ?, ?);");
+                    + "(tl_from, tl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
             stWriteLnk = connection.db.prepare("REPLACE INTO pagelinks "
-                    + "(pl_from, pl_namespace, pl_title) VALUES (?, ?, ?);");
+                    + "(pl_from, pl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
             stWriteRedirect = connection.db.prepare("REPLACE INTO redirect "
-                    + "(rd_from, rd_namespace, rd_title) VALUES (?, ?, ?);");
+                    + "(rd_from, rd_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
             
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
