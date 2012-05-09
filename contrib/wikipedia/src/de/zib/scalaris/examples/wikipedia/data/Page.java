@@ -230,9 +230,25 @@ public class Page implements Serializable {
      * @return a map of restrictions
      */
     public static Map<String, String> restrictionsFromString(String restrictionsStr) {
+        return restrictionsFromString(restrictionsStr, ":");
+    }
+
+    /**
+     * Converts a restrictions string to its corresponding map.
+     * 
+     * @param restrictionsStr
+     *            a string of the form
+     *            <tt>key1=value1&lt;SEPARATOR&gt;key2=value2</tt>
+     * @param separator
+     *            the separator between key value pairs
+     * 
+     * @return a map of restrictions
+     */
+    public static Map<String, String> restrictionsFromString(
+            String restrictionsStr, final String separator) {
         LinkedHashMap<String, String> restrictions_map = new LinkedHashMap<String, String>();
         if (!restrictionsStr.isEmpty()) {
-            String[] restrictions_array = restrictionsStr.split(":");
+            String[] restrictions_array = restrictionsStr.split(separator);
             for (int i = 0; i < restrictions_array.length; ++i) {
                 String[] restriction = restrictions_array[i].split("=");
                 if (restriction.length == 2) {
