@@ -425,11 +425,12 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     }
     
     /**
+     * Starts the conversion.
      * 
      * @throws RuntimeException
      * @throws FileNotFoundException
      */
-    void convertObjects() throws RuntimeException, FileNotFoundException {
+    public void convertObjects() throws RuntimeException, FileNotFoundException {
         try {
             try {
                 // BEWARE: keep in sync with ScalarisDataHandler!
@@ -581,13 +582,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         } catch (FileNotFoundException e) {
             throw e;
         } catch (SQLiteException e) {
-            System.err.println("read of failed (sqlite error: " + e.toString() + ")");
+            System.err.println("read failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
-            System.err.println("read of failed (sqlite error: " + e.toString() + ")");
+            System.err.println("read failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (IOException e) {
-            System.err.println("read of failed (error: " + e.toString() + ")");
+            System.err.println("read failed (error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
     }

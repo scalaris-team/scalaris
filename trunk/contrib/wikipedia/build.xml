@@ -280,6 +280,19 @@
       </classpath>
     </java>
   </target>
+  
+  <target name="dumpdb-addlinks" depends="build,import.get.data">
+    <fail unless="data">You must specify the data property for 'ant dumpdb-addlinks'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <arg value="${data}"/>
+      <arg value="dumpdb-addlinks"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
 
   <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
     <fail unless="data">You must specify the data property for 'ant filter'.</fail>
