@@ -136,6 +136,15 @@ public class SQLiteDataHandler {
                     + "INNER JOIN text ON rev_text_id == old_id "
                     + "WHERE page_namespace == ? AND page_title == ?;");
         }
+        
+        /**
+         * Disposes all statements as well as the DB connection to free
+         * resources.
+         */
+        public void dispose() {
+            stmtGetLatestRev.dispose();
+            db.dispose();
+        }
     }
     
     /**
@@ -157,10 +166,11 @@ public class SQLiteDataHandler {
         Page page = null;
         Revision revision = null;
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        final String titleAsString = title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to SQLite DB", true, title, page, revision, false,
-                    false, title.toString(), System.currentTimeMillis() - timeAtStart);
+                    false, titleAsString, System.currentTimeMillis() - timeAtStart);
         }
         
         final SQLiteStatement stmt = connection.stmtGetLatestRev;
@@ -175,7 +185,7 @@ public class SQLiteDataHandler {
                     if (columnName.equals("page_id")) {
                         page.setId(stmt.columnInt(i));
                     } else if (columnName.equals("page_restrictions")) {
-                        page.setRestrictions(Page.restrictionsFromString(stmt.columnString(i)));
+                        page.setRestrictions(Page.restrictionsFromString(stmt.columnString(i), ","));
                     } else if (columnName.equals("page_is_redirect")) {
                         page.setRedirect(stmt.columnInt(i) != 0);
                     } else if (columnName.equals("rev_id")) {
@@ -191,24 +201,29 @@ public class SQLiteDataHandler {
                     } else if (columnName.equals("rev_minor_edit")) {
                         revision.setMinor(stmt.columnInt(i) != 0);
                     } else if (columnName.equals("old_text")) {
-                        revision.setB64pText(stmt.columnString(i));
+                        revision.setPackedText(stmt.columnBlob(i));
                     }
                 }
                 page.setCurRev(revision);
+            } else {
+                return new RevisionResult(false, involvedKeys,
+                        "page \"" + titleAsString + "\" not found", false,
+                        title, page, revision, true, false, titleAsString,
+                        System.currentTimeMillis() - timeAtStart);
             }
             // there should only be one data item
             if (stmt.step()) {
                 return new RevisionResult(false, involvedKeys,
                         "more than one result", false, title, page, revision, false,
-                        false, title.toString(), System.currentTimeMillis() - timeAtStart);
+                        false, titleAsString, System.currentTimeMillis() - timeAtStart);
             }
 
-            return new RevisionResult(involvedKeys, title, page, revision, title.toString(),
+            return new RevisionResult(involvedKeys, title, page, revision, titleAsString,
                     System.currentTimeMillis() - timeAtStart);
         } catch (SQLiteException e) {
             return new RevisionResult(false, involvedKeys, "SQLite exception: "
                     + e.getMessage(), false, title, page, revision, false,
-                    false, title.toString(), System.currentTimeMillis()
+                    false, titleAsString, System.currentTimeMillis()
                             - timeAtStart);
         } finally {
             try {
