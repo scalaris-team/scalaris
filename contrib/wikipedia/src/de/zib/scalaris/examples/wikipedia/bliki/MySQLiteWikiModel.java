@@ -42,18 +42,18 @@ public class MySQLiteWikiModel extends MyWikiModel {
      * @param linkBaseURL
      *            base url pointing to links - can contain ${title} for
      *            replacement
-     * @param dbFileName
-     *            the name of the database file to write to
+     * @param connection
+     *            the database connection
      * @param namespace
      *            namespace of the wiki
      * 
      * @throws SQLiteException
      *             if the DB connection fails
      */
-    public MySQLiteWikiModel(String imageBaseURL, String linkBaseURL, String dbFileName, MyNamespace namespace) throws SQLiteException {
+    public MySQLiteWikiModel(String imageBaseURL, String linkBaseURL, Connection connection, MyNamespace namespace) throws SQLiteException {
         super(imageBaseURL, linkBaseURL, namespace);
-        assert (dbFileName != null);
-        this.connection = new Connection(dbFileName);
+        assert (connection != null);
+        this.connection = connection;
     }
 
 //    /**

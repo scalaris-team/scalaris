@@ -89,6 +89,8 @@ public class Main {
                     doImport(filename, Arrays.copyOfRange(args, 2, args.length), ImportType.XML_2_DB);
                 } else if (args[1].equals("convert")) {
                     doConvert(filename, Arrays.copyOfRange(args, 2, args.length));
+                } else if (args[1].equals("dumpdb-addlinks")) {
+                    doDumpdbAddlinks(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
             }
         } catch (SAXException e) {
@@ -260,15 +262,15 @@ public class Main {
      * Converts the default prepared SQLite dump to a different optimisation scheme.
      * 
      * @param dbReadFileName
-     * @param args
+     * @param args 
      * 
      * @throws RuntimeException
      * @throws IOException
      * @throws SAXException
      * @throws FileNotFoundException
      */
-    private static void doConvert(String dbReadFileName, String[] args) throws RuntimeException, IOException,
-            FileNotFoundException {
+    private static void doConvert(String dbReadFileName, String[] args)
+            throws RuntimeException, FileNotFoundException {
         
         int i = 0;
         String dbWriteFileName;
@@ -303,6 +305,32 @@ public class Main {
         WikiDumpConvertPreparedSQLite.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         handler.convertObjects();
+        handler.tearDown();
+        shutdownHook.run();
+        Runtime.getRuntime().removeShutdownHook(shutdownHook);
+    }
+
+    /**
+     * processed a SQLite DB created from xml2db and parses all links, i.e.
+     * interconnections between pages of the wiki.
+     * 
+     * @param dbReadFileName
+     * @param args 
+     * 
+     * @throws RuntimeException
+     * @throws IOException
+     * @throws SAXException
+     * @throws FileNotFoundException
+     */
+    private static void doDumpdbAddlinks(String dbReadFileName, String[] args)
+            throws RuntimeException {
+        WikiDumpHandler.println(System.out, "adding links to: " + dbReadFileName);
+        
+        WikiDumpSQLiteAddLinkTables handler = new WikiDumpSQLiteAddLinkTables(dbReadFileName);
+        handler.setUp();
+        WikiDumpSQLiteAddLinkTables.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
+        handler.processLinks();
         handler.tearDown();
         shutdownHook.run();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
