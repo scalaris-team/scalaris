@@ -20,11 +20,12 @@
 -export([make_ring/2, 
          fill_ring/3,
          start_sync/0,
+         reset/0,
          db_stats/0,
          set_recon_method/1]).
 
--export([test_upd/0,
-         test_regen/0]). %TEST SETS
+-export([test_bloom/1,
+         test_regen/0]). %EVAL SETS
 
 -include("scalaris.hrl").
 
@@ -33,44 +34,54 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type ring_type()    :: symmetric | random.
--type failure_type() :: update | regen | mixed.
--type db_type()      :: wiki | random.
--type db_parameter() :: {ftype, failure_type()} |
-                        {fprob, 0..100} |            %failure probability
-                        {distribution, db_generator:distribution()}.
--record(db_status, {entries    = 0  :: non_neg_integer(),
-                    existing   = 0  :: non_neg_integer(),
-                    missing    = 0  :: non_neg_integer(),
-                    outdated   = 0  :: non_neg_integer()}).
--type db_status() :: #db_status{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
--define(ReplicationFactor, 4).
+-define(REP_FACTOR, 4).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Eval Quick Start
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec test_upd() -> ok.
-test_upd() ->
-    make_ring(symmetric, 10),
-    _ = fill_ring(random, 10000, [{ftype, update}]),
-    db_stats(),
-    util:for_to(1, 10, 
-                fun(_) ->
-                        start_sync(),
-                        db_stats()
-                end),
-    ok.    
+-spec test_bloom(float()) -> ok.
+test_bloom(Fpr) ->
+    test_bloom(Fpr, update, 10, 10000).
 
 -spec test_regen() -> ok.
 test_regen() ->
-    make_ring(symmetric, 10),
-    R = fill_ring(random, 10000, [{ftype, regen}]),
-    print_db_status(R),
-    start_sync(),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_bloom(Fpr, FType, Nodes, DBCount) ->
+    Method = bloom,
+    make_ring(symmetric, Nodes),
+    InitStats = fill_ring(random, DBCount, [{ftype, FType}]),
+    print_db_status(InitStats),
+    IterCount = 5,
+    _ = set_recon_method(Method),
+    config:write(rr_bloom_fpr, Fpr),
+    Result = util:for_to_ex(1, IterCount, 
+                            fun(I) ->
+                                    Stats = start_sync(),
+                                    io:format("<<<<ROUND ~p/~p>>>>>>", [I, IterCount]),
+                                    print_db_status(Stats),
+                                    {I, Stats}
+                            end,
+                            [{0, InitStats}]),
+    R = lists:map(fun({I, {_, _, _, O}}) -> [I, (?REP_FACTOR * DBCount) - O] end, 
+                  lists:reverse(Result)),
+    {{YY, MM, DD}, {Hour, Min, Sec}} = erlang:localtime(),
+    eval_export:write_to_file(gnuplot, R, 
+                              [{filename, io_lib:format("~p-~p-~p_~p-~p-~p_test_upd-~p", 
+                                                        [YY, MM, DD, Hour, Min, Sec, Method])},
+                               {caption, io_lib:format("~p rep ~p - fpr=~p", [Method, FType, Fpr])},
+                               {comment, io_lib:format("Parameter: ftype=~p ; Nodes=~p ; DBSize=~p ; Fpr=~p", [FType, Nodes, DBCount, Fpr])},
+                               {gnuplot_args, io_lib:format("u 1:2 t \"~p\" w lp, ~p t \"max\"", [Method, ?REP_FACTOR * DBCount])},
+                               {set_yrange, io_lib:format("0:~p", [(?REP_FACTOR * DBCount) + 2000])},
+                               {gp_xlabel, "round"},
+                               {gp_ylabel, "up-to-date copies"}]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -80,7 +91,7 @@ test_regen() ->
 -spec make_ring(ring_type(), pos_integer()) -> ok.
 make_ring(Type, Size) ->
     %if ring exists kill all   
-    _ = set_recon_method(bloom), 
+    _ = set_recon_method(bloom),
     _ = case Type of
             random -> 
                 _ = admin:add_node([{first}]),
@@ -89,36 +100,34 @@ make_ring(Type, Size) ->
                 Ids = get_symmetric_ids(Size),
                 _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
                 [admin:add_node_at_id(Id) || Id <- tl(Ids)]
-        end,
+        end,    
     wait_for_stable_ring(),
+    io:format("RING READY: ~p - ~p/~p Nodes~n", [Type, get_ring_size(), Size]),
     ok.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
--spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> db_status().
+-spec fill_ring(db_generator:db_type(), pos_integer(), [db_generator:db_parameter()]) -> db_generator:db_status().
 fill_ring(Type, DBSize, Params) ->
-    erlang:put(?DBSizeKey, ?ReplicationFactor * DBSize),
-    case Type of
-        random -> fill_random(DBSize, Params);
-        wiki -> fill_wiki(DBSize, Params)
+    erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
+    db_generator:fill_ring(Type, DBSize, Params).
+
+-spec reset() -> ok | failed.
+reset() ->
+    {_, NotFound} = api_vm:kill_nodes_by_name(api_vm:get_nodes()),
+    erlang:length(NotFound) > 0 andalso
+        erlang:error(some_nodes_not_found),
+    util:wait_for(fun() -> api_vm:number_of_nodes() =:= 0 end),
+    case api_vm:number_of_nodes() of
+        0 -> ok;
+        _ -> failed
     end.
 
-fill_random(DBSize, Params) ->    
-    Distr = proplists:get_value(distribution, Params, uniform),            
-    I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
-    Keys = db_generator:get_db(I, DBSize, Distr),    
-    insert_random_db(Keys, Params).
-fill_wiki(_DBSize, _Params) ->
-    %TODO
-    #db_status{}.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_sync() -> ok.
+-spec start_sync() -> db_generator:db_status().
 start_sync() ->
     Nodes = get_node_list(),
-    io:format("--> START SYNC - ~p~n", [config:read(rep_update_recon_method)]),
+    io:format("--> START SYNC - ~p~n", [config:read(rr_recon_method)]),
     %start
     lists:foreach(fun(Node) ->
                           comm:send(Node, {send_to_group_member, rrepair, {rr_trigger}})
@@ -136,7 +145,7 @@ start_sync() ->
                 end)
       end, 
       Nodes),
-    ok.
+    get_db_status().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -151,113 +160,46 @@ db_stats() ->
 -spec set_recon_method(rr_recon:method()) -> ok | {error, term()}.
 set_recon_method(Method) ->
     config:write(rrepair_enabled, true),
-    config:write(rep_update_interval, 100000000),
-    config:write(rep_update_trigger, trigger_periodic),
-    config:write(rep_update_recon_method, Method),
-    config:write(rep_update_resolve_method, simple),
-    config:write(rep_update_recon_fpr, 0.01),
-    config:write(rep_update_max_items, case Method of
-                                           bloom -> 10000;
-                                           _ -> 100000
-                                       end),
-    config:write(rep_update_negotiate_sync_interval, case Method of
+    config:write(rr_trigger_interval, 100000000),
+    config:write(rr_trigger, trigger_periodic),
+    config:write(rr_recon_method, Method),
+    config:write(rr_resolve_method, simple),
+    config:write(rr_bloom_fpr, 0.01),
+    config:write(rr_max_items, case Method of
+                                   bloom -> 10000;
+                                   _ -> 100000
+                               end),
+    config:write(rr_negotiate_sync_interval, case Method of
                                                          bloom -> false;
                                                          _ -> true
                                                      end),    
     
-    RM = config:read(rep_update_recon_method),
+    RM = config:read(rr_recon_method),
     case RM =:= Method of
         true -> ok;
         _ -> {error, set_failed}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% DB Generation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% @doc Inserts a list of keys replicated into the ring
--spec insert_random_db([?RT:key()], [db_parameter()]) -> db_status().
-insert_random_db(Keys, Params) ->
-    FType = proplists:get_value(ftype, Params, update),
-    FProb = proplists:get_value(fprob, Params, 50),    
-    {I, M, O} = 
-        lists:foldl(
-          fun(Key, {Ins, Mis, Out}) ->
-                  RepKeys = ?RT:get_replica_keys(Key),
-                  %insert error?
-                  EKey = case FProb >= randoms:rand_uniform(1, 100) of
-                             true -> util:randomelem(RepKeys);
-                             _ -> null
-                         end,
-                  %insert regen error
-                  {EType, WKeys} = case EKey =/= null of
-                                       true ->
-                                           EEType = case FType of 
-                                                        mixed -> 
-                                                            case randoms:rand_uniform(1, 3) of
-                                                                1 -> update;
-                                                                _ -> regen
-                                                            end;
-                                                        _ -> FType
-                                                    end,
-                                           {EEType, 
-                                            case EEType of
-                                                regen -> [X || X <- RepKeys, X =/= EKey];
-                                                _ -> RepKeys
-                                            end};
-                                       _ -> {FType, RepKeys}
-                                   end,
-                  %write replica group
-                  lists:foreach(
-                    fun(RKey) ->
-                            DBEntry = db_entry:new(RKey, val, 2),
-                            api_dht_raw:unreliable_lookup(RKey, 
-                                                          {set_key_entry, comm:this(), DBEntry}),
-                            receive {set_key_entry_reply, _} -> ok end
-                    end,
-                    WKeys),
-                  %insert update error
-                  NewOut = if EType =:= update andalso EKey =/= null ->
-                                  Msg = {set_key_entry, comm:this(), db_entry:new(EKey, old, 1)},
-                                  api_dht_raw:unreliable_lookup(EKey, Msg),
-                                  receive {set_key_entry_reply, _} -> ok end,
-                                  Out + 1;
-                              true -> Out
-                           end,
-                  {Ins + length(WKeys), Mis + 4 - length(WKeys), NewOut}
-          end, 
-          {0, 0, 0}, Keys),
-    #db_status{ entries = length(Keys) * ?ReplicationFactor, 
-                existing = I, 
-                missing = M, 
-                outdated = O}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Analysis Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec print_db_status(db_status()) -> ok.
-print_db_status(#db_status{ entries = Items,
-                            existing = Inserted,
-                            missing = Missing,
-                            outdated = Outdated }) ->
-    io:format("Items=~p
-               Existing=~p
-               Missing=~p
-               Outdated=~p~n", 
-              [Items, Inserted, Missing, Outdated]),
+-spec print_db_status(db_generator:db_status()) -> ok.
+print_db_status({Count, Inserted, Missing, Outdated}) ->
+    io:format("Items=~p~nExisting=~p~nMissing=~p~nOutdated=~p~n",
+              [Count, Inserted, Missing, Outdated]),
     ok.
 
--spec get_db_status() -> db_status().
+-spec get_ring_size() -> non_neg_integer().
+get_ring_size() ->
+    api_vm:number_of_nodes().
+
+-spec get_db_status() -> db_generator:db_status().
 get_db_status() ->
     DBSize = erlang:get(?DBSizeKey),
     Ring = statistics:get_ring_details(),
     Stored = statistics:get_total_load(Ring),
-    #db_status{ entries = DBSize,
-                existing = Stored,
-                missing = DBSize - Stored,
-                outdated = count_outdated()
-              }.
+    {DBSize, Stored, DBSize - Stored, count_outdated()}.
 
 -spec count_outdated() -> non_neg_integer().
 count_outdated() ->
@@ -266,7 +208,7 @@ count_outdated() ->
       fun(Node, Acc) -> 
               comm:send(Node, {send_to_group_member, rrepair, Req}),
               receive
-                  {count_old_replicas_reply, O} -> Acc + O
+                  {count_old_replicas_reply, Old} -> Acc + Old
               end
       end, 
       0, get_node_list()).

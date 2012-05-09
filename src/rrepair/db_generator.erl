@@ -116,10 +116,10 @@ non_uniform_key_list(I, Fun, Acc, AccType) ->
 non_uniform_add(Value, I, Acc, OutType) ->
     {_, LKey, RKey, _} = intervals:get_bounds(I),    
     X = LKey + erlang:round(Value * (RKey - LKey)),
-    lists:append(case OutType of
-                     list_key -> X;
-                     list_key_val -> {X, gen_value()}
-                 end, Acc).
+    [case OutType of
+         list_key -> X;
+         list_key_val -> {X, gen_value()}
+     end | Acc].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
