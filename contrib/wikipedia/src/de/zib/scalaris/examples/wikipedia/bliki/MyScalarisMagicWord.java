@@ -20,8 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
-import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 
 /**
  * Gets values for magic words not handled by {@link MyMagicWord} which need
@@ -165,11 +166,11 @@ public class MyScalarisMagicWord extends MyMagicWord {
             return model.formatStatisticNumber(rawNumber, 0);
 //            {{NUMBEROFACTIVEUSERS}}
         } else if (name.equals(MAGIC_PAGES_IN_CATEGORY) || name.equals(MAGIC_PAGES_IN_CAT)) {
-            final String category0 = MyWikiModel.createFullPageName(
-                    model.getCategoryNamespace(), parameter.trim());
-            ValueResult<BigInteger> catListResult = ScalarisDataHandlerUnnormalised
-                    .getPagesInCategoryCount(model.connection, category0,
-                            model.getNamespace());
+            NormalisedTitle category = new NormalisedTitle(
+                    MyNamespace.CATEGORY_NAMESPACE_KEY,
+                    MyWikiModel.normaliseName(parameter.trim()));
+            ValueResult<BigInteger> catListResult = ScalarisDataHandlerNormalised
+                    .getPagesInCategoryCount(model.connection, category);
             model.addStats(catListResult.stats);
             model.addInvolvedKeys(catListResult.involvedKeys);
             if (catListResult.success) {
