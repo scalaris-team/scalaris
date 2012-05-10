@@ -2,7 +2,7 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.List;
 
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 

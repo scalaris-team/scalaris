@@ -32,7 +32,7 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -56,7 +56,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public static String getRevKey(String title, int id, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getRevKey(MyWikiModel.normalisePageTitle(title, nsObject), id);
+        return ScalarisDataHandlerNormalised.getRevKey(NormalisedTitle.fromUnnormalised(title, nsObject), id);
     }
     
     /**
@@ -68,7 +68,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getPageKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPageKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getPageKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
     
     /**
@@ -80,7 +80,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getRevListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getRevListKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getRevListKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
     
     /**
@@ -92,7 +92,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getCatPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getCatPageListKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getCatPageListKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -104,7 +104,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getCatPageCountKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getCatPageCountKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getCatPageCountKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -116,7 +116,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getTplPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getTplPageListKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getTplPageListKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
     
     /**
@@ -128,7 +128,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      * @return Scalaris key
      */
     public final static String getBackLinksPageListKey(String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getBackLinksPageListKey(MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getBackLinksPageListKey(NormalisedTitle.fromUnnormalised(title, nsObject));
     }
     
     /**
@@ -145,7 +145,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static PageHistoryResult getPageHistory(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPageHistory(connection, MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getPageHistory(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -163,7 +163,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static RevisionResult getRevision(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getRevision(connection, MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getRevision(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -182,7 +182,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static RevisionResult getRevision(Connection connection,
             String title, int id, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getRevision(connection, MyWikiModel.normalisePageTitle(title, nsObject), id);
+        return ScalarisDataHandlerNormalised.getRevision(connection, NormalisedTitle.fromUnnormalised(title, nsObject), id);
     }
 
     /**
@@ -220,7 +220,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPagesInCategory(connection, MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getPagesInCategory(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -237,7 +237,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, MyWikiModel.normalisePageTitle(title, nsObject), nsObject);
+        return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, NormalisedTitle.fromUnnormalised(title, nsObject), nsObject);
     }
 
     /**
@@ -254,7 +254,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPagesLinkingTo(connection, MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getPagesLinkingTo(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -271,7 +271,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPagesInCategoryCount(connection, MyWikiModel.normalisePageTitle(title, nsObject));
+        return ScalarisDataHandlerNormalised.getPagesInCategoryCount(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
@@ -316,7 +316,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         }
         
-        final NormalisedTitle normTitle = MyWikiModel.normalisePageTitle(title0, nsObject);
+        final NormalisedTitle normTitle = NormalisedTitle.fromUnnormalised(title0, nsObject);
         final String normTitleStr = normTitle.toString();
         Transaction scalaris_tx = new Transaction(connection);
 

@@ -29,7 +29,7 @@ import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;

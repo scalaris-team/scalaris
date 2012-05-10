@@ -35,7 +35,7 @@ import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.operations.Operation;
@@ -249,7 +249,7 @@ public class ScalarisDataHandler {
                     throws ClassCastException {
                 return v.listValue(new ListElementConverter<NormalisedTitle>() {
                     public NormalisedTitle convert(final int i, final ErlangValue v) {
-                        return NormalisedTitle.fromString(v.stringValue());
+                        return NormalisedTitle.fromNormalised(v.stringValue());
                     }
                 });
             }
@@ -402,7 +402,7 @@ public class ScalarisDataHandler {
             String randomTitle = result.value.get(
                     random.nextInt(result.value.size())).stringValue();
             return new ValueResult<NormalisedTitle>(result.involvedKeys,
-                    NormalisedTitle.fromString(randomTitle));
+                    NormalisedTitle.fromNormalised(randomTitle));
         } else {
             return new ValueResult<NormalisedTitle>(false, result.involvedKeys,
                     result.message, result.connect_failed);

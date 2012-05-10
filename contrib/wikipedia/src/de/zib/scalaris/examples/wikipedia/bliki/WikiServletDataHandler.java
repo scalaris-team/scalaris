@@ -24,7 +24,6 @@ import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;

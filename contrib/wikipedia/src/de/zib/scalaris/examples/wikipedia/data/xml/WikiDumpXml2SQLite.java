@@ -26,8 +26,7 @@ import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -321,7 +320,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
         
         @Override
         public void run() {
-            NormalisedTitle normTitle = MyWikiModel.normalisePageTitle(page.getTitle(), wikiModel.getNamespace());
+            NormalisedTitle normTitle = NormalisedTitle.fromUnnormalised(page.getTitle(), wikiModel.getNamespace());
             // check if page exists:
             try {
                 final SQLiteStatement stmt = db.prepare("SELECT page_id FROM page WHERE page_namespace == ? AND page_title = ?;");

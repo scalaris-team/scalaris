@@ -65,7 +65,6 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.SpecialPage;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
@@ -1642,7 +1641,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
                 // also actively update the bloom filter of existing pages
-                existingPages.add(MyWikiModel.normalisePageTitle(title, namespace));
+                existingPages.add(NormalisedTitle.fromUnnormalised(title, namespace));
                 ArrayList<Long> times = new ArrayList<Long>();
                 for (List<Long> time : page.getStats().values()) {
                     times.addAll(time);
