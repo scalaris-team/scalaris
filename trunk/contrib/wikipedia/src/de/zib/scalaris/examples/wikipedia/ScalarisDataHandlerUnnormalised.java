@@ -237,7 +237,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, NormalisedTitle.fromUnnormalised(title, nsObject), nsObject);
+        return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, NormalisedTitle.fromUnnormalised(title, nsObject));
     }
 
     /**
