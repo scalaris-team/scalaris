@@ -40,7 +40,7 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * 
  * @author Nico Kruber, kruber@zib.de
  */
-public class WikiDumpSQLiteAddLinkTables implements WikiDump {
+public class WikiDumpSQLiteLinkTables implements WikiDump {
     private static final int PRINT_PAGES_EVERY = 500;
     /**
      * The time at the start of an import operation.
@@ -78,7 +78,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
      * @throws RuntimeException
      *             if the connection to Scalaris fails
      */
-    public WikiDumpSQLiteAddLinkTables(String dbFileName)
+    public WikiDumpSQLiteLinkTables(String dbFileName)
             throws RuntimeException {
         this.dbFileName = dbFileName;
     }
@@ -310,7 +310,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
             throw new RuntimeException(e);
         }
         println("Creating link tables...");
-        prepareDB();
+        createLinkTables();
     }
 
     /* (non-Javadoc)
@@ -381,7 +381,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
      * 
      * @throws RuntimeException
      */
-    public void prepareDB() throws RuntimeException {
+    public void createLinkTables() throws RuntimeException {
         try {
             /**
              * Track page-to-page hyperlinks within the wiki.
