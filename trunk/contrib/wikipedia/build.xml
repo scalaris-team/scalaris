@@ -119,8 +119,16 @@
     </java>
   </target>
 
-  <target name="import.get.data" unless="data">
+  <target name="import.get.data_xml_sql" unless="data">
     <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2, *.db)"/>
+  </target>
+
+  <target name="import.get.data_xml" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2)"/>
+  </target>
+
+  <target name="import.get.data_sql" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.db" message="Wikipedia dump file (*.db)"/>
   </target>
 
   <target name="import.get.allowed_pages" unless="allowed_pages">
@@ -167,11 +175,11 @@
   <property name="category9" value="" />
   <property name="category10" value="" />
 
-  <target name="import.get.filtered_pagelist" unless="filtered_pagelist" depends="import.get.data">
+  <target name="import.get.filtered_pagelist" unless="filtered_pagelist">
     <input addproperty="filtered_pagelist" defaultvalue="${data}-filtered_pagelist.txt" message="Write filtered pagelist to this file (will be created or overwritten)"/>
   </target>
 
-  <target name="import.get.prepare_db" unless="prepare_db" depends="import.get.data">
+  <target name="import.get.prepare_db" unless="prepare_db">
     <input addproperty="prepare_db" defaultvalue="${data}-1.db" message="Write pre-processed K/V pairs to this database (file must not exist yet!)"/>
   </target>
 
@@ -188,7 +196,7 @@
 
   <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
 
-  <target name="import-xml" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
+  <target name="import-xml" depends="build,import.get.data_xml_sql,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
     <fail unless="data">You must specify the data property for 'ant import-xml'.</fail>
     <fail unless="max_revisions">You must specify the max_revisions property for 'ant import-xml'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant import-xml'.</fail>
@@ -210,15 +218,15 @@
     </java>
   </target>
 
-  <target name="import.get.number_of_importers" unless="number_of_importers" depends="import.get.data">
+  <target name="import.get.number_of_importers" unless="number_of_importers">
     <input addproperty="number_of_importers" defaultvalue="1" message="Total number of (independent) import jobs"/>
   </target>
 
-  <target name="import.get.my_import_number" unless="my_import_number" depends="import.get.data">
+  <target name="import.get.my_import_number" unless="my_import_number">
     <input addproperty="my_import_number" defaultvalue="1" message="This import's job number (1 &lt;= my_import_number &lt;= number_of_importers)"/>
   </target>
   
-  <target name="import-db" depends="build,import.get.data,import.get.number_of_importers,import.get.my_import_number,scalaris.properties">
+  <target name="import-db" depends="build,import.get.data_sql,import.get.number_of_importers,import.get.my_import_number,scalaris.properties">
     <fail unless="data">You must specify the data property for 'ant import-db'.</fail>
     <fail unless="number_of_importers">You must specify the number_of_importers property for 'ant import-db'.</fail>
     <fail unless="my_import_number">You must specify the my_import_number property for 'ant import-db'.</fail>
@@ -237,7 +245,7 @@
     </java>
   </target>
   
-  <target name="prepare" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+  <target name="prepare" depends="build,import.get.data_xml,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
     <fail unless="data">You must specify the data property for 'ant prepare'.</fail>
     <fail unless="max_revisions">You must specify the max_revisions property for 'ant prepare'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant prepare'.</fail>
@@ -259,7 +267,7 @@
     </java>
   </target>
   
-  <target name="xml2db" depends="build,import.get.data,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+  <target name="xml2db" depends="build,import.get.data_xml,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
     <fail unless="data">You must specify the data property for 'ant xml2db'.</fail>
     <fail unless="max_revisions">You must specify the max_revisions property for 'ant xml2db'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant xml2db'.</fail>
@@ -281,7 +289,7 @@
     </java>
   </target>
   
-  <target name="dumpdb-addlinks" depends="build,import.get.data">
+  <target name="dumpdb-addlinks" depends="build,import.get.data_sql">
     <fail unless="data">You must specify the data property for 'ant dumpdb-addlinks'.</fail>
     <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
       <arg value="${data}"/>
@@ -294,7 +302,40 @@
     </java>
   </target>
 
-  <target name="filter" depends="build,import.get.data,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
+  <target name="dumpdb-filter" depends="build,import.get.data_sql,import.get.recursion_lvl,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
+    <fail unless="data">You must specify the data property for 'ant dumpdb-filter'.</fail>
+    <fail unless="filtered_pagelist">You must specify the filtered_pagelist property for 'ant dumpdb-filter'.</fail>
+    <fail unless="allowed_pages">You must specify the allowed_pages property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category1">You must specify the category1 property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category2">You must specify the category2 property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category3">You must specify the category3 property for 'ant dumpdb-filter'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="dumpdb-filter"/>
+      <arg value="${recursion_lvl}"/>
+      <arg value="${filtered_pagelist}"/>
+      <arg value="${allowed_pages}"/>
+      <arg value="${category1}"/>
+      <arg value="${category2}"/>
+      <arg value="${category3}"/>
+      <arg value="${category4}"/>
+      <arg value="${category5}"/>
+      <arg value="${category6}"/>
+      <arg value="${category7}"/>
+      <arg value="${category8}"/>
+      <arg value="${category9}"/>
+      <arg value="${category10}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="filter" depends="build,import.get.data_xml,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
     <fail unless="data">You must specify the data property for 'ant filter'.</fail>
     <fail unless="max_time">You must specify the max_time property for 'ant filter'.</fail>
     <fail unless="filtered_pagelist">You must specify the filtered_pagelist property for 'ant filter'.</fail>

@@ -17,7 +17,13 @@ package de.zib.scalaris.examples.wikipedia.data.xml;
 
 import java.io.PrintStream;
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
@@ -25,6 +31,7 @@ import com.almworks.sqlite4java.SQLiteStatement;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler.Connection;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MySQLiteWikiModel;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
@@ -461,5 +468,314 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         }
+    }
+    
+    /**
+     * Extracts all pages in the given categories from the given DB.
+     * 
+     * @param allowedCats0
+     *            include all pages in these categories (un-normalised page
+     *            titles)
+     * @param allowedPages0
+     *            a number of pages to include, also parses these pages for more
+     *            links (un-normalised page titles)
+     * @param depth
+     *            follow links this deep
+     * @param normalised
+     *            whether the pages should be returned as normalised page titles
+     *            or not
+     * 
+     * @return a (sorted) set of page titles
+     * 
+     * @throws RuntimeException
+     *             if any error occurs
+     */
+    public SortedSet<String> getPagesInCategories(
+            Collection<String> allowedCats0, Collection<String> allowedPages0, int depth,
+            boolean normalised) throws RuntimeException {
+        SiteInfo siteInfo = WikiDumpXml2SQLite.readSiteInfo(connection.db);
+        MyNamespace namespace = new MyNamespace(siteInfo);
+        ArrayList<NormalisedTitle> allowedCats = new ArrayList<NormalisedTitle>(allowedCats0.size());
+        MyWikiModel.normalisePageTitles(allowedCats0, namespace, allowedCats);
+        ArrayList<NormalisedTitle> allowedPages = new ArrayList<NormalisedTitle>(allowedPages0.size());
+        MyWikiModel.normalisePageTitles(allowedPages0, namespace, allowedPages);
+        return getPagesInCategories2(allowedCats, allowedPages, depth, normalised);
+    }
+    
+    /**
+     * Extracts all pages in the given categories from the given DB.
+     * 
+     * @param allowedCats
+     *            include all pages in these categories (normalised page
+     *            titles)
+     * @param allowedPages
+     *            a number of pages to include, also parses these pages for more
+     *            links (normalised page titles)
+     * @param depth
+     *            follow links this deep
+     * @param normalised
+     *            whether the pages should be returned as normalised page titles
+     *            or not
+     * 
+     * @return a (sorted) set of page titles
+     * 
+     * @throws RuntimeException
+     *             if any error occurs
+     */
+    public SortedSet<String> getPagesInCategories2(
+            Collection<NormalisedTitle> allowedCats, Collection<NormalisedTitle> allowedPages, int depth,
+            boolean normalised) throws RuntimeException {
+        try {
+            connection.db.exec("CREATE TEMPORARY TABLE currentpages(cp_id INTEGER PRIMARY KEY ASC);");
+            SiteInfo siteInfo = WikiDumpXml2SQLite.readSiteInfo(connection.db);
+            MyNamespace namespace = new MyNamespace(siteInfo);
+
+            Set<NormalisedTitle> allowedCatsFull = getSubCategories(
+                    allowedCats, namespace);
+
+            Set<NormalisedTitle> currentPages = new HashSet<NormalisedTitle>();
+            currentPages.addAll(allowedPages);
+            currentPages.addAll(allowedCatsFull);
+            currentPages.addAll(getPagesDirectlyInCategories(allowedCatsFull));
+
+            Set<NormalisedTitle> normalisedPages = getRecursivePages(currentPages, depth);
+            
+            // no need to drop table - we set temporary tables to be in-memory only
+//            connection.db.exec("DROP TABLE currentpages;");
+
+            // note: need to sort case-sensitively (wiki is only case-insensitive at the first char)
+            final TreeSet<String> pages = new TreeSet<String>();
+            if (normalised) {
+                pages.addAll(ScalarisDataHandlerNormalised.normList2normStringList(normalisedPages));
+            } else {
+                MyWikiModel.denormalisePageTitles(normalisedPages, namespace, pages);
+            }
+            return pages;
+        } catch (SQLiteException e) {
+            System.err.println("read of pages in categories failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        }
+    }
+    
+    /**
+     * Gets all sub-categories for the given ones from an SQLite database.
+     * 
+     * Note: needs a (temporary) <tt>currentpages</tt> table to be set up before this
+     * call.
+     * 
+     * @param allowedCats
+     *            include all pages in these categories (normalised page titles)
+     * 
+     * @return the set of the given categories and all their sub-categories
+     *         (normalised)
+     * 
+     * @throws SQLiteException
+     *             if an error occurs
+     */
+    private Set<NormalisedTitle> getSubCategories(
+            Collection<? extends NormalisedTitle> allowedCats,
+            MyNamespace nsObject) throws SQLiteException {
+        if (!allowedCats.isEmpty()) {
+            SQLiteStatement stmt = null;
+            SQLiteStatement stmtCount = null;
+            try {
+                println(" determining sub-categories of " + allowedCats.toString() + "");
+                // first insert all categories:
+                stmt = connection.db.prepare("REPLACE INTO currentpages (cp_id) SELECT page_id FROM page WHERE page_title == ?;");
+                for (NormalisedTitle pageTitle : allowedCats) {
+                    if (pageTitle.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                        stmt.bind(1, pageTitle.toString()).stepThrough().reset();
+                    }
+                }
+                stmt.dispose();
+
+                // then recursively determine all sub categories:
+                stmt = connection.db
+                        .prepare("REPLACE INTO currentpages (cp_id) SELECT cl_from FROM categorylinks "
+                                + "INNER JOIN currentpages on cl_to == cp_id "
+                                + "INNER JOIN page ON cl_from == page_id WHERE page_namespace == "
+                                + MyNamespace.CATEGORY_NAMESPACE_KEY + ";");
+                stmtCount = connection.db
+                        .prepare("SELECT COUNT(*) FROM currentpages;");
+                // note: not necessary to use the correct value at first
+                int oldCount = 0;
+                int newCount = 0;
+                do {
+                    oldCount = newCount;
+                    stmt.stepThrough().reset();
+                    if (stmtCount.step()) {
+                        newCount = stmtCount.columnInt(0);
+                    }
+                    stmtCount.reset();
+                    println("  added " + newCount + " categories");
+                } while (oldCount != newCount);
+                stmt.dispose();
+                stmtCount.dispose();
+
+                // now read back all categories:
+                stmt = connection.db.prepare("SELECT page_title FROM currentpages INNER JOIN page on page_id == cp_id;");
+                Set<NormalisedTitle> allowedCatsFull = new HashSet<NormalisedTitle>(newCount);
+                while(stmt.step()) {
+                    String title = stmt.columnString(0);
+                    allowedCatsFull.add(new NormalisedTitle(MyNamespace.CATEGORY_NAMESPACE_KEY, title));
+                }
+                stmt.reset();
+                connection.db.exec("DELETE FROM currentpages;");
+                return allowedCatsFull;
+            } finally {
+                if (stmt != null) {
+                    stmt.dispose();
+                }
+                if (stmtCount != null) {
+                    stmtCount.dispose();
+                }
+            }
+        } else {
+            return new HashSet<NormalisedTitle>();
+        }
+    }
+    
+    /**
+     * Gets all pages in the given category set from an SQLite database. Note:
+     * sub-categories are not taken into account.
+     * 
+     * @param allowedCats
+     *            include all pages in these categories (normalised page
+     *            titles)
+     * @param db
+     *            connection to the SQLite database
+     * 
+     * @return a set of pages (directly) in the given categories (normalised
+     *         page titles)
+     * 
+     * @throws SQLiteException
+     *             if an error occurs
+     */
+    private Set<NormalisedTitle> getPagesDirectlyInCategories(Set<NormalisedTitle> allowedCats) throws SQLiteException {
+        Set<NormalisedTitle> currentPages = new HashSet<NormalisedTitle>();
+
+        if (!allowedCats.isEmpty()) {
+            SQLiteStatement stmt = null;
+            try {
+                println(" determining pages in any of the sub-categories");
+                // first insert all categories:
+                stmt = connection.db
+                        .prepare("REPLACE INTO currentpages (cp_id) "
+                                + "SELECT page_id FROM page WHERE page_namespace == "
+                                + MyNamespace.CATEGORY_NAMESPACE_KEY
+                                + " page_title == ?;");
+                for (NormalisedTitle pageTitle : allowedCats) {
+                    if (pageTitle.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                        stmt.bind(1, pageTitle.toString()).stepThrough().reset();
+                    }
+                }
+                stmt.dispose();
+                
+                // select all pages belonging to any of the allowed categories:
+                stmt = connection.db
+                        .prepare("SELECT page_namespace, page_title FROM currentpages " +
+                                "INNER JOIN categorylinks ON cl_to == cp_id " +
+                                "INNER JOIN page ON cl_from == page_id;");
+                while (stmt.step()) {
+                    int namespace = stmt.columnInt(0);
+                    String title = stmt.columnString(1);
+                    currentPages.add(new NormalisedTitle(namespace, title));
+                }
+                stmt.dispose();
+                connection.db.exec("DELETE FROM currentpages;");
+            } finally {
+                if (stmt != null) {
+                    stmt.dispose();
+                }
+            }
+        }
+        return currentPages;
+    }
+    
+    /**
+     * Gets all pages and their dependencies from an SQLite database, follows
+     * links recursively.
+     * 
+     * Note: needs a (temporary) currentPages table to be set up before this
+     * call.
+     * 
+     * @param currentPages
+     *            parse these pages recursively (normalised page titles)
+     * @param depth
+     *            follow links this deep
+     * 
+     * @return a set of normalised page titles
+     * 
+     * @throws SQLiteException
+     *             if an error occurs
+     */
+    private Set<NormalisedTitle> getRecursivePages(
+            Set<NormalisedTitle> currentPages, int depth)
+            throws SQLiteException {
+        Set<NormalisedTitle> allPages = new HashSet<NormalisedTitle>(100000);
+        SQLiteStatement stmt = null;
+        try {
+            println("adding all mediawiki pages");
+            // add all auto-included pages
+            stmt = connection.db
+                    .prepare("REPLACE INTO currentpages (cp_id) SELECT page_id FROM page WHERE page_namespace == "
+                            + MyNamespace.MEDIAWIKI_NAMESPACE_KEY + ";");
+            stmt.stepThrough().reset();
+            stmt.dispose();
+
+            println("adding " + currentPages.size() + " pages");
+            stmt = connection.db.prepare("REPLACE INTO currentpages (cp_id) SELECT page_id FROM page WHERE page_namespace == ? AND page_title == ?;");
+            for (NormalisedTitle page : currentPages) {
+                stmt.bind(1, page.namespace).bind(2, page.title).stepThrough().reset();
+            }
+            stmt.dispose();
+            allPages.addAll(currentPages);
+            while(depth >= 0) {
+                println("recursion level: " + depth);
+
+                println(" adding categories of " + allPages.size() + " pages");
+                // add all categories the page belongs to
+                stmt = connection.db
+                        .prepare("REPLACE INTO currentpages (cp_id) SELECT cl_to FROM categorylinks "
+                                + "INNER JOIN currentpages on cl_from == cp_id;");
+                stmt.stepThrough().dispose();
+
+                println(" adding templates of " + allPages.size() + " pages");
+                // add all templates (and their requirements) of the pages
+                stmt = connection.db
+                        .prepare("REPLACE INTO currentpages (cp_id) SELECT tl_to FROM templatelinks "
+                                + "INNER JOIN currentpages on tl_from == cp_id;");
+                stmt.stepThrough().dispose();
+
+                // now read back all pages (except auto-included ones):
+                stmt = connection.db
+                        .prepare("SELECT page_namespace,page_title FROM currentpages "
+                                + "INNER JOIN page on page_id == cp_id " 
+                                + "WHERE page_namespace != " + MyNamespace.MEDIAWIKI_NAMESPACE_KEY + " ;");
+                while(stmt.step()) {
+                    int namespace = stmt.columnInt(0);
+                    String title = stmt.columnString(1);
+                    allPages.add(new NormalisedTitle(namespace, title));
+                }
+                stmt.reset();
+
+                if (depth > 1) {
+                    println(" adding links of " + allPages.size() + " pages");
+                    // add all links of the pages for further processing
+                    stmt = connection.db
+                            .prepare("REPLACE INTO currentpages (cp_id) SELECT pl_to FROM pagelinks "
+                                    + "INNER JOIN currentpages on pl_from == cp_id;");
+                    stmt.stepThrough().dispose();
+                }
+
+                --depth;
+            }
+            connection.db.exec("DELETE FROM currentPages;");
+        } finally {
+            if (stmt != null) {
+                stmt.dispose();
+            }
+        }
+        return allPages;
     }
 }

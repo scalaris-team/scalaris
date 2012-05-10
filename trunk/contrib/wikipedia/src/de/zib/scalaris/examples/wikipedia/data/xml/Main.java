@@ -91,6 +91,8 @@ public class Main {
                     doConvert(filename, Arrays.copyOfRange(args, 2, args.length));
                 } else if (args[1].equals("dumpdb-addlinks")) {
                     doDumpdbAddlinks(filename, Arrays.copyOfRange(args, 2, args.length));
+                } else if (args[1].equals("dumpdb-filter")) {
+                    doDumpdbFilter(filename, Arrays.copyOfRange(args, 2, args.length));
                 }
             }
         } catch (SAXException e) {
@@ -334,6 +336,91 @@ public class Main {
         handler.tearDown();
         shutdownHook.run();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
+    }
+
+    /**
+     * Filters all pages in the Wikipedia XML2DB dump from the given file and
+     * creates a list of page names belonging to certain categories.
+     * 
+     * @param filename
+     * @param args
+     * 
+     * @throws RuntimeException
+     * @throws IOException
+     * @throws SAXException
+     * @throws FileNotFoundException
+     */
+    private static void doDumpdbFilter(String filename, String[] args) throws RuntimeException, IOException,
+            SAXException, FileNotFoundException {
+        int i = 0;
+        int recursionLvl = 1;
+        if (args.length > i) {
+            try {
+                recursionLvl = Integer.parseInt(args[i]);
+            } catch (NumberFormatException e) {
+                System.err.println("no number: " + args[i]);
+                System.exit(-1);
+            }
+        }
+        ++i;
+
+        String pageListFileName = "";
+        if (args.length > i && !args[i].isEmpty()) {
+            pageListFileName = args[i];
+        } else {
+            System.err.println("need a pagelist file name for filter; arguments given: " + Arrays.toString(args));
+            System.exit(-1);
+        }
+        ++i;
+        
+        Set<String> allowedPages0 = new HashSet<String>();
+        allowedPages0.add("Main Page");
+        String allowedPagesFileName = "";
+        if (args.length > i && !args[i].isEmpty()) {
+            allowedPagesFileName = args[i];
+            FileReader inFile = new FileReader(allowedPagesFileName);
+            BufferedReader br = new BufferedReader(inFile);
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (!line.isEmpty()) {
+                    allowedPages0.add(line);
+                }
+            }
+        }
+        ++i;
+        
+        LinkedList<String> rootCategories = new LinkedList<String>();
+        if (args.length > i) {
+            for (String rCat : Arrays.asList(args).subList(i, args.length)) {
+                if (!rCat.isEmpty()) {
+                    rootCategories.add(rCat);
+                }
+            }
+        }
+        WikiDumpHandler.println(System.out, "filtering by categories " + rootCategories.toString() + " ...");
+        WikiDumpHandler.println(System.out, " wiki dump     : " + filename);
+        WikiDumpHandler.println(System.out, " allowed pages : " + allowedPagesFileName);
+        WikiDumpHandler.println(System.out, " recursion lvl : " + recursionLvl);
+        
+
+
+        WikiDumpHandler.println(System.out, "creating list of pages to import (recursion level: " + recursionLvl + ") ...");
+        Set<String> allowedCats0 = new HashSet<String>(rootCategories);
+        
+        WikiDumpSQLiteLinkTables handler = new WikiDumpSQLiteLinkTables(filename);
+        handler.setUp();
+        SortedSet<String> pages = handler.getPagesInCategories(allowedCats0,
+                allowedPages0, recursionLvl, false);
+        handler.tearDown();
+
+        do {
+            FileWriter outFile = new FileWriter(pageListFileName);
+            PrintWriter out = new PrintWriter(outFile);
+            for (String page : pages) {
+                out.println(page);
+            }
+            out.close();
+        } while(false);
     }
 
     /**
