@@ -28,7 +28,6 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
-import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
@@ -373,13 +372,11 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      *            the connection to Scalaris
      * @param title
      *            the title of the template
-     * @param nsObject
-     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
-            NormalisedTitle title, final MyNamespace nsObject) {
+            NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
         return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
                 Arrays.asList(getTplPageListKey(title)), true,
