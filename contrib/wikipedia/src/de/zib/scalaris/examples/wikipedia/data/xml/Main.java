@@ -326,9 +326,9 @@ public class Main {
             throws RuntimeException {
         WikiDumpHandler.println(System.out, "adding links to: " + dbReadFileName);
         
-        WikiDumpSQLiteAddLinkTables handler = new WikiDumpSQLiteAddLinkTables(dbReadFileName);
+        WikiDumpSQLiteLinkTables handler = new WikiDumpSQLiteLinkTables(dbReadFileName);
         handler.setUp();
-        WikiDumpSQLiteAddLinkTables.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
+        WikiDumpSQLiteLinkTables.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         handler.processLinks();
         handler.tearDown();
