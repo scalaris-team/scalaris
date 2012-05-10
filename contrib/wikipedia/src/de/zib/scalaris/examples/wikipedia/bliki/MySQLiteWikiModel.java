@@ -34,7 +34,7 @@ public class MySQLiteWikiModel extends MyWikiModel {
     
     /**
      * Creates a new wiki model to render wiki text using the given connection
-     * to Scalaris.
+     * to a SQLite DB.
      * 
      * @param imageBaseURL
      *            base url pointing to images - can contain ${image} for
@@ -56,46 +56,42 @@ public class MySQLiteWikiModel extends MyWikiModel {
         this.connection = connection;
     }
 
-//    /**
-//     * Determines if a template name corresponds to a magic word using
-//     * {@link MyScalarisMagicWord#isMagicWord(String)}.
-//     * 
-//     * @param name
-//     *            the template name
-//     * 
-//     * @return whether the template is a magic word or not
-//     */
-//    @Override
-//    protected boolean isMagicWord(String name) {
-//        // TODO
-//        return false;
-////        return MyScalarisMagicWord.isMagicWord(name);
-//    }
-//
-//    /**
-//     * Retrieves the contents of the given magic word from Scalaris.
-//     * 
-//     * @param templateName
-//     *            the template's name without the namespace, e.g. a magic word
-//     *            including its parameters
-//     * @param magicWord
-//     *            the magic word alone
-//     * @param parameter
-//     *            the parameters of the magic word
-//     * 
-//     * @return the contents of the magic word (see
-//     *         {@link MyScalarisMagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)})
-//     */
-//    @Override
-//    protected String retrieveMagicWord(String articleName, String magicWord,
-//            String parameter) {
-//        // TODO
-//        return MyMagicWord.processMagicWord(articleName, parameter, this);
-////        return MyScalarisMagicWord.processMagicWord(magicWord, parameter, this);
-//    }
+    /**
+     * Determines if a template name corresponds to a magic word using
+     * {@link MySQLiteMagicWord#isMagicWord(String)}.
+     * 
+     * @param name
+     *            the template name
+     * 
+     * @return whether the template is a magic word or not
+     */
+    @Override
+    protected boolean isMagicWord(String name) {
+        return MySQLiteMagicWord.isMagicWord(name);
+    }
 
     /**
-     * Retrieves the contents of the given page from Scalaris. Caches retrieved
+     * Retrieves the contents of the given magic word from the SQLite DB.
+     * 
+     * @param templateName
+     *            the template's name without the namespace, e.g. a magic word
+     *            including its parameters
+     * @param magicWord
+     *            the magic word alone
+     * @param parameter
+     *            the parameters of the magic word
+     * 
+     * @return the contents of the magic word (see
+     *         {@link MySQLiteMagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)})
+     */
+    @Override
+    protected String retrieveMagicWord(String articleName, String magicWord,
+            String parameter) {
+        return MySQLiteMagicWord.processMagicWord(magicWord, parameter, this);
+    }
+
+    /**
+     * Retrieves the contents of the given page from the SQLite DB. Caches retrieved
      * pages in {@link #pageCache}.
      * 
      * @param namespace

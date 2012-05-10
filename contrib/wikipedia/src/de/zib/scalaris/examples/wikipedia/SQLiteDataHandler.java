@@ -4,6 +4,7 @@
 package de.zib.scalaris.examples.wikipedia;
 
 import java.io.File;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,6 +102,21 @@ public class SQLiteDataHandler {
         public SQLiteStatement stmtGetLatestRev;
         
         /**
+         * Allows retrieval of the total number of pages.
+         */
+        public SQLiteStatement stmtGetPageCount;
+        
+        /**
+         * Allows retrieval of the total number of articles.
+         */
+        public SQLiteStatement stmtGetArticleCount;
+        
+        /**
+         * Allows retrieval of the total number of pages inside a category.
+         */
+        public SQLiteStatement stmtGetPagesInCatCount;
+        
+        /**
          * Creates all prepared statements and stores them in the object's
          * members.
          * 
@@ -131,10 +147,19 @@ public class SQLiteDataHandler {
         }
 
         protected void initStmts() throws SQLiteException {
-            stmtGetLatestRev = this.db.prepare("SELECT * from page "
+            stmtGetLatestRev = this.db.prepare("SELECT * FROM page "
                     + "INNER JOIN revision ON page_latest == rev_id "
                     + "INNER JOIN text ON rev_text_id == old_id "
                     + "WHERE page_namespace == ? AND page_title == ?;");
+            stmtGetPageCount = this.db
+                    .prepare("SELECT ss_total_pages FROM site_stats WHERE ss_row_id == 1;");
+            stmtGetArticleCount = this.db
+                    .prepare("SELECT ss_good_articles FROM site_stats WHERE ss_row_id == 1;");
+            stmtGetPagesInCatCount = this.db
+                    .prepare("SELECT COUNT(*) FROM categorylinks "
+                            + "WHERE cl_to = (SELECT page_id from page where page_namespace = "
+                            + MyNamespace.CATEGORY_NAMESPACE_KEY
+                            + " AND page_title = ?);");
         }
         
         /**
@@ -143,16 +168,19 @@ public class SQLiteDataHandler {
          */
         public void dispose() {
             stmtGetLatestRev.dispose();
+            stmtGetPageCount.dispose();
+            stmtGetArticleCount.dispose();
+            stmtGetPagesInCatCount.dispose();
             db.dispose();
         }
     }
     
     /**
      * Retrieves the current, i.e. most up-to-date, version of a page from
-     * Scalaris.
+     * the SQLite DB.
      * 
      * @param connection
-     *            the connection to Scalaris
+     *            the connection to the SQLite DB
      * @param title
      *            the title of the page
      * @param nsObject
@@ -165,7 +193,7 @@ public class SQLiteDataHandler {
         final long timeAtStart = System.currentTimeMillis();
         Page page = null;
         Revision revision = null;
-        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         final String titleAsString = title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
@@ -225,6 +253,120 @@ public class SQLiteDataHandler {
                     + e.getMessage(), false, title, page, revision, false,
                     false, titleAsString, System.currentTimeMillis()
                             - timeAtStart);
+        } finally {
+            try {
+                stmt.reset();
+            } catch (SQLiteException e) {
+            }
+        }
+    }
+
+    /**
+     * Retrieves the number of all available pages from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static ValueResult<BigInteger> getPageCount(Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "page count";
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<BigInteger>(false, involvedKeys,
+                    "no connection to SQLite DB", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return getInteger(connection.stmtGetPageCount, null, timeAtStart,
+                statName, involvedKeys);
+    }
+
+    /**
+     * Retrieves the number of available articles, i.e. pages in the main
+     * namespace, from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * 
+     * @return a result object with the number of articles on success
+     */
+    public static ValueResult<BigInteger> getArticleCount(Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "article count";
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<BigInteger>(false, involvedKeys,
+                    "no connection to SQLite DB", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return getInteger(connection.stmtGetArticleCount, null, timeAtStart,
+                statName, involvedKeys);
+    }
+
+    /**
+     * Retrieves the number of all pages in the given category from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static ValueResult<BigInteger> getPagesInCategoryCount(
+            Connection connection, NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "page count in " + title;
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<BigInteger>(false, involvedKeys,
+                    "no connection to SQLite DB", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return getInteger(connection.stmtGetPagesInCatCount, title.title,
+                timeAtStart, statName, involvedKeys);
+    }
+
+    /**
+     * Retrieves a number from the SQLite DB using a prepared statement with the
+     * given bindings and a single result column.
+     * 
+     * @param stmt
+     *            the statement to evaluate
+     * @param bind1
+     *            string to bind to parameter 1 (if not <tt>null</tt>)
+     * @param timeAtStart
+     *            the start time of the method using this method
+     * @param statName
+     *            name for the time measurement statistics
+     * @param involvedKeys
+     *            list of all involved keys
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static ValueResult<BigInteger> getInteger(
+            final SQLiteStatement stmt, String bind1, final long timeAtStart,
+            final String statName, List<InvolvedKey> involvedKeys) {
+        try {
+            if (bind1 != null) {
+                stmt.bind(1, bind1);
+            }
+            if (stmt.step()) {
+                BigInteger number = BigInteger.valueOf(stmt.columnLong(0));
+                return new ValueResult<BigInteger>(involvedKeys, number, statName,
+                        System.currentTimeMillis() - timeAtStart);
+            }
+            return new ValueResult<BigInteger>(
+                    false,
+                    involvedKeys,
+                    "unknown exception reading " + statName,
+                    false, statName, System.currentTimeMillis() - timeAtStart);
+        } catch (SQLiteException e) {
+            return new ValueResult<BigInteger>(false, involvedKeys,
+                    "unknown exception reading " + statName + ": "
+                            + e.getMessage(), false, statName,
+                    System.currentTimeMillis() - timeAtStart);
         } finally {
             try {
                 stmt.reset();
