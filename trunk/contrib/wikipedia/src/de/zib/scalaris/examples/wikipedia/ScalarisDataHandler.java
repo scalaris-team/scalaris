@@ -155,13 +155,14 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public final static ValueResult<List<NormalisedTitle>> getPageList(Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
         ArrayList<String> scalaris_keys = new ArrayList<String>(
                 MyNamespace.MAX_NAMESPACE_ID - MyNamespace.MIN_NAMESPACE_ID + 1);
         for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
             scalaris_keys.add(getPageListKey(i));
         }
         return getPageList2(connection, ScalarisOpType.PAGE_LIST,
-                scalaris_keys, false, "page list");
+                scalaris_keys, false, timeAtStart, "page list");
     }
 
     /**
@@ -175,8 +176,10 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public final static ValueResult<List<NormalisedTitle>> getPageList(int namespace, Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
         return getPageList2(connection, ScalarisOpType.PAGE_LIST,
-                Arrays.asList(getPageListKey(namespace)), false, "page list:" + namespace);
+                Arrays.asList(getPageListKey(namespace)), false, timeAtStart,
+                "page list:" + namespace);
     }
 
     /**
@@ -192,12 +195,13 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<List<Contribution>> getContributions(
             Connection connection, String contributor) {
+        final long timeAtStart = System.currentTimeMillis();
         final String statName = "contributions of " + contributor;
         if (Options.getInstance().WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
             ValueResult<List<Contribution>> result = getPageList3(connection,
                     ScalarisOpType.CONTRIBUTION,
                     Arrays.asList(getContributionListKey(contributor)), false,
-                    statName, new ErlangConverter<List<Contribution>>() {
+                    timeAtStart, statName, new ErlangConverter<List<Contribution>>() {
                         @Override
                         public List<Contribution> convert(ErlangValue v)
                                 throws ClassCastException {
@@ -226,6 +230,8 @@ public class ScalarisDataHandler {
      * @param failNotFound
      *            whether the operation should fail if the key is not found or
      *            not
+     * @param timeAtStart
+     *            the start time of the method using this method
      * @param statName
      *            name for the time measurement statistics
      * 
@@ -234,9 +240,9 @@ public class ScalarisDataHandler {
     protected final static ValueResult<List<NormalisedTitle>> getPageList2(
             Connection connection, ScalarisOpType opType,
             Collection<String> scalaris_keys, boolean failNotFound,
-            String statName) {
+            final long timeAtStart, String statName) {
         ValueResult<List<NormalisedTitle>> result = getPageList3(connection, opType,
-                scalaris_keys, failNotFound, statName,
+                scalaris_keys, failNotFound, timeAtStart, statName,
                 new ErlangConverter<List<NormalisedTitle>>() {
             @Override
             public List<NormalisedTitle> convert(ErlangValue v)
@@ -267,6 +273,8 @@ public class ScalarisDataHandler {
      * @param failNotFound
      *            whether the operation should fail if the key is not found or
      *            not (the value contains null if not failed!)
+     * @param timeAtStart
+     *            the start time of the method using this method
      * @param statName
      *            name for the time measurement statistics
      * 
@@ -274,8 +282,7 @@ public class ScalarisDataHandler {
      */
     protected final static <T> ValueResult<List<T>> getPageList3(Connection connection,
             ScalarisOpType opType, Collection<String> scalaris_keys,
-            boolean failNotFound, String statName, ErlangConverter<List<T>> conv) {
-        final long timeAtStart = System.currentTimeMillis();
+            boolean failNotFound, final long timeAtStart, String statName, ErlangConverter<List<T>> conv) {
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         
         if (connection == null) {
@@ -313,12 +320,13 @@ public class ScalarisDataHandler {
      * @return a result object with the number of pages on success
      */
     public final static ValueResult<BigInteger> getPageCount(Connection connection) {
+        final long timeAtStart = System.currentTimeMillis();
         ArrayList<String> scalaris_keys = new ArrayList<String>(
                 MyNamespace.MAX_NAMESPACE_ID - MyNamespace.MIN_NAMESPACE_ID + 1);
         for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
             scalaris_keys.add(getPageCountKey(i));
         }
-        return getInteger2(connection, scalaris_keys, false, "page count");
+        return getInteger2(connection, scalaris_keys, false, timeAtStart, "page count");
     }
 
     /**
@@ -333,7 +341,9 @@ public class ScalarisDataHandler {
      * @return a result object with the number of pages on success
      */
     public final static ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
-        return getInteger2(connection, getPageCountKey(namespace), false, "page count:" + namespace);
+        final long timeAtStart = System.currentTimeMillis();
+        return getInteger2(connection, getPageCountKey(namespace), false,
+                timeAtStart, "page count:" + namespace);
     }
 
     /**
@@ -346,7 +356,9 @@ public class ScalarisDataHandler {
      * @return a result object with the number of articles on success
      */
     public final static ValueResult<BigInteger> getArticleCount(Connection connection) {
-        return getInteger2(connection, getArticleCountKey(), false, "article count");
+        final long timeAtStart = System.currentTimeMillis();
+        return getInteger2(connection, getArticleCountKey(), false,
+                timeAtStart, "article count");
     }
 
     /**
@@ -359,7 +371,9 @@ public class ScalarisDataHandler {
      * @return a result object with the number of articles on success
      */
     public final static ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
-        return getInteger2(connection, getStatsPageEditsKey(), false, "page edits");
+        final long timeAtStart = System.currentTimeMillis();
+        return getInteger2(connection, getStatsPageEditsKey(), false,
+                timeAtStart, "page edits");
     }
 
     /**
@@ -373,9 +387,10 @@ public class ScalarisDataHandler {
      * @return a result object with the page list on success
      */
     public final static ValueResult<NormalisedTitle> getRandomArticle(Connection connection, Random random) {
+        final long timeAtStart = System.currentTimeMillis();
         ValueResult<List<ErlangValue>> result = getPageList3(connection,
                 ScalarisOpType.PAGE_LIST, Arrays.asList(getPageListKey(0)),
-                true, "random article",
+                true, timeAtStart, "random article",
                 new ErlangConverter<List<ErlangValue>>() {
                     @Override
                     public List<ErlangValue> convert(ErlangValue v)
@@ -404,14 +419,17 @@ public class ScalarisDataHandler {
      * @param failNotFound
      *            whether the operation should fail if the key is not found or
      *            not
+     * @param timeAtStart
+     *            the start time of the method using this method
      * @param statName
      *            name for the time measurement statistics
      * 
      * @return a result object with the number on success
      */
     protected final static ValueResult<BigInteger> getInteger2(Connection connection,
-            String scalaris_key, boolean failNotFound, String statName) {
-        return getInteger2(connection, Arrays.asList(scalaris_key), failNotFound, statName);
+            String scalaris_key, boolean failNotFound, final long timeAtStart, String statName) {
+        return getInteger2(connection, Arrays.asList(scalaris_key),
+                failNotFound, timeAtStart, statName);
     }
 
     /**
@@ -424,14 +442,16 @@ public class ScalarisDataHandler {
      * @param failNotFound
      *            whether the operation should fail if the key is not found or
      *            not
+     * @param timeAtStart
+     *            the start time of the method using this method
      * @param statName
      *            name for the time measurement statistics
      * 
      * @return a result object with the number on success
      */
-    protected final static ValueResult<BigInteger> getInteger2(Connection connection,
-            Collection<String> scalaris_keys, boolean failNotFound, String statName) {
-        final long timeAtStart = System.currentTimeMillis();
+    protected final static ValueResult<BigInteger> getInteger2(
+            Connection connection, Collection<String> scalaris_keys,
+            boolean failNotFound, final long timeAtStart, String statName) {
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
