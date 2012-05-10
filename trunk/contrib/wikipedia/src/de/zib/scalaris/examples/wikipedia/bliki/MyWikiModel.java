@@ -16,7 +16,6 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
-import info.bliki.wiki.filter.Util;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.namespaces.Namespace;
@@ -315,11 +314,7 @@ public class MyWikiModel extends WikiModel {
         // note: cannot cache templates here since the text returned by the
         // implementation-specific retrievePage() method may depend in the exact
         // parameters or not
-        String text = retrievePage(namespace, articleName, templateParameters);
-        if (text != null && !text.isEmpty()) {
-            text = removeNoIncludeContents(text);
-        }
-        return text;
+        return retrievePage(namespace, articleName, templateParameters);
     }
 
     /**
@@ -482,46 +477,6 @@ public class MyWikiModel extends WikiModel {
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters, boolean followRedirect) {
         return null;
-    }
-
-    /**
-     * Fixes noinclude tags inside includeonly/onlyinclude not being filtered
-     * out by the template parsing.
-     * 
-     * @param text
-     *            the template's text
-     * 
-     * @return the text without anything within noinclude tags
-     */
-    protected final String removeNoIncludeContents(String text) {
-        // do not alter if showing the template page: 
-        if (getRecursionLevel() == 0) {
-            return text;
-        }
-        
-        StringBuilder sb = new StringBuilder(text.length());
-        int curPos = 0;
-        while(true) {
-            // starting tag:
-            String startString = "<", endString = "noinclude>";
-            int index = Util.indexOfIgnoreCase(text, startString, endString, curPos);
-            if (index != (-1)) {
-                sb.append(text.substring(curPos, index));
-                curPos = index;
-            } else {
-                sb.append(text.substring(curPos));
-                return sb.toString();
-            }
-    
-            // ending tag:
-            startString = "</"; endString = "noinclude>";
-            index = Util.indexOfIgnoreCase(text, startString, endString, curPos);
-            if (index != (-1)) {
-                curPos = index + startString.length() + endString.length();
-            } else {
-                return sb.toString();
-            }
-        }
     }
 
     /* (non-Javadoc)
@@ -791,7 +746,7 @@ public class MyWikiModel extends WikiModel {
     @Override
     public void addLink(String topicName) {
         /*
-         * to not add links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
+         * do not add links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * the internal links
          */
         String namespace = getNamespace(topicName);
@@ -1120,17 +1075,6 @@ public class MyWikiModel extends WikiModel {
         pageCache = new HashMap<NormalisedTitle, String>();
     }
 
-    /* (non-Javadoc)
-     * @see info.bliki.wiki.model.AbstractWikiModel#isTemplateTopic()
-     */
-    @Override
-    public boolean isTemplateTopic() {
-        // best to declare every page as a template topic
-        // -> e.g. does not remove <noinclude> tags in ordinary pages 
-        return true;
-//        return isTemplateNamespace(getNamespace(getPageName()));
-    }
-
     /**
      * Checks whether the given namespace is a valid media namespace.
      * 
@@ -1269,6 +1213,7 @@ public class MyWikiModel extends WikiModel {
 
     @Override
     public String getRedirectLink() {
+        // remove "#section" from redirect links (this form of redirects is unsupported)
         final String link = super.getRedirectLink();
         if (link != null) {
             return link.replaceFirst("#.*$", "");

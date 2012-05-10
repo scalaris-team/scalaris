@@ -166,7 +166,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             wikiModel.setUp();
             final NormalisedTitle normTitle = wikiModel.normalisePageTitle(page.getTitle());
             wikiModel.setPageName(page.getTitle());
-            wikiModel.render(null, page.getCurRev().unpackedText());
+            wikiModel.render(null, page.getCurRev().unpackedText(), true);
             
             // categories:
             do {
