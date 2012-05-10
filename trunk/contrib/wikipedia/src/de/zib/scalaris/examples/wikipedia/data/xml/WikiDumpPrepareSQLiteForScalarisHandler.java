@@ -45,7 +45,7 @@ import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
@@ -726,7 +726,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 final String stmtPage = stmt.columnString(1);
                 if (listKey == null) {
                     // first row
-                    listKey = NormalisedTitle.fromString(stmtKey);
+                    listKey = NormalisedTitle.fromNormalised(stmtKey);
                     pageList.add(stmtPage);
                 } else if (listKey.equals(stmtKey)) {
                     // next item with the same list key
@@ -735,7 +735,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     // new item, i.e. different list key
                     // -> write old list, then accumulate new
                     writeToScalarisKV(listKey, pageList, listType);
-                    listKey = NormalisedTitle.fromString(stmtKey);
+                    listKey = NormalisedTitle.fromNormalised(stmtKey);
                     pageList.add(stmtPage);
                 }
             }

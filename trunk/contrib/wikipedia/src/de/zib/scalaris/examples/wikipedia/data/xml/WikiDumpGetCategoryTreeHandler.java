@@ -38,7 +38,7 @@ import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
+import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 
@@ -343,8 +343,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
                             "WHERE page.title LIKE '" + (new NormalisedTitle(MyNamespace.TEMPLATE_NAMESPACE_KEY, "")).toString() + "%';");
             while (stmt.step()) {
-                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
-                NormalisedTitle template = NormalisedTitle.fromString(stmt.columnString(1));
+                NormalisedTitle pageTitle = NormalisedTitle.fromNormalised(stmt.columnString(0));
+                NormalisedTitle template = NormalisedTitle.fromNormalised(stmt.columnString(1));
                 updateMap(templateTree, pageTitle, template);
             }
             stmt.dispose();
@@ -353,8 +353,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "includes INNER JOIN pages AS page ON includes.title == page.id " +
                             "INNER JOIN pages AS incl ON includes.include == incl.id;");
             while (stmt.step()) {
-                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
-                NormalisedTitle include = NormalisedTitle.fromString(stmt.columnString(1));
+                NormalisedTitle pageTitle = NormalisedTitle.fromNormalised(stmt.columnString(0));
+                NormalisedTitle include = NormalisedTitle.fromNormalised(stmt.columnString(1));
                 updateMap(includeTree, pageTitle, include);
             }
             stmt.dispose();
@@ -363,8 +363,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                             "redirects INNER JOIN pages AS page ON redirects.title == page.id " +
                             "INNER JOIN pages AS redir ON redirects.redirect == redir.id;");
             while (stmt.step()) {
-                NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
-                NormalisedTitle redirect = NormalisedTitle.fromString(stmt.columnString(1));
+                NormalisedTitle pageTitle = NormalisedTitle.fromNormalised(stmt.columnString(0));
+                NormalisedTitle redirect = NormalisedTitle.fromNormalised(stmt.columnString(1));
                 updateMap(referenceTree, redirect, pageTitle);
             }
         } catch (SQLiteException e) {
@@ -526,7 +526,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS cat ON categories.category == cat.id" +
                                     "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
-                        NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(0));
+                        NormalisedTitle pageCategory = NormalisedTitle.fromNormalised(stmt.columnString(0));
                         addToPages(allowedCatsFull, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -540,7 +540,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     "WHERE page.title LIKE '" + MyNamespace.NamespaceEnum.CATEGORY_NAMESPACE_KEY.getId() + ":%' OR "
                                     + "page.title LIKE '" + MyNamespace.NamespaceEnum.TEMPLATE_NAMESPACE_KEY.getId() + ":%';");
                     while (stmt.step()) {
-                        NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(0));
+                        NormalisedTitle pageTemplate = NormalisedTitle.fromNormalised(stmt.columnString(0));
                         Set<NormalisedTitle> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
                         addToPages(allowedCatsFull, newPages, tplChildren, includeTree, referenceTree);
                     }
@@ -593,8 +593,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "categories INNER JOIN pages AS page ON categories.title == page.id " +
                                 "INNER JOIN pages AS cat ON categories.category == cat.id;");
                 while (stmt.step()) {
-                    NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
-                    NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(1));
+                    NormalisedTitle pageTitle = NormalisedTitle.fromNormalised(stmt.columnString(0));
+                    NormalisedTitle pageCategory = NormalisedTitle.fromNormalised(stmt.columnString(1));
                     if (allowedCats.contains(pageCategory)) {
                         currentPages.add(pageTitle);
                     }
@@ -606,8 +606,8 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                 "templates INNER JOIN pages AS page ON templates.title == page.id " +
                                 "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                 while (stmt.step()) {
-                    NormalisedTitle pageTitle = NormalisedTitle.fromString(stmt.columnString(0));
-                    NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(1));
+                    NormalisedTitle pageTitle = NormalisedTitle.fromNormalised(stmt.columnString(0));
+                    NormalisedTitle pageTemplate = NormalisedTitle.fromNormalised(stmt.columnString(1));
                     if (allowedCats.contains(pageTemplate)) {
                         currentPages.add(pageTitle);
                     }
@@ -666,7 +666,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                               + MyNamespace.NamespaceEnum.MEDIAWIKI_NAMESPACE_KEY.getId()
                               + ":%';");
             while (stmt.step()) {
-                autoIncluded.add(NormalisedTitle.fromString(stmt.columnString(0)));
+                autoIncluded.add(NormalisedTitle.fromNormalised(stmt.columnString(0)));
             }
             currentPages.addAll(autoIncluded);
             stmt.dispose();
@@ -693,7 +693,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS page ON categories.title == page.id " +
                                     "INNER JOIN pages AS cat ON categories.category == cat.id;");
                     while (stmt.step()) {
-                        NormalisedTitle pageCategory = NormalisedTitle.fromString(stmt.columnString(0));
+                        NormalisedTitle pageCategory = NormalisedTitle.fromNormalised(stmt.columnString(0));
                         addToPages(allPages, newPages, pageCategory, includeTree, referenceTree);
                     }
                     stmt.dispose();
@@ -705,7 +705,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                                     // "INNER JOIN pages AS page ON templates.title == page.id " +
                                     "INNER JOIN pages AS tpl ON templates.template == tpl.id;");
                     while (stmt.step()) {
-                        NormalisedTitle pageTemplate = NormalisedTitle.fromString(stmt.columnString(0));
+                        NormalisedTitle pageTemplate = NormalisedTitle.fromNormalised(stmt.columnString(0));
                         Set<NormalisedTitle> tplChildren = WikiDumpGetCategoryTreeHandler.getAllChildren(templateTree, pageTemplate);
                         addToPages(allPages, newPages, tplChildren, includeTree, referenceTree);
                     }
@@ -720,7 +720,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     while (stmt.step()) {
                         String pageLink = stmt.columnString(0);
                         if (!pageLink.isEmpty()) { // there may be empty links
-                            pageLinks.add(NormalisedTitle.fromString(pageLink));
+                            pageLinks.add(NormalisedTitle.fromNormalised(pageLink));
                         }
                     }
                     stmt.dispose();

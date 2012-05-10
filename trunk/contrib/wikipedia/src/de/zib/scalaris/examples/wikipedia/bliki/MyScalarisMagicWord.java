@@ -22,7 +22,6 @@ import java.util.List;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
-import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.NormalisedTitle;
 
 /**
  * Gets values for magic words not handled by {@link MyMagicWord} which need
