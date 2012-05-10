@@ -15,7 +15,6 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
-import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -68,6 +67,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
     private SQLiteStatement stWriteTpl = null;
     private SQLiteStatement stWriteLnk = null;
     private SQLiteStatement stWriteRedirect = null;
+    private SQLiteStatement stWriteStats = null;
     
     /**
      * Constructor.
@@ -168,7 +168,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
 //        this.stop = true;
     }
     
-    void updateLinks3(Integer key, NormalisedTitle value, SQLiteStatement stWrite, String tableName) {
+    protected void updateLinks3(Integer key, NormalisedTitle value, SQLiteStatement stWrite, String tableName) {
         try {
             try {
                 stWrite.bind(1, key).bind(2, value.namespace)
@@ -177,12 +177,12 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
                 stWrite.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of " + tableName + key + " failed (sqlite error: " + e.toString() + ")");
+            System.err.println("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
             e.printStackTrace();
         }
     }
     
-    void updateLinks2(Integer key, NormalisedTitle value, SQLiteStatement stWrite, String tableName) {
+    protected void updateLinks2(Integer key, NormalisedTitle value, SQLiteStatement stWrite, String tableName) {
         try {
             try {
                 stWrite.bind(1, key).bind(2, value.title).stepThrough();
@@ -190,23 +190,38 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
                 stWrite.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of " + tableName + key + " failed (sqlite error: " + e.toString() + ")");
+            System.err.println("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
+            e.printStackTrace();
+        }
+    }
+
+    protected void updateSiteStats(long editCount, int articleCount) {
+        try {
+            try {
+                stWriteStats.bind(1, editCount).bind(2, articleCount).stepThrough();
+            } finally {
+                stWriteStats.reset();
+            }
+        } catch (SQLiteException e) {
+            System.err.println("write of sitestats failed (sqlite error: " + e.toString() + ")");
             e.printStackTrace();
         }
     }
     
     /**
+     * Parses all wiki pages in the DB and (re-)creates the link tables.
      * 
      * @throws RuntimeException
-     * @throws FileNotFoundException
      */
-    void processLinks() throws RuntimeException {
+    public void processLinks() throws RuntimeException {
         importStart();
         try {
             try {
                 SiteInfo siteInfo = WikiDumpXml2SQLite.readSiteInfo(connection.db);
                 MyNamespace namespace = new MyNamespace(siteInfo);
                 MySQLiteWikiModel wikiModel = new MySQLiteWikiModel("", "", connection, namespace);
+                long editCount = 0l;
+                int articleCount = 0;
 
                 while (stGetPages.step()) {
                     NormalisedTitle normTitle = new NormalisedTitle(
@@ -256,6 +271,10 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
                         NormalisedTitle link = wikiModel.normalisePageTitle(link_raw);
                         updateLinks3(page.getId(), link, stWriteLnk, "pagelinks");
                     }
+                    if (MyWikiModel.isArticle(normTitle.namespace, wikiModel
+                            .getLinks(), wikiModel.getCategories().keySet())) {
+                        ++articleCount;
+                    }
                     
                     wikiModel.tearDown();
                     ++importedPages;
@@ -264,6 +283,7 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
                         println("processed pages: " + importedPages);
                     }
                 }
+                updateSiteStats(editCount, articleCount);
             } finally {
                 stGetPages.reset();
             }
@@ -324,6 +344,9 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
         }
         if (stWriteRedirect != null) {
             stWriteRedirect.dispose();
+        }
+        if (stWriteStats != null) {
+            stWriteStats.dispose();
         }
         importEnd();
     }
@@ -402,6 +425,20 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
                     + "rd_to int unsigned NOT NULL default 0"
                     + ");";
             connection.db.exec(createRedirectsTable);
+
+            /**
+             * Contains a single row with some aggregate info on the state of the site.
+             */
+            final String createSiteStatsTable = "CREATE TABLE IF NOT EXISTS site_stats ("
+                    + "ss_row_id int unsigned NOT NULL,"
+                    + "ss_total_views bigint unsigned default 0,"
+                    + "ss_total_edits bigint unsigned default 0,"
+                    + "ss_good_articles bigint unsigned default 0,"
+                    + "ss_total_pages bigint default '-1'"
+                    + ");";
+            connection.db.exec(createSiteStatsTable);
+            // create index here to check at insertion:
+            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ss_row_id ON site_stats (ss_row_id);");
             
             stWriteCat = connection.db.prepare("REPLACE INTO categorylinks "
                     + "(cl_from, cl_to) SELECT ?, page_id FROM page "
@@ -417,6 +454,9 @@ public class WikiDumpSQLiteAddLinkTables implements WikiDump {
             stWriteRedirect = connection.db.prepare("REPLACE INTO redirect "
                     + "(rd_from, rd_to) SELECT ?, page_id FROM page "
                     + "WHERE page_namespace == ? AND page_title == ?;");
+            stWriteStats = connection.db.prepare("REPLACE INTO site_stats "
+                    + "(ss_row_id, ss_total_views, ss_total_edits, ss_good_articles, ss_total_pages) "
+                    + "SELECT 1, 0, ?, ?, COUNT(*) FROM page;");
             
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
