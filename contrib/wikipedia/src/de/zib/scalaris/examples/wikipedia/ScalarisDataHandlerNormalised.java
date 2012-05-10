@@ -360,9 +360,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
             NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
         return getPageList2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
                 Arrays.asList(getCatPageListKey(title)), false,
-                "pages in " + title);
+                timeAtStart, "pages in " + title);
     }
 
     /**
@@ -379,9 +380,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             NormalisedTitle title, final MyNamespace nsObject) {
+        final long timeAtStart = System.currentTimeMillis();
         return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
                 Arrays.asList(getTplPageListKey(title)), true,
-                "pages in " + title);
+                timeAtStart, "pages in " + title);
     }
 
     /**
@@ -396,11 +398,12 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      */
     public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection,
             NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
         final String statName = "links to " + title;
         if (Options.getInstance().WIKI_USE_BACKLINKS) {
             return getPageList2(connection, ScalarisOpType.BACKLINK_PAGE_LIST,
                     Arrays.asList(getBackLinksPageListKey(title)),
-                    false, statName);
+                    false, timeAtStart, statName);
         } else {
             return new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0),
                     new ArrayList<NormalisedTitle>(0));
@@ -419,8 +422,9 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      */
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
         return getInteger2(connection, getCatPageCountKey(title), false,
-                "page count in " + title);
+                timeAtStart, "page count in " + title);
     }
     
     /**
