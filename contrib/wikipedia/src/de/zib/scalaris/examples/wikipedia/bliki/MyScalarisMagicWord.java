@@ -30,54 +30,6 @@ import de.zib.scalaris.examples.wikipedia.ValueResult;
  * @author Nico Kruber, kruber@zib.de
  */
 public class MyScalarisMagicWord extends MyMagicWord {
-    // statistics
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_NUMBER_ARTICLES = "NUMBEROFARTICLES";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_NUMBER_PAGES = "NUMBEROFPAGES";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_NUMBER_FILES = "NUMBEROFFILES";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_PAGES_IN_CATEGORY = "PAGESINCATEGORY";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_PAGES_IN_CAT = "PAGESINCAT";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_NUMBER_USERS = "NUMBEROFUSERS";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_NUMBER_ADMINS = "NUMBEROFADMINS";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_PAGES_IN_NS = "PAGESINNS";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_PAGES_IN_NAMESPACE = "PAGESINNAMESPACE";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_ID = "REVISIONID";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_DAY = "REVISIONDAY";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_DAY2 = "REVISIONDAY2";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_MONTH = "REVISIONMONTH";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_YEAR = "REVISIONYEAR";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_REVISION_TIMESTAMP = "REVISIONTIMESTAMP";
-
-    @SuppressWarnings("javadoc")
-    public static final String MAGIC_PAGE_SIZE = "PAGESIZE";
 
     private static List<String> MY_MAGIC_WORDS = new ArrayList<String>();
 
@@ -92,7 +44,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
         MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_CAT);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_USERS);
         MY_MAGIC_WORDS.add(MAGIC_NUMBER_ADMINS);
-        MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NS);
+        MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NAMESPACE_NS);
         MY_MAGIC_WORDS.add(MAGIC_PAGES_IN_NAMESPACE);
         // page values
         MY_MAGIC_WORDS.add(MAGIC_REVISION_ID);

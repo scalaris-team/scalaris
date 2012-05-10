@@ -391,7 +391,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             // get a list of previous categories and templates:
             wikiModel.setUp();
             final long timeAtRenderStart = System.currentTimeMillis();
-            wikiModel.render(null, oldPage.getCurRev().unpackedText());
+            wikiModel.render(null, oldPage.getCurRev().unpackedText(), true);
             timeAtStart -= (System.currentTimeMillis() - timeAtRenderStart);
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
@@ -412,7 +412,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
         wikiModel.setUp();
         do {
             final long timeAtRenderStart = System.currentTimeMillis();
-            wikiModel.render(null, newRev.unpackedText());
+            wikiModel.render(null, newRev.unpackedText(), true);
             timeAtStart -= (System.currentTimeMillis() - timeAtRenderStart);
         } while (false);
         if (wikiModel.getRedirectLink() != null) {
