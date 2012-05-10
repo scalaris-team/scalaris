@@ -117,6 +117,21 @@ public class SQLiteDataHandler {
         public SQLiteStatement stmtGetPagesInCatCount;
         
         /**
+         * Allows retrieval of the list of pages inside a category.
+         */
+        public SQLiteStatement stmtGetPagesInCat;
+        
+        /**
+         * Allows retrieval of the list of pages using a template.
+         */
+        public SQLiteStatement stmtGetPagesInTpl;
+        
+        /**
+         * Allows retrieval of the list of pages linking to another page.
+         */
+        public SQLiteStatement stmtGetPagesLinkingTo;
+        
+        /**
          * Creates all prepared statements and stores them in the object's
          * members.
          * 
@@ -160,6 +175,18 @@ public class SQLiteDataHandler {
                             + "WHERE cl_to = (SELECT page_id from page where page_namespace = "
                             + MyNamespace.CATEGORY_NAMESPACE_KEY
                             + " AND page_title = ?);");
+            stmtGetPagesInCat = this.db
+                    .prepare("SELECT page_namespace, page_title FROM categorylinks "
+                            + "INNER JOIN page on cl_from = page_id "
+                            + "WHERE cl_to = (SELECT page_id from page where page_namespace = ? AND page_title = ?);");
+            stmtGetPagesInTpl = this.db
+                    .prepare("SELECT page_namespace, page_title FROM templatelinks "
+                            + "INNER JOIN page on tl_from = page_id "
+                            + "WHERE tl_to = (SELECT page_id from page where page_namespace = ? AND page_title = ?);");
+            stmtGetPagesLinkingTo = this.db
+                    .prepare("SELECT page_namespace, page_title FROM pagelinks "
+                            + "INNER JOIN page on pl_from = page_id "
+                            + "WHERE pl_to = (SELECT page_id from page where page_namespace = ? AND page_title = ?);");
         }
         
         /**
@@ -171,6 +198,7 @@ public class SQLiteDataHandler {
             stmtGetPageCount.dispose();
             stmtGetArticleCount.dispose();
             stmtGetPagesInCatCount.dispose();
+            stmtGetPagesInCat.dispose();
             db.dispose();
         }
     }
@@ -364,6 +392,136 @@ public class SQLiteDataHandler {
                     false, statName, System.currentTimeMillis() - timeAtStart);
         } catch (SQLiteException e) {
             return new ValueResult<BigInteger>(false, involvedKeys,
+                    "unknown exception reading " + statName + ": "
+                            + e.getMessage(), false, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        } finally {
+            try {
+                stmt.reset();
+            } catch (SQLiteException e) {
+            }
+        }
+    }
+
+    /**
+     * Retrieves a list of pages in the given category from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * @param title
+     *            the title of the category
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<NormalisedTitle>> getPagesInCategory(
+            Connection connection, NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "pages in " + title;
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
+                    "no connection to SQLite DB", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return getPageList(connection.stmtGetPagesInCat, null, title.title,
+                timeAtStart, statName, involvedKeys);
+    }
+
+    /**
+     * Retrieves a list of pages using the given template from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * @param title
+     *            the title of the template
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(
+            Connection connection, NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "pages in " + title;
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (connection == null) {
+            return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
+                    "no connection to SQLite DB", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
+        return getPageList(connection.stmtGetPagesInTpl, title.namespace,
+                title.title, timeAtStart, statName, involvedKeys);
+    }
+
+    /**
+     * Retrieves a list of pages linking to the given page from the SQLite DB.
+     * 
+     * @param connection
+     *            the connection to the SQLite DB
+     * @param title
+     *            the title of the page
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(
+            Connection connection, NormalisedTitle title) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "links to " + title;
+        final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (Options.getInstance().WIKI_USE_BACKLINKS) {
+            if (connection == null) {
+                return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
+                        "no connection to SQLite DB", true, statName,
+                        System.currentTimeMillis() - timeAtStart);
+            }
+            return getPageList(connection.stmtGetPagesLinkingTo,
+                    title.namespace, title.title, timeAtStart, statName,
+                    involvedKeys);
+        } else {
+            return new ValueResult<List<NormalisedTitle>>(involvedKeys,
+                    new ArrayList<NormalisedTitle>(0));
+        }
+    }
+
+    /**
+     * Retrieves a list of pages from the SQLite DB using a prepared statement
+     * with the given bindings and two result columns, the namespace and the
+     * title.
+     * 
+     * @param stmt
+     *            the statement to evaluate
+     * @param namespace
+     *            bound to parameter 1 if not <tt>null</tt>
+     * @param title
+     *            bound to parameter 2 if <tt>namespace</tt> is not <tt>null</tt>,
+     *            otherwise to parameter 1
+     * @param timeAtStart
+     *            the start time of the method using this method
+     * @param statName
+     *            name for the time measurement statistics
+     * @param involvedKeys
+     *            list of all involved keys
+     * 
+     * @return a result object with the number of pages on success
+     */
+    public static ValueResult<List<NormalisedTitle>> getPageList(
+            final SQLiteStatement stmt, Integer namespace, String title, final long timeAtStart,
+            final String statName, List<InvolvedKey> involvedKeys) {
+        // namespace != null -> title != null:
+        assert (namespace == null || title != null);
+        try {
+            ArrayList<NormalisedTitle> result = new ArrayList<NormalisedTitle>();
+            if (namespace != null) {
+                stmt.bind(1, namespace);
+                stmt.bind(2, title);
+            } else {
+                stmt.bind(1, title);
+            }
+            while (stmt.step()) {
+                result.add(new NormalisedTitle(stmt.columnInt(0), stmt.columnString(1)));
+            }
+            return new ValueResult<List<NormalisedTitle>>(involvedKeys, result, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        } catch (SQLiteException e) {
+            return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
                     "unknown exception reading " + statName + ": "
                             + e.getMessage(), false, statName,
                     System.currentTimeMillis() - timeAtStart);
