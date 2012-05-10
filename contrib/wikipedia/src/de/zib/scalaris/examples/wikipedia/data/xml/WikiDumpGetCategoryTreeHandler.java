@@ -568,7 +568,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
      * sub-categories are not taken into account.
      * 
      * @param allowedCats
-     *            include all pages in these categories (un-normalised page
+     *            include all pages in these categories (normalised page
      *            titles)
      * @param db
      *            connection to the SQLite database
