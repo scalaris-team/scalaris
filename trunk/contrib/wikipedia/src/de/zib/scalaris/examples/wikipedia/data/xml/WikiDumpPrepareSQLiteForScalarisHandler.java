@@ -15,12 +15,8 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -29,8 +25,6 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
@@ -121,17 +115,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      */
     static <T> void writeObject(SQLiteStatement stWrite, String key, T value)
             throws RuntimeException {
-        try {
-            try {
-                stWrite.bind(1, key).bind(2, objectToBytes(value)).stepThrough();
-            } finally {
-                stWrite.reset();
-            }
-        } catch (SQLiteException e) {
-            System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
-        } catch (IOException e) {
-            System.err.println("write of " + key + " failed");
-        }
+        WikiDumpXml2SQLite.writeObject(stWrite, key,
+                CommonErlangObjects.encode(ErlangValue.convertToErlang(value)));
     }
 
     /**
@@ -148,12 +133,8 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      * @see {@link #objectFromBytes(byte[])}
      */
     static <T> byte[] objectToBytes(T value) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
-        oos.writeObject(CommonErlangObjects.encode(ErlangValue.convertToErlang(value)));
-        oos.flush();
-        oos.close();
-        return bos.toByteArray();
+        return WikiDumpXml2SQLite.objectToBytes(CommonErlangObjects
+                .encode(ErlangValue.convertToErlang(value)));
     }
 
     /**
@@ -170,11 +151,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
      */
     static OtpErlangObject objectFromBytes(byte[] value) throws IOException,
             ClassNotFoundException {
-        ObjectInputStream ois = new ObjectInputStream(
-                new GZIPInputStream(new ByteArrayInputStream(value)));
-        OtpErlangObject result = (OtpErlangObject) ois.readObject();
-        ois.close();
-        return result;
+        return WikiDumpXml2SQLite.<OtpErlangObject>objectFromBytes(value);
     }
 
     /**
@@ -201,54 +178,30 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     }
 
     /**
-     * Note: may need to qualify static function call due to
-     *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
-     * <tt>WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key)</tt>
+     * Reads an Erlang-encoded, byte-encoded object from a SQLite DB.
      * 
-     * @param siteinfo
+     * @param stRead
+     *            read statement
      * @param key
+     *            key to read from
      * 
-     * @return the encoded object
+     * @return the Erlang-encoded object
      * 
      * @throws IOException
      * @throws FileNotFoundException
      */
     static OtpErlangObject readObject(SQLiteStatement stRead, String key)
             throws RuntimeException, FileNotFoundException {
-        try {
-            try {
-                stRead.bind(1, key);
-                if (stRead.step()) {
-                    // there should only be one result
-                    byte[] value = stRead.columnBlob(0);
-                    return objectFromBytes(value);
-                } else {
-                    throw new FileNotFoundException();
-                }
-            } finally {
-                stRead.reset();
-            }
-        } catch (FileNotFoundException e) {
-            throw e;
-        } catch (SQLiteException e) {
-            System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
-            throw new RuntimeException(e);
-        } catch (ClassNotFoundException e) {
-            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
-            throw new RuntimeException(e);
-        }
+        return WikiDumpXml2SQLite.<OtpErlangObject>readObject(stRead, key);
     }
 
     /**
-     * Note: may need to qualify static function call due to
-     *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
-     * <tt>WikiDumpPrepareSQLiteForScalarisHandler.<T>readObject(stRead, key)</tt>
+     * Reads an Erlang-encoded, byte-encoded object from a SQLite DB.
      * 
-     * @param siteinfo
+     * @param stRead
+     *            read statement
      * @param key
+     *            key to read from
      * 
      * @return the decoded object
      * 
