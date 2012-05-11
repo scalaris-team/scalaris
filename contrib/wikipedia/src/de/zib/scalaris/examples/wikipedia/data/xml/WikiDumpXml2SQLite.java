@@ -15,11 +15,18 @@
  */
 package de.zib.scalaris.examples.wikipedia.data.xml;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
@@ -140,6 +147,128 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
     }
 
     /**
+     * @param <T>
+     * @param siteinfo
+     * @param key
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    static <T> void writeObject(SQLiteStatement stWrite, String key, T value)
+            throws RuntimeException {
+        try {
+            try {
+                stWrite.bind(1, key).bind(2, objectToBytes(value)).stepThrough();
+            } finally {
+                stWrite.reset();
+            }
+        } catch (SQLiteException e) {
+            System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+        } catch (IOException e) {
+            System.err.println("write of " + key + " failed");
+        }
+    }
+
+    /**
+     * Reads a byte-encoded object from a SQLite DB.
+     * 
+     * Note: may need to qualify static function call due to
+     * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+     * <tt>WikiDumpXml2SQLite.<T>readObject(stRead, key)</tt>
+     * 
+     * @param <T>
+     *            the type to convert the object to
+     * 
+     * @param stRead
+     *            read statement
+     * @param key
+     *            key to read from
+     * 
+     * @return the decoded object
+     * 
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    static <T> T readObject(SQLiteStatement stRead, String key)
+            throws RuntimeException, FileNotFoundException {
+        try {
+            try {
+                stRead.bind(1, key);
+                if (stRead.step()) {
+                    // there should only be one result
+                    byte[] value = stRead.columnBlob(0);
+                    return WikiDumpXml2SQLite.<T>objectFromBytes(value);
+                } else {
+                    throw new FileNotFoundException();
+                }
+            } finally {
+                stRead.reset();
+            }
+        } catch (FileNotFoundException e) {
+            throw e;
+        } catch (SQLiteException e) {
+            System.err.println("read of " + key + " failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Converts this value to bytes for use by SQLite.
+     * 
+     * @param value
+     *            the object to convert
+     * 
+     * @return the byte array
+     * 
+     * @throws IOException
+     * 
+     * @see {@link #objectFromBytes(byte[])}
+     */
+    static <T> byte[] objectToBytes(T value) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(bos));
+        oos.writeObject(value);
+        oos.flush();
+        oos.close();
+        return bos.toByteArray();
+    }
+
+    /**
+     * Reads an object from a (compressed) byte array.
+     * 
+     * Note: may need to qualify static function call due to
+     *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+     * <tt>WikiDumpXml2SQLite.<T>objectFromBytes(value)</tt>
+     * 
+     * @param <T>
+     *            the type to convert the object to
+     * 
+     * @param value
+     *            the byte array to get the object from
+     * 
+     * @return the encoded object
+     * 
+     * @throws IOException
+     * @throws ClassNotFoundException
+     * 
+     * @see #objectToBytes(Object)
+     */
+    static <T> T objectFromBytes(byte[] value) throws IOException,
+            ClassNotFoundException {
+        ObjectInputStream ois = new ObjectInputStream(
+                new GZIPInputStream(new ByteArrayInputStream(value)));
+        @SuppressWarnings("unchecked")
+        T result = (T) ois.readObject();
+        ois.close();
+        return result;
+    }
+
+    /**
      * Reads the site info object from the given DB.
      * 
      * @param db
@@ -153,7 +282,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
         SQLiteStatement stmt = null;
         try {
             stmt = db.prepare("SELECT value FROM properties WHERE key == ?");
-            return WikiDumpPrepareSQLiteForScalarisHandler.readObject2(stmt, "siteinfo").jsonValue(SiteInfo.class);
+            return WikiDumpXml2SQLite.<SiteInfo>readObject(stmt, "siteinfo");
         } catch (SQLiteException e) {
             throw new RuntimeException(e);
         } catch (FileNotFoundException e) {
@@ -269,7 +398,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
                 SQLiteStatement stmt = null;
                 try {
                     stmt = db.prepare("REPLACE INTO properties (key, value) VALUES (?, ?);");
-                    WikiDumpPrepareSQLiteForScalarisHandler.writeObject(stmt, "siteinfo", siteInfo);
+                    writeObject(stmt, "siteinfo", siteInfo);
                 } catch (SQLiteException e) {
                     throw new RuntimeException(e);
                 } finally {
