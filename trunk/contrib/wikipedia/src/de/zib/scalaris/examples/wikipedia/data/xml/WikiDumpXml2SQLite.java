@@ -168,7 +168,10 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
     @Override
     protected void export(XmlPage page_xml) {
         ++pageCount;
-        addSQLiteJob(new SQLiteWritePageJob(page_xml.getPage(), page_xml.getRevisions()));
+        final Page page = page_xml.getPage();
+        if (page.getCurRev() != null) {
+            addSQLiteJob(new SQLiteWritePageJob(page, page_xml.getRevisions()));
+        }
         if ((pageCount % PRINT_PAGES_EVERY) == 0) {
             println("processed pages: " + pageCount);
         }
