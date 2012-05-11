@@ -38,6 +38,7 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public class WikiDumpXml2SQLite extends WikiDumpHandler {
+    private static final int PRINT_PAGES_EVERY = 500;
     protected SQLiteConnection db = null;
     protected SQLiteStatement stWritePage = null;
     protected SQLiteStatement stWriteRevision = null;
@@ -168,6 +169,9 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
     protected void export(XmlPage page_xml) {
         ++pageCount;
         addSQLiteJob(new SQLiteWritePageJob(page_xml.getPage(), page_xml.getRevisions()));
+        if ((pageCount % PRINT_PAGES_EVERY) == 0) {
+            println("processed pages: " + pageCount);
+        }
     }
     
     protected class SQLiteWorker extends Thread {
