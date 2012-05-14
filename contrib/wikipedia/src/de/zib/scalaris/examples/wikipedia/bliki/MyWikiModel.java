@@ -923,9 +923,7 @@ public class MyWikiModel extends WikiModel {
      */
     @Override
     public void setUp() {
-        // WikiModel forgets to reset fRedirectLink
         super.setUp();
-        fRedirectLink = null;
         magicWordCache = new HashMap<String, String>();
         pageCache = new HashMap<NormalisedTitle, String>();
     }
