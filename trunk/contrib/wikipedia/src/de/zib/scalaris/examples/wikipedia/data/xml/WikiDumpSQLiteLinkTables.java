@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import com.almworks.sqlite4java.SQLiteConnection;
 import com.almworks.sqlite4java.SQLiteException;
 import com.almworks.sqlite4java.SQLiteStatement;
 
@@ -221,6 +222,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
      * @throws RuntimeException
      */
     public void processLinks() throws RuntimeException {
+        println("Populating link tables...");
         importStart();
         try {
             try {
@@ -309,15 +311,91 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
      */
     @Override
     public void setUp() {
+        // note: this needs to be executed from the thread that works on the DB!
         try {
-            connection = new Connection(SQLiteDataHandler.openDB(dbFileName, false, null));
-            stGetPages = connection.db.prepare("SELECT page_namespace, page_title FROM page");
+            println("Creating link tables...");
+            final SQLiteConnection db = SQLiteDataHandler.openDB(dbFileName, false, null);
+            
+            /**
+             * Track page-to-page hyperlinks within the wiki.
+             */
+            final String createPageLinksTable = "CREATE TABLE IF NOT EXISTS pagelinks ("
+                    + "pl_from int unsigned NOT NULL default 0,"
+                    + "pl_to int unsigned NOT NULL default 0"
+                    + ");";
+            db.exec(createPageLinksTable);
+            // create index here to check at insertion:
+            db.exec("CREATE UNIQUE INDEX IF NOT EXISTS pl_from ON pagelinks (pl_from,pl_to);");
+            
+            /**
+             * Track template inclusions.
+             */
+            final String createTemplateLinksTable = "CREATE TABLE IF NOT EXISTS templatelinks ("
+                    + "tl_from int unsigned NOT NULL default 0,"
+                    + "tl_to int unsigned NOT NULL default 0"
+                    + ");";
+            db.exec(createTemplateLinksTable);
+            // create index here to check at insertion:
+            db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tl_from ON templatelinks (tl_from,tl_to);");
+        
+            /**
+             * Track category inclusions *used inline*.
+             * This tracks a single level of category membership.
+             */
+            final String createCategoryLinksTable = "CREATE TABLE IF NOT EXISTS categorylinks ("
+                    + "cl_from int unsigned NOT NULL default 0,"
+                    + "cl_to int unsigned NOT NULL default 0"
+                    + ");";
+            db.exec(createCategoryLinksTable);
+            // create index here to check at insertion:
+            db.exec("CREATE UNIQUE INDEX IF NOT EXISTS cl_from ON categorylinks (cl_from,cl_to);");
+            
+            /**
+             * For each redirect, this table contains exactly one row defining its target.
+             */
+            final String createRedirectsTable = "CREATE TABLE IF NOT EXISTS redirect ("
+                    + "rd_from int unsigned NOT NULL default 0 PRIMARY KEY,"
+                    + "rd_to int unsigned NOT NULL default 0"
+                    + ");";
+            db.exec(createRedirectsTable);
+        
+            /**
+             * Contains a single row with some aggregate info on the state of the site.
+             */
+            final String createSiteStatsTable = "CREATE TABLE IF NOT EXISTS site_stats ("
+                    + "ss_row_id int unsigned NOT NULL,"
+                    + "ss_total_views bigint unsigned default 0,"
+                    + "ss_total_edits bigint unsigned default 0,"
+                    + "ss_good_articles bigint unsigned default 0,"
+                    + "ss_total_pages bigint default '-1'"
+                    + ");";
+            db.exec(createSiteStatsTable);
+            // create index here to check at insertion:
+            db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ss_row_id ON site_stats (ss_row_id);");
+        
+            stGetPages = db.prepare("SELECT page_namespace, page_title FROM page");
+            stWriteCat = db.prepare("REPLACE INTO categorylinks "
+                    + "(cl_from, cl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == "
+                    + MyNamespace.CATEGORY_NAMESPACE_KEY
+                    + " AND page_title == ?;");
+            stWriteTpl = db.prepare("REPLACE INTO templatelinks "
+                    + "(tl_from, tl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
+            stWriteLnk = db.prepare("REPLACE INTO pagelinks "
+                    + "(pl_from, pl_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
+            stWriteRedirect = db.prepare("REPLACE INTO redirect "
+                    + "(rd_from, rd_to) SELECT ?, page_id FROM page "
+                    + "WHERE page_namespace == ? AND page_title == ?;");
+            stWriteStats = db.prepare("REPLACE INTO site_stats "
+                    + "(ss_row_id, ss_total_views, ss_total_edits, ss_good_articles, ss_total_pages) "
+                    + "SELECT 1, 0, ?, ?, COUNT(*) FROM page;");
+        
+            connection = new Connection(db);
         } catch (SQLiteException e) {
-            System.err.println("Cannot read database: " + dbFileName);
             throw new RuntimeException(e);
         }
-        println("Creating link tables...");
-        createLinkTables();
     }
 
     /* (non-Javadoc)
@@ -383,93 +461,6 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
         WikiDumpHandler.println(msgOut, message);
     }
 
-    /**
-     * Note: this needs to be executed from the thread that works on the DB!
-     * 
-     * @throws RuntimeException
-     */
-    public void createLinkTables() throws RuntimeException {
-        try {
-            /**
-             * Track page-to-page hyperlinks within the wiki.
-             */
-            final String createPageLinksTable = "CREATE TABLE IF NOT EXISTS pagelinks ("
-                    + "pl_from int unsigned NOT NULL default 0,"
-                    + "pl_to int unsigned NOT NULL default 0"
-                    + ");";
-            connection.db.exec(createPageLinksTable);
-            // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS pl_from ON pagelinks (pl_from,pl_to);");
-            
-            /**
-             * Track template inclusions.
-             */
-            final String createTemplateLinksTable = "CREATE TABLE IF NOT EXISTS templatelinks ("
-                    + "tl_from int unsigned NOT NULL default 0,"
-                    + "tl_to int unsigned NOT NULL default 0"
-                    + ");";
-            connection.db.exec(createTemplateLinksTable);
-            // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tl_from ON templatelinks (tl_from,tl_to);");
-
-            /**
-             * Track category inclusions *used inline*.
-             * This tracks a single level of category membership.
-             */
-            final String createCategoryLinksTable = "CREATE TABLE IF NOT EXISTS categorylinks ("
-                    + "cl_from int unsigned NOT NULL default 0,"
-                    + "cl_to int unsigned NOT NULL default 0"
-                    + ");";
-            connection.db.exec(createCategoryLinksTable);
-            // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS cl_from ON categorylinks (cl_from,cl_to);");
-            
-            /**
-             * For each redirect, this table contains exactly one row defining its target.
-             */
-            final String createRedirectsTable = "CREATE TABLE IF NOT EXISTS redirect ("
-                    + "rd_from int unsigned NOT NULL default 0 PRIMARY KEY,"
-                    + "rd_to int unsigned NOT NULL default 0"
-                    + ");";
-            connection.db.exec(createRedirectsTable);
-
-            /**
-             * Contains a single row with some aggregate info on the state of the site.
-             */
-            final String createSiteStatsTable = "CREATE TABLE IF NOT EXISTS site_stats ("
-                    + "ss_row_id int unsigned NOT NULL,"
-                    + "ss_total_views bigint unsigned default 0,"
-                    + "ss_total_edits bigint unsigned default 0,"
-                    + "ss_good_articles bigint unsigned default 0,"
-                    + "ss_total_pages bigint default '-1'"
-                    + ");";
-            connection.db.exec(createSiteStatsTable);
-            // create index here to check at insertion:
-            connection.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ss_row_id ON site_stats (ss_row_id);");
-            
-            stWriteCat = connection.db.prepare("REPLACE INTO categorylinks "
-                    + "(cl_from, cl_to) SELECT ?, page_id FROM page "
-                    + "WHERE page_namespace == "
-                    + MyNamespace.CATEGORY_NAMESPACE_KEY
-                    + " AND page_title == ?;");
-            stWriteTpl = connection.db.prepare("REPLACE INTO templatelinks "
-                    + "(tl_from, tl_to) SELECT ?, page_id FROM page "
-                    + "WHERE page_namespace == ? AND page_title == ?;");
-            stWriteLnk = connection.db.prepare("REPLACE INTO pagelinks "
-                    + "(pl_from, pl_to) SELECT ?, page_id FROM page "
-                    + "WHERE page_namespace == ? AND page_title == ?;");
-            stWriteRedirect = connection.db.prepare("REPLACE INTO redirect "
-                    + "(rd_from, rd_to) SELECT ?, page_id FROM page "
-                    + "WHERE page_namespace == ? AND page_title == ?;");
-            stWriteStats = connection.db.prepare("REPLACE INTO site_stats "
-                    + "(ss_row_id, ss_total_views, ss_total_edits, ss_good_articles, ss_total_pages) "
-                    + "SELECT 1, 0, ?, ?, COUNT(*) FROM page;");
-            
-        } catch (SQLiteException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
     /**
      * Extracts all pages in the given categories from the given DB.
      * 
