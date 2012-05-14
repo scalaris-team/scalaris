@@ -328,7 +328,7 @@ public class Main {
                     } else if (option.getLongOpt().equals("getsubscribers")) {
                         return 14;
                     } else {
-                        return 0;
+                        return 15;
                     }
                 }
 
