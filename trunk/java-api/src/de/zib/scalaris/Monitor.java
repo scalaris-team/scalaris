@@ -26,7 +26,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 import de.zib.scalaris.ErlangValue.ListElementConverter;
 
 /**
- * Provides methods to interact with a specific Scalaris (Erlang) VM.
+ * Provides methods to monitor a specific Scalaris (Erlang) VM.
  *
  * @author Nico Kruber, kruber@zib.de
  * @version 3.11
@@ -50,7 +50,8 @@ public class Monitor {
      */
     public Monitor(final String node) throws ConnectionException {
         final ConnectionFactory cf = ConnectionFactory.getInstance();
-        connection = cf.createConnection(new FixedNodeConnectionPolicy(node));
+        final String fixedNode = ConnectionFactory.fixLocalhostName(node);
+        connection = cf.createConnection(new FixedNodeConnectionPolicy(fixedNode));
     }
 
     /**
