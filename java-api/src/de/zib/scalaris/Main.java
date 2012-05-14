@@ -15,9 +15,17 @@
  */
 package de.zib.scalaris;
 
+import java.lang.management.ManagementFactory;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+
+import javax.management.InstanceAlreadyExistsException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.NotCompliantMBeanException;
+import javax.management.ObjectName;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -293,6 +301,10 @@ public class Main {
             }
         } else if (line.hasOption("lh")) { // get local host name
             System.out.println(ConnectionFactory.getLocalhostName());
+        } else if (line.hasOption("jmx")) { // start JMX monitoring service
+            final String node = line.getOptionValue("jmx");
+            checkArguments(node, options, "jmx");
+            startJmxService(node, verbose);
         } else {
             // print help if no other option was given
 //        if (line.hasOption("help")) {
@@ -327,8 +339,10 @@ public class Main {
                         return 13;
                     } else if (option.getLongOpt().equals("getsubscribers")) {
                         return 14;
-                    } else {
+                    } else if (option.getLongOpt().equals("jmxservice")) {
                         return 15;
+                    } else {
+                        return 16;
                     }
                 }
 
@@ -348,6 +362,44 @@ public class Main {
             if (!line.hasOption("help")) {
                 System.exit(1);
             }
+        }
+    }
+
+    /**
+     * Registers some MBeans to monitor Scalaris via JMX and then waits forever
+     * until interrupted.
+     *
+     * @param node
+     *            the node name of the Erlang VM to connect to
+     * @param verbose
+     *            whether verbose information should be printed in case of
+     *            connection failures
+     */
+    private static void startJmxService(final String node, final boolean verbose) {
+        try {
+            final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            final ObjectName nodeMonitorName = new ObjectName("de.zib.scalaris:type=MonitorNode");
+            final de.zib.scalaris.jmx.MonitorNode nodeMonitorMbean = new de.zib.scalaris.jmx.MonitorNode(node);
+            final ObjectName serviceMonitorName = new ObjectName("de.zib.scalaris:type=MonitorService");
+            final de.zib.scalaris.jmx.MonitorService serviceMonitorMbean = new de.zib.scalaris.jmx.MonitorService(node);
+            mbs.registerMBean(nodeMonitorMbean, nodeMonitorName);
+            mbs.registerMBean(serviceMonitorMbean, serviceMonitorName);
+            System.out.println("Waiting forever...");
+            Thread.sleep(Long.MAX_VALUE);
+        } catch (final InterruptedException e) {
+            System.out.println("stopped service");
+        } catch (final MalformedObjectNameException e) {
+            throw new RuntimeException(e);
+        } catch (final NullPointerException e) {
+            throw new RuntimeException(e);
+        } catch (final ConnectionException e) {
+            printException("publish failed with connection error", e, verbose);
+        } catch (final InstanceAlreadyExistsException e) {
+            throw new RuntimeException(e);
+        } catch (final MBeanRegistrationException e) {
+            throw new RuntimeException(e);
+        } catch (final NotCompliantMBeanException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -429,9 +481,16 @@ public class Main {
         bench.setOptionalArg(true);
         group.addOption(bench);
 
+        final Option jmx = new Option("jmx", "jmxservice", true, "starts a service exposing Scalaris monitoring values via JMX");
+        read.setArgName("node");
+        read.setArgs(1);
+        read.setOptionalArg(true);
+        group.addOption(jmx);
+
         options.addOptionGroup(group);
 
         options.addOption(new Option("lh", "localhost", false, "gets the local host's name as known to Java (for debugging purposes)"));
+
 
         return options;
     }
