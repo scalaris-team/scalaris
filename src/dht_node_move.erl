@@ -569,7 +569,6 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
         not_found ->
             Command = check_setup_slide_not_found(
                         State, Type, MyNode, TargetNode, TargetId),
-            io:format("slide_command: ~p~n", [Command]),
             exec_setup_slide_not_found(
               Command, State, MoveFullId, TargetNode, TargetId, Tag,
               MaxTransportEntries, SourcePid, MsgTag, NextOp);
