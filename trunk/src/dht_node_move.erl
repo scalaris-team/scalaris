@@ -45,7 +45,7 @@
          can_slide_succ/3, can_slide_pred/3,
          rm_notify_new_pred/4, rm_send_node_change/4,
          make_slide/5,
-         make_slide_leave/1, make_jump/4,
+         make_slide_leave/2, make_jump/4,
          crashed_node/3,
          send/3, send_no_slide/3, send2/3, % for dht_node_join
          check_config/0]).
@@ -569,6 +569,7 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
         not_found ->
             Command = check_setup_slide_not_found(
                         State, Type, MyNode, TargetNode, TargetId),
+            io:format("slide_command: ~p~n", [Command]),
             exec_setup_slide_not_found(
               Command, State, MoveFullId, TargetNode, TargetId, Tag,
               MaxTransportEntries, SourcePid, MsgTag, NextOp);
@@ -1091,11 +1092,11 @@ accept_delta(State, PredOrSucc, OldSlideOp, ChangedData, DeletedKeys) ->
                     % TODO: piggy-back slide setup information with delta_ack (if possible)
                     State6 = accept_delta2(State3, PredOrSucc, SlideOp),
                     make_jump(State6, NewTargetId, NewTag, NewSourcePid);
-                {leave} ->
+                {leave, NewSourcePid} ->
                     % finish current slide, then set up leave
                     % (this is not a continued operation!)
                     State7 = accept_delta2(State3, PredOrSucc, SlideOp),
-                    make_slide_leave(State7)
+                    make_slide_leave(State7, NewSourcePid)
             end
     end.
 
@@ -1195,8 +1196,8 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
                     make_slide(State1, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
                 {jump, NewTargetId, NewTag, NewSourcePid} ->
                     make_jump(State1, NewTargetId, NewTag, NewSourcePid);
-                {leave} ->
-                    make_slide_leave(State1)
+                {leave, NewSourcePid} ->
+                    make_slide_leave(State1, NewSourcePid)
             end
     end.
 
@@ -1256,9 +1257,9 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
             % set up. Unless our scheduled op is a leave operation which needs
             % to be favoured.
             case slide_op:get_next_op(SlideOp) of
-                {leave} ->
+                {leave, NewSourcePid} when NewSourcePid =/= continue ->
                     State1 = abort_slide(State, SlideOp, scheduled_leave, true),
-                    make_slide_leave(State1);
+                    make_slide_leave(State1, NewSourcePid);
                 MyNextOp ->
                     % TODO: check if warnings are generated in all cases
                     case MyNextOp of
@@ -1468,13 +1469,13 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
             send_no_slide(NodePid, Msg, 0);
         _ -> ok
     end,
-    notify_source_pid(SourcePid, {move, result, Tag, Reason}),
     % re-start a leaving slide on the leaving node if it hasn't left the ring yet:
     case slide_op:is_leave(Type, 'send') andalso
              not slide_op:is_jump(Type) of
-        true -> comm:send_local(self(), {leave}),
+        true -> comm:send_local(self(), {leave, SourcePid}),
                 State;
-        _    -> State
+        _    -> notify_source_pid(SourcePid, {move, result, Tag, Reason}),
+                State
     end.
 
 % failure detector reported dead node
@@ -1534,15 +1535,16 @@ make_jump(State, TargetId, Tag, SourcePid) ->
 %% @doc Creates a slide that will move all data to the successor and leave the
 %%      ring. Note: Will re-try (forever) to successfully start a leaving slide
 %%      if anything causes an abort!
--spec make_slide_leave(State::dht_node_state:state()) -> dht_node_state:state().
-make_slide_leave(State) ->
+-spec make_slide_leave(State::dht_node_state:state(), SourcePid::comm:erl_local_pid() | null)
+        -> dht_node_state:state().
+make_slide_leave(State, SourcePid) ->
     MoveFullId = util:get_global_uid(),
     InitNode = dht_node_state:get(State, node),
     OtherNode = dht_node_state:get(State, succ),
     log:log(info, "[ Node ~.0p ] starting leave (succ: ~.0p)~n", [InitNode, OtherNode]),
     setup_slide(State, {leave, 'send'}, MoveFullId, InitNode,
                 OtherNode, node:id(OtherNode), leave,
-                unknown, null, nomsg, {none}).
+                unknown, SourcePid, nomsg, {none}).
 
 %% @doc Send a  node change update message to this module inside the dht_node.
 %%      Will be registered with the dht_node as a node change subscriber.
