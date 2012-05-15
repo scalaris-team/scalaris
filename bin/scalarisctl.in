@@ -54,6 +54,7 @@ yaws_port=""
 join_at=""
 start_mgmt_server=0
 start_dht_node="" # "dht_node"
+cmd=""
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -290,11 +291,6 @@ scalarisstart(){
     if [ "$verbose" -eq 1 ]; then
         tmp="$tmp -scalaris verbose true"
     fi
-    if [ "$1" == "-v" ]; then
-        # -v can be given after <cmd> and then is not handled by getopt.
-        shift
-        tmp="$tmp -scalaris verbose true"
-    fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
     export YAWSHOME="$HOME/.scalaris/$NODE_NAME"
     mkdir -p "$YAWSHOME"
@@ -343,56 +339,59 @@ debug(){
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifqmsvn:p:y:k:e:c:" optionName; do
-    case "$optionName" in
-        c) SCALARIS_COOKIE=$OPTARG;;
-        e) erl_flags=$OPTARG;;
-        d) daemonize=1;;
-        f) first=1;;
-        q) first_quorum=1;;
-        h) usage 0;;
-        i) echo "WARN: interactive is now default";;
-        k) join_at=$OPTARG;;
-        n) NODE_NAME=$OPTARG;;
-        p) port=$OPTARG;;
-        y) yaws_port=$OPTARG;;
-        m) start_mgmt_server=1;;
-        s) start_dht_node="dht_node";;
-        v) echo setting verbose from cli
-            verbose=1;;
-        [?]) echo "Wrong parameter $optionName."
-            usage 1;;
-    esac
+until [ -z "$1" ]; do
+  OPTIND=1
+  case $1 in
+    "--help")
+      shift
+      usage 0;;
+    checkinstallation | start | stop | restart | list | debug)
+      cmd="$1"
+      shift;;
+    *)
+      if getopts "dhifqmsvn:p:y:k:e:c:" optionName; then
+        case "$optionName" in
+            c) SCALARIS_COOKIE=$OPTARG;;
+            e) erl_flags=$OPTARG;;
+            d) daemonize=1;;
+            f) first=1;;
+            q) first_quorum=1;;
+            h) usage 0;;
+            i) echo "WARN: interactive is now default";;
+            k) join_at=$OPTARG;;
+            n) NODE_NAME=$OPTARG ; fix_node_name;;
+            p) port=$OPTARG;;
+            y) yaws_port=$OPTARG;;
+            m) start_mgmt_server=1;;
+            s) start_dht_node="dht_node";;
+            v) echo setting verbose from cli
+               verbose=1;;
+          [?]) echo "Wrong parameter $1."
+               usage 1;;
+        esac
+        shift $(($OPTIND-1))
+      else
+        shift
+        usage 1
+      fi;;
+  esac
 done
 
-shift $(($OPTIND-1))
-
-fix_node_name
-
-if [ $# -gt 1 ]; then
-    echo "warning: found a command-like parameter ($1), which was not in the last position"
-    echo "         please put commands after all the options"
-    echo "exiting now"
-    exit 1
-fi
-
-case $1 in
+case $cmd in
     checkinstallation)
         checkinstallation;;
     start)
-        shift
         scalarisstart;;
     stop)
         scalarisstop;;
     restart)
         scalarisstop
-        shift 1
         scalarisstart;;
     list)
         list_erlang_processes;;
     debug)
-       shift 1
-       debug;;
-    *) usage 1;;
+        debug;;
+    *)
+        echo "Unknown command: $cmd."
+        usage 1;;
 esac
-
