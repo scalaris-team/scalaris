@@ -98,15 +98,16 @@ del_nodes(Count, Graceful, Prev) ->
     case util:random_subset(Count, get_dht_node_specs()) of
         [] -> Prev;
         [_|_] = Specs ->
-            Successful =
-                lists:foldr(fun(Spec = {_Id, Pid, _Type, _}, Successful) ->
+            {Successful, NoPartner} =
+                lists:foldr(fun(Spec = {_Id, Pid, _Type, _}, {Successful, NoPartner}) ->
                                     Name = pid_groups:group_of(Pid),
                                     case del_node(Spec, Graceful) of
-                                        ok -> [Name | Successful];
-                                        {error, not_found} -> Successful
+                                        ok -> {[Name | Successful], NoPartner};
+                                        {error, not_found} -> {Successful, NoPartner};
+                                        {error, no_partner_found} -> {Successful, [Name | NoPartner]}
                                     end
-                            end, [], Specs),
-            Missing = Count - length(Successful),
+                            end, {[], []}, Specs),
+            Missing = Count - length(Successful) - length(NoPartner),
             del_nodes(Missing, Graceful, Successful)
     end.
 
@@ -125,7 +126,8 @@ del_nodes_by_name(Names, Graceful) ->
                       Name = pid_groups:group_of(Pid),
                       case del_node(Spec, Graceful) of
                           ok -> {[Name | Ok], NotFound};
-                          {error, not_found} -> {Ok, [Name | NotFound]}
+                          {error, not_found} -> {Ok, [Name | NotFound]};
+                          {error, no_partner_found} -> {Ok, NotFound}
                       end
               end, {[], []}, Specs)
     end.
@@ -133,14 +135,23 @@ del_nodes_by_name(Names, Graceful) ->
 %% @doc Delete a single node.
 -spec del_node({Id::term() | undefined, Child::pid() | undefined,
                 Type::worker | supervisor, Modules::[module()] | dynamic},
-               Graceful::boolean()) -> ok | {error, not_found}.
+               Graceful::boolean()) -> ok | {error, not_found | no_partner_found}.
 del_node({Id, Pid, _Type, _}, Graceful) ->
     case Graceful of
         true ->
             Group = pid_groups:group_of(Pid),
             case pid_groups:pid_of(Group, dht_node) of
                 failed  -> {error, not_found};
-                DhtNode -> comm:send_local(DhtNode, {leave, null})
+                DhtNode ->
+                    UId = util:get_pids_uid(),
+                    Self = comm:reply_as(self(), 3, {leave_result, UId, '_'}),
+                    comm:send_local(DhtNode, {leave, Self}),
+                    receive
+                        {leave_result, UId, {move, result, leave, ok}} ->
+                            ok;
+                        {leave_result, UId, {move, result, leave, leave_no_partner_found}} ->
+                            {error, no_partner_found}
+                    end
             end;
         false ->
             util:supervisor_terminate_childs(Pid),

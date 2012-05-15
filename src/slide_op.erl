@@ -22,7 +22,7 @@
 
 -export([new_slide/8, new_slide_i/8,
          new_receiving_slide_join/5, new_sending_slide_join/4,
-         new_sending_slide_leave/3, new_sending_slide_leave/4,
+         new_sending_slide_leave/4, new_sending_slide_leave/5,
          new_sending_slide_jump/4, new_sending_slide_jump/5,
          other_type_to_my_type/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
@@ -195,17 +195,19 @@ new_sending_slide_join(MoveId, JoiningNode, Tag, Neighbors) ->
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring and transfer its data to its successor.
 -spec new_sending_slide_leave(MoveId::id(), Tag::any(),
+        SourcePid::comm:erl_local_pid() | null,
         Neighbors::nodelist:neighborhood()) -> slide_op().
-new_sending_slide_leave(MoveId, Tag, Neighbors) ->
+new_sending_slide_leave(MoveId, Tag, SourcePid, Neighbors) ->
     TargetId = node:id(nodelist:pred(Neighbors)),
-    new_sending_slide_leave(MoveId, TargetId, Tag, Neighbors).
+    new_sending_slide_leave(MoveId, TargetId, Tag, SourcePid, Neighbors).
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring incrementally (current step is to move to
 %%      CurTargetId) and transfer its data to its successor.
 -spec new_sending_slide_leave(MoveId::id(), CurTargetId::?RT:key(), Tag::any(),
+        SourcePid::comm:erl_local_pid() | null,
         Neighbors::nodelist:neighborhood()) -> slide_op().
-new_sending_slide_leave(MoveId, CurTargetId, Tag, Neighbors) ->
+new_sending_slide_leave(MoveId, CurTargetId, Tag, SourcePid, Neighbors) ->
     {Interval, TargetNode} =
         get_interval_tnode('succ', 'send', CurTargetId, Neighbors),
     NextOp = case node:id(nodelist:pred(Neighbors)) of
@@ -218,7 +220,7 @@ new_sending_slide_leave(MoveId, CurTargetId, Tag, Neighbors) ->
               interval = Interval,
               target_id = CurTargetId,
               tag = Tag,
-              source_pid = null,
+              source_pid = SourcePid,
               next_op = NextOp}.
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
