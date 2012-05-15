@@ -341,6 +341,16 @@ scalarisstop(){
     popd > /dev/null
 }
 
+scalarisgstop(){
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -name ctl_$RANDOM \
+        -pa $BEAMDIR \
+        -noinput \
+        -eval "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), io:format(\"~p~n\", [Res]), halt(0)."
+    popd > /dev/null
+}
+
 list_erlang_processes(){
     $EPMD -names || echo "could not run epmd"
 }
@@ -366,7 +376,7 @@ until [ -z "$1" ]; do
     "--screen")
       shift
       DAEMONIZE_SCREEN=1;;
-    checkinstallation | start | stop | restart | list | debug)
+    checkinstallation | start | stop | gstop | restart | list | debug)
       cmd="$1"
       shift;;
     *)
@@ -405,6 +415,8 @@ case $cmd in
         scalarisstart;;
     stop)
         scalarisstop;;
+    gstop)
+        scalarisgstop;;
     restart)
         scalarisstop
         scalarisstart;;
