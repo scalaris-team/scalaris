@@ -120,10 +120,10 @@ get_other_vms(MaxVMs) ->
 
 -spec shutdown_vm() -> {struct, [{Key::atom(), Value::term()}]}.
 shutdown_vm() ->
-    spawn(fun() -> timer:sleep(100), api_vm:shutdown_vm() end),
-    {struct, [{status, "ok"}]}.
+    Result = api_vm:shutdown_vm(),
+    {struct, [{status, erlang:atom_to_list(Result)}]}.
 
 -spec kill_vm() -> {struct, [{Key::atom(), Value::term()}]}.
 kill_vm() ->
-    spawn(fun() -> timer:sleep(100), api_vm:kill_vm() end),
-    {struct, [{status, "ok"}]}.
+    Result = api_vm:kill_vm(),
+    {struct, [{status, erlang:atom_to_list(Result)}]}.

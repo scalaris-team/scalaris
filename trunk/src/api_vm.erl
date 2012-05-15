@@ -148,13 +148,19 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
     util:random_subset(MaxVMs, lists:usort(RandomConns)).
 
 %% @doc Graceful shutdown of this VM.
--spec shutdown_vm() -> no_return().
+-spec shutdown_vm() -> ok.
 shutdown_vm() ->
     _ = shutdown_nodes(number_of_nodes()),
     util:wait_for(fun() -> number_of_nodes() =:= 0 end),
-    erlang:halt().
+    kill_vm().
 
 %% @doc Kills this VM.
--spec kill_vm() -> no_return().
+-spec kill_vm() -> ok.
 kill_vm() ->
+    spawn(fun kill_vm2/0),
+    ok.
+
+-spec kill_vm2() -> no_return().
+kill_vm2() ->
+    timer:sleep(1000),
     erlang:halt().
