@@ -166,7 +166,7 @@ add_x_rm_y_load_test(X, Y) ->
     check_size(X + 1),
     timer:sleep(500),
     % let Y nodes gracefully leave
-    _ = [comm:send_local(Pid, {leave}) || Pid <- util:random_subset(Y, pid_groups:find_all(dht_node))],
+    _ = [comm:send_local(Pid, {leave, null}) || Pid <- util:random_subset(Y, pid_groups:find_all(dht_node))],
     check_size(X + 1 - Y),
     util:wait_for_process_to_die(BenchPid).
 

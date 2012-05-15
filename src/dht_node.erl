@@ -67,7 +67,8 @@
     rt_message() |
     dht_node_move:move_message() |
     {zombie, Node::node:node_type()} |
-    {crash, DeadPid::comm:mypid()}.
+    {crash, DeadPid::comm:mypid()} |
+    {leave, SourcePid::comm:erl_local_pid() | null}.
 
 %% @doc message handler
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
@@ -91,8 +92,8 @@ on(Msg, State) when element(1, Msg) =:= rm_trigger ->
     RMState1 = rm_loop:on(Msg, RMState),
     dht_node_state:set_rm(State, RMState1);
 
-on({leave}, State) ->
-    dht_node_move:make_slide_leave(State);
+on({leave, SourcePid}, State) ->
+    dht_node_move:make_slide_leave(State, SourcePid);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Finger Maintenance
