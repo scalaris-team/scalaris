@@ -55,6 +55,7 @@ join_at=""
 start_mgmt_server=0
 start_dht_node="" # "dht_node"
 DIST_ERL_PORT=""
+DAEMONIZE_SCREEN=0
 cmd=""
 
 usage(){
@@ -62,6 +63,7 @@ usage(){
     echo " options:"
     echo "    -h          - print this help message"
     echo "    -d          - daemonize"
+    echo "    --screen    - if daemonized, put an interactive session into screen"
     echo "    -e <params> - pass additional parameters to erl"
     echo "    -f          - first node (to start a new Scalaris instead of joining one) (not with -q)"
     echo "    -q          - elect first node from known hosts (not with -f)"
@@ -265,7 +267,7 @@ scalarisstart(){
     if [ $FAILED -eq 0 ]; then
         erl_flags="$ERL_SCHED_FLAGS $erl_flags"
     fi
-    if [ $daemonize -ne 0 ]; then
+    if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -eq 0 ]; then
         BACKGROUND="-detached"
     fi
     local tmp
@@ -302,18 +304,24 @@ scalarisstart(){
     mkdir -p "$YAWSHOME"
     mkdir -p "$LOGDIR/$NODE_NAME"
     pushd $BEAMDIR > /dev/null
-    $ERL -setcookie "$SCALARIS_COOKIE" \
-        -pa $SCALARISDIR/contrib/yaws/ebin \
-        -pa $SCALARISDIR/contrib/log4erl/ebin \
-        -pa $BEAMDIR $TOKEFLAGS $BACKGROUND \
-        -yaws embedded true \
-        -scalaris log_path "\"$LOGDIR/$NODE_NAME\"" \
-        -scalaris docroot "\"$DOCROOTDIR\"" \
-        -scalaris config "\"$ETCDIR/scalaris.cfg\"" \
-        -scalaris local_config "\"$ETCDIR/scalaris.local.cfg\"" \
-        -connect_all false -hidden -name $NODE_NAME \
-        $SCALARIS_ADDITIONAL_PARAMETERS \
-        -s scalaris `echo $erl_flags`;
+    START_CMD="\"$ERL\" -setcookie \"$SCALARIS_COOKIE\"\
+ -pa $SCALARISDIR/contrib/yaws/ebin\
+ -pa $SCALARISDIR/contrib/log4erl/ebin\
+ -pa $BEAMDIR $TOKEFLAGS $BACKGROUND\
+ -yaws embedded true\
+ -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
+ -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
+ -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
+ -scalaris local_config \"\\\"$ETCDIR/scalaris.local.cfg\\\"\"\
+ -connect_all false -hidden -name $NODE_NAME\
+ $SCALARIS_ADDITIONAL_PARAMETERS\
+ -s scalaris `echo $erl_flags`"
+    #echo "$START_CMD"
+    if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
+        screen -S "$NODE_NAME" -d -m /bin/bash -c "$START_CMD"
+    else
+        eval $START_CMD
+    fi
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: could not start scalaris"
@@ -355,6 +363,9 @@ until [ -z "$1" ]; do
       shift
       DIST_ERL_PORT=$1
       shift;;
+    "--screen")
+      shift
+      DAEMONIZE_SCREEN=1;;
     checkinstallation | start | stop | restart | list | debug)
       cmd="$1"
       shift;;
