@@ -69,6 +69,7 @@
     existing_data |
     target_down | % target node reported down by fd
     scheduled_leave | % tried to continue a slide but a leave was already scheduled
+    leave_no_partner_found | % tried to do a graceful leave but no successor to move the data to
     next_op_mismatch |
     {protocol_error, string()}.
 
@@ -644,7 +645,11 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                 end;
             _ when not CanSlide -> {abort, ongoing_slide, Type};
             _ when not NodesCorrect -> {abort, wrong_pred_succ_node, Type};
-            _ -> {ok, move_done} % MoveDone, i.e. target id already reached (noop)
+            _ ->
+                case slide_op:is_leave(Type) of
+                    false -> {ok, move_done}; % MoveDone, i.e. target id already reached (noop)
+                    true  -> {abort, leave_no_partner_found, Type}
+                end
         end,
     Command.
 
@@ -685,7 +690,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             % TODO: activate incremental leave:
 %%             IncTargetKey = find_incremental_target_id(Neighbors, dht_node_state:get(State, db), TargetId, NewType, OtherMTE),
 %%             SlideOp = slide_op:new_sending_slide_leave(MoveFullId, IncTargetKey, leave, Neighbors),
-            SlideOp = slide_op:new_sending_slide_leave(MoveFullId, leave, Neighbors),
+            SlideOp = slide_op:new_sending_slide_leave(MoveFullId, leave, SourcePid, Neighbors),
             case MsgTag of
                 nomsg ->
                     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_change_id),
@@ -1469,7 +1474,8 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
         _ -> ok
     end,
     % re-start a leaving slide on the leaving node if it hasn't left the ring yet:
-    case slide_op:is_leave(Type, 'send') andalso
+    case Reason =/= leave_no_partner_found andalso
+             slide_op:is_leave(Type, 'send') andalso
              not slide_op:is_jump(Type) of
         true -> comm:send_local(self(), {leave, SourcePid}),
                 State;
