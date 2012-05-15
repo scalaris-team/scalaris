@@ -343,8 +343,9 @@ debug(){
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
-while getopts "dhifqmsvn:p:y:k:e:" optionName; do
+while getopts "dhifqmsvn:p:y:k:e:c:" optionName; do
     case "$optionName" in
+        c) SCALARIS_COOKIE=$OPTARG;;
         e) erl_flags=$OPTARG;;
         d) daemonize=1;;
         f) first=1;;
