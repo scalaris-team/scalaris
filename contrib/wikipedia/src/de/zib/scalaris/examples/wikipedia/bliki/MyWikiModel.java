@@ -19,6 +19,7 @@ import info.bliki.htmlcleaner.TagNode;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.namespaces.Namespace;
+import info.bliki.wiki.tags.IgnoreTag;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -169,6 +170,10 @@ public class MyWikiModel extends WikiModel {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("fullurl", MyFullurl.CONST);
         Configuration.DEFAULT_CONFIGURATION.addTemplateFunction("localurl", MyLocalurl.CONST);
+        
+        // do not put these into the HTML text (they are not rendered anyway)
+        Configuration.DEFAULT_CONFIGURATION.addTokenTag("inputbox", new IgnoreTag("inputbox"));
+        Configuration.DEFAULT_CONFIGURATION.addTokenTag("imagemap", new IgnoreTag("imagemap"));
         
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
