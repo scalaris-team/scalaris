@@ -57,6 +57,7 @@ start_dht_node="" # "dht_node"
 DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
 cmd=""
+NODES_PER_VM=1
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -313,6 +314,7 @@ scalarisstart(){
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
  -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
  -scalaris local_config \"\\\"$ETCDIR/scalaris.local.cfg\\\"\"\
+ -scalaris nodes_per_vm \"$NODES_PER_VM\"\
  -connect_all false -hidden -name $NODE_NAME\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
@@ -389,6 +391,10 @@ until [ -z "$1" ]; do
     "--screen")
       shift
       DAEMONIZE_SCREEN=1;;
+    "--nodes-per-vm")
+      shift
+      NODES_PER_VM=$1
+      shift;;
     checkinstallation | start | stop | gstop | restart | list | debug | status)
       cmd="$1"
       shift;;
