@@ -386,9 +386,10 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl
 chmod u+x java-api/scalaris
+chmod u+x contrib/init.d/scalaris
 
