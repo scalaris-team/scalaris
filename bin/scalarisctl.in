@@ -316,11 +316,10 @@ scalarisstart(){
  -connect_all false -hidden -name $NODE_NAME\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
-    #echo "$START_CMD"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        screen -S "$NODE_NAME" -d -m /bin/bash -c "$START_CMD"
+        screen -S "$NODE_NAME" -d -m /bin/bash -x -c +B "$START_CMD"
     else
-        eval $START_CMD
+        bash -x -f +B -c "$START_CMD"
     fi
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
