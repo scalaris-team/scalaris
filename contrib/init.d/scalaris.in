@@ -17,9 +17,9 @@ else
     . /etc/init.d/functions
 fi
 
-prefix = @prefix@
-exec_prefix = @exec_prefix@
-datarootdir = @datarootdir@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
 
 SCALARIS_NODE=node
 NODES_PER_VM=1
