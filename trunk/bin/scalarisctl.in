@@ -340,14 +340,25 @@ scalarisstop(){
     popd > /dev/null
 }
 
-scalarisgstop(){
+scalariscall(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
         -name ctl_$RANDOM \
         -pa $BEAMDIR \
         -noinput \
-        -eval "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), io:format(\"~p~n\", [Res]), halt(0)."
+        -eval "$1"
+    FAILED=$?
     popd > /dev/null
+    return $FAILED
+}
+
+scalarisgstop(){
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), io:format(\"~p~n\", [Res]), halt(0)."
+}
+
+scalarisstatus(){
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, number_of_nodes, []), case Res of N when is_integer(N) -> io:format(\"Number of nodes: ~p~n\", [Res]), halt(0); _ -> halt(1) end."
+    exit $?
 }
 
 list_erlang_processes(){
@@ -375,7 +386,7 @@ until [ -z "$1" ]; do
     "--screen")
       shift
       DAEMONIZE_SCREEN=1;;
-    checkinstallation | start | stop | gstop | restart | list | debug)
+    checkinstallation | start | stop | gstop | restart | list | debug | status)
       cmd="$1"
       shift;;
     *)
@@ -412,6 +423,8 @@ case $cmd in
         checkinstallation;;
     start)
         scalarisstart;;
+    status)
+        scalarisstatus;;
     stop)
         scalarisstop;;
     gstop)
