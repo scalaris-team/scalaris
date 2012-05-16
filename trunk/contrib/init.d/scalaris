@@ -1,0 +1,161 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          scalaris
+# Required-Start:    $network $remote_fs
+# Required-Stop:     $network $remote_fs
+# Default-Start:     3 4 5
+# Default-Stop:
+# Short-Description: Scalaris node
+# Description:       Default Scalaris node. http://code.google.com/p/scalaris/
+### END INIT INFO
+
+# Source function library.
+if [ -e /lib/lsb/init-functions ]; then
+    . /lib/lsb/init-functions
+else
+    . /etc/init.d/functions
+fi
+
+SCALARIS_USER=scalaris
+SCALARIS_NODE=node
+
+PID_DS=/var/run/scalaris_${SCALARIS_NODE}.pid
+
+LOG_DS=/var/log/scalaris/initd_${SCALARIS_NODE}.log
+
+SCALARISCTL="/usr/bin/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
+
+start() {
+    if [ -f $PID_DS -a -e /proc/`cat $PID_DS` ];then
+        echo "Scalaris node \"${SCALARIS_NODE}\" already started"
+        return 0
+    fi
+
+    echo >> $LOG_DS
+    date >> $LOG_DS
+    echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
+    echo "Starting Scalaris node \"${SCALARIS_NODE}\"..."
+    sudo -u $SCALARIS_USER $SCALARISCTL start >> $LOG_DS 2>&1
+    if [ $? -ne 0 ]; then
+        return 1 # generic or unspecified error
+    fi
+    screen -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo > $PID_DS
+    sleep 1s
+
+    if [ -e /proc/$PROCPID ]; then
+        echo
+    else
+        echo
+        return 1
+    fi
+
+    return 0
+}
+
+gstop() {
+    result=0
+    if [ -f $PID_DS ]; then
+        echo "Shutting down Scalaris node \"${SCALARIS_NODE}\"..."
+        PROCPID=`cat $PID_DS`
+        if [ -e /proc/$PROCPID ];then
+            $SCALARISCTL gstop
+            result=$?
+        else
+            # not running anymore
+            result=0
+        fi
+    fi
+    if [ $result -eq 0 ]; then
+        rm -f $PID_DS
+    fi
+
+    return $result
+}
+
+stop() {
+    result=0
+    if [ -f $PID_DS ]; then
+        echo "Killing Scalaris node \"${SCALARIS_NODE}\"..."
+        killproc -p $PID_DS screen
+        result=$?
+    fi
+    if [ $result -eq 0 ]; then
+        rm -f $PID_DS
+    fi
+
+    return $result
+}
+
+status() {
+    if [ -f $PID_DS ]; then
+        PROCPID=`cat $PID_DS`
+        if [ ! -e /proc/$PROCPID ];then
+            echo "Scalaris node \"${SCALARIS_NODE}\" has crashed"
+            return 1 # program is dead and /var/run pid file exists
+        else
+            echo -n "Checking Scalaris node \"${SCALARIS_NODE}\"..."
+            $SCALARISCTL status
+            if [ $? -ne 0 ]; then
+                echo " probably crashed"
+                return 4 # program or service status is unknown
+            fi
+            echo " running"
+            return 0
+        fi
+    else
+        echo "Scalaris node \"${SCALARIS_NODE}\" is not running"
+        return 3 # program is not running
+    fi
+}
+
+restart() {
+    return gstop && sleep 1 && start
+}
+
+# See how we were called.
+case "$1" in
+    start)
+        start
+        result=$?
+        ;;
+    stop)
+        gstop
+        result=$?
+        ;;
+    kill)
+        stop
+        result=$?
+        ;;
+    restart)
+        restart
+        result=$?
+        ;;
+    try-restart)
+        ## Stop the service and if this succeeds (i.e. the
+        ## service was running before), start it again.
+        if [ `$0 status >/dev/null` ]; then
+          $0 restart
+          result=$?
+        else
+          result=0
+        fi
+        ;;
+    reload)
+        result=3
+        ;;
+    force-reload)
+        restart
+        result=$?
+        ;;
+    status)
+        status
+        result=$?
+        ;;
+    *)
+        echo -e "Usage: $0 {start|stop|kill|restart|try-restart|reload|force-reload|status}\n"
+        result=1
+        ;;
+esac
+
+exit $result
