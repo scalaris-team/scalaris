@@ -337,7 +337,9 @@ scalarisstop(){
         -pa $BEAMDIR \
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
+    FAILED=$?
     popd > /dev/null
+    return $FAILED
 }
 
 scalariscall(){
@@ -353,12 +355,13 @@ scalariscall(){
 }
 
 scalarisgstop(){
-    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), io:format(\"~p~n\", [Res]), halt(0)."
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), case Res of ok -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end."
+    return $?
 }
 
 scalarisstatus(){
-    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, number_of_nodes, []), case Res of N when is_integer(N) -> io:format(\"Number of nodes: ~p~n\", [Res]), halt(0); _ -> halt(1) end."
-    exit $?
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, number_of_nodes, []), case Res of N when is_integer(N) -> io:format(\"Number of nodes: ~p~n\", [Res]), halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end."
+    return $?
 }
 
 list_erlang_processes(){
