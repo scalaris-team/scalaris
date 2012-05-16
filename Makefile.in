@@ -565,6 +565,9 @@ install-erlang: compile
 	else \
 	  touch $(ETCDIR)/scalaris.local.cfg ; \
 	fi
+	install -d $(INITDIR)
+	install -m 744 -t $(INITDIR) \
+	           contrib/init.d/scalaris
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \

@@ -4203,7 +4203,7 @@ echo "detected OS is: '$DRIVER_OS'"
 
 mkdir -p ~/.yaws 2> /dev/null
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf"
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -4927,6 +4927,7 @@ do
     "bin/scalarisctl") CONFIG_FILES="$CONFIG_FILES bin/scalarisctl" ;;
     "java-api/scalaris") CONFIG_FILES="$CONFIG_FILES java-api/scalaris" ;;
     "java-api/scalaris-java.conf") CONFIG_FILES="$CONFIG_FILES java-api/scalaris-java.conf" ;;
+    "contrib/init.d/scalaris") CONFIG_FILES="$CONFIG_FILES contrib/init.d/scalaris" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -5379,4 +5380,5 @@ fi
 
 chmod u+x bin/scalarisctl
 chmod u+x java-api/scalaris
+chmod u+x contrib/init.d/scalaris
 
