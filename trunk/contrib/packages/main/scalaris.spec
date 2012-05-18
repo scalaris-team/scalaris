@@ -16,6 +16,7 @@ Source99:       scalaris-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
+Requires:       screen
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -116,6 +117,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/scalarisctl
 %{_prefix}/lib/scalaris
 %{_localstatedir}/log/scalaris
+%{_sysconfdir}/init.d/scalaris
 %attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
