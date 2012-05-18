@@ -52,6 +52,8 @@ DOCDIR=$(DESTDIR)@docdir@
 JAVADIR=$(DESTDIR)@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=$(DESTDIR)@localstatedir@/log/scalaris
+# /var/run
+RUNDIR=$(DESTDIR)@localstatedir@/run
 # /usr/lib/ruby/site_ruby/1.8
 RUBYSITELIBDIR=$(DESTDIR)@RUBYSITELIBDIR@
 # /usr/lib/python2.7/site-packages
@@ -610,6 +612,7 @@ install-erlang: compile
 	install -m 644 -t $(SCALARISDIR)/contrib/log4erl/ebin \
 	           contrib/log4erl/ebin/*.beam
 	install -d $(LOGDIR)
+	install -d $(RUNDIR)
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
 	           bin/scalarisctl
