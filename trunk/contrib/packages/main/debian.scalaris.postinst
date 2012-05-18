@@ -28,5 +28,15 @@ fi
 
 create_scalaris_user
 
+echo "Installing Scalaris RC-links..."
+update-rc.d scalaris defaults > /dev/null
+
+echo "Re-starting Scalaris service if started..."
+if which invoke-rc.d >/dev/null 2>&1; then
+  invoke-rc.d scalaris try-restart
+else
+  /etc/init.d/scalaris try-restart
+fi
+
 #DEBHELPER#
 

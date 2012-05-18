@@ -51,6 +51,7 @@ BuildRequires:  pkg-config
 Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+Requires(pre):  %insserv_prereq
 %endif
 
 %description
@@ -103,6 +104,45 @@ exit 0
 if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2>&1; then
   echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> %{_sysconfdir}/scalaris/scalarisctl.conf
 fi
+
+%if 0%{?suse_version}
+%fillup_and_insserv -f scalaris
+%endif
+%if 0%{?fedora_version}
+/sbin/chkconfig --add scalaris
+%endif
+%if 0%{?mandriva_version}
+%_post_service scalaris
+%endif
+
+%preun
+%if 0%{?suse_version}
+%stop_on_removal scalaris
+%endif
+%if 0%{?fedora_version}
+# 0 packages after uninstall -> pkg is about to be removed
+  if [ "$1" = "0" ] ; then
+    /sbin/service scalaris stop >/dev/null 2>&1
+    /sbin/chkconfig --del scalaris
+  fi
+%endif
+%if 0%{?mandriva_version}
+%_preun_service scalaris
+%endif
+
+%postun
+%if 0%{?suse_version}
+%restart_on_update scalaris
+%insserv_cleanup
+%endif
+%if 0%{?fedora_version}
+# >=1 packages after uninstall -> pkg was updated -> restart
+if [ "$1" -ge "1" ] ; then
+  /sbin/service scalaris condrestart >/dev/null 2>&1 || :
+fi
+%endif
+%if 0%{?mandriva_version}
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
