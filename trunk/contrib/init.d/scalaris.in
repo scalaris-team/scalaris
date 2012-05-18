@@ -33,9 +33,12 @@ LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen --nodes-per-vm ${NODES_PER_VM}"
 
 start() {
-    if [ -f $PID_DS -a -e /proc/`cat $PID_DS` ];then
-        echo "Scalaris node \"${SCALARIS_NODE}\" already started"
-        return 0
+    if [ -f $PID_DS ]; then
+        PROCPID=`cat $PID_DS`
+        if [ ! -e /proc/$PROCPID ];then
+            echo "Scalaris node \"${SCALARIS_NODE}\" already started"
+            return 0
+        fi
     fi
 
     echo >> $LOG_DS
