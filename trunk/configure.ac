@@ -58,9 +58,9 @@ AS_IF([test ! -x "$BROWSER"],
 #
 ###########################################################
 
-AC_PATH_PROG(SCREEN, screen, "/bin/false")
-if test -z $ac_cv_path_SCREEN ; then
-  AC_MSG_NOTICE([screen not found - you won't be able to run scalaris deamonized with screen, i.d. 'scalarisctl -d --screen'])
+AC_PATH_PROG(SCREEN, screen1, "/bin/false")
+if test "$ac_cv_path_SCREEN" = "/bin/false" ; then
+  AC_MSG_NOTICE([screen not found - you won't be able to run scalaris deamonized with screen, i.e. 'scalarisctl -d --screen'])
 fi
 
 ###########################################################
