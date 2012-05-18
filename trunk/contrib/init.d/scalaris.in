@@ -44,18 +44,19 @@ start() {
     echo >> $LOG_DS
     date >> $LOG_DS
     echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
-    echo "Starting Scalaris node \"${SCALARIS_NODE}\"..."
+    echo -n "Starting Scalaris node \"${SCALARIS_NODE}\"... "
     sudo -u $SCALARIS_USER $SCALARISCTL start >> $LOG_DS 2>&1
     if [ $? -ne 0 ]; then
+        echo "failed"
         return 1 # generic or unspecified error
     fi
     screen -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo > $PID_DS
     sleep 1s
 
     if [ -e /proc/$PROCPID ]; then
-        echo
+        echo "success"
     else
-        echo
+        echo "failed"
         return 1
     fi
 
@@ -65,7 +66,7 @@ start() {
 gstop() {
     result=0
     if [ -f $PID_DS ]; then
-        echo "Shutting down Scalaris node \"${SCALARIS_NODE}\"..."
+        echo -n "Shutting down Scalaris node \"${SCALARIS_NODE}\"... "
         PROCPID=`cat $PID_DS`
         if [ -e /proc/$PROCPID ];then
             $SCALARISCTL gstop
@@ -77,6 +78,9 @@ gstop() {
     fi
     if [ $result -eq 0 ]; then
         rm -f $PID_DS
+        echo "success"
+    else
+        echo "failed"
     fi
 
     return $result
@@ -85,12 +89,15 @@ gstop() {
 stop() {
     result=0
     if [ -f $PID_DS ]; then
-        echo "Killing Scalaris node \"${SCALARIS_NODE}\"..."
+        echo -n "Killing Scalaris node \"${SCALARIS_NODE}\"... "
         killproc -p $PID_DS screen
         result=$?
     fi
     if [ $result -eq 0 ]; then
         rm -f $PID_DS
+        echo "success"
+    else
+        echo "failed"
     fi
 
     return $result
@@ -103,13 +110,13 @@ status() {
             echo "Scalaris node \"${SCALARIS_NODE}\" has crashed"
             return 1 # program is dead and /var/run pid file exists
         else
-            echo -n "Checking Scalaris node \"${SCALARIS_NODE}\"..."
+            echo -n "Checking Scalaris node \"${SCALARIS_NODE}\"... "
             $SCALARISCTL status
             if [ $? -ne 0 ]; then
-                echo " probably crashed"
+                echo "probably crashed"
                 return 4 # program or service status is unknown
             fi
-            echo " running"
+            echo "running"
             return 0
         fi
     else
