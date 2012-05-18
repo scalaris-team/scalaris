@@ -20,6 +20,7 @@ fi
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 datarootdir=@datarootdir@
+SCREEN=@SCREEN@
 
 SCALARIS_NODE=node
 NODES_PER_VM=1
@@ -50,7 +51,7 @@ start() {
         echo "failed"
         return 1 # generic or unspecified error
     fi
-    screen -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo > $PID_DS
+    $SCREEN -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo > $PID_DS
     sleep 1s
 
     if [ -e /proc/$PROCPID ]; then

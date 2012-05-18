@@ -54,6 +54,17 @@ AS_IF([test ! -x "$BROWSER"],
 
 ###########################################################
 #
+# check screen availabiligy for 'scalarisctl -d --screen'
+#
+###########################################################
+
+AC_PATH_PROG(SCREEN, screen, "/bin/false")
+if test -z $ac_cv_path_SCREEN ; then
+  AC_MSG_NOTICE([screen not found - you won't be able to run scalaris deamonized with screen, i.d. 'scalarisctl -d --screen'])
+fi
+
+###########################################################
+#
 # check whether to compile to native code using HiPE
 #
 ###########################################################
