@@ -16,6 +16,7 @@ Source99:       scalaris-rpmlintrc
 Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildArch:      noarch
+BuildRequires:  screen
 Requires:       screen
 
 ##########################################################################################
@@ -156,7 +157,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_docdir}/scalaris/ChangeLog
 %{_bindir}/scalarisctl
 %{_prefix}/lib/scalaris
-%{_localstatedir}/log/scalaris
+%attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %{_sysconfdir}/init.d/scalaris
 %attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
