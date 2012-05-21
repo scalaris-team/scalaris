@@ -33,6 +33,13 @@ LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 
 SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen --nodes-per-vm ${NODES_PER_VM}"
 
+# For SELinux we need to use 'runuser' not 'su'
+if [ -x "/sbin/runuser" ]; then
+    SU="/sbin/runuser -s /bin/sh $SCALARIS_USER"
+else
+    SU="/bin/sudo -s /bin/sh -u $SCALARIS_USER"
+fi
+
 start() {
     if [ -f $PID_DS ]; then
         PROCPID=`cat $PID_DS`
@@ -46,13 +53,13 @@ start() {
     date >> $LOG_DS
     echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
     echo -n "Starting Scalaris node \"${SCALARIS_NODE}\"... "
-    sudo -u $SCALARIS_USER $SCALARISCTL start >> $LOG_DS 2>&1
+    $SU -c "$SCALARISCTL start" >> $LOG_DS 2>&1
     if [ $? -ne 0 ]; then
         echo "failed"
         return 1 # generic or unspecified error
     fi
-    $SCREEN -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo > $PID_DS
     sleep 1s
+    $SU -c "$SCREEN -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo" > $PID_DS
 
     if [ -e /proc/$PROCPID ]; then
         echo "success"
