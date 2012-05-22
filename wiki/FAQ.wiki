@@ -198,6 +198,28 @@ Note: we do not support Scalaris on Windows at the moment.
 
 = Configuration =
 
+== Which ports are used by Scalaris? ==
+
+If you have a firewall on your servers, you have to open the following ports. If you run Scalaris on Amazon EC2, you have to open these ports in the management console for your security group.
+
+|| Port  || Purpose                             || How to change ||
+|| 14195 || Used for all internal communication || see [FAQ#How_can_I_change_the_port_used_for_internal_communication?]||
+|| 8000  || Web-server and JSON-RPC             || see [FAQ#How_can_I_change_the_web_server_port/yaws_port?] ||
+|| 4369  || necessary, if you want to access Scalaris via the Java-API from a remote node (epmd) || - ||
+|| random port || necessary, if you want to access Scalaris via the Java-API from a remote node || [FAQ#How_can_I_change_the_ports_used_for_the_Java-API?]||
+
+== How can I change the port used for internal communication? == 
+
+When you start Scalaris using `scalarisctl`, the parameter `-p` can change the port.
+
+`scalarisctl -p THEPORT`
+
+== How can I change the ports used for the Java-API? == 
+
+The epmd is a Erlang daemon which always listens on port 4369. It provides means to lookup the port of Erlang processes by their name. Every time Scalaris starts, it will listen on a different port. But you can limit the range from which Scalaris selects this port. In the following example, we will limit the range to just 14194.
+
+`scalarisctl -e "-kernel inet_dist_listen_min 14194 inet_dist_listen_max 14194"`
+
 == How can I change the web server port/yaws port? ==
 
 For changing the yaws port of the first node or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/firstnode.sh` or `bin/joining_node.sh`.
