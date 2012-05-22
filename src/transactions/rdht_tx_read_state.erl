@@ -50,7 +50,7 @@
                     ?RT:key() | unknown,    % Key,
                     non_neg_integer(),      % NumOk,
                     non_neg_integer(),      % NumFail,
-                    {any(), integer()},     % Result = {Val, Vers},
+                    {?DB:value() | 0, integer()},     % Result = {Val, Vers},
                     tx_tlog:tx_status() | false, % is_decided
                     boolean()               % is_client_informed
                   }.
@@ -58,7 +58,7 @@
 -spec new(rdht_tx:req_id()) -> read_state().
 new(Id) ->
     {Id, unknown, unknown, 0, 0, {0, -1}, false, false}.
--spec new_val(rdht_tx:req_id(), any(), integer()) -> read_state().
+-spec new_val(rdht_tx:req_id(), ?DB:value(), integer()) -> read_state().
 new_val(Id, Val, Vers) ->
     {Id, unknown, unknown, 0, 0, {Val, Vers}, false, false}.
 -spec new_client(rdht_tx:req_id(), pid(), ?RT:key()) -> read_state().
@@ -100,7 +100,7 @@ set_client_informed(State) -> setelement(8, State, true).
 get_numreplied(State) ->
     get_numok(State) + get_numfailed(State).
 
--spec add_reply(read_state(), any(), integer(),
+-spec add_reply(read_state(), ?DB:value(), integer(),
                 non_neg_integer(), non_neg_integer()) -> read_state().
 add_reply(State, Val, Vers, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
