@@ -59,7 +59,7 @@ public class ConnectionTest {
     @Test
     public final void testConnectionOtpSelfPeerNode() throws ConnectionException,
             OtpErlangExit, OtpAuthException, IOException, InterruptedException {
-        final OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
+        final OtpSelf self = new OtpSelf("testConnection@" + ConnectionFactory.getLocalhostName(), ConnectionFactory
                 .getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
@@ -96,7 +96,7 @@ public class ConnectionTest {
     @Test
     public final void testConnectionOtpSelfConnectionPolicy() throws ConnectionException,
             OtpErlangExit, OtpAuthException, IOException, InterruptedException {
-        final OtpSelf self = new OtpSelf("testConnection", ConnectionFactory
+        final OtpSelf self = new OtpSelf("testConnection@" + ConnectionFactory.getLocalhostName(), ConnectionFactory
                 .getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
@@ -138,7 +138,7 @@ public class ConnectionTest {
         TimeUnit.MILLISECONDS.sleep(10);
 
         // wrong cookie:
-        self = new OtpSelf("testFailedConnection",
+        self = new OtpSelf("testFailedConnection@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie() + "someWrongCookieValue");
         remote = new PeerNode(ConnectionFactory.getInstance().getNodes().get(0).getNode().node());
         connectionPolicy = new DefaultConnectionPolicy(remote);
@@ -170,7 +170,7 @@ public class ConnectionTest {
         TimeUnit.MILLISECONDS.sleep(10);
 
         // unknown host name:
-        self = new OtpSelf("testFailedConnection",
+        self = new OtpSelf("testFailedConnection@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         remote = new PeerNode(ConnectionFactory.getInstance().getNodes().get(0).getNode().node() + "noneExistingHost");
         connectionPolicy = new DefaultConnectionPolicy(remote);
@@ -202,7 +202,7 @@ public class ConnectionTest {
         TimeUnit.MILLISECONDS.sleep(10);
 
         // non-existing node name:
-        self = new OtpSelf("testFailedConnection",
+        self = new OtpSelf("testFailedConnection@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         remote = new PeerNode("noneExistingNode" + ConnectionFactory.getInstance().getNodes().get(0).getNode().node());
         connectionPolicy = new DefaultConnectionPolicy(remote);
@@ -255,7 +255,7 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangList()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException {
-        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
@@ -299,7 +299,7 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangList_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
-        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
@@ -350,7 +350,7 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangObjectArray()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException {
-        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangObjectArray",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangObjectArray@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
@@ -395,7 +395,7 @@ public class ConnectionTest {
     public final void testDoRPCStringStringOtpErlangObjectArray_fail()
             throws ConnectionException, OtpErlangExit, OtpAuthException,
             IOException, OtpErlangRangeException, InterruptedException {
-        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList",
+        final OtpSelf self = new OtpSelf("testDoRPCStringStringOtpErlangList@" + ConnectionFactory.getLocalhostName(),
                 ConnectionFactory.getInstance().getCookie());
         final PeerNode remote = new PeerNode(ConnectionFactory.getInstance()
                 .getNodes().get(0).getNode().node());
