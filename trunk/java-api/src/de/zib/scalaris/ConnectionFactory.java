@@ -81,6 +81,8 @@ public class ConnectionFactory {
      */
     private static final String defaultConfigFile = "scalaris.properties";
 
+    private static final String hostname = findLocalhostName();
+
     /**
      * The name of the node to connect to.
      */
@@ -258,7 +260,7 @@ public class ConnectionFactory {
             clientName = clientName + "_" + clientNameUUID.getAndIncrement();
         }
         try {
-            final OtpSelf self = new OtpSelf(clientName, cookie);
+            final OtpSelf self = new OtpSelf(clientName + "@" + getLocalhostName(), cookie);
             return new Connection(self, connectionPolicy);
         } catch (final Exception e) {
 //                 e.printStackTrace();
@@ -370,6 +372,17 @@ public class ConnectionFactory {
     }
 
     /**
+     * Returns the name of the local host as determined by
+     * {@link #findLocalhostName()}.
+     *
+     * @return the local host' name or <tt>localhost</tt> if no IP address was
+     *         found
+     */
+    public static final String getLocalhostName() {
+        return hostname;
+    }
+
+    /**
      * Returns the name of the local host (or at least what Java thinks it is).
      * If the system property <tt>scalaris.erlang.nodename</tt> is set, this
      * will be returned, otherwise we look-up our hostname with
@@ -378,7 +391,7 @@ public class ConnectionFactory {
      * @return the local host' name or <tt>localhost</tt> if no IP address was
      *         found
      */
-    public static final String getLocalhostName() {
+    private static final String findLocalhostName() {
         String hostname = "localhost";
 
         final String erlangNodeName = System.getProperty("scalaris.erlang.nodename");
