@@ -113,7 +113,7 @@ join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1,
     NewFVal = F1Val bor F2Val,
     #bloom{
            size = Size1,
-           filter = <<NewFVal:NewSize>>,                            
+           filter = <<NewFVal:Size1>>,                            
            max_items = erlang:max(ExpItem1, ExpItem2), 
            hfs = Hfs,                              
            items_count = Items1 + Items2 %approximation            
