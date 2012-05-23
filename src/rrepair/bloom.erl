@@ -80,7 +80,7 @@ add_list_(Bloom, Items) ->
                }.
 
 % faster than lists:foldl
-p_add_list(Hfs, BFSize, Acc, []) -> 
+p_add_list(_Hfs, _BFSize, Acc, []) -> 
     Acc;
 p_add_list(Hfs, BFSize, Acc, [Item | Items]) ->
     Pos = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
@@ -175,17 +175,24 @@ get_property(Bloom, Property) ->
 -spec set_Bits(binary(), [integer()]) -> binary().
 set_Bits(Filter, []) -> 
     Filter;
-% V1
 set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
-    <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
+    <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,    
     NewByte = OldByte bor (2#10000000 bsr (Pos rem 8)),
-    set_Bits(<<PreBin/binary, NewByte:8, PostBin/binary>>, Positions).
+    NewBinary = case NewByte of
+                    OldByte -> Filter;
+                    _ -> <<PreBin/binary, NewByte:8, PostBin/binary>>
+                end,
+    set_Bits(NewBinary, Positions).
 
 % ->V2 -> 1/3 slower than V1
 %% set_Bits(Filter, [Pos | Positions]) ->
-%%     <<A:Pos/bitstring, _:1/bitstring, B/bitstring>> = Filter,
-%%     set_Bits(<<A:Pos/bitstring, 1:1, B/bitstring>>, Positions).
+%%     <<A:Pos/bitstring, B:1/bitstring, C/bitstring>> = Filter,
+%%     NewBinary = case B of
+%%                     0 -> Filter;
+%%                     _ -> <<A:Pos/bitstring, 1:1, C/bitstring>>
+%%                 end,
+%%     set_Bits(NewBinary, Positions).
 
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [integer()]) -> boolean().
