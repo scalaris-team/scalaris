@@ -73,11 +73,19 @@ add_list_(Bloom, Items) ->
            items_count = FilledCount,
            filter = Filter
           } = Bloom,
-    Positions = lists:append([apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]) || Item <- Items]),
+    F = p_add_list(Hfs, BFSize, Filter, Items),
     Bloom#bloom{
-                filter = set_Bits(Filter, Positions),
+                filter = F,
                 items_count = FilledCount + length(Items)
                }.
+
+% faster than lists:foldl
+p_add_list(Hfs, BFSize, Acc, []) -> 
+    Acc;
+p_add_list(Hfs, BFSize, Acc, [Item | Items]) ->
+    Pos = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
+    NAcc = set_Bits(Acc, Pos),
+    p_add_list(Hfs, BFSize, NAcc, Items).    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -99,8 +107,7 @@ is_element_(Bloom, Item) ->
 join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1, 
              filter = F1, hfs = Hfs}, 
       #bloom{size = Size2, max_items = ExpItem2, items_count = Items2, 
-             filter = F2}) ->
-    NewSize = erlang:max(Size1, Size2),
+             filter = F2}) when Size1 =:= Size2 ->
     <<F1Val : Size1>> = F1,
     <<F2Val : Size2>> = F2,
     NewFVal = F1Val bor F2Val,
