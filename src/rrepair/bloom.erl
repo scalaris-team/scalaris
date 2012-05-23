@@ -168,22 +168,37 @@ get_property(Bloom, Property) ->
 -spec set_Bits(binary(), [integer()]) -> binary().
 set_Bits(Filter, []) -> 
     Filter;
-set_Bits(Filter, [Pos | Positions]) -> 
+% V1
+set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
     <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
-    NewByte = OldByte bor (1 bsl (Pos rem 8)),
+    NewByte = OldByte bor (2#10000000 bsr (Pos rem 8)),
     set_Bits(<<PreBin/binary, NewByte:8, PostBin/binary>>, Positions).
+
+% ->V2 -> 1/3 slower than V1
+%% set_Bits(Filter, [Pos | Positions]) ->
+%%     <<A:Pos/bitstring, _:1/bitstring, B/bitstring>> = Filter,
+%%     set_Bits(<<A:Pos/bitstring, 1:1, B/bitstring>>, Positions).
 
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [integer()]) -> boolean().
 check_Bits(_, []) -> 
     true;
-check_Bits(Filter, [Pos | Positions]) -> 
-    PreBytes = Pos div 8,
-    <<_:PreBytes/binary, CheckByte:8, _/binary>> = Filter,
-    case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
-        true -> check_Bits(Filter, Positions);
-        false -> false
+% V1
+%% check_Bits(Filter, [Pos | Positions]) -> 
+%%     PreBytes = Pos div 8,
+%%     <<_:PreBytes/binary, CheckByte:8, _/binary>> = Filter,
+%%     case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
+%%         true -> check_Bits(Filter, Positions);
+%%         false -> false
+%%     end.
+
+% V 2 - 12 % faster than V1
+check_Bits(Filter, [Pos | Positions]) ->
+    <<_:Pos/bitstring, C:1, _/bitstring>> = Filter,
+    case C of
+        1 -> check_Bits(Filter, Positions);
+        0 -> false
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
