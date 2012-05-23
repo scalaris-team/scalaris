@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 %            2009 onScale solutions GmbH
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
@@ -216,5 +216,8 @@ forward_to_hbs(Pid, Msg) ->
         %% synchronously. Let gen_component report the error.
         [Entry] ->
             HBSPid = element(2, Entry),
-            comm:send_local(HBSPid, Msg)
+            comm:send_local(HBSPid, Msg);
+        [] ->
+            log:log(info,
+                    "[ FD ] outdated message? No hbs found to forward msg: ~p~n" ++ "Message dropped.", [Msg])
     end, ok.
