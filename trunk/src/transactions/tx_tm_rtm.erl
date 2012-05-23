@@ -737,7 +737,10 @@ on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     State;
 
 on_init({tx_tm_rtm_tid_isdone, _TxId} = Msg, State) ->
-    comm:send_local(self(), Msg),
+    msg_delay:send_local(1, self(), Msg),
+    State;
+on_init({tp_committed, ItemId} = _Msg, State) ->
+    msg_delay:send_local(1, self(), Msg),
     State;
 
 on_init({crash, Pid, _Cookie}, State) ->
