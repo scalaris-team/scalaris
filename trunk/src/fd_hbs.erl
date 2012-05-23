@@ -282,8 +282,16 @@ check_config() ->
 %% @private
 -spec report_crash(state()) -> kill.
 report_crash(State) ->
-    log:log(warn, "[ FD ~p ] reports ~.0p as crashed",
-            [comm:this(), state_get_rem_pids(State)]),
+    RemPids = state_get_rem_pids(State),
+    case RemPids of
+        [] ->
+            log:log(warn, "[ FD ~p ] remote host ~p (fd_hbs) is unresponsive.~n"
+                    ++    "          No pids to report as crashed locally.~n"
+                    ++    "          Finishing own fd_hbs.",
+                    [comm:this(), state_get_rem_hbs(State)]);
+        _ -> log:log(warn, "[ FD ~p ] reports ~.0p as crashed and finishes.",
+                     [comm:this(), RemPids])
+    end,
     FD = pid_groups:find_a(fd),
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
     erlang:unlink(FD),
