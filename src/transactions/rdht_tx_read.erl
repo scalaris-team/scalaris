@@ -170,20 +170,18 @@ on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
     TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, MajOk, MajDeny),
-    _ = case {rdht_tx_read_state:is_newly_decided(TmpEntry),
-              rdht_tx_read_state:get_client(TmpEntry)} of
-            {true, unknown} ->
+    _ = case rdht_tx_read_state:get_client(TmpEntry) of
+            unknown ->
                 %% when we get a client, we will inform it
                 pdb:set(TmpEntry, Table);
-            {true, Client} ->
-                inform_client(Client, TmpEntry),
-                NewEntry = rdht_tx_read_state:set_client_informed(TmpEntry),
-                pdb:set(NewEntry, Table);
-            {false, unknown} ->
-                pdb:set(TmpEntry, Table);
-            {false, _Client} ->
-                pdb:set(TmpEntry, Table),
-                delete_if_all_replied(TmpEntry, Reps, Table)
+            Client ->
+                NewEntry =
+                    case rdht_tx_read_state:is_newly_decided(TmpEntry) of
+                        true  -> inform_client(Client, TmpEntry);
+                        false -> TmpEntry
+                    end,
+                pdb:set(NewEntry, Table),
+                delete_if_all_replied(NewEntry, Reps, Table)
         end,
     State;
 
@@ -194,13 +192,12 @@ on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
     Tmp1Entry = rdht_tx_read_state:set_client(Entry, Pid),
     TmpEntry = rdht_tx_read_state:set_key(Tmp1Entry, Key),
     _ = case rdht_tx_read_state:is_newly_decided(TmpEntry) of
-        true ->
-            inform_client(Pid, TmpEntry),
-            Tmp2Entry = rdht_tx_read_state:set_client_informed(TmpEntry),
-            pdb:set(Tmp2Entry, Table),
-            delete_if_all_replied(Tmp2Entry, Reps, Table);
-        false -> pdb:set(TmpEntry, Table)
-    end,
+            true ->
+                Tmp2Entry = inform_client(Pid, TmpEntry),
+                pdb:set(Tmp2Entry, Table),
+                delete_if_all_replied(Tmp2Entry, Reps, Table);
+            false -> pdb:set(TmpEntry, Table)
+        end,
 %    State;
 %
 %%% triggered periodically
@@ -241,7 +238,8 @@ get_entry(Id, Table) ->
 inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
     Msg = msg_reply(Id, make_tlog_entry(Entry)),
-    comm:send_local(Client, Msg), ok.
+    comm:send_local(Client, Msg),
+    rdht_tx_read_state:set_client_informed(Entry).
 
 -spec make_tlog_entry(rdht_tx_read_state:read_state()) ->
                                 tx_tlog:tlog_entry().
@@ -252,11 +250,12 @@ make_tlog_entry(Entry) ->
     tx_tlog:new_entry(read, Key, Vers, Status, Val).
 
 delete_if_all_replied(Entry, Reps, Table) ->
+    ?TRACE("rdht_tx_read:delete_if_all_replied Reps: ~p =?= ~p, ClientInformed: ~p Client: ~p~n",
+              [Reps, rdht_tx_read_state:get_numreplied(Entry), rdht_tx_read_state:is_client_informed(Entry), rdht_tx_read_state:get_client(Entry)]),
     Id = rdht_tx_read_state:get_id(Entry),
     case (Reps =:= rdht_tx_read_state:get_numreplied(Entry))
         andalso (rdht_tx_read_state:is_client_informed(Entry)) of
-        true ->
-            pdb:delete(Id, Table);
+        true  -> pdb:delete(Id, Table);
         false -> Entry
     end.
 
