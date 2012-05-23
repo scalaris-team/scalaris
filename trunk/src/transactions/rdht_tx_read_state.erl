@@ -119,16 +119,18 @@ add_reply(State, Val, Vers, MajOk, MajDeny) ->
 -spec update_decided(read_state(), non_neg_integer(),
                      non_neg_integer()) -> read_state().
 update_decided(State, MajOk, MajDeny) ->
-    ?TRACE("rdht_tx_read_state:update_decided state maj ~p ~p~n", [State, Maj]),
+    ?TRACE("rdht_tx_read_state:update_decided state maj ~p ~p ~p~n",
+           [State, MajOk, MajDeny]),
     OK = get_numok(State) >= MajOk,
     Abort = get_numfailed(State) >= MajDeny,
     {_, Vers} = get_result(State),
     case Vers =/= -1 of
         true ->
-            case {OK, Abort} of
-                {true, false} -> set_decided(State, value);
-                {false, true} -> set_decided(State, {fail, not_found});
-                _ -> State
+            if OK andalso (not Abort) ->
+                    set_decided(State, value);
+               (not OK) andalso Abort ->
+                    set_decided(State, {fail, not_found});
+               true -> State
             end;
         false ->
             case get_numreplied(State) of
