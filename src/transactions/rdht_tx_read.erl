@@ -234,7 +234,8 @@ get_entry(Id, Table) ->
 %         _ -> ok
 %     end.
 
--spec inform_client(pid(), rdht_tx_read_state:read_state()) -> ok.
+-spec inform_client(pid(), rdht_tx_read_state:read_state()) ->
+                           rdht_tx_read_state:read_state().
 inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
     Msg = msg_reply(Id, make_tlog_entry(Entry)),
