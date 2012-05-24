@@ -39,7 +39,7 @@ all() -> [
           tester_join,
           tester_equals
           %tester_fpr
-          %fprof,
+          %fprof
          ].
 
 suite() ->
@@ -160,12 +160,13 @@ tester_fpr(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprof(_) ->
-    fprof:trace(start, "bloom_fprof.trace"),
-    BF = newBloom(100, 0.1),
-    _ = ?BLOOM:add(BF, 5423452345),
-    fprof:trace(stop),
-    fprof:profile(file, "bloom_fprof.trace"),
-    fprof:analyse([{dest, "bloom_fprof.analysis"}, {cols, 120}]),
+    Count = 1000,
+    BF = newBloom(Count, 0.1),
+    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)], 
+        
+    fprof:apply(?BLOOM, add, [BF, Items]),
+    fprof:profile(),
+    fprof:analyse([{cols, 120}]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
