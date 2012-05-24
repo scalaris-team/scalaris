@@ -162,7 +162,7 @@ public class MyWikiModel extends WikiModel {
     protected Map<NormalisedTitle, String> pageCache = new HashMap<NormalisedTitle, String>();
     
     protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
-            Pattern.compile("^.*?([\\p{C}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Pattern.compile("^.*?([\\p{Cc}\\p{Cn}\\p{Co}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     protected static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^#REDIRECT[^\\[]?\\[\\[:?([^\\]]*)\\]\\]$", Pattern.CASE_INSENSITIVE);
 
