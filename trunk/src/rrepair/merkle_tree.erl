@@ -138,13 +138,13 @@ lookup(I, {_, _, _, I, _} = Node) ->
     Node;
 lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
-        true when length(ChildList) =:= 0 -> Node;
+        true when ChildList =:= [] -> Node;
         true ->
             IChilds = 
                 lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
-            case length(IChilds) of
-                0 -> not_found;
-                1 -> [IChild] = IChilds, 
+            case IChilds of
+                [] -> not_found;
+                [_] -> [IChild] = IChilds,
                      lookup(I, IChild);
                 _ -> error_logger:error_msg("tree interval not correct splitted")
             end;
@@ -239,11 +239,11 @@ insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config)
     insert_to_node(Key, {nil, 1 + Config#mt_config.branch_factor, [], Interval, NewLeafs}, Config);
 
 insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
-    {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
-    case length(_Dest) of
-        0 -> error_logger:error_msg("InsertFailed!"), Node;
+    {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
+    case Dest0 of
+        [] -> error_logger:error_msg("InsertFailed!"), Node;
         _ ->
-            Dest = hd(_Dest),
+            Dest = hd(Dest0),
             OldSize = node_size(Dest),
             NewDest = insert_to_node(Key, Dest, Config),
             {Hash, Count + (node_size(NewDest) - OldSize), [], Interval, [NewDest|Rest]}
