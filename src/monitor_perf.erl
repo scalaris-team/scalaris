@@ -74,6 +74,10 @@ on({bench} = _Msg, State) ->
     run_bench(),
     State;
 
+on({tx_tm_rtm_commit_reply, _, _} = _Msg, State) ->
+    % left-over commit information from bench, more specifically api_tx:req_list/1
+    State;
+
 on({propagate} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     msg_delay:send_local(get_gather_interval(), self(), {propagate}),
