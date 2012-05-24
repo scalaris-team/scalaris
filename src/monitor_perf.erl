@@ -54,6 +54,13 @@
 -define(TRACE1(Msg, State),
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
 
+%% @doc Creates a monitoring value for benchmarks with a 1m monitoring interval
+%%      and a timing histogram, only keeping the newest value.
+-spec init_bench() -> ok.
+init_bench() ->
+    monitor:proc_set_value(
+      ?MODULE, 'read_read', rrd:create(60 * 1000000, 1, {timing_with_hist, ms})).
+
 -spec run_bench() -> ok.
 run_bench() ->
     Key1 = randoms:getRandomString(),
@@ -62,6 +69,40 @@ run_bench() ->
     {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
     monitor:proc_set_value(?MODULE, 'read_read',
                            fun(Old) -> rrd:add_now(TimeInUs / 1000, Old) end).
+
+-spec init_system_stats() -> ok.
+init_system_stats() ->
+    monitor:proc_set_value(
+      ?MODULE, 'mem_total', rrd:create(60 * 1000000, 1, event)),
+    monitor:proc_set_value(
+      ?MODULE, 'mem_processes', rrd:create(60 * 1000000, 1, event)),
+    monitor:proc_set_value(
+      ?MODULE, 'mem_system', rrd:create(60 * 1000000, 1, event)),
+    monitor:proc_set_value(
+      ?MODULE, 'mem_atom', rrd:create(60 * 1000000, 1, event)),
+    monitor:proc_set_value(
+      ?MODULE, 'mem_binary', rrd:create(60 * 1000000, 1, event)),
+    monitor:proc_set_value(
+      ?MODULE, 'mem_ets', rrd:create(60 * 1000000, 1, event)).
+
+-spec collect_system_stats() -> ok.
+collect_system_stats() ->
+    [{total, MemTotal}, {processes, MemProcs}, {system, MemSys},
+     {atom, MemAtom}, {binary, MemBin}, {ets, MemEts}] =
+        erlang:memory([total, processes, system, atom, binary, ets]),
+    
+    monitor:proc_set_value(?MODULE, 'mem_total',
+                           fun(Old) -> rrd:add_now(MemTotal, Old) end),
+    monitor:proc_set_value(?MODULE, 'mem_processes',
+                           fun(Old) -> rrd:add_now(MemProcs, Old) end),
+    monitor:proc_set_value(?MODULE, 'mem_system',
+                           fun(Old) -> rrd:add_now(MemSys, Old) end),
+    monitor:proc_set_value(?MODULE, 'mem_atom',
+                           fun(Old) -> rrd:add_now(MemAtom, Old) end),
+    monitor:proc_set_value(?MODULE, 'mem_binary',
+                           fun(Old) -> rrd:add_now(MemBin, Old) end),
+    monitor:proc_set_value(?MODULE, 'mem_ets',
+                           fun(Old) -> rrd:add_now(MemEts, Old) end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
@@ -72,6 +113,7 @@ on({bench} = _Msg, State) ->
         I -> msg_delay:send_local(I, self(), {bench})
     end,
     run_bench(),
+    collect_system_stats(),
     State;
 
 on({tx_tm_rtm_commit_reply, _, _} = _Msg, State) ->
@@ -227,9 +269,8 @@ init(null) ->
              msg_delay:send_local(FirstDelay, self(), {bench}),
              msg_delay:send_local(get_gather_interval(), self(), {propagate})
     end,
-    % 1m monitoring interval, only keep newest
-    monitor:proc_set_value(
-      ?MODULE, 'read_read', rrd:create(60 * 1000000, 1, {timing_with_hist, ms})),
+    init_bench(),
+    init_system_stats(),
     Now = os:timestamp(),
     State = #state{id = util:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
