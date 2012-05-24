@@ -209,9 +209,7 @@ insert_list(Terms, Tree) ->
 -spec insert(Key::term(), merkle_tree()) -> merkle_tree().
 insert(Key, {merkle_tree, Config, Root} = Tree) ->
     case intervals:in(Key, get_interval(Root)) of
-        true ->
-            NewRoot = insert_to_node(Key, Root, Config),
-            {merkle_tree, Config, NewRoot};
+        true -> {merkle_tree, Config, insert_to_node(Key, Root, Config)};
         false -> Tree
     end.
 
@@ -242,11 +240,9 @@ insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config)
 
 insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
     {_Dest, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
-    case length(_Dest) =:= 0 of
-        true ->
-            error_logger:error_msg("InsertFailed: No free slots in Merkle_Tree!"),
-            Node;
-        false ->
+    case length(_Dest) of
+        0 -> error_logger:error_msg("InsertFailed!"), Node;
+        _ ->
             Dest = hd(_Dest),
             OldSize = node_size(Dest),
             NewDest = insert_to_node(Key, Dest, Config),
@@ -435,16 +431,16 @@ build_config(ParamList) ->
 key_in_I(Key, Intervals) ->
     p_key_in_I(Key, [], Intervals).
 
-p_key_in_I(Key, Left, {Interval, C, L}) ->
-    lists:append([Left, [{Interval, C+1, [Key | L]}]]);
+p_key_in_I(_Key, _Left, []) ->
+    erlang:error(precondition_violated);
 p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     CheckKey = case rr_recon:decodeBlob(Key) of
                    {K, _} -> K;
                    _ -> Key
                end,
     case intervals:in(CheckKey, Interval) of
-        true -> lists:append([Left, [{Interval, C+1, [Key | L]}], Right]);
-        false -> p_key_in_I(Key, lists:append([Left, [P]]), Right)
+        true -> [{Interval, C + 1, [Key | L]} | Left] ++ Right;
+        false -> p_key_in_I(Key, [P | Left], Right)
     end.
 
 -spec keys_to_intervals([Key], [I]) -> [{I, Count, [Key]}] when
