@@ -39,6 +39,7 @@ all() -> [
           tester_join,
           tester_equals
           %tester_fpr
+          %eprof
           %fprof
          ].
 
@@ -156,6 +157,21 @@ measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
 
 tester_fpr(_) ->
     tester:test(?MODULE, prop_fpr, 2, 2, [{threads, 1}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+eprof(_) ->
+    Count = 1000,
+    BF = newBloom(Count, 0.1),
+    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)], 
+        
+    eprof:start(),
+    Fun = fun() -> ?BLOOM:add(BF, Items) end,
+    eprof:profile([], Fun),
+    eprof:stop_profiling(),
+    eprof:analyze(procs, [{sort, time}]),
+    
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

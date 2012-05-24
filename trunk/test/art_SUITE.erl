@@ -32,8 +32,8 @@
 
 all() -> [
           tester_new,
-          tester_lookup,
-          eprof
+          tester_lookup
+          %eprof
          ].
 
 suite() ->
