@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(tx_tm_rtm).
 -author('schintke@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
 %%-define(TRACE_RTM_MGMT(X,Y), ct:pal(X,Y)).
@@ -743,6 +743,7 @@ on_init({new_node_id, Id}, State) ->
     NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
     state_set_RTMs(State, NewRTMs);
 
+%% do not accept new commit requests when not enough rtms are valid
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     %% only in tx_tm
     tx_tm = state_get_role(State),
@@ -753,14 +754,24 @@ on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     comm:send_local(DHTNode, {lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
     State;
 
+%% perform operations on already running transactions, should not be a problem
+on_init({learner_decide, _ItemId, _PaxosID, _Value} = Msg, State) ->
+    on(Msg, State);
 on_init({tx_tm_rtm_tid_isdone, _TxId} = Msg, State) ->
-    msg_delay:send_local(1, self(), Msg),
-    State;
+    on(Msg, State);
 on_init({tp_committed, _ItemId} = Msg, State) ->
-    msg_delay:send_local(1, self(), Msg),
-    State;
+    on(Msg, State);
 on_init({delete_if_still_uninitialized, _ItemId} = Msg, State) ->
     on(Msg, State);
+on_init({register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
+    {ErrCodeTx, _TxState} = get_tx_entry(Tid, State),
+    case new =:= ErrCodeTx of
+        true ->
+            msg_delay:send_local(1, self(), Msg),
+            State;
+        false ->
+            on(Msg, State)
+    end;
 
 on_init({crash, Pid, _Cookie}, State) ->
     on_init({crash, Pid}, State);

@@ -27,7 +27,7 @@
 %% @version $Id$
 -module(msg_delay).
 -author('schintke@onscale.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
