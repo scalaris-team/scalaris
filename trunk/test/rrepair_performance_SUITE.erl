@@ -63,7 +63,7 @@ end_per_suite(Config) ->
 
 comparison(_) ->
     Iter = 100,
-    DBSize = 2000,
+    DBSize = 5000,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     DB = db_generator:get_db(I, DBSize, uniform),    
@@ -116,7 +116,7 @@ art_build_time(I, DB, _DBSize, Iterations, MerkleConfig, ArtConfig) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 art(_) ->    
-    ToAdd = 2000,
+    ToAdd = 5000,
     ExecTimes = 100,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
@@ -140,7 +140,7 @@ art(_) ->
 merkle_tree(_) ->
     % PARAMETER
     ExecTimes = 100,
-    ToAdd = 2000,
+    ToAdd = 5000,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
     DB = db_generator:get_db(I, ToAdd, uniform),

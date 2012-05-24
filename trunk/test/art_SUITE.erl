@@ -32,7 +32,8 @@
 
 all() -> [
           tester_new,
-          tester_lookup
+          tester_lookup,
+          eprof
          ].
 
 suite() ->
@@ -95,6 +96,25 @@ nodes_in_art(Iter, Art, Acc) ->
 
 tester_lookup(_) ->
   tester:test(?MODULE, prop_lookup, 2, 100).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+eprof(_) ->
+    L=0,
+    R=193307343591240590005637476551917548364,
+    ToAdd=1273,
+    
+    I = intervals:new('[', L, R, ']'),
+    Keys = db_generator:get_db(I, ToAdd, uniform),
+    Merkle = merkle_tree:new(I, Keys, []),
+        
+    eprof:start(),
+    Fun = fun() -> art:new(Merkle) end,
+    eprof:profile([], Fun),
+    eprof:stop_profiling(),
+    eprof:analyze(procs, [{sort, time}]),
+    
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
