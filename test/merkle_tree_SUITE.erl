@@ -37,9 +37,9 @@ all() -> [
           tester_bulk_insert,
           tester_iter,
           tester_lookup,
-          test_empty,
-          eprof,
-          fprof          
+          test_empty
+          %eprof,
+          %fprof          
          ].
 
 suite() ->
