@@ -263,7 +263,7 @@ pids_to_names(Pids, Timeout) ->
                     true -> comm:make_local(Pid);
                     _    -> comm:send(comm:get(pid_groups, Pid),
                                       {group_and_name_of, Pid,
-                                       comm:reply_as(Pid, 2, {ok, '_', Pid})}),
+                                       comm:reply_as(comm:this(), 2, {ok, '_', Pid})}),
                             comm:send_local_after(Timeout, self(), {timeout, Pid})
                 end
             end || Pid <- Pids],
