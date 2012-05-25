@@ -17,7 +17,7 @@
 %% @end
 %% @version $Id$
 
--export([new/2, new/3, add/2, is_element/2]).
+-export([new/2, new/3, new/4, add/2, is_element/2]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
@@ -44,9 +44,14 @@ new(BitPerItem, MaxItems, Hfs) ->
 
 % @doc Creates new bloom filter with default hash function set
 -spec new(integer(), float()) -> bloom_filter().
-new(MaxElements, FPR) when is_float(FPR) ->
-    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxElements, FPR)),
-    new(MaxElements, FPR, Hfs).
+new(MaxItems, FPR) when is_float(FPR) ->
+    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
+    new(MaxItems, FPR, Hfs).
+
+-spec new(integer(), float(), ?REP_HFS:hfs(), [key()]) -> bloom_filter().
+new(MaxItems, FPR, Hfs, Items) ->
+    BF = new(MaxItems, FPR, Hfs),
+    add(BF, Items).
 
 -spec add(bloom_filter(), key() | [key()]) -> bloom_filter().
 add(Bloom, Item) when is_list(Item) -> add_list_(Bloom, Item);
