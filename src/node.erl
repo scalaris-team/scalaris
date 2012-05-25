@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([id/1, id_version/1, pidX/1, erlNode/1, yawsPort/1,
+-export([id/1, id_version/1, pidX/1, yawsPort/1,
          new/3, null/0, is_valid/1,
          same_process/2, is_newer/2, newer/2, is_me/1,
          update_id/2]).
@@ -37,7 +37,6 @@
 -record(node, {pid        = ?required(node, pid)        :: comm:mypid(),
                id         = ?required(node, id)         :: ?RT:key(),
                id_version = ?required(node, id_version) :: non_neg_integer(),
-               erl_node   = erlang:node()               :: node(),
                yaws_port  = config:read(yaws_port)      :: non_neg_integer()}).
 -opaque(node_type() :: #node{}).
 
@@ -52,9 +51,6 @@ null() -> null.
 %% @doc Gets the pid of the node.
 -spec pidX(node_type()) -> comm:mypid().
 pidX(#node{pid=PID}) -> PID.
-
--spec erlNode(node_type()) -> node().
-erlNode(#node{erl_node = Node}) -> Node.
 
 -spec yawsPort(node_type()) -> non_neg_integer().
 yawsPort(#node{yaws_port = Port}) -> Port.
