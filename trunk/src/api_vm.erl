@@ -138,7 +138,7 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
                          [{group_member, cyclon}]),
                receive
                    ?SCALARIS_RECV({cy_cache, Cache}, %% ->
-                       [{node:erlNode(Node),
+                       [{erlang:node(comm:make_local(node:pidX(Node))),
                          comm:get_ip(node:pidX(Node)),
                          comm:get_port(node:pidX(Node)),
                          node:yawsPort(Node)} || Node <- Cache])
