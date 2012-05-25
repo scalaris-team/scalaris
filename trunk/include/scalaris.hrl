@@ -65,9 +65,13 @@
 %-define(RM, rm_tmansharp).
 %% userdevguide-end scalaris:rm
 
-% enable logging of message statistics
--define(LOG_MESSAGE(MESSAGE, SIZE), ok).
-%% -define(LOG_MESSAGE(MESSAGE, SIZE), comm_logger:log(comm:get_msg_tag(MESSAGE), SIZE).
+% enable logging of message statistics at the granularity of socket messages
+-define(LOG_MESSAGE_SOCK(SNDRCV, MESSAGE, SIZE, CHANNEL), ok).
+%% -define(LOG_MESSAGE_SOCK(SNDRCV, BINARYMESSAGE, SIZE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, socket_bin}, SIZE)).
+
+% enable logging of message statistics at the granularity of erlang messages
+-define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), ok).
+%% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, byte_size(term_to_binary(MESSAGE)))).
 
 
 % enable native register for all processes in gen_component or disable

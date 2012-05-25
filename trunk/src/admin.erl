@@ -242,7 +242,7 @@ number_of_nodes() ->
 % messages in total. get_dump/0 returns a map from message-tag to
 % message-count and message-size and a timestamp when the measurement
 % was started.
--spec get_dump() -> {gb_tree(), {integer(), integer(), integer()}}.
+-spec get_dump() -> {Received::gb_tree(), Sent::gb_tree(), util:time()}.
 get_dump() ->
     Servers = util:get_proc_in_vms(admin_server),
     _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})
@@ -252,30 +252,46 @@ get_dump() ->
                  {get_comm_layer_dump_response, Dump} ->
                      Dump
              end || _ <- Servers],
-    StartTime = lists:min([Start || {_, Start} <- Dumps]),
-    Keys = lists:usort(lists:flatten([gb_trees:keys(Map) || {Map, _} <- Dumps])),
+    StartTime = lists:min([Start || {_, _, Start} <- Dumps]),
+    GetKeys =
+        fun(DumpsX, ElementX) ->
+                lists:usort(
+                  lists:flatten(
+                    [gb_trees:keys(element(ElementX, DumpX)) || DumpX <- DumpsX]))
+        end,
+    ReceivedKeys = GetKeys(Dumps, 1),
+    SentKeys = GetKeys(Dumps, 2),
     {lists:foldl(fun (Tag, Map) ->
-                         gb_trees:enter(Tag, get_aggregate(Tag, Dumps), Map)
-                 end, gb_trees:empty(), Keys), StartTime}.
+                         gb_trees:enter(Tag, get_aggregate(Tag, Dumps, 1), Map)
+                 end, gb_trees:empty(), ReceivedKeys),
+     lists:foldl(fun (Tag, Map) ->
+                         gb_trees:enter(Tag, get_aggregate(Tag, Dumps, 2), Map)
+                 end, gb_trees:empty(), SentKeys),
+     StartTime}.
 
-% @doc returns communications information. similar to get_dump_bw/0 it
+% @doc returns communications information. similar to get_dump/0 it
 % returns message statistics per message-tag, but it scales all values
 % by the elapsed time. so it returns messages per second and bytes per
 % second for each message-tag
--spec get_dump_bw() -> list({atom(), float(), float()}).
+-spec get_dump_bw() -> {Received::[{atom(), float(), float()}], Sent::[{atom(), float(), float()}]}.
 get_dump_bw() ->
-    {Map, StartTime} = get_dump(),
+    {Received, Sent, StartTime} = get_dump(),
     RunTime = timer:now_diff(erlang:now(), StartTime),
-    [{Tag, Size / RunTime, Count / RunTime} || {Tag, {Size, Count}} <- gb_trees:to_list(Map)].
+    AggFun =
+        fun(Map) ->
+                [{Tag, Size / RunTime, Count / RunTime} || {Tag, {Size, Count}} <- gb_trees:to_list(Map)]
+        end,
+    {AggFun(Received), AggFun(Sent)}.
 
-get_aggregate(_Tag, []) ->
+get_aggregate(_Tag, [], _Element) ->
     {0, 0};
-get_aggregate(Tag, [{Dump, _} | Rest]) ->
-    case gb_trees:lookup(Tag, Dump) of
+get_aggregate(Tag, [Dump | Rest], Element) ->
+    Map = element(Element, Dump),
+    case gb_trees:lookup(Tag, Map) of
         none ->
-            get_aggregate(Tag, Rest);
+            get_aggregate(Tag, Rest, Element);
         {value, {Size, Count}} ->
-            {AggSize, AggCount} = get_aggregate(Tag, Rest),
+            {AggSize, AggCount} = get_aggregate(Tag, Rest, Element),
             {AggSize + Size, AggCount + Count}
     end.
 

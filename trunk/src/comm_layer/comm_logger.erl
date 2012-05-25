@@ -26,14 +26,15 @@
 %% API
 -export([start_link/0]).
 
--export([log/2, dump/0]).
+-export([log/3, dump/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {start :: {integer(), integer(), integer()},
-                map   :: gb_tree()}).
+-record(state, {start    :: util:time(),
+                received :: gb_tree(),
+                sent     :: gb_tree()}).
 
 %%====================================================================
 %% API
@@ -50,15 +51,15 @@ start_link() ->
 %% Function: log(Tag, Size) -> ok
 %% Description: logs a message type with its size
 %%--------------------------------------------------------------------
--spec log(atom(), integer()) -> ok.
-log(Tag, Size) ->
-    gen_server:cast(?MODULE, {log, Tag, Size}).
+-spec log('send' | 'rcv', term(), integer()) -> ok.
+log(SendRcv, Tag, Size) ->
+    gen_server:cast(?MODULE, {log, SendRcv, Tag, Size}).
 
 %%--------------------------------------------------------------------
 %% Function: dump() -> {gb_tree:gb_trees(), {Date, Time}}
 %% Description: gets the logging state
 %%--------------------------------------------------------------------
--spec dump() -> {gb_tree(), {integer(), integer(), integer()}}.
+-spec dump() -> {Received::gb_tree(), Sent::gb_tree(), util:time()}.
 dump() ->
     gen_server:call(?MODULE, {dump}).
 
@@ -75,7 +76,7 @@ dump() ->
 %%--------------------------------------------------------------------
 -spec init(list()) -> {ok, #state{}}.
 init([]) ->
-    {ok, #state{start=erlang:now(), map=gb_trees:empty()}}.
+    {ok, #state{start=erlang:now(), received=gb_trees:empty(), sent=gb_trees:empty()}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
@@ -86,9 +87,9 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
--spec handle_call({dump}, any(), #state{}) -> {reply, any(), #state{}}.
+-spec handle_call({dump}, any(), #state{}) -> {reply, {Received::gb_tree(), Sent::gb_tree(), util:time()}, #state{}}.
 handle_call({dump}, _From, State) ->
-    Reply = {State#state.map, State#state.start},
+    Reply = {State#state.received, State#state.sent, State#state.start},
     {reply, Reply, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -100,13 +101,20 @@ handle_call(_Request, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
--spec handle_cast({log, atom(), integer()}, #state{}) -> {noreply, #state{}}.
-handle_cast({log, Tag, Size}, State) ->
-    case gb_trees:lookup(Tag, State#state.map) of
+-spec handle_cast({log, 'send' | 'rcv', atom(), integer()}, #state{}) -> {noreply, #state{}}.
+handle_cast({log, 'rcv', Tag, Size}, State) ->
+    case gb_trees:lookup(Tag, State#state.received) of
         none ->
-            {noreply, State#state{map=gb_trees:insert(Tag, {Size, 1}, State#state.map)}};
+            {noreply, State#state{received=gb_trees:insert(Tag, {Size, 1}, State#state.received)}};
         {value, {OldSize, OldCount}} ->
-            {noreply, State#state{map=gb_trees:update(Tag, {Size + OldSize, OldCount + 1}, State#state.map)}}
+            {noreply, State#state{received=gb_trees:update(Tag, {Size + OldSize, OldCount + 1}, State#state.received)}}
+    end;
+handle_cast({log, 'send', Tag, Size}, State) ->
+    case gb_trees:lookup(Tag, State#state.sent) of
+        none ->
+            {noreply, State#state{sent=gb_trees:insert(Tag, {Size, 1}, State#state.sent)}};
+        {value, {OldSize, OldCount}} ->
+            {noreply, State#state{sent=gb_trees:update(Tag, {Size + OldSize, OldCount + 1}, State#state.sent)}}
     end;
 handle_cast(_Msg, State) ->
     {noreply, State}.

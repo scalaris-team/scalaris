@@ -41,8 +41,8 @@ start() ->
 -spec ganglia_loop(PreviousTime::util:time()) -> no_return().
 ganglia_loop(_Last) ->
     % message statistics
-    {Tree, _Time} = comm_logger:dump(),
-    update(Tree),
+    {Received, Sent, _Time} = comm_logger:dump(),
+    update(Received, Sent),
     Now = erlang:now(),
     % transaction statistics
     % TODO: get statistics from the client monitor
@@ -54,8 +54,8 @@ ganglia_loop(_Last) ->
     timer:sleep(config:read(ganglia_interval)),
     ganglia_loop(Now).
 
--spec update(Tree::gb_tree()) -> ok.
-update(Tree) ->
+-spec update(Received::gb_tree(), Sent::gb_tree()) -> ok.
+update(Received, Sent) ->
     _ = gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
     _ = gmetric(both, "Memory used by Erlang processes", "int32", erlang:memory(processes_used), "Bytes"),
     _ = gmetric(both, "Memory used by ETS tables", "int32", erlang:memory(ets), "Bytes"),
@@ -69,7 +69,8 @@ update(Tree) ->
     LocalLoad = fetch_local_load(),
     _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics],
     _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- LocalLoad],
-    traverse(gb_trees:iterator(Tree)).
+    traverse(received, gb_trees:iterator(Received)),
+    traverse(sent, gb_trees:iterator(Sent)).
 
 %% -spec update_timer({Timer::string(), Count::pos_integer(), Min::number(), Avg::number(), Max::number()}, SinceLast::number()) -> ok.
 %% update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
@@ -79,13 +80,13 @@ update(Tree) ->
 %%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
 %%     ok.
 
--spec traverse(Iter1::term()) -> ok.
-traverse(Iter1) ->
+-spec traverse(received | sent, Iter1::term()) -> ok.
+traverse(RcvSnd, Iter1) ->
   case gb_trees:next(Iter1) of
     none -> ok;
     {Key, {Bytes, _Count}, Iter2} ->
-      _ = gmetric(positive, Key, "int32", Bytes, "Bytes"),
-      traverse(Iter2)
+      _ = gmetric(positive, lists:flatten(io_lib:format("~s ~p", [RcvSnd, Key])), "int32", Bytes, "Bytes"),
+      traverse(RcvSnd, Iter2)
   end.
 
 -spec gmetric(Slope::both | positive, Metric::string(), Type::string(), Value::number(), Unit::string()) -> string().

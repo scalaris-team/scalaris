@@ -105,11 +105,11 @@ get_tags(none) ->
 get_tags({Tag, {Size, _Count}, Iterator}) ->
     [{Tag, Size} | get_tags(gb_trees:next(Iterator))].
 
-out(Arg) ->
-    {Map, Start} = comm_logger:dump(),
+tree_log_to_table(Map, Start, Heading) ->
     case gb_trees:size(Map) of
       0 ->
-        {ehtml, {p, [], "No messages logged. Enable logging in include/scalaris.hrl (LOG_MESSAGE macro)."}};
+        [{h3, [], Heading},
+         {p, [], "No messages logged. Enable logging in include/scalaris.hrl (LOG_MESSAGE and/or LOG_MESSAGE_SOCK macro)."}];
       _ ->
         SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
         {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
@@ -124,8 +124,13 @@ out(Arg) ->
             {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
             {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
           ]},
-        {ehtml, {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}}
+        [{h3, [], Heading},
+         {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}]
     end.
+
+out(Arg) ->
+    {Received, Sent, Start} = comm_logger:dump(),
+    {ehtml, [tree_log_to_table(Received, Start, "Received Messages") ++ tree_log_to_table(Sent, Start, "Sent Messages")]}.
 </erl>
 
 </div>

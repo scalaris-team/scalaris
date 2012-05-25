@@ -43,7 +43,7 @@ send(Target, Message, Options) ->
     {MyIP, MyPort} = comm_server:get_local_address_port(),
     case Target of
         {MyIP, MyPort, LocalTarget} ->
-            ?LOG_MESSAGE(Message, byte_size(term_to_binary(Message))),
+            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
             PID = case is_pid(LocalTarget) of
                       true -> LocalTarget;
                       false -> whereis(LocalTarget)
