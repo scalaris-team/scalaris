@@ -43,7 +43,6 @@ send(Target, Message, Options) ->
     {MyIP, MyPort} = comm_server:get_local_address_port(),
     case Target of
         {MyIP, MyPort, LocalTarget} ->
-            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
             PID = case is_pid(LocalTarget) of
                       true -> LocalTarget;
                       false -> whereis(LocalTarget)
@@ -71,6 +70,7 @@ send(Target, Message, Options) ->
             end,
             ok;
         {{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} ->
+            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
             comm_server:send(Target, Message, Options);
         _ ->
             log:log(error,"[ CL ] wrong call to comm:send: ~w ! ~w", [Target, Message]),
