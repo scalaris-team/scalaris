@@ -59,9 +59,8 @@
 
 -record(bloom_recon_struct, 
         {
-         interval = intervals:empty()                     :: intervals:interval(), 
-         keyBF    = ?required(bloom_recon_struct, keyBF)  :: ?REP_BLOOM:bloom_filter(),
-         versBF   = ?required(bloom_recon_struct, versBF) :: ?REP_BLOOM:bloom_filter()         
+         interval = intervals:empty()                       :: intervals:interval(), 
+         bloom    = ?required(bloom_recon_struct, bloom)    :: ?REP_BLOOM:bloom_filter()         
         }).
 -type bloom_recon_struct() :: #bloom_recon_struct{}.
 
@@ -231,8 +230,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         ownerLocalPid = Owner,
                         dest_rr_pid = DestRU_Pid,
                         struct = #bloom_recon_struct{ interval = BloomI, 
-                                                            keyBF = KeyBF,
-                                                            versBF = VersBF},
+                                                      bloom = BF},
                         round = Round }) ->
     %if rest interval is non empty start another sync    
     SyncFinished = intervals:is_empty(RestI),
@@ -240,24 +238,11 @@ on({get_chunk_response, {RestI, DBList}}, State =
         send_chunk_req(DhtNodePid, self(), RestI, 
                        mapInterval(RestI, get_interval_quadrant(BloomI)), 
                        get_max_items(bloom)),
-    {Obsolete, Missing} = 
-        filterPartitionMap(fun(Filter) -> 
-                                   not ?REP_BLOOM:is_element(VersBF, Filter) 
-                           end,
-                           fun(Partition) -> 
-                                   {MinKey, _} = decodeBlob(Partition),
-                                   ?REP_BLOOM:is_element(KeyBF, MinKey)
-                           end,
-                           fun(Map) -> 
-                                   {K, _} = decodeBlob(Map), 
-                                   K 
-                           end,
-                           DBList),
-    ?TRACE("Reconcile Bloom Round=~p ; Obsolete=~p ; Missing=~p", [Round, length(Obsolete), length(Missing)]),
-    length(Obsolete) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Obsolete}, []}),
-    length(Missing) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Missing}, []}),
+    Diff = [erlang:element(1, decodeBlob(KV)) || KV <- DBList,
+                                                 not ?REP_BLOOM:is_element(BF, KV)],
+    ?TRACE("Reconcile Bloom Round=~p ; Diff=~p", [Round, length(Diff)]),
+    length(Diff) > 0 andalso
+        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Diff}, []}),
     SyncFinished andalso        
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
@@ -521,37 +506,13 @@ build_recon_struct(bloom, {I, DBItems}) ->
     Fpr = get_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    Hfs = ?REP_HFS:new(HFCount),    
-    {KeyBF, VerBF} = fill_bloom(DBItems, 
-                                ?REP_BLOOM:new(ElementNum, Fpr, Hfs), 
-                                ?REP_BLOOM:new(ElementNum, Fpr, Hfs)),
-    #bloom_recon_struct{ interval = mapInterval(I, 1), keyBF = KeyBF, versBF = VerBF };
-
+    BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
+    #bloom_recon_struct{ interval = mapInterval(I, 1), bloom = BF };
 build_recon_struct(merkle_tree, {I, DBItems}) ->
-    ?TRACE("START BUILD MERKLE", []),
-    M = merkle_tree:new(I, DBItems, []),
-    ?TRACE("END BUILD MERKLE", []),
-    M;
-
+    merkle_tree:new(I, DBItems, []);
 build_recon_struct(art, Chunk) ->
     Tree = build_recon_struct(merkle_tree, Chunk),
     art:new(Tree).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% bloom_filter specific
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Create two bloom filter of a given database chunk.
-%%      One over all keys and one over all keys concatenated with their version.
--spec fill_bloom(DB, Key::Bloom, Version::Bloom) -> {Key2::Bloom, Version2::Bloom} when
-      is_subtype(DB,    db_as_list_enc()),
-      is_subtype(Bloom, ?REP_BLOOM:bloom_filter()).
-fill_bloom([], KeyBF, VerBF) ->
-    {KeyBF, VerBF};
-fill_bloom([DB_Entry_Enc | T], KeyBF, VerBF) ->
-    {KeyOnly, _} = decodeBlob(DB_Entry_Enc),
-    fill_bloom(T, 
-               ?REP_BLOOM:add(KeyBF, KeyOnly), 
-               ?REP_BLOOM:add(VerBF, DB_Entry_Enc)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
@@ -575,27 +536,6 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
        end,
        MaxItems}),
     ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% @ doc filter, partition and map items of a list in one run
--spec filterPartitionMap(Filter::Fun, Partition::Fun, Map::Fun, List) -> {True::List, False::List} when
-     is_subtype(Fun,  fun((A) -> boolean())),
-     is_subtype(List, [A]).                                                                                                     
-filterPartitionMap(Filter, Pred, Map, List) ->
-    filterPartitionMap(Filter, Pred, Map, List, [], []).
-
-filterPartitionMap(_, _, _, [], TrueL, FalseL) -> {TrueL, FalseL};
-filterPartitionMap(Filter, Pred, Map, [H | T], TrueL, FalseL) ->
-    {Satis, NonSatis} = 
-        case Filter(H) of
-            true -> case Pred(H) of
-                        true -> {[Map(H) | TrueL], FalseL};
-                        false -> {TrueL, [Map(H) | FalseL]}
-                    end;        
-            false -> {TrueL, FalseL}
-        end,
-    filterPartitionMap(Filter, Pred, Map, T, Satis, NonSatis).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
