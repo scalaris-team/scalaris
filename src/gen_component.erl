@@ -467,11 +467,12 @@ on(Msg, State) ->
 
 -spec on_unknown_event(comm:message(), gc_state()) -> gc_state().
 on_unknown_event({web_debug_info, Requestor}, State) ->
+    io:format("web_debug_info, gc"),
     comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
-                                 {"module", gc_mod(State)},
-                                 {"handler", gc_hand(State)},
-                                 {"state", State}]}),
+                                 {"module", lists:flatten(io_lib:format("~.0p", [gc_mod(State)]))},
+                                 {"handler", lists:flatten(io_lib:format("~.0p", [gc_hand(State)]))},
+                                 {"state", lists:flatten(io_lib:format("~.0p", [State]))}]}),
     State;
 on_unknown_event(UnknownMessage, State) ->
     log:log(error,
