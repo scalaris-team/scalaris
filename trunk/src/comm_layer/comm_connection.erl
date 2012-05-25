@@ -387,7 +387,12 @@ status(State) ->
          _            -> connected
      end.
 
-report_bundle_error(Options, {Address, Port, _Pid}, Message, Reason) when is_list(Options) ->
+-spec report_bundle_error
+        (comm:send_options(), {inet:ip_address(), comm_server:tcp_port(), pid()},
+         comm:message(), socket_closed | inet:posix()) -> ok;
+        ([comm:send_options()], {inet:ip_address(), comm_server:tcp_port(), unpack_msg_bundle},
+         [{pid(), comm:message()}], socket_closed | inet:posix()) -> ok.
+report_bundle_error(Options, {Address, Port, unpack_msg_bundle}, Message, Reason) ->
     zip_and_foldr(
       fun (OptionsX, {DestPid, MessageX}) ->
                comm_layer:report_send_error(
