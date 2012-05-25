@@ -18,13 +18,14 @@
 %% @version $Id$
 -module(trace_mpath).
 -author('schintke@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %% 1. call trace_mpath:start(your_trace_id)
 %% 2. perform a request like api_tx:read("a")
-%% 3. call trace_mpath:stop(your_trace_id)
+%% 3. call trace_mpath:stop() %% trace_id is taken from the calling
+%%                               process implicitly
 %% 4. call trace_mpath:get_trace(your_trace_id) to retrieve the trace,
 %%    when you think everything is recorded
 %% 5. call trace_mpath:cleanup(your_trace_id) to free the memory
@@ -36,7 +37,7 @@
 
 %% client functions
 -export([start/0, start/1, start/2, stop/0]).
--export([get_trace/0, get_trace/1, cleanup/1]).
+-export([get_trace/0, get_trace/1, cleanup/0, cleanup/1]).
 
 %% trace analysis
 -export([send_histogram/1]).
@@ -113,6 +114,9 @@ get_trace(TraceId) ->
     receive
         ?SCALARIS_RECV({get_trace_reply, Log}, Log)
     end.
+
+-spec cleanup() -> ok.
+cleanup() -> cleanup(default).
 
 -spec cleanup(trace_id()) -> ok.
 cleanup(TraceId) ->
@@ -250,8 +254,11 @@ on({get_trace, Pid, TraceId}, State) ->
             comm:send(Pid, {get_trace_reply, lists:reverse(Msgs)})
     end,
     State;
-on({clear_trace, TraceId}, State) ->
-    lists:keytake(TraceId, 1, State).
+on({cleanup, TraceId}, State) ->
+    case lists:keytake(TraceId, 1, State) of
+        {value, _Tuple, TupleList2} -> TupleList2;
+        false                       -> State
+    end.
 
 passed_state_new(TraceId, Logger) -> {TraceId, Logger}.
 passed_state_trace_id(State)      -> element(1, State).
