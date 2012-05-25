@@ -36,8 +36,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %DETAIL DEBUG MESSAGES
 %-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -312,6 +312,7 @@ on({check_node_response, Result, I, ChildHashs}, State =
                         struct = Tree,
                         round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
+    NodeIsLeaf = merkle_tree:is_leaf(Node),
     IncOps = 
         case Result of
             not_found -> [{error_count, 1}]; 
@@ -319,8 +320,11 @@ on({check_node_response, Result, I, ChildHashs}, State =
             ok_inner -> [{tree_compareSkipped, merkle_tree:size(Node)}];
             fail_leaf ->
                 Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
-                [{tree_leafsSynced, Leafs}];               
-            fail_inner ->
+                [{tree_leafsSynced, Leafs}];
+            fail_inner when NodeIsLeaf ->
+                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
+                [{tree_leafsSynced, Leafs}];
+            fail_inner when not NodeIsLeaf ->
                 MyChilds = merkle_tree:get_childs(Node),
                 {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
                 SkippedSubNodes = 
