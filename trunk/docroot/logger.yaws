@@ -71,13 +71,13 @@ make_table([], _Map, Start, TotalBytes, TotalCount) ->
     [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
        [
          {td, [], {p, [], "Total"}}, 
-         {td, [], {p, [], io_lib:format("~p", [TotalBytes])}}, 
-         {td, [], {p, [], io_lib:format("~p", [TotalCount])}}, 
-         {td, [], {p, [], io_lib:format("~p", [TotalBytes / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
-         {td, [], {p, [], io_lib:format("~p", [TotalCount / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
-         {td, [], {p, [], io_lib:format("~p", [TotalBytes / TotalCount])}}, 
-         {td, [], {p, [], "100.0"}}, 
-         {td, [], {p, [], "100.0"}}
+         {td, [], {p, [], io_lib:format("~15.10._B", [TotalBytes])}}, 
+         {td, [], {p, [], io_lib:format("~15.10._B", [TotalCount])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [TotalBytes / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [TotalCount / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
+         {td, [], {p, [], io_lib:format("~15.3._f", [TotalBytes / TotalCount])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [100.0])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [100.0])}}
        ] }
 ];
 make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
@@ -85,13 +85,13 @@ make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
     [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
        [
          {td, [], {p, [], io_lib:format("~p", [Tag])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Size])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Count])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Count / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
-         {td, [], {p, [], io_lib:format("~p", [Size / Count])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Size / TotalBytes * 100.0])}}, 
-         {td, [], {p, [], io_lib:format("~p", [Count / TotalCount * 100.0])}}
+         {td, [], {p, [], io_lib:format("~15.10._B", [Size])}}, 
+         {td, [], {p, [], io_lib:format("~15.10._B", [Count])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [Count / timer:now_diff(erlang:now(), Start) * 1000000.0])}},
+         {td, [], {p, [], io_lib:format("~15.3._f", [Size / Count])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [Size / TotalBytes * 100.0])}}, 
+         {td, [], {p, [], io_lib:format("~15.3._f", [Count / TotalCount * 100.0])}}
        ] }
        | make_table(Rest, Map, Start, TotalBytes, TotalCount)].
 
@@ -115,14 +115,14 @@ tree_log_to_table(Map, Start, Heading) ->
         {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
         TableHead = {tr, [{bgcolor, '#000099'}], 
           [
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Message Tag"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Size"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Count"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Byte/s"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average 1/s"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Message Size"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
-            {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
+            {td, [{align, "center"}, {style, "width: 210px;"}], {strong, [], {font, [{color, "white"}], "Message Tag"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Total Size"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Total Count"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Average Byte/s"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Average 1/s"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Average Msg Size"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Percent of Bytes"}}},
+            {td, [{align, "center"}, {style, "width: 125px;"}], {strong, [], {font, [{color, "white"}], "Percent of Count"}}}
           ]},
         [{h3, [], Heading},
          {table, [], [TableHead | make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]}]
