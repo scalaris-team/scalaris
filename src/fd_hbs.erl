@@ -285,7 +285,7 @@ report_crash(State) ->
     RemPids = state_get_rem_pids(State),
     case RemPids of
         [] ->
-            log:log(warn, "[ FD ~p ] remote host ~p (fd_hbs) is unresponsive.~n"
+            log:log(info, "[ FD ~p ] remote host ~p (fd_hbs) is unresponsive.~n"
                     ++    "          No pids to report as crashed locally.~n"
                     ++    "          Finishing own fd_hbs.",
                     [comm:this(), state_get_rem_hbs(State)]);
