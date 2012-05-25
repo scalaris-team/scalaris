@@ -134,7 +134,7 @@ fill_ring(Type, DBSize, Params) ->
     end.
 
 fill_random(DBSize, Params) ->    
-    Distr = proplists:get_value(distribution, Params, uniform),            
+    Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
     Keys = db_generator:get_db(I, DBSize, Distr),
     insert_random_db(Keys, Params).
