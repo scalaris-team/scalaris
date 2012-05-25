@@ -467,7 +467,6 @@ on(Msg, State) ->
 
 -spec on_unknown_event(comm:message(), gc_state()) -> gc_state().
 on_unknown_event({web_debug_info, Requestor}, State) ->
-    io:format("web_debug_info, gc"),
     comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
                                  {"module", lists:flatten(io_lib:format("~.0p", [gc_mod(State)]))},
