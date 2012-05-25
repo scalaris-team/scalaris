@@ -219,7 +219,7 @@ on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->
     case NextOp of
         {retry} ->
             comm:send(Target, Message,
-                      ?SEND_OPTIONS ++ [{shepherd, shepherd_new(Count + 1)}]),
+                      ?SEND_OPTIONS ++ [{shepherd, shepherd_new(Count)}]),
             State;
         {delay, Sec} ->
             msg_delay:send_local(
