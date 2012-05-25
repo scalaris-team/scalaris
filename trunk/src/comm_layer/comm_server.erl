@@ -158,8 +158,4 @@ on({unregister_conn, Address, Port, Client}, State) ->
 on({set_local_address, Address, Port, Client}, State) ->
     ets:insert(?MODULE, {local_address_port, {Address, Port}}),
     Client ! {set_local_address_done},
-    State;
-
-on({web_debug_info, Requestor}, State) ->
-    comm:send_local(Requestor, {web_debug_info_reply, []}),
     State.
