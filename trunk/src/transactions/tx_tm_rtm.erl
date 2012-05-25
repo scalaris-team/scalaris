@@ -763,6 +763,8 @@ on_init({tp_committed, _ItemId} = Msg, State) ->
     on(Msg, State);
 on_init({delete_if_still_uninitialized, _ItemId} = Msg, State) ->
     on(Msg, State);
+on_init({tx_tm_rtm_delete, _TxId, _Decision} = Msg, State) ->
+    on(Msg, State);
 on_init({register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
     {ErrCodeTx, _TxState} = get_tx_entry(Tid, State),
     case new =:= ErrCodeTx of
