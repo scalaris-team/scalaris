@@ -32,16 +32,9 @@
 -include("record_helpers.hrl").
 
 -define(REP_FACTOR, 4).
+-define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--record(rrNodeStatus, {
-                        nodeKey     = ?required(rrNodeStatus, nodeKey)      :: ?RT:key(), 
-                        nodeRange   = ?required(rrNodeStatus, nodeRange)    :: intervals:interval(),
-                        dbItemCount = 0                                     :: pos_integer(),
-                        versionSum  = 0                                     :: pos_integer()
-                      }).
--type rrDBStatus() :: [#rrNodeStatus{}].
 
 basic_tests() ->
     [get_symmetric_keys_test,
@@ -50,30 +43,38 @@ basic_tests() ->
      tester_mapInterval,
      tester_minKeyInInterval].
 
-upd_tests() ->
-    [upd_no_outdated,
-     upd_min_nodes,     % sync in an single node ring
-     upd_simple,        % run one sync round
-     upd_dest,          % run one sync with a specified dest node 
-     upd_parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
+repair_tests() ->
+    [no_diff,       % ring is not out of sync e.g. no outdated or missing replicas
+     min_nodes,     % sync in an single node ring
+     simple,        % run one sync round
+     multi_round,   % run multiple sync rounds
+     dest,          % run one sync with a specified dest node 
+     parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
 
 all() ->
-    [{group, basic_tests},
-     {group, upd_tests}
-     %bloomSync_times
+    [{group, basic},
+     {group, repair}
      ].
 
 groups() ->
-    [{basic_tests,  [parallel], basic_tests()},
-     {upd_tests,    [sequence], [{upd_bloom,    [sequence], upd_tests()}, %{repeat_until_any_fail, 1000}
-                                 {upd_merkle,   [sequence], upd_tests()},
-                                 {upd_art,      [sequence], upd_tests()}]}
+    [{basic,  [parallel], basic_tests()},
+     {repair, [sequence], [{upd_bloom,    [sequence], repair_tests()}, %{repeat_until_any_fail, 1000}
+                           {upd_merkle,   [sequence], repair_tests()},
+                           {upd_art,      [sequence], repair_tests()},
+                           {regen_bloom,  [sequence], repair_tests()},
+                           {regen_merkle, [sequence], repair_tests()},
+                           {regen_art,    [sequence], repair_tests()},
+                           {mixed_bloom,  [sequence], repair_tests()}, 
+                           {mixed_merkle, [sequence], repair_tests()},
+                           {mixed_art,    [sequence], repair_tests()}]}
     ].
 
 suite() ->
     [
-     {timetrap, {seconds, 15}}
+     {timetrap, {seconds, 240}}
     ].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_per_suite(Config) ->
     _ = crypto:start(),    
@@ -83,6 +84,32 @@ end_per_suite(Config) ->
     crypto:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+init_per_group(Group, Config) ->
+    ct:comment(io_lib:format("BEGIN ~p", [Group])),
+    case Group of
+        upd_bloom -> [{ru_method, bloom}, {ftype, update}];
+        upd_merkle -> [{ru_method, merkle_tree}, {ftype, update}];
+        upd_art -> [{ru_method, art}, {ftype, update}];
+        regen_bloom -> [{ru_method, bloom}, {ftype, regen}];
+        regen_merkle -> [{ru_method, merkle_tree}, {ftype, regen}];
+        regen_art -> [{ru_method, art}, {ftype, regen}];
+        mixed_bloom -> [{ru_method, bloom}, {ftype, mixed}];
+        mixed_merkle -> [{ru_method, merkle_tree}, {ftype, mixed}];
+        mixed_art -> [{ru_method, art}, {ftype, mixed}];
+        _ -> []
+    end ++ Config.
+
+end_per_group(Group, Config) ->  
+    Method = proplists:get_value(ru_method, Config, undefined),
+    FType = proplists:get_value(ftype, Config, undefined),
+    case Method of
+        undefined -> ct:comment(io_lib:format("END ~p", [Group]));
+        M -> ct:comment(io_lib:format("END ~p/~p", [FType, M]))
+    end,
+    proplists:delete(ru_method, Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -112,49 +139,45 @@ get_rep_upd_config(Method) ->
 % Replica Update tests
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-init_per_group(Group, Config) ->
-    ct:comment(io_lib:format("BEGIN ~p", [Group])),
-    case Group of
-        upd_bloom -> [{ru_method, bloom} | Config];
-        upd_merkle -> [{ru_method, merkle_tree} | Config];
-        upd_art -> [{ru_method, art} | Config];
-        _ -> Config
-    end.
-
-end_per_group(Group, Config) ->  
-    Method = proplists:get_value(ru_method, Config, undefined),
-    case Method of
-        undefined -> ct:comment(io_lib:format("END ~p", [Group]));
-        M -> ct:comment(io_lib:format("END ~p/~p", [Group, M]))
-    end,
-    proplists:delete(ru_method, Config).
-
-
-upd_no_outdated(Config) ->
+no_diff(Config) ->
     Method = proplists:get_value(ru_method, Config),
-    [Start, End] = start_sync(Config, 4, 1000, 0, 1, 0.1, get_rep_upd_config(Method)),
-    ?assert(Start =:= End).
+    FType = proplists:get_value(ftype, Config),
+    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}], 
+                              1, 0.1, get_rep_upd_config(Method)),
+    ?assert(sync_degree(Start) =:= sync_degree(End)).
 
-upd_min_nodes(Config) ->
+min_nodes(Config) ->
     Method = proplists:get_value(ru_method, Config),
-    [Start, End] = start_sync(Config, 1, 1, 1000, 1, 0.2, get_rep_upd_config(Method)),
-    ?assert(Start =:= End).    
+    FType = proplists:get_value(ftype, Config),
+    [Start, End] = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
+                              1, 0.2, get_rep_upd_config(Method)),
+    ?assert(sync_degree(Start) =:= sync_degree(End)).    
 
-upd_simple(Config) ->
+simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
-    [Start, End] = start_sync(Config, 4, 1000, 10, 1, 0.1, get_rep_upd_config(Method)),
-    ?assert(Start < End).    
+    FType = proplists:get_value(ftype, Config),
+    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
+                              1, 0.1, get_rep_upd_config(Method)),
+    ?assert(sync_degree(Start) < sync_degree(End)).
 
-upd_dest(Config) ->
+multi_round(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
+    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
+                              3, 0.1, get_rep_upd_config(Method)),
+    ?assert(sync_degree(Start) < sync_degree(End)). 
+
+dest(Config) ->
     %parameter
     NodeCount = 7,
     DataCount = 1000,
     Fpr = 0.1,
     Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
     config:write(rr_bloom_fpr, Fpr),
-    db_generator:fill_ring(random, DataCount, [{ftype, update}, 
+    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
                                                {fprob, 50}, 
                                                {distribution, uniform}]),
     %chose node pair    
@@ -162,7 +185,9 @@ upd_dest(Config) ->
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %measure initial sync degree
     SO = count_outdated(SKey),
-    CO = count_outdated(CKey),    
+    SM = count_dbsize(SKey),
+    CO = count_outdated(CKey),
+    CM = count_dbsize(CKey),
     %server starts sync
     api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
@@ -170,30 +195,30 @@ upd_dest(Config) ->
     waitForSyncRoundEnd([SKey, CKey]),
     %measure sync degree
     SONew = count_outdated(SKey),
+    SMNew = count_dbsize(SKey),
     CONew = count_outdated(CKey),
-    ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p
-            Server outdated: [~p] -> [~p]~nClient outdated: [~p] -> [~p]", 
-           [Method, SKey, CKey, SO, SONew, CO, CONew]),
+    CMNew = count_dbsize(CKey),
+    ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p~n"
+           "Server Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p~n"
+           "Client Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p", 
+           [Method, SKey, CKey, 
+            SO, SONew, SM, SMNew, SO - SONew, SMNew - SM,
+            CO, CONew, CM, CMNew, CO - CONew, CMNew - CM]),
     %clean up
     unittest_helper:stop_ring(),
-    ?implies(SO > 0, ?assert(SONew < SO)) andalso ?implies(CO > 0, ?assert(CONew < CO)).
+    ?implies(SO > 0, ?assert(SONew < SO)) andalso
+        ?implies(CO > 0, ?assert(CONew < CO)) andalso
+        ?implies(SM =/= SMNew, SMNew > SM) andalso
+        ?implies(CM =/= CMNew, CMNew > CM).
 
-upd_parts(Config) ->
+parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
     OldConf = get_rep_upd_config(Method),
-    Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),
-    [Start, End] = start_sync(Config, 4, 1000, 100, 1, 0.1, Conf),
-    ?assert(Start < End).
-
-upd_fpr_compare(Config) ->
-    Method = proplists:get_value(ru_method, Config),
-    Conf = get_rep_upd_config(Method),    
-    Fpr1 = 0.2,
-    Fpr2 = 0.01,
-    R1 = start_sync(Config, 4, 1000, 100, 2, Fpr1, Conf),
-    R2 = start_sync(Config, 4, 1000, 100, 2, Fpr2, Conf),
-    ct:pal("Result FPR=~p - ~p~nFPR=~p - ~p", [Fpr1, R1, Fpr2, R2]),
-    ?assert(lists:nth(2, R1) < lists:nth(2, R2) orelse lists:last(R1) < lists:last(R2)).    
+    Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
+    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
+                              1, 0.1, Conf),
+    ?assert(sync_degree(Start) < sync_degree(End)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Basic Functions Group
@@ -271,45 +296,6 @@ tester_minKeyInInterval(_) ->
     tester:test(?MODULE, prop_minKeyInInterval, 2, 10, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Bloom Filter Tests
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-bloomSync_times(Config) ->
-    %Parameter
-    NodeCount = 4,
-    DataCount = 1000,
-    Rounds = 1,
-    Fpr = 0.1,
-    %start_bloom_sync measurement
-    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    DestVersCount = NodeCount * 2 * DataCount,
-    ItemCount = NodeCount * DataCount,
-    %Build Ring
-    {BuildRingTime, _} = util:tc(?MODULE, build_symmetric_ring, [NodeCount, Config, get_rep_upd_config(bloom)]),
-    config:write(rr_bloom_fpr, Fpr),
-    {FillTime, _} = util:tc(?MODULE, fill_symmetric_ring, [DataCount, NodeCount, 100]),
-    %measure initial sync degree
-    {DBStatusTime, DBStatus} = util:tc(?MODULE, getDBStatus, []),
-    {GetVersionCountTime, VersCount} = util:tc(?MODULE, getVersionCount, [DBStatus]),
-    InitialOutdated = DestVersCount - VersCount,
-    %run sync rounds    
-    Result = [calc_sync_degree(InitialOutdated, ItemCount) |
-                  lists:reverse(util:for_to_ex(1,
-                                               Rounds, 
-                                               fun(_I) ->
-                                                       startSyncRound(NodeKeys),
-                                                       timer:sleep(5000),
-                                                       calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
-                                                                        ItemCount)
-                                               end))],
-    ct:pal(">>BLOOM SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [Rounds, Fpr, Result]),
-    %clean up
-    {StopRingTime, _} = util:tc(unittest_helper, stop_ring, []),    
-    ct:pal("EXECUTION TIMES in microseconds (10^-6)~nBuildRing = ~w~nFillRing = ~w~nDBStatus = ~w~nGetVersionCount = ~w~nStopRing = ~w",
-           [BuildRingTime, FillTime, DBStatusTime, GetVersionCountTime, StopRingTime]),
-    ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -318,38 +304,40 @@ bloomSync_times(Config) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
--spec start_sync(Config, NodeCount::Int, DataCount::Int, 
-                 OutdatedP, Rounds::Int, Fpr, RepConfig::Config) -> [Fpr] 
-when
-    is_subtype(Config,      [tuple()]),
-    is_subtype(Int,         pos_integer()),
-    is_subtype(OutdatedP,   0..100),        %outdated probability in percent
-    is_subtype(Fpr,         float()).          
-start_sync(Config, NodeCount, DataCount, OutdatedProb, Rounds, Fpr, RepUpdConfig) ->
+%% -spec start_sync(Config, NodeCount::Int, DBSize::Int, 
+%%                  DBParams, Rounds::Int, Fpr, RepConf::Config) -> [S::Status, E::Status]
+%% when
+%%     is_subtype(Config,      [tuple()]),
+%%     is_subtype(Int,         pos_integer()),
+%%     is_subtype(DBParams,    [db_generator:db_parameter()]),
+%%     is_subtype(Fpr,         float()),
+%%     is_subtype(Status,      db_generator:db_status()).
+start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RepUpdConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    DestVersCount = NodeCount * 2 * DataCount,
-    ItemCount = NodeCount * DataCount,
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RepUpdConfig),
     config:write(rr_bloom_fpr, Fpr),
-    fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
+    %fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
+    erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
+    db_generator:fill_ring(random, DBSize, DBParams),
     %measure initial sync degree
-    InitialOutdated = DestVersCount - getVersionCount(getDBStatus()),
+    InitDBStat = get_db_status(),
+    print_status(0, InitDBStat),
     %run sync rounds
-    Result = [calc_sync_degree(InitialOutdated, ItemCount) |
-                  lists:reverse(util:for_to_ex(1,
-                                               Rounds, 
-                                               fun(_I) ->
-                                                       startSyncRound(NodeKeys),
-                                                       waitForSyncRoundEnd(NodeKeys),
-                                                       calc_sync_degree(DestVersCount - getVersionCount(getDBStatus()), 
-                                                                        ItemCount)
-                                               end))],
-    SyncMethod = proplists:get_value(rr_recon_method, RepUpdConfig),
-    ct:pal(">>[~p] SYNC RUN>> ~w Rounds  Fpr=~w  SyncLog ~w", [SyncMethod, Rounds, Fpr, Result]),
+    util:for_to_ex(1, Rounds, 
+                   fun(I) ->
+                           startSyncRound(NodeKeys),
+                           waitForSyncRoundEnd(NodeKeys),
+                           print_status(I, get_db_status())
+                   end),
+    EndStat = get_db_status(),
     %clean up
     unittest_helper:stop_ring(),
-    Result.
+    [InitDBStat, EndStat].
+
+-spec print_status(Round::integer(), db_generator:db_status()) -> ok.
+print_status(R, {_, _, M, O}) ->
+    ct:pal(">>SYNC RUN [Round ~p] Missing=[~p] Outdated=[~p]", [R, M, O]).
 
 -spec count_outdated(?RT:key()) -> non_neg_integer().
 count_outdated(Key) ->
@@ -358,6 +346,47 @@ count_outdated(Key) ->
     receive
         {count_old_replicas_reply, Old} -> Old
     end.
+
+-spec count_outdated() -> non_neg_integer().
+count_outdated() ->
+    Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
+    lists:foldl(
+      fun(Node, Acc) -> 
+              comm:send(Node, {send_to_group_member, rrepair, Req}),
+              receive
+                  {count_old_replicas_reply, Old} -> Acc + Old
+              end
+      end, 
+      0, get_node_list()).
+
+get_node_list() ->
+    mgmt_server:node_list(),
+    receive
+        {get_list_response, N} -> N
+        after 2000 ->
+            log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
+            throw('mgmt_server_timeout')
+    end.
+
+% @doc counts db size on node responsible for key
+-spec count_dbsize(?RT:key()) -> non_neg_integer().
+count_dbsize(Key) ->
+    RingData = unittest_helper:get_ring_data(),
+    N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) -> 
+                             intervals:in(Key, intervals:new(LBr, LK, RK, RBr)) 
+                     end, RingData),
+    case N of
+        [] -> 0;
+        [{_Pid, _I, DB, _Pred, _Succ, ok}] -> length(DB);
+        _ -> 0
+    end.
+
+-spec get_db_status() -> db_generator:db_status().
+get_db_status() ->
+    DBSize = erlang:get(?DBSizeKey),
+    Ring = statistics:get_ring_details(),
+    Stored = statistics:get_total_load(Ring),
+    {DBSize, Stored, DBSize - Stored, count_outdated()}.
 
 -spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
 get_symmetric_keys(NodeCount) ->
@@ -377,40 +406,6 @@ build_symmetric_ring(NodeCount, Config, RepUpdConfig) ->
     unittest_helper:check_ring_size_fully_joined(NodeCount),
     % wait a bit for the rm-processes to settle
     timer:sleep(500),
-    ok.
-
--spec fill_symmetric_ring(non_neg_integer(), pos_integer(), 0..100) -> ok.
-fill_symmetric_ring(DataCount, NodeCount, OutdatedProbability) ->
-    NodeIds = lists:sort(get_symmetric_keys(NodeCount)),
-    util:for_to(1, 
-                NodeCount div 4,
-                fun(N) ->
-                        From = lists:nth(N, NodeIds),
-                        To = lists:nth(N + 1, NodeIds),
-                        % write DataCount items to nth-Node and its symmetric replicas
-                        [begin
-                             Key = element(2, intervals:get_bounds(I)),
-                             RepKeys = ?RT:get_replica_keys(Key),
-                             %write replica group
-                             lists:foreach(fun(X) -> 
-                                                   DBEntry = db_entry:new(X, "2", 2),
-                                                   api_dht_raw:unreliable_lookup(X, 
-                                                                                 {set_key_entry, comm:this(), DBEntry}),
-                                                   receive {set_key_entry_reply, _} -> ok end
-                                           end, 
-                                           RepKeys),
-                             %random replica is outdated                             
-                             case OutdatedProbability >= randoms:rand_uniform(1, 100) of
-                                 true ->
-                                     OldKey = util:randomelem(RepKeys),
-                                     api_dht_raw:unreliable_lookup(OldKey, {set_key_entry, comm:this(), db_entry:new(OldKey, "1", 1)}),
-                                     receive {set_key_entry_reply, _} -> ok end,
-                                     ok;
-                                 _ -> ok
-                             end
-                         end || I <- intervals:split(intervals:new('[', From, To, ']'), DataCount)]
-                end),
-    ct:pal("[~w]-Nodes-Ring filled with [~w] items per node", [NodeCount, DataCount]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,24 +431,7 @@ waitForSyncRoundEnd(NodeKeys) ->
       NodeKeys),
     ok.
 
-% @doc returns replica update specific node db information
--spec getDBStatus() -> rrDBStatus().
-getDBStatus() ->
-    RingData = unittest_helper:get_ring_data(),
-    [ #rrNodeStatus{ nodeKey = LV,
-                     nodeRange = intervals:new(LBr, LV, RV, RBr), 
-                     dbItemCount = length(DB),
-                     versionSum = lists:sum(lists:map(fun(X) -> db_entry:get_version(X) end, DB))
-                     } 
-    || {_Pid, {LBr, LV, RV, RBr}, DB, _Pred, _Succ, ok} = _Node <- RingData].
-
-getVersionCount(RingStatus) ->
-    lists:sum(lists:map(fun(#rrNodeStatus{ versionSum = V}) -> V end, RingStatus)).
-
-print_sync_status(ObsoleteCount, ItemCount) ->
-    ct:pal("SyncDegree: ~7.4f%   -- ItemsOutdated=~w",
-           [100 * calc_sync_degree(ObsoleteCount, ItemCount),
-            ObsoleteCount]).
-
-calc_sync_degree(ObsoleteCount, ItemCount) ->
-    (ItemCount - ObsoleteCount) / ItemCount.
+-spec sync_degree(db_generator:db_status()) -> float().
+sync_degree({Count, _Ex, M, O}) ->
+    (Count - M - O) / Count.
+    
