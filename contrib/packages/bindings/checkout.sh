@@ -35,7 +35,7 @@ if [ ${result} -eq 0 ]; then
   targzfile="${tarfile}.gz"
   newfoldername="${folder}-${pkg_version}"
   echo "making ${targzfile} ..."
-  mv "${folder}" "${newfoldername}" && tar -cf ${tarfile} ${newfoldername} ${newfoldername}/contrib/wikipedia/contrib/apache-tomcat-7.0.26 ${newfoldername}/contrib/wikipedia/contrib/commons-codec-1.4.jar --exclude-vcs --exclude="${newfoldername}/src" --exclude="${newfoldername}/test" --exclude="${newfoldername}/include" --exclude="${newfoldername}/contrib" --exclude="${newfoldername}/user-dev-guide" --exclude="${newfoldername}/doc" --exclude="${newfoldername}/docroot" && tar -rf ${tarfile} ${newfoldername}/contrib/wikipedia/contrib/apache-tomcat-* ${newfoldername}/contrib/wikipedia/contrib/commons-codec-1.4.jar && gzip ${tarfile} && mv "${newfoldername}" "${folder}"
+  mv "${folder}" "${newfoldername}" && tar -cf ${tarfile} ${newfoldername} --exclude-vcs --exclude="${newfoldername}/src" --exclude="${newfoldername}/test" --exclude="${newfoldername}/include" --exclude="${newfoldername}/contrib" --exclude="${newfoldername}/user-dev-guide" --exclude="${newfoldername}/doc" --exclude="${newfoldername}/docroot" && tar -rf ${tarfile} ${newfoldername}/contrib/wikipedia/contrib/apache-tomcat-* ${tarfile} ${newfoldername}/contrib/init.d --exclude-vcs && gzip -f ${tarfile} && mv "${newfoldername}" "${folder}"
   result=$?
 fi
 
