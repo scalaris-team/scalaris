@@ -456,11 +456,11 @@ module Scalaris
       undefined = 0
       if result.is_a?(Array)
         for element in result
-          if element == 'ok':
+          if element == 'ok'
               ok += 1
-          elsif element == 'locks_set':
+          elsif element == 'locks_set'
               locks_set += 1
-          elsif element == 'undef':
+          elsif element == 'undef'
               undefined += 1
           else
             raise UnknownError.new(:'Unknown reason ' + element + :'in ' + result)
@@ -820,7 +820,7 @@ module Scalaris
     
     # Adds a read operation to the request list.
     def add_read(key)
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'read' => key}
@@ -829,7 +829,7 @@ module Scalaris
     
     # Adds a write operation to the request list.
     def add_write(key, value, binary = false)
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'write' => {key => JSONConnection.encode_value(value, binary)}}
@@ -838,7 +838,7 @@ module Scalaris
 
     # Adds a add_del_on_list operation to the request list.
     def add_add_del_on_list(key, to_add, to_remove)
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'add_del_on_list' => {'key' => key, 'add' => to_add, 'del'=> to_remove}}
@@ -847,7 +847,7 @@ module Scalaris
 
     # Adds a add_on_nr operation to the request list.
     def add_add_on_nr(key, to_add)
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'add_on_nr' => {key => to_add}}
@@ -856,7 +856,7 @@ module Scalaris
 
     # Adds a test_and_set operation to the request list.
     def add_test_and_set(key, old_value, new_value)
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('No further request supported after a commit!')
       end
       @requests << {'test_and_set' => {'key' => key,
@@ -867,7 +867,7 @@ module Scalaris
 
     # Adds a commit operation to the request list.
     def add_commit
-      if (@is_commit):
+      if (@is_commit)
           raise RuntimeError.new('Only one commit per request list allowed!')
       end
       @requests << {'commit' => ''}
