@@ -141,6 +141,11 @@ on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
     forward_to_hbs(Subscriber, {del_watching_of, Pid}),
     State;
 
+on({crashed, WatchedPid} = Msg, State) ->
+    ?TRACE("FD: crashed message via fd for watched pid ~p~n", [WatchedPid]),
+    forward_to_hbs(WatchedPid, Msg),
+    State;
+
 %% on({web_debug_info, _Requestor}, State) ->
 %%     ?TRACE("FD: web_debug_info~n", []),
 %% TODO: reimplement for new fd.
