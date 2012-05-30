@@ -270,11 +270,9 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                                 MyWikiModel.normaliseName(tpl_raw));
                         updateLinks3(page.getId(), template, stWriteTpl, "templatelinks");
                     }
-                    for (String tpl_raw: wikiModel.getIncludes()) {
-                        NormalisedTitle template = new NormalisedTitle(
-                                MyNamespace.TEMPLATE_NAMESPACE_KEY,
-                                MyWikiModel.normaliseName(tpl_raw));
-                        updateLinks3(page.getId(), template, stWriteTpl, "templatelinks");
+                    for (String incl_raw: wikiModel.getIncludes()) {
+                        NormalisedTitle include = wikiModel.normalisePageTitle(incl_raw);
+                        updateLinks3(page.getId(), include, stWriteTpl, "templatelinks");
                     }
                     for (String link_raw: wikiModel.getLinks()) {
                         NormalisedTitle link = wikiModel.normalisePageTitle(link_raw);
