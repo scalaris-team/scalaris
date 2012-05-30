@@ -572,36 +572,17 @@ public class MyWikiModel extends WikiModel {
      *         (index 1)
      */
     public static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject) {
-        return splitNsTitle(fullTitle, nsObject, true);
-    }
-
-    /**
-     * Splits the given full title into its namespace and page title components.
-     * 
-     * @param fullTitle
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * @param onlyValidNs
-     *            whether only valid namespaces should be split off
-     * 
-     * @return a 2-element array with the namespace (index 0) and the page title
-     *         (index 1)
-     */
-    private static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject, boolean onlyValidNs) {
         int colonIndex = fullTitle.indexOf(':');
         if (colonIndex != (-1)) {
-            String maybeNs = fullTitle.substring(0, colonIndex);
-            if (!onlyValidNs || nsObject.getNumberByName(maybeNs) != null) {
+            String maybeNs = normaliseName(fullTitle.substring(0, colonIndex));
+            if (nsObject.getNumberByName(maybeNs) != null) {
                 // this is a real namespace
                 return new String[] { maybeNs,
-                        fullTitle.substring(colonIndex + 1) };
-            } else {
-                // page belongs to the main namespace and only contains a colon
-                return new String[] { "", fullTitle };
+                        normaliseName(fullTitle.substring(colonIndex + 1)) };
             }
+            // else: page belongs to the main namespace and only contains a colon
         }
-        return new String[] {"", fullTitle};
+        return new String[] {"", normaliseName(fullTitle)};
     }
 
     /**
