@@ -16,6 +16,7 @@
 package de.zib.scalaris.examples.wikipedia;
 
 import java.util.EnumMap;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -172,15 +173,14 @@ public class Options {
     public static class APPEND_INCREMENT implements Optimisation {
     }
 
-
     /**
      * Indicates that the new append and increment operations of Scalaris should
-     * be used and list values should be split among several partions, i.e.
-     * buckets, depending on the value's hash.
+     * be used and list values should be distributed among several partions, i.e.
+     * buckets.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class APPEND_INCREMENT_BUCKETS_WITH_HASH implements Optimisation {
+    public static abstract class APPEND_INCREMENT_BUCKETS implements Optimisation {
         final protected int buckets;
         
         /**
@@ -189,7 +189,7 @@ public class Options {
          * @param buckets
          *            number of available buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets) {
+        public APPEND_INCREMENT_BUCKETS(int buckets) {
             this.buckets = buckets;
         }
 
@@ -211,6 +211,75 @@ public class Options {
          * 
          * @return the bucket string, e.g. ":0"
          */
+        abstract public <T> String getBucketString(final T value);
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be randomly distributed among several
+     * partions, i.e. buckets.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_BUCKETS_RANDOM extends APPEND_INCREMENT_BUCKETS {
+        final static protected Random rand = new Random();
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_BUCKETS_RANDOM(int buckets) {
+            super(buckets);
+        }
+
+        /**
+         * Gets the string to append to the key in order to point to the bucket
+         * for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        @Override
+        public <T> String getBucketString(final T value) {
+            if (buckets > 1) {
+                return ":" + rand.nextInt(buckets);
+            } else {
+                return "";
+            }
+        }
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be distributed among several partions, i.e.
+     * buckets, depending on the value's hash.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_BUCKETS_WITH_HASH extends APPEND_INCREMENT_BUCKETS {
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets) {
+            super(buckets);
+        }
+        
+        /**
+         * Gets the string to append to the key in order to point to the bucket
+         * for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        @Override
         public <T> String getBucketString(final T value) {
             if (buckets > 1) {
                 return ":" + (value.hashCode() % buckets);
@@ -287,6 +356,8 @@ public class Options {
                             optimisation = new Options.TRADITIONAL();
                         } else if (optimisationStr.equals("APPEND_INCREMENT")) {
                             optimisation = new Options.APPEND_INCREMENT();
+                        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM")) {
+                            optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
                         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH")) {
                             optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
                         }

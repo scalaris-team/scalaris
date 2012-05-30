@@ -34,7 +34,7 @@ import com.almworks.sqlite4java.SQLiteStatement;
 
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.Options;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_HASH;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
@@ -309,14 +309,16 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         }
     }
     
-    static class SQLiteWriteBucketListWithHashJob implements Runnable {
+    static class SQLiteWriteBucketListJob implements Runnable {
         protected final String key;
         protected final String countKey;
         protected final List<ErlangValue> value;
         protected final SQLiteStatement stWrite;
-        protected final Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation;
+        protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
         
-        public SQLiteWriteBucketListWithHashJob(String key, List<ErlangValue> value, String countKey, SQLiteStatement stWrite, Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation) {
+        public SQLiteWriteBucketListJob(String key, List<ErlangValue> value,
+                String countKey, SQLiteStatement stWrite,
+                Options.APPEND_INCREMENT_BUCKETS optimisation) {
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -372,13 +374,15 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         }
     }
     
-    static class SQLiteWriteBucketCounterWithHashJob implements Runnable {
+    static class SQLiteWriteBucketCounterJob implements Runnable {
         protected final String key;
         protected final int value;
         protected final SQLiteStatement stWrite;
-        protected final Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation;
+        protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
         
-        public SQLiteWriteBucketCounterWithHashJob(String key, int value, SQLiteStatement stWrite, Options.APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation) {
+        public SQLiteWriteBucketCounterJob(String key, int value,
+                SQLiteStatement stWrite,
+                Options.APPEND_INCREMENT_BUCKETS optimisation) {
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -536,11 +540,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         println("unknown key: " + key);
                     }
 
-                    APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation2 = null;
+                    APPEND_INCREMENT_BUCKETS optimisation2 = null;
                     if (opType != null) {
                         final Optimisation optimisation = dbWriteOptions.OPTIMISATIONS.get(opType);
-                        if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
-                            optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_HASH) optimisation;
+                        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                            optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
                         } else {
                             copyValue = true;
                         }
@@ -555,7 +559,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     } else if (optimisation2 != null) {
                         switch (listOrCount) {
                             case LIST:
-                                addSQLiteJob(new SQLiteWriteBucketListWithHashJob(
+                                addSQLiteJob(new SQLiteWriteBucketListJob(
                                         key,
                                         WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue(),
                                         countKey,
@@ -563,7 +567,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                                 break;
                             case COUNTER:
                                 if (optimisation2.getBuckets() > 1) {
-                                    addSQLiteJob(new SQLiteWriteBucketCounterWithHashJob(
+                                    addSQLiteJob(new SQLiteWriteBucketCounterJob(
                                             key,
                                             WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).intValue(),
                                             stWrite, optimisation2));
