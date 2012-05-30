@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_HASH;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
@@ -93,8 +93,8 @@ public class MyScalarisOpExecWrapper {
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
-            final APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_HASH) optimisation;
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+            final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final String key2 = key + optimisation2.getBucketString(toAdd);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else {
@@ -128,8 +128,8 @@ public class MyScalarisOpExecWrapper {
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_HASH) {
-            final APPEND_INCREMENT_BUCKETS_WITH_HASH optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_HASH) optimisation;
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+            final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final HashMap<String, String> countKeys = new HashMap<String, String>(toAdd.size() + toRemove.size());
             final LinkedMultiHashMap<String, T> kvAdd = new LinkedMultiHashMap<String, T>();
             final LinkedMultiHashMap<String, T> kvRemove = new LinkedMultiHashMap<String, T>();

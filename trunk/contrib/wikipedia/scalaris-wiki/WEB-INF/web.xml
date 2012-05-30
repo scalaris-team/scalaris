@@ -59,6 +59,7 @@ available optimisations (parameter types depend on the implementation):
  see implementations of de.zib.scalaris.examples.wikipedia.Options.ListOptimisation
   TRADITIONAL
   APPEND_INCREMENT
+  APPEND_INCREMENT_BUCKETS_RANDOM(int buckets)
   APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets)
 
 example:
