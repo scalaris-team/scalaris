@@ -108,14 +108,11 @@ on({get_state, Sender, Key}, State =
     comm:send(Sender, {get_state_response, Value}),
     State;
 
-on({?TRIGGER_NAME}, State = #rrepair_state{ round = Round, open_recon = OpenRecon }) ->
+on({?TRIGGER_NAME}, State) ->
     ?TRACE_KILL("RR: SYNC TRIGGER", []),
-    {ok, Pid} = rr_recon:start(Round),
-    comm:send_local(Pid, {start, get_recon_method(), random}),
+    comm:send_local(self(), {request_sync, get_recon_method(), random}),
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
-    State#rrepair_state{ trigger_state = NewTriggerState, 
-                         round = next_round(Round),
-                         open_recon = OpenRecon + 1 };
+    State#rrepair_state{ trigger_state = NewTriggerState };
 
 % @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %      Random leads to sync with a node which is associated with this (e.g. symmetric partner)  
@@ -134,20 +131,19 @@ on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_re
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({continue_recon, Sender, Round, Msg}, 
-   State = #rrepair_state{ open_recon = OpenRecon }) ->
+on({continue_recon, Sender, Round, Msg}, State) ->
     ?TRACE_KILL("CONTINUE RECON FROM ~p", [Sender]),
     {ok, Pid} = rr_recon:start(Round, Sender),
     comm:send_local(Pid, Msg),
-    State#rrepair_state{ open_recon = OpenRecon + 1 };
+    State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
 on({rr_stats, Msg}, State) ->
     {ok, Pid} = rr_statistics:start(),
     comm:send_local(Pid, Msg),
     State;
 
-on({recon_forked}, State = #rrepair_state{ open_recon = Recon }) ->
-    State#rrepair_state{ open_recon = Recon + 1 };
+on({recon_forked}, State) ->
+    State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
 on({recon_progress_report, _Sender, _Round, _Master, Stats}, State) ->
     OpenRecon = State#rrepair_state.open_recon - 1,
