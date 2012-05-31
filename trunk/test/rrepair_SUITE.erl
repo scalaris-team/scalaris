@@ -200,15 +200,14 @@ dest(Config) ->
     CONew = count_outdated(CKey),
     CMNew = count_dbsize(CKey),
     ct:pal("SYNC RUN << ~p / ~p >>~nServerKey=~p~nClientKey=~p~n"
-           "Server Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p~n"
-           "Client Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p", 
+           "Server Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p~n"
+           "Client Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p", 
            [Method, FType, SKey, CKey, 
             SO, SONew, SM, SMNew, SO - SONew, SMNew - SM,
             CO, CONew, CM, CMNew, CO - CONew, CMNew - CM]),
     %clean up
     unittest_helper:stop_ring(),
-    ?implies(SO > 0, ?assert(SONew < SO)) andalso
-        ?implies(CO > 0, ?assert(CONew < CO)) andalso
+    ?implies(SO > 0 orelse CO > 0, SONew < SO orelse CONew < CO) andalso
         ?implies(SM =/= SMNew, SMNew > SM) andalso
         ?implies(CM =/= CMNew, CMNew > CM).
 
@@ -315,16 +314,12 @@ when
     is_subtype(Status,      db_generator:db_status()).
 start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    %build and fill ring
     build_symmetric_ring(NodeCount, Config, RRConfig),
     config:write(rr_bloom_fpr, Fpr),
-    %fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
     db_generator:fill_ring(random, DBSize, DBParams),
-    %measure initial sync degree
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
-    %run sync rounds
     util:for_to_ex(1, Rounds, 
                    fun(I) ->
                            startSyncRound(NodeKeys),
@@ -332,7 +327,6 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
                            print_status(I, get_db_status())
                    end),
     EndStat = get_db_status(),
-    %clean up
     unittest_helper:stop_ring(),
     {InitDBStat, EndStat}.
 
@@ -377,7 +371,6 @@ count_dbsize(Key) ->
                              intervals:in(Key, intervals:new(LBr, LK, RK, RBr)) 
                      end, RingData),
     case N of
-        [] -> 0;
         [{_Pid, _I, DB, _Pred, _Succ, ok}] -> length(DB);
         _ -> 0
     end.
