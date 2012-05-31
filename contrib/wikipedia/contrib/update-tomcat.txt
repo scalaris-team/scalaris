@@ -9,7 +9,7 @@
 4) in <tomcat-dir>/conf/server.xml search for the active "Connector" tag and add the following to its properties:
 URIEncoding="UTF-8"
 -> sets default parameter encoding to UTF-8 (required by the wiki app)
-maxHttpHeaderSize="65536"
+maxHttpHeaderSize="131072"
 -> support redirect URLs with a lot of logged involved and failed keys
 5) change paths in <wiki-dir>/build.xml
 6) remove <old-tomcat-dir>

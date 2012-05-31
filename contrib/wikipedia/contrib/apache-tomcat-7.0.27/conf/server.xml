@@ -69,7 +69,7 @@
     -->
     <Connector port="8080" protocol="HTTP/1.1"
                connectionTimeout="20000"
-	       maxHttpHeaderSize="65536"
+	       maxHttpHeaderSize="131072"
                redirectPort="8443" URIEncoding="UTF-8" />
     <!-- A "Connector" using the shared thread pool-->
     <!--
