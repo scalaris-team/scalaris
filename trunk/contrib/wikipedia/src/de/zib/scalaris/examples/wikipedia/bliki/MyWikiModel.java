@@ -572,10 +572,27 @@ public class MyWikiModel extends WikiModel {
      *         (index 1)
      */
     public static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject) {
+        return splitNsTitle(fullTitle, nsObject, true);
+    }
+
+    /**
+     * Splits the given full title into its namespace and page title components.
+     * 
+     * @param fullTitle
+     *            the (full) title including a namespace (if present)
+     * @param nsObject
+     *            the namespace for determining how to split the title
+     * @param onlyValidNs
+     *            whether only valid namespaces should be split off
+     * 
+     * @return a 2-element array with the namespace (index 0) and the page title
+     *         (index 1)
+     */
+    private static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject, boolean onlyValidNs) {
         int colonIndex = fullTitle.indexOf(':');
         if (colonIndex != (-1)) {
             String maybeNs = normaliseName(fullTitle.substring(0, colonIndex));
-            if (nsObject.getNumberByName(maybeNs) != null) {
+            if (!onlyValidNs || nsObject.getNumberByName(maybeNs) != null) {
                 // this is a real namespace
                 return new String[] { maybeNs,
                         normaliseName(fullTitle.substring(colonIndex + 1)) };
@@ -713,7 +730,7 @@ public class MyWikiModel extends WikiModel {
         if (INTERLANGUAGE_KEYS.contains(namespace)) {
             // also check if this is an inter wiki link to an external wiki in another language
             // -> only ignore inter language links to the same wiki
-            String namespace2 = getNamespace(title);
+            String namespace2 = splitNsTitle(title, getNamespace(), false)[0];
             if (!ignoreInterLang || (!namespace2.isEmpty() && isInterWiki(namespace2))) {
                 // bliki is not able to parse language-specific interwiki links
                 // -> use default language
@@ -735,8 +752,10 @@ public class MyWikiModel extends WikiModel {
          * do not add links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * the internal links
          */
-        String namespace = getNamespace(topicName);
-        if (namespace.isEmpty() || !isInterWiki(namespace)) {
+        String[] nsTitle = splitNsTitle(topicName, getNamespace(), false);
+        if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
+            appendInterWikiLink(nsTitle[0], nsTitle[1], "");
+        } else {
             super.addLink(topicName);
         }
     }
@@ -751,7 +770,7 @@ public class MyWikiModel extends WikiModel {
          * convert links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * external links if the link is an interwiki link
          */
-        String[] nsTitle = splitNsTitle(topic0);
+        String[] nsTitle = splitNsTitle(topic0, getNamespace(), false);
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
             appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
