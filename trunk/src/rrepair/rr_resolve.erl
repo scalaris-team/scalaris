@@ -136,7 +136,6 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, KVVList}, State =
        #rr_resolve_state{ operation = {key_upd_dest, Dest, _},
-                          ownerRemotePid = MyNodePid,
                           feedback = {FB, _},
                           stats = Stats }) ->
     ?TRACE("START GET ENTRIES - KEY SYNC", []),
@@ -168,8 +167,8 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     NewFB = if
                 not Done andalso Exists andalso DoFB =/= nil -> 
                     {DoFB, [{db_entry:get_key(Entry),
-                            db_entry:get_value(Entry),
-                            db_entry:get_version(Entry)} | FBItems]};
+                             db_entry:get_value(Entry),
+                             db_entry:get_version(Entry)} | FBItems]};
                 true -> FB
             end,
     if
