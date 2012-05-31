@@ -17,7 +17,7 @@
 %%         Updates local and/or remote Key-Value-Pairs (kv-pair)
 %%         Sync-Modes:
 %%           1) key_upd: updates local kv-pairs with received kv-list, if received kv is newer
-%%           2) key_upd_: creates kv-list out of a given key-list and sends it to dest
+%%           2) key_upd_dest: creates kv-list out of a given key-list and sends it to dest
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
@@ -40,8 +40,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -137,12 +137,14 @@ on({get_state_response, MyI}, State =
 on({get_entries_response, KVVList}, State =
        #rr_resolve_state{ operation = {key_upd_dest, Dest, _},
                           ownerRemotePid = MyNodePid,
+                          feedback = {FB, _},
                           stats = Stats }) ->
     ?TRACE("START GET ENTRIES - KEY SYNC", []),
-    comm:send(Dest, {request_resolve, 
-                     Stats#resolve_stats.round, 
-                     {key_upd, KVVList}, 
-                     [{feedback, MyNodePid}]}),
+    Options = case FB of
+                  nil -> [];
+                  _ -> [{feedback, FB}]
+              end,
+    comm:send(Dest, {request_resolve, Stats#resolve_stats.round, {key_upd, KVVList}, Options}),
     comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
     State;
 
