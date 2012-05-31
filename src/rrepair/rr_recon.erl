@@ -156,12 +156,13 @@ on({get_state_response, MyI}, State =
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid}) ->
     DestI = proplists:get_value(interval, Params),
-    DestReconPid = proplists:get_value(reconPid, Params),
+    DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
     case intervals:is_subset(MyIntersec, MyI) and not intervals:is_empty(MyIntersec) of
         false ->
-            comm:send_local(self(), {shutdown, negotiate_interval_master}),            
-            comm:send(DestReconPid, {shutdown, no_interval_intersection});
+            comm:send_local(self(), {shutdown, negotiate_interval_master}),
+            DestReconPid =/= undefined andalso
+                comm:send(DestReconPid, {shutdown, no_interval_intersection});
         true ->
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
             send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod))
@@ -395,7 +396,6 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                     true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
                     false ->
                         ArtParams = [{interval, art:get_interval(SyncStruct)},
-                                     {reconPid, comm:this()},
                                      {art, SyncStruct}],
                         comm:send(DestRRPid, 
                                   {continue_recon, OwnerPid, Round, 
