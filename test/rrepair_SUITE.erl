@@ -81,6 +81,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
+    erlang:erase(?DBSizeKey),
     crypto:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
@@ -142,28 +143,28 @@ get_rep_upd_config(Method) ->
 no_diff(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}], 
                               1, 0.1, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) =:= sync_degree(End)).
 
 min_nodes(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    [Start, End] = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
                               1, 0.2, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) =:= sync_degree(End)).    
 
 simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
                               1, 0.1, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) < sync_degree(End)).
 
 multi_round(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
                               3, 0.1, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) < sync_degree(End)). 
 
@@ -198,10 +199,10 @@ dest(Config) ->
     SMNew = count_dbsize(SKey),
     CONew = count_outdated(CKey),
     CMNew = count_dbsize(CKey),
-    ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p~n"
+    ct:pal("SYNC RUN << ~p / ~p >>~nServerKey=~p~nClientKey=~p~n"
            "Server Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p~n"
            "Client Outdated=[~p -> ~p] Items=[~p -> ~p] - Upd=~p ; Regen=~p", 
-           [Method, SKey, CKey, 
+           [Method, FType, SKey, CKey, 
             SO, SONew, SM, SMNew, SO - SONew, SMNew - SM,
             CO, CONew, CM, CMNew, CO - CONew, CMNew - CM]),
     %clean up
@@ -216,7 +217,7 @@ parts(Config) ->
     FType = proplists:get_value(ftype, Config),
     OldConf = get_rep_upd_config(Method),
     Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
-    [Start, End] = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
                               1, 0.1, Conf),
     ?assert(sync_degree(Start) < sync_degree(End)).
 
@@ -304,18 +305,18 @@ tester_minKeyInInterval(_) ->
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
-%% -spec start_sync(Config, NodeCount::Int, DBSize::Int, 
-%%                  DBParams, Rounds::Int, Fpr, RepConf::Config) -> [S::Status, E::Status]
-%% when
-%%     is_subtype(Config,      [tuple()]),
-%%     is_subtype(Int,         pos_integer()),
-%%     is_subtype(DBParams,    [db_generator:db_parameter()]),
-%%     is_subtype(Fpr,         float()),
-%%     is_subtype(Status,      db_generator:db_status()).
-start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RepUpdConfig) ->
+-spec start_sync(Config, Nodes::Int, DBSize::Int, DBParams,
+                 Rounds::Int, Fpr, RRConf::Config) -> {Start::Status, End::Status}
+when
+    is_subtype(Config,      [tuple()]),
+    is_subtype(Int,         pos_integer()),
+    is_subtype(DBParams,    [db_generator:db_parameter()]),
+    is_subtype(Fpr,         float()),
+    is_subtype(Status,      db_generator:db_status()).
+start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, RepUpdConfig),
+    build_symmetric_ring(NodeCount, Config, RRConfig),
     config:write(rr_bloom_fpr, Fpr),
     %fill_symmetric_ring(DataCount, NodeCount, OutdatedProb),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
@@ -333,7 +334,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RepUpdConfig) ->
     EndStat = get_db_status(),
     %clean up
     unittest_helper:stop_ring(),
-    [InitDBStat, EndStat].
+    {InitDBStat, EndStat}.
 
 -spec print_status(Round::integer(), db_generator:db_status()) -> ok.
 print_status(R, {_, _, M, O}) ->
@@ -392,7 +393,7 @@ get_db_status() ->
 get_symmetric_keys(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
-build_symmetric_ring(NodeCount, Config, RepUpdConfig) ->
+build_symmetric_ring(NodeCount, Config, RRConfig) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
@@ -401,7 +402,7 @@ build_symmetric_ring(NodeCount, Config, RepUpdConfig) ->
       fun() ->  get_symmetric_keys(NodeCount) end,
       [{config, lists:flatten([{log_path, PrivDir}, 
                                {dht_node, mockup_dht_node},
-                               RepUpdConfig])}]),
+                               RRConfig])}]),
     % wait for all nodes to finish their join 
     unittest_helper:check_ring_size_fully_joined(NodeCount),
     % wait a bit for the rm-processes to settle
