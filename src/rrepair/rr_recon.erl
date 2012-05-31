@@ -228,6 +228,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         method = bloom,
                         dhtNodePid = DhtNodePid,
                         ownerLocalPid = Owner,
+                        ownerRemotePid = OwnerR,
                         dest_rr_pid = DestRU_Pid,
                         struct = #bloom_recon_struct{ interval = BloomI, 
                                                       bloom = BF},
@@ -242,7 +243,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                  not ?REP_BLOOM:is_element(BF, KV)],
     ?TRACE("Reconcile Bloom Round=~p ; Diff=~p", [Round, length(Diff)]),
     length(Diff) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, DestRU_Pid, Diff}, []}),
+        comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, DestRU_Pid, Diff}, [{feedback, OwnerR}]}),
     SyncFinished andalso        
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
@@ -308,7 +309,8 @@ on({check_node_response, Result, I, ChildHashs}, State =
        #rr_recon_state{ dest_recon_pid = DestReconPid,
                         dest_rr_pid = SrcNode,
                         stats = Stats, 
-                        ownerLocalPid = OwnerPid,
+                        ownerLocalPid = OwnerL,
+                        ownerRemotePid = OwnerR,
                         struct = Tree,
                         round = Round }) ->
     Node = merkle_tree:lookup(I, Tree),
@@ -319,10 +321,10 @@ on({check_node_response, Result, I, ChildHashs}, State =
             ok_leaf -> [{tree_compareSkipped, 1}];
             ok_inner -> [{tree_compareSkipped, merkle_tree:size(Node)}];
             fail_leaf ->
-                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
+                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerL, OwnerR}),
                 [{tree_leafsSynced, Leafs}];
             fail_inner when NodeIsLeaf ->
-                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerPid}),
+                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerL, OwnerR}),
                 [{tree_leafsSynced, Leafs}];
             fail_inner when not NodeIsLeaf ->
                 MyChilds = merkle_tree:get_childs(Node),
@@ -421,8 +423,9 @@ compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
     end.
 
 % @doc Starts simple sync for a given node, returns number of leaf sync requests.
--spec reconcileNode(Node | not_found, {Dest::Pid, Round, Owner::Pid}) -> non_neg_integer() when
-    is_subtype(Pid,     comm:mypid() | undefined),
+-spec reconcileNode(Node | not_found, {Dest::RPid, Round, OwnerLocal::LPid, OwnerRemote::RPid}) -> non_neg_integer() when
+    is_subtype(LPid,    comm:erl_local_pid()),
+    is_subtype(RPid,    comm:mypid() | undefined),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(Round,   rrepair:round()).
 reconcileNode(not_found, _) -> 0;
@@ -433,13 +436,13 @@ reconcileNode(Node, Conf) ->
                              0, merkle_tree:get_childs(Node))
     end.
 
--spec reconcileLeaf(Node, {Dest::Pid, Round, OwnRRepair::Pid}) -> 1 when
-    is_subtype(Pid,     comm:mypid() | undefined),
+-spec reconcileLeaf(Node, {Dest::RPid, Round, OwnerLocal::LPid, OwnerRemote::RPid}) -> 1 when
+    is_subtype(LPid,    comm:erl_local_pid()),
+    is_subtype(RPid,    comm:mypid() | undefined),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(Round,   rrepair:round()).
-reconcileLeaf(_, {undefined, _, _}) -> erlang:error("Recon Destination PID undefined");
-reconcileLeaf(_, {_, _, undefined}) -> erlang:error("Recon Owner PID undefined");
-reconcileLeaf(Node, {Dest, Round, Owner}) ->
+reconcileLeaf(_, {undefined, _, _, _}) -> erlang:error("Recon Destination PID undefined");
+reconcileLeaf(Node, {Dest, Round, OwnerL, OwnerR}) ->
     ToSync = lists:map(fun(KeyVer) -> 
                            case decodeBlob(KeyVer) of
                                {K, _} -> K;
@@ -447,7 +450,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, Dest, ToSync}, []}),
+    comm:send_local(OwnerL, {request_resolve, Round, {key_upd_dest, Dest, ToSync}, [{feedback, OwnerR}]}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -461,13 +464,14 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
     is_subtype(Stats,  rr_recon_stats:stats()).
 art_recon(Tree, Art, #rr_recon_state{ round = Round, 
                                       dest_rr_pid = DestPid,
-                                      ownerLocalPid = OwnerPid,
+                                      ownerLocalPid = OwnerL,
+                                      ownerRemotePid = OwnerR,
                                       stats = Stats }) ->
     case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
         true -> 
             {NodesToSync, NStats} = 
                 art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
-            _ = [reconcileLeaf(X, {DestPid, Round, OwnerPid}) || X <- NodesToSync],
+            _ = [reconcileLeaf(X, {DestPid, Round, OwnerL, OwnerR}) || X <- NodesToSync],
             {ok, NStats};
         false -> {ok, Stats}
     end.
