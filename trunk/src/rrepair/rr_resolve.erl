@@ -17,7 +17,7 @@
 %%         Updates local and/or remote Key-Value-Pairs (kv-pair)
 %%         Sync-Modes:
 %%           1) key_upd: updates local kv-pairs with received kv-list, if received kv is newer
-%%           2) key_sync: synchronizes kv-pairs between two nodes (only for small lists)
+%%           2) key_upd_: creates kv-list out of a given key-list and sends it to dest
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
@@ -40,8 +40,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -72,7 +72,7 @@
 
 -type operation() ::
     {key_upd, ?DB:kvv_list()} |
-    {key_sync, DestPid::comm:mypid(), [?RT:key()]}.
+    {key_upd_dest, DestPid::comm:mypid(), [?RT:key()]}.
 
 -record(rr_resolve_state,
         {
@@ -82,7 +82,7 @@
          operation      = ?required(rr_resolve_state, operation)        :: operation(),
          stats          = #resolve_stats{}                              :: stats(),
          feedback       = {nil, []}                                     :: feedback(),
-         feedback_resp  = false                                         :: boolean(),
+         feedback_resp  = false                                         :: boolean(),           %true if this is a feedback response
          send_stats     = nil                                           :: nil | comm:mypid() 
          }).
 -type state() :: #rr_resolve_state{}.
@@ -102,8 +102,7 @@ on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid,
                           stats = Stats
-                          }) ->
-    ?TRACE("START GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p", [MyI, length(KvvList)]),
+                          }) ->    
     MyPid = comm:this(),
     ToUpdate = 
         lists:foldl(
@@ -116,28 +115,30 @@ on({get_state_response, MyI}, State =
                   Acc + length(UpdKeys)
           end, 0, KvvList),
     %kill is done by update_key_entry_ack
-    ?TRACE("DetailSync START ToDo=~p", [ToUpdate]),
+    ?TRACE("GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p ; ToUpdate=~p", [MyI, length(KvvList), ToUpdate]),
     ToUpdate =:= 0 andalso
         comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
     State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_sync, _, KeyList},
+       #rr_resolve_state{ operation = {key_upd_dest, _, KeyList},
                           dhtNodePid = DhtPid }) ->    
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
                           intervals:in(K, MyI)],
-    comm:send_local(DhtPid, {get_entries, self(), intervals:from_elements(FilterKeyList)}),
+    UpdI = intervals:from_elements(FilterKeyList),
+    comm:send_local(DhtPid, {get_entries, self(), 
+                             fun(X) -> intervals:in(db_entry:get_key(X), UpdI) end,
+                             fun(X) -> {db_entry:get_key(X),
+                                        db_entry:get_value(X), 
+                                        db_entry:get_version(X)} end}),
     State;
 
-on({get_entries_response, Entries}, State =
-       #rr_resolve_state{ operation = {key_sync, Dest, _},
+on({get_entries_response, KVVList}, State =
+       #rr_resolve_state{ operation = {key_upd_dest, Dest, _},
                           ownerRemotePid = MyNodePid,
                           stats = Stats }) ->
     ?TRACE("START GET ENTRIES - KEY SYNC", []),
-    KVVList = [{db_entry:get_key(X), 
-                db_entry:get_value(X), 
-                db_entry:get_version(X)} || X <- Entries],
     comm:send(Dest, {request_resolve, 
                      Stats#resolve_stats.round, 
                      {key_upd, KVVList}, 
@@ -199,8 +200,8 @@ build_comment(#rr_resolve_state{ operation = Operation,
                       "key_upd without feedback"; 
                   {key_upd, _} when not Resp andalso FBDest =/= nil -> 
                       ["key_upd with feedback to ", FBDest];
-                  {key_sync, Dest, _} -> 
-                      ["key_sync with", Dest]
+                  {key_upd_dest, Dest, _} -> 
+                      ["key_upd_dest with", Dest]
               end,
     Stats#resolve_stats{ comment = Comment }.
 

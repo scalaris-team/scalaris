@@ -201,9 +201,6 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> state().
 init(Trigger) ->	
     TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    monitor:proc_set_value(?MODULE, 'Recv-Sync-Req-Count', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
-    monitor:proc_set_value(?MODULE, 'Send-Sync-Req', rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
-    monitor:proc_set_value(?MODULE, 'Progress', rrd:create(60 * 1000000, 3, event)), % 60s monitoring interval
     #rrepair_state{trigger_state = trigger:next(TriggerState)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

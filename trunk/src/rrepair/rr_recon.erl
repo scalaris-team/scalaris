@@ -242,11 +242,11 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                  not ?REP_BLOOM:is_element(BF, KV)],
     ?TRACE("Reconcile Bloom Round=~p ; Diff=~p", [Round, length(Diff)]),
     length(Diff) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_sync, DestRU_Pid, Diff}, []}),
+        comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, DestRU_Pid, Diff}, []}),
     SyncFinished andalso        
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
-    
+
 on({start, Method, DestKey}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
     Stage = case Method of
@@ -334,13 +334,11 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                                   false -> merkle_tree:size(MNode) - 1
                                               end
                                 end, 0, Matched),
-                lists:foreach(fun(X) -> 
-                                      comm:send(DestReconPid, 
-                                                {check_node,
-                                                 comm:this(), 
-                                                 merkle_tree:get_interval(X), 
-                                                 merkle_tree:get_hash(X)}) 
-                              end, NotMatched),
+                _ = [comm:send(DestReconPid, 
+                               {check_node,
+                                comm:this(), 
+                                merkle_tree:get_interval(X), 
+                                merkle_tree:get_hash(X)}) || X <- NotMatched],
                 [{tree_compareLeft, length(NotMatched)},
                  {tree_nodesCompared, length(Matched)},
                  {tree_compareSkipped, SkippedSubNodes}]    
@@ -449,7 +447,7 @@ reconcileLeaf(Node, {Dest, Round, Owner}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(Owner, {request_resolve, Round, {key_sync, Dest, ToSync}, []}),
+    comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, Dest, ToSync}, []}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -534,12 +532,10 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
       DhtPid, 
       {get_chunk, SrcPid, I, 
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
-       fun(Item) -> 
-               encodeBlob(minKeyInInterval(db_entry:get_key(Item), DestI), 
-                          db_entry:get_version(Item)) 
+       fun(Item) -> encodeBlob(minKeyInInterval(db_entry:get_key(Item), DestI), 
+                               db_entry:get_version(Item)) 
        end,
-       MaxItems}),
-    ok.
+       MaxItems}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
