@@ -482,9 +482,9 @@ public class Main {
         group.addOption(bench);
 
         final Option jmx = new Option("jmx", "jmxservice", true, "starts a service exposing Scalaris monitoring values via JMX");
-        read.setArgName("node");
-        read.setArgs(1);
-        read.setOptionalArg(true);
+        jmx.setArgName("node");
+        jmx.setArgs(1);
+        jmx.setOptionalArg(true);
         group.addOption(jmx);
 
         options.addOptionGroup(group);
