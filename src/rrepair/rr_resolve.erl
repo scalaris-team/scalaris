@@ -13,11 +13,11 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica update resolution module
+%% @doc    replica update resolve module
 %%         Updates local and/or remote Key-Value-Pairs (kv-pair)
 %%         Sync-Modes:
 %%           1) key_upd: updates local kv-pairs with received kv-list, if received kv is newer
-%%           2) key_upd_dest: creates kv-list out of a given key-list and sends it to dest
+%%           2) key_upd_send: creates kv-list out of a given key-list and sends it to dest
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
@@ -72,7 +72,7 @@
 
 -type operation() ::
     {key_upd, ?DB:kvv_list()} |
-    {key_upd_dest, DestPid::comm:mypid(), [?RT:key()]}.
+    {key_upd_send, DestPid::comm:mypid(), [?RT:key()]}.
 
 -record(rr_resolve_state,
         {
@@ -121,7 +121,7 @@ on({get_state_response, MyI}, State =
     State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd_dest, _, KeyList},
+       #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
                           dhtNodePid = DhtPid }) ->    
     FilterKeyList = [K || X <- KeyList, 
                           K <- ?RT:get_replica_keys(X), 
@@ -135,7 +135,7 @@ on({get_state_response, MyI}, State =
     State;
 
 on({get_entries_response, KVVList}, State =
-       #rr_resolve_state{ operation = {key_upd_dest, Dest, _},
+       #rr_resolve_state{ operation = {key_upd_send, Dest, _},
                           feedback = {FB, _},
                           stats = Stats }) ->
     ?TRACE("START GET ENTRIES - KEY SYNC", []),
@@ -201,8 +201,8 @@ build_comment(#rr_resolve_state{ operation = Operation,
                       "key_upd without feedback"; 
                   {key_upd, _} when not Resp andalso FBDest =/= nil -> 
                       ["key_upd with feedback to ", FBDest];
-                  {key_upd_dest, Dest, _} -> 
-                      ["key_upd_dest with", Dest]
+                  {key_upd_send, Dest, _} -> 
+                      ["key_upd_send with", Dest]
               end,
     Stats#resolve_stats{ comment = Comment }.
 
