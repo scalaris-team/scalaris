@@ -1654,11 +1654,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 redirectUrl.append("&notice=successfully%20saved%20page");
                 redirectUrl.append("&save_times=" + StringUtils.join(times, "%2C"));
                 redirectUrl.append("&save_attempts=" + page.getSaveAttempts());
-                redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
                 for (Entry<Integer, List<String>> failedKeys : page.getFailedKeys().entrySet()) {
                     redirectUrl.append("&failed_keys" + failedKeys.getKey() + "=" + URLEncoder.encode(StringUtils.join(failedKeys.getValue(), " # "), "UTF-8"));
                 }
                 redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
+                redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
                 response.sendRedirect("http://"
                         + Options.getInstance().SERVERNAME
                         + Options.getInstance().SERVERPATH
