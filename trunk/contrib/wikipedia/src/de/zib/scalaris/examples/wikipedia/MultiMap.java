@@ -170,4 +170,12 @@ public class MultiMap<T extends Map<K, List<V>>, K, V> implements Map<K, List<V>
         return data.values();
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return data.toString();
+    }
+
 }
