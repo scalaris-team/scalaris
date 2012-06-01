@@ -244,7 +244,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                                                  not ?REP_BLOOM:is_element(BF, KV)],
     ?TRACE("Reconcile Bloom Round=~p ; Diff=~p", [Round, length(Diff)]),
     length(Diff) > 0 andalso
-        comm:send_local(Owner, {request_resolve, Round, {key_upd_dest, DestRU_Pid, Diff}, [{feedback, OwnerR}]}),
+        comm:send_local(Owner, {request_resolve, Round, {key_upd_send, DestRU_Pid, Diff}, [{feedback, OwnerR}]}),
     SyncFinished andalso        
         comm:send_local(self(), {shutdown, sync_finished}),
     State;
@@ -450,7 +450,7 @@ reconcileLeaf(Node, {Dest, Round, OwnerL, OwnerR}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(OwnerL, {request_resolve, Round, {key_upd_dest, Dest, ToSync}, [{feedback, OwnerR}]}),
+    comm:send_local(OwnerL, {request_resolve, Round, {key_upd_send, Dest, ToSync}, [{feedback, OwnerR}]}),
     1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
