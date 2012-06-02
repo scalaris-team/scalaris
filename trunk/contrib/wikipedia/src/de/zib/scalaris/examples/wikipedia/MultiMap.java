@@ -131,7 +131,7 @@ public class MultiMap<T extends Map<K, List<V>>, K, V> implements Map<K, List<V>
      *         previously associated null with key, if the implementation
      *         supports null values.)
      */
-    public List<V> put(K key, V value) {
+    public List<V> put1(K key, V value) {
         ArrayList<V> list = new ArrayList<V>();
         list.add(value);
         return put(key, list);

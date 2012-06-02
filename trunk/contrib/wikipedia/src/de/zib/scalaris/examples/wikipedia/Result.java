@@ -75,6 +75,6 @@ public class Result {
      *            time in milliseconds for this operation
      */
     public void addStat(String name, long time) {
-        stats.put(name, time);
+        stats.put1(name, time);
     }
 }
