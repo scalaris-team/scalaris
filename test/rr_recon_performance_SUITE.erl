@@ -21,7 +21,7 @@
 %%%-------------------------------------------------------------------
 %% @version $Id $
 
--module(rrepair_performance_SUITE).
+-module(rr_recon_performance_SUITE).
 
 -author('malange@informatik.hu-berlin.de').
 
