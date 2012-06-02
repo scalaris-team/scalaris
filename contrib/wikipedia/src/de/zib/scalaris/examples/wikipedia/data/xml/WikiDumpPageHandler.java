@@ -132,16 +132,16 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                     NormalisedTitle category = new NormalisedTitle(
                             MyNamespace.CATEGORY_NAMESPACE_KEY,
                             MyWikiModel.normaliseName(cat_raw));
-                    newCategories.put(category, normTitle);
+                    newCategories.put1(category, normTitle);
                 }
                 for (String tpl_raw: wikiModel.getTemplates()) {
                     NormalisedTitle template = new NormalisedTitle(
                             MyNamespace.TEMPLATE_NAMESPACE_KEY,
                             MyWikiModel.normaliseName(tpl_raw));
-                    newTemplates.put(template, normTitle);
+                    newTemplates.put1(template, normTitle);
                 }
                 for (String link: wikiModel.getLinks()) {
-                    newBackLinks.put(wikiModel.normalisePageTitle(link),
+                    newBackLinks.put1(wikiModel.normalisePageTitle(link),
                             normTitle);
                 }
                 if (MyWikiModel.isArticle(normTitle.namespace, wikiModel
