@@ -66,6 +66,7 @@
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
          regen_fail_count = 0      :: non_neg_integer(),
+         feedback_response= false  :: boolean(),            %true if this is a feedback response
          comment          = []     :: [any()]
          }).
 -type stats() :: #resolve_stats{}.
@@ -81,8 +82,7 @@
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = ?required(rr_resolve_state, operation)        :: operation(),
          stats          = #resolve_stats{}                              :: stats(),
-         feedback       = {nil, []}                                     :: feedback(),
-         feedback_resp  = false                                         :: boolean(),           %true if this is a feedback response
+         feedback       = {nil, []}                                     :: feedback(),           
          send_stats     = nil                                           :: nil | comm:mypid() 
          }).
 -type state() :: #rr_resolve_state{}.
@@ -138,7 +138,6 @@ on({get_entries_response, KVVList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
                           feedback = {FB, _},
                           stats = Stats }) ->
-    ?TRACE("START GET ENTRIES - KEY SYNC", []),
     Options = case FB of
                   nil -> [];
                   _ -> [{feedback, FB}]
@@ -179,21 +178,22 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     end,
     State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
-on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,   
-                                     send_stats = SendStats,                                 
+on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner, 
+                                     send_stats = SendStats,
                                      stats = Stats } = State) ->
     NStats = build_comment(State, Stats),
     send_stats(SendStats, NStats),
-    comm:send_local(Owner, {resolve_progress_report, self(), NStats}),    
+    comm:send_local(Owner, {resolve_progress_report, self(), NStats}),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-build_comment(#rr_resolve_state{ operation = Operation,
-                                 feedback = {FBDest, _},
-                                 feedback_resp = Resp }, Stats) ->
+-spec build_comment(state(), stats()) -> stats().
+build_comment(#rr_resolve_state{ operation = Operation, feedback = {FBDest, _} }, 
+              Stats) ->
+    Resp = Stats#resolve_stats.feedback_response,
     Comment = case Operation of 
                   {key_upd, _} when Resp ->
                       "key_upd by feedback";
@@ -202,13 +202,12 @@ build_comment(#rr_resolve_state{ operation = Operation,
                   {key_upd, _} when not Resp andalso FBDest =/= nil -> 
                       ["key_upd with feedback to ", FBDest];
                   {key_upd_send, Dest, _} -> 
-                      ["key_upd_send with", Dest]
+                      ["key_upd_send to ", Dest]
               end,
     Stats#resolve_stats{ comment = Comment }.
 
 -spec send_feedback(feedback(), rrepair:round()) -> ok.
 send_feedback({nil, _}, _) -> ok;
-send_feedback({_, []}, _) -> ok;
 send_feedback({Dest, Items}, Round) ->
     comm:send(Dest, {request_resolve, Round, {key_upd, Items}, [feedback_response]}).
 
@@ -251,8 +250,10 @@ start(Round, Operation, Options) ->
                                ownerRemotePid = comm:this(), 
                                dhtNodePid = pid_groups:get_my(dht_node),
                                operation = Operation,
-                               stats = #resolve_stats{ round = Round },
+                               stats = #resolve_stats{ round = Round, 
+                                                       feedback_response = FBResp },
                                feedback = {FBDest, []},
-                               feedback_resp = FBResp,
-                               send_stats = StatsDest },    
+                               send_stats = StatsDest },
+    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p", 
+           [element(1, Operation), FBDest, FBResp]),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
