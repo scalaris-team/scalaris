@@ -105,6 +105,7 @@ on({get_state, Sender, Key}, State =
                 round -> Round;
                 open_sync -> Recon + Resolve
             end,
+    ?TRACE_RESOLVE("RREPAIR - GET STATE - Recon=~p ; Resolve=~p", [Recon, Resolve]),
     comm:send(Sender, {get_state_response, Value}),
     State;
 
@@ -156,7 +157,7 @@ on({resolve_progress_report, _Sender, _Stats}, State) ->
     OpenResolve = State#rrepair_state.open_resolve - 1,
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
            [_Sender, rr_resolve:print_resolve_stats(_Stats),
-            State#rrepair_state.open_recon, OpenResolve]),    
+            State#rrepair_state.open_recon, OpenResolve]),
     State#rrepair_state{ open_resolve = OpenResolve };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
