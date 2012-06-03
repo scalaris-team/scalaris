@@ -39,9 +39,6 @@ BuildRequires:  scalaris-java >= 0.4.1+svn3078
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 %define with_tomcat5 1
 %define with_tomcat6 0
-%if 0%{?mandriva_version} >= 2011 || 0%{?mdkversion} >= 201100
-BuildConflicts: libpulseaudio0 lib64pulseaudio0 libalsa-plugins-pulseaudio lib64alsa-plugins-pulseaudio
-%endif
 %endif
 
 ###########################################################################################
