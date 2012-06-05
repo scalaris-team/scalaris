@@ -32,10 +32,11 @@
 -export([is_sane_for_commit/1]).
 
 %% Operations on entries of TLogs
--export([new_entry/5]).
+-export([new_entry/6]).
 -export([get_entry_operation/1, set_entry_operation/2]).
 -export([get_entry_key/1,       set_entry_key/2]).
 -export([get_entry_status/1,    set_entry_status/2]).
+-export([get_entry_snapshot/1,  set_entry_snapshot/2]).
 -export([get_entry_value/1,     set_entry_value/2]).
 -export([get_entry_version/1]).
 
@@ -74,7 +75,7 @@ add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 add_or_update_status_by_key(TLog, Key, Status) ->
     case lists:keyfind(Key, 2, TLog) of
         false ->
-            Entry = new_entry(rdht_tx_write, Key, _Vers = 0, Status, _Val = 0),
+            Entry = new_entry(rdht_tx_write, Key, _Vers = 0, Status, _Snapshot = 0, _Val = 0),
             add_entry(TLog, Entry);
         Entry ->
             NewEntry = set_entry_status(Entry, Status),
@@ -107,9 +108,9 @@ is_sane_for_commit(TLog) ->
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),
-                tx_status(), any()) -> tlog_entry().
-new_entry(Op, Key, Vers, Status, Val) ->
-    {Op, Key, Vers, Status, 0, Val}.
+                tx_status(), non_neg_integer(), any()) -> tlog_entry().
+new_entry(Op, Key, Vers, Status, Snapshot, Val) ->
+    {Op, Key, Vers, Status, Snapshot, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
@@ -131,6 +132,12 @@ get_entry_status(Element)    -> element(4, Element).
 
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val)    -> setelement(4, Element, Val).
+
+-spec get_entry_snapshot(tlog_entry()) -> tx_status().
+get_entry_snapshot(Element)    -> element(5, Element).
+
+-spec set_entry_snapshot(tlog_entry(), tx_status()) -> tlog_entry().
+set_entry_snapshot(Element, Val)    -> setelement(5, Element, Val).
 
 -spec get_entry_value(tlog_entry()) -> any().
 get_entry_value(Element)     -> element(6, Element).
