@@ -189,11 +189,11 @@ update_tlog_entry(TLogEntry, Request) ->
     %% validation and increment then in case of write.
     case Status of
         value ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue);
+            tx_tlog:new_entry(?MODULE, Key, Version, value, 0, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, WriteValue)
+            tx_tlog:new_entry(?MODULE, Key, Version, value, 0, WriteValue)
 %        {fail, timeout} ->
-%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout},
+%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout}, 0,
 %                               WriteValue)
     end.
 

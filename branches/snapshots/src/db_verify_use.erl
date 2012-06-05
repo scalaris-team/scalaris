@@ -144,6 +144,12 @@ delete_entry_({DB, Counter} = _DB_, Entry) ->
     verify_counter(Counter),
     {?BASE_DB:delete_entry(DB, Entry), update_counter(Counter)}.
 
+%% @doc Copy existing entry to snapshot tabe
+%% @TODO Implement!
+-spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+copy_value_to_snapshot_table_(State = {_DB, _Subscr, _SnapTable}, _Key) ->
+    State.
+
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
 get_load_({DB, Counter} = _DB_) ->
@@ -228,6 +234,20 @@ get_data_({DB, Counter} = _DB_) ->
     ?TRACE1(get_data, _DB_),
     verify_counter(Counter),
     ?BASE_DB:get_data(DB).
+
+%% @doc Returns snapshot data as is
+%% @TODO implement! 
+-spec get_snapshot_data_(DB::db_t()) -> db_as_list(). 
+get_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
+    [].
+
+%% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
+%%      if there is a matching tuple available in the snapshot set. The other tuples are
+%%      returned as is.
+%% @TODO implement! 
+-spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
+join_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
+    [].
 
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
