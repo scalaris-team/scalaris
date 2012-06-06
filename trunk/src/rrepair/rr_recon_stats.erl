@@ -23,6 +23,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(rr_recon_stats,
         {
+         round              = {0, 0} :: rrepair:round(),
          tree_size          = {0, 0} :: merkle_tree:mt_size(),
          tree_nodesCompared = 0      :: non_neg_integer(),
          tree_compareSkipped= 0      :: non_neg_integer(),
@@ -35,12 +36,13 @@
          }). 
 -type stats() :: #rr_recon_stats{}.
 
--type stats_types() :: non_neg_integer() | merkle_tree:mt_size() | boolean().
+-type stats_types() :: non_neg_integer() | merkle_tree:mt_size() | boolean() | rrepair:round().
+-type field_list()  :: [{atom(), stats_types()}]. %atom = any field name of rr_recon_stats record
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions and Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([new/0, inc/2, set/2, get/2,
+-export([new/0, new/1, inc/2, set/2, get/2,
          print/1]).
 
 -ifdef(with_export_type_support).
@@ -55,13 +57,14 @@
 new() ->
     #rr_recon_stats{}.
 
+-spec new(field_list()) -> stats().
+new(KVList) ->
+    set(KVList, #rr_recon_stats{}).
+
 % @doc increases the record field with name key by value
--spec inc([{Key, Value}], Stats) -> NewStats when
-    is_subtype(Key,      atom()), %any field name of rr_recon_stats record
-    is_subtype(Value,    stats_types()),
-    is_subtype(Stats,    stats()),
-    is_subtype(NewStats, stats()).
-inc([], Stats) ->
+-spec inc(field_list(), Old::Stats) -> New::Stats when
+    is_subtype(Stats, stats()).
+inc([], Stats) -> 
     Stats;
 inc([{K, V} | L], Stats) ->
     NS = case K of
@@ -88,15 +91,13 @@ inc([{K, V} | L], Stats) ->
     inc(L, NS).
 
 % @doc sets the value of record field with name of key to the given value
--spec set([{Key, Value}], Stats) -> NewStats when
-    is_subtype(Key,      atom()), %any field name of rr_recon_stats record
-    is_subtype(Value,    stats_types()),
-    is_subtype(Stats,    stats()),
-    is_subtype(NewStats, stats()).
+-spec set(field_list(), Old::Stats) -> New::Stats when
+    is_subtype(Stats, stats()).
 set([], Stats) ->
     Stats;
 set([{K, V} | L], Stats) ->
     NS = case K of
+             round -> Stats#rr_recon_stats{ round = V };
              tree_size -> Stats#rr_recon_stats{ tree_size = V };
              tree_compareLeft -> Stats#rr_recon_stats{ tree_compareLeft = V };
              tree_nodesCompared -> Stats#rr_recon_stats { tree_nodesCompared = V };
@@ -112,6 +113,7 @@ set([{K, V} | L], Stats) ->
 -spec get(atom(), stats()) -> stats_types().
 get(K, Stats) ->
     case K of
+        round -> Stats#rr_recon_stats.round;
         tree_size -> Stats#rr_recon_stats.tree_size;
         tree_compareLeft -> Stats#rr_recon_stats.tree_compareLeft;
         tree_nodesCompared -> Stats#rr_recon_stats.tree_nodesCompared;
