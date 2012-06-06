@@ -70,12 +70,17 @@
          }).
 -type state() :: #rrepair_state{}.
 
+-type rr_state_field() :: round |           %next round id
+                          open_recon |      %number of open recon processes
+                          open_resolve |    %number of open resolve processes
+                          open_sync.        %open_recon + open_resolve
+
 -type message() ::
     {?TRIGGER_NAME} |    
     % API
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
-    {get_state, Sender::comm:mypid(), Key::atom()} |
+    {get_state, Sender::comm:mypid(), Key::rr_state_field()} |
     % internal
     {continue_recon, SenderRRPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
     {recon_forked} |
@@ -84,30 +89,13 @@
     % rr statistics
     {rr_stats, rr_statistics:requests()} |
     % report
-    {recon_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
-        Master::boolean(), Stats::rr_recon_stats:stats()} |
-    {resolve_progress_report, Sender::comm:erl_local_pid(), Round::round(), 
-        Stats::rr_resolve:stats()}.
+    {recon_progress_report, Sender::comm:erl_local_pid(), Master::boolean(), Stats::rr_recon_stats:stats()} |
+    {resolve_progress_report, Sender::comm:erl_local_pid(), Stats::rr_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
-
-% @doc request replica repair status
-on({get_state, Sender, Key}, State = 
-       #rrepair_state{ open_recon = Recon,
-                       open_resolve = Resolve,
-                       round = Round }) ->
-    Value = case Key of
-                open_recon -> Recon;
-                open_resolve -> Resolve;
-                round -> Round;
-                open_sync -> Recon + Resolve
-            end,
-    ?TRACE_RESOLVE("RREPAIR - GET STATE - Recon=~p ; Resolve=~p", [Recon, Resolve]),
-    comm:send(Sender, {get_state_response, Value}),
-    State;
 
 on({?TRIGGER_NAME}, State) ->
     ?TRACE_KILL("RR: SYNC TRIGGER", []),
@@ -129,6 +117,21 @@ on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_re
     _ = rr_resolve:start(Round, Operation, Options),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
+% @doc request replica repair status
+on({get_state, Sender, Key}, State = 
+       #rrepair_state{ open_recon = Recon,
+                       open_resolve = Resolve,
+                       round = Round }) ->
+    Value = case Key of
+                open_recon -> Recon;
+                open_resolve -> Resolve;
+                round -> Round;
+                open_sync -> Recon + Resolve
+            end,
+    ?TRACE_RESOLVE("RREPAIR - GET STATE - Recon=~p ; Resolve=~p", [Recon, Resolve]),
+    comm:send(Sender, {get_state_response, Value}),
+    State;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
@@ -138,19 +141,23 @@ on({continue_recon, Sender, Round, Msg}, State) ->
     comm:send_local(Pid, Msg),
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
+on({recon_forked}, State) ->
+    State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 on({rr_stats, Msg}, State) ->
     {ok, Pid} = rr_statistics:start(),
     comm:send_local(Pid, Msg),
     State;
 
-on({recon_forked}, State) ->
-    State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({recon_progress_report, _Sender, _Round, _Master, Stats}, State) ->
+on({recon_progress_report, _Sender, _Master, Stats}, State) ->
     OpenRecon = State#rrepair_state.open_recon - 1,
     rr_recon_stats:get(finish, Stats) andalso
         ?TRACE_RECON("~nRECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
-                     [_Round, _Sender, _Master, rr_recon_stats:print(Stats), OpenRecon]),
+                     [_Sender, _Master, rr_recon_stats:print(Stats), OpenRecon]),
     State#rrepair_state{ open_recon = OpenRecon };
 
 on({resolve_progress_report, _Sender, _Stats}, State) ->
