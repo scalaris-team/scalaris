@@ -15,7 +15,7 @@
 
 require "test/unit"
 begin
-  require "#{File.dirname(__FILE__)}/scalaris"
+  require "#{File.expand_path(File.dirname(__FILE__))}/scalaris"
 rescue LoadError => e
   raise unless e.message =~ /scalaris/
   require "scalaris"
@@ -671,7 +671,7 @@ end
     
     # checks if there are more elements in list than in expectedElements and returns one of those elements
     def self._getDiffElement(list, expectedElements)
-      for e in expectedElements:
+      expectedElements.each do |e|
         list.delete(e)
       end
       
