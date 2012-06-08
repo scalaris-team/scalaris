@@ -26,7 +26,7 @@
 
 -export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 
--opaque global_uid() :: {pos_integer(), comm:mypid()}.
+-opaque global_uid() :: {pos_integer(), pid()}.
 
 -spec get_pids_uid() -> pos_integer().
 get_pids_uid() ->
@@ -43,7 +43,9 @@ get_pids_uid() ->
 
 -spec get_global_uid() -> global_uid().
 get_global_uid() ->
-    _Result = {get_pids_uid(), comm:this()}
+    % note: Erlang makes the local pid() globally unique by adding the node
+    %       name when transferring it
+    _Result = {get_pids_uid(), self()}
     %% , term_to_binary(_Result, [{minor_version, 1}])
     .
 
