@@ -149,10 +149,9 @@ newly_decided(State) ->
         false ->
             Prepared = get_numprepared(State) =:= get_maj_for_prepared(State),
             Abort =    get_numabort(State) =:= get_maj_for_abort(State),
-            case {Prepared, Abort} of
-                {true, false} -> prepared;
-                {false, true} -> abort;
-                _ -> false
+            if Prepared andalso not Abort -> prepared;
+               not Prepared andalso Abort -> abort;
+               true -> false
             end;
         _Any -> false
     end.

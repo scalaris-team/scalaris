@@ -165,12 +165,14 @@ on({acceptor_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
 on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
     ?TRACE("acceptor:delete_if_no_learner~n", []),
     {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
-    case {ErrCode, acceptor_state:get_learners(StateForID)} of
-        {new, _} -> ok; %% already deleted
-        {_, []} ->
-            %% io:format("Deleting unhosted acceptor id~n"),
-            pdb:delete(PaxosID, ETSTableName);
-        {_, _} -> ok %% learners are registered
+    case ErrCode of
+        new -> ok; %% already deleted
+        _ -> case acceptor_state:get_learners(StateForID) of
+                 [] ->
+                     %% io:format("Deleting unhosted acceptor id~n"),
+                     pdb:delete(PaxosID, ETSTableName);
+                 _ -> ok %% learners are registered
+             end
     end,
     State;
 
