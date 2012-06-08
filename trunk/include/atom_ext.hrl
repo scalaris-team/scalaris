@@ -40,6 +40,9 @@
 -define(get_key_with_id_reply_atom, get_key_with_id_reply).
 -define(get_key_with_id_reply, ?int_or_atom(21, ?get_key_with_id_reply_atom)).
 
+-define(get_key_atom, get_key).
+-define(get_key, ?int_or_atom(22, ?get_key_atom)).
+
 %% paxos
 -define(proposer_accept_atom, proposer_accept).
 -define(proposer_accept, ?int_or_atom(41, ?proposer_accept_atom)).

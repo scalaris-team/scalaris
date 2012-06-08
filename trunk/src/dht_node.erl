@@ -32,8 +32,8 @@
 -endif.
 
 -type(database_message() ::
-      {get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
-      {get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
+      {?get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
+      {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
       {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any())} |
@@ -208,13 +208,13 @@ on({send_error, Target, {?lookup_fin, _, _, _} = Message, _Reason}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({get_key, Source_PID, HashedKey}, State) ->
+on({?get_key, Source_PID, HashedKey}, State) ->
     comm:send(Source_PID,
               {get_key_response, HashedKey,
                ?DB:read(dht_node_state:get(State, db), HashedKey)}),
     State;
 
-on({get_key, Source_PID, SourceId, HashedKey}, State) ->
+on({?get_key, Source_PID, SourceId, HashedKey}, State) ->
     Msg = {?get_key_with_id_reply, SourceId, HashedKey,
            ?DB:read(dht_node_state:get(State, db), HashedKey)},
     comm:send(Source_PID, Msg),
