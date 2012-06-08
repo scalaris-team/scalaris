@@ -52,19 +52,19 @@
 -type tx_item_id() :: {?tx_item_id, uid:global_uid()}.
 -type tx_item_state() ::
  {
-   tx_item_id(), %%  1 TxItemId, id of the item
+   TxItemId::tx_item_id(), %%  1 id of the item
    ?tx_item_state,     %%  2 tx_item_state, data type tag for debugging
-   tx_state:tx_id() | undefined_tx_id,  %%  3 TxId, part of transaction with id TxId
-   tx_tlog:tlog_entry() | empty_tlog_entry, %%  4 TLogEntry, corresponding transaction log entry
-   non_neg_integer(), %%  5 Maj_for_prepared, prepare votes to decide prepared
-   non_neg_integer(), %%  6 Maj_for_abort, abort votes to decide abort
-   false | ?prepared | ?abort, %%  7 Decided?, current decision status
-   non_neg_integer(), %%  8 Numprepared, number of received prepare votes
-   non_neg_integer(), %%  9 Numabort, number of received abort votes
-   [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}],         %% 10 [{PaxosID, RTLogEntry, TP}], involved PaxosIDs
-   new | uninitialized | ok, %% 11 Status, item status
-   [tuple()],         %% 12 HoldBackQueue, when not initialized
-   non_neg_integer()  %% 13 NumCommitted
+   TxId::tx_state:tx_id() | undefined_tx_id,  %%  3 part of transaction with id TxId
+   TLogEntry::tx_tlog:tlog_entry() | empty_tlog_entry, %%  4 corresponding transaction log entry
+   Maj_for_prepared::non_neg_integer(), %%  5 prepare votes to decide prepared
+   Maj_for_abort::non_neg_integer(), %%  6 abort votes to decide abort
+   Decided::false | ?prepared | ?abort, %%  7 current decision status
+   Numprepared::non_neg_integer(), %%  8 number of received prepare votes
+   Numabort::non_neg_integer(), %%  9 number of received abort votes
+   [{paxos_id(), RTLogEntry::tx_tlog:tlog_entry(), TP::comm:mypid()}], %% 10 involved PaxosIDs
+   Status::new | uninitialized | ok, %% 11 item status
+   HoldBackQueue::[tuple()],         %% 12 when not initialized
+   NumCommitted::non_neg_integer()  %% 13
  }.
 
 %% @TODO maybe the following entries are also necessary?:
