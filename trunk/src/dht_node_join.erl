@@ -117,7 +117,7 @@ join_as_other(Id, IdVersion, Options) ->
     comm:init_and_wait_for_valid_pid(),
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
-    JoinUUID = util:get_pids_uid(),
+    JoinUUID = uid:get_pids_uid(),
     get_known_nodes(JoinUUID),
     msg_delay:send_local(get_join_timeout() div 1000, self(),
                          {join, timeout, JoinUUID}),
@@ -519,7 +519,7 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
         true ->
             try
                 % TODO: implement step-wise join
-                MoveFullId = util:get_global_uid(),
+                MoveFullId = uid:get_global_uid(),
                 Neighbors = dht_node_state:get(State, neighbors),
                 fd:subscribe([node:pidX(NewPred)], {move, MoveFullId}),
                 SlideOp = slide_op:new_sending_slide_join(
@@ -932,7 +932,7 @@ get_candidates(JoinState)    -> element(7, JoinState).
                (phase4, phase_2_4()) -> phase4().
 set_phase(Phase, JoinState) -> setelement(1, JoinState, Phase).
 -spec set_new_join_uuid(Phase) -> Phase when is_subtype(Phase, phase_2_4()).
-set_new_join_uuid(JoinState) -> setelement(2, JoinState, util:get_pids_uid()).
+set_new_join_uuid(JoinState) -> setelement(2, JoinState, uid:get_pids_uid()).
 -spec set_join_ids(JoinIds::[?RT:key()], phase_2_4()) -> phase_2_4().
 set_join_ids(JoinIds, JoinState) -> setelement(6, JoinState, JoinIds).
 -spec remove_join_id(JoinId::?RT:key(), phase_2_4()) -> phase_2_4().
@@ -971,7 +971,7 @@ skip_psv_lb({_Phase, _JoinUUId, Options, _CurIdVersion, _ContactNodes, _JoinIds,
 -spec new_connection(OldConn::{null | pos_integer(), comm:mypid()})
         -> connection().
 new_connection({_, Node}) ->
-    {util:get_pids_uid(), Node}.
+    {uid:get_pids_uid(), Node}.
 
 -spec update_connection(
         OldConn::{null | pos_integer(), comm:mypid()},

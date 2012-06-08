@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([global_uid/0, time/0, time_utc/0]).
+-export_type([time/0, time_utc/0]).
 -endif.
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
@@ -59,12 +59,9 @@
          wait_for_table_to_disappear/1,
          ets_tables_of/1]).
 
--export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
 -export([repeat/3, repeat/4, parallel_run/4]).
 
 -export([empty/1]).
-
--opaque global_uid() :: {pos_integer(), comm:mypid()}.
 
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
@@ -548,42 +545,6 @@ tc(Fun) ->
     Val = Fun(),
     After = os:timestamp(),
     {timer:now_diff(After, Before), Val}.
-
--spec get_pids_uid() -> pos_integer().
-get_pids_uid() ->
-    Result = case erlang:get(pids_uid_counter) of
-                 undefined ->
-                     %% Same pid may be reused in the same VM, so we
-                     %% get a VM unique offset to start
-                     %% It is not completely safe, but safe enough
-                     element(1, erlang:statistics(reductions));
-                 Any -> Any + 1
-             end,
-    erlang:put(pids_uid_counter, Result),
-    Result.
-
--spec get_global_uid() -> global_uid().
-get_global_uid() ->
-    _Result = {get_pids_uid(), comm:this()}
-    %% , term_to_binary(_Result, [{minor_version, 1}])
-    .
-
-%% @doc Checks whether the given GUID is an old incarnation of a GUID from
-%%      my node.
--spec is_my_old_uid(pos_integer() | global_uid()) -> boolean() | remote.
-is_my_old_uid({LocalUid, Pid}) ->
-    case comm:this() of
-        Pid -> is_my_old_uid(LocalUid);
-        _   -> remote
-    end;
-is_my_old_uid(Id) when is_integer(Id) ->
-    LastUid = case erlang:get(pids_uid_counter) of
-                  undefined -> 0;
-                  Any -> Any
-              end,
-    Id =< LastUid;
-is_my_old_uid(_Id) ->
-    false.
 
 -spec zipfoldl(ZipFun::fun((X, Y) -> Z), FoldFun::fun((Z, Acc) -> Acc), L1::[X], L2::[Y], Acc) -> Acc.
 zipfoldl(ZipFun, FoldFun, [L1H | L1R], [L2H | L2R], AccIn) ->

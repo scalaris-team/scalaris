@@ -46,8 +46,8 @@
 -export_type([paxos_id/0]).
 -endif.
 
--type paxos_id() :: {paxos_id, util:global_uid()}.
--type tx_item_id() :: {tx_item_id, util:global_uid()}.
+-type paxos_id() :: {paxos_id, uid:global_uid()}.
+-type tx_item_id() :: {tx_item_id, uid:global_uid()}.
 -type tx_item_state() ::
  {
    tx_item_id(), %%  1 TxItemId, id of the item
@@ -87,8 +87,8 @@ new(ItemId, TxId, TLogEntry) ->
             write ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
-%%    PaxosIds = [ {paxos_id, util:get_global_uid()} || _ <- RTLogEntries ],
-    PaxosIds = [ {util:get_global_uid()} || _ <- RTLogEntries ],
+%%    PaxosIds = [ {paxos_id, uid:get_global_uid()} || _ <- RTLogEntries ],
+    PaxosIds = [ {uid:get_global_uid()} || _ <- RTLogEntries ],
     TPs = [ unknown || _ <- PaxosIds ],
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
     ReplDeg = config:read(replication_factor),

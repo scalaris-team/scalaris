@@ -47,7 +47,7 @@ count(_Config) ->
     ?equals(api_tx:write("j", 3), {ok}),
     ?equals(api_tx:write("k", 5), {ok}),
     ?equals(api_tx:write("l", 7), {ok}),
-    Id = util:get_global_uid(),
+    Id = uid:get_global_uid(),
     bulkowner:issue_bulk_owner(Id, intervals:all(), {bulk_read_entry, comm:this()}),
     ?equals(collect(Id, 0), 68),
     ?expect_no_message(),

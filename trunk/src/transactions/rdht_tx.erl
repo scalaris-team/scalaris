@@ -39,7 +39,7 @@
 -export_type([req_id/0]).
 -endif.
 
--type req_id() :: util:global_uid().
+-type req_id() :: uid:global_uid().
 -type request_on_key() :: api_tx:request_on_key().
 -type results() :: [ api_tx:result() ].
 
@@ -206,7 +206,7 @@ initiate_rdht_ops(ReqList) ->
     %% @todo should choose a dht_node in the local VM at random or even
     %% better round robin.
     [ begin
-          NewReqId = util:get_global_uid(), % local id not sufficient
+          NewReqId = uid:get_global_uid(), % local id not sufficient
           OpModule = case req_get_op(Entry) of
                          read -> rdht_tx_read;
                          write -> rdht_tx_write;
@@ -500,7 +500,7 @@ commit(TLog) ->
         false -> {fail, abort, tx_tlog:get_insane_keys(TLog)};
         true ->
             Client = comm:this(),
-            ClientsId = {commit_client_id, util:get_global_uid()},
+            ClientsId = {commit_client_id, uid:get_global_uid()},
             ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
             case pid_groups:find_a(tx_tm) of
                 failed ->

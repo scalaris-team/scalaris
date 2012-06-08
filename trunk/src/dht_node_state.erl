@@ -62,7 +62,7 @@
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 bulkowner_reply_timer   = null :: null | reference(),
-                bulkowner_reply_ids     = []   :: [util:global_uid()],
+                bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid()
                }).
 -opaque state() :: #state{}.
@@ -247,7 +247,7 @@ add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
 rm_db_range(State = #state{db_range=DBRange}, SlideId) ->
     State#state{db_range = [X || X = {_, Id} <- DBRange, Id =/= SlideId]}.
 
--spec add_bulkowner_reply_msg(State::state(), Id::util:global_uid(), Target::comm:mypid(),
+-spec add_bulkowner_reply_msg(State::state(), Id::uid:global_uid(), Target::comm:mypid(),
                               Msg::comm:message(), Parents::[comm:mypid()]) -> state().
 add_bulkowner_reply_msg(State = #state{bulkowner_reply_ids = IDs}, Id, Target, Msg, Parents) ->
     PrevMsgs = case erlang:get({'$bulkowner_reply_msg', Id}) of
@@ -259,7 +259,7 @@ add_bulkowner_reply_msg(State = #state{bulkowner_reply_ids = IDs}, Id, Target, M
     State#state{bulkowner_reply_ids = [Id | IDs]}.
 
 -spec take_bulkowner_reply_msgs(State::state())
-        -> {state(), [{Id::util:global_uid(), Target::comm:mypid(),
+        -> {state(), [{Id::uid:global_uid(), Target::comm:mypid(),
                        Msgs::[comm:message()], Parents::[comm:mypid()]}]}.
 take_bulkowner_reply_msgs(State = #state{bulkowner_reply_ids = IDs}) ->
     {State#state{bulkowner_reply_ids = []},
