@@ -54,7 +54,7 @@ msg_naccepted(Proposer, PaxosID, NewerRound) ->
 
 -spec msg_accepted(comm:mypid(), any(), non_neg_integer(), any()) -> ok.
 msg_accepted(Learner, PaxosID, Raccepted, Val) ->
-    comm:send(Learner, {acceptor_accepted, PaxosID, Raccepted, Val}).
+    comm:send(Learner, {?acceptor_accept, PaxosID, Raccepted, Val}).
 
 %%% public function to initiate a new paxos instance
 %%% gets a
@@ -141,7 +141,7 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     end,
     State;
 
-on({proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = State) ->
+on({?proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = State) ->
     ?TRACE("acceptor:accept for paxos id: ~p round ~p~n", [PaxosID, InRound]),
     {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case ErrCode of

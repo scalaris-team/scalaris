@@ -40,7 +40,7 @@
 -type msg() ::
         data_node_leases:msg()
       | data_node_db:msg()
-      | {lookup_fin, ?RT:key(), comm:message()}.
+      | {?lookup_fin, ?RT:key(), comm:message()}.
 
 -record(state, {
           %% my leases for working...
@@ -65,7 +65,7 @@ on({read, _SourcePid, _SourceId, _HashedKey} = Msg, State) ->
     data_node_db:on(Msg, State);
 
 %% messages concerning routing
-on({lookup_fin, Key, Msg}, State) ->
+on({?lookup_fin, Key, Msg}, State) ->
     case data_node_leases:is_owner(State, Key) of
         true ->
             gen_component:post_op(State, Msg);
@@ -73,7 +73,7 @@ on({lookup_fin, Key, Msg}, State) ->
             io:format("I am not owner~n"),
             case pid_groups:get_my(router_node) of
                 failed -> ok; %% TODO: Delete this case, should not happen.
-                Pid -> comm:send_local(Pid, {lookup_aux, Key, Msg})
+                Pid -> comm:send_local(Pid, {?lookup_aux, Key, Msg})
             end,
             State
     end.

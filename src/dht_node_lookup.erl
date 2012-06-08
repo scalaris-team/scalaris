@@ -33,23 +33,23 @@ lookup_aux(State, Key, Hops, Msg) ->
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> % found node -> terminate
             P = node:pidX(nodelist:succ(Neighbors)),
-            comm:send(P, {lookup_fin, Key, Hops + 1, Msg}, [{shepherd, self()}]);
+            comm:send(P, {?lookup_fin, Key, Hops + 1, Msg}, [{shepherd, self()}]);
         _ ->
             P = ?RT:next_hop(State, Key),
-            comm:send(P, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, self()}])
+            comm:send(P, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, self()}])
     end.
 %% userdevguide-end dht_node_lookup:routing
 
 -spec lookup_aux_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::comm:message()) -> ok.
-lookup_aux_failed(State, _Target, {lookup_aux, Key, Hops, Msg} = _Message) ->
+lookup_aux_failed(State, _Target, {?lookup_aux, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_aux_failed(State, ~p, ~p)~n", [_Target, _Message]),
-    comm:send_local_after(100, self(), {lookup_aux, Key, Hops + 1, Msg}),
+    comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
 
 -spec lookup_fin_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::comm:message()) -> ok.
-lookup_fin_failed(State, _Target, {lookup_fin, Key, Hops, Msg} = _Message) ->
+lookup_fin_failed(State, _Target, {?lookup_fin, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
-    comm:send_local_after(100, self(), {lookup_aux, Key, Hops + 1, Msg}),
+    comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
