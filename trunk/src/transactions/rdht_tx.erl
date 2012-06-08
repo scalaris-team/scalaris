@@ -92,9 +92,8 @@ rl_chk_and_encode([{commit}], Acc, OKorAbort) ->
     {lists:reverse(Acc), OKorAbort, true};
 rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
     case Req of
-        {write, Key, Value} ->
-            rl_chk_and_encode(RL, [{write, Key, Value} | Acc],
-                              OKorAbort);
+        {write, _Key, _Value} = Write ->
+            rl_chk_and_encode(RL, [Write | Acc], OKorAbort);
         {commit} = Commit ->
             log:log(info, "Commit not at end of a req_list. Deciding abort."),
             rl_chk_and_encode(RL, [Commit | Acc], abort);
