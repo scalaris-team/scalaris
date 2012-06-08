@@ -63,6 +63,8 @@
 
 -export([empty/1]).
 
+-export([extint2atom/1]).
+
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
@@ -939,3 +941,32 @@ debug_info(Pid) when is_pid(Pid) ->
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
 empty(_) -> "".
+
+-spec extint2atom(atom() | integer()) -> atom().
+extint2atom(X) when is_atom(X) -> X;
+extint2atom(X) when is_integer(X) ->
+    case X of
+        %% lookup
+        ?lookup_aux -> ?lookup_aux_atom;
+        ?lookup_fin -> ?lookup_fin_atom;
+        %% dht_node
+        ?get_key_with_id_reply -> ?get_key_with_id_reply_atom;
+        %% paxos
+        ?proposer_accept -> ?proposer_accept_atom;
+        ?acceptor_accept -> ?acceptor_accept_atom;
+        %% transactions
+        ?register_TP -> ?register_TP_atom;
+        ?tx_tm_rtm_init_RTM -> ?tx_tm_rtm_init_RTM_atom;
+        ?tp_do_commit_abort -> ?tp_do_commit_abort_atom;
+        ?tx_tm_rtm_delete -> ?tx_tm_rtm_delete_atom;
+        ?tp_committed -> ?tp_committed_atom;
+        ?tx_state -> ?tx_state_atom;
+        ?tx_id -> ?tx_id_atom;
+        ?tx_item_id -> ?tx_item_id_atom;
+        ?tx_item_state -> ?tx_item_state_atom;
+        ?commit_client_id -> ?commit_client_id_atom;
+        ?undecided -> ?undecided_atom;
+        ?prepared -> ?prepared_atom;
+        ?commit -> ?commit_atom;
+        ?abort -> ?abort_atom
+    end.
