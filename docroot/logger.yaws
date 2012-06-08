@@ -83,8 +83,8 @@ make_table([], _Map, Start, TotalBytes, TotalCount) ->
 make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
     {Size, Count} = gb_trees:get(Tag, Map),
     RealTag = case Tag of
-                {Channel, MsgTag} -> {Channel, comm:msg_tag_to_atom(MsgTag)};
-                MsgTag -> comm:msg_tag_to_atom(MsgTag)
+                {Channel, MsgTag} -> {Channel, util:extint2atom(MsgTag)};
+                MsgTag -> util:extint2atom(MsgTag)
               end,
     [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
        [
