@@ -33,9 +33,9 @@
 -callback work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                      api_tx:request()) -> ok.
 -callback validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
--callback validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
--callback commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
--callback abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-callback validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), ?prepared | ?abort}.
+-callback commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
+-callback abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->

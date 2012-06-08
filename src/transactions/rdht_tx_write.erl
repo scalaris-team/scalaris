@@ -81,7 +81,7 @@ validate_prefilter(TLogEntry) ->
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
--spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
+-spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), ?prepared | ?abort}.
 validate(DB, RTLogEntry) ->
     %% contact DB to check entry
     %% set locks on DB
@@ -100,7 +100,7 @@ validate(DB, RTLogEntry) ->
 %%%            T2Entry = db_entry:set_version(T1, RTVers),
 %%%            T3Entry = db_entry:set_writelock(T2, true),
 %%%            NewDB = ?DB:set_entry(DB, T3Entry),
-%%%            {NewDB, prepared};
+%%%            {NewDB, ?prepared};
 %%%        false ->
     VersionOK = (RTVers =:= DBVers),
     Lockable = not db_entry:is_locked(DBEntry),
@@ -109,12 +109,12 @@ validate(DB, RTLogEntry) ->
             %% set locks on entry
             NewEntry = db_entry:set_writelock(DBEntry),
             NewDB = ?DB:set_entry(DB, NewEntry),
-            {NewDB, prepared};
+            {NewDB, ?prepared};
         false ->
-            {DB, abort}
+            {DB, ?abort}
     end.
 
--spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 commit(DB, RTLogEntry, _OwnProposalWas) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
@@ -133,13 +133,13 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
         end,
     ?DB:set_entry(DB, NewEntry).
 
--spec abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
     %% release locks?
     case OwnProposalWas of
-        prepared ->
+        ?prepared ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
@@ -149,7 +149,7 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
                     ?DB:set_entry(DB, NewEntry);
                 _ -> DB
             end;
-        abort ->
+        ?abort ->
             DB
     end.
 

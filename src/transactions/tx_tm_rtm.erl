@@ -52,7 +52,7 @@
 msg_commit_reply(Client, ClientsID, Result) ->
     comm:send(Client, {tx_tm_rtm_commit_reply, ClientsID, Result}).
 
--spec msg_tp_do_commit_abort(comm:mypid(), any(), commit | abort) -> ok.
+-spec msg_tp_do_commit_abort(comm:mypid(), any(), ?commit | ?abort) -> ok.
 msg_tp_do_commit_abort(TP, Id, Result) ->
     comm:send(TP, {?tp_do_commit_abort, Id, Result}).
 
@@ -206,7 +206,7 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
                 {TxResult, TmpTxState} = tx_state:add_item_decision(TxState, Decision),
                 NewTxState =
                     case TxResult of
-                        undecided -> TmpTxState;
+                        ?undecided -> TmpTxState;
                         false -> TmpTxState;
                         {tx_newly_decided, Result} ->
                             T1TxState = inform_tps(TmpTxState, State, Result),
@@ -228,8 +228,8 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     Maj = config:read(quorum_factor),
     RTMs = state_get_RTMs(State),
     GLLearner = state_get_gllearner(State),
-    NewTid = {tx_id, uid:get_global_uid()},
-    NewTxItemIds = [ {tx_item_id, uid:get_global_uid()} || _ <- TransLog ],
+    NewTid = {?tx_id, uid:get_global_uid()},
+    NewTxItemIds = [ {?tx_item_id, uid:get_global_uid()} || _ <- TransLog ],
     TLogTxItemIds = lists:zip(TransLog, NewTxItemIds),
     TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
                               TLogTxItemIds, [GLLearner]),
@@ -528,7 +528,7 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
             {ok, ItemState} = get_item_entry(ItemId, State),
 
             case tx_state:is_decided(TxState) of
-                undecided ->
+                ?undecided ->
                     %% store TP info to corresponding PaxosId
                     NewEntry =
                         tx_item_state:set_tp_for_paxosid(ItemState, TP, PaxosID),
@@ -598,7 +598,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                 Proposer =
                                     comm:make_global(get_my(Role, proposer)),
                                 proposer:start_paxosid(
-                                  Proposer, PaxId, _Acceptors = ValidAccs, abort,
+                                  Proposer, PaxId, _Acceptors = ValidAccs, ?abort,
                                   Maj, length(ValidAccs) + 1, ThisRTMsNumber),
                                 ok
                             end
@@ -851,14 +851,14 @@ set_entry(NewEntry, State) ->
     pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
--spec inform_client(tx_state:tx_state(), state(), commit | abort) -> ok.
+-spec inform_client(tx_state:tx_state(), state(), ?commit | ?abort) -> ok.
 inform_client(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
     Client = tx_state:get_client(TxState),
     ClientsId = tx_state:get_clientsid(TxState),
     ClientResult = case Result of
-                       commit -> commit;
-                       abort -> {abort, get_failed_keys(TxState, State)}
+                       ?commit -> commit;
+                       ?abort -> {abort, get_failed_keys(TxState, State)}
                    end,
     case Client of
         unknown -> ok;
@@ -866,7 +866,7 @@ inform_client(TxState, State, Result) ->
     end,
     ok.
 
--spec inform_tps(tx_state:tx_state(), state(), commit | abort) ->
+-spec inform_tps(tx_state:tx_state(), state(), ?commit | ?abort) ->
                            tx_state:tx_state().
 inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
@@ -886,7 +886,7 @@ inform_tps(TxState, State, Result) ->
     Y = [ Z || Z <- lists:flatten(X), Z =:= ok ],
     tx_state:set_numinformed(TxState, length(Y)).
 
--spec inform_rtms(tx_state:tx_id(), state(), commit | abort) -> ok.
+-spec inform_rtms(tx_state:tx_id(), state(), ?commit | ?abort) -> ok.
 inform_rtms(TxId, State, Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
     %% TODO: better inform the rtms stored in the txid?!
@@ -906,7 +906,7 @@ inform_rtms(TxId, State, Result) ->
 trigger_delete_if_done(TxState) ->
     ?TRACE("tx_tm_rtm:trigger delete?~n", []),
     case (tx_state:is_decided(TxState)) of
-        undecided -> ok;
+        ?undecided -> ok;
         false -> ok;
         Decision -> %% commit / abort
             %% @TODO majority informed is sufficient?!
@@ -1083,7 +1083,7 @@ get_failed_keys(TxState, State) ->
                   || {TLogEntr, TxItemId} <- TLogTxItemIds ],
             [ tx_tlog:get_entry_key(TLogEntr)
               || {TLogEntr, TxItem} <- TLog_TxItems,
-                 abort =:= tx_item_state:get_decided(TxItem)]
+                 ?abort =:= tx_item_state:get_decided(TxItem)]
     end,
     case tx_state:get_numabort(TxState) =:= length(Result) of
         true -> ok;

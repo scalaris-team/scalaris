@@ -58,10 +58,10 @@
 -export_type([tx_id/0, tx_state/0]).
 -endif.
 
--type tx_id() :: {tx_id, uid:global_uid()}.
+-type tx_id() :: {?tx_id, uid:global_uid()}.
 -type tx_state() ::
         {tx_id(),                  %% Tid
-         tx_state,                 %% type-marker (unnecessary in principle)
+         ?tx_state,                 %% type-marker (unnecessary in principle)
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
          comm:mypid() | unknown,   %% TM
@@ -69,7 +69,7 @@
          [{tx_tlog:tlog_entry(),
            tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
          [comm:mypid()],           %% Learners,
-         undecided | false | abort | commit, %% Status decided?
+         ?undecided | false | ?abort | ?commit, %% Status decided?
          non_neg_integer(),        %% NumIds,
          non_neg_integer(),        %% NumPrepared,
          non_neg_integer(),        %% NumAbort,
@@ -88,7 +88,7 @@
 is_tx_state(TxState) ->
     is_tuple(TxState)
         andalso erlang:tuple_size(TxState) >= 2
-        andalso tx_state =:= element(2, TxState).
+        andalso ?tx_state =:= element(2, TxState).
 
 -spec new(tx_id(), comm:mypid() | unknown,
           comm:mypid() | unknown, comm:mypid() | unknown,
@@ -96,8 +96,8 @@ is_tx_state(TxState) ->
           [{tx_tlog:tlog_entry(), tx_item_state:tx_item_id()}],
           [comm:mypid()]) -> tx_state().
 new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->
-    {Tid, tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
-     undecided, length(TLogTxItemIds),
+    {Tid, ?tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
+     ?undecided, length(TLogTxItemIds),
      _Prepared = 0, _Aborts = 0, _Informed = 0, _CommitsAcked = 0,
      _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
 -spec new(tx_id()) -> tx_state().
@@ -135,9 +135,9 @@ get_tlog_txitemids(State) ->      element(7, State).
 set_tlog_txitemids(State, Val) -> setelement(7, State, Val).
 -spec get_learners(tx_state()) -> [comm:mypid()].
 get_learners(State) ->            element(8, State).
--spec is_decided(tx_state()) -> undecided | false | abort | commit.
+-spec is_decided(tx_state()) -> ?undecided | false | ?abort | ?commit.
 is_decided(State) ->              element(9, State).
--spec set_decided(tx_state(), undecided | false | abort | commit) -> tx_state().
+-spec set_decided(tx_state(), ?undecided | false | ?abort | ?commit) -> tx_state().
 set_decided(State, Val) ->        setelement(9, State, Val).
 -spec get_numids(tx_state()) -> non_neg_integer().
 get_numids(State) ->              element(10, State).
@@ -176,17 +176,17 @@ get_hold_back(State) -> element(17, State).
 set_hold_back(State, Queue) -> setelement(17, State, Queue).
 
 
--spec newly_decided(tx_state()) -> undecided | false | abort | commit.
+-spec newly_decided(tx_state()) -> ?undecided | false | ?abort | ?commit.
 newly_decided(State) ->
-    case (undecided =:= is_decided(State)) of
+    case (?undecided =:= is_decided(State)) of
         false -> false; %% was already decided
         true ->
             %% maybe: calculate decision:
             case {get_numabort(State) > 0,
                   get_numprepared(State) =:= get_numids(State)} of
-                {true, _} -> abort;
-                {_, true} -> commit;
-                {_, _} -> undecided
+                {true, _} -> ?abort;
+                {_, true} -> ?commit;
+                {_, _} -> ?undecided
             end
     end.
 
@@ -200,18 +200,18 @@ all_tps_registered(State) ->
     %% @TODO use repl. degree
     get_numtpsregistered(State) =:= get_numids(State) * 4.
 
--spec add_item_decision(tx_state(), prepared | abort) ->
-                               {undecided | false
-                                | {tx_newly_decided, abort | commit},
+-spec add_item_decision(tx_state(), ?prepared | ?abort) ->
+                               {?undecided | false
+                                | {tx_newly_decided, ?abort | ?commit},
                                 tx_state()}.
 add_item_decision(State, Decision) ->
     T1 =
         case Decision of
-            prepared -> inc_numprepared(State);
-            abort    -> inc_numabort(State)
+            ?prepared -> inc_numprepared(State);
+            ?abort    -> inc_numabort(State)
         end,
     case newly_decided(T1) of
-        undecided -> {undecided, T1};
+        ?undecided -> {?undecided, T1};
         false -> {false, T1};
         Result -> %% commit or abort
             T2 = set_decided(T1, Result),

@@ -24,6 +24,8 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
+-include("scalaris.hrl").
+
 %% Operations on tx_item_state
 -export([new/1, new/3]).
 -export([get_txid/1]).
@@ -47,16 +49,16 @@
 -endif.
 
 -type paxos_id() :: {paxos_id, uid:global_uid()}.
--type tx_item_id() :: {tx_item_id, uid:global_uid()}.
+-type tx_item_id() :: {?tx_item_id, uid:global_uid()}.
 -type tx_item_state() ::
  {
    tx_item_id(), %%  1 TxItemId, id of the item
-   tx_item_state,     %%  2 tx_item_state, data type tag for debugging
+   ?tx_item_state,     %%  2 tx_item_state, data type tag for debugging
    tx_state:tx_id() | undefined_tx_id,  %%  3 TxId, part of transaction with id TxId
    tx_tlog:tlog_entry() | empty_tlog_entry, %%  4 TLogEntry, corresponding transaction log entry
    non_neg_integer(), %%  5 Maj_for_prepared, prepare votes to decide prepared
    non_neg_integer(), %%  6 Maj_for_abort, abort votes to decide abort
-   false | prepared | abort, %%  7 Decided?, current decision status
+   false | ?prepared | ?abort, %%  7 Decided?, current decision status
    non_neg_integer(), %%  8 Numprepared, number of received prepare votes
    non_neg_integer(), %%  9 Numabort, number of received abort votes
    [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}],         %% 10 [{PaxosID, RTLogEntry, TP}], involved PaxosIDs
@@ -72,7 +74,7 @@
 -spec new(tx_item_id()) -> tx_item_state().
 new(ItemId) ->
     ReplDeg = config:read(replication_factor),
-    {ItemId, tx_item_state, undefined_tx_id, empty_tlog_entry,
+    {ItemId, ?tx_item_state, undefined_tx_id, empty_tlog_entry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, _no_paxIds = [], uninitialized, _HoldBack = [], 0}.
 
@@ -92,7 +94,7 @@ new(ItemId, TxId, TLogEntry) ->
     TPs = [ unknown || _ <- PaxosIds ],
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
     ReplDeg = config:read(replication_factor),
-    {ItemId, tx_item_state, TxId, TLogEntry,
+    {ItemId, ?tx_item_state, TxId, TLogEntry,
      quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
      false, 0, 0, PaxIDsRTLogsTPs,
      uninitialized, _HoldBack = [], 0}.
@@ -107,9 +109,9 @@ get_txid(State) ->           element(3, State).
 get_maj_for_prepared(State) -> element(5, State).
 -spec get_maj_for_abort(tx_item_state()) -> non_neg_integer().
 get_maj_for_abort(State) ->  element(6, State).
--spec get_decided(tx_item_state()) -> false | prepared | abort.
+-spec get_decided(tx_item_state()) -> false | ?prepared | ?abort.
 get_decided(State) ->        element(7, State).
--spec set_decided(tx_item_state(), false | prepared | abort) -> tx_item_state().
+-spec set_decided(tx_item_state(), false | ?prepared | ?abort) -> tx_item_state().
 set_decided(State, Val) ->   setelement(7, State, Val).
 -spec get_numprepared(tx_item_state()) -> non_neg_integer().
 get_numprepared(State) ->    element(8, State).
@@ -143,14 +145,14 @@ get_numcommitted(State) ->    element(13, State).
 -spec inc_numcommitted(tx_item_state()) -> tx_item_state().
 inc_numcommitted(State) ->       setelement(13, State, element(13,State) + 1).
 
--spec newly_decided(tx_item_state()) -> false | prepared | abort.
+-spec newly_decided(tx_item_state()) -> false | ?prepared | ?abort.
 newly_decided(State) ->
     case get_decided(State) of
         false ->
             Prepared = get_numprepared(State) =:= get_maj_for_prepared(State),
             Abort =    get_numabort(State) =:= get_maj_for_abort(State),
-            if Prepared andalso not Abort -> prepared;
-               not Prepared andalso Abort -> abort;
+            if Prepared andalso not Abort -> ?prepared;
+               not Prepared andalso Abort -> ?abort;
                true -> false
             end;
         _Any -> false
@@ -166,7 +168,7 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
 -spec add_learner_decide(tx_item_state(), comm:message()) ->
                                 {hold_back
                                  | state_updated
-                                 | {item_newly_decided, prepared | abort},
+                                 | {item_newly_decided, ?prepared | ?abort},
                                  tx_item_state()}.
 add_learner_decide(State, {learner_decide, _ItemId, _PaxosID, Value} = Msg) ->
     case ok =/= get_status(State) of
@@ -177,8 +179,8 @@ add_learner_decide(State, {learner_decide, _ItemId, _PaxosID, Value} = Msg) ->
         false -> %% ok
             TmpState =
                 case Value of
-                    prepared -> tx_item_state:inc_numprepared(State);
-                    abort ->    tx_item_state:inc_numabort(State)
+                    ?prepared -> tx_item_state:inc_numprepared(State);
+                    ?abort ->    tx_item_state:inc_numabort(State)
                 end,
             case newly_decided(TmpState) of
                 false -> {state_updated, TmpState};

@@ -95,7 +95,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                           tx_tlog:tlog_entry(),
                           comm:mypid(),
                           tx_item_state:tx_item_id()},
-                         commit | abort, dht_node_state:state())
+                         ?commit | ?abort, dht_node_state:state())
                         -> dht_node_state:state().
 on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
     ?TRACE("tx_tp:on_do_commit_abort({, ...})~n", []),
@@ -133,7 +133,7 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_St
 
 -spec on_do_commit_abort_fwd(comm:mypid(), tx_item_state:tx_item_id(),
                              tx_tlog:tlog_entry(),
-                             commit | abort, prepared | abort,
+                             ?commit | ?abort, ?prepared | ?abort,
                              dht_node_state:state())
                            -> dht_node_state:state().
 on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
@@ -148,13 +148,13 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
         true ->
             Res =
                 case tx_tlog:get_entry_operation(RTLogEntry) of
-                    read when Result =:= abort ->
+                    read when Result =:= ?abort ->
                         rdht_tx_read:abort(DB, RTLogEntry, OwnProposal);
-                    read when Result =:= commit ->
+                    read when Result =:= ?commit ->
                         rdht_tx_read:commit(DB, RTLogEntry, OwnProposal);
-                    write when Result =:= abort ->
+                    write when Result =:= ?abort ->
                         rdht_tx_write:abort(DB, RTLogEntry, OwnProposal);
-                    write when Result =:= commit ->
+                    write when Result =:= ?commit ->
                         rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
                 end,
             comm:send(TM, {?tp_committed, TMItemId}),

@@ -56,3 +56,30 @@
 
 -define(tp_committed_atom, tp_committed).
 -define(tp_committed, 65).
+
+-define(tx_state_atom, tx_state).
+-define(tx_state, 66).
+
+-define(tx_id_atom, tx_id).
+-define(tx_id, 67).
+
+-define(tx_item_id_atom, tx_item_id).
+-define(tx_item_id, 68).
+
+-define(tx_item_state_atom, tx_item_state).
+-define(tx_item_state, 69).
+
+-define(commit_client_id_atom, commit_client_id).
+-define(commit_client_id, 70).
+
+-define(undecided_atom, undecided).
+-define(undecided, 71).
+
+-define(prepared_atom, prepared).
+-define(prepared, 72).
+
+-define(commit_atom, commit).
+-define(commit, 73).
+
+-define(abort_atom, abort).
+-define(abort, 74).

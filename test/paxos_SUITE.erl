@@ -23,6 +23,7 @@
 -vsn('$Id$').
 
 -compile(export_all).
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 all() -> [
@@ -98,7 +99,7 @@ tester_fast_paxos(CountAcceptors, Count, Prefix) ->
             || Id <- lists:seq(1, Count)],
     _ = [ acceptor:start_paxosid(X, Id, Learners)
             || X <- Acceptors,  Id <- lists:seq(1, Count)],
-    _ = [ proposer:start_paxosid(hd(Proposers), Id, Acceptors, prepared,
+    _ = [ proposer:start_paxosid(hd(Proposers), Id, Acceptors, ?prepared,
                                  Majority, CountProposers, 0)
             || Id <- lists:seq(1, Count)],
     receive done -> ok
@@ -126,7 +127,7 @@ tester_paxos(CountAcceptors, Count, Prefix) ->
            end),
     _ = spawn(fun() ->
                       [ proposer:start_paxosid(hd(Proposers), Id, Acceptors,
-                                               prepared, Majority, CountProposers)
+                                               ?prepared, Majority, CountProposers)
                           || Id <- lists:seq(1, Count)]
               end),
     receive done -> ok
@@ -184,9 +185,9 @@ test_two_proposers(_Config) ->
     gen_component:bp_set(comm:make_local(Proposer1), acceptor_ack, bp1),
     %% initiate full paxos
     proposer:start_paxosid(Proposer1, paxid123, Acceptors,
-                           prepared, Majority, length(Proposers), 3),
+                           ?prepared, Majority, length(Proposers), 3),
     proposer:start_paxosid(Proposer2, paxid123, Acceptors,
-                           abort, Majority, length(Proposers), 2),
+                           ?abort, Majority, length(Proposers), 2),
 
     %% should receive an abort
     receive {learner_decide, cpaxid123, _, Res1} = Any -> io:format("Expected abort Received ~p~n", [Any]) end,
@@ -211,9 +212,9 @@ test_two_proposers(_Config) ->
     gen_component:bp_set(comm:make_local(Proposer2), acceptor_ack, bp2),
     %% initiate full paxos
     proposer:start_paxosid(Proposer1, paxid124, Acceptors,
-                           prepared, Majority, length(Proposers), 1),
+                           ?prepared, Majority, length(Proposers), 1),
     proposer:start_paxosid(Proposer2, paxid124, Acceptors,
-                           abort, Majority, length(Proposers), 2),
+                           ?abort, Majority, length(Proposers), 2),
 
     %% should receive a prepared as proposer2 was hold
     receive {learner_decide, cpaxid124, _, Res3} = Any3 -> io:format("Expected prepared Received ~p~n", [Any3]) end,

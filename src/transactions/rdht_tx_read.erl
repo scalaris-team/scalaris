@@ -85,7 +85,7 @@ validate_prefilter(TLogEntry) ->
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
--spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
+-spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), ?prepared | ?abort}.
 validate(DB, RTLogEntry) ->
     ?TRACE("rdht_tx_read:validate)~n", []),
     %% contact DB to check entry
@@ -99,18 +99,18 @@ validate(DB, RTLogEntry) ->
             %% set locks on entry
             NewEntry = db_entry:inc_readlock(DBEntry),
             NewDB = ?DB:set_entry(DB, NewEntry),
-            {NewDB, prepared};
+            {NewDB, ?prepared};
         false ->
-            {DB, abort}
+            {DB, ?abort}
     end.
 
--spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 commit(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
     %% perform op: nothing to do for 'read'
     %% release locks
     case OwnProposalWas of
-        prepared ->
+        ?prepared ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
@@ -120,14 +120,14 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
                     ?DB:set_entry(DB, NewEntry);
                 _ -> DB %% a write has already deleted this lock
             end;
-        abort ->
+        ?abort ->
             %% we could compare DB with RTLogEntry and update if outdated
             %% as this commit confirms the status of a majority of the
             %% replicas. Could also be possible already in the validate req?
             DB
     end.
 
--spec abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 abort(DB, RTLogEntry, OwnProposalWas) ->
     ?TRACE("rdht_tx_read:abort)~n", []),
     %% same as when committing
