@@ -499,7 +499,7 @@ commit(TLog) ->
         false -> {fail, abort, tx_tlog:get_insane_keys(TLog)};
         true ->
             Client = comm:this(),
-            ClientsId = {commit_client_id, uid:get_global_uid()},
+            ClientsId = {?commit_client_id, uid:get_global_uid()},
             ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
             case pid_groups:find_a(tx_tm) of
                 failed ->
