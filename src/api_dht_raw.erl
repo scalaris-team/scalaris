@@ -39,13 +39,13 @@ unreliable_lookup(Key, Msg) ->
 
 -spec unreliable_get_key(Key::?RT:key()) -> ok.
 unreliable_get_key(Key) ->
-    unreliable_lookup(Key, {get_key, comm:this(), Key}).
+    unreliable_lookup(Key, {?get_key, comm:this(), Key}).
 
 -spec unreliable_get_key(CollectorPid::comm:mypid(),
                          ReqId::{rdht_req_id, pos_integer()},
                          Key::?RT:key()) -> ok.
 unreliable_get_key(CollectorPid, ReqId, Key) ->
-    unreliable_lookup(Key, {get_key, CollectorPid, ReqId, Key}).
+    unreliable_lookup(Key, {?get_key, CollectorPid, ReqId, Key}).
 %% userdevguide-end api_dht_raw:lookup
 
 %% @doc Read a range of key-value pairs between the given two keys (inclusive).
