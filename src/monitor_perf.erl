@@ -30,7 +30,7 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -record(state,
-        {id      = ?required(state, id)      :: util:global_uid(),
+        {id      = ?required(state, id)      :: uid:global_uid(),
          perf_rr = ?required(state, perf_rr) :: rrd:rrd(),
          perf_lh = ?required(state, perf_lh) :: rrd:rrd(),
          perf_tx = ?required(state, perf_tx) :: rrd:rrd()
@@ -41,12 +41,12 @@
     {bench} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
-    {bulkowner, deliver, Id::util:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::util:global_uid()}, Parents::[comm:mypid(),...]} |
-    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid()}} |
-    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::util:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
-    {bulkowner, gather, Id::util:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
-    {bulkowner, reply, Id::util:global_uid(), {gather_stats_response, Id::util:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
-    {bulkowner, deliver, Id::util:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
+    {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::uid:global_uid()}, Parents::[comm:mypid(),...]} |
+    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::uid:global_uid()}} |
+    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::uid:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
+    {bulkowner, gather, Id::uid:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
+    {bulkowner, reply, Id::uid:global_uid(), {gather_stats_response, Id::uid:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
+    {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
     {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
@@ -133,7 +133,7 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
         false -> State;
         _ ->
             % start a new timeslot and gather stats...
-            NewId = util:get_global_uid(),
+            NewId = uid:get_global_uid(),
             Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
             bulkowner:issue_bulk_owner(NewId, intervals:all(), Msg),
             Leader1 = check_timeslots(Leader),
@@ -272,7 +272,7 @@ init(null) ->
     init_bench(),
     init_system_stats(),
     Now = os:timestamp(),
-    State = #state{id = util:get_global_uid(),
+    State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
                    perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now)},
@@ -298,7 +298,7 @@ broadcast_values(OldState, NewState) ->
         true -> % new slot -> broadcast latest values only:
             SendState = reduce_timeslots(1, OldState),
             Msg = {send_to_group_member, monitor_perf, {report_value, SendState}},
-            bulkowner:issue_bulk_owner(util:get_global_uid(), intervals:all(), Msg);
+            bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg);
         _ -> ok %nothing to do
     end.
 

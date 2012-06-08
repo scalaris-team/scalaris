@@ -30,7 +30,7 @@
 -export_type([lb_op/0, id/0]).
 -endif.
 
--type id() :: util:global_uid().
+-type id() :: uid:global_uid().
 
 -type type() :: slide | jump.
 
@@ -60,7 +60,7 @@ no_op() -> no_op.
     NodeNew::node_details:node_details(), SuccessorNew::node_details:node_details())
         -> lb_op().
 slide_op(Node, Successor, NodeNew, SuccessorNew) ->
-    #lb_op{type = slide, id = util:get_global_uid(),
+    #lb_op{type = slide, id = uid:get_global_uid(),
            n1 = Node, n1succ = Successor,
            n1_new = NodeNew, n1succ_new = SuccessorNew}.
 
@@ -72,7 +72,7 @@ slide_op(Node, Successor, NodeNew, SuccessorNew) ->
         -> lb_op().
 jump_op(NodeToMove, NodeToMove_succ, NodePosition,
         NodeToMoveNew, NodeToMove_succNew, NodePositionNew) ->
-    #lb_op{type = jump, id = util:get_global_uid(),
+    #lb_op{type = jump, id = uid:get_global_uid(),
            n1 = NodeToMove, n1succ = NodeToMove_succ, n3 = NodePosition,
            n1_new = NodeToMoveNew, n1succ_new = NodeToMove_succNew, n3_new = NodePositionNew}.
 

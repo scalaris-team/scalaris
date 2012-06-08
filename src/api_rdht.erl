@@ -40,7 +40,7 @@ delete(Key) -> delete(Key, 2000).
 %%      inconsistencies for api_tx functions.
 -spec delete(client_key(), Timeout::pos_integer()) -> delete_result().
 delete(Key, Timeout) ->
-    ClientsId = {delete_client_id, util:get_global_uid()},
+    ClientsId = {delete_client_id, uid:get_global_uid()},
     ReplicaKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     _ = [ api_dht_raw:unreliable_lookup(
             Replica, {delete_key, comm:this(), ClientsId, Replica})
@@ -51,7 +51,7 @@ delete(Key, Timeout) ->
 
 %% @doc collect the response for the delete requests
 -spec delete_collect_results(ReplicaKeys::[?RT:key()],
-                             ClientsId::{delete_client_id, util:global_uid()},
+                             ClientsId::{delete_client_id, uid:global_uid()},
                              Results::[ok | locks_set | undef])
                             -> delete_result().
 delete_collect_results([], _ClientsId, Results) ->

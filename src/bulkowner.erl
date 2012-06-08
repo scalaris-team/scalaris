@@ -36,15 +36,15 @@
 
 -type bulkowner_req() ::
       {bulkowner, start,
-       Id::util:global_uid(), I::intervals:interval(), Msg::comm:message()}
-      | {bulkowner, Id::util:global_uid(), I::intervals:interval(),
+       Id::uid:global_uid(), I::intervals:interval(), Msg::comm:message()}
+      | {bulkowner, Id::uid:global_uid(), I::intervals:interval(),
          Msg::comm:message(), Parents::[comm:mypid(),...]}
-      | {bulkowner, deliver, Id::util:global_uid(), Range::intervals:interval(),
+      | {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(),
          Msg::comm:message(), Parents::[comm:mypid(),...]}
-      | {bulkowner, reply, Id::util:global_uid(), Target::comm:mypid(),
+      | {bulkowner, reply, Id::uid:global_uid(), Target::comm:mypid(),
          Msg::comm:message(), Parents::[comm:mypid()]}
       | {bulkowner, reply_process_all}
-      | {bulkowner, gather, Id::util:global_uid(), Target::comm:mypid(),
+      | {bulkowner, gather, Id::uid:global_uid(), Target::comm:mypid(),
          [comm:message()], Parents::[comm:mypid()]}.
 
 -type bulkowner_send_error() ::
@@ -54,17 +54,17 @@
 
 %% @doc Start a bulk owner operation to send the message to all nodes in the
 %%      given interval.
--spec issue_bulk_owner(Id::util:global_uid(), I::intervals:interval(), Msg::comm:message()) -> ok.
+-spec issue_bulk_owner(Id::uid:global_uid(), I::intervals:interval(), Msg::comm:message()) -> ok.
 issue_bulk_owner(Id, I, Msg) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, start, Id, I, Msg}).
 
--spec issue_send_reply(Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
+-spec issue_send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
 issue_send_reply(Id, Target, Msg, Parents) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
--spec send_reply(Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
+-spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
 send_reply(Id, Target, Msg, [], Shepherd) ->
@@ -72,7 +72,7 @@ send_reply(Id, Target, Msg, [], Shepherd) ->
 send_reply(Id, Target, Msg, [Parent | Rest], Shepherd) ->
     comm:send(Parent, {bulkowner, reply, Id, Target, Msg, Rest}, [{shepherd, Shepherd}]).
 
--spec send_reply_failed(Id::util:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid(), FailedPid::comm:mypid()) -> ok.
+-spec send_reply_failed(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid(), FailedPid::comm:mypid()) -> ok.
 send_reply_failed(_Id, Target, Msg, [], _Shepherd, Target) ->
     log:log(warn, "[ ~p ] cannot send bulkowner_reply with message ~p (target node not available)",
             [pid_groups:pid_to_name(self()), Msg]);
@@ -80,7 +80,7 @@ send_reply_failed(Id, Target, Msg, Parents, Shepherd, _FailedPid) ->
     send_reply(Id, Target, Msg, Parents, Shepherd).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
--spec bulk_owner(State::dht_node_state:state(), Id::util:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
+-spec bulk_owner(State::dht_node_state:state(), Id::uid:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
 bulk_owner(State, Id, I, Msg, Parents) ->
 %%     ct:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
     Neighbors = dht_node_state:get(State, neighbors),
@@ -112,7 +112,7 @@ bulk_owner(State, Id, I, Msg, Parents) ->
 %%      Note that the range (id(Starting_node), id(Succ_of_starting_node)]
 %%      has already been covered by bulk_owner/3.
 -spec bulk_owner_iter(ReverseRTList::nodelist:snodelist(),
-                      Id::util:global_uid(),
+                      Id::uid:global_uid(),
                       I::intervals:interval(), Msg::comm:message(),
                       Limit::?RT:key(), Parents::[comm:mypid(),...]) -> ok.
 bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->

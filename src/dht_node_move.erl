@@ -1136,7 +1136,7 @@ continue_slide_delta(State, PredOrSucc, SlideOp) ->
                     Neighbors = dht_node_state:get(State, neighbors),
                     % continued slide with pred/succ, receive data
                     % -> reserve slide_op with pred/succ
-                    NewMoveFullId = util:get_global_uid(),
+                    NewMoveFullId = uid:get_global_uid(),
                     fd:subscribe([node:pidX(TargetNode)], {move, NewMoveFullId}),
                     NextSlideOp =
                         slide_op:new_slide(
@@ -1319,7 +1319,7 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
             end;
         not_found when MoveMsgTag =:= rm_new_pred ->
             % ignore (local) rm_new_pred messages arriving too late
-            case util:is_my_old_uid(MoveFullId) of
+            case uid:is_my_old_uid(MoveFullId) of
                 true -> ok;
                 remote ->
                     log:log(info, "[ dht_node_move ~.0p ] ~.0p received with no "
@@ -1515,7 +1515,7 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
                     _    -> 'rcv'
                 end
         end,
-    MoveFullId = util:get_global_uid(),
+    MoveFullId = uid:get_global_uid(),
     MyNode = nodelist:node(Neighbors),
     TargetNode = nodelist:PredOrSucc(Neighbors),
     setup_slide(State, {slide, PredOrSucc, SendOrReceive},
@@ -1528,7 +1528,7 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
                 Tag::any(), SourcePid::comm:erl_local_pid() | null)
     -> dht_node_state:state().
 make_jump(State, TargetId, Tag, SourcePid) ->
-    MoveFullId = util:get_global_uid(),
+    MoveFullId = uid:get_global_uid(),
     MyNode = dht_node_state:get(State, node),
     TargetNode = dht_node_state:get(State, succ),
     log:log(info, "[ Node ~.0p ] starting jump (succ: ~.0p, TargetId: ~.0p)~n",
@@ -1543,7 +1543,7 @@ make_jump(State, TargetId, Tag, SourcePid) ->
 -spec make_slide_leave(State::dht_node_state:state(), SourcePid::comm:erl_local_pid() | null)
         -> dht_node_state:state().
 make_slide_leave(State, SourcePid) ->
-    MoveFullId = util:get_global_uid(),
+    MoveFullId = uid:get_global_uid(),
     InitNode = dht_node_state:get(State, node),
     OtherNode = dht_node_state:get(State, succ),
     log:log(info, "[ Node ~.0p ] starting leave (succ: ~.0p)~n", [InitNode, OtherNode]),

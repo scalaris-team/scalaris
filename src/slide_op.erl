@@ -45,7 +45,7 @@
 -export_type([slide_op/0, id/0, phase/0, type/0, next_op/0]).
 -endif.
 
--type id() :: util:global_uid().
+-type id() :: uid:global_uid().
 
 -type type() ::
         {slide, pred | succ, 'send' | 'rcv'} |
@@ -93,7 +93,7 @@
 
 %% @doc Sets up a slide operation of the given type. One of the nodes will
 %%      change its ID to TargetId.
--spec new_slide(MoveId::util:global_uid(), Type::type(), CurTargetId::?RT:key(),
+-spec new_slide(MoveId::uid:global_uid(), Type::type(), CurTargetId::?RT:key(),
                 Tag::any(), SourcePid::comm:erl_local_pid() | null,
                 OtherMTE::unknown | pos_integer(), NextOp::next_op(),
                 Neighbors::nodelist:neighborhood())
@@ -121,7 +121,7 @@ new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, Neighbors
 
 %% @doc Sets up an incremental slide operation of the given type. One of the
 %%      nodes will change its ID to CurTargetId and finally FinalTargetId.
--spec new_slide_i(MoveId::util:global_uid(), Type::type(),
+-spec new_slide_i(MoveId::uid:global_uid(), Type::type(),
                 CurTargetId::?RT:key(), FinalTargetId::?RT:key(),
                 Tag::any(), SourcePid::comm:erl_local_pid() | null,
                 OtherMTE::unknown | pos_integer(), Neighbors::nodelist:neighborhood())
@@ -158,7 +158,7 @@ get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors) ->
 %% @doc Sets up a new slide operation for a joining node (see
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
 %%      as the target id of the slide operation.
--spec new_receiving_slide_join(MoveId::util:global_uid(), NewPred::node:node_type(),
+-spec new_receiving_slide_join(MoveId::uid:global_uid(), NewPred::node:node_type(),
         NewSucc::node:node_type(), MyNewKey::?RT:key(), Tag::any()) -> slide_op().
 new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
     IntervalToReceive = node:mk_interval_between_ids(node:id(NewPred), MyNewKey),
@@ -174,7 +174,7 @@ new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
 %%      some of its data.
 %%      Throws 'throw:not_responsible' if the current node is not responsible
 %%      for the ID of JoiningNode.
--spec new_sending_slide_join(MoveId::util:global_uid(), JoiningNode::node:node_type(),
+-spec new_sending_slide_join(MoveId::uid:global_uid(), JoiningNode::node:node_type(),
         Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
 new_sending_slide_join(MoveId, JoiningNode, Tag, Neighbors) ->
     JoiningNodeId = node:id(JoiningNode),

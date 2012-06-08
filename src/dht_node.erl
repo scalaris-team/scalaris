@@ -48,7 +48,7 @@
       % direct DB manipulation:
       {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
       {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
-      {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, util:global_uid()}, HashedKey::?RT:key()} |
+      {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, uid:global_uid()}, HashedKey::?RT:key()} |
       {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
 
 -type(lookup_message() ::

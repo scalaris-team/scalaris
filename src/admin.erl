@@ -143,7 +143,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
             case pid_groups:pid_of(Group, dht_node) of
                 failed  -> {error, not_found};
                 DhtNode ->
-                    UId = util:get_pids_uid(),
+                    UId = uid:get_pids_uid(),
                     Self = comm:reply_as(self(), 3, {leave_result, UId, '_'}),
                     comm:send_local(DhtNode, {leave, Self}),
                     receive

@@ -278,7 +278,7 @@ calc_wmc_outcome(Key, PreOps) ->
     end.
 
 init_new_db_key(Value) ->
-    UID = util:get_global_uid(),
+    UID = uid:get_global_uid(),
     NewKey = lists:flatten(io_lib:format("~p", [UID])),
     Keys = ?RT:get_replica_keys(?RT:hash_key(NewKey)),
     _ = [ begin

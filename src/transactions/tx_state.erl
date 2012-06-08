@@ -58,7 +58,7 @@
 -export_type([tx_id/0, tx_state/0]).
 -endif.
 
--type tx_id() :: {tx_id, util:global_uid()}.
+-type tx_id() :: {tx_id, uid:global_uid()}.
 -type tx_state() ::
         {tx_id(),                  %% Tid
          tx_state,                 %% type-marker (unnecessary in principle)

@@ -61,14 +61,14 @@ range_read(From, To) ->
 %% @doc Read a range of key-value pairs in the given interval.
 -spec range_read(intervals:interval()) -> {ok | timeout, [db_entry:entry()]}.
 range_read(Interval) ->
-    Id = util:get_global_uid(),
+    Id = uid:get_global_uid(),
     bulkowner:issue_bulk_owner(Id, Interval,
                                {bulk_read_entry, comm:this()}),
     TimerRef = comm:send_local_after(config:read(range_read_timeout), self(),
                                      {range_read_timeout, Id}),
     range_read_loop(Interval, Id, intervals:empty(), [], TimerRef).
 
--spec range_read_loop(Interval::intervals:interval(), Id::util:global_uid(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
+-spec range_read_loop(Interval::intervals:interval(), Id::uid:global_uid(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, %% ->
@@ -87,7 +87,7 @@ range_read_loop(Interval, Id, Done, Data, TimerRef) ->
            end)
     end.
 
--spec delete_and_cleanup_timer(reference(), util:global_uid()) -> ok.
+-spec delete_and_cleanup_timer(reference(), uid:global_uid()) -> ok.
 delete_and_cleanup_timer(TimerRef, Id) ->
     %% cancel timeout
     _ = erlang:cancel_timer(TimerRef),
