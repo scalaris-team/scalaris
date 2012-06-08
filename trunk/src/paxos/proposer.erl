@@ -63,7 +63,7 @@ msg_prepare(Dest, ReplyTo, PaxosID, Round) ->
                  non_neg_integer(), any()) -> ok.
 msg_accept(Dest, ReplyTo, PaxosID, Round, Value) ->
     ?TRACE("Sending proposer_accept ~p, ~p Proposal ~p~n", [PaxosID, Round, Value]),
-    Msg = {proposer_accept, ReplyTo, PaxosID, Round, Value},
+    Msg = {?proposer_accept, ReplyTo, PaxosID, Round, Value},
     comm:send(Dest, Msg).
 
 -spec start_paxosid(comm:mypid(), any(), [ comm:mypid() ], any(),

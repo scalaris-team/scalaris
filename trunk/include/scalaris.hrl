@@ -111,3 +111,4 @@
                       end).
 
 -include("types.hrl").
+-include("atom_ext.hrl").

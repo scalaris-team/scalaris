@@ -134,7 +134,7 @@ on({get_state_response, MyI}, State =
                _ -> DestKey
            end,
     ?TRACE("START_TO_DEST ~p", [DestKey]),
-    comm:send_local(DhtPid, {lookup_aux, DKey, 0, Msg}),    
+    comm:send_local(DhtPid, {?lookup_aux, DKey, 0, Msg}),    
     comm:send_local(self(), {shutdown, negotiate_interval_master}),
     State;
 

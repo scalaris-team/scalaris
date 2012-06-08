@@ -82,9 +82,13 @@ make_table([], _Map, Start, TotalBytes, TotalCount) ->
 ];
 make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
     {Size, Count} = gb_trees:get(Tag, Map),
+    RealTag = case Tag of
+                {Channel, MsgTag} -> {Channel, comm:msg_tag_to_atom(MsgTag)};
+                MsgTag -> comm:msg_tag_to_atom(MsgTag)
+              end,
     [{tr, [{bgcolor, '#CCDCEE'}, {width, "100%"}], 
        [
-         {td, [], {p, [], io_lib:format("~p", [Tag])}}, 
+         {td, [], {p, [], io_lib:format("~p", [RealTag])}}, 
          {td, [], {p, [], io_lib:format("~15.10._B", [Size])}}, 
          {td, [], {p, [], io_lib:format("~15.10._B", [Count])}}, 
          {td, [], {p, [], io_lib:format("~15.3._f", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])}}, 

@@ -52,8 +52,8 @@
       {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
-      {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
-      {lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
+      {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
+      {?lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
 -type(rt_message() ::
       {rt_update, RoutingTable::?RT:external_rt()}).
@@ -139,7 +139,7 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
 %% messages handled as a transaction participant (TP)
 on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
-on({tp_do_commit_abort, Id, Result}, State) ->
+on({?tp_do_commit_abort, Id, Result}, State) ->
     tx_tp:on_do_commit_abort(Id, Result, State);
 on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
     tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
@@ -147,11 +147,11 @@ on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, Stat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see api_dht_raw.erl and dht_node_look up.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({lookup_aux, Key, Hops, Msg}, State) ->
+on({?lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({lookup_fin, Key, Hops, Msg}, State) ->
+on({?lookup_fin, Key, Hops, Msg}, State) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
     FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
     case FwdList of
@@ -194,15 +194,15 @@ on({lookup_fin, Key, Hops, Msg}, State) ->
                     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
                     State
             end;
-        [Pid] -> comm:send(Pid, {lookup_fin, Key, Hops + 1, Msg}),
+        [Pid] -> comm:send(Pid, {?lookup_fin, Key, Hops + 1, Msg}),
                  State
     end;
 
-on({send_error, Target, {lookup_aux, _, _, _} = Message, _Reason}, State) ->
+on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
-%on({send_failed, {send_error, Target, {lookup_aux, _, _, _}} = Message, _Reason}, _Pids}}, State) ->
+%on({send_failed, {send_error, Target, {?lookup_aux, _, _, _}} = Message, _Reason}, _Pids}}, State) ->
 %    dht_node_lookup:lookup_aux_failed(State, Target, Message);
-on({send_error, Target, {lookup_fin, _, _, _} = Message, _Reason}, State) ->
+on({send_error, Target, {?lookup_fin, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -215,7 +215,7 @@ on({get_key, Source_PID, HashedKey}, State) ->
     State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
-    Msg = {get_key_with_id_reply, SourceId, HashedKey,
+    Msg = {?get_key_with_id_reply, SourceId, HashedKey,
            ?DB:read(dht_node_state:get(State, db), HashedKey)},
     comm:send(Source_PID, Msg),
     State;

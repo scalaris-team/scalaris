@@ -105,7 +105,7 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
     end,
     State;
 
-on({acceptor_accepted, PaxosID, Round, Value}, ETSTableName = State) ->
+on({?acceptor_accept, PaxosID, Round, Value}, ETSTableName = State) ->
     ?TRACE("learner:accepted for paxosid '~p' and round '~p' value '~p'~n",
            [PaxosID, Round, Value]),
     MyState = case pdb:get(PaxosID, ETSTableName) of

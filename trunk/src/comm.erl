@@ -50,6 +50,9 @@
 %% initialization
 -export([init_and_wait_for_valid_pid/0]).
 
+%% debugging, user presentation
+-export([msg_tag_to_atom/1]).
+
 
 -ifdef(with_export_type_support).
 -export_type([message/0, msg_tag/0, mypid/0,
@@ -202,14 +205,30 @@ get_port(Pid) -> comm_layer:get_port(Pid).
 %%      atom).
 -spec get_msg_tag(message() | group_message()) -> atom().
 get_msg_tag({Msg, _Cookie})
-  when is_tuple(Msg) andalso is_atom(erlang:element(1, Msg)) ->
+  when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
 get_msg_tag({send_to_group_member, _ProcessName, Msg})
-  when is_tuple(Msg) andalso is_atom(erlang:element(1, Msg)) ->
+  when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
 get_msg_tag(Msg)
-  when is_tuple(Msg) andalso is_atom(erlang:element(1, Msg)) ->
+  when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     erlang:element(1, Msg).
+
+-spec msg_tag_to_atom(MsgTag::atom() | integer()) -> atom().
+msg_tag_to_atom(MsgTag) when is_atom(MsgTag) -> MsgTag;
+msg_tag_to_atom(MsgTag) when is_integer(MsgTag) ->
+    case MsgTag of
+        ?lookup_aux -> ?lookup_aux_atom;
+        ?lookup_fin -> ?lookup_fin_atom;
+        ?get_key_with_id_reply -> ?get_key_with_id_reply_atom;
+        ?proposer_accept -> ?proposer_accept_atom;
+        ?acceptor_accept -> ?acceptor_accept_atom;
+        ?register_TP -> ?register_TP_atom;
+        ?tx_tm_rtm_init_RTM -> ?tx_tm_rtm_init_RTM_atom;
+        ?tp_do_commit_abort -> ?tp_do_commit_abort_atom;
+        ?tx_tm_rtm_delete -> ?tx_tm_rtm_delete_atom;
+        ?tp_committed -> ?tp_committed_atom
+    end.
 
 % note: cannot simplify to the following spec -> this lets dialyzer crash
 %-spec unpack_cookie(mypid(), message()) -> {mypid(), message()}.

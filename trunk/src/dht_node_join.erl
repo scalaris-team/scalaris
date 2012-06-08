@@ -467,7 +467,7 @@ process_join_state({web_debug_info, Requestor} = _Msg,
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
     case get_connections(JoinState) of
         [] ->
             comm:send_local_after(100, self(), FullMsg),
@@ -475,19 +475,19 @@ process_join_state({lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _Qu
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:reply_as(self(), 3, {join, send_failed, '_', []}),
-            comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
+            comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-process_join_state({join, send_failed, {send_error, Target, {lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
     case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
         failed ->
-            comm:send_local_after(100, self(), {lookup_aux, Key, Hops + 1, Msg}),
+            comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
             ok;
         {ok, {_, Pid}} ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:reply_as(self(), 3, {join, send_failed, '_', [Target | FailedPids]}),
-            comm:send(Pid, {lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
+            comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
     
@@ -749,7 +749,7 @@ lookup(JoinState, JoinIds = [_|_]) ->
             NewConns =
                 [begin
                      NewConn = new_connection(Conn),
-                     Msg = {lookup_aux, Id, 0,
+                     Msg = {?lookup_aux, Id, 0,
                             {join, get_candidate, comm:this(), Id, MyLbPsv, NewConn}},
                      ?TRACE_SEND(Node, Msg),
                      comm:send(Node, Msg),

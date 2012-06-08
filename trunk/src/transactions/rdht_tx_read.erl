@@ -162,7 +162,7 @@ init([]) ->
 
 -spec on(comm:message(), state()) -> state().
 %% reply triggered by api_dht_raw:unreliable_get_key/3
-on({get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
+on({?get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
    {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
     Entry = get_entry(Id, Table),

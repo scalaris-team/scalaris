@@ -21,6 +21,8 @@
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
@@ -76,7 +78,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                                        _Maj = 3, _MaxProposers = 5,
                                        0),
                 %% send registerTP to each RTM (send with it the learner id)
-                _ = [ comm:send(X, {register_TP, {Tid, ItemId, PaxId,
+                _ = [ comm:send(X, {?register_TP, {Tid, ItemId, PaxId,
                                                   comm:this()}})
                       || X <- [TM | RTMs], unknown =/= X],
                 %% (optimized: embed the proposer's accept message in registerTP message)
@@ -118,12 +120,12 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_St
                     %% and already deleted the state,
                     %% so we claim we committed
                     %% msg_delay:send_local(
-                    %%   1, self(), {tp_do_commit_abort, Id, Result});
-                    comm:send(TM, {tp_committed, TMItemId});
+                    %%   1, self(), {?tp_do_commit_abort, Id, Result});
+                    comm:send(TM, {?tp_committed, TMItemId});
                 false ->
                     % we don't have an own proposal yet (no validate seen), so we forward msg as is.
                     dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                               {tp_do_commit_abort, Id,
+                                               {?tp_do_commit_abort, Id,
                                                 Result})
             end,
             DHT_Node_State
@@ -155,7 +157,7 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
                     {write, commit} ->
                         rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
                 end,
-            comm:send(TM, {tp_committed, TMItemId}),
+            comm:send(TM, {?tp_committed, TMItemId}),
             Res;
         false ->
             %% forward commit to now responsible node
