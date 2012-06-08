@@ -108,25 +108,25 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     MyGroup = pid_groups:my_groupname(),
     Pid = pid_groups:get_my(Process),
     SupTx = pid_groups:get_my(sup_dht_node_core_tx),
-    NewPid = case {Pid, SupTx} of
-                 {failed, failed} -> failed;
-                 {failed, SupTx} ->
-                     %% start, if necessary
-                     RTM_desc = util:sup_worker_desc(
-                                  Process, tx_tm_rtm, start_link,
-                                  [MyGroup, Process]),
-                     case supervisor:start_child(SupTx, RTM_desc) of
-                         {ok, TmpPid} -> TmpPid;
-                         {ok, TmpPid, _} -> TmpPid;
-                         {error, {already_started, TmpPid}} -> TmpPid;
-                         {error, Reason} ->
-                             log:log(warn, "[ ~.0p ] tx_tm_rtm start_child failed: ~.0p~n",
-                                     [comm:this(), Reason]),
-                             msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process}),
-                             failed
-                     end;
-                 _ -> Pid
-             end,
+    NewPid =
+        if Pid =:= failed andalso SupTx =:= failed -> failed;
+           Pid =:= failed ->
+               %% start, if necessary
+               RTM_desc = util:sup_worker_desc(
+                            Process, tx_tm_rtm, start_link,
+                            [MyGroup, Process]),
+               case supervisor:start_child(SupTx, RTM_desc) of
+                   {ok, TmpPid} -> TmpPid;
+                   {ok, TmpPid, _} -> TmpPid;
+                   {error, {already_started, TmpPid}} -> TmpPid;
+                   {error, Reason} ->
+                       log:log(warn, "[ ~.0p ] tx_tm_rtm start_child failed: ~.0p~n",
+                               [comm:this(), Reason]),
+                       msg_delay:send_local(1, self(), {get_rtm, Source_PID, Key, Process}),
+                       failed
+               end;
+           true -> Pid
+        end,
     case NewPid of
         failed -> State;
         _ ->

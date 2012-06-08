@@ -147,14 +147,14 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
             Res =
-                case {tx_tlog:get_entry_operation(RTLogEntry), Result} of
-                    {read, abort} ->
+                case tx_tlog:get_entry_operation(RTLogEntry) of
+                    read when Result =:= abort ->
                         rdht_tx_read:abort(DB, RTLogEntry, OwnProposal);
-                    {read, commit} ->
+                    read when Result =:= commit ->
                         rdht_tx_read:commit(DB, RTLogEntry, OwnProposal);
-                    {write, abort} ->
+                    write when Result =:= abort ->
                         rdht_tx_write:abort(DB, RTLogEntry, OwnProposal);
-                    {write, commit} ->
+                    write when Result =:= commit ->
                         rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
                 end,
             comm:send(TM, {?tp_committed, TMItemId}),

@@ -676,8 +676,8 @@ on_bp_req_in_bp(Msg, State,
                 {'$gen_component', bp, bp_set_cond, Cond, BPName} = BPMsg,
                 IsFromQueue) ->
     NextState =
-        case {gc_bpqueue(State), IsFromQueue} of
-            {[_H|_T], false} -> gc_bp_hold_back(State, BPMsg);
+        case gc_bpqueue(State) of
+            [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
             _ -> gc_bp_set_cond(State, Cond, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);
@@ -685,8 +685,8 @@ on_bp_req_in_bp(Msg, State,
                 {'$gen_component', bp, bp_set, MsgTag, BPName} = BPMsg,
                 IsFromQueue) ->
     NextState =
-        case {gc_bpqueue(State), IsFromQueue} of
-            {[_H|_T], false} -> gc_bp_hold_back(State, BPMsg);
+        case gc_bpqueue(State) of
+            [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
             _ -> gc_bp_set(State, MsgTag, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);
@@ -694,8 +694,8 @@ on_bp_req_in_bp(Msg, State,
                 {'$gen_component', bp, bp_del, BPName}= BPMsg,
                 IsFromQueue)->
     NextState =
-        case {gc_bpqueue(State), IsFromQueue} of
-            {[_H|_T], false} -> gc_bp_hold_back(State, BPMsg);
+        case gc_bpqueue(State) of
+            [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
             _ -> gc_bp_del(State, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);

@@ -327,8 +327,8 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
     %% inform RTMs on delete
     Role = state_get_role(State),
     {DeleteIt, NewState} =
-        case {ErrCode, Role} of
-            {ok, tx_tm} ->
+        case ErrCode of
+            ok when Role =:= tx_tm ->
                 RTMs = tx_state:get_rtms(TxState),
                 send_to_rtms(RTMs, fun(_X) -> Msg end),
                 %% inform used learner to delete paxosids.
@@ -348,7 +348,7 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 msg_delay:send_local(1, comm:make_local(GLLearner),
                                      {learner_deleteids, lists:flatten(AllPaxIds)}),
                 {_DeleteIt = true, State};
-            {ok, _} ->
+            ok ->
                 %% the test trigger_delete was passed, at least by the TM
                 %% RTMs only wait for all tp register messages, to not miss them
                 %% record, that every TP was informed and all paxids decided
@@ -377,8 +377,8 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 comm:send_local(LAcceptor,
                                 {acceptor_deleteids, lists:flatten(AllPaxIds)}),
                 {Delete, TmpState};
-            {new, _} -> {false, State}; %% already deleted
-            {uninitialized, _} ->
+            new -> {false, State}; %% already deleted
+            uninitialized ->
                 {false, State} %% will be deleted when msg_delay triggers it
         end,
     case DeleteIt of
@@ -527,14 +527,14 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
             _ = set_entry(TxState, State),
             {ok, ItemState} = get_item_entry(ItemId, State),
 
-            case {tx_state:is_decided(TxState), Role} of
-                {undecided, _} ->
+            case tx_state:is_decided(TxState) of
+                undecided ->
                     %% store TP info to corresponding PaxosId
                     NewEntry =
                         tx_item_state:set_tp_for_paxosid(ItemState, TP, PaxosID),
                     trigger_delete_if_done(TxState),
                     set_entry(NewEntry, State);
-                {Decision, tx_tm} ->
+                Decision when Role =:= tx_tm ->
                     %% if ?register_TP arrives after tx decision, inform the
                     %% slowly client directly
                     %% find matching RTLogEntry and send commit_reply
