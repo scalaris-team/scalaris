@@ -54,13 +54,26 @@ AS_IF([test ! -x "$BROWSER"],
 
 ###########################################################
 #
-# check screen availabiligy for 'scalarisctl -d --screen'
+# check screen availability for 'scalarisctl -d --screen'
 #
 ###########################################################
 
 AC_PATH_PROG(SCREEN, screen, "/bin/false")
 if test "$ac_cv_path_SCREEN" = "/bin/false" ; then
   AC_MSG_NOTICE([screen not found - you won't be able to run scalaris deamonized with screen, i.e. 'scalarisctl -d --screen'])
+fi
+
+###########################################################
+#
+# check sudo, runuser availability for the init.d script
+#
+###########################################################
+
+AC_PATH_PROG(SUDO, sudo, "/bin/false")
+AC_PATH_PROG(RUNUSER, runuser, "/bin/false")
+
+if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = "/bin/false"; then
+  AC_MSG_NOTICE([sudo or runuser not found - you won't be able to use our init.d script])
 fi
 
 ###########################################################
