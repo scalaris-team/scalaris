@@ -21,6 +21,8 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 datarootdir=@datarootdir@
 SCREEN=@SCREEN@
+SUDO=@SUDO@
+RUNUSER=@RUNUSER@
 
 SCALARIS_NODE=node
 NODES_PER_VM=1
@@ -34,10 +36,10 @@ LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen --nodes-per-vm ${NODES_PER_VM}"
 
 # For SELinux we need to use 'runuser' not 'su'
-if [ -x "/sbin/runuser" ]; then
-    SU="/sbin/runuser -s /bin/sh $SCALARIS_USER"
+if [ -x "$RUNUSER" ]; then
+    SU="$RUNUSER -s /bin/sh $SCALARIS_USER"
 else
-    SU="/bin/sudo -s /bin/sh -u $SCALARIS_USER"
+    SU="$SUDO -s /bin/sh -u $SCALARIS_USER"
 fi
 
 start() {
