@@ -48,7 +48,7 @@
 -export_type([paxos_id/0]).
 -endif.
 
--type paxos_id() :: {paxos_id, uid:global_uid()}.
+-opaque paxos_id() :: {uid:global_uid()}.
 -type tx_item_id() :: {?tx_item_id, uid:global_uid()}.
 -type tx_item_state() ::
  {
