@@ -61,9 +61,9 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
             true ->
                 {TmpDB, Proposal} =
                     case tx_tlog:get_entry_operation(RTLogEntry) of
-                        read ->
+                        ?read ->
                             rdht_tx_read:validate(DB, RTLogEntry);
-                        write ->
+                        ?write ->
                             rdht_tx_write:validate(DB, RTLogEntry)
                     end,
                 %% remember own proposal for lock release
@@ -148,13 +148,13 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
         true ->
             Res =
                 case tx_tlog:get_entry_operation(RTLogEntry) of
-                    read when Result =:= ?abort ->
+                    ?read when Result =:= ?abort ->
                         rdht_tx_read:abort(DB, RTLogEntry, OwnProposal);
-                    read when Result =:= ?commit ->
+                    ?read when Result =:= ?commit ->
                         rdht_tx_read:commit(DB, RTLogEntry, OwnProposal);
-                    write when Result =:= ?abort ->
+                    ?write when Result =:= ?abort ->
                         rdht_tx_write:abort(DB, RTLogEntry, OwnProposal);
-                    write when Result =:= ?commit ->
+                    ?write when Result =:= ?commit ->
                         rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
                 end,
             comm:send(TM, {?tp_committed, TMItemId}),

@@ -127,7 +127,7 @@ update_decided(State, MajOk, MajDeny) ->
     case Vers =/= -1 of
         true ->
             if OK andalso (not Abort) ->
-                    set_decided(State, value);
+                    set_decided(State, ?value);
                (not OK) andalso Abort ->
                     set_decided(State, {fail, not_found});
                true -> State

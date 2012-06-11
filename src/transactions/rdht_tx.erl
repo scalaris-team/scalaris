@@ -164,7 +164,7 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
         true ->
             %% key is in TLog, rdht op not necessary
             case tx_tlog:get_entry_operation(TEntry) of
-                write ->
+                ?write ->
                     first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
                 _ ->
                     case req_get_op(Req) of
@@ -263,7 +263,7 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
             %% key was in TLog, new entry is newer and contains value
             %% for read?
             case tx_tlog:get_entry_operation(TEntry) of
-                read ->
+                ?read ->
                     %% check versions: if mismatch -> change status to abort
                     NewTLogEntry =
                         case tx_tlog:get_entry_version(TEntry)
@@ -318,8 +318,8 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
 -spec tlog_cleanup(tx_tlog:tlog()) -> tx_tlog:tlog().
 tlog_cleanup(TLog) ->
     [ case tx_tlog:get_entry_operation(TLogEntry) of
-          read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
-          write -> TLogEntry
+          ?read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
+          ?write -> TLogEntry
       end || TLogEntry <- TLog ].
 
 %% @doc Get a result entry for a read from the given TLog entry.
@@ -327,7 +327,7 @@ tlog_cleanup(TLog) ->
                        {tx_tlog:tlog_entry(), api_tx:read_result()}.
 tlog_read(Entry, _Key, EnDecode) ->
     Res = case tx_tlog:get_entry_status(Entry) of
-              value -> {ok, tx_tlog:get_entry_value(Entry)};
+              ?value -> {ok, tx_tlog:get_entry_value(Entry)};
               %% try reading from a failed entry (type mismatch was the reason?)
               {fail, abort} -> {ok, tx_tlog:get_entry_value(Entry)};
               {fail, not_found} = R -> R %% not_found
@@ -343,21 +343,21 @@ tlog_write(Entry, _Key, Value1, EnDecode) ->
     NewEntryAndResult =
         fun(FEntry, FValue) ->
                 case tx_tlog:get_entry_operation(FEntry) of
-                    write ->
+                    ?write ->
                         {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
-                    read ->
-                        E1 = tx_tlog:set_entry_operation(FEntry, write),
+                    ?read ->
+                        E1 = tx_tlog:set_entry_operation(FEntry, ?write),
                         E2 = tx_tlog:set_entry_value(E1, FValue),
                         {E2, {ok}}
             end
         end,
     case tx_tlog:get_entry_status(Entry) of
-        value ->
+        ?value ->
             NewEntryAndResult(Entry, Value);
         {fail, not_found} ->
-            E1 = tx_tlog:set_entry_operation(Entry, write),
+            E1 = tx_tlog:set_entry_operation(Entry, ?write),
             E2 = tx_tlog:set_entry_value(E1, Value),
-            E3 = tx_tlog:set_entry_status(E2, value),
+            E3 = tx_tlog:set_entry_status(E2, ?value),
             {E3, {ok}};
         {fail, abort} ->
             {Entry, {ok}}
@@ -382,7 +382,7 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel, true) ->
             case ToAdd =:= [] andalso ToDel =:= [] of
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    case value =:= Status
+                    case ?value =:= Status
                         orelse {fail, not_found} =:= Status of
                         true ->
                             NewValue1 = lists:append(ToAdd, OldValue),
@@ -419,7 +419,7 @@ tlog_add_on_nr(Entry, Key, X, true) ->
             case X == 0 of %% also accepts 0.0
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    case value =:= Status orelse
+                    case ?value =:= Status orelse
                         {fail, not_found} =:= Status of
                         true ->
                             NewValue = OldValue + X,

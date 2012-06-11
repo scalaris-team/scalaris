@@ -179,12 +179,12 @@ update_tlog_entry(TLogEntry, Request) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
     case Status of
-        value ->
-            tx_tlog:new_entry(write, Key, Version, value, WriteValue);
+        ?value ->
+            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(write, Key, Version, value, WriteValue)
+            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue)
 %        {fail, timeout} ->
-%            tx_tlog:new_entry(write, Key, Version, {fail, timeout},
+%            tx_tlog:new_entry(?write, Key, Version, {fail, timeout},
 %                               WriteValue)
     end.
 

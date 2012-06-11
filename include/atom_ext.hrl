@@ -92,3 +92,12 @@
 
 -define(abort_atom, abort).
 -define(abort, ?int_or_atom(74, ?abort_atom)).
+
+-define(value_atom, value).
+-define(value, ?int_or_atom(75, ?value_atom)).
+
+-define(read_atom, read).
+-define(read, ?int_or_atom(76, ?read_atom)).
+
+-define(write_atom, write).
+-define(write, ?int_or_atom(77, ?write_atom)).
