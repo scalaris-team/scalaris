@@ -65,7 +65,7 @@
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
          comm:mypid() | unknown,   %% TM
-         [tx_tm_rtm:rtms()], %% [{Key, RTM, Nth}]
+         [tx_tm_rtm:rtms()], %% [{Key, RTM, Nth, Acceptor}]
          [{tx_tlog:tlog_entry(),
            tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
          [comm:mypid()],           %% Learners,
