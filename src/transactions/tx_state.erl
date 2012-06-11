@@ -182,11 +182,13 @@ newly_decided(State) ->
         false -> false; %% was already decided
         true ->
             %% maybe: calculate decision:
-            case {get_numabort(State) > 0,
-                  get_numprepared(State) =:= get_numids(State)} of
-                {true, _} -> ?abort;
-                {_, true} -> ?commit;
-                {_, _} -> ?undecided
+            case get_numabort(State) > 0 of
+                true -> ?abort;
+                _ ->
+                    case get_numprepared(State) =:= get_numids(State) of
+                        true -> ?commit;
+                        _ -> ?undecided
+                    end
             end
     end.
 
