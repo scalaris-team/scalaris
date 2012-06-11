@@ -27,9 +27,9 @@
 -include("scalaris.hrl").
 
 %% Operations on tx_item_state
--export([new/1, new/3]).
+-export([new/1, new/3, new/6]).
 -export([get_txid/1]).
--export([get_maj_for_prepared/1]).
+-export([get_maj_for_prepared/1, get_maj_for_abort/1]).
 -export([get_itemid/1, set_itemid/2]).
 -export([get_decided/1]).
 -export([set_decided/2]).
@@ -61,7 +61,7 @@
    Decided::false | ?prepared | ?abort, %%  7 current decision status
    Numprepared::non_neg_integer(), %%  8 number of received prepare votes
    Numabort::non_neg_integer(), %%  9 number of received abort votes
-   [{paxos_id(), RTLogEntry::tx_tlog:tlog_entry(), TP::comm:mypid()}], %% 10 involved PaxosIDs
+   [{paxos_id(), RTLogEntry::tx_tlog:tlog_entry(), TP::comm:mypid() | unknown}], %% 10 involved PaxosIDs
    Status::new | uninitialized | ok, %% 11 item status
    HoldBackQueue::[tuple()],         %% 12 when not initialized
    NumCommitted::non_neg_integer()  %% 13
@@ -81,6 +81,16 @@ new(ItemId) ->
 -spec new(tx_item_id(), tx_state:tx_id(), tx_tlog:tlog_entry())
          -> tx_item_state().
 new(ItemId, TxId, TLogEntry) ->
+    ReplDeg = config:read(replication_factor),
+    new(ItemId, TxId, TLogEntry, quorum:majority_for_accept(ReplDeg),
+        quorum:majority_for_deny(ReplDeg), unknown).
+
+%% pre: if paxos IDs are given, their order must match the order of the created RTLogEntries!
+-spec new(tx_item_id(), tx_state:tx_id(), tx_tlog:tlog_entry(),
+          Maj_for_prepared::non_neg_integer(),
+          Maj_for_abort::non_neg_integer(), PaxosIds::[paxos_id()] | unknown)
+         -> tx_item_state().
+new(ItemId, TxId, TLogEntry, Maj_for_prepared, Maj_for_abort, PaxosIds0) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries =
         case tx_tlog:get_entry_operation(TLogEntry) of
@@ -89,13 +99,16 @@ new(ItemId, TxId, TLogEntry) ->
             write ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
-%%    PaxosIds = [ {paxos_id, uid:get_global_uid()} || _ <- RTLogEntries ],
-    PaxosIds = [ {uid:get_global_uid()} || _ <- RTLogEntries ],
+    PaxosIds =
+        case PaxosIds0 of
+            unknown -> [ {uid:get_global_uid()} || _ <- RTLogEntries ];
+%%          unknown -> [ {paxos_id, uid:get_global_uid()} || _ <- RTLogEntries ];
+            _ -> PaxosIds0
+        end,
     TPs = [ unknown || _ <- PaxosIds ],
     PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
-    ReplDeg = config:read(replication_factor),
     {ItemId, ?tx_item_state, TxId, TLogEntry,
-     quorum:majority_for_accept(ReplDeg), quorum:majority_for_deny(ReplDeg),
+     Maj_for_prepared, Maj_for_abort,
      false, 0, 0, PaxIDsRTLogsTPs,
      uninitialized, _HoldBack = [], 0}.
 

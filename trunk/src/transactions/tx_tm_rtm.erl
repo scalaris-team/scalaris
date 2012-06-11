@@ -462,15 +462,22 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     _ = set_entry(NewEntry, NewState),
 
     %% lookup items locally and merge with given ItemStates
+    ItemStatesWithTLog = lists:zip(
+                           tx_state:get_tlog_txitemids(NewEntry), ItemStates),
     NewItemStates =
         [ begin
-              EntryId = tx_item_state:get_itemid(Entry),
               {LocalItemStatus, LocalItem} = get_item_entry(EntryId, NewState),
               TmpItem = case LocalItemStatus of
-                            new -> Entry; %% nothing known locally
+                            new -> %% nothing known locally
+                                tx_item_state:new(
+                                  EntryId, Tid, TLogEntry, Maj_for_prepared,
+                                  Maj_for_abort, PaxosIds);
                             uninitialized ->
                                 %% take over hold back from existing entry
                                 IHoldBQ = tx_item_state:get_hold_back(LocalItem),
+                                Entry = tx_item_state:new(
+                                          EntryId, Tid, TLogEntry, Maj_for_prepared,
+                                          Maj_for_abort, PaxosIds),
                                 tx_item_state:set_hold_back(Entry, IHoldBQ);
                             ok ->
                                 log:log(error, "Duplicate init_RTM for an item", []),
@@ -479,7 +486,7 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
               NewItem = tx_item_state:set_status(TmpItem, ok),
               _ = set_entry(NewItem, NewState),
               NewItem
-          end || Entry <- ItemStates],
+          end || {{TLogEntry, EntryId}, {EntryId, Maj_for_prepared, Maj_for_abort, PaxosIds}} <- ItemStatesWithTLog],
 
     %% initiate local paxos acceptors (with received paxos_ids)
     Learners = tx_state:get_learners(TxState),
@@ -797,9 +804,17 @@ rtm_update(RTMs) ->
 -spec init_RTMs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
 init_RTMs(TxState, ItemStates) ->
     ?TRACE("tx_tm_rtm:init_RTMs~n", []),
+    ItemStatesForRTM =
+        [ begin
+              PaxIDs_RTLogs_TPs = tx_item_state:get_paxosids_rtlogs_tps(ItemState),
+              PaxosIDs = [PaxosId || {PaxosId, _, _} <- PaxIDs_RTLogs_TPs],
+              {tx_item_state:get_itemid(ItemState),
+               tx_item_state:get_maj_for_prepared(ItemState),
+               tx_item_state:get_maj_for_abort(ItemState), PaxosIDs}
+          end || ItemState <- ItemStates],
     RTMs = tx_state:get_rtms(TxState),
     send_to_rtms(
-      RTMs, fun(X) -> {?tx_tm_rtm_init_RTM, TxState, ItemStates, get_nth(X)}
+      RTMs, fun(X) -> {?tx_tm_rtm_init_RTM, TxState, ItemStatesForRTM, get_nth(X)}
             end).
 
 -spec init_TPs(tx_state:tx_state(), [tx_item_state:tx_item_state()]) -> ok.
