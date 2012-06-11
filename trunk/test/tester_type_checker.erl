@@ -134,7 +134,8 @@ check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
             case ValCheck(Value) of
                 true -> true;
                 false -> {false, [{Value, Report} | CheckStack]}
-            end
+            end;
+        {false, _} = R -> R
     end.
 
 check_typedef(_Value, {typedef, tester, test_any}, _, _) ->
