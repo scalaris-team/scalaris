@@ -28,17 +28,10 @@
 -endif.
 
 -ifdef(have_callback_support).
--callback tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
--callback tlogentry_get_value(tx_tlog:tlog_entry()) -> any().
--callback tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
-    [
-     {tlogentry_get_status, 1},
-     {tlogentry_get_value, 1},
-     {tlogentry_get_version, 1}
-    ];
+    [];
 behaviour_info(_Other) ->
     undefined.
 -endif.
