@@ -46,12 +46,12 @@
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status() :: value | {fail, abort | not_found}.
--type tx_op()     :: read | write.
+-type tx_status() :: ?value | {fail, abort | not_found}.
+-type tx_op()     :: ?read | ?write.
 
 -type tlog_key() :: client_key().%% | ?RT:key().
 %% TLogEntry: {Operation, Key, Status, Value, Version}
-%% Sample: {read,"key3",value,"value3",0}
+%% Sample: {?read,"key3",?value,"value3",0}
 -type tlog_entry() ::
           { tx_op(),                  %% operation
             tlog_key(), %% key | hashed and replicated key
@@ -74,7 +74,7 @@ add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 add_or_update_status_by_key(TLog, Key, Status) ->
     case lists:keyfind(Key, 2, TLog) of
         false ->
-            Entry = new_entry(write, Key, _Vers = 0, Status, _Val = 0),
+            Entry = new_entry(?write, Key, _Vers = 0, Status, _Val = 0),
             add_entry(TLog, Entry);
         Entry ->
             NewEntry = set_entry_status(Entry, Status),

@@ -94,9 +94,9 @@ new(ItemId, TxId, TLogEntry, Maj_for_prepared, Maj_for_abort, PaxosIds0) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries =
         case tx_tlog:get_entry_operation(TLogEntry) of
-            read ->
+            ?read ->
                 rdht_tx_read:validate_prefilter(TLogEntry);
-            write ->
+            ?write ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
     PaxosIds =

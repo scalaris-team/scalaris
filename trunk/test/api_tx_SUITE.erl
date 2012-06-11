@@ -746,7 +746,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
         {fail, not_found} ->
             case element(1, Req) of
                 write ->
-                    ?equals(tx_tlog:get_entry_status(NewEntry), value),
+                    ?equals(tx_tlog:get_entry_status(NewEntry), ?value),
                     ?equals(tx_tlog:get_entry_value(NewEntry),
                             rdht_tx:encode_value(element(3, Req))),
                     ?equals(NRes, [{ok}]);
@@ -763,7 +763,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     case NRes of
                         [{ok}] ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    value); %% will create the value
+                                    ?value); %% will create the value
                         [{fail, not_a_number}] ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
                                     {fail, abort})
@@ -773,44 +773,44 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     case NRes of
                         [{ok}] ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    value); %% will create the value
+                                    ?value); %% will create the value
                         [{fail, not_a_list}] ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
                                     {fail, abort})
                     end
             end;
         {fail, abort} = Fail ->
-            TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, value),
+            TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, ?value),
             ?equals_w_note(NRes,
                            element(2, api_tx:req_list([TmpTLogEntry], [Req])),
                            {Req, RingVal}),
             ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
-        value ->
+        ?value ->
             case tx_tlog:get_entry_operation(OldEntry) of
-                read ->
+                ?read ->
                     ?equals(NRes, element(2, api_tx:req_list([Req])));
-                write ->
+                ?write ->
                     ?equals([{ok}, hd(NRes)], element(2, api_tx:req_list([{write, element(2, Req), rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))}, Req])))
             end,
             case element(1, Req) of
                 write ->
                     ?equals(tx_tlog:get_entry_status(NewEntry),
-                            value),
+                            ?value),
                     ?equals(tx_tlog:get_entry_value(NewEntry),
                             rdht_tx:encode_value(element(3, Req))),
                     ?equals(NRes, [{ok}]);
                 read ->
                     ?equals(TLog, NTLog),
                     case tx_tlog:get_entry_operation(OldEntry) of
-                        read ->
+                        ?read ->
                             ?equals(NRes, [{ok, RingVal}]);
-                        write ->
+                        ?write ->
                             ?equals(NRes, [{ok, rdht_tx:decode_value(tx_tlog:get_entry_value(NewEntry))}])
                     end;
                 test_and_set ->
                     case hd(NRes) of
                         {ok} ->
-                            ?equals(value,
+                            ?equals(?value,
                                     tx_tlog:get_entry_status(NewEntry));
                         {fail, {key_changed, _X}} ->
                             ?equals({fail, abort},
@@ -821,7 +821,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                 add_on_nr ->
                     case hd(NRes) of
                         {ok} ->
-                            ?equals(value,
+                            ?equals(?value,
                                     tx_tlog:get_entry_status(NewEntry));
                         {fail, not_a_number} ->
                             ?equals({fail, abort},
@@ -832,7 +832,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                 add_del_on_list ->
                     case hd(NRes) of
                         {ok} ->
-                            ?equals(value,
+                            ?equals(?value,
                                     tx_tlog:get_entry_status(NewEntry));
                         {fail, not_a_list} ->
                             ?equals({fail, abort},
@@ -851,14 +851,14 @@ check_commit(TLog, CommitRes, RingVal) ->
     case CommitRes of
         {ok} ->
             case tx_tlog:get_entry_operation(TEntry) of
-                read ->
+                ?read ->
                     NewRingVal = case api_tx:read(Key) of
                                      {fail, not_found} -> none;
                                      {ok, NewVal} -> NewVal
                                  end,
                     ?equals(RingVal, NewRingVal);
-                write ->
-                    ?equals(value, tx_tlog:get_entry_status(TEntry)),
+                ?write ->
+                    ?equals(?value, tx_tlog:get_entry_status(TEntry)),
                     {ok, NewRingVal} = api_tx:read(Key),
                     ?equals(rdht_tx:decode_value(
                               tx_tlog:get_entry_value(TEntry)),
