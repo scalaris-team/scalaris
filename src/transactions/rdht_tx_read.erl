@@ -32,8 +32,6 @@
          commit/3, abort/3]).
 
 -behaviour(rdht_op_beh).
--export([tlogentry_get_status/1, tlogentry_get_value/1,
-         tlogentry_get_version/1]).
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
@@ -44,13 +42,6 @@
 %% reply messages a client should expect (when calling asynch work_phase/3)
 msg_reply(Id, TLogEntry) ->
     {rdht_tx_read_reply, Id, TLogEntry}.
-
--spec tlogentry_get_status(tx_tlog:tlog_entry()) -> tx_tlog:tx_status().
-tlogentry_get_status(TLogEntry)  -> tx_tlog:get_entry_status(TLogEntry).
--spec tlogentry_get_value(tx_tlog:tlog_entry()) -> any().
-tlogentry_get_value(TLogEntry)   -> tx_tlog:get_entry_value(TLogEntry).
--spec tlogentry_get_version(tx_tlog:tlog_entry()) -> integer().
-tlogentry_get_version(TLogEntry) -> tx_tlog:get_entry_version(TLogEntry).
 
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                  api_tx:request()) -> ok.
