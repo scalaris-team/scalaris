@@ -55,7 +55,7 @@
 -type tlog_entry() ::
           { tx_op(),                  %% operation
             tlog_key(), %% key | hashed and replicated key
-            integer(),                %% version
+            non_neg_integer() | -1,   %% version
             tx_status(),              %% status
             any()                     %% value
           }.
@@ -114,7 +114,7 @@ get_insane_keys(TLog) ->
                 end, [], TLog).
 
 %% Operations on Elements of TransLogs (public)
--spec new_entry(tx_op(), client_key() | ?RT:key(), integer(),
+-spec new_entry(tx_op(), client_key() | ?RT:key(), non_neg_integer() | -1,
                 tx_status(), any()) -> tlog_entry().
 new_entry(Op, Key, Vers, Status, Val) ->
     {Op, Key, Vers, Status, Val}.
@@ -131,7 +131,7 @@ get_entry_key(Element)       -> element(2, Element).
 -spec set_entry_key(tlog_entry(), client_key() | ?RT:key()) -> tlog_entry().
 set_entry_key(Entry, Val)    -> setelement(2, Entry, Val).
 
--spec get_entry_version(tlog_entry()) -> integer().
+-spec get_entry_version(tlog_entry()) -> non_neg_integer() | -1.
 get_entry_version(Element)   -> element(3, Element).
 
 -spec get_entry_status(tlog_entry()) -> tx_status().
