@@ -229,8 +229,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     RTMs = state_get_RTMs(State),
     GLLearner = state_get_gllearner(State),
     NewTid = {?tx_id, uid:get_global_uid()},
-    NewTxItemIds = [ {?tx_item_id, uid:get_global_uid()} || _ <- TransLog ],
-    TLogTxItemIds = lists:zip(TransLog, NewTxItemIds),
+    TLogTxItemIds = [ {TLogEntry, {?tx_item_id, uid:get_global_uid()}} || TLogEntry <- TransLog ],
     TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
                               TLogTxItemIds, [GLLearner]),
     TxState = tx_state:set_status(TmpTxState, ok),
@@ -580,7 +579,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
-            {_, TxItemIDs} = lists:unzip(tx_state:get_tlog_txitemids(TxState)),
+            TxItemIDs = [ TxItemId || {_, TxItemId} <- tx_state:get_tlog_txitemids(TxState)],
             [ begin
                   {_, ItemState} = get_item_entry(ItemId, State),
                   case tx_item_state:get_decided(ItemState) of
