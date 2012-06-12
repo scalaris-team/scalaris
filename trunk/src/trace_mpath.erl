@@ -37,7 +37,7 @@
 
 %% client functions
 -export([start/0, start/1, start/2, stop/0]).
--export([get_trace/0, get_trace/1, cleanup/0, cleanup/1]).
+-export([get_trace/0, get_trace/1, get_trace_raw/1, cleanup/0, cleanup/1]).
 
 %% trace analysis
 -export([send_histogram/1]).
@@ -59,16 +59,16 @@
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
 -type send_event()   :: {log_send, erlang:timestamp(), trace_id(),
-                         pidinfo(), pidinfo(), comm:message()}.
+                         Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type info_event()   :: {log_info, erlang:timestamp(), trace_id(),
                          pidinfo(), comm:message()}.
 -type recv_event()   :: {log_recv, erlang:timestamp(), trace_id(),
-                         pidinfo(), pidinfo(), comm:message()}.
+                         Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
 -type passed_state() :: {trace_id(), logger()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
-                         pidinfo(), pidinfo(), comm:message()}.
+                         Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 
 -ifdef(with_export_type_support).
 -export_type([logger/0]).
@@ -109,6 +109,23 @@ get_trace() -> get_trace(default).
 
 -spec get_trace(trace_id()) -> trace().
 get_trace(TraceId) ->
+    LogRaw = get_trace_raw(TraceId),
+    [case Event of
+         {SendOrRcv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
+           when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
+             {SendOrRcv, Time, TraceId, Source, Dest,
+              convert_msg({Tag, Key, Hops, convert_msg(Msg)})};
+         {SendOrRcv, Time, TraceId, Source, Dest, Msg} ->
+             {SendOrRcv, Time, TraceId, Source, Dest, convert_msg(Msg)};
+         {log_info, _Time, _TraceId, _Pid, _Msg} = X -> X
+     end || Event <- LogRaw].
+
+-spec convert_msg(Msg::comm:message()) -> comm:message().
+convert_msg(Msg) when is_tuple(Msg) ->
+    setelement(1, Msg, util:extint2atom(element(1, Msg))).
+
+-spec get_trace_raw(trace_id()) -> trace().
+get_trace_raw(TraceId) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
     comm:send_local(LoggerPid, {get_trace, comm:this(), TraceId}),
     receive
