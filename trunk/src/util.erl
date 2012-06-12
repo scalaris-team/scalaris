@@ -969,5 +969,8 @@ extint2atom(X) when is_integer(X) ->
         ?undecided -> ?undecided_atom;
         ?prepared -> ?prepared_atom;
         ?commit -> ?commit_atom;
-        ?abort -> ?abort_atom
+        ?abort -> ?abort_atom;
+        ?value -> ?value_atom;
+        ?read -> ?read_atom;
+        ?write -> ?write_atom
     end.
