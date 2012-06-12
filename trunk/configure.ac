@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.65)
-AC_INIT(scalaris, 0.4.1+svn, schuett@zib.de)
+AC_INIT(scalaris, 0.4.1+svn, scalaris@googlegroups.com)
 
 ###########################################################
 #
