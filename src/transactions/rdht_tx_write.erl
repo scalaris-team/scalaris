@@ -51,15 +51,11 @@ msg_reply(Id, TLogEntry) ->
 -spec work_phase(pid(), rdht_tx:req_id(), api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     ?TRACE("rdht_tx_write:work_phase asynch~n", []),
-    %% PRE: No entry for key in TLog
-    %% build translog entry from quorum read
     %% Find rdht_tx_write process
-    WriteValue = erlang:element(3, Request),
-
     RdhtTxWritePid = pid_groups:find_a(?MODULE),
-    rdht_tx_read:work_phase(RdhtTxWritePid, {ReqId, ClientPid, WriteValue},
-                            Request),
-    ok.
+    % hash key here so that any error during the process is thrown in the client's context
+    HashedKey = ?RT:hash_key(element(2, Request)),
+    comm:send_local(RdhtTxWritePid, {start_work_phase, ReqId, ClientPid, HashedKey, Request}).
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
@@ -156,18 +152,28 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     ?TRACE("rdht_tx_write: Starting rdht_tx_write for DHT node: ~p~n",
            [pid_groups:my_groupname()]),
-    _State = null.
+    DHTNodeGroup = pid_groups:my_groupname(),
+    Table = list_to_atom(DHTNodeGroup ++ "_rdht_tx_write"),
+    pdb:new(Table, [set, private, named_table]),
+    Table.
+
+-spec on(comm:message(), pdb:tableid()) -> pdb:tableid().
+on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->
+    %% PRE: No entry for key in TLog
+    %% build translog entry from quorum read
+    pdb:set({ReqId, ClientPid, element(3, Request)}, TableName),
+    rdht_tx_read:work_phase_key(self(), ReqId, element(2, Request), HashedKey),
+    TableName;
 
 %% reply triggered by rdht_tx_write:work_phase/3
-%% ClientPid and WriteValue could also be stored in local process state via ets
--spec on(comm:message(), null) -> null.
-on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
+on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
+    {Id, ClientPid, WriteValue} = pdb:get(Id, TableName),
     Key = tx_tlog:get_entry_key(TLogEntry),
     Request = {write, Key, WriteValue},
     NewTLogEntry = update_tlog_entry(TLogEntry, Request),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
-    State.
+    TableName.
 
 -spec update_tlog_entry(tx_tlog:tlog_entry(), api_tx:request()) ->
                                tx_tlog:tlog_entry().
