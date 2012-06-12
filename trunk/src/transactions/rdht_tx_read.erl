@@ -25,9 +25,10 @@
 -define(TRACE(X,Y), ok).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -behaviour(tx_op_beh).
--export([work_phase/3,
+-export([work_phase/3, work_phase_key/4,
          validate_prefilter/1, validate/2,
          commit/3, abort/3]).
 
@@ -46,22 +47,29 @@ msg_reply(Id, TLogEntry) ->
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                  api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
+    Key = element(2, Request),
+    HashedKey = ?RT:hash_key(Key),
+    work_phase_key(ClientPid, ReqId, Key, HashedKey).
+
+-spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
+                     client_key(), ?RT:key()) -> ok.
+work_phase_key(ClientPid, ReqId, Key, HashedKey) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
 
     CollectorPid = pid_groups:find_a(?MODULE),
-    Key = element(2, Request),
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
     %% trigger quorum read
-    quorum_read(comm:make_global(CollectorPid), ReqId, Request),
+    quorum_read(comm:make_global(CollectorPid), ReqId, HashedKey),
     ok.
 
-quorum_read(CollectorPid, ReqId, Request) ->
+-spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
+                  HashedKey::?RT:key()) -> ok.
+quorum_read(CollectorPid, ReqId, HashedKey) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
-    Key = element(2, Request),
-    RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    RKeys = ?RT:get_replica_keys(HashedKey),
     _ = [ api_dht_raw:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
     ok.
 
