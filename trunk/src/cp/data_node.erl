@@ -122,14 +122,17 @@ get_rlease_mgmt(#state{rlease_mgmt=RLMState}) -> RLMState.
 set_rlease_mgmt(State, RLMState) -> State#state{rlease_mgmt = RLMState}.
 
 %% operations on the lease list
+-spec add_lease_to_master_list(leases:lease()) -> ok.
 add_lease_to_master_list(Lease) ->
     DataNode = pid_groups:get_my(data_node),
     comm:send_local(DataNode, {add_lease_to_master_list, Lease}).
 
+-spec delete_lease_from_master_list(leases:lease()) -> ok.
 delete_lease_from_master_list(Lease) ->
     DataNode = pid_groups:get_my(data_node),
     comm:send_local(DataNode, {delete_lease_from_master_list, Lease}).
 
+-spec update_lease_in_master_list(leases:lease()) -> ok.
 update_lease_in_master_list(Lease) ->
     DataNode = pid_groups:get_my(data_node),
     comm:send_local(DataNode, {update_lease_in_master_list, Lease}).
