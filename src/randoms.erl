@@ -38,8 +38,8 @@ getRandomString() ->
 getRandomInt() ->
     rand_uniform(1, 16#100000000).
 
-%% @doc Generates a random number N between Lo lt; N &lt; Hi using the crypto library
-%%      pseudo-random number generator.
+%% @doc Generates a random number N between Lo &lt;= N &lt; Hi using the crypto
+%%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
 rand_uniform(Lo, Hi) when Lo < Hi ->
     crypto:rand_uniform(Lo, Hi);
