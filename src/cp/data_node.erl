@@ -30,7 +30,10 @@
 -export([new_state/0,
          get_leases/1, set_leases/2,
          get_db/1,
-         get_rlease_mgmt/1, set_rlease_mgmt/2]).
+         get_rlease_mgmt/1, set_rlease_mgmt/2,
+         % operations on the lease list
+         add_lease_to_master_list/1, delete_lease_from_master_list/1,
+         update_lease_in_master_list/1]).
 
 -ifdef(with_export_type_support).
 -export_type([msg/0, state/0]).
@@ -117,3 +120,16 @@ get_db(#state{db=DB}) -> DB.
 get_rlease_mgmt(#state{rlease_mgmt=RLMState}) -> RLMState.
 -spec set_rlease_mgmt(state(), rlease_mgmt:state()) -> state().
 set_rlease_mgmt(State, RLMState) -> State#state{rlease_mgmt = RLMState}.
+
+%% operations on the lease list
+add_lease_to_master_list(Lease) ->
+    DataNode = pid_groups:get_my(data_node),
+    comm:send_local({add_lease_to_master_list, Lease}).
+
+delete_lease_from_master_list(Lease) ->
+    DataNode = pid_groups:get_my(data_node),
+    comm:send_local({delete_lease_from_master_list, Lease}).
+
+update_lease_in_master_list(Lease) ->
+    DataNode = pid_groups:get_my(data_node),
+    comm:send_local({update_lease_in_master_list, Lease}).

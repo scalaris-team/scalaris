@@ -27,12 +27,14 @@
 %% operations for abstract data type 'lease'
 -export([new_for_all/0,
          get_id/1,
-         get_epoch/1,
-         get_owner/1,
+         get_epoch/1, inc_epoch/1,
+         get_owner/1, i_am_owner/1, set_owner_to_self/1,
          get_range/1,
          get_aux/1,
-         get_version/1,
-         get_timeout/1]).
+         get_version/1, inc_version/1,
+         get_timeout/1, set_timeout/2, update_timeout/1,
+         is_valid/1
+        ]).
 -export([get_persistent_info/1]).
 
 %% operations on lists of the 'lease' type
@@ -63,6 +65,11 @@ new_for_all() ->
            range = Range, aux = nil, version = 0,
            timeout = calc_timeout(os:timestamp())}.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Getter
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec get_id(lease()) -> lease_id().
 get_id(Lease) -> Lease#lease.id.
 -spec get_epoch(lease()) -> non_neg_integer().
@@ -77,6 +84,36 @@ get_aux(Lease) -> Lease#lease.aux.
 get_version(Lease) -> Lease#lease.version.
 -spec get_timeout(lease()) -> erlang:timestamp().
 get_timeout(Lease) -> Lease#lease.timeout.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% More complex operations on leases
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec inc_epoch(lease()) -> lease().
+inc_epoch(#lease{epoch=Epoch} = Lease) ->
+    Lease#lease{epoch=Epoch + 1, version = 1}.
+
+-spec inc_version(lease()) -> lease().
+inc_version(#lease{version=Version} = Lease) ->
+    Lease#lease{version = Version + 1}.
+
+-spec i_am_owner(lease()) -> boolean().
+i_am_owner(#lease{owner=Owner}) ->
+    Owner == comm:make_global(pid_groups:get_my(data_node)).
+
+-spec set_owner_to_self(lease()) -> lease().
+set_owner_to_self(Lease) ->
+    Lease#lease{owner = comm:make_global(pid_groups:get_my(data_node))}.
+
+-spec set_timeout(lease(), erlang:timestamp()) -> lease().
+set_timeout(Lease, Timeout) ->
+    Lease#lease{timeout = Timeout}.
+
+-spec update_timeout(lease()) -> lease().
+update_timeout(Lease) ->
+    set_timeout(Lease, calc_timeout(os:timestamp())).
+
 
 % -spec calc_lease_id(lease()) -> lease_id().
 % calc_lease_id(Lease) ->
@@ -114,15 +151,12 @@ is_owner(Leases, Key) ->
 
 
 
-%% private functions
-i_am_owner(#lease{owner=Owner}) ->
-    Owner == comm:this().
-
-%% private time related functions
 % @doc valid if timeout in future
+-spec is_valid(lease()) -> boolean().
 is_valid(#lease{timeout=Timeout}) ->
     timer:now_diff(Timeout, precision_time()) > epsilon().
 
+%% private time related functions
 % @doc returns the precise current time; could apply delta to erlang:now()
 precision_time() ->
     os:timestamp().
