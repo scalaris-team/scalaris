@@ -101,3 +101,6 @@
 
 -define(write_atom, write).
 -define(write, ?int_or_atom(77, ?write_atom)).
+
+-define(value_dropped_atom, value_dropped).
+-define(value_dropped, ?int_or_atom(78, ?value_dropped_atom)).

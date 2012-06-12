@@ -38,6 +38,7 @@
 -export([get_entry_key/1,       set_entry_key/2]).
 -export([get_entry_status/1,    set_entry_status/2]).
 -export([get_entry_value/1,     set_entry_value/2]).
+-export([drop_value/1]).
 -export([get_entry_version/1]).
 
 -ifdef(with_export_type_support).
@@ -146,3 +147,5 @@ get_entry_value(Element)     -> element(5, Element).
 -spec set_entry_value(tlog_entry(), any()) -> tlog_entry().
 set_entry_value(Element, Val)     -> setelement(5, Element, Val).
 
+-spec drop_value(tlog_entry()) -> tlog_entry().
+drop_value(Element)     -> setelement(5, Element, ?value_dropped).
