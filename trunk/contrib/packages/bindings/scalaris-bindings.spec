@@ -75,7 +75,7 @@ BuildRequires:  pkg-config
 %global python3_libdir   %{python3_prefix}/%{_lib}/python%{python3_ver}
 %global python3_sitedir  %{python3_libdir}/site-packages
 %endif
-%if 0%{?suse_version} > 1210
+%if 0%{?suse_version} >= 1210
 BuildRequires:  python3-2to3
 %endif
 %if 0%{?suse_version} >= 1130 
