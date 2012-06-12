@@ -55,9 +55,9 @@
 
 -record(state, {
           %% state for embedded paxos learner...
-          learner_state   :: pdb:table_id(),
+          learner_state   :: pdb:tableid(),
           %% {lease_ops, Key} -> state map (progress)
-          progress_state  :: pdb:table_id()
+          progress_state  :: pdb:tableid()
          }).
 -type state() :: #state{}.
 
@@ -218,7 +218,7 @@ renew_lease(Lease, ClientPid) ->
     comm:send_local(LeaseOps, {renew_lease, Lease, ClientPid}).
 
 %% @doc acquire a lease
--spec acquire_lease(rt_beh:key(), comm:mypid()) -> ok.
+-spec acquire_lease(?RT:key(), comm:mypid()) -> ok.
 acquire_lease(Key, ClientPid) ->
     LeaseOps = pid_groups:get_my(lease_ops),
     comm:send_local(LeaseOps, {acquire_lease, Key, ClientPid}).
