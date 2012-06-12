@@ -32,8 +32,6 @@
          validate_prefilter/1, validate/2,
          commit/3, abort/3]).
 
--behaviour(rdht_op_beh).
-
 -behaviour(gen_component).
 -export([init/1, on/2]).
 
