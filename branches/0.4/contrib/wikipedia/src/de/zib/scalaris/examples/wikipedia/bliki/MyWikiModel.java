@@ -903,7 +903,7 @@ public class MyWikiModel extends WikiModel {
      *            the number of milliseconds it took to retrieve the page
      */
     public void addStat(String title, long value) {
-        stats.put(title, value);
+        stats.put1(title, value);
     }
 
     /**
