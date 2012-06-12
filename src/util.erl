@@ -46,7 +46,7 @@
          readable_utc_time/1,
          for_to/3, for_to_ex/3, for_to_ex/4,
          collect_while/1]).
--export([debug_info/0, debug_info/1]).
+-export([debug_info/0, debug_info/1, print_bits/2]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -941,6 +941,13 @@ debug_info(Pid) when is_pid(Pid) ->
 %% empty shell_prompt_func
 -spec empty(any()) -> [].
 empty(_) -> "".
+
+-spec print_bits(fun((string(), [term()]) -> Result), binary()) -> Result.
+print_bits(FormatFun, Binary) ->
+    BitSize = erlang:bit_size(Binary),
+    <<BinNr:BitSize>> = Binary,
+    NrBits = lists:flatten(io_lib:format("~B", [BitSize])),
+    FormatFun("~" ++ NrBits ++ ".2B", [BinNr]).
 
 -spec extint2atom(atom() | integer()) -> atom().
 extint2atom(X) when is_atom(X) -> X;
