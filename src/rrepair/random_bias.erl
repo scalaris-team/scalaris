@@ -32,29 +32,35 @@
 -export_type([distribution_fun/0]).
 -endif.
 
--record(binomial_state, { n = ?required(binomial_state, n) :: pos_integer(),
-                          p = ?required(binomial_state, p) :: float(),
-                          k = 0                            :: non_neg_integer()
-                        }).
--type binomial_state() :: #binomial_state{}.
+-type binomial_state() :: {binom,
+                           N::pos_integer(),
+                           P::float(),
+                           K::non_neg_integer()
+                          }.
 
 -type distribution_fun() :: fun(() -> {ok, float()} | {last, float()}).
-
--type distribution_state() :: #binomial_state{}. %or others
+-type distribution_state() :: binomial_state(). %or others
 -type generator_state() :: { State       :: distribution_state(),
                              CalcFun     :: fun((distribution_state()) -> any()),
                              NewStateFun :: fun((distribution_state()) -> distribution_state() | exit)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% API Functions
+%% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % creates a new binomial distribution generation fun.
 -spec binomial(pos_integer(), float()) -> distribution_fun().
 binomial(N, P) ->
-    State = { #binomial_state{ n = N, p = P },
-              fun calc_binomial/1,
-              fun next_state/1 },
+    create_distribution_fun({ {binom, N, P, 0},
+                              fun calc_binomial/1,
+                              fun next_state/1 }).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec create_distribution_fun(generator_state()) -> distribution_fun().
+create_distribution_fun(State) ->
     Pid = spawn(fun() -> generator(State) end),
     fun() ->
             comm:send_local(Pid, {next, self()}),
@@ -77,10 +83,11 @@ generator({ DS, CalcFun, NextFun }) ->
     end.
 
 -spec calc_binomial(binomial_state()) -> float().
-calc_binomial(#binomial_state{ n = N, p = P, k = K }) ->
+calc_binomial({binom, N, P, K }) ->
     mathlib:binomial_coeff(N, K) * math:pow(P, K) * math:pow(1 - P, N - K).
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
-next_state(#binomial_state{ n = N, k = K}) when K =:= N -> exit;
-next_state(#binomial_state{ k = K} = S) -> 
-    S#binomial_state{ k = K + 1}. 
+next_state({binom, N, _P, K}) when K =:= N -> 
+    exit;
+next_state({binom, N, P, K}) -> 
+    {binom, N, P, K + 1}.
