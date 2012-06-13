@@ -12,6 +12,11 @@
 			<param-value>localhost:8080</param-value>
 		</init-param>
 		<init-param>
+			<param-name>LOG_USER_REQS</param-name>
+			<!-- keep records of the last x minutes since the last request-->
+			<param-value>0</param-value>
+		</init-param>
+		<init-param>
 			<param-name>SERVERPATH</param-name>
 			<param-value>/scalaris-wiki/wiki</param-value>
 		</init-param>

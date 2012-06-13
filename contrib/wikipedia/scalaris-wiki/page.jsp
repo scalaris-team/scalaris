@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<%@page import="de.zib.scalaris.examples.wikipedia.bliki.WikiServlet"%>
 <%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@page import="java.net.URL"%>
 <%@page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
@@ -424,5 +425,6 @@ server: <%= renderTime %>
                 </pre></div>
         </div>
         <!-- /footer -->
+<% WikiServlet.storeUserReq(pageBean.getStartTime(), WikiServlet.getParam(request, "service_user"), renderTime); %>
 </body>
 </html>

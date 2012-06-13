@@ -81,6 +81,12 @@ public class Options {
             ScalarisOpType.class);
     
     /**
+     * Store user requests in a log for the last x minutes before the last
+     * request.
+     */
+    public int LOG_USER_REQS = 0;
+    
+    /**
      * Creates a new default option object.
      */
     public Options() {
@@ -310,13 +316,16 @@ public class Options {
      *            {@link Options#WIKI_STORE_CONTRIBUTIONS}
      * @param OPTIMISATIONS
      *            {@link Options#OPTIMISATIONS}
+     * @param LOG_USER_REQS
+     *            {@link Options#LOG_USER_REQS}
      */
     public static void parseOptions(Options options, final String SERVERNAME, final String SERVERPATH,
             final String WIKI_USE_BACKLINKS,
             final String WIKI_SAVEPAGE_RETRIES,
             final String WIKI_SAVEPAGE_RETRY_DELAY,
             final String WIKI_REBUILD_PAGES_CACHE,
-            final String WIKI_STORE_CONTRIBUTIONS, final String OPTIMISATIONS) {
+            final String WIKI_STORE_CONTRIBUTIONS, final String OPTIMISATIONS,
+            final String LOG_USER_REQS) {
         if (SERVERNAME != null) {
             options.SERVERNAME = SERVERNAME;
         }
@@ -367,6 +376,9 @@ public class Options {
                     }
                 }
             }
+        }
+        if (LOG_USER_REQS != null) {
+            options.LOG_USER_REQS = Integer.parseInt(LOG_USER_REQS);
         }
     }
 }
