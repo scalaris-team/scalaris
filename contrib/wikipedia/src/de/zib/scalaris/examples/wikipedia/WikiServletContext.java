@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
+import de.zib.scalaris.examples.wikipedia.bliki.WikiPageBeanBase;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiServlet;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
@@ -51,17 +52,23 @@ public interface WikiServletContext {
      * Gets the base URL for links to articles relative to the servlet's context
      * path.
      * 
+     * @param page
+     *            the page to get the URL for
+     * 
      * @return the linkbaseurl
      */
-    public abstract String getLinkbaseurl();
+    public abstract String getLinkbaseurl(WikiPageBeanBase page);
 
     /**
      * Gets the base URL for links to images relative to the servlet's context
      * path.
      * 
+     * @param page
+     *            the page to get the URL for
+     * 
      * @return the imagebaseurl
      */
-    public abstract String getImagebaseurl();
+    public abstract String getImagebaseurl(WikiPageBeanBase page);
 
     /**
      * Adds the given event handler to the list of event handlers.

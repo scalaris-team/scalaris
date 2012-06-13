@@ -329,9 +329,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             return;
         }
 
+        final String serviceUser = getParam(request, "service_user");
+        
         Connection connection = getConnection(request);
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean(startTime)); // should forward to another page
+            showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime)); // should forward to another page
             return; // return just in case
         }
         try {
@@ -344,14 +346,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             // show empty page for testing purposes if a parameter called "test" exists:
             if (request.getParameter("test") != null) {
-                showEmptyPage(request, response, new WikiPageBean(startTime));
+                showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime));
                 return;
             }
             
             // if the "search" parameter exists, show the search
             String req_search = request.getParameter("search");
             if (req_search != null) {
-                handleSearch(request, response, null, req_search, connection, new WikiPageListBean(startTime));
+                handleSearch(request, response, null, req_search, connection, new WikiPageListBean(serviceUser, startTime));
                 return;
             }
 
@@ -364,20 +366,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             String req_action = request.getParameter("action");
 
             if (!MyWikiModel.isValidTitle(req_title)) {
-                handleViewPageBadTitle(request, response, connection, new WikiPageBean(startTime));
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean(serviceUser, startTime));
             } else if (req_title.startsWith("Special:")) {
                 handleViewSpecialPage(request, response, req_title, req_search, "Special:".length(), connection, startTime);
             } else if (req_title.startsWith(namespace.getSpecial() + ":")) {
                 handleViewSpecialPage(request, response, req_title, req_search, namespace.getSpecial().length() + 1, connection, startTime);
             } else if (req_action == null || req_action.equals("view")) {
-                handleViewPage(request, response, req_title, connection, new WikiPageBean(startTime));
+                handleViewPage(request, response, req_title, connection, new WikiPageBean(serviceUser, startTime));
             } else if (req_action.equals("history")) {
-                handleViewPageHistory(request, response, req_title, connection, new WikiPageBean(startTime));
+                handleViewPageHistory(request, response, req_title, connection, new WikiPageBean(serviceUser, startTime));
             } else if (req_action.equals("edit")) {
-                handleEditPage(request, response, req_title, connection, new WikiPageEditBean(startTime));
+                handleEditPage(request, response, req_title, connection, new WikiPageEditBean(serviceUser, startTime));
             } else {
                 // default: show page
-                handleViewPage(request, response, req_title, connection, new WikiPageBean(startTime));
+                handleViewPage(request, response, req_title, connection, new WikiPageBean(serviceUser, startTime));
             }
 
             // if the request has not been forwarded, print a general error
@@ -415,36 +417,37 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, String req_search,
             int prefixLength, Connection connection, long startTime)
             throws IOException, ServletException {
+        final String serviceUser = getParam(request, "service_user");
         final String plainTitle = title.substring(prefixLength);
         // a "/" which separates the special page title from its parameters
         final String plainTitleToSlash = plainTitle.split("/")[0];
         if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_RANDOM))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_RANDOM))) {
-            handleViewRandomPage(request, response, title, connection, new WikiPageBean(startTime));
+            handleViewRandomPage(request, response, title, connection, new WikiPageBean(serviceUser, startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_ALLPAGES))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_ALLPAGES))) {
-            handleSpecialAllPages(request, response, title, connection, new WikiPageListBean(startTime));
+            handleSpecialAllPages(request, response, title, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_PREFIXINDEX))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_PREFIXINDEX))) {
-            handleSpecialPrefix(request, response, title, connection, new WikiPageListBean(startTime));
+            handleSpecialPrefix(request, response, title, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SEARCH))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SEARCH))) {
-            handleSearch(request, response, title, req_search, connection, new WikiPageListBean(startTime));
+            handleSearch(request, response, title, req_search, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_WHATLINKSHERE))
                 || plainTitleToSlash.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_WHATLINKSHERE))) {
-            handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean(startTime));
+            handleSpecialWhatLinksHere(request, response, title, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_SPECIALPAGES))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_SPECIALPAGES))) {
-            handleViewSpecialPages(request, response, connection, new WikiPageListBean(startTime));
+            handleViewSpecialPages(request, response, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_STATS))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS))) {
-            handleViewSpecialStatistics(request, response, connection, new WikiPageListBean(startTime));
+            handleViewSpecialStatistics(request, response, connection, new WikiPageListBean(serviceUser, startTime));
         } else if (plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_EN.get(SpecialPage.SPECIAL_VERSION))
                 || plainTitle.equalsIgnoreCase(SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION))) {
-            handleViewSpecialVersion(request, response, connection, new WikiPageListBean(startTime));
+            handleViewSpecialVersion(request, response, connection, new WikiPageListBean(serviceUser, startTime));
         } else {
             // no such special page
-            handleViewPageNotExisting(request, response, title, connection, new WikiPageBean(startTime));
+            handleViewPageNotExisting(request, response, title, connection, new WikiPageBean(serviceUser, startTime));
         }
     }
 
@@ -660,8 +663,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response) throws ServletException, IOException {
         long startTime = System.currentTimeMillis();
         Connection connection = getConnection(request);
+        final String serviceUser = getParam(request, "service_user");
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean(startTime)); // should forward to another page
+            showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime)); // should forward to another page
             return; // return just in case
         }
         try {
@@ -674,11 +678,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             String req_title = request.getParameter("title");
             if (!MyWikiModel.isValidTitle(req_title)) {
-                handleViewPageBadTitle(request, response, connection, new WikiPageBean(startTime));
+                handleViewPageBadTitle(request, response, connection, new WikiPageBean(serviceUser, startTime));
             } else {
                 handleEditPageSubmitted(request, response,
                         request.getParameter("title"), connection,
-                        new WikiPageEditBean(startTime));
+                        new WikiPageEditBean(serviceUser, startTime));
             }
 
             // if the request has not been forwarded, print a general error
@@ -715,6 +719,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         ValueResult<NormalisedTitle> result = getRandomArticle(connection, new Random());
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
         if (result.success) {
             ArrayList<Long> times = new ArrayList<Long>();
             for (List<Long> time : result.stats.values()) {
@@ -727,12 +732,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
             response.sendRedirect("http://" + Options.getInstance().SERVERNAME
                     + Options.getInstance().SERVERPATH
-                    + response.encodeRedirectURL(redirectUrl.toString()));
+                    + response.encodeRedirectURL(redirectUrl.toString())
+                    + serviceUser);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, page);
         } else {
-            response.sendRedirect(response.encodeRedirectURL("?title=Main Page&notice=error: can not view random page: <pre>" + result.message + "</pre>"));
+            response.sendRedirect(response.encodeRedirectURL("?title=Main Page&notice=error: can not view random page: <pre>" + result.message + "</pre>" + serviceUser));
         }
     }
 
@@ -822,7 +828,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
         if (renderer > 0) {
             String mainText = wikiModel.render(revision.unpackedText(), true);
@@ -1258,7 +1264,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             int pagesInFirst = specialPagesInGroup.getValue().size() / 2 + specialPagesInGroup.getValue().size() % 2;
             for (; i < pagesInFirst; ++i) {
                 Entry<String, String> pageInFirst = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + "\" title=\"" + pageInFirst.getKey() + "\">" + pageInFirst.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + "\" title=\"" + pageInFirst.getKey() + "&amp;service_user=" + page.getServiceUser() + "\">" + pageInFirst.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
@@ -1267,7 +1273,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             content.append("    <ul>\n");
             while(it.hasNext()) {
                 Entry<String, String> pageInSecond = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + "\" title=\"" + pageInSecond.getKey() + "\">" + pageInSecond.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + "\" title=\"" + pageInSecond.getKey() + "&amp;service_user=" + page.getServiceUser() + "\">" + pageInSecond.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
@@ -1303,7 +1309,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewSpecialStatistics(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
             WikiPageListBean page) throws ServletException, IOException {
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyWikiModel wikiModel = getWikiModel(connection, page);
         final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_STATS));
         page.setPageHeading("Statistics");
         page.setTitle(title);
@@ -1674,10 +1680,12 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 }
                 redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
                 redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
+                final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
                 response.sendRedirect("http://"
                         + Options.getInstance().SERVERNAME
                         + Options.getInstance().SERVERPATH
-                        + response.encodeRedirectURL(redirectUrl.toString()));
+                        + response.encodeRedirectURL(redirectUrl.toString())
+                        + serviceUser);
                 return;
             } else {
                 // set error message and show the edit page again (see below)
@@ -1696,7 +1704,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         // set the textarea's contents:
         page.setPage(StringEscapeUtils.escapeHtml(content));
 
-        MyWikiModel wikiModel = getWikiModel(connection);
+        MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
         page.setPreview(wikiModel.render(content, true));
         page.addStats(wikiModel.getStats());
@@ -1784,7 +1792,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         return null;
     }
     
-    abstract protected MyWikiModel getWikiModel(Connection connection);
+    abstract protected MyWikiModel getWikiModel(Connection connection, WikiPageBeanBase page);
 
     /**
      * Adds the given notice to the notice attribute.
@@ -1926,7 +1934,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getNamespace()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getNamespace()
      */
     @Override
     public final NamespaceUtils getNamespace() {
@@ -1934,7 +1942,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getSiteinfo()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getSiteinfo()
      */
     @Override
     public SiteInfo getSiteinfo() {
@@ -1942,7 +1950,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getVersion()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getVersion()
      */
     @Override
     public String getVersion() {
@@ -1950,23 +1958,25 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getLinkbaseurl()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getLinkbaseurl(WikiPageBeanBase)
      */
     @Override
-    public String getLinkbaseurl() {
-        return Options.getInstance().SERVERPATH + "?title=${title}";
+    public String getLinkbaseurl(WikiPageBeanBase page) {
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + page.getServiceUser();
+        return Options.getInstance().SERVERPATH + "?title=${title}" + serviceUser;
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getImagebaseurl()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getImagebaseurl(WikiPageBeanBase)
      */
     @Override
-    public String getImagebaseurl() {
-        return Options.getInstance().SERVERPATH + "?get_image=${image}";
+    public String getImagebaseurl(WikiPageBeanBase page) {
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + page.getServiceUser();
+        return Options.getInstance().SERVERPATH + "?get_image=${image}" + serviceUser;
     }
 
     /* (non-Javadoc)
-     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletInterface#getImagebaseurl()
+     * @see de.zib.scalaris.examples.wikipedia.bliki.WikiServletContext#getImagebaseurl()
      */
     @Override
     public synchronized void registerEventHandler(WikiEventHandler handler) {

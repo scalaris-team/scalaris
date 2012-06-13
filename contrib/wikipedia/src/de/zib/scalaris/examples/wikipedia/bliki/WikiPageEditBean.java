@@ -46,11 +46,13 @@ public class WikiPageEditBean extends WikiPageBeanBase {
     /**
      * Creates a new (empty) bean with the given start time.
      * 
+     * @param serviceUser
+     *            service user
      * @param startTime
      *            the time when the request reached the servlet (in ms)
      */
-    public WikiPageEditBean(long startTime) {
-        super(startTime);
+    public WikiPageEditBean(String serviceUser, long startTime) {
+        super(serviceUser, startTime);
     }
 
     /**
