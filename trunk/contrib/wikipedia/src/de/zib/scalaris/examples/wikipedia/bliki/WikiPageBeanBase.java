@@ -30,6 +30,10 @@ import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 public class WikiPageBeanBase {
 
     /**
+     * the service user
+     */
+    private String serviceUser = "";
+    /**
      * the title of the site
      */
     private String title = "";
@@ -77,11 +81,14 @@ public class WikiPageBeanBase {
     /**
      * Creates a new (empty) bean with the given start time.
      * 
+     * @param serviceUser
+     *            service user
      * @param startTime
      *            the time when the request reached the servlet (in ms)
      */
-    public WikiPageBeanBase(long startTime) {
+    public WikiPageBeanBase(String serviceUser, long startTime) {
         super();
+        this.serviceUser = serviceUser;
         this.startTime = startTime;
     }
     
@@ -93,6 +100,7 @@ public class WikiPageBeanBase {
      */
     public WikiPageBeanBase(WikiPageBeanBase other) {
         super();
+        this.serviceUser = other.serviceUser;
         this.title = other.title;
         version = other.version;
         notice = other.notice;
@@ -369,5 +377,19 @@ public class WikiPageBeanBase {
      */
     public void setStartTime(long startTime) {
         this.startTime = startTime;
+    }
+
+    /**
+     * @return the serviceUser
+     */
+    public String getServiceUser() {
+        return serviceUser;
+    }
+
+    /**
+     * @param serviceUser the serviceUser to set
+     */
+    public void setServiceUser(String serviceUser) {
+        this.serviceUser = serviceUser;
     }
 }
