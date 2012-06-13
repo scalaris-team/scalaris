@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.EnumMap;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -127,6 +128,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * Full list of normalised special page titles for {@link #existingPages}. 
      */
     protected final List<NormalisedTitle> specialPages;
+    
+    protected static LinkedList<Map<String, Object>>[] userReqLogs = null;
+    protected static int curReqLog = 0;
+    protected static int curReqLogStartTime = 0;
 
     /**
      * Creates the servlet. 
@@ -152,6 +157,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * Servlet initialisation: imports options from the servlet info, and
      * initialises it.
      */
+    @SuppressWarnings("unchecked")
     @Override
     public final void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -163,6 +169,14 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         loadPlugins();
         startExistingPagesUpdate();
         existingPages.addAll(specialPages);
+        if (Options.getInstance().LOG_USER_REQS > 0) {
+            userReqLogs = new LinkedList[Options.getInstance().LOG_USER_REQS];
+            for (int i = 0; i < userReqLogs.length; ++i) {
+                userReqLogs[i] = new LinkedList<Map<String, Object>>();
+            }
+            // integer resolution should be enough
+            curReqLogStartTime = (int) (System.currentTimeMillis() / 1000);
+        }
     }
 
     /**
@@ -181,7 +195,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY"),
                 config.getInitParameter("WIKI_REBUILD_PAGES_CACHE"),
                 config.getInitParameter("WIKI_STORE_CONTRIBUTIONS"),
-                config.getInitParameter("WIKI_OPTIMISATIONS"));
+                config.getInitParameter("WIKI_OPTIMISATIONS"),
+                config.getInitParameter("LOG_USER_REQS"));
     }
     
     /**
@@ -1808,7 +1823,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @param name
      *            the name of the parameter
      * 
-     * @return the notice parameter or ""
+     * @return the requested parameter or ""
      */
     public static String getParam(HttpServletRequest request, String name) {
         String parValue = request.getParameter(name);
@@ -1975,6 +1990,52 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             } finally {
                 releaseConnection(null, connection);
             }
+        }
+    }
+    
+    /**
+     * Adds a user request to the user request log if enabled by setting
+     * {@link Options#LOG_USER_REQS} to a value larger than <tt>0</tt>.
+     * 
+     * @param timestamp
+     *            milliseconds since midnight, January 1, 1970
+     * @param serviceUser
+     *            service user name (may be null)
+     * @param servertime
+     *            time spend in the web server
+     */
+    public static void storeUserReq(long timestamp, String serviceUser, long servertime) {
+        if (userReqLogs.length > 0) {
+            int timestamp_s = (int) (timestamp / 1000);
+            // build log entry:
+            Map<String, Object> entry = new HashMap<String, Object>();
+            entry.put("timestamp", timestamp_s);
+            entry.put("serviceuser", serviceUser == null ? "" : serviceUser);
+            entry.put("servertime", servertime);
+            
+            // get the correct bucket:
+            LinkedList<Map<String, Object>> curReqLogList;
+            synchronized (userReqLogs) {
+                curReqLogList = userReqLogs[curReqLog];
+                int diffInMin = (timestamp_s - curReqLogStartTime) / 60;
+                if (diffInMin > 0) {
+                    if (diffInMin > userReqLogs.length) {
+                        for (LinkedList<Map<String, Object>> log : userReqLogs) {
+                            log.clear();
+                        }
+                        curReqLog = 0;
+                        curReqLogList = userReqLogs[curReqLog];
+                    } else  {
+                        while ((curReqLogStartTime + 60) < timestamp_s) {
+                            curReqLogList = userReqLogs[curReqLog];
+                            curReqLogList.clear();
+                            curReqLog = (++curReqLog) % userReqLogs.length;
+                        }
+                    }
+                    curReqLogStartTime += 60 * diffInMin;
+                }
+            }
+            curReqLogList.add(entry);
         }
     }
 }
