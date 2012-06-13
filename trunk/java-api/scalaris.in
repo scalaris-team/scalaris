@@ -30,22 +30,31 @@ no_config=false
 scalaris_exec_debug=false
 show_help=false
 no_erl=false
-for arg in "$@" ; do
-  if [ "$arg" = "--noconfig" ] ; then
-    no_config=true
-  elif [ "$arg" = "--noerl" ] ; then
-    no_erl=true
-  elif [ "$arg" = "--execdebug" ] ; then
-    scalaris_exec_debug=true
-  elif [ my"$arg" = my"-h"  -o my"$arg" = my"--help"  ] ; then
-    show_help=true
-    scalaris_exec_args="$scalaris_exec_args --help"
-  else
-    if [  my"$arg" = my"-h"  -o  my"$arg" = my"-help" ] ; then
+jmvopts=""
+
+until [ -z "$1" ]; do
+  case $1 in
+    "--noconfig")
+      no_config=true
+      shift;;
+    "--noerl")
+      no_erl=true
+      shift;;
+    "--execdebug")
+      scalaris_exec_debug=true
+      shift;;
+    "-h" | "--help" | "-help")
       show_help=true
-    fi
-    scalaris_exec_args="$scalaris_exec_args \"$arg\""
-  fi
+      scalaris_exec_args="$scalaris_exec_args --help"
+      shift;;
+    "--jvmopts")
+      shift
+      jmvopts="$jmvopts $1"
+      shift;;
+    *)
+      scalaris_exec_args="$scalaris_exec_args \"$1\""
+      shift;;
+  esac
 done
 
 # activate no_config if called in the source tree:
@@ -302,10 +311,11 @@ fi
 # java options, and scalaris args
 scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS\
   -classpath \"$LOCALCLASSPATH\"\
+  $jmvopts\
   -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\"\
   -Dscalaris.erlang.nodename=\"$ERLANG_NODE_NAME\"\
   -Dscalaris.cookie=\"`get_cookie`\"\
-  -Dscalaris.node=\"$SCALARIS_JAPI_NODE\"
+  -Dscalaris.node=\"$SCALARIS_JAPI_NODE\"\
   $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
 if $scalaris_exec_debug ; then
     echo $scalaris_exec_command
