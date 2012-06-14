@@ -323,7 +323,7 @@ scalarisstart(){
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        $SCREEN -S "scalaris_$NODE_NAME" -d -m /bin/bash -x -c +B "$START_CMD"
+        $SCREEN -S "scalaris_$NODE_NAME" -d -m /bin/bash -x -c +B "$START_CMD; sleep 365d"
     else
         bash -x -f +B -c "$START_CMD"
     fi
