@@ -30,7 +30,6 @@ if [ -e @sysconfdir@/scalaris/initd.conf ]; then
 fi
 
 SCALARIS_NODE=${SCALARIS_NODE-"node"}
-NODES_PER_VM=${NODES_PER_VM-1}
 
 SCALARIS_USER=scalaris
 
@@ -38,7 +37,7 @@ PID_DS="@localstatedir@/run/scalaris_${SCALARIS_NODE}.pid"
 
 LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 
-SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen --nodes-per-vm ${NODES_PER_VM}"
+SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
