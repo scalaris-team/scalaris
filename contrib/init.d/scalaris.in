@@ -36,7 +36,7 @@ LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen --nodes-per-vm ${NODES_PER_VM}"
 
 # For SELinux we need to use 'runuser' not 'su'
-if [ -x "$RUNUSER" ]; then
+if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
     SU="$RUNUSER -s /bin/sh $SCALARIS_USER"
 else
     SU="$SUDO -s /bin/sh -u $SCALARIS_USER"
