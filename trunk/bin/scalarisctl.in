@@ -58,7 +58,7 @@ start_dht_node="" # "dht_node"
 DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
 cmd=""
-NODES_PER_VM=1
+NODES_PER_VM=""
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -304,6 +304,9 @@ scalarisstart(){
     if [ -n "$DIST_ERL_PORT" ]; then
         tmp="$tmp -kernel inet_dist_listen_min $DIST_ERL_PORT inet_dist_listen_max $DIST_ERL_PORT"
     fi
+    if [ -n "$NODES_PER_VM" ]; then
+        tmp="$tmp -scalaris nodes_per_vm \"$NODES_PER_VM\""
+    fi
     SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
     export YAWSHOME="$HOME/.scalaris/$NODE_NAME"
     mkdir -p "$YAWSHOME"
@@ -318,7 +321,6 @@ scalarisstart(){
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
  -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
  -scalaris local_config \"\\\"$ETCDIR/scalaris.local.cfg\\\"\"\
- -scalaris nodes_per_vm \"$NODES_PER_VM\"\
  -connect_all false -hidden -name $NODE_NAME\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
