@@ -6,6 +6,7 @@ usr/share/doc/scalaris/LICENSE
 usr/share/doc/scalaris/ChangeLog
 var/log/scalaris
 etc/init.d/scalaris
+etc/scalaris/initd.conf
 etc/scalaris/scalarisctl.conf
 etc/scalaris/scalaris.cfg
 etc/scalaris/scalaris.cfg.example

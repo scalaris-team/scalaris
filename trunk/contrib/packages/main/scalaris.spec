@@ -160,6 +160,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %{_sysconfdir}/init.d/scalaris
 %attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd.conf
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
 %attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example

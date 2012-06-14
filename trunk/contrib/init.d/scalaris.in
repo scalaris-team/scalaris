@@ -24,8 +24,13 @@ SCREEN=@SCREEN@
 SUDO=@SUDO@
 RUNUSER=@RUNUSER@
 
-SCALARIS_NODE=node
-NODES_PER_VM=1
+# Source config.
+if [ -e @sysconfdir@/scalaris/initd.conf ]; then
+    . @sysconfdir@/scalaris/initd.conf
+fi
+
+SCALARIS_NODE=${SCALARIS_NODE-"node"}
+NODES_PER_VM=${NODES_PER_VM-1}
 
 SCALARIS_USER=scalaris
 

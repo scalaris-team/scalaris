@@ -560,7 +560,8 @@ install-erlang: compile
 	install -m 644 -t $(ETCDIR) \
 	           bin/scalarisctl.conf \
 	           bin/scalaris.cfg \
-	           bin/scalaris.local.cfg.example
+	           bin/scalaris.local.cfg.example \
+	           contrib/init.d/initd.conf
 	if [ -f bin/scalaris.local.cfg ]; then \
 	  install -m 644 -t $(ETCDIR) \
 	           bin/scalaris.local.cfg; \
