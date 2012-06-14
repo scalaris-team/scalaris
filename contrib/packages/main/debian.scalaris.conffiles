@@ -1,3 +1,4 @@
+/etc/scalaris/initd.conf
 /etc/scalaris/scalaris.cfg
 /etc/scalaris/scalaris.local.cfg
 /etc/scalaris/scalarisctl.conf
