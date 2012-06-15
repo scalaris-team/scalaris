@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011,2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Approximate Reconciliation Tree (ART) implementation
 %%         Represents a packed merkle tree.
-%%         SRC: 2002 - J.Byers, J.Considine, M.Mitzenmachen
+%% @end
+%% @reference
+%%         2002 - J.Byers, J.Considine, M.Mitzenmachen
 %%              Fast Approximate Reconcilication of Set Differences
 %%              - BU Computer Science TR
 %% @end
@@ -65,7 +67,8 @@ default_art_config() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec new() -> art().
-new() -> {art, default_art_config(), intervals:empty(), empty, empty}.
+new() -> 
+    {art, default_art_config(), intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
 new(Tree) ->
@@ -78,8 +81,7 @@ new(Tree, _Config) ->
     InnerBF = ?REP_BLOOM:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
     LeafBF = ?REP_BLOOM:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
-    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), 
-                                 ?REP_BLOOM:print(LBF)]),    
+    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), ?REP_BLOOM:print(LBF)]),    
     {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -104,19 +106,13 @@ get_config({art, Config, _, _, _}) ->
 
 -spec lookup(merkle_tree:mt_node(), art()) -> boolean().
 lookup(Node, Art) ->
-    %?TRACE("MT=~p~nAT=~p", [merkle_tree:get_interval(Node), get_interval(Art)]),
     lookup_cf([{Node, get_correction_factor(Art)}], Art).
-    %case get_interval(Art) =:= merkle_tree:get_interval(Node) of        
-    %    true -> lookup_cf([{Node, get_correction_factor(Art)}], Art);
-    %    false -> false
-    %end.
 
 -spec lookup_cf([{Node, CF}], Art) -> Result when
     is_subtype(Art,    art()),
     is_subtype(Node,   merkle_tree:mt_node()),
     is_subtype(CF,     non_neg_integer()),        %correction factor
     is_subtype(Result, boolean()).
-
 lookup_cf([], _Art) ->
     true;
 lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
@@ -146,12 +142,9 @@ lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
 %% Helper
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec fill_bloom(Iterator, InnerBloom1, LeafBloom1) -> {InnerBloom2, LeafBloom2} when
-      is_subtype(Iterator,    merkle_tree:mt_iter()),
-      is_subtype(InnerBloom1, ?REP_BLOOM:bloom_filter()),
-      is_subtype(LeafBloom1,  ?REP_BLOOM:bloom_filter()),
-      is_subtype(InnerBloom2, ?REP_BLOOM:bloom_filter()),
-      is_subtype(LeafBloom2,  ?REP_BLOOM:bloom_filter()).
+-spec fill_bloom(Iterator, Inner1::BF, Leaf1::BF) -> {Inner2::BF, Leaf2::BF} when
+      is_subtype(Iterator,  merkle_tree:mt_iter()),
+      is_subtype(BF,        ?REP_BLOOM:bloom_filter()).
 fill_bloom(Iter, IBF, LBF) ->
     Next = merkle_tree:next(Iter),
     case Next of
