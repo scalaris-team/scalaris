@@ -49,9 +49,10 @@
           %% my leases for working...
           leases   :: data_node_leases:state(),
           %% my database for user content
-          db       :: data_node_db:state(),
+          kv_state       :: data_node_db:state(),
           %% replicated lease storage and management of the lease_db
-          rlease_mgmt :: rlease_mgmt:state()
+          rlease_state :: [rlease:state()],
+          rbr_state :: rbr:state()
          }).
 -type state() :: #state{}.
 
@@ -68,17 +69,39 @@ on({read, _SourcePid, _SourceId, _HashedKey} = Msg, State) ->
     data_node_db:on(Msg, State);
 
 %% messages concerning routing
-on({?lookup_fin, Key, Msg}, State) ->
+on({?lookup_fin, Key, Msg, Consistency}, State) ->
     case data_node_leases:is_owner(State, Key) of
         true ->
-            gen_component:post_op(State, Msg);
+            gen_component:post_op({consistent, State}, Msg);
         false ->
-            io:format("I am not owner~n"),
-            case pid_groups:get_my(router_node) of
-                failed -> ok; %% TODO: Delete this case, should not happen.
-                Pid -> comm:send_local(Pid, {?lookup_aux, Key, Msg})
-            end,
-            State
+            case Consistency of
+                consistent ->
+                    io:format("I am not owner~n"),
+                    case pid_groups:get_my(router_node) of
+                        failed -> ok; %% TODO: Delete this case, should not happen.
+                        Pid -> comm:send_local(Pid, {?lookup_aux, Key, Msg})
+                    end,
+                    State;
+                best_effort ->
+                    gen_component:post_op({not_consistent, State}, Msg)
+            end
+    end;
+
+on(Msg, {Consistency, State})
+  when rbr =:= element(1, Msg) ->
+    NewRBRState =
+        rbr:on(Msg, {Consistency, get_rbr_state(State)}),
+    set_rbr_state(State, NewRBRState);
+
+on(Msg, State)
+  when acceptor =:= element(1, Msg) ->
+    case element(2, Msg) of
+        {kv_db, _} ->
+            NewKVState = rbr_acceptor:on(Msg, get_kv_state(State)),
+            set_kv_state(State, NewKVState);
+        {lease_db, Nth} ->
+            NewLeaseState = rbr_acceptor:on(Msg, get_rlease_state(State, Nth)),
+            set_rlease_state(State, Nth, NewLeaseState)
     end.
 
 
@@ -106,20 +129,21 @@ is_first(Options) ->
 %% operations on the state
 -spec new_state() -> state().
 new_state() ->
-    #state{db  = data_node_db:new_state(),
+    #state{kv_state  = data_node_db:new_state(),
            leases = data_node_leases:new_state(),
-           rlease_mgmt = rlease_mgmt:new_state()}.
+           rlease_state = [rlease:new_state()
+                           || lists:seq(1, config:get(replication_factor))]}.
 
 -spec get_leases(state()) -> data_node_leases:state().
 get_leases(#state{leases=Leases}) -> Leases.
 -spec set_leases(state(), data_node_leases:state()) -> state().
 set_leases(State, LState) -> State#state{leases = LState}.
 -spec get_db(state()) -> data_node_db:state().
-get_db(#state{db=DB}) -> DB.
+get_db(#state{kv_state=DB}) -> DB.
 -spec get_rlease_mgmt(state()) -> rlease_mgmt:state().
-get_rlease_mgmt(#state{rlease_mgmt=RLMState}) -> RLMState.
+get_rlease_mgmt(#state{rlease_state=RLMState}) -> RLMState.
 -spec set_rlease_mgmt(state(), rlease_mgmt:state()) -> state().
-set_rlease_mgmt(State, RLMState) -> State#state{rlease_mgmt = RLMState}.
+set_rlease_mgmt(State, RLMState) -> State#state{rlease_state = RLMState}.
 
 %% operations on the lease list
 -spec add_lease_to_master_list(leases:lease()) -> ok.
@@ -136,3 +160,23 @@ delete_lease_from_master_list(Lease) ->
 update_lease_in_master_list(Lease) ->
     DataNode = pid_groups:get_my(data_node),
     comm:send_local(DataNode, {update_lease_in_master_list, Lease}).
+
+
+-spec get_rbr_state(state()) -> rbr:state().
+get_rbr_state(#state{rbr_state=RBRState}) -> RBRState.
+-spec set_rbr_state(state(), rbr:state()) -> state().
+set_rbr_state(State, RBRState) -> State#state{rbr_state = RBRState}.
+
+-spec get_kv_state(state()) -> kv:state().
+get_kv_state(#state{kv_state=KVState}) -> KVState.
+-spec set_kv_state(state(), kv:state()) -> state().
+set_kv_state(State, KVState) -> State#state{kv_state = KVState}.
+
+-spec get_rlease_state(state(), pos_integer()) -> rlease:state().
+get_rlease_state(#state{rlease_state=RLeaseState}, Nth) -> lists:nth(RLeaseState, Nth).
+-spec set_rlease_state(state(), pos_integer(), rlease:state()) -> state().
+set_rlease_state(State, Nth, RleaseState) ->
+    NewRLeaseState =
+        util:list_set_nth(State#state.rlease_state, Nth, RleaseState),
+    State#state{ rlease_state = NewRLeaseState }.
+
