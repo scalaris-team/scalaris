@@ -23,6 +23,7 @@
 -vsn('$Id').
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 -behaviour(gen_component).
 -export([start_link/2, on/2, init/1]).
 
@@ -37,6 +38,7 @@
 
 -ifdef(with_export_type_support).
 -export_type([msg/0, state/0]).
+-export_type([consistency/0]).
 -endif.
 
 % accepted messages of data_node processes
@@ -47,17 +49,19 @@
 
 -record(state, {
           %% my leases for working...
-          leases   :: data_node_leases:state(),
+          leases       = ?required(state, leases) :: data_node_leases:state(),
           %% my database for user content
-          kv_state       :: data_node_db:state(),
+          kv_state     = ?required(state, kv_state) :: data_node_db:state(),
           %% replicated lease storage and management of the lease_db
-          rlease_state :: [rlease:state()],
-          rbr_state :: rbr:state()
+          rlease_state = ?required(state, rlease_state) :: [rlease_mgmt:state()],
+          rbr_state    = ?required(state, rbr_state) :: rbr:state()
          }).
 -type state() :: #state{}.
 
+-type consistency() :: consistent | not_consistent.
+
 %% @doc message handler
--spec on(msg(), state()) -> state().
+-spec on(msg(), state() | {consistency(), state()}) -> state().
 
 %% messages concerning leases
 on({lease, _LeaseMsg} = Msg, State) ->
@@ -129,10 +133,14 @@ is_first(Options) ->
 %% operations on the state
 -spec new_state() -> state().
 new_state() ->
-    #state{kv_state  = data_node_db:new_state(),
-           leases = data_node_leases:new_state(),
-           rlease_state = [rlease:new_state()
-                           || lists:seq(1, config:get(replication_factor))]}.
+    RepDegree = config:read(replication_factor),
+    case erlang:is_integer(RepDegree) of
+        true -> #state{kv_state  = data_node_db:new_state(),
+                       leases = data_node_leases:new_state(),
+                       rlease_state = [rlease_mgmt:new_state()
+                                       || lists:seq(1, RepDegree)],
+                       rbr_state = rbr:new_state()}
+    end.
 
 -spec get_leases(state()) -> data_node_leases:state().
 get_leases(#state{leases=Leases}) -> Leases.
@@ -167,14 +175,14 @@ get_rbr_state(#state{rbr_state=RBRState}) -> RBRState.
 -spec set_rbr_state(state(), rbr:state()) -> state().
 set_rbr_state(State, RBRState) -> State#state{rbr_state = RBRState}.
 
--spec get_kv_state(state()) -> kv:state().
+-spec get_kv_state(state()) -> data_node_db:state().
 get_kv_state(#state{kv_state=KVState}) -> KVState.
--spec set_kv_state(state(), kv:state()) -> state().
+-spec set_kv_state(state(), data_node_db:state()) -> state().
 set_kv_state(State, KVState) -> State#state{kv_state = KVState}.
 
--spec get_rlease_state(state(), pos_integer()) -> rlease:state().
+-spec get_rlease_state(state(), pos_integer()) -> rlease_mgmt:state().
 get_rlease_state(#state{rlease_state=RLeaseState}, Nth) -> lists:nth(RLeaseState, Nth).
--spec set_rlease_state(state(), pos_integer(), rlease:state()) -> state().
+-spec set_rlease_state(state(), pos_integer(), rlease_mgmt:state()) -> state().
 set_rlease_state(State, Nth, RleaseState) ->
     NewRLeaseState =
         util:list_set_nth(State#state.rlease_state, Nth, RleaseState),

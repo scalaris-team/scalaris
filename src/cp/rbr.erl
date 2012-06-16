@@ -31,9 +31,14 @@
 
 -export([qread/4, qwrite/3, qwrite_fast/3]).
 -export([on/2]).
+-export([new_state/0]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
+
+-ifdef(with_export_type_support).
+-export_type([state/0]).
+-endif.
 
 -type state() :: tuple().
 
@@ -46,25 +51,25 @@
       | consistent_or_cquorum.
 
 %@doc Trigger a quorum read for the given key and the given database
--spec qread(comm:local_pid(), ?RT:key(), database(), lookup_type()) -> ok.
+-spec qread(comm:erl_local_pid(), ?RT:key(), database(), lookup_type()) -> ok.
 qread(ReplyAsPid, Key, DB, LookupType) ->
     comm:send_local(self(), {rbr, qread, ReplyAsPid, Key, DB, LookupType}).
 
--spec on(comm:message(), state()| {lookup:consistency(), state()}) -> state().
+-spec on(comm:message(), state()| {data_node:consistency(), state()}) -> state().
 on({rbr, qread, ReplyAsPid, Key, DB, LookupType}, TableName) ->
     RKeys = ?RT:get_replica_keys_with_index(Key),
 
-    ReqId = uid:global_uid(),
+    ReqId = uid:get_global_uid(),
     RBRPid = comm:reply_as(comm:this(), 3, {rbr, qread_reply, ReqId, '_'}),
     ColState =
         case LookupType of
             consistent  ->
-                [ lookup:consistent(
+                _ = [ lookup:consistent(
                     RKey, {acceptor, {DB, Nth}, get_key, Key, Nth, DB, RBRPid})
                   || {RKey, Nth} <- RKeys ],
                 {_Counter = 0, _Vers = -2, _Val = '_'};
             consistent_or_cquorum ->
-                [ lookup:best_effort_consistent(
+                _ = [ lookup:best_effort_consistent(
                     RKey, {acceptor, DB, get_key, Key, Nth, DB, RBRPid})
                   || {RKey, Nth} <- RKeys ],
                 _ColState = []
@@ -146,11 +151,11 @@ get_cquorum(L) ->
 %% existance: must, must_not, may
 
 
--spec qwrite(comm:local_pid(), ?RT:key(), client_value()) -> ok.
+-spec qwrite(comm:erl_local_pid(), ?RT:key(), client_value()) -> ok.
 qwrite(_ReplyPid, _Key, _Val) ->
     ok.
 
--spec qwrite_fast(comm:local_pid(), ?RT:key(), client_value()) -> ok.
+-spec qwrite_fast(comm:erl_local_pid(), ?RT:key(), client_value()) -> ok.
 qwrite_fast(_ReplyPid, _Key, _Val) ->
 
 %    only for Lease renewal;
@@ -160,3 +165,7 @@ qwrite_fast(_ReplyPid, _Key, _Val) ->
 % used for concurrency control
 
     ok.
+
+-spec new_state() -> state().
+new_state() ->
+    {pdb:new(?MODULE, [set, private])}.

@@ -20,8 +20,9 @@
 -module(rlease_mgmt).
 -author('schintke@zib.de').
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id ').
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 %% part of data_node on-handler for lease management
 -export([on/2]).
@@ -35,15 +36,15 @@
 
 -type nth() :: non_neg_integer().
 -record(rlease, {
-          key :: {?RT:key(), nth()}, %% key, nth replica
-          lease :: leases:lease()
+          key   = ?required(rlease, key) :: {?RT:key(), nth()}, %% key, nth replica
+          lease = ?required(rlease, lease) :: leases:lease()
          }).
 -type rlease() :: #rlease{}.
 -record(rleasedb, {
-          rleases :: [rlease()],
-          persistent :: ?DB:db()
+          rleases    = ?required(rleasedb, rleases) :: [rlease()],
+          persistent = ?required(rleasedb, persistent) :: ?DB:db_t()
          }).
--opaque state() :: #rleasedb{}.
+-type state() :: #rleasedb{}.
 
 -ifdef(with_export_type_support).
 -export_type([msg/0, state/0]).
