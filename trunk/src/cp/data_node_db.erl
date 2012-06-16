@@ -22,6 +22,7 @@
 -author('schuett@zib.de').
 -vsn('$Id').
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 %% operations provided for the data_node
 -export([read/2]).
@@ -37,8 +38,8 @@
 -export_type([msg/0, state/0]).
 -endif.
 
--record(state, {db :: ?DB:db()}).
--opaque state() :: #state{}.
+-record(state, {db = ?required(state, db) :: ?DB:db()}).
+-type state() :: #state{}.
 
 
 -spec new_state() -> state().

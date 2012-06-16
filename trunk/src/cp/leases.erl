@@ -21,8 +21,9 @@
 -module(leases).
 -author('schintke@zib.de').
 -author('schuett@zib.de').
--vsn('$Id').
+-vsn('$Id ').
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 
 %% operations for abstract data type 'lease'
 -export([new_for_all/0,
@@ -43,13 +44,13 @@
 
 -type lease_id() :: ?RT:key().
 -record(lease, {
-          id      :: lease_id(),
-          epoch   :: non_neg_integer(),
-          owner   :: comm:mypid(),
-          range   :: intervals:interval(),
-          aux     :: any(),
-          version :: non_neg_integer(),
-          timeout :: erlang:timestamp()}).
+          id      = ?required(lease, id     ) :: lease_id(),
+          epoch   = ?required(lease, epoch  ) :: non_neg_integer(),
+          owner   = ?required(lease, owner  ) :: comm:mypid(),
+          range   = ?required(lease, range  ) :: intervals:interval(),
+          aux     = ?required(lease, aux    ) :: any(),
+          version = ?required(lease, version) :: non_neg_integer(),
+          timeout = ?required(lease, timeout) :: erlang:timestamp()}).
 -type lease() :: #lease{}.
 -type leases() :: [lease()].
 

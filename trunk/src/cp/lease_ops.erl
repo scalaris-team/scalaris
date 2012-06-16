@@ -23,6 +23,7 @@
 -vsn('$Id').
 
 -include("scalaris.hrl").
+-include("record_helpers.hrl").
 -behaviour(gen_component).
 -export([start_link/2, on/2, init/1]).
 
@@ -55,9 +56,9 @@
 
 -record(state, {
           %% state for embedded paxos learner...
-          learner_state   :: pdb:tableid(),
+          learner_state  = ?required(state, learner_state) :: pdb:tableid(),
           %% {lease_ops, Key} -> state map (progress)
-          progress_state  :: pdb:tableid()
+          progress_state = ?required(state, progress_state) :: pdb:tableid()
          }).
 -type state() :: #state{}.
 
