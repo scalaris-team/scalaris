@@ -42,8 +42,10 @@ SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
     SU="$RUNUSER -s /bin/bash $SCALARIS_USER -c"
+    SU2="$RUNUSER $SCALARIS_USER -c"
 else
     SU="$SUDO -H -u $SCALARIS_USER -s /bin/bash"
+    SU2="$SUDO -H -u $SCALARIS_USER"
 fi
 
 start() {
@@ -65,7 +67,7 @@ start() {
         return 1 # generic or unspecified error
     fi
     sleep 1s
-    $SU "$SCREEN -ls | grep "scalaris_${SCALARIS_NODE}" | cut -d'.' -f1 | xargs echo" > $PID_DS
+    $SU2 $SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | xargs echo > $PID_DS
 
     if [ -e /proc/$PROCPID ]; then
         echo "success"
