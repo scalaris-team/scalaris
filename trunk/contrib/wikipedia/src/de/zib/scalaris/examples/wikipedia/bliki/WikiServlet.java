@@ -2015,7 +2015,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            time spend in the web server
      */
     public static void storeUserReq(long timestamp, String serviceUser, long servertime) {
-        if (userReqLogs.length > 0) {
+        if (userReqLogs != null && userReqLogs.length > 0) {
             int timestamp_s = (int) (timestamp / 1000);
             // build log entry:
             Map<String, Object> entry = new HashMap<String, Object>();
