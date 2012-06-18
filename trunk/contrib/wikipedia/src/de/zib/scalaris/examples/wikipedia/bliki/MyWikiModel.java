@@ -268,23 +268,24 @@ public class MyWikiModel extends WikiModel {
          * or "{{:Main Page/Introduction}}" which transcludes the page but does
          * not need "Template:" prepended 
          */
-        String namespace2;
-        String articleName2;
         String processedMagicWord = null;
         int index = articleName.indexOf(':');
         if (index > 0) {
-            namespace2 = articleName.substring(0, index);
-            articleName2 = articleName.substring(index + 1).trim();
+            final String maybeNs = articleName.substring(0, index);
+            final String maybeName = articleName.substring(index + 1).trim();
             if (isTemplateNamespace(namespace)) {
                 // if it is a magic word, the first part is the word itself, the second its parameters
-                processedMagicWord = getMagicWord(articleName, namespace2, articleName2);
+                processedMagicWord = getMagicWord(articleName, maybeNs, maybeName);
+            }
+            // set the corrected namespace and article name (if it is a namespace!)
+            if (getNamespace().getNumberByName(maybeNs) != null) {
+                namespace = maybeNs;
+                articleName = maybeName;
             }
         } else {
-            namespace2 = namespace;
-            articleName2 = articleName;
             if (isTemplateNamespace(namespace)) {
                 // if it is a magic word, there are no parameters
-                processedMagicWord = getMagicWord(articleName, articleName2, "");
+                processedMagicWord = getMagicWord(articleName, articleName, "");
             }
         }
 
@@ -301,9 +302,6 @@ public class MyWikiModel extends WikiModel {
             return null;
         }
         
-        // set the corrected namespace and article name (see above)
-        namespace = namespace2;
-        articleName = articleName2;
         if (isTemplateNamespace(namespace)) {
             addTemplate(articleName);
         } else {
