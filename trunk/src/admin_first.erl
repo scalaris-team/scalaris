@@ -29,7 +29,7 @@
 is_first_vm() ->
     util:is_unittest()
         orelse
-    util:app_get_env(first, false) =:= true
+    config:read(first) =:= true
         orelse
     (util:app_get_env(first_quorum, false) =:= true andalso has_first_quorum()).
 
