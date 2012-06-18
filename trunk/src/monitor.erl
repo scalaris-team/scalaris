@@ -223,9 +223,13 @@ on({check_timeslots}, State) ->
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     State;
 
-on({get_rrds, TableIndexes, SourcePid}, {Table, _ApiTxReqList} = State) ->
-    MyData = [{Process, Key, get_rrd(Table, TableIndex)}
-             || {Process, Key} = TableIndex <- TableIndexes],
+on({get_rrds, TableIndexes, SourcePid}, {Table, ApiTxReqList} = State) ->
+    MyData = [case get_rrd(Table, TableIndex) of
+                  undefined when Process =:= api_tx andalso Key =:= 'req_list' ->
+                      % special case: always return an empty rrd for {api_tx, req_list}
+                      {Process, Key, init_apitx_reqlist_rrd(rrd:get_current_time(ApiTxReqList))};
+                  Value -> {Process, Key, Value}
+              end || {Process, Key} = TableIndex <- TableIndexes],
     comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 
@@ -313,8 +317,12 @@ init(null) ->
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     TableName = pid_groups:my_groupname() ++ ":monitor",
     {ets:new(list_to_atom(TableName), [ordered_set, protected]),
-     % 10s monitoring interval, only keep newest in the client process
-     rrd:create(10 * 1000000, 1, {timing_with_hist, ms})}.
+     init_apitx_reqlist_rrd(os:timestamp())}.
+
+-spec init_apitx_reqlist_rrd(Time::util:time()) -> rrd:rrd().
+init_apitx_reqlist_rrd(Time) ->
+    % 10s monitoring interval, only keep newest in the client process
+    rrd:create(10 * 1000000, 1, {timing_with_hist, ms}, Time).
 
 %% @doc Checks whether config parameters of the monitor process exist and are
 %%      valid.
