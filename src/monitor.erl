@@ -218,8 +218,11 @@ on({report_single, Process, Key, NewValue_or_UpdateFun}, State) ->
     proc_set_value(Process, Key, NewValue_or_UpdateFun),
     State;
 
-on({check_timeslots}, State) ->
+on({check_timeslots}, {_Table, OldApiTxReqList} = State) ->
     proc_check_all_timeslot(),
+    % manual check for {api_tx, req_list} necessary:
+    NewApiTxReqList = rrd:check_timeslot_now(OldApiTxReqList),
+    check_report(api_tx, 'req_list', OldApiTxReqList, NewApiTxReqList),
     comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
     State;
 
