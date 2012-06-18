@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ### BEGIN INIT INFO
 # Provides:          scalaris
@@ -41,9 +41,9 @@ SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-    SU="$RUNUSER -s /bin/sh $SCALARIS_USER -c"
+    SU="$RUNUSER -s /bin/bash $SCALARIS_USER -c"
 else
-    SU="$SUDO -H -u $SCALARIS_USER -s /bin/sh"
+    SU="$SUDO -H -u $SCALARIS_USER -s /bin/bash"
 fi
 
 start() {
