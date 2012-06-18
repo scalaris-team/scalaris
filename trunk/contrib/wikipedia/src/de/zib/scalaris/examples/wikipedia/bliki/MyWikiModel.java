@@ -174,6 +174,7 @@ public class MyWikiModel extends WikiModel {
         // do not put these into the HTML text (they are not rendered anyway)
         Configuration.DEFAULT_CONFIGURATION.addTokenTag("inputbox", new IgnoreTag("inputbox"));
         Configuration.DEFAULT_CONFIGURATION.addTokenTag("imagemap", new IgnoreTag("imagemap"));
+        Configuration.DEFAULT_CONFIGURATION.addTokenTag("timeline", new IgnoreTag("timeline"));
         
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
