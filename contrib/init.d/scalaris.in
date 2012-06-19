@@ -65,7 +65,7 @@ start() {
         return 1 # generic or unspecified error
     fi
     sleep 1s
-    $SU -c "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | xargs echo" > $PID_DS
+    $SU -c "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | head -n1 | xargs echo" > $PID_DS
 
     if [ -e /proc/$PROCPID ]; then
         echo "success"
