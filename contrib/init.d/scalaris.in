@@ -41,9 +41,9 @@ SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-    SU="$RUNUSER $SCALARIS_USER"
+    SU="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
 else
-    SU="$SU $SCALARIS_USER"
+    SU="$SU $SCALARIS_USER -s /bin/bash -c"
 fi
 
 start() {
@@ -59,13 +59,13 @@ start() {
     date >> $LOG_DS
     echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
     echo -n "Starting Scalaris node \"${SCALARIS_NODE}\"... "
-    $SU -s /bin/bash -c "$SCALARISCTL start" >> $LOG_DS 2>&1
+    $SU "$SCALARISCTL start" >> $LOG_DS 2>&1
     if [ $? -ne 0 ]; then
         echo "failed"
         return 1 # generic or unspecified error
     fi
     sleep 1s
-    $SU -c "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | head -n1 | xargs echo" > $PID_DS
+    $SU "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | head -n1 | xargs echo" > $PID_DS
 
     if [ -e /proc/$PROCPID ]; then
         echo "success"
