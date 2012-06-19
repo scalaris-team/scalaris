@@ -624,7 +624,7 @@ ERL
 ERLCFLAGS
 ERLC
 RUNUSER
-SUDO
+SU
 SCREEN
 BROWSER
 target_alias
@@ -1934,20 +1934,20 @@ fi
 
 ###########################################################
 #
-# check sudo, runuser availability for the init.d script
+# check su, runuser availability for the init.d script
 #
 ###########################################################
 
-# Extract the first word of "sudo", so it can be a program name with args.
-set dummy sudo; ac_word=$2
+# Extract the first word of "su", so it can be a program name with args.
+set dummy su; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_path_SUDO+:} false; then :
+if ${ac_cv_path_SU+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  case $SUDO in
+  case $SU in
   [\\/]* | ?:[\\/]*)
-  ac_cv_path_SUDO="$SUDO" # Let the user override the test with a path.
+  ac_cv_path_SU="$SU" # Let the user override the test with a path.
   ;;
   *)
   as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
@@ -1957,7 +1957,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_SUDO="$as_dir/$ac_word$ac_exec_ext"
+    ac_cv_path_SU="$as_dir/$ac_word$ac_exec_ext"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -1965,14 +1965,14 @@ done
   done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_path_SUDO" && ac_cv_path_SUDO=""/bin/false""
+  test -z "$ac_cv_path_SU" && ac_cv_path_SU=""/bin/false""
   ;;
 esac
 fi
-SUDO=$ac_cv_path_SUDO
-if test -n "$SUDO"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SUDO" >&5
-$as_echo "$SUDO" >&6; }
+SU=$ac_cv_path_SU
+if test -n "$SU"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SU" >&5
+$as_echo "$SU" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
@@ -2021,9 +2021,9 @@ fi
 
 
 
-if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: sudo or runuser not found - you won't be able to use our init.d script" >&5
-$as_echo "$as_me: sudo or runuser not found - you won't be able to use our init.d script" >&6;}
+if test "$ac_cv_path_SU" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: su or runuser not found - you won't be able to use our init.d script" >&5
+$as_echo "$as_me: su or runuser not found - you won't be able to use our init.d script" >&6;}
 fi
 
 ###########################################################
