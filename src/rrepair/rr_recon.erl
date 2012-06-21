@@ -133,7 +133,7 @@ on({get_state_response, MyI}, State =
                random -> select_sync_node(MyI);        
                _ -> DestKey
            end,
-    ?TRACE("START_TO_DEST ~p", [DestKey]),
+    ?TRACE("START_TO_DEST ~p", [DKey]),
     comm:send_local(DhtPid, {?lookup_aux, DKey, 0, Msg}),    
     comm:send_local(self(), {shutdown, negotiate_interval_initiator}),
     State;
@@ -183,9 +183,8 @@ on({get_state_response, MyI}, State =
                         dhtNodePid = DhtPid,
                         struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
-    %MyBloomI = mapInterval(BloomI, get_interval_quadrant(MyI)),
     MySyncI = find_intersection(MyI, BloomI),
-    %?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n BloomIMapped=~p ~n SynI=~p", [MyI, BloomI, MyBloomI, MySyncI]),
+    ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n SynI=~p", [MyI, BloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
         true -> comm:send_local(self(), {shutdown, empty_interval});
         false -> send_chunk_req(DhtPid, self(), MySyncI, mapInterval(MySyncI, 1), get_max_items(bloom))
@@ -284,8 +283,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_node, SenderPid, Interval, Hash}, State =
-       #rr_recon_state{ struct = Tree }) ->
+on({check_node, SenderPid, Interval, Hash}, State = #rr_recon_state{ struct = Tree }) ->
     Node = merkle_tree:lookup(Interval, Tree),
     {Result, ChildHashs} = 
         case Node of
@@ -319,12 +317,6 @@ on({check_node_response, Result, I, ChildHashs}, State =
             not_found -> [{error_count, 1}]; 
             ok_leaf -> [{tree_compareSkipped, 1}];
             ok_inner -> [{tree_compareSkipped, merkle_tree:size(Node)}];
-            fail_leaf ->
-                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerL, OwnerR}),
-                [{tree_leafsSynced, Leafs}];
-            fail_inner when NodeIsLeaf ->
-                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerL, OwnerR}),
-                [{tree_leafsSynced, Leafs}];
             fail_inner when not NodeIsLeaf ->
                 MyChilds = merkle_tree:get_childs(Node),
                 {Matched, NotMatched} = compareNodes(MyChilds, ChildHashs, {[], []}),
@@ -342,7 +334,10 @@ on({check_node_response, Result, I, ChildHashs}, State =
                                 merkle_tree:get_hash(X)}) || X <- NotMatched],
                 [{tree_compareLeft, length(NotMatched)},
                  {tree_nodesCompared, length(Matched)},
-                 {tree_compareSkipped, SkippedSubNodes}]    
+                 {tree_compareSkipped, SkippedSubNodes}];
+            _ -> %case fail_leaf OR fail_inner when NodeIsLeaf
+                Leafs = reconcileNode(Node, {SrcNode, Round, OwnerL, OwnerR}),
+                [{tree_leafsSynced, Leafs}]            
         end,
     FinalStats = rr_recon_stats:inc(IncOps ++ [{tree_compareLeft, -1}, 
                                                {tree_nodesCompared, 1}], Stats),
@@ -392,8 +387,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                 case Initiator of
                     true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
                     false ->
-                        ArtParams = [{interval, art:get_interval(SyncStruct)},
-                                     {art, SyncStruct}],
+                        ArtParams = [{interval, art:get_interval(SyncStruct)}, {art, SyncStruct}],
                         comm:send(DestRRPid, 
                                   {continue_recon, OwnerPid, Round, 
                                    {continue, art, res_shared_interval, ArtParams, true}}),
@@ -413,8 +407,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
     is_subtype(Result,      {Matched::NodeL, NotMatched::NodeL}).
 compareNodes([], [], Acc) -> Acc;
 compareNodes([N | Nodes], [H | NodeHashs], {Matched, NotMatched}) ->
-    Hash = merkle_tree:get_hash(N),
-    case Hash =:= H of
+    case merkle_tree:get_hash(N) =:= H of
         true -> compareNodes(Nodes, NodeHashs, {[N|Matched], NotMatched});
         false -> compareNodes(Nodes, NodeHashs, {Matched, [N|NotMatched]})
     end.
@@ -514,8 +507,7 @@ build_recon_struct(bloom, {I, DBItems}) ->
 build_recon_struct(merkle_tree, {I, DBItems}) ->
     merkle_tree:new(I, DBItems, []);
 build_recon_struct(art, Chunk) ->
-    Tree = build_recon_struct(merkle_tree, Chunk),
-    art:new(Tree).
+    art:new(build_recon_struct(merkle_tree, Chunk)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
@@ -559,14 +551,13 @@ map_key_to_quadrant(Key, N) ->
 -spec get_key_quadrant(?RT:key()) -> pos_integer().
 get_key_quadrant(Key) ->
     Keys = lists:sort(?RT:get_replica_keys(Key)),
-    {_, Q} = lists:foldl(fun(X, {Status, Nr} = Acc) ->
-                                 case X =:= Key of
-                                     true when Status =:= no -> {yes, Nr};
-                                     false when Status =:= no -> {no, Nr + 1};
-                                     _ -> Acc
-                                 end
-                         end, {no, 1}, Keys),
-    Q.
+    erlang:element(2, lists:foldl(fun(X, {Status, Nr} = Acc) ->
+                                          case X =:= Key of
+                                              true when Status =:= no -> {yes, Nr};
+                                              false when Status =:= no -> {no, Nr + 1};
+                                              _ -> Acc
+                                          end
+                                  end, {no, 1}, Keys)).
 
 % @doc Returns the quadrant in which a given interval begins.
 -spec get_interval_quadrant(intervals:interval()) -> pos_integer().
@@ -603,18 +594,14 @@ mapInterval(I, Q) ->
 % @doc Gets intersection of two associated intervals as sub interval of A.
 -spec find_intersection(intervals:interval(), intervals:interval()) -> intervals:interval().
 find_intersection(A, B) ->
-    I = lists:foldl(fun(Q, Acc) ->
-                            Sec = intervals:intersection(A, mapInterval(B, Q)),
-                            case intervals:is_empty(Acc) 
-                                     andalso not intervals:is_empty(Sec) of
-                                true -> Sec;
-                                false -> Acc
-                            end
-                    end, intervals:empty(), lists:seq(1, rep_factor())),
-    I.
-    %{_, RI} = intervals:get_elements(I),
-    %?TRACE("--->FIND INTERSEC<------~nI=~p~nR=~p", [I, RI]),
-    %RI.
+    lists:foldl(fun(Q, Acc) ->
+                        Sec = intervals:intersection(A, mapInterval(B, Q)),
+                        case intervals:is_empty(Acc) 
+                                 andalso not intervals:is_empty(Sec) of
+                            true -> Sec;
+                            false -> Acc
+                        end
+                    end, intervals:empty(), lists:seq(1, rep_factor())).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
