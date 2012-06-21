@@ -208,7 +208,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
             true ->
-                {BTime, NTree} = util:tc(fun() -> merkle_tree:insert_list(DBList, Params) end),
+                {BTime, NTree} = util:tc(merkle_tree, insert_list, [DBList, Params]),
                 {rr_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
             false -> util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
         end,
