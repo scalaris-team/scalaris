@@ -24,6 +24,7 @@ MODULES=yaws \
 	yaws_sup \
 	yaws_api \
 	yaws_log \
+	yaws_trace \
 	yaws_logger \
 	yaws_ls \
 	yaws_debug \
@@ -43,7 +44,7 @@ MODULES=yaws \
 	yaws_pam \
 	json json2 jsonrpc yaws_jsonrpc yaws_xmlrpc\
 	haxe yaws_rpc \
-	yaws_soap_srv yaws_soap_lib \
+	yaws_soap_srv yaws_soap_lib yaws_soap12_lib \
 	authmod_gssapi \
 	yaws_appmod_cgi \
 	yaws_appmod_fcgi \
@@ -81,8 +82,8 @@ yaws_generated.erl:	yaws_generated.template ../vsn.mk
 	    ../scripts/gen-yaws-generated true > yaws_generated.erl
 
 yaws_configure.hrl:	 ../vsn.mk ../include.mk
-	if [  $(HAVE_SENDFILE) = "true" ]; then \
-		echo "-define(HAVE_SENDFILE, true)." > yaws_configure.hrl; \
+	if [  $(HAVE_YAWS_SENDFILE) = "true" ]; then \
+		echo "-define(HAVE_YAWS_SENDFILE, true)." > yaws_configure.hrl; \
 	else touch yaws_configure.hrl; fi
 
 
@@ -111,15 +112,15 @@ clean:
 		mime_types.erl yaws_configure.hrl mime_type_c.beam
 
 install: regen all docsinstall
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/lib/yaws/examples/ebin
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/lib/yaws/examples/include
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/lib/yaws/ebin
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/lib/yaws/priv
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/yaws/examples/ebin
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/yaws/examples/include
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/yaws/ebin
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/yaws/priv
 	$(INSTALL) -d $(DESTDIR)$(VARDIR)/log/yaws
 	$(INSTALL) -d $(DESTDIR)$(VARDIR)/yaws/ebin
-	(cd ..; tar cf - ebin ) | (cd $(DESTDIR)$(PREFIX)/lib/yaws; tar xf - )
-	(cd ..; tar cf - include ) | (cd $(DESTDIR)$(PREFIX)/lib/yaws; tar xf - )
-	(cd ..; tar cf - priv/*.xsd ) | (cd $(DESTDIR)$(PREFIX)/lib/yaws; tar xf - )
+	(cd ..; tar cf - ebin ) | (cd $(DESTDIR)$(LIBDIR)/yaws; tar xf - )
+	(cd ..; tar cf - include ) | (cd $(DESTDIR)$(LIBDIR)/yaws; tar xf - )
+	(cd ..; tar cf - priv/*.xsd ) | (cd $(DESTDIR)$(LIBDIR)/yaws; tar xf - )
 
 docsinstall:
 	$(INSTALL) -d $(DESTDIR)$(VARDIR)/yaws/www

@@ -25,7 +25,7 @@
          update_sconf/2, delete_sconf/2,
          eq_sconfs/2, soft_setconf/4, hard_setconf/2,
          can_hard_gc/2, can_soft_setconf/4,
-         can_soft_gc/2, verify_upgrade_args/2]).
+         can_soft_gc/2, verify_upgrade_args/2, toks/2]).
 
 %% where to look for yaws.conf
 paths() ->
@@ -63,7 +63,7 @@ load(E) ->
             GC2 = if E#env.traceoutput == undefined ->
                           GC;
                      true ->
-                          ?gc_set_tty_trace(GC,true)
+                          ?gc_set_tty_trace(GC, E#env.traceoutput)
                   end,
             GC3 =  ?gc_set_debug(GC2, E#env.debug),
             GC4 = GC3#gconf{trace = E#env.trace},
@@ -454,6 +454,8 @@ make_default_sconf() ->
     #sconf{docroot = filename:join([Y, "www"])}.
 
 yaws_dir() ->
+    %% below, ignore dialyzer warning:
+    %% "The pattern 'false' can never match the type 'true'"
     case  yaws_generated:is_local_install() of
         true ->
             P = filename:split(code:which(?MODULE)),
@@ -733,6 +735,9 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                 I when is_integer(I) ->
                     fload(FD, globals, GC#gconf{keepalive_timeout = I},
                           C, Cs, Lno+1, Next);
+                _ when Val == "infinity" ->
+                    fload(FD, globals, GC#gconf{keepalive_timeout = infinity},
+                          C, Cs, Lno+1, Next);
                 _ ->
                     {error, ?F("Expect integer at line ~w", [Lno])}
             end;
@@ -856,14 +861,10 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
             %% just ignore - not relevant any longer
             fload(FD, globals, GC,
                   C, Cs, Lno+1, Next);
-        ["x_forwarded_for_log_proxy_whitelist", '=' | Suffixes] ->
-            case ip_list_parser(Suffixes, []) of
-                error ->
-                    {error, ?F("Expect IP address at line ~w:", [Lno])};
-                {ok, Addrs} ->
-                    GC2 = GC#gconf{x_forwarded_for_log_proxy_whitelist = Addrs},
-                    fload(FD, globals, GC2, C, Cs, Lno+1, Next)
-            end;
+        ["x_forwarded_for_log_proxy_whitelist", '=' | _] ->
+            error_logger:info_msg("Warning, x_forwarded_for_log_proxy_whitelist"
+                                  " is deprecated and ignored~n", []),
+            fload(FD, globals, GC, C, Cs, Lno+1, Next);
         ["ysession_mod", '=', Mod_str] ->
             Ysession_mod = list_to_atom(Mod_str),
             fload(FD, globals, GC#gconf{ysession_mod = Ysession_mod},
@@ -890,6 +891,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         [] ->
             fload(FD, server, GC, C, Cs, Lno+1, Next);
 
+        ["server_signature", '=', Signature] ->
+            fload(FD, server, GC, C#sconf{yaws=Signature}, Cs, Lno+1, Next);
         ["access_log", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
@@ -931,7 +934,8 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
         ["deflate", '=', Bool] ->
             case is_bool(Bool) of
                 {true, Val} ->
-                    C2 = ?sc_set_deflate(C, Val),
+                    C2 = ?sc_set_deflate(C#sconf{deflate_options=#deflate{}},
+                                         Val),
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
                 false ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
@@ -1016,18 +1020,32 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
             fload(FD, server, GC, C2, Cs, Lno+1, Next);
 
         ["docroot", '=', Rootdir | XtraDirs] ->
-            RootDirs = lists:map(
-                         fun(R) -> filename:absname(R)
-                         end, [Rootdir | XtraDirs]),
-            case lists:filter(
-                   fun(R) -> not is_dir(R) end, RootDirs) of
-                [] ->
+            RootDirs = lists:map(fun(R) -> filename:absname(R) end,
+                                 [Rootdir | XtraDirs]),
+            case lists:filter(fun(R) -> not is_dir(R) end, RootDirs) of
+                [] when C#sconf.docroot =:= undefined ->
                     C2 = C#sconf{docroot = hd(RootDirs),
                                  xtra_docroots = tl(RootDirs)},
                     fload(FD, server, GC, C2, Cs, Lno+1, Next);
-                _ ->
-                    {error, ?F("Expect directory at line ~w (docroot: ~s)",
-                               [Lno, hd(RootDirs)])}
+                [] ->
+                    XtraDocroots = RootDirs ++ C#sconf.xtra_docroots,
+                    C2 = C#sconf{xtra_docroots = XtraDocroots},
+                    fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                NoDirs ->
+                    error_logger:info_msg("Warning, Skip invalid docroots"
+                                          " at line ~w : ~s~n",
+                                          [Lno, string:join(NoDirs, ", ")]),
+                    case lists:subtract(RootDirs, NoDirs) of
+                        [] ->
+                            fload(FD, server, GC, C, Cs, Lno+1, Next);
+                        [H|T] when C#sconf.docroot =:= undefined ->
+                            C2 = C#sconf{docroot = H, xtra_docroots = T},
+                            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+                        Ds ->
+                            XtraDocroots = Ds ++ C#sconf.xtra_docroots,
+                            C2 = C#sconf{xtra_docroots = XtraDocroots},
+                            fload(FD, server, GC, C2, Cs, Lno+1, Next)
+                    end
             end;
 
         ["partial_post_size",'=',Size] ->
@@ -1051,6 +1069,10 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
 
         ['<', "redirect", '>'] ->
             fload(FD, server_redirect, GC, C, Cs, Lno+1, Next, []);
+
+        ['<', "deflate", '>'] ->
+            fload(FD, server_deflate, GC, C, Cs, Lno+1, Next,
+                  #deflate{mime_types=[]});
 
         %% noop
         ["default_server_on_this_ip", '=', _Bool] ->
@@ -1101,6 +1123,10 @@ fload(FD, server, GC, C, Cs, Lno, Chars) ->
                     {error, ?F("Expect true|false at line ~w", [Lno])}
             end;
 
+        ['<', "/server", '>'] when C#sconf.docroot =:= undefined ->
+            {error,
+             ?F("No valid docroot configured for virthost '~s' (port: ~w)",
+                [C#sconf.servername, C#sconf.port])};
         ['<', "/server", '>'] ->
             case C#sconf.listen of
                 [] ->
@@ -1572,6 +1598,106 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
             Err
     end;
 
+fload(FD, server_deflate, _GC, _C, _Cs, Lno, eof, _Deflate) ->
+    file:close(FD),
+    {error, ?F("Unexpected end of file at line ~w", [Lno])};
+
+fload(FD, server_deflate, GC, C, Cs, Lno, Chars, Deflate) ->
+    Next = io:get_line(FD, ''),
+    case toks(Lno, Chars) of
+        [] ->
+            fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, Deflate);
+        ["min_compress_size", '=', CSize] ->
+            case (catch list_to_integer(CSize)) of
+                I when is_integer(I), I > 0 ->
+                    D2 = Deflate#deflate{min_compress_size=I},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                _ when CSize == "nolimit" ->
+                    D2 = Deflate#deflate{min_compress_size=nolimit},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                _ ->
+                    {error, ?F("Expect integer > 0 at line ~w", [Lno])}
+            end;
+        ["mime_types", '=' | MimeTypes] ->
+            case parse_compressible_mime_types(MimeTypes,
+                                               Deflate#deflate.mime_types) of
+                {ok, L} ->
+                    D2 = Deflate#deflate{mime_types=L},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                {error, Str} ->
+                    {error, ?F("~s at line ~w", [Str, Lno])}
+            end;
+        ["compression_level", '=', CLevel] ->
+            L = try
+                    list_to_integer(CLevel)
+                catch error:badarg ->
+                        list_to_atom(CLevel)
+                end,
+            if
+                L =:= none; L =:= default;
+                L =:= best_compression; L =:= best_speed ->
+                    D2 = Deflate#deflate{compression_level=L},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                is_integer(L), L >= 0, L =< 9 ->
+                    D2 = Deflate#deflate{compression_level=L},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                true ->
+                    {error, ?F("Bad compression level at line ~w", [Lno])}
+            end;
+        ["window_size", '=', WSize] ->
+            case (catch list_to_integer(WSize)) of
+                I when is_integer(I), I > 8, I < 16 ->
+                    D2 = Deflate#deflate{window_size=I * -1},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                _ ->
+                    {error,
+                     ?F("Expect integer between 9..15 at line ~w",
+                        [Lno])}
+            end;
+        ["mem_level", '=', MLevel] ->
+            case (catch list_to_integer(MLevel)) of
+                I when is_integer(I), I >= 1, I =< 9 ->
+                    D2 = Deflate#deflate{mem_level=I},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                _ ->
+                    {error, ?F("Expect integer between 1..9 at line ~w", [Lno])}
+            end;
+        ["strategy", '=', Strategy] ->
+            if
+                Strategy =:= "default";
+                Strategy =:= "filtered";
+                Strategy =:= "huffman_only" ->
+                    D2 = Deflate#deflate{strategy=list_to_atom(Strategy)},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                true ->
+                    {error,
+                     ?F("Unknown strategy ~p at line ~w", [Strategy, Lno])}
+            end;
+        ["use_gzip_static", '=', Bool] ->
+            case is_bool(Bool) of
+                {true, Val} ->
+                    D2 = Deflate#deflate{use_gzip_static=Val},
+                    fload(FD, server_deflate, GC, C, Cs, Lno+1, Next, D2);
+                false ->
+                    {error, ?F("Expect true|false at line ~w", [Lno])}
+            end;
+        ['<', "/deflate", '>'] ->
+            D2 = case Deflate#deflate.mime_types of
+                     [] ->
+                         Deflate#deflate{
+                           mime_types = ?DEFAULT_COMPRESSIBLE_MIME_TYPES
+                          };
+                     _ ->
+                         Deflate
+                 end,
+            C2 = C#sconf{deflate_options = D2},
+            fload(FD, server, GC, C2, Cs, Lno+1, Next);
+        [H|T] ->
+            {error, ?F("Unexpected input ~p at line ~w", [[H|T], Lno])};
+        Err ->
+            Err
+    end;
+
 fload(FD, extra_cgi_vars, _GC, _C, _Cs, Lno, eof, _EVars) ->
     file:close(FD),
     {error, ?F("Unexpected end of file at line ~w", [Lno])};
@@ -1708,7 +1834,7 @@ is_string_char([C|T]) ->
             %% FIXME check that [C, hd(T)] really is a char ?? how
             utf8;
         true ->
-            lists:member(C, [$., $/, $:, $_, $-, $+, $~, $@])
+            lists:member(C, [$., $/, $:, $_, $-, $+, $~, $@, $*])
     end.
 
 is_special(C) ->
@@ -1868,6 +1994,31 @@ parse_phpmod(['<', "extern", ',', NodeModFunSpec, '>'], _) ->
     end.
 
 
+parse_compressible_mime_types(_, all) ->
+    {ok, all};
+parse_compressible_mime_types(["all"|_], _Acc) ->
+    {ok, all};
+parse_compressible_mime_types(["*/*"|_], _Acc) ->
+    {ok, all};
+parse_compressible_mime_types(["defaults"|Rest], Acc) ->
+    parse_compressible_mime_types(Rest, ?DEFAULT_COMPRESSIBLE_MIME_TYPES++Acc);
+parse_compressible_mime_types([',' | Rest], Acc) ->
+    parse_compressible_mime_types(Rest, Acc);
+parse_compressible_mime_types([MimeType | Rest], Acc) ->
+    Res = re:run(MimeType, "^([-\\w\+]+)/([-\\w\+\.]+|\\*)$",
+                 [{capture, all_but_first, list}]),
+    case Res of
+        {match, [Type,"*"]} ->
+            parse_compressible_mime_types(Rest, [{Type, all}|Acc]);
+        {match, [Type,SubType]} ->
+            parse_compressible_mime_types(Rest, [{Type, SubType}|Acc]);
+        nomatch ->
+            {error, "Invalid MimeType"}
+    end;
+parse_compressible_mime_types([], Acc) ->
+    {ok, Acc}.
+
+
 ssl_start() ->
     case catch ssl:start() of
         ok ->
@@ -2004,6 +2155,7 @@ eq_sconfs(S1,S2) ->
 soft_setconf(GC, Groups, OLDGC, OldGroups) ->
     if
         GC /= OLDGC ->
+            yaws_trace:setup(GC),
             update_gconf(GC);
         true ->
             ok
@@ -2025,12 +2177,7 @@ hard_setconf(GC, Groups) ->
     case gen_server:call(yaws_server,{setconf, GC, Groups},infinity) of
         ok ->
             yaws_log:setup(GC, Groups),
-            case GC#gconf.trace of
-                false ->
-                    ok;
-                {true, What} ->
-                    yaws_log:open_trace(What)
-            end;
+            yaws_trace:setup(GC);
         E ->
             erlang:error(E)
     end.
@@ -2090,7 +2237,6 @@ can_soft_setconf(NEWGC, NewGroups, OLDGC, OldGroups) ->
 
 can_soft_gc(G1, G2) ->
     if
-        G1#gconf.trace == G2#gconf.trace,
         G1#gconf.flags == G2#gconf.flags,
         G1#gconf.logdir == G2#gconf.logdir,
         G1#gconf.log_wrap_size == G2#gconf.log_wrap_size,
@@ -2205,16 +2351,6 @@ delete_sconf(SC) ->
 
 update_gconf(GC) ->
     ok = gen_server:call(yaws_server, {update_gconf, GC}, infinity).
-
-ip_list_parser([], Addrs) ->
-    {ok,lists:reverse(Addrs)};
-ip_list_parser([IP|IPs], Addrs) ->
-    case inet_parse:address(IP) of
-        {error, _} ->
-            error;
-        {ok, Addr} ->
-            ip_list_parser(IPs, [Addr|Addrs])
-    end.
 
 
 -define(MAXBITS_IPV4, 32).
