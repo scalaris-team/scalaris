@@ -846,22 +846,31 @@ class TestPubSub(unittest.TestCase):
         conn.close_connection()
     
     def _checkNotifications(self, notifications, expected):
+        not_received = []
+        unrelated_items = []
+        unrelated_topics = []
         for (topic, contents) in expected.items():
             if topic not in notifications:
                 notifications[topic] = []
             for content in contents:
-                self.assertTrue(content in notifications[topic],
-                                msg = "subscription (" + topic + ", " + content + ") not received by server)")
+                if not content in notifications[topic]:
+                    not_received.append(topic + ": " + content)
                 notifications[topic].remove(content)
             if len(notifications[topic]) > 0:
-                self.fail("Received element (" + topic + ", " + notifications[topic][0] + ") which is not part of the subscription.")
+                unrelated_items.append("(" + topic + ": " + ", ".join(notifications[topic]) + ")")
             del notifications[topic]
         # is there another (unexpected) topic we received content for?
         if len(notifications) > 0:
             for (topic, contents) in notifications.items():
                 if len(contents) > 0:
-                    self.fail("Received notification for topic (" + topic + ", " + contents[0] + ") which is not part of the subscription.")
+                    unrelated_topics.append("(" + topic + ": " + ", ".join(contents) + ")")
                     break
+        
+        fail_msg = "not received: " + ", ".join(not_received) + "\n" +\
+                   "unrelated items: " + ", ".join(unrelated_items) + "\n" +\
+                   "unrelated topics: " + ", ".join(unrelated_topics)
+        self.assertTrue(len(not_received) == 0 and len(unrelated_items) == 0
+                        and len(unrelated_topics) == 0, fail_msg)
     
     # Test method for the publish/subscribe system.
     # Single server, subscription to one topic, multiple publishs.
