@@ -18,14 +18,13 @@ package de.zib.scalaris;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -677,20 +676,20 @@ public class PubSubTest {
     }
 
     private void checkNotifications(final Map<String, Vector<String>> notifications, final Map<String, Vector<String>> expected) {
+        final List<String> notReceived = new ArrayList<String>();
+        final List<String> unrelatedItems = new ArrayList<String>();
+        final List<String> unrelatedTopics = new ArrayList<String>();;
         for (final Entry<String, Vector<String>> expected_element : expected.entrySet()) {
             final String topic = expected_element.getKey();
             final Vector<String> notifications_topic = notifications.get(topic);
             for (final String content : expected_element.getValue()) {
-                assertTrue("subscription (" + topic + ", " + content
-                        + ") not received by server)",
-                        (notifications_topic != null)
-                                && notifications_topic.contains(content));
+                if ((notifications_topic == null) || !notifications_topic.contains(content)) {
+                    notReceived.add(topic + ": " + content);
+                }
                 notifications_topic.remove(content);
             }
-            if ((notifications_topic != null) && (notifications_topic.size() > 0)) {
-                fail("Received element (" + topic + ", "
-                        + notifications_topic.get(0)
-                        + ") which is not part of the subscription.");
+            if ((notifications_topic != null) && !notifications_topic.isEmpty()) {
+                unrelatedItems.add("(" + topic + ": " + notifications_topic.toString() + ")");
             }
             notifications.remove(topic);
         }
@@ -699,12 +698,16 @@ public class PubSubTest {
         if (notifications.size() > 0) {
             for (final Entry<String, Vector<String>> element : notifications.entrySet()) {
                 if (element.getValue().size() > 0) {
-                    fail("Received notification for topic (" + element.getKey() + ", "
-                            + element.getValue().get(0)
-                            + ") which is not part of the subscription.");
+                    unrelatedTopics.add("(" + element.getKey() + ": " + element.getValue().toString() + ")");
                 }
             }
         }
+
+        final String failMsg = "not received: " + notReceived.toString() + "\n"
+                + "unrelated items: " + unrelatedItems.toString() + "\n"
+                + "unrelated topics: " + unrelatedTopics.toString();
+        assertTrue(failMsg, notReceived.isEmpty() && unrelatedItems.isEmpty()
+                && unrelatedTopics.isEmpty());
     }
 
     /**
