@@ -10,9 +10,12 @@
 -module(yaws_generated).
 -author('klacke@bluetail.com').
 
--compile(export_all).
+-export([version/0,
+         vardir/0,
+         etcdir/0,
+         is_local_install/0]).
 
-version() -> "1.92".
+version() -> "1.93".
 
 vardir() ->  "/usr/local/var".
 
