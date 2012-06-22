@@ -101,7 +101,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
          * @return a negative integer, zero, or a positive integer if the first
          *         argument is less than, equal to, or greater than the second
          */
-        public int compare(PeerNode o1, PeerNode o2) {
+        public int compare(final PeerNode o1, final PeerNode o2) {
             // Returns a negative integer, zero, or a positive integer as the
             // first argument is less than, equal to, or greater than the
             // second.
@@ -109,17 +109,17 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
                 return 0;
             }
 
-            Date d1 = o1.getLastFailedConnect();
-            Date d2 = o2.getLastFailedConnect();
-            Long o1Time = ((d1 == null) ? 0 : d1.getTime());
-            Long o2Time = ((d2 == null) ? 0 : d2.getTime());
-            int compByTime = o1Time.compareTo(o2Time);
+            final Date d1 = o1.getLastFailedConnect();
+            final Date d2 = o2.getLastFailedConnect();
+            final Long o1Time = ((d1 == null) ? 0 : d1.getTime());
+            final Long o2Time = ((d2 == null) ? 0 : d2.getTime());
+            final int compByTime = o1Time.compareTo(o2Time);
 
             if (compByTime == 0) {
                 // two different nodes have the same fail dates
                 // -> make order dependent on their hash code:
-                int h1 = o1.hashCode();
-                int h2 = o2.hashCode();
+                final int h1 = o1.hashCode();
+                final int h2 = o2.hashCode();
                 if (h1 < h2) {
                     return -1;
                 } else if (h1 > h2){
@@ -127,7 +127,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
                 } else {
                     // two different nodes have equal fail dates and hash codes
                     // -> compare their names (last resort)
-                    int compByName = o1.getNode().node().compareTo(o2.getNode().node());
+                    final int compByName = o1.getNode().node().compareTo(o2.getNode().node());
                     if (compByName != 0) {
                         return compByName;
                     } else {
@@ -163,7 +163,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * Random number generator for selecting random nodes in the
      * {@link #goodNodes} list.
      */
-    private Random random = new Random();
+    private final Random random = new Random();
 
     /**
      * The maximal number of connection retries.
@@ -179,7 +179,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param remoteNode the (only) available remote node
      */
-    public DefaultConnectionPolicy(PeerNode remoteNode) {
+    public DefaultConnectionPolicy(final PeerNode remoteNode) {
         super(remoteNode);
         availableNodeAdded(remoteNode);
     }
@@ -197,10 +197,10 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * @param availableRemoteNodes
      *            the remote nodes available for connections
      */
-    public DefaultConnectionPolicy(List<PeerNode> availableRemoteNodes) {
+    public DefaultConnectionPolicy(final List<PeerNode> availableRemoteNodes) {
         super(availableRemoteNodes);
         synchronized (availableRemoteNodes) {
-            for (PeerNode remoteNode : availableRemoteNodes) {
+            for (final PeerNode remoteNode : availableRemoteNodes) {
                 availableNodeAdded(remoteNode);
             }
         }
@@ -214,7 +214,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param newNode the new node
      */
-    public synchronized void availableNodeAdded(PeerNode newNode) {
+    @Override
+    public synchronized void availableNodeAdded(final PeerNode newNode) {
         synchronized (newNode) {
             if (newNode.getFailureCount() == 0) {
                 goodNodes.add(newNode);
@@ -229,7 +230,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param removedNode the removed node
      */
-    public synchronized void availableNodeRemoved(PeerNode removedNode) {
+    @Override
+    public synchronized void availableNodeRemoved(final PeerNode removedNode) {
         goodNodes.remove(removedNode);
         badNodes.remove(removedNode);
     }
@@ -238,6 +240,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * Resets the {@link #goodNodes} and {@link #badNodes} members as the list
      * of available nodes has been reset.
      */
+    @Override
     public synchronized void availableNodesReset() {
         goodNodes.clear();
         badNodes.clear();
@@ -251,7 +254,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param node the failed node
      */
-    public synchronized void nodeFailed(PeerNode node) {
+    @Override
+    public synchronized void nodeFailed(final PeerNode node) {
         synchronized (node) {
             // remove the node from the badNodes if it is in there (will be
             // reinserted at a new point)
@@ -274,7 +278,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param node the node
      */
-    public void nodeFailReset(PeerNode node) {
+    @Override
+    public void nodeFailReset(final PeerNode node) {
         synchronized (node) {
             if (node.getFailureCount() > 0) {
                 // a previously failed node must be in badNodes
@@ -294,7 +299,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param node the node
      */
-    public synchronized void nodeConnectSuccess(PeerNode node) {
+    @Override
+    public synchronized void nodeConnectSuccess(final PeerNode node) {
         synchronized (node) {
             node.setLastConnectSuccess();
             if (node.getFailureCount() > 0) {
@@ -355,9 +361,10 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * @see Connection#doRPC(String, String,
      *      com.ericsson.otp.erlang.OtpErlangObject[])
      */
+    @Override
     @SuppressWarnings("unchecked")
-    public synchronized <E extends Exception> PeerNode selectNode(int retry,
-            PeerNode failedNode, E e) throws E {
+    public synchronized <E extends Exception> PeerNode selectNode(final int retry,
+            final PeerNode failedNode, final E e) throws E {
         if (retry <= maxRetries) {
             if ((goodNodes.size() + badNodes.size()) < 1) {
                 throw new UnsupportedOperationException(
@@ -368,13 +375,13 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
                 return badNodes.first();
             }
         } else {
-            String newMessage = e.getMessage() + ", bad nodes: " + badNodes.toString() + ", good nodes: " + goodNodes.toString() + ", retries: " + (retry - 1);
+            final String newMessage = e.getMessage() + ", bad nodes: " + badNodes.toString() + ", good nodes: " + goodNodes.toString() + ", retries: " + (retry - 1);
             if (e instanceof OtpAuthException) {
-                OtpAuthException e1 = new OtpAuthException(newMessage);
+                final OtpAuthException e1 = new OtpAuthException(newMessage);
                 e1.setStackTrace(e.getStackTrace());
                 throw (E) e1;
             } else if (e instanceof IOException) {
-                IOException e1 = new IOException(newMessage);
+                final IOException e1 = new IOException(newMessage);
                 e1.setStackTrace(e.getStackTrace());
                 throw (E) e1;
             } else {
@@ -398,7 +405,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      *
      * @param maxRetries the maxRetries to set
      */
-    public void setMaxRetries(int maxRetries) {
+    public void setMaxRetries(final int maxRetries) {
         this.maxRetries = maxRetries;
     }
 
@@ -419,8 +426,8 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * @return the list of good nodes
      */
     public synchronized List<PeerNode> getBadNodes() {
-        ArrayList<PeerNode> result = new ArrayList<PeerNode>(badNodes.size());
-        for (PeerNode p : badNodes) {
+        final ArrayList<PeerNode> result = new ArrayList<PeerNode>(badNodes.size());
+        for (final PeerNode p : badNodes) {
             result.add(p);
         }
         return result;
