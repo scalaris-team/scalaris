@@ -135,7 +135,7 @@ public class NodeDiscovery implements Runnable {
                 return;
             }
 
-            // first, remove nodes with failed connection attempts to make room for the new nodes:
+            // first, remove nodes with failed connection attempts (or never connected ones) to make room for the new nodes:
             // sort existing nodes, least failed connection attempts first
             Collections.sort(existingNodes, new LeastFailedNodesComparator());
             int failedNodesToRemove;
@@ -152,7 +152,7 @@ public class NodeDiscovery implements Runnable {
             int lastNodeIdx = existingNodes.size() - 1;
             for (; lastNodeIdx >= (existingNodes.size() - failedNodesToRemove); --lastNodeIdx) {
                 final PeerNode node = existingNodes.get(lastNodeIdx);
-                if (node.getFailureCount() > 0) {
+                if ((node.getFailureCount() > 0) || (node.getLastConnectSuccess() == null)) {
                     cf.removeNode(node);
                 } else {
                     break;
@@ -165,6 +165,8 @@ public class NodeDiscovery implements Runnable {
             for (int i = 0; (i < (maxNodes - remainingNodes)) && (i < otherVms.size()); ++i) {
                 cf.addNode(otherVms.get(i));
             }
+            // TODO: replace some more remaining nodes with newly discovered ones?
+            // e.g. randomly select some to be replaced?
         } catch (final ConnectionException e) {
             e.printStackTrace();
         }
