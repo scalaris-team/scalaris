@@ -115,32 +115,37 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
             final Long o2Time = ((d2 == null) ? 0 : d2.getTime());
             final int compByTime = o1Time.compareTo(o2Time);
 
-            if (compByTime == 0) {
-                // two different nodes have the same fail dates
-                // -> make order dependent on their hash code:
-                final int h1 = o1.hashCode();
-                final int h2 = o2.hashCode();
-                if (h1 < h2) {
-                    return -1;
-                } else if (h1 > h2){
-                    return 1;
-                } else {
-                    // two different nodes have equal fail dates and hash codes
-                    // -> compare their names (last resort)
-                    final int compByName = o1.getNode().node().compareTo(o2.getNode().node());
-                    if (compByName != 0) {
-                        return compByName;
-                    } else {
-                        throw new ClassCastException(
-                                "Cannot compare "
-                                        + o1
-                                        + " with "
-                                        + o2
-                                        + ": they share the same fail time, hash code, node name and cookie.");
-                    }
-                }
-            } else {
+            if (compByTime != 0) {
                 return compByTime;
+            }
+
+            final Integer o1FailureCount = o1.getFailureCount();
+            final Integer o2FailureCount = o2.getFailureCount();
+            final int compByFailureCount = o1FailureCount.compareTo(o2FailureCount);
+
+            if (compByFailureCount != 0) {
+                return compByFailureCount;
+            }
+
+            // two different nodes have the same fail dates
+            // -> make order dependent on their hash code:
+            final int h1 = o1.hashCode();
+            final int h2 = o2.hashCode();
+            if (h1 < h2) {
+                return -1;
+            } else if (h1 > h2){
+                return 1;
+            } else {
+                // two different nodes have equal fail dates and hash codes
+                // -> compare their names (last resort)
+                final int compByName = o1.getNode().node().compareTo(o2.getNode().node());
+                if (compByName != 0) {
+                    return compByName;
+                } else {
+                    throw new ClassCastException(
+                            "Cannot compare " + o1 + " with " + o2 +
+                            ": they share the same fail time, fail count, hash code and node name.");
+                }
             }
         }
     }
