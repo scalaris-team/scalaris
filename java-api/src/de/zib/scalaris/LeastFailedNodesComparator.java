@@ -16,6 +16,7 @@
 package de.zib.scalaris;
 
 import java.util.Comparator;
+import java.util.Date;
 
 /**
  * Defines the order of the {@link PeerNode} objects with least recently
@@ -88,6 +89,18 @@ class LeastFailedNodesComparator implements Comparator<PeerNode>, java.io.Serial
         }
 
         // two different nodes have the same fail counts
+        // -> make order dependent on their last successful connection date
+        final Date d1 = o1.getLastConnectSuccess();
+        final Date d2 = o2.getLastConnectSuccess();
+        final Long o1Time = ((d1 == null) ? 0 : d1.getTime());
+        final Long o2Time = ((d2 == null) ? 0 : d2.getTime());
+        // most recently connection success first:
+        final int compByTime = o2Time.compareTo(o1Time);
+
+        if (compByTime != 0) {
+            return compByTime;
+        }
+
         // -> make order dependent on their hash code:
         final int h1 = o1.hashCode();
         final int h2 = o2.hashCode();
