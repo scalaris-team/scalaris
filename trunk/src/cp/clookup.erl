@@ -14,24 +14,41 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc    data_node join protocol
+%% @doc    lookup with given consistency model consistent or best_effort.
 %% @end
 %% @version $Id$
--module(data_node_join).
+-module(clookup).
 -author('schuett@zib.de').
 -author('schintke@zib.de').
--vsn('$Id').
+-vsn('$Id ').
+
 -include("scalaris.hrl").
 
--export([join_as_first/2]).
+-export([lookup/3, lookup/4]).
 
--spec join_as_first(data_node:state(), [tuple()]) -> data_node:state().
-join_as_first(State, _Options) ->
-    Lease = leases:new_for_all(),
-    LMState = data_node:get_rlease_mgmt(State),
-    LMState1 = rlease_mgmt:store_rlease(LMState, Lease, 1),
-    LMState2 = rlease_mgmt:store_rlease(LMState1, Lease, 2),
-    LMState3 = rlease_mgmt:store_rlease(LMState2, Lease, 3),
-    LMState4 = rlease_mgmt:store_rlease(LMState3, Lease, 4),
-    State1 = data_node:set_leases(State, [Lease]),
-    data_node:set_rlease_mgmt(State1, LMState4).
+-ifdef(with_export_type_support).
+-export_type([need_consistency/0]).
+-export_type([got_consistency/0]).
+-endif.
+
+-type need_consistency() :: proven | best_effort.
+-type got_consistency()  :: was_consistent | was_not_consistent.
+
+-spec lookup(?RT:key(), comm:message(), need_consistency()) -> ok.
+lookup(Key, Msg, NeedConsistency) ->
+    lookup(pid_groups:find_a(router_node), Key, Msg, NeedConsistency).
+
+-spec lookup(comm:erl_local_pid(), ?RT:key(),
+             comm:message(), need_consistency()) -> ok.
+lookup(Pid, Key, Msg, NeedConsistency) ->
+    comm:send_local(Pid, {?lookup_aux, Key, Msg, NeedConsistency}).
+
+
+
+
+
+
+
+
+
+

@@ -46,45 +46,61 @@
         kv_db
       | lease_db.
 
--type lookup_type() ::
-        consistent
-      | consistent_or_cquorum.
+-type quorum_type() ::
+        q_need_consistent
+      | q_consistent_or_cquorum.
 
 %@doc Trigger a quorum read for the given key and the given database
--spec qread(comm:erl_local_pid(), ?RT:key(), database(), lookup_type()) -> ok.
+-spec qread(comm:erl_local_pid(), ?RT:key(), database(), quorum_type()) -> ok.
 qread(ReplyAsPid, Key, DB, LookupType) ->
     comm:send_local(self(), {rbr, qread, ReplyAsPid, Key, DB, LookupType}).
 
--spec on(comm:message(), state()| {data_node:consistency(), state()}) -> state().
-on({rbr, qread, ReplyAsPid, Key, DB, LookupType}, TableName) ->
-    RKeys = ?RT:get_replica_keys_with_index(Key),
+-spec on(comm:message(),
+         state() | {clookup:got_consistency(), state()}) -> state().
+
+%% qread request triggered by rbr:qread/4
+on({rbr, qread, ReplyAsPid, Key, DB, LookupType}, {TableName}) ->
+    %% initiate quorum read
+    %% lookup-type: q_lconsistent required for kv operations
+    %% lookup-type: q_lconsistent_or_cquorum used for leases
+    %% ColState used to collect replies (tuple for kv, list for leases)
+    %% State managed via ReqID and local pdb entry (prefixed with {rbr, '_'})
+    Keys = ?RT:get_replica_keys(Key),
+    RKeys = lists:zip(lists:seq(1, length(Keys)), Keys),
 
     ReqId = uid:get_global_uid(),
     RBRPid = comm:reply_as(comm:this(), 3, {rbr, qread_reply, ReqId, '_'}),
     ColState =
         case LookupType of
-            consistent  ->
-                _ = [ lookup:consistent(
-                    RKey, {acceptor, {DB, Nth}, get_key, Key, Nth, DB, RBRPid})
+            q_need_consistent  ->
+                _ = [ clookup:lookup(
+                        RKey,
+                        {acceptor, DB, get_key, Key, Nth, DB, RBRPid},
+                        proven
+                       )
                   || {RKey, Nth} <- RKeys ],
                 {_Counter = 0, _Vers = -2, _Val = '_'};
-            consistent_or_cquorum ->
-                _ = [ lookup:best_effort_consistent(
-                    RKey, {acceptor, DB, get_key, Key, Nth, DB, RBRPid})
+            q_consistent_or_cquorum ->
+                _ = [ clookup:lookup(
+                        RKey,
+                        {acceptor, {DB, Nth}, get_key, Key, Nth, DB, RBRPid},
+                        best_effort)
                   || {RKey, Nth} <- RKeys ],
-                _ColState = []
+                []
         end,
 
     pdb:set({{rbr, ReqId}, LookupType, ColState, ReplyAsPid}, TableName),
 
-    TableName;
+    {TableName};
 
 %% collect majority of replies
-%% replies may be consistent or not consistent
+%% lookup replies may be reported as consistent or not_consistent (in the state)
 on({rbr, qread_reply, ReqId, {acceptor, get_key_reply, InVers, InVal}},
-   {Consistency, TableName}) ->
+   {Consistency, {TableName}}) ->
+    %% always decide at the moment, when a majority is reached for the
+    %% first time
     case pdb:get({rbr, ReqId}, TableName) of
-        undefined -> ok; %% drop outdated messages
+        undefined -> ok; %% no state in pdb -> drop slow minority message
         {_, LookupType, ColState, ReplyAsPid} ->
             NewColState = add_to_colstate(ColState, InVers, InVal, Consistency),
 
@@ -94,39 +110,50 @@ on({rbr, qread_reply, ReqId, {acceptor, get_key_reply, InVers, InVal}},
                         {{rbr, ReqId}, LookupType, NewColState, ReplyAsPid},
                     pdb:set(NewReqState, TableName);
                 true ->
-                    pdb:delete({rbr, ReqId}, TableName),
                     case decision(NewColState) of
                         {done, NewVers, NewVal} ->
                             comm:send(ReplyAsPid, {qread_reply, NewVers, NewVal});
                         failed ->
+                            %% no cquorum collected (only for
+                            %% consistent_or_cquorum)
                             comm:send(ReplyAsPid, {qread_reply, please_retry})
-                    end
+                    end,
+                    pdb:delete({rbr, ReqId}, TableName)
           end
     end,
-    TableName.
+    {TableName}.
 
+%% for quorum_type: consistent
 have_majority({Counter, _, _}) ->
     Counter =:= quorum:majority_for_accept(config:read(replication_factor));
+%% for quorum_type: consistent_or_cquorum
 have_majority(L) ->
     length(L)
         =:= quorum:majority_for_accept(config:read(replication_factor)).
 
+%% for quorum_type: consistent
 add_to_colstate({Counter, Vers, Val}, InVers, InVal, _Consistency) ->
     case Vers < InVers of
         true  -> {Counter + 1, InVers, InVal};
         false -> {Counter + 1, Vers, Val}
     end;
+%% for quorum_type: consistent_or_cquorum
 add_to_colstate(L, InVers, InVal, Consistency) ->
     [ {InVers, InVal, Consistency} | L].
 
+%% for quorum_type: consistent
 decision({_Counter, Vers, Val}) -> {done, Vers, Val};
-
+%% for quorum_type: consistent_or_cquorum
 decision(L) ->
-    OnlyConsistent = lists:all(fun(X) -> element(3, X) == consistent end, L),
-    case OnlyConsistent of
+    OnlyConsistentReplies =
+        lists:all(fun(X) -> element(3, X) == consistent end, L),
+    case OnlyConsistentReplies of
         true ->
+            %% take value of latest version
             MaxVers =
-                lists:foldl(fun(X, Acc) -> util:max(element(3, X), Acc) end, -1, L),
+                lists:foldl(fun(X, Acc) ->
+                                    util:max(element(3, X), Acc)
+                            end, -1, L),
             Matches = lists:filter(fun(X) -> element(3, X) =:= MaxVers end, L),
             {Vers, Val, _} = hd(Matches),
             {done, Vers, Val};
@@ -134,14 +161,16 @@ decision(L) ->
             get_cquorum(L)
     end.
 
+%% PRE: length(L) == Maj
+%% for quorum_type: consistent_or_cquorum
 get_cquorum(L) ->
+    %% get latest version, all have to have the same version
     MaxVers =
         lists:foldl(fun(X, Acc) -> util:max(element(3, X), Acc) end, -1, L),
-    Matches = lists:filter(fun(X) -> element(3, X) =:= MaxVers end, L),
-    Maj = quorum:majority_for_accept(config:read(replication_factor)),
-    case length(Matches) =:= Maj of
+    CQuorum = lists:all(fun(X) -> element(3, X) =:= MaxVers end, L),
+    case CQuorum of
         true ->
-            {Vers, Val, _} = hd(Matches),
+            {Vers, Val, _} = hd(L), % any value is fine as all are the same
             {done, Vers, Val};
         false ->
             failed
@@ -149,7 +178,6 @@ get_cquorum(L) ->
 
 %% lookup: consistent / consistent_or_cquorum / cquorum
 %% existance: must, must_not, may
-
 
 -spec qwrite(comm:erl_local_pid(), ?RT:key(), client_value()) -> ok.
 qwrite(_ReplyPid, _Key, _Val) ->

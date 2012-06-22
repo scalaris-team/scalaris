@@ -20,7 +20,7 @@
 -module(data_node).
 -author('schuett@zib.de').
 -author('schintke@zib.de').
--vsn('$Id').
+-vsn('$Id ').
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -38,7 +38,6 @@
 
 -ifdef(with_export_type_support).
 -export_type([msg/0, state/0]).
--export_type([consistency/0]).
 -endif.
 
 % accepted messages of data_node processes
@@ -58,10 +57,8 @@
          }).
 -type state() :: #state{}.
 
--type consistency() :: consistent | not_consistent.
-
 %% @doc message handler
--spec on(msg(), state() | {consistency(), state()}) -> state().
+-spec on(msg(), state() | {clookup:got_consistency(), state()}) -> state().
 
 %% messages concerning leases
 on({lease, _LeaseMsg} = Msg, State) ->
@@ -73,28 +70,29 @@ on({read, _SourcePid, _SourceId, _HashedKey} = Msg, State) ->
     data_node_db:on(Msg, State);
 
 %% messages concerning routing
-on({?lookup_fin, Key, Msg, Consistency}, State) ->
+on({?lookup_fin, Key, Msg, NeedConsistency}, State) ->
     case data_node_leases:is_owner(State, Key) of
         true ->
-            gen_component:post_op({consistent, State}, Msg);
+            gen_component:post_op({was_consistent, State}, Msg);
         false ->
-            case Consistency of
-                consistent ->
+            case NeedConsistency of
+                proven ->
                     io:format("I am not owner~n"),
                     case pid_groups:get_my(router_node) of
                         failed -> ok; %% TODO: Delete this case, should not happen.
-                        Pid -> comm:send_local(Pid, {?lookup_aux, Key, Msg})
+                        Pid ->
+                            clookup:lookup(Pid, Key, Msg, NeedConsistency)
                     end,
                     State;
                 best_effort ->
-                    gen_component:post_op({not_consistent, State}, Msg)
+                    gen_component:post_op({was_not_consistent, State}, Msg)
             end
     end;
 
-on(Msg, {Consistency, State})
+on(Msg, {GotConsistency, State})
   when rbr =:= element(1, Msg) ->
     NewRBRState =
-        rbr:on(Msg, {Consistency, get_rbr_state(State)}),
+        rbr:on(Msg, {GotConsistency, get_rbr_state(State)}),
     set_rbr_state(State, NewRBRState);
 
 on(Msg, State)
@@ -138,7 +136,7 @@ new_state() ->
         true -> #state{kv_state  = data_node_db:new_state(),
                        leases = data_node_leases:new_state(),
                        rlease_state = [rlease_mgmt:new_state()
-                                       || lists:seq(1, RepDegree)],
+                                       || _ <- lists:seq(1, 4)],
                        rbr_state = rbr:new_state()}
     end.
 
@@ -148,9 +146,9 @@ get_leases(#state{leases=Leases}) -> Leases.
 set_leases(State, LState) -> State#state{leases = LState}.
 -spec get_db(state()) -> data_node_db:state().
 get_db(#state{kv_state=DB}) -> DB.
--spec get_rlease_mgmt(state()) -> rlease_mgmt:state().
+-spec get_rlease_mgmt(state()) -> [rlease_mgmt:state()].
 get_rlease_mgmt(#state{rlease_state=RLMState}) -> RLMState.
--spec set_rlease_mgmt(state(), rlease_mgmt:state()) -> state().
+-spec set_rlease_mgmt(state(), [rlease_mgmt:state()]) -> state().
 set_rlease_mgmt(State, RLMState) -> State#state{rlease_state = RLMState}.
 
 %% operations on the lease list
@@ -181,10 +179,9 @@ get_kv_state(#state{kv_state=KVState}) -> KVState.
 set_kv_state(State, KVState) -> State#state{kv_state = KVState}.
 
 -spec get_rlease_state(state(), pos_integer()) -> rlease_mgmt:state().
-get_rlease_state(#state{rlease_state=RLeaseState}, Nth) -> lists:nth(RLeaseState, Nth).
+get_rlease_state(#state{rlease_state=RLeaseState}, Nth) -> lists:nth(Nth, RLeaseState).
 -spec set_rlease_state(state(), pos_integer(), rlease_mgmt:state()) -> state().
 set_rlease_state(State, Nth, RleaseState) ->
     NewRLeaseState =
         util:list_set_nth(State#state.rlease_state, Nth, RleaseState),
     State#state{ rlease_state = NewRLeaseState }.
-
