@@ -17,8 +17,6 @@ package de.zib.scalaris;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.SortedSet;
@@ -66,90 +64,6 @@ import com.ericsson.otp.erlang.OtpAuthException;
  */
 public class DefaultConnectionPolicy extends ConnectionPolicy {
 
-    /**
-     * Helper class that defines the order of the {@link PeerNode} objects in
-     * the {@link DefaultConnectionPolicy#badNodes} member: least recently
-     * failed = first.
-     *
-     * @author Nico Kruber, kruber@zib.de
-     *
-     * @version 2.3
-     * @since 2.3
-     */
-    private static class BadNodesComparator implements Comparator<PeerNode>, java.io.Serializable {
-        /**
-         * ID for serialisation purposes.
-         */
-        private static final long serialVersionUID = 1L;
-
-        /**
-         * Defines a order of nodes with failed connections (least recently
-         * failed nodes first).
-         *
-         * Returns a negative integer, zero, or a positive integer if the first
-         * argument is less than, equal to, or greater than the second.
-         *
-         * Warning: This method is unsynchronised and should therefore only be
-         * used by calls from functions inside {@link DefaultConnectionPolicy}
-         * which are synchronised!
-         *
-         * @param o1
-         *            the first node
-         * @param o2
-         *            the second node
-         *
-         * @return a negative integer, zero, or a positive integer if the first
-         *         argument is less than, equal to, or greater than the second
-         */
-        public int compare(final PeerNode o1, final PeerNode o2) {
-            // Returns a negative integer, zero, or a positive integer as the
-            // first argument is less than, equal to, or greater than the
-            // second.
-            if (o1 == o2) {
-                return 0;
-            }
-
-            final Date d1 = o1.getLastFailedConnect();
-            final Date d2 = o2.getLastFailedConnect();
-            final Long o1Time = ((d1 == null) ? 0 : d1.getTime());
-            final Long o2Time = ((d2 == null) ? 0 : d2.getTime());
-            final int compByTime = o1Time.compareTo(o2Time);
-
-            if (compByTime != 0) {
-                return compByTime;
-            }
-
-            final Integer o1FailureCount = o1.getFailureCount();
-            final Integer o2FailureCount = o2.getFailureCount();
-            final int compByFailureCount = o1FailureCount.compareTo(o2FailureCount);
-
-            if (compByFailureCount != 0) {
-                return compByFailureCount;
-            }
-
-            // two different nodes have the same fail dates
-            // -> make order dependent on their hash code:
-            final int h1 = o1.hashCode();
-            final int h2 = o2.hashCode();
-            if (h1 < h2) {
-                return -1;
-            } else if (h1 > h2){
-                return 1;
-            } else {
-                // two different nodes have equal fail dates and hash codes
-                // -> compare their names (last resort)
-                final int compByName = o1.getNode().node().compareTo(o2.getNode().node());
-                if (compByName != 0) {
-                    return compByName;
-                } else {
-                    throw new ClassCastException(
-                            "Cannot compare " + o1 + " with " + o2 +
-                            ": they share the same fail time, fail count, hash code and node name.");
-                }
-            }
-        }
-    }
-
     // we could use synchronised lists and sets as provided by
     // Collections.synchronizedList and Collections.synchronizedSortedSet
     // but those two depend on each other and we thus need synchronised methods
@@ -162,7 +76,7 @@ public class DefaultConnectionPolicy extends ConnectionPolicy {
      * Bad nodes (nodes which recently failed) in the order of their failed
      * date.
      */
-    protected SortedSet<PeerNode> badNodes = new TreeSet<PeerNode>(new BadNodesComparator());
+    protected SortedSet<PeerNode> badNodes = new TreeSet<PeerNode>(new LeastRecentlyFailedNodesComparator());
 
     /**
      * Random number generator for selecting random nodes in the
