@@ -144,7 +144,7 @@ on({acquire_lease, Key, ClientPid} = _Msg,
    #state{progress_state = _TableName} = State) ->
     ReplyTo = comm:reply_as(comm:this(), 4,
                             {acquire_lease_qread_reply, Key, ClientPid, '_'}),
-    rbr:qread(ReplyTo, Key),
+    rbr:qread(ReplyTo, Key, lease_db, q_consistent_or_cquorum),
     State;
 on({acquire_lease_qread_reply, Key, ClientPid, LearnerResult} = _Msg,
    #state{progress_state = TableName} = State) ->

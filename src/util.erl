@@ -46,6 +46,7 @@
          readable_utc_time/1,
          for_to/3, for_to_ex/3, for_to_ex/4,
          collect_while/1]).
+-export([list_set_nth/3]).
 -export([debug_info/0, debug_info/1, print_bits/2]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
@@ -904,6 +905,16 @@ collect_while(GatherFun, Count) ->
         true          -> GatherFun(Count + 1);
         false         -> []
     end.
+
+-spec list_set_nth(list(), pos_integer(), any()) -> list().
+list_set_nth(L, Pos, Val) ->
+    {Result, _} = lists:foldr(fun(X, {Acc, Iter}) ->
+                                      case Iter == Pos of
+                                          true -> {[Val|Acc], Iter-1};
+                                          false -> {[X|Acc], Iter-1}
+                                      end
+                              end, {[], length(L)}, L),
+    Result.
 
 -spec debug_info() -> [[{string(), term()}]].
 debug_info() ->

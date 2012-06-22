@@ -30,21 +30,23 @@
 
 %% operations on rlease_mgmt state
 -export([new_state/0,   %% create new state
-         get_rlease/3,  %% get a lease by its lease_id
+%         get_rlease/3,  %% get a lease by its lease_id
          store_rlease/3 %% store a lease (replaced, when id already exists)
         ]).
 
--type nth() :: non_neg_integer().
--record(rlease, {
-          key   = ?required(rlease, key) :: {?RT:key(), nth()}, %% key, nth replica
-          lease = ?required(rlease, lease) :: leases:lease()
-         }).
--type rlease() :: #rlease{}.
+-type nth() :: pos_integer().
+%-record(rlease, {
+%          key   = ?required(rlease, key) :: {?RT:key(), nth()}, %% key, nth replica
+%          lease = ?required(rlease, lease) :: leases:lease()
+%         }).
+%-type rlease() :: #rlease{}.
+
 -record(rleasedb, {
-          rleases    = ?required(rleasedb, rleases) :: [rlease()],
-          persistent = ?required(rleasedb, persistent) :: ?DB:db_t()
+          rleases    = ?required(rleasedb, rleases) :: leases:leases(),
+          persistent = ?required(rleasedb, persistent) :: tid() %% ?DB:db(), this is not possible, because for dialyzer ?DB ist strictly depending to store db_entries...
          }).
--type state() :: #rleasedb{}.
+-type rleasedb() :: #rleasedb{}.
+-type state() :: rleasedb().
 
 -ifdef(with_export_type_support).
 -export_type([msg/0, state/0]).
@@ -60,40 +62,40 @@ new_state() ->
               persistent = PersistentTable}.
 
 %% TODO: replace by quorum read on replicated lease stores
--spec get_rlease(state(), leases:lease_id(), nth()) -> rlease() | unknown.
-get_rlease(#rleasedb{rleases = RLeases}, LeaseId, ReplNo) ->
-    case lists:keyfind({LeaseId, ReplNo}, #rlease.key, RLeases) of
-        false -> unknown;
-        RLease -> RLease
-    end.
+-spec get_rlease([state()], leases:lease_id(), nth()) -> leases:lease() | unknown.
+get_rlease(L, LeaseId, ReplNo) ->
+    RLeases = lists:nth(ReplNo, L),
+    VList = RLeases#rleasedb.rleases,
+    leases:find_by_id(VList, LeaseId).
 
 %% TODO: replace by paxos on replicated lease stores
--spec store_rlease(state(), leases:lease(), nth()) -> state().
+-spec store_rlease([state()], leases:lease(), nth()) -> [state()].
 store_rlease(RLeases, Lease, ReplNo) ->
-    VTable = RLeases#rleasedb.rleases,
-    PTable = RLeases#rleasedb.persistent,
+    RLeaseDB = lists:nth(ReplNo, RLeases),
+    VTable = RLeaseDB#rleasedb.rleases,
+    PTable = RLeaseDB#rleasedb.persistent,
     LeaseId = leases:get_id(Lease),
     LeaseEpoch = leases:get_epoch(Lease),
-    RId = {LeaseId, ReplNo},
-    RLease = {RId, Lease},
-    PLease = {RId, leases:get_persistent_info(Lease)},
-    case lists:keyfind(RId, #rleasedb.rleases, VTable) of
-        false -> %% lease is new
-            ets:insert(PTable, PLease),
-            RLeases#rleasedb{rleases=[RLease | VTable]};
-        FoundLease ->
-            case leases:get_epoch(FoundLease#rlease.lease) of
-                LeaseEpoch ->
-                    %% epoch is unchanged -> update in ram
-                    NewRLeases = lists:keyreplace(RId, #rleasedb.rleases, VTable, RLease),
-                    RLeases#rleasedb{rleases=NewRLeases};
-                _ ->
-                    %% epoch is changed -> write to disk
-                    ets:insert(PTable, PLease),
-                    NewRLeases = lists:keyreplace(RId, #rleasedb.rleases, VTable, RLease),
-                    RLeases#rleasedb{rleases=NewRLeases}
-            end
-    end.
+    PLease = leases:get_persistent_info(Lease),
+    Res =
+        case leases:find_by_id(VTable, LeaseId) of
+            unknown -> %% lease is new
+                ets:insert(PTable, PLease),
+                RLeaseDB#rleasedb{rleases=[Lease | VTable]};
+            FoundLease ->
+                case leases:get_epoch(FoundLease) of
+                    LeaseEpoch ->
+                        %% epoch is unchanged -> update in ram
+                        NewRLeases = lists:keyreplace(LeaseId, #rleasedb.rleases, VTable, Lease),
+                        RLeaseDB#rleasedb{rleases=NewRLeases};
+                    _ ->
+                        %% epoch is changed -> write to disk
+                        ets:insert(PTable, PLease),
+                        NewRLeaseDB = lists:keyreplace(LeaseId, #rleasedb.rleases, VTable, Lease),
+                        RLeaseDB#rleasedb{rleases=NewRLeaseDB}
+                end
+        end,
+    util:list_set_nth(RLeases, ReplNo, Res).
 
 %% %% scan DB for own lease entries (used on recovery)
 %% -spec get_my_leases(state()) -> [rlease()].
