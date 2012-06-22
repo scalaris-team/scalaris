@@ -53,9 +53,6 @@ class LeastRecentlyFailedNodesComparator implements Comparator<PeerNode>, java.i
      *         argument is less than, equal to, or greater than the second
      */
     public int compare(final PeerNode o1, final PeerNode o2) {
-        // Returns a negative integer, zero, or a positive integer as the
-        // first argument is less than, equal to, or greater than the
-        // second.
         if (o1 == o2) {
             return 0;
         }
@@ -70,33 +67,6 @@ class LeastRecentlyFailedNodesComparator implements Comparator<PeerNode>, java.i
             return compByTime;
         }
 
-        final Integer o1FailureCount = o1.getFailureCount();
-        final Integer o2FailureCount = o2.getFailureCount();
-        final int compByFailureCount = o1FailureCount.compareTo(o2FailureCount);
-
-        if (compByFailureCount != 0) {
-            return compByFailureCount;
-        }
-
-        // two different nodes have the same fail dates and counts
-        // -> make order dependent on their hash code:
-        final int h1 = o1.hashCode();
-        final int h2 = o2.hashCode();
-        if (h1 < h2) {
-            return -1;
-        } else if (h1 > h2){
-            return 1;
-        } else {
-            // two different nodes have equal fail dates and hash codes
-            // -> compare their names (last resort)
-            final int compByName = o1.getNode().node().compareTo(o2.getNode().node());
-            if (compByName != 0) {
-                return compByName;
-            } else {
-                throw new ClassCastException(
-                        "Cannot compare " + o1 + " with " + o2 +
-                        ": they share the same fail time, fail count, hash code and node name.");
-            }
-        }
+        return LeastFailedNodesComparator.compareS(o1, o2);
     }
 }
