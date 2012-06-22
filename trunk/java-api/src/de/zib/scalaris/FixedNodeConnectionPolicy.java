@@ -15,14 +15,18 @@ public class FixedNodeConnectionPolicy extends ConnectionPolicy {
     /**
      * Creates a new connection policy working with the given remote node.
      *
-     * Provided for convenience.
-     *
-     * Attention: This method also synchronises on the node.
+     * @param remoteNode the (only) available remote node
+     */
+    public FixedNodeConnectionPolicy(final PeerNode remoteNode) {
+        super(remoteNode);
+    }
+    /**
+     * Creates a new connection policy working with the given remote node.
      *
      * @param remoteNode the (only) available remote node
      */
     public FixedNodeConnectionPolicy(final String remoteNode) {
-        super(new PeerNode(remoteNode));
+        this(new PeerNode(remoteNode));
     }
 
     @Override

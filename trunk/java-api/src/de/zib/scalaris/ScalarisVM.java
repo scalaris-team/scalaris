@@ -52,6 +52,21 @@ public class ScalarisVM {
      *             if the connection fails or the connection policy is not
      *             cloneable
      */
+    public ScalarisVM(final PeerNode node) throws ConnectionException {
+        final ConnectionFactory cf = ConnectionFactory.getInstance();
+        connection = cf.createConnection(new FixedNodeConnectionPolicy(node));
+    }
+
+    /**
+     * Creates a connection to the erlang VM of the given Scalaris node. Uses
+     * the connection policy of the global connection factory.
+     *
+     * @param node
+     *            Scalaris node to connect with
+     * @throws ConnectionException
+     *             if the connection fails or the connection policy is not
+     *             cloneable
+     */
     public ScalarisVM(final String node) throws ConnectionException {
         final ConnectionFactory cf = ConnectionFactory.getInstance();
         connection = cf.createConnection(new FixedNodeConnectionPolicy(node));
