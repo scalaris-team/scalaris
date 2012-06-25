@@ -11,8 +11,9 @@ URIEncoding="UTF-8"
 -> sets default parameter encoding to UTF-8 (required by the wiki app)
 maxHttpHeaderSize="131072"
 -> support redirect URLs with a lot of logged involved and failed keys
-4b) in <tomcat-dir>/conf/web.xml, un-comment the setCharacterEncodingFilter filter and filter-mapping, i.e. search for the following string:
+4b) in <tomcat-dir>/conf/web.xml, un-comment the "setCharacterEncodingFilter" and "failedRequestFilter" filters as well as their filter-mappings, i.e. search for the following strings:
 <filter-name>setCharacterEncodingFilter</filter-name>
+<filter-name>failedRequestFilter</filter-name>
 5) change paths in <wiki-dir>/build.xml
 6) remove <old-tomcat-dir>
 7) update links in <scalaris-dir>/java-api/test-lib:
