@@ -78,9 +78,8 @@ start_link() ->
     end,
     X = supervisor:start_link(?MODULE, ChildSpecs),
 
-
     %% now configure Yaws
-    yaws_api:setconf(GC, SCList),
+    ok = yaws_api:setconf(GC, SCList),
 
     X.
 
