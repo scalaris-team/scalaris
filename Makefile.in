@@ -67,6 +67,7 @@ SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaw
 # libraries needed to build a plt suitable for the dialyzer target
 DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
+DIALYZER_FLAGS ?= 
 
 SCALARIS_CT_NAME ?= ct
 # for java-test and java-bench:
@@ -458,19 +459,19 @@ svn:
 	$(SVN) propset svn:keywords Id src/*.erl src/*/*.erl test/*.erl bin/*.cfg
 
 dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl --no_native
+	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Werror_handling -Wrace_conditions -Wunmatched_returns -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/mockup*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl --no_native
 
 dialyzer-col:
 	$(MAKE) dialyzer | sed -f contrib/dialyzer-col.sed
 
 dialyzer-all: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test
+	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test
 
 dialyzer-all-col:
 	$(MAKE) dialyzer-all | sed -f contrib/dialyzer-col.sed
 
 %_SUITE-dialyzer: compile
-	$(DIALYZER) @DIALYZER_FLAGS@ -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl test/$*_SUITE.erl --no_native
+	$(DIALYZER) @DIALYZER_FLAGS@ $(DIALYZER_FLAGS) -Werror_handling -Wrace_conditions -Wunmatched_returns -Wno_return -Wno_opaque -I include/ -I contrib/yaws/include/ -I contrib/log4erl/include/ --src -c src src/*/ test/unittest_helper.erl test/tester*.erl test/erl_id_trans.erl test/measure_util.erl test/scalaris_cth.erl test/$*_SUITE.erl --no_native
 
 %_SUITE-dialyzer-col:
 	$(MAKE) $*_SUITE-dialyzer | sed -f contrib/dialyzer-col.sed
