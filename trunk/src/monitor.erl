@@ -322,7 +322,7 @@ init(null) ->
     {ets:new(list_to_atom(TableName), [ordered_set, protected]),
      init_apitx_reqlist_rrd(os:timestamp())}.
 
--spec init_apitx_reqlist_rrd(Time::util:time()) -> rrd:rrd().
+-spec init_apitx_reqlist_rrd(Time::util:time() | rrd:internal_time()) -> rrd:rrd().
 init_apitx_reqlist_rrd(Time) ->
     % 10s monitoring interval, only keep newest in the client process
     rrd:create(10 * 1000000, 1, {timing_with_hist, ms}, Time).
