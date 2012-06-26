@@ -402,7 +402,7 @@
   <target name="dist" depends="build">
     <jar jarfile="scalaris-wiki.war" update="false">
       <fileset dir="scalaris-wiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
-      <fileset dir="scalaris-wiki" includes="WEB-INF/dumps/empty.xml" />
+      <fileset dir="scalaris-wiki" includes="WEB-INF/dumps/empty-*.xml" />
     </jar>
   </target>
 
