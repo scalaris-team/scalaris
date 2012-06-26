@@ -1,47 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app id="WebApp_ID" version="2.4" xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
-	<display-name>WikiOnScalaris</display-name>
-	<servlet>
-		<description>
-		</description>
-		<display-name>WikiServletScalaris</display-name>
-		<servlet-name>WikiServletScalaris</servlet-name>
-		<servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
-		<init-param>
-			<param-name>SERVERNAME</param-name>
-			<param-value>localhost:8080</param-value>
-		</init-param>
-		<init-param>
-			<param-name>LOG_USER_REQS</param-name>
-			<!-- keep records of the last x minutes since the last request-->
-			<param-value>0</param-value>
-		</init-param>
-		<init-param>
-			<param-name>SERVERPATH</param-name>
-			<param-value>/scalaris-wiki/wiki</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_USE_BACKLINKS</param-name>
-			<param-value>true</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_SAVEPAGE_RETRIES</param-name>
-			<param-value>3</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_SAVEPAGE_RETRY_DELAY</param-name>
-			<param-value>10</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
-			<param-value>600</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
-			<param-value>OUTSIDE_TX</param-value>
-		</init-param>
-		<init-param>
-			<param-name>WIKI_OPTIMISATIONS</param-name>
+    <display-name>WikiOnScalaris</display-name>
+    <servlet>
+        <description>
+        </description>
+        <display-name>WikiServletScalaris</display-name>
+        <servlet-name>WikiServletScalaris</servlet-name>
+        <servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
+        <init-param>
+            <param-name>SERVERNAME</param-name>
+            <param-value>localhost:8080</param-value>
+        </init-param>
+        <init-param>
+            <param-name>LOG_USER_REQS</param-name>
+            <!-- keep records of the last x minutes since the last request-->
+            <param-value>0</param-value>
+        </init-param>
+        <init-param>
+            <param-name>SERVERPATH</param-name>
+            <param-value>/scalaris-wiki/wiki</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_USE_BACKLINKS</param-name>
+            <param-value>true</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_SAVEPAGE_RETRIES</param-name>
+            <param-value>3</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_SAVEPAGE_RETRY_DELAY</param-name>
+            <param-value>10</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
+            <param-value>600</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
+            <param-value>OUTSIDE_TX</param-value>
+        </init-param>
+        <init-param>
+            <!-- IMPORTANT: When changing this file, leae both -name and -value on the same line.
+                            Otherwise 'sed' will fail to match it. -->
+            <param-name>WIKI_OPTIMISATIONS</param-name>
 <!--
 optimisations are executed in the same order as mentioned
 format: "|"-separated list of the following (no spaces!): 
@@ -70,13 +72,14 @@ available optimisations (parameter types depend on the implementation):
 example:
  <param-value>ALL:APPEND_INCREMENT|PAGE_LIST:APPEND_INCREMENT_BUCKETS_WITH_HASH(10)</param-value>
 -->
-			<param-value>ALL:APPEND_INCREMENT</param-value>
-		</init-param>
-	</servlet>
-	<servlet-mapping>
-		<servlet-name>WikiServletScalaris</servlet-name>
-		<url-pattern>/wiki</url-pattern>
-	</servlet-mapping><welcome-file-list>
-		<welcome-file>index.jsp</welcome-file>
-	</welcome-file-list>
+            <param-value>ALL:APPEND_INCREMENT</param-value>
+        </init-param>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>WikiServletScalaris</servlet-name>
+        <url-pattern>/wiki</url-pattern>
+    </servlet-mapping>
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
 </web-app>
