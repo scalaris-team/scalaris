@@ -10,15 +10,16 @@
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <%
-String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle());
-String pageTitleWithPars = pageBean.titleWithParameters();
-String safePageTitleWithPars = StringEscapeUtils.escapeHtml(pageTitleWithPars);
+final String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle());
+final String pageTitleWithPars = pageBean.titleWithParameters();
+final String safePageTitleWithPars = StringEscapeUtils.escapeHtml(pageTitleWithPars);
 
-String safeFromTitle = StringEscapeUtils.escapeHtml(pageBean.getFromPage());
-String safeToTitle = StringEscapeUtils.escapeHtml(pageBean.getToPage());
-String safeTargetTitle = StringEscapeUtils.escapeHtml(pageBean.getTarget());
-String safePrefixTitle = StringEscapeUtils.escapeHtml(pageBean.getPrefix());
-String safeSearchTitle = StringEscapeUtils.escapeHtml(pageBean.getSearch());
+final String safeFromTitle = StringEscapeUtils.escapeHtml(pageBean.getFromPage());
+final String safeToTitle = StringEscapeUtils.escapeHtml(pageBean.getToPage());
+final String safeTargetTitle = StringEscapeUtils.escapeHtml(pageBean.getTarget());
+final String safePrefixTitle = StringEscapeUtils.escapeHtml(pageBean.getPrefix());
+final String safeSearchTitle = StringEscapeUtils.escapeHtml(pageBean.getSearch());
+final String andServiceUser = pageBean.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + pageBean.getServiceUser();
 %>
 <title>${ pageBean.pageHeading } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
@@ -134,7 +135,7 @@ ${ pageBean.page }
                         </form>
                       </div>
                     </td>
-<% /*               <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages&amp;service_user=${ pageBean.serviceUser }" title="Special:AllPages">All pages</a></td> */ %>
+<% /*               <td class="mw-allpages-nav"><a href="wiki?title=Special:AllPages<%= andServiceUser >" title="Special:AllPages">All pages</a></td> */ %>
                   </tr>
                 </table>
                 <% } %>
@@ -144,9 +145,9 @@ ${ pageBean.page }
   <%
       if (pageBean.isFoundFullMatch()) {
   %>
-    <b>There is a page named "<a href="wiki?title=<%= safeSearchTitle %>&amp;service_user=${ pageBean.serviceUser }" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki.</b>
+    <b>There is a page named "<a href="wiki?title=<%= safeSearchTitle %><%= andServiceUser %>" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki.</b>
   <% } else {%>
-    <b>Create the page "<a href="wiki?title=<%= safeSearchTitle %>&amp;action=edit&amp;service_user=${ pageBean.serviceUser }" class="new" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki!</b>
+    <b>Create the page "<a href="wiki?title=<%= safeSearchTitle %>&amp;action=edit<%= andServiceUser %>" class="new" title="<%= safeSearchTitle %>"><%= pageBean.getSearch() %></a>" on this wiki!</b>
   <% } %>
   </p>
 <% } %>
@@ -158,18 +159,18 @@ ${ pageBean.page }
 %>
                   <tr>
                     <td style="width:33%">
-                      <a href="wiki?title=<%= value %>&amp;service_user=${ pageBean.serviceUser }"><%= value %></a>
+                      <a href="wiki?title=<%= value %><%= andServiceUser %>"><%= value %></a>
           <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %> 
-                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>&amp;service_user=${ pageBean.serviceUser }" title="Special:WhatLinksHere">← links</a>)</span>
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %><%= andServiceUser %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
                     </td>
                     <td style="width:33%">
 <%      if (iter.hasNext()) {
             value = iter.next();
 %>
-                      <a href="wiki?title=<%= value %>&amp;service_user=${ pageBean.serviceUser }"><%= value %></a> 
+                      <a href="wiki?title=<%= value %><%= andServiceUser %>"><%= value %></a> 
           <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %>
-                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>&amp;service_user=${ pageBean.serviceUser }" title="Special:WhatLinksHere">← links</a>)</span>
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %><%= andServiceUser %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
 <%      } %>
                     </td>
@@ -177,9 +178,9 @@ ${ pageBean.page }
 <%      if (iter.hasNext()) {
             value = iter.next();
 %>
-                      <a href="wiki?title=<%= value %>&amp;service_user=${ pageBean.serviceUser }"><%= value %></a>
+                      <a href="wiki?title=<%= value %><%= andServiceUser %>"><%= value %></a>
           <% if (de.zib.scalaris.examples.wikipedia.Options.getInstance().WIKI_USE_BACKLINKS) { %> 
-                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %>&amp;service_user=${ pageBean.serviceUser }" title="Special:WhatLinksHere">← links</a>)</span>
+                      <span class="mw-whatlinkshere-tools">(<a href="wiki?title=Special:WhatLinksHere&amp;target=<%= value %><%= andServiceUser %>" title="Special:WhatLinksHere">← links</a>)</span>
           <% } %>
 <%      } %>
                     </td>
@@ -190,9 +191,9 @@ ${ pageBean.page }
 %>
                 </table>
                 <hr />
-<% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages&amp;service_user=${ pageBean.serviceUser }" title="Special:AllPages">All pages</a></p> */ %>
+<% /*           <p class="mw-allpages-nav"><a href="wiki?title=Special:AllPages<%= andServiceUser >" title="Special:AllPages">All pages</a></p> */ %>
                 <div class="printfooter">
-                Retrieved from "<a href="wiki?title=<%= pageTitleWithPars %>&amp;service_user=${ pageBean.serviceUser }">wiki?title=${ pageBean.title }</a>"</div>
+                Retrieved from "<a href="wiki?title=<%= pageTitleWithPars %><%= andServiceUser %>">wiki?title=${ pageBean.title }</a>"</div>
                 <!-- /bodytext -->
 <% if (req_render == null || !req_render.equals("0")) { %>
                 <!-- catlinks -->
@@ -211,7 +212,7 @@ ${ pageBean.page }
 <div id="p-personal" class="">
     <h5>Personal tools</h5>
     <ul>
-                    <li id="pt-login"><a href="wiki?title=Special:UserLogin&amp;returnto=<%= safePageTitleWithPars %>&amp;service_user=${ pageBean.serviceUser }" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
+                    <li id="pt-login"><a href="wiki?title=Special:UserLogin&amp;returnto=<%= safePageTitleWithPars %><%= andServiceUser %>" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in / create account</a></li>
     </ul>
 </div>
 
@@ -222,7 +223,7 @@ ${ pageBean.page }
 <div id="p-namespaces" class="vectorTabs">
     <h5>Namespaces</h5>
     <ul>
-                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= pageTitleWithPars %>&amp;service_user=${ pageBean.serviceUser }" >Special page</a></span></li>
+                    <li id="ca-special" class="selected"><span><a href="wiki?title=<%= pageTitleWithPars %><%= andServiceUser %>" >Special page</a></span></li>
     </ul>
 </div>
 
@@ -280,7 +281,7 @@ ${ pageBean.page }
         <!-- panel -->
             <div id="mw-panel" class="noprint collapsible-nav">
                 <!-- logo -->
-                    <div id="p-logo"><a style="background-image: url(&quot;images/Wikipedia.png&quot;);" href="wiki?title=Main Page&amp;service_user=${ pageBean.serviceUser }" title="Visit the main page"></a></div>
+                    <div id="p-logo"><a style="background-image: url(&quot;images/Wikipedia.png&quot;);" href="wiki?title=Main Page<%= andServiceUser %>" title="Visit the main page"></a></div>
                 <!-- /logo -->
                 
 <!-- navigation -->
@@ -288,10 +289,10 @@ ${ pageBean.page }
     <h5>Links</h5>
     <div class="body">
                 <ul>
-                    <li id="n-mainpage"><a href="wiki?title=Main Page&amp;service_user=${ pageBean.serviceUser }" title="Visit the main page [z]" accesskey="z">Main Page</a></li>
-                    <li id="n-recentchanges"><a href="wiki?title=Special:RecentChanges&amp;service_user=${ pageBean.serviceUser }" title="The list of recent changes in the wiki [r]" accesskey="r">New changes</a></li>
-                    <li id="n-randompage"><a href="wiki?title=Special:Random&amp;service_user=${ pageBean.serviceUser }" title="Load a random page [x]" accesskey="x">Show any entry</a></li>
-                    <li id="n-help"><a href="wiki?title=Help:Contents&amp;service_user=${ pageBean.serviceUser }" title="The place to find out">Help</a></li>
+                    <li id="n-mainpage"><a href="wiki?title=Main Page<%= andServiceUser %>" title="Visit the main page [z]" accesskey="z">Main Page</a></li>
+                    <li id="n-recentchanges"><a href="wiki?title=Special:RecentChanges<%= andServiceUser %>" title="The list of recent changes in the wiki [r]" accesskey="r">New changes</a></li>
+                    <li id="n-randompage"><a href="wiki?title=Special:Random<%= andServiceUser %>" title="Load a random page [x]" accesskey="x">Show any entry</a></li>
+                    <li id="n-help"><a href="wiki?title=Help:Contents<%= andServiceUser %>" title="The place to find out">Help</a></li>
                 </ul>
             </div>
 </div>
@@ -307,7 +308,7 @@ ${ pageBean.page }
     <h5 tabindex="2">Toolbox</h5>
     <div style="display: block;" class="body">
         <ul>
-                    <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages&amp;service_user=${ pageBean.serviceUser }" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
+                    <li id="t-specialpages"><a href="wiki?title=Special:SpecialPages<%= andServiceUser %>" title="List of all special pages [q]" accesskey="q">Special pages</a></li>
         </ul>
     </div>
 </div>
@@ -321,9 +322,9 @@ ${ pageBean.page }
         <!-- footer -->
         <div id="footer">
                 <ul id="footer-places">
-                    <li id="footer-places-privacy"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy&amp;service_user=${ pageBean.serviceUser }" title="<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy">Privacy policy</a></li>
-                    <li id="footer-places-about"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:About&amp;service_user=${ pageBean.serviceUser }" title="<%= pageBean.getWikiNamespace().getMeta() %>:About">About <%= pageBean.getWikiNamespace().getMeta() %></a></li>
-                    <li id="footer-places-disclaimer"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer&amp;service_user=${ pageBean.serviceUser }" title="<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer">Disclaimers</a></li>
+                    <li id="footer-places-privacy"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy<%= andServiceUser %>" title="<%= pageBean.getWikiNamespace().getMeta() %>:Privacy policy">Privacy policy</a></li>
+                    <li id="footer-places-about"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:About<%= andServiceUser %>" title="<%= pageBean.getWikiNamespace().getMeta() %>:About">About <%= pageBean.getWikiNamespace().getMeta() %></a></li>
+                    <li id="footer-places-disclaimer"><a href="wiki?title=<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer<%= andServiceUser %>" title="<%= pageBean.getWikiNamespace().getMeta() %>:General disclaimer">Disclaimers</a></li>
                 </ul>
                 <ul id="footer-icons" class="noprint">
                 </ul>
