@@ -1250,6 +1250,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         specialPages.put("Page tools", curSpecialPages);
 
         StringBuilder content = new StringBuilder();
+        final String serviceUser = "&amp;service_user=" + page.getServiceUser();
         for (Entry<String, Map<String, String>> specialPagesInGroup: specialPages.entrySet()) {
             String groupName = specialPagesInGroup.getKey();
             int i = 0;
@@ -1264,7 +1265,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             int pagesInFirst = specialPagesInGroup.getValue().size() / 2 + specialPagesInGroup.getValue().size() % 2;
             for (; i < pagesInFirst; ++i) {
                 Entry<String, String> pageInFirst = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + "\" title=\"" + pageInFirst.getKey() + "&amp;service_user=" + page.getServiceUser() + "\">" + pageInFirst.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + "\" title=\"" + pageInFirst.getKey() + serviceUser + "\">" + pageInFirst.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
@@ -1273,7 +1274,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             content.append("    <ul>\n");
             while(it.hasNext()) {
                 Entry<String, String> pageInSecond = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + "\" title=\"" + pageInSecond.getKey() + "&amp;service_user=" + page.getServiceUser() + "\">" + pageInSecond.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + "\" title=\"" + pageInSecond.getKey() + serviceUser + "\">" + pageInSecond.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
