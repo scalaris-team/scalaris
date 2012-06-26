@@ -1,22 +1,18 @@
 1) download & extract the new tomcat
-2) remove <tomcat-dir>/webapps/*
+2) remove <new-tomcat-dir>/webapps/*
 3) move to new tomcat-dir:
 <old-tomcat-dir>/webapps/ROOT
 <old-tomcat-dir>/webapps/scalaris-wiki
 <old-tomcat-dir>/.gitignore
 <old-tomcat-dir>/logs/.gitignore
 <old-tomcat-dir>/work/.gitignore
-4a) in <tomcat-dir>/conf/server.xml search for the active "Connector" tag and add the following to its properties:
+4a) in <new-tomcat-dir>/conf/server.xml search for the active "Connector" tag and add the following to its properties:
 URIEncoding="UTF-8"
 -> sets default parameter encoding to UTF-8 (required by the wiki app)
 maxHttpHeaderSize="131072"
 -> support redirect URLs with a lot of logged involved and failed keys
-4b) in <tomcat-dir>/conf/web.xml, un-comment the "setCharacterEncodingFilter" and "failedRequestFilter" filters as well as their filter-mappings, i.e. search for the following strings:
+4b) in <new-tomcat-dir>/conf/web.xml, un-comment the "setCharacterEncodingFilter" and "failedRequestFilter" filters as well as their filter-mappings, i.e. search for the following strings:
 <filter-name>setCharacterEncodingFilter</filter-name>
 <filter-name>failedRequestFilter</filter-name>
 5) change paths in <wiki-dir>/build.xml
-6) remove <old-tomcat-dir>
-7) update links in <scalaris-dir>/java-api/test-lib:
-cd java-api/test-lib
-ln -s ../../contrib/wikipedia/contrib/apache-tomcat-*/bin/*.jar ./
-ln -s ../../contrib/wikipedia/contrib/apache-tomcat-*/lib/*.jar ./
+6) replace contents in <old-tomcat-dir> with contents of <new-tomcat-dir>

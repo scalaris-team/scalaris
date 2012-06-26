@@ -18,7 +18,7 @@
     <pathelement location="contrib/sqlite4java.jar"/>
   </path>
 
-  <property name="tomcat.home" value="contrib/apache-tomcat-7.0.27" />
+  <property name="tomcat.home" value="contrib/apache-tomcat" />
 
   <!-- All libraries needed to build the sources -->
   <path id="build.classpath">
