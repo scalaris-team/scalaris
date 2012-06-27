@@ -15,6 +15,8 @@
  */
 package de.zib.scalaris;
 
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangDouble;
@@ -108,7 +110,7 @@ public class Transaction extends
     /**
      * Erlang transaction log.
      */
-    private OtpErlangObject transLog = null;
+    private final Translog transLog = new FilteringTransLog();
 
     /**
      * Constructor, uses the default connection returned by
@@ -335,6 +337,153 @@ public class Transaction extends
     }
 
     /**
+     * TransLog abstraction layer, tightly coupled with <tt>tx_tlog</tt>.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.17
+     * @since 3.17
+     */
+    protected static interface Translog {
+        /**
+         * Merges a new tlog object (from Scalaris) with this translog by adding
+         * new entries and replacing existing ones.
+         *
+         * @param newTLog
+         *            new tlog entries from Scalaris
+         *
+         * @return this object
+         */
+        public abstract Translog merge(final OtpErlangObject newTLog);
+
+        /**
+         * Checks whether the translog is empty.
+         *
+         * @return <tt>true</tt> if empty
+         */
+        public abstract boolean isEmpty();
+
+        /**
+         * Clears the translog.
+         */
+        public abstract void reset();
+
+        /**
+         * Creates a minimal tlog only containing entries for the keys in the
+         * given request list.
+         *
+         * @param req
+         *            the request list
+         *
+         * @return minimal tlog
+         */
+        public abstract OtpErlangObject filter(final RequestList req);
+    }
+
+    /**
+     * TransLog abstraction layer sending the whole tlog for each request,
+     * using the Scalaris-provided tlog as is.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.17
+     * @since 3.17
+     */
+    protected static class FullTransLog implements Translog {
+        protected OtpErlangObject tlog = null;
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#merge(com.ericsson.otp.erlang.OtpErlangObject)
+         */
+        public Translog merge(final OtpErlangObject newTLog) {
+            this.tlog = newTLog;
+            return this;
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#isEmpty()
+         */
+        public boolean isEmpty() {
+            return this.tlog == null;
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#reset()
+         */
+        public void reset() {
+            this.tlog = null;
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#filter(de.zib.scalaris.Transaction.RequestList)
+         */
+        public OtpErlangObject filter(final RequestList req) {
+            return this.tlog;
+        }
+    }
+
+    /**
+     * TransLog abstraction layer only sending the subset of the tlog that is
+     * actually required for a request, tightly coupled with <tt>tx_tlog</tt>.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.17
+     * @since 3.17
+     */
+    protected static class FilteringTransLog implements Translog {
+        protected LinkedHashMap<OtpErlangString, OtpErlangTuple> entries = new LinkedHashMap<OtpErlangString, OtpErlangTuple>();
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#merge(com.ericsson.otp.erlang.OtpErlangObject)
+         */
+        public Translog merge(final OtpErlangObject newTLog) {
+            try {
+                final OtpErlangList newTLogL = (OtpErlangList) newTLog;
+                for (int i = 0; i < newTLogL.arity(); ++i) {
+                    final OtpErlangTuple entry = (OtpErlangTuple) newTLogL.elementAt(i);
+                    final OtpErlangString key = (OtpErlangString) entry.elementAt(1);
+                    entries.put(key, entry);
+                }
+            } catch (final ClassCastException e) {
+                throw new UnknownException(newTLog);
+            }
+            return this;
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#isEmpty()
+         */
+        public boolean isEmpty() {
+            return entries.isEmpty();
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#reset()
+         */
+        public void reset() {
+            entries.clear();
+        }
+
+        /* (non-Javadoc)
+         * @see de.zib.scalaris.Translog#filter(de.zib.scalaris.Transaction.RequestList)
+         */
+        public OtpErlangObject filter(final RequestList req) {
+            OtpErlangList result;
+            if (req.isCommit()) {
+                result = new OtpErlangList(entries.values().toArray(new OtpErlangTuple[0]));
+            } else {
+                final HashSet<OtpErlangTuple> resultJ = new HashSet<OtpErlangTuple>(req.size());
+                for (final Operation op : req.getRequests()) {
+                    final OtpErlangTuple entry = entries.get(op.getKey());
+                    if (entry != null) {
+                        resultJ.add(entry);
+                    }
+                }
+                result = new OtpErlangList(resultJ.toArray(new OtpErlangTuple[0]));
+            }
+            return result;
+        }
+    }
+
+    /**
      * Executes all requests in <code>req</code>.
      *
      * <p>
@@ -370,12 +519,12 @@ public class Transaction extends
         }
         OtpErlangObject received_raw = null;
         final OtpErlangList erlangReqList = req.getErlangReqList(compressed);
-        if (transLog == null) {
+        if (transLog.isEmpty()) {
             received_raw = connection.doRPC(module(), "req_list",
                     new OtpErlangObject[] { erlangReqList });
         } else {
             received_raw = connection.doRPC(module(), "req_list",
-                    new OtpErlangObject[] { transLog, erlangReqList });
+                    new OtpErlangObject[] { transLog.filter(req), erlangReqList });
         }
         try {
             /*
@@ -383,14 +532,14 @@ public class Transaction extends
              *  {tx_tlog:tlog(), [{ok} | {ok, Value} | {fail, abort | timeout | not_found}]}
              */
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            transLog = received.elementAt(0);
+            transLog.merge(received.elementAt(0));
             if (received.arity() == 2) {
                 final ResultList result = new ResultList((OtpErlangList) received.elementAt(1), compressed);
                 if (req.isCommit()) {
                     if (result.size() >= 1) {
                         result.processCommitAt(result.size() - 1);
                         // transaction was successful: reset transaction log
-                        transLog = null;
+                        transLog.reset();
                     } else {
                         throw new UnknownException(result.getResults());
                     }
@@ -445,7 +594,7 @@ public class Transaction extends
      * @see #commit()
      */
     public void abort() {
-        transLog = null;
+        transLog.reset();
     }
 
     @Override
