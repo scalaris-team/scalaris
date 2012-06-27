@@ -54,14 +54,21 @@ public class NodeDiscovery implements Runnable {
     }
 
     /**
-     * Connection Factory to work with.
+     * {@link ConnectionFactory} to work with.
      */
     protected final ConnectionFactory cf;
+
     /**
      * Maximum number of nodes that should remain in the
      * {@link ConnectionFactory} {@link #cf}.
      */
-    protected final int maxNodes;
+    protected int maxNodes = 10;
+
+    /**
+     * Minimum time in seconds since the last successful connection for a node
+     * to be removed in favour of newly discovered nodes.
+     */
+    protected int minAgeToRemove = 60;
 
     /**
      * Constructor
@@ -69,12 +76,9 @@ public class NodeDiscovery implements Runnable {
      * @param cf
      *            the {@link ConnectionFactory} to add nodes to / remove nodes
      *            from
-     * @param maxNodes
-     *            maximum number of nodes to keep track of
      */
-    public NodeDiscovery(final ConnectionFactory cf, final int maxNodes) {
+    public NodeDiscovery(final ConnectionFactory cf) {
         this.cf = cf;
-        this.maxNodes = maxNodes;
     }
 
     /**
@@ -135,40 +139,133 @@ public class NodeDiscovery implements Runnable {
                 return;
             }
 
-            // first, remove nodes with failed connection attempts (or never connected ones) to make room for the new nodes:
-            // sort existing nodes, least failed connection attempts first
-            Collections.sort(existingNodes, new LeastFailedNodesComparator());
-            int failedNodesToRemove;
-            if (otherVms.size() > maxNodes) {
-                failedNodesToRemove = existingNodes.size();
-            } else if ((existingNodes.size() + otherVms.size()) <= maxNodes) {
-                failedNodesToRemove = 0;
-            } else {
-                failedNodesToRemove = (existingNodes.size() + otherVms.size()) - maxNodes;
-            }
-            assert failedNodesToRemove >= 0;
-            assert failedNodesToRemove <= existingNodes.size();
-
-            int lastNodeIdx = existingNodes.size() - 1;
-            for (; lastNodeIdx >= (existingNodes.size() - failedNodesToRemove); --lastNodeIdx) {
-                final PeerNode node = existingNodes.get(lastNodeIdx);
-                if ((node.getFailureCount() > 0) || (node.getLastConnectSuccess() == null)) {
-                    cf.removeNode(node);
-                } else {
-                    break;
-                }
-            }
-            // note: existingNodes still contains the removed nodes here!
-
-            // then add new nodes (not more than maxNodes number of available nodes!)
-            final int remainingNodes = lastNodeIdx + 1;
-            for (int i = 0; (i < (maxNodes - remainingNodes)) && (i < otherVms.size()); ++i) {
-                cf.addNode(otherVms.get(i));
-            }
-            // TODO: replace some more remaining nodes with newly discovered ones?
-            // e.g. randomly select some to be replaced?
+            final int remainingNodes = removeFailedNodes(existingNodes, otherVms);
+            addNewNodes(existingNodes, otherVms, remainingNodes);
         } catch (final ConnectionException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Removes nodes with failed connection attempts, without any previous
+     * connections, or with connections longer than minAgeToRemove seconds ago
+     * from the {@link ConnectionFactory} {@link #cf} to make room for newly
+     * discovered nodes.
+     *
+     * @param existingNodes
+     *            existing Erlang VMs
+     * @param otherVms
+     *            newly discovered Erlang VMs not already in
+     *            <tt>existingNodes</tt> (non-empty)
+     *
+     * @return number of remaining nodes in the {@link ConnectionFactory}
+     *         {@link #cf}
+     */
+    protected int removeFailedNodes(final List<PeerNode> existingNodes,
+            final List<String> otherVms) {
+        // sort existing nodes, least failed connection attempts first
+        Collections.sort(existingNodes, new LeastFailedNodesComparator());
+        int failedNodesToRemove;
+        final int existingNodesCount = existingNodes.size();
+        if (otherVms.size() > maxNodes) {
+            failedNodesToRemove = existingNodesCount;
+        } else if ((existingNodesCount + otherVms.size()) <= maxNodes) {
+            failedNodesToRemove = 0;
+        } else {
+            failedNodesToRemove = (existingNodesCount + otherVms.size()) - maxNodes;
+        }
+        assert failedNodesToRemove >= 0;
+        assert failedNodesToRemove <= existingNodesCount;
+
+        int lastNodeIdx = existingNodesCount - 1;
+        for (; lastNodeIdx >= (existingNodesCount - failedNodesToRemove); --lastNodeIdx) {
+            final PeerNode node = existingNodes.get(lastNodeIdx);
+            if (  // failed connection?
+                       (node.getFailureCount() > 0)
+                  // never connected?
+                    || (node.getLastConnectSuccess() == null)
+                  // last connection longer than minAgeToRemove seconds ago?
+                    || (node.getLastConnectSuccess().getTime() < (System
+                            .currentTimeMillis() - (minAgeToRemove * 1000)))) {
+                cf.removeNode(node);
+                existingNodes.remove(lastNodeIdx);
+            } else {
+                break;
+            }
+        }
+        return lastNodeIdx + 1;
+    }
+
+    /**
+     * Adds newly discovered nodes to the {@link ConnectionFactory} {@link #cf}.
+     *
+     * @param existingNodes
+     *            existing Erlang VMs
+     * @param otherVms
+     *            newly discovered Erlang VMs not already in
+     *            <tt>existingNodes</tt> (non-empty)
+     * @param remainingNodes
+     *            number of remaining nodes in the {@link ConnectionFactory}
+     *            {@link #cf}
+     */
+    protected void addNewNodes(final List<PeerNode> existingNodes,final List<String> otherVms,
+            final int remainingNodes) {
+        // then add new nodes (not more than maxNodes number of available nodes!)
+        for (int i = 0; (i < (maxNodes - remainingNodes)) && (i < otherVms.size()); ++i) {
+            cf.addNode(otherVms.get(i));
+        }
+        // TODO: replace some more remaining nodes with newly discovered ones?
+        // e.g. randomly select some to be replaced?
+    }
+
+    /**
+     * Gets the maximum number of nodes that should remain in the
+     * {@link ConnectionFactory} {@link #cf}.
+     *
+     * @return the maxNodes member
+     */
+    public final int getMaxNodes() {
+        return maxNodes;
+    }
+
+    /**
+     * Sets the maximum number of nodes that should remain in the
+     * {@link ConnectionFactory} {@link #cf}.
+     *
+     * @param maxNodes
+     *            the maxNodes to set
+     */
+    public final void setMaxNodes(final int maxNodes) {
+        this.maxNodes = maxNodes;
+    }
+
+    /**
+     * Gets the minimum time in seconds since the last successful connection for
+     * a node to be removed in favour of newly discovered nodes.
+     *
+     * @return the minAgeToRemove member
+     */
+    public final int getMinAgeToRemove() {
+        return minAgeToRemove;
+    }
+
+    /**
+     * Sets the minimum time in seconds since the last successful connection for
+     * a node to be removed in favour of newly discovered nodes.
+     *
+     * @param minAgeToRemove
+     *            the minAgeToRemove to set
+     */
+    public final void setMinAgeToRemove(final int minAgeToRemove) {
+        this.minAgeToRemove = minAgeToRemove;
+    }
+
+    /**
+     * Gets the {@link ConnectionFactory} to work with.
+     *
+     * @return the connection factory
+     */
+    public final ConnectionFactory getCf() {
+        return cf;
     }
 }
