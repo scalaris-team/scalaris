@@ -249,7 +249,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
 
                     wikiModel.setUp();
                     wikiModel.setPageName(page.getTitle());
-                    wikiModel.render(null, revision.unpackedText(), true);
+                    wikiModel.renderPageWithCache(null, revision.unpackedText());
 
                     String redirLink_raw = wikiModel.getRedirectLink();
                     if (redirLink_raw != null) {

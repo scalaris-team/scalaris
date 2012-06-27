@@ -832,7 +832,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
         if (renderer > 0) {
-            String mainText = wikiModel.render(revision.unpackedText(), true);
+            String mainText = wikiModel.renderPageWithCache(revision.unpackedText());
             if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
                 ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, title, namespace);
                 page.addStats(catPagesResult.stats);
@@ -884,7 +884,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 // add the content from the page directed to:
                 wikiModel.tearDown();
                 wikiModel.setUp();
-                mainText = wikiModel.render(wikiModel.getRedirectContent(redirectedPageName), true);
+                mainText = wikiModel.renderPageWithCache(wikiModel.getRedirectContent(redirectedPageName));
             }
             page.setPage(mainText);
             page.setCategories(wikiModel.getCategories().keySet());
@@ -1708,7 +1708,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
         MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
-        page.setPreview(wikiModel.render(content, true));
+        page.setPreview(wikiModel.renderPageWithCache(content));
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         page.setPage(content);

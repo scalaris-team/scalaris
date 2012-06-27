@@ -16,6 +16,8 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
+import info.bliki.wiki.filter.HTMLConverter;
+import info.bliki.wiki.filter.ITextConverter;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.namespaces.Namespace;
@@ -160,6 +162,13 @@ public class MyWikiModel extends WikiModel {
     protected BloomFilter<NormalisedTitle> existingPages = null;
 
     protected Map<NormalisedTitle, String> pageCache = new HashMap<NormalisedTitle, String>();
+
+    /**
+     * Text of the page to render, i.e. given to
+     * {@link #renderPageWithCache(String)} or
+     * {@link #renderPageWithCache(ITextConverter, String)}.
+     */
+    private String renderWikiText = null;
     
     protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
             Pattern.compile("^.*?([\\p{Cc}\\p{Cn}\\p{Co}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -930,6 +939,9 @@ public class MyWikiModel extends WikiModel {
         super.setUp();
         magicWordCache = new HashMap<String, String>();
         pageCache = new HashMap<NormalisedTitle, String>();
+        if (renderWikiText != null) {
+            pageCache.put(normalisePageTitle(getPageName()), renderWikiText );
+        }
     }
 
     /**
@@ -1181,5 +1193,45 @@ public class MyWikiModel extends WikiModel {
     public boolean isImageNamespace(String namespace) {
         return super.isImageNamespace(namespace) ||
                 ((MyNamespace) fNamespace).getNumberByName(namespace) == Namespace.FILE_NAMESPACE_KEY;
+    }
+
+    /**
+     * Renders the raw Wikipedia text into a string for a given converter
+     * (renders the wiki text as if a template topic will be displayed
+     * directly).
+     * 
+     * @param converter
+     *            a text converter. <b>Note</b> the converter may be
+     *            <code>null</code>, if you only would like to analyze the raw
+     *            wiki text and don't need to convert. This speeds up the
+     *            parsing process.
+     * @param rawWikiText
+     *            a raw wiki text
+     * @return <code>null</code> if an IOException occurs or
+     *         <code>converter==null</code>
+     * 
+     * @see info.bliki.wiki.model.AbstractWikiModel#render(info.bliki.wiki.filter.ITextConverter,
+     *      java.lang.String, boolean)
+     */
+    public String renderPageWithCache(ITextConverter converter, String rawWikiText) {
+        renderWikiText = rawWikiText;
+        return super.render(converter, rawWikiText, true);
+    }
+
+    /**
+     * Renders the raw Wikipedia text into an HTML string and use the default
+     * HTMLConverter (renders the wiki text as if a template topic will be
+     * displayed directly).
+     * 
+     * @param rawWikiText
+     *            a raw wiki text
+     * @return <code>null</code> if an IOException occurs
+     * 
+     * @see info.bliki.wiki.model.AbstractWikiModel#render(java.lang.String,
+     *      boolean)
+     */
+    public String renderPageWithCache(String rawWikiText) {
+        renderWikiText = rawWikiText;
+        return super.render(new HTMLConverter(), rawWikiText, true);
     }
 }
