@@ -72,7 +72,7 @@ import de.zib.tools.PropertyLoader;
  * default, {@link DefaultConnectionPolicy} is used.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.10
+ * @version 3.16
  * @since 2.0
  */
 public class ConnectionFactory {
@@ -488,6 +488,26 @@ public class ConnectionFactory {
     }
 
     /**
+     * Sets the name of the node to connect to.
+     *
+     * The list of nodes available for connection will be cleared at first, the
+     * node will then be added.
+     *
+     * @param node
+     *            the node to set (will not be mangled by
+     *            {@link #fixLocalhostName(String)}!)
+     *
+     * @see ConnectionFactory#addNode(PeerNode)
+     *
+     * @since 3.16
+     */
+    public void setNode(final PeerNode node) {
+        this.nodes.clear();
+        connectionPolicy.availableNodesReset();
+        addNode(node);
+    }
+
+    /**
      * Adds a node to the set of nodes available for connections.
      *
      * @param node
@@ -500,8 +520,22 @@ public class ConnectionFactory {
      */
     public void addNode(final String node) {
         final PeerNode p = new PeerNode(node);
-        this.nodes.add(p);
-        connectionPolicy.availableNodeAdded(p);
+        addNode(p);
+    }
+
+    /**
+     * Adds a node to the set of nodes available for connections.
+     *
+     * @param node
+     *            the node to add
+     *
+     * @see ConnectionFactory#setNode(String)
+     *
+     * @since 3.16
+     */
+    public void addNode(final PeerNode node) {
+        this.nodes.add(node);
+        connectionPolicy.availableNodeAdded(node);
     }
 
     /**
