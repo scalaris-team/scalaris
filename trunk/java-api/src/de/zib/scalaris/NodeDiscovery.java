@@ -17,6 +17,7 @@ package de.zib.scalaris;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -59,6 +60,12 @@ public class NodeDiscovery implements Runnable {
     protected final ConnectionFactory cf;
 
     /**
+     * If not null, connections currently in the pool to removed nodes will be
+     * closed.
+     */
+    protected final ConnectionPool cPool;
+
+    /**
      * Maximum number of nodes that should remain in the
      * {@link ConnectionFactory} {@link #cf}.
      */
@@ -79,6 +86,18 @@ public class NodeDiscovery implements Runnable {
      */
     public NodeDiscovery(final ConnectionFactory cf) {
         this.cf = cf;
+        this.cPool = null;
+    }
+
+    /**
+     * Constructor
+     *
+     * @param cPool
+     *            the {@link ConnectionPool} to interact with
+     */
+    public NodeDiscovery(final ConnectionPool cPool) {
+        this.cf = cPool.getConnectionFactory();
+        this.cPool = cPool;
     }
 
     /**
@@ -141,6 +160,9 @@ public class NodeDiscovery implements Runnable {
 
             final int remainingNodes = removeFailedNodes(existingNodes, otherVms);
             addNewNodes(existingNodes, otherVms, remainingNodes);
+            if (cPool != null) {
+                cPool.closeAllBut(new HashSet<PeerNode>(existingNodes));
+            }
         } catch (final ConnectionException e) {
             e.printStackTrace();
         }
@@ -212,7 +234,9 @@ public class NodeDiscovery implements Runnable {
             final int remainingNodes) {
         // then add new nodes (not more than maxNodes number of available nodes!)
         for (int i = 0; (i < (maxNodes - remainingNodes)) && (i < otherVms.size()); ++i) {
-            cf.addNode(otherVms.get(i));
+            final PeerNode p = new PeerNode(otherVms.get(i));
+            cf.addNode(p);
+            existingNodes.add(p);
         }
         // TODO: replace some more remaining nodes with newly discovered ones?
         // e.g. randomly select some to be replaced?
