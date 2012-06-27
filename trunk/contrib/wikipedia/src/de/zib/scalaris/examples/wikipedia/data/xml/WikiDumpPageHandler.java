@@ -127,7 +127,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
             if (!revisions.isEmpty() && wikiModel != null) {
                 wikiModel.setUp();
                 wikiModel.setPageName(page.getTitle());
-                wikiModel.render(null, revisions.get(0).unpackedText(), true);
+                wikiModel.renderPageWithCache(null, revisions.get(0).unpackedText());
                 for (String cat_raw: wikiModel.getCategories().keySet()) {
                     NormalisedTitle category = new NormalisedTitle(
                             MyNamespace.CATEGORY_NAMESPACE_KEY,
