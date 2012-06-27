@@ -17,6 +17,11 @@
             <param-value>0</param-value>
         </init-param>
         <init-param>
+            <param-name>SCALARIS_NODE_DISCOVERY</param-name>
+            <!-- use the node discovery daemon to look for new Scalaris nodes (fixed delay between runs in seconds (0 to disable)-->
+            <param-value>60</param-value>
+        </init-param>
+        <init-param>
             <param-name>SERVERPATH</param-name>
             <param-value>/scalaris-wiki/wiki</param-value>
         </init-param>
