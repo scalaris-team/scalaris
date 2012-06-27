@@ -42,8 +42,10 @@ import org.xml.sax.helpers.XMLReaderFactory;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
+import de.zib.scalaris.NodeDiscovery;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
+import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
@@ -70,6 +72,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     private static final int MAX_WAIT_FOR_CONNECTION = 10000; // 10s
     
     private ConnectionPool cPool;
+    protected NodeDiscovery nodeDiscovery;
 
     /**
      * Default constructor creating the servlet.
@@ -114,6 +117,10 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
 //        cFactory.setConnectionPolicy(new RoundRobinConnectionPolicy(cFactory.getNodes()));
 
         cPool = new ConnectionPool(cFactory, CONNECTION_POOL_SIZE);
+        if (Options.getInstance().SCALARIS_NODE_DISCOVERY > 0) {
+            nodeDiscovery = new NodeDiscovery(cPool);
+            nodeDiscovery.startWithFixedDelay(Options.getInstance().SCALARIS_NODE_DISCOVERY);
+        }
     }
     
     /**

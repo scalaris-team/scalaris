@@ -196,7 +196,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 config.getInitParameter("WIKI_REBUILD_PAGES_CACHE"),
                 config.getInitParameter("WIKI_STORE_CONTRIBUTIONS"),
                 config.getInitParameter("WIKI_OPTIMISATIONS"),
-                config.getInitParameter("LOG_USER_REQS"));
+                config.getInitParameter("LOG_USER_REQS"),
+                config.getInitParameter("SCALARIS_NODE_DISCOVERY"));
     }
     
     /**
