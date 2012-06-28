@@ -63,6 +63,10 @@
       {lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
       {lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
+-type(snapshot_message() ::
+      {do_snapshot, SnapNumber::non_neg_integer(), Leader::any()} |
+      {local_snapshot_is_done}).
+
 -type(rt_message() ::
       {rt_update, RoutingTable::?RT:external_rt()}).
 
@@ -74,6 +78,7 @@
     dht_node_join:join_message() |
     rt_message() |
     dht_node_move:move_message() |
+    snapshot_message() |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid()}.
 
@@ -262,7 +267,7 @@ on({get_key, Source_PID, HashedKey}, State) ->
     State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
-    SnapInfo = dht_node_state:get(snapshot_state,State),
+    SnapInfo = dht_node_state:get(State,snapshot_state),
     SnapNumber = snapshot_state:get_number(SnapInfo),
     Msg = {get_key_with_id_reply, SourceId, HashedKey, SnapNumber,
            ?DB:read(dht_node_state:get(State, db), HashedKey)},

@@ -165,18 +165,18 @@ check_db(DB) ->
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
 -spec set_subscription_(State::db_t(), subscr_t()) -> db_t().
-set_subscription_(State = {_DB, Subscr}, SubscrTuple) ->
+set_subscription_(State = {_DB, Subscr,_SnapState}, SubscrTuple) ->
     ets:insert(Subscr, SubscrTuple),
     State.
 
 %% doc Gets a subscription stored under Tag (empty list if there is none).
 -spec get_subscription_(State::db_t(), Tag::any()) -> [subscr_t()].
-get_subscription_({_DB, Subscr}, Tag) ->
+get_subscription_({_DB, Subscr, _SnapState}, Tag) ->
     ets:lookup(Subscr, Tag).
 
 %% doc Removes a subscription stored under Tag (if there is one).
 -spec remove_subscription_(State::db_t(), Tag::any()) -> db_t().
-remove_subscription_(State = {_DB, Subscr}, Tag) ->
+remove_subscription_(State = {_DB, Subscr, _SnapState}, Tag) ->
     case ets:lookup(Subscr, Tag) of
         [] -> ok;
         [{Tag, _I, _ChangesFun, RemSubscrFun}] -> RemSubscrFun(Tag)
@@ -187,7 +187,7 @@ remove_subscription_(State = {_DB, Subscr}, Tag) ->
 %% @doc Go through all subscriptions and perform the given operation if
 %%      matching.
 -spec call_subscribers(State::db_t(), Operation::close_db | subscr_op_t()) -> db_t().
-call_subscribers(State = {_DB, Subscr, _SnapTable}, Operation) ->
+call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
     call_subscribers_iter(State, Operation, ets:first(Subscr)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
@@ -195,7 +195,7 @@ call_subscribers(State = {_DB, Subscr, _SnapTable}, Operation) ->
         CurrentKey::subscr_t() | '$end_of_table') -> db_t().
 call_subscribers_iter(State, _Operation, '$end_of_table') ->
     State;
-call_subscribers_iter(State = {_DB, Subscr}, Op, CurrentKey) ->
+call_subscribers_iter(State = {_DB, Subscr, _SnapState}, Op, CurrentKey) ->
     % assume the key exists (it should since we are iterating over the table!)
     [{Tag, I, ChangesFun, RemSubscrFun}] = ets:lookup(Subscr, CurrentKey),
     NewState =
