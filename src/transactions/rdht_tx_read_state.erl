@@ -34,9 +34,10 @@
          get_numreplied/1,
          is_client_informed/1,
          set_client_informed/1,
-         add_reply/5,
+         add_reply/6,
          update_decided/3,
-         is_newly_decided/1]).
+         is_newly_decided/1,
+         get_snapshot_number/1, set_snapshot_number/2]).
 
 -include("scalaris.hrl").
 
@@ -52,18 +53,19 @@
                     non_neg_integer(),      % NumFail,
                     {any(), integer()},     % Result = {Val, Vers},
                     tx_tlog:tx_status() | false, % is_decided
-                    boolean()               % is_client_informed
+                    boolean(),              % is_client_informed
+                    non_neg_integer()       % snapshot number
                   }.
 
 -spec new(rdht_tx:req_id()) -> read_state().
 new(Id) ->
-    {Id, unknown, unknown, 0, 0, {0, -1}, false, false}.
+    {Id, unknown, unknown, 0, 0, {0, -1}, false, false, 0}.
 -spec new_val(rdht_tx:req_id(), any(), integer()) -> read_state().
 new_val(Id, Val, Vers) ->
-    {Id, unknown, unknown, 0, 0, {Val, Vers}, false, false}.
+    {Id, unknown, unknown, 0, 0, {Val, Vers}, false, false, 0}.
 -spec new_client(rdht_tx:req_id(), pid(), ?RT:key()) -> read_state().
 new_client(Id, Pid, Key) ->
-    {Id, Pid, Key, 0, 0, {0, -1}, false, false}.
+    {Id, Pid, Key, 0, 0, {0, -1}, false, false, 0}.
 
 -spec get_id(read_state()) -> rdht_tx:req_id().
 get_id(State) ->             element(1, State).
@@ -95,15 +97,19 @@ set_decided(State, Val) ->   setelement(7, State, Val).
 is_client_informed(State) -> element(8, State).
 -spec set_client_informed(read_state()) -> read_state().
 set_client_informed(State) -> setelement(8, State, true).
+-spec get_snapshot_number(read_state()) -> non_neg_integer().
+get_snapshot_number(State) -> element(9, State).
+-spec set_snapshot_number(read_state(), non_neg_integer()) -> read_state().
+set_snapshot_number(State, Val) -> setelement(9, State, Val).
 
 -spec get_numreplied(read_state()) -> non_neg_integer().
 get_numreplied(State) ->
     get_numok(State) + get_numfailed(State).
 
 -spec add_reply(read_state(), any(), integer(),
-                non_neg_integer(), non_neg_integer()) -> read_state().
-add_reply(State, Val, Vers, MajOk, MajDeny) ->
-    ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
+                non_neg_integer(), non_neg_integer(), non_neg_integer()) -> read_state().
+add_reply(State, Val, Vers, MajOk, MajDeny, SnapNumber) ->
+    ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny snapnr ~p ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny, SnapNumber]),
     {OldVal, OldVers} = get_result(State),
     NewResult = case Vers > OldVers of
                     true -> {Val, Vers};
@@ -114,7 +120,8 @@ add_reply(State, Val, Vers, MajOk, MajDeny) ->
                    true -> inc_numok(TmpState);
                    false -> inc_numfailed(TmpState)
                end,
-    update_decided(NewState, MajOk, MajDeny).
+    AnotherState = set_snapshot_number(NewState, SnapNumber),
+    update_decided(AnotherState, MajOk, MajDeny).
 
 -spec update_decided(read_state(), non_neg_integer(),
                      non_neg_integer()) -> read_state().

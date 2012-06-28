@@ -14,60 +14,56 @@
 
 %% @author Stefan Keidel <keidel@informatik.hu-berlin.de>
 %% @doc Local state information needed for the S3 snapshot algorithm
+%% @version $Id: snapshot_state.erl 2850 2012-03-12 09:10:51Z stefankeidel85@gmail.com $
 -module(snapshot_state).
 -author('keidel@informatik.hu-berlin.de').
+-vsn('$Id: snapshot_state.erl 2850 2012-03-12 09:10:51Z stefankeidel85@gmail.com $').
 
--export([init_participant/0,
-		 init_leader/0,
-		 get_snap_number_leader/1,
-		 get_snap_number_part/1,
-		 set_snap_number_leader/2,
-		 set_snap_number_part/2]).
+-export([new/0,new/3,get_number/1,is_in_progress/1,get_leaders/1,
+         set_number/2,add_leader/2,start_progress/1,stop_progress/1]).
 
 -ifdef(with_export_type_support).
--export_type([snap_part_info/0,snap_leader_info/0]).
+-export_type([snapshot_state/0]).
 -endif.
 
-% record specs
+-type(snapshot_state() :: {SnapNo::non_neg_integer(),InProgress::boolean(),Leaders::list()}).
 
--record(s3_state, {
-	number = 0 :: non_neg_integer(),
-	in_progress = 'false' :: boolean(),
-	leaders = [] :: list()
-}).
+% constructors
 
--record(s3_leader_state, {
-	snapshots = [] :: list(),
-	in_progress = 'false' :: boolean(),
-	number = 0 :: non_neg_integer()
-}).
+-spec new() -> snapshot_state().
+new() ->
+    erlang:put("local_snap_number",0),
+    {0,false,[]}.
 
-% type specs
-
--type snap_part_info() :: s3_state.
--type snap_leader_info() :: s3_leader_state.
-
-% basic functions
-
--spec init_participant() -> snap_part_info().
-init_participant() -> #s3_state{}.
-
--spec init_leader() -> snap_leader_info().
-init_leader() -> #s3_leader_state{}.
+-spec new(non_neg_integer(),boolean(),list()) -> snapshot_state().
+new(Number,InProgress,Leaders) ->
+    erlang:put("local_snap_number",Number),
+    {Number,InProgress,Leaders}.
 
 % getters
 
--spec get_snap_number_leader(SnapLeaderInfo :: snap_leader_info()) -> non_neg_integer().
-get_snap_number_leader(SnapLeaderInfo) -> SnapLeaderInfo#s3_leader_state.number.
+-spec get_number(snapshot_state()) -> non_neg_integer().
+get_number({Number,_,_}) -> Number.
 
--spec get_snap_number_part(SnapPartInfo :: snap_part_info()) -> non_neg_integer().
-get_snap_number_part(SnapPartInfo) -> SnapPartInfo#s3_leader_state.number.
+-spec is_in_progress(snapshot_state()) -> boolean().
+is_in_progress({_,InProgress,_}) -> InProgress.
+
+-spec get_leaders(snapshot_state()) -> list().
+get_leaders({_,_,Leaders}) -> Leaders.
 
 % setters
 
--spec set_snap_number_leader(SnapLeaderInfo :: snap_leader_info(), NewVal :: non_neg_integer()) -> snap_leader_info().
-set_snap_number_leader(SnapLeaderInfo,NewVal) -> SnapLeaderInfo#s3_leader_state{number=NewVal}.
+-spec set_number(snapshot_state(), non_neg_integer()) -> snapshot_state().
+set_number(SnapInfo,NewVal) -> 
+    erlang:put("local_snap_number",NewVal),
+    setelement(1,SnapInfo,NewVal).
 
--spec set_snap_number_part(SnapPartInfo :: snap_part_info(), NewVal :: non_neg_integer()) -> snap_part_info().
-set_snap_number_part(SnapPartInfo,NewVal) -> SnapPartInfo#s3_leader_state{number=NewVal}.
+-spec add_leader(snapshot_state(),any()) -> snapshot_state().
+add_leader({Number,InProgress,Leaders},NewLeader) ->
+    {Number,InProgress,[NewLeader | Leaders]}.
+  
+-spec start_progress(snapshot_state()) -> snapshot_state().
+start_progress(SnapInfo) -> setelement(2,SnapInfo,true).
 
+-spec stop_progress(snapshot_state()) -> snapshot_state().
+stop_progress(SnapInfo) -> setelement(2,SnapInfo,false).

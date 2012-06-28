@@ -52,6 +52,7 @@
 -export([copy_value_to_snapshot_table/2, get_snapshot_data/1, join_snapshot_data/1]).
 -export([set_snapshot_entry/2, get_snapshot_entry/2, delete_snapshot_entry/2, delete_snapshot_entry_at_key/2]).
 -export([init_snapshot/1,snapshot_is_lockfree/1]).
+-export([snapshot_is_running/1,delete_snapshot/1]).
 
 %% public methods:
 % note: these wrapper methods need to be used in order for dialyzer to cope
@@ -200,6 +201,12 @@ delete_snapshot_entry(DB, Entry) -> delete_snapshot_entry_(DB, Entry).
 
 -spec snapshot_is_lockfree(DB::db()) -> boolean().
 snapshot_is_lockfree(DB) -> snapshot_is_lockfree_(DB).
+
+-spec snapshot_is_running(DB::db()) -> boolean().
+snapshot_is_running(DB) -> snapshot_is_running_(DB).
+
+-spec delete_snapshot(DB::db()) -> NewDB::db().
+delete_snapshot(DB) -> delete_snapshot_(DB).
 
 % Methods that should not be used inside the DB implementation (and thus do not need a wrapper):
 %% -spec read(DB::db(), Key::?RT:key()) ->
