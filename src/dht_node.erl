@@ -391,7 +391,7 @@ on({bulkowner_deliver, Id, Range, Msg, Parents}, State) ->
                 {send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
                                     {bulkowner_deliver, Id, Range, Msg1, Parents});
-                {do_snapshot, SnapNo, Leader} ->
+                {do_snapshot, _SnapNo, _Leader} ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg)
             end
     end,
