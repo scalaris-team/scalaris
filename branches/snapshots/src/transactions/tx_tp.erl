@@ -21,6 +21,8 @@
 -author('schintke@onscale.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
@@ -28,7 +30,7 @@
 
 %%% functions for gen_component module and supervisor callbacks
 -export([init/0, on_init_TP/2]).
--export([on_do_commit_abort/3, on_do_commit_abort_fwd/6]).
+-export([on_do_commit_abort/4, on_do_commit_abort_fwd/7]).
 
 -spec init() -> atom().
 init() ->
@@ -53,6 +55,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
     Key = tx_tlog:get_entry_key(RTLogEntry),
+    LocalSnapNumber = snapshot_state:get_number(dht_node_state:get(DHT_Node_State,snapshot_state)),
     NewDB =
         %% check only necessary in case of damaged routing
         case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
@@ -60,9 +63,9 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                 {TmpDB, Proposal} =
                     case tx_tlog:get_entry_operation(RTLogEntry) of
                         rdht_tx_read ->
-                            rdht_tx_read:validate(DB, RTLogEntry);
+                            rdht_tx_read:validate(DB, LocalSnapNumber, RTLogEntry);
                         rdht_tx_write ->
-                            rdht_tx_write:validate(DB, RTLogEntry)
+                            rdht_tx_write:validate(DB, LocalSnapNumber, RTLogEntry)
                     end,
                 %% remember own proposal for lock release
                 TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
@@ -93,16 +96,16 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                           tx_tlog:tlog_entry(),
                           comm:mypid(),
                           tx_item_state:tx_item_id()},
-                         commit | abort, dht_node_state:state())
+                         commit | abort, non_neg_integer, dht_node_state:state())
                         -> dht_node_state:state().
-on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
+on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, TMSnapNo, DHT_Node_State) ->
     ?TRACE("tx_tp:on_do_commit_abort({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
     % get own proposal for lock release
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
     case pdb:get(PaxosId, TP_DB) of
         {PaxosId, Proposal} ->
-            NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, Proposal, DHT_Node_State),
+            NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, Proposal, TMSnapNo, DHT_Node_State),
             %% delete corresponding proposer state
             Proposer = comm:make_global(dht_node_state:get(DHT_Node_State, proposer)),
             proposer:stop_paxosids(Proposer, [PaxosId]),
@@ -131,37 +134,45 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_St
 
 -spec on_do_commit_abort_fwd(comm:mypid(), tx_item_state:tx_item_id(),
                              tx_tlog:tlog_entry(),
-                             commit | abort, prepared | abort,
+                             commit | abort, prepared | abort, non_neg_integer(),
                              dht_node_state:state())
                            -> dht_node_state:state().
-on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
-    NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State),
+on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DHT_Node_State) ->
+    NewDB = update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DHT_Node_State),
     dht_node_state:set_db(DHT_Node_State, NewDB).
 
-update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_State) ->
+update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DHT_Node_State) ->
     %% Check for DB responsibility:
     DB = dht_node_state:get(DHT_Node_State, db),
     Key = tx_tlog:get_entry_key(RTLogEntry),
+    OwnSnapNo = snapshot_state:get_number(dht_node_state:get(DHT_Node_State,snapshot_state)),
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
             Res =
                 case {tx_tlog:get_entry_operation(RTLogEntry), Result} of
                     {rdht_tx_read, abort} ->
-                        rdht_tx_read:abort(DB, RTLogEntry, OwnProposal);
+                        rdht_tx_read:abort(DB, RTLogEntry, OwnProposal, TMSnapNo, OwnSnapNo);
                     {rdht_tx_read, commit} ->
-                        rdht_tx_read:commit(DB, RTLogEntry, OwnProposal);
+                        rdht_tx_read:commit(DB, RTLogEntry, OwnProposal, TMSnapNo, OwnSnapNo);
                     {rdht_tx_write, abort} ->
-                        rdht_tx_write:abort(DB, RTLogEntry, OwnProposal);
+                        rdht_tx_write:abort(DB, RTLogEntry, OwnProposal, TMSnapNo, OwnSnapNo);
                     {rdht_tx_write, commit} ->
-                        rdht_tx_write:commit(DB, RTLogEntry, OwnProposal)
+                        rdht_tx_write:commit(DB, RTLogEntry, OwnProposal, TMSnapNo, OwnSnapNo)
                 end,
             comm:send(TM, {tp_committed, TMItemId}),
+            % check if snapshot is running and if so, if it's already done
+            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),
+            case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(Res),?DB:snapshot_is_lockfree(Res)} of
+                {true,true,0} -> comm:send(self(), {local_snapshot_is_done});
+                _ -> ok
+            end,
+                
             Res;
         false ->
             %% forward commit to now responsible node
             dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
                                        {tp_do_commit_abort_fwd,
                                         TM, TMItemId, RTLogEntry,
-                                        Result, OwnProposal}),
+                                        Result, OwnProposal, TMSnapNo}),
             DB
     end.

@@ -193,10 +193,10 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
 %% messages handled as a transaction participant (TP)
 on({init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
-on({tp_do_commit_abort, Id, Result}, State) ->
-    tx_tp:on_do_commit_abort(Id, Result, State);
-on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
-    tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
+on({tp_do_commit_abort, Id, Result, SnapNr}, State) ->
+    tx_tp:on_do_commit_abort(Id, Result, SnapNr, State);
+on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, SnapNr}, State) ->
+    tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, SnapNr, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see api_dht_raw.erl and dht_node_look up.erl)
@@ -262,7 +262,9 @@ on({get_key, Source_PID, HashedKey}, State) ->
     State;
 
 on({get_key, Source_PID, SourceId, HashedKey}, State) ->
-    Msg = {get_key_with_id_reply, SourceId, HashedKey,
+    SnapInfo = dht_node_state:get(snapshot_state,State),
+    SnapNumber = snapshot_state:get_number(SnapInfo),
+    Msg = {get_key_with_id_reply, SourceId, HashedKey, SnapNumber,
            ?DB:read(dht_node_state:get(State, db), HashedKey)},
     comm:send(Source_PID, Msg),
     State;
@@ -383,7 +385,9 @@ on({bulkowner_deliver, Id, Range, Msg, Parents}, State) ->
                     comm:send(Issuer, {bulkowner_reply, Id, ReplyMsg});
                 {send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
-                                    {bulkowner_deliver, Id, Range, Msg1, Parents})
+                                    {bulkowner_deliver, Id, Range, Msg1, Parents});
+                {do_snapshot, SnapNo, Leader} ->
+                    comm:send_local(pid_groups:get_my(dht_node), Msg)
             end
     end,
     State;
@@ -517,7 +521,13 @@ on({zombie, Node}, State) ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:zombie_node(RMState, Node),
     % TODO: call other modules, e.g. join, move
-    dht_node_state:set_rm(State, RMState1).
+    dht_node_state:set_rm(State, RMState1);
+
+on({do_snapshot, SnapNumber, Leader}, State) ->
+    snapshot:on_do_snapshot(SnapNumber, Leader, State);
+
+on({local_snapshot_is_done}, State) ->
+    snapshot:on_local_snapshot_is_done(State).
 
 
 %% userdevguide-begin dht_node:start

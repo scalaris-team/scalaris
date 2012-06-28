@@ -32,9 +32,9 @@
 -callback work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                      rdht_tx:request()) -> ok.
 -callback validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
--callback validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
--callback commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
--callback abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort) -> ?DB:db().
+-callback validate(?DB:db(), non_neg_integer(), tx_tlog:tlog_entry()) -> {?DB:db(), prepared | abort}.
+-callback commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort, non_neg_integer(), non_neg_integer()) -> ?DB:db().
+-callback abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort, non_neg_integer(), non_neg_integer()) -> ?DB:db().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
@@ -49,11 +49,11 @@ behaviour_info(callbacks) ->
      {validate_prefilter, 1},
      %% validate a single item
      %% validate(DB, RTLogentry) -> {DB, Proposal (prepared/abort)}
-     {validate, 2},
-     %% commit(DB, RTLogentry, OwnProposalWas)
-     {commit, 3},
-     %% abort(DB, RTLogentry, OwnProposalWas)
-     {abort, 3}
+     {validate, 3},
+     %% commit(DB, RTLogentry, OwnProposalWas, TMSnapNo, OwnSnapNo)
+     {commit, 5},
+     %% abort(DB, RTLogentry, OwnProposalWas, TMSnapNo, OwnSnapNo)
+     {abort, 5}
     ];
 behaviour_info(_Other) ->
     undefined.

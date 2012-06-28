@@ -43,8 +43,7 @@
          take_bulkowner_reply_msgs/1,
          get_bulkowner_reply_timer/1,
          set_bulkowner_reply_timer/2,
-		 set_snap_part_info/2,
-		 set_snap_leader_info/2]).
+		 set_snapshot_state/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0]).
@@ -66,8 +65,7 @@
                 bulkowner_reply_timer   = null :: null | reference(),
                 bulkowner_reply_ids     = []   :: [util:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
-				snap_part_info   = null :: snapshot_state:snap_part_info() | null,
-				snap_leader_info        = null :: snapshot_state:snap_leader_info() | null 
+				snapshot_state   = null :: snapshot_state:snapshot_state() | null 
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -81,8 +79,7 @@ new(RT, RMState, DB) ->
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
-		   snap_part_info = snapshot_state:init_participant(),
-		   snap_leader_info = snapshot_state:init_leader()
+		   snapshot_state = snapshot_state:new()
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -110,8 +107,7 @@ new(RT, RMState, DB) ->
 %%        <li>load = the load of the own node (provided for convenience).</li>
 %%        <li>slide_pred = information about the node's current slide operation with its predecessor.</li>
 %%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
-%%        <li>snap_part_info = snapshot algorithm state information</li>
-%%        <li>snap_leader_info = snapshot algorithm leader state information</li>
+%%        <li>snapshot_state = snapshot algorithm state information</li>
 %%      </ul>
 %%      Beware of race conditions sing the neighborhood may have changed at
 %%      the next call.
@@ -138,8 +134,7 @@ new(RT, RMState, DB) ->
          (state(), load) -> integer();
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
-         (state(), snap_part_info) -> snapshot_stat:snap_part_info() | null;
-         (state(), snap_leader_info) -> snapshot_stat:snap_leader_info() | null;
+         (state(), snapshot_state) -> snapshot_state:snapshot_state() | null;
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
          (state(), monitor_proc) -> pid().
@@ -147,7 +142,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc,
-		   snap_part_info=SnapPartInfo, snap_leader_info=SnapLeaderInfo}, Key) ->
+		   snapshot_state=SnapState}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -168,8 +163,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         proposer     -> Proposer;
         slide_pred   -> SlidePred;
         slide_succ   -> SlideSucc;
-		snap_part_info -> SnapPartInfo;
-		snap_leader_info -> SnapLeaderInfo;
+		snapshot_state -> SnapState;
         rm_state     -> RMState;
         monitor_proc -> MonitorProc;
         succlist     -> nodelist:succs(rm_loop:get_neighbors(RMState));
@@ -251,11 +245,8 @@ set_rm(State, RMState) -> State#state{rm_state = RMState}.
 set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};
 set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 
--spec set_snap_leader_info(State::state(),NewInfo::snapshot_state:snap_leader_info()) -> state().
-set_snap_leader_info(State,NewInfo) -> State#state{snap_leader_info=NewInfo}.
-
--spec set_snap_part_info(State::state(),NewInfo::snapshot_state:snap_part_info()) -> state().
-set_snap_part_info(State,NewInfo) -> State#state{snap_part_info=NewInfo}.
+-spec set_snapshot_state(State::state(),NewInfo::snapshot_state:snapshot_state()) -> state().
+set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
