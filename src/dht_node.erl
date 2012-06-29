@@ -137,11 +137,11 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     end;
 
 %% messages handled as a transaction participant (TP)
-on({init_TP, Params}, State) ->
+on({?init_TP, Params}, State) ->
     tx_tp:on_init_TP(Params, State);
 on({?tp_do_commit_abort, Id, Result}, State) ->
     tx_tp:on_do_commit_abort(Id, Result, State);
-on({tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
+on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
     tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
