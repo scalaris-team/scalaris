@@ -86,7 +86,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
             false ->
                 %% forward commit to now responsible node
                 dht_node_lookup:lookup_aux(
-                  DHT_Node_State, Key, 0, {init_TP, Params}),
+                  DHT_Node_State, Key, 0, {?init_TP, Params}),
                 DB
         end,
     dht_node_state:set_db(DHT_Node_State, NewDB).
@@ -162,7 +162,7 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, DHT_Node_Sta
         false ->
             %% forward commit to now responsible node
             dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
-                                       {tp_do_commit_abort_fwd,
+                                       {?tp_do_commit_abort_fwd,
                                         TM, TMItemId, RTLogEntry,
                                         Result, OwnProposal}),
             DB

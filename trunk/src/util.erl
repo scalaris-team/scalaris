@@ -990,5 +990,7 @@ extint2atom(X) when is_integer(X) ->
         ?abort -> ?abort_atom;
         ?value -> ?value_atom;
         ?read -> ?read_atom;
-        ?write -> ?write_atom
+        ?write -> ?write_atom;
+        ?init_TP -> ?init_TP_atom;
+        ?tp_do_commit_abort_fwd -> ?tp_do_commit_abort_fwd_atom
     end.

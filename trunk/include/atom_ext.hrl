@@ -104,3 +104,9 @@
 
 -define(value_dropped_atom, value_dropped).
 -define(value_dropped, ?int_or_atom(78, ?value_dropped_atom)).
+
+-define(init_TP_atom, init_TP).
+-define(init_TP, ?int_or_atom(79, ?init_TP_atom)).
+
+-define(tp_do_commit_abort_fwd_atom, tp_do_commit_abort_fwd).
+-define(tp_do_commit_abort_fwd, ?int_or_atom(80, ?tp_do_commit_abort_fwd_atom)).

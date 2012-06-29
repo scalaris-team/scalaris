@@ -826,7 +826,7 @@ init_TPs(TxState, ItemStates) ->
           ItemId = tx_item_state:get_itemid(ItemState),
           [ begin
                 Key = tx_tlog:get_entry_key(RTLog),
-                Msg1 = {init_TP, {Tid, CleanRTMs, Accs, TM,
+                Msg1 = {?init_TP, {Tid, CleanRTMs, Accs, TM,
                                   tx_tlog:drop_value(RTLog), ItemId, PaxId}},
                 %% delivers message to a dht_node process, which has
                 %% also the role of a TP
