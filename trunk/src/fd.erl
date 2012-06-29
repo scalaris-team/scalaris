@@ -30,8 +30,8 @@
 -export_type([cookie/0]).
 -endif.
 
--export([subscribe/1, subscribe/2]).
--export([unsubscribe/1, unsubscribe/2]).
+-export([subscribe/1, subscribe/2, subscribe_refcount/2]).
+-export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2]).
 -export([update_subscriptions/2]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
@@ -41,42 +41,100 @@
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
-%% @doc generates a failure detector for the calling process on the given pid.
+%% @doc Generates a failure detector for the calling process on the given pid.
 -spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
 subscribe([]) -> ok;
 subscribe(GlobalPids) ->
     subscribe(GlobalPids, {self(), '$fd_nil'}).
 
-%% @doc generates a failure detector for the calling process and cookie on the
+%% @doc Generates a failure detector for the calling process and cookie on the
 %%      given pid.
 -spec subscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 subscribe([], _Cookie)         -> ok;
 subscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
     FD = my_fd_pid(),
-    _ = [begin
-             comm:send_local(FD, {add_subscriber_via_fd, self(), Pid, Cookie})
-         end
-         || Pid <- GlobalPids],
+    _ = [subscribe_single(FD, Pid, Cookie) || Pid <- GlobalPids],
     ok;
-subscribe(GlobalPid, Cookie) -> subscribe([GlobalPid], Cookie).
+subscribe(GlobalPid, Cookie) ->
+    subscribe_single(my_fd_pid(), GlobalPid, Cookie).
 
-%% @doc deletes the failure detector for the given pid.
+-spec subscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
+subscribe_single(FD, GlobalPid, Cookie) ->
+    comm:send_local(FD, {add_subscriber_via_fd, self(), GlobalPid, Cookie}).
+
+%% @doc Generates a failure detector for the calling process and cookie on the
+%%      given pid - uses reference counting to be subscribed to a pid only once.
+%%      Unsubscribe with unsubscribe_refcount/2!
+-spec subscribe_refcount(comm:mypid() | [comm:mypid()], cookie()) -> ok.
+subscribe_refcount([], _Cookie)         -> ok;
+subscribe_refcount(GlobalPids, Cookie) when is_list(GlobalPids) ->
+    FD = my_fd_pid(),
+    _ = [subscribe_single_refcount(FD, Pid, Cookie) || Pid <- GlobalPids],
+    ok;
+subscribe_refcount(GlobalPid, Cookie) ->
+    subscribe_single_refcount(my_fd_pid(), GlobalPid, Cookie).
+
+-spec subscribe_single_refcount(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
+subscribe_single_refcount(FD, GlobalPid, Cookie) ->
+    Key = {'$fd_subscribe', GlobalPid, Cookie},
+    OldCount = case erlang:get(Key) of
+                   undefined -> subscribe_single(FD, GlobalPid, Cookie),
+                                0;
+                   X -> X
+               end,
+    erlang:put(Key, OldCount + 1),
+    ok.
+
+%% @doc Deletes the failure detector for the given pid.
 -spec unsubscribe(comm:mypid() | [comm:mypid()]) -> ok.
 unsubscribe([])-> ok;
 unsubscribe(GlobalPids)->
     unsubscribe(GlobalPids, {self(), '$fd_nil'}).
 
-%% @doc deletes the failure detector for the given pid and cookie.
+%% @doc Deletes the failure detector for the given pid and cookie.
 -spec unsubscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 unsubscribe([], _Cookie)         -> ok;
 unsubscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
     FD = my_fd_pid(),
     _ = [begin
-             comm:send_local(FD, {del_subscriber_via_fd, self(), Pid, Cookie})
+             unsubscribe_single(FD, Pid, Cookie)
          end
          || Pid <- GlobalPids],
     ok;
-unsubscribe(GlobalPid, Cookie) -> unsubscribe([GlobalPid], Cookie).
+unsubscribe(GlobalPid, Cookie) ->
+    unsubscribe_single(my_fd_pid(), GlobalPid, Cookie).
+
+-spec unsubscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
+unsubscribe_single(FD, GlobalPid, Cookie) ->
+    comm:send_local(FD, {del_subscriber_via_fd, self(), GlobalPid, Cookie}).
+
+%% @doc Deletes the failure detector for the given pid and cookie - uses
+%%      reference counting to be subscribed to a pid only once.
+%%      Subscribe with unsubscribe_refcount/2!
+-spec unsubscribe_refcount(comm:mypid() | [comm:mypid()], cookie()) -> ok.
+unsubscribe_refcount([], _Cookie)         -> ok;
+unsubscribe_refcount(GlobalPids, Cookie) when is_list(GlobalPids) ->
+    FD = my_fd_pid(),
+    _ = [begin
+             unsubscribe_single_refcount(FD, Pid, Cookie)
+         end
+         || Pid <- GlobalPids],
+    ok;
+unsubscribe_refcount(GlobalPid, Cookie) ->
+    unsubscribe_single_refcount(my_fd_pid(), GlobalPid, Cookie).
+
+-spec unsubscribe_single_refcount(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
+unsubscribe_single_refcount(FD, GlobalPid, Cookie) ->
+    Key = {'$fd_subscribe', GlobalPid, Cookie},
+    _ = case erlang:get(Key) of
+            undefined -> ok; % TODO: warn here?
+            1 -> %% delay the actual unsubscribe for better perf.?
+                unsubscribe_single(FD, GlobalPid, Cookie),
+                erlang:erase(Key);
+            OldCount ->
+                erlang:put(Key, OldCount - 1)
+        end,
+    ok.
 
 %% @doc Unsubscribes from the pids in OldPids but not in NewPids and subscribes
 %%      to the pids in NewPids but not in OldPids.

@@ -97,8 +97,6 @@ start_link(DHTNodeGroup, Role) ->
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
      GLocalLearner  :: comm:mypid(),
-     %% reference counting on subscriptions inside RTMs
-     Subs           :: [{comm:mypid(), non_neg_integer()}],
      OpenTxNum      :: non_neg_integer()}.
 
 %% initialize: return initial state.
@@ -120,14 +118,13 @@ init([]) ->
     case Role of
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
-            State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner,
-                     [], 0},
+            State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner, 0},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, fun ?MODULE:on_init/2);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, [], 0}
+        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, 0}
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -1037,47 +1034,22 @@ state_get_lacceptor(State)     -> element(4, State).
 state_set_gllearner(State, Pid) -> setelement(5, State, Pid).
 -spec state_get_gllearner(state()) -> comm:mypid().
 state_get_gllearner(State) -> element(5, State).
--spec state_get_subs(state()) -> [{comm:mypid(), non_neg_integer()}].
-state_get_subs(State)          -> element(6, State).
--spec state_set_subs(state(), [{comm:mypid(), non_neg_integer()}]) -> state().
-state_set_subs(State, Val)          -> setelement(6, State, Val).
 -spec state_get_opentxnum(state()) -> non_neg_integer().
-state_get_opentxnum(State) -> element(7, State).
+state_get_opentxnum(State) -> element(6, State).
 -spec state_inc_opentxnum(state()) -> state().
-state_inc_opentxnum(State) -> setelement(7, State, element(7, State) + 1).
+state_inc_opentxnum(State) -> setelement(6, State, element(6, State) + 1).
 -spec state_dec_opentxnum(state()) -> state().
-state_dec_opentxnum(State) -> setelement(7, State, element(7, State) - 1).
+state_dec_opentxnum(State) -> setelement(6, State, element(6, State) - 1).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
-    Subs = state_get_subs(State),
-    NewSubs = case lists:keyfind(Pid, 1, Subs) of
-                  false -> 
-                      fd:subscribe(Pid, {self(), state_get_role(State)}),
-                      [{Pid, 1} | Subs];
-                  Tuple ->
-                      NewVal = setelement(2, Tuple, element(2, Tuple) + 1),
-                      lists:keyreplace(Pid, 1, Subs, NewVal)
-              end,
-    state_set_subs(State, NewSubs).
+    fd:subscribe_refcount(Pid, {self(), state_get_role(State)}),
+    State.
 
 -spec state_unsubscribe(state(), comm:mypid()) -> state().
 state_unsubscribe(State, Pid) ->
-    Subs = state_get_subs(State),
-    NewSubs = case lists:keyfind(Pid, 1, Subs) of
-                  false -> Subs;
-                  Tuple ->
-                      case element(2, Tuple) of
-                          1 ->
-                              %% delay the actual unsubscribe for better perf.?
-                              fd:unsubscribe(element(1, Tuple), {self(), state_get_role(State)}),
-                              lists:keydelete(Pid, 1, Subs);
-                          Num ->
-                              NewVal = setelement(2, Tuple, Num - 1),
-                              lists:keyreplace(Pid, 1, Subs, NewVal)
-                      end
-              end,
-    state_set_subs(State, NewSubs).
+    fd:unsubscribe_refcount(Pid, {self(), state_get_role(State)}),
+    State.
 
 -spec get_failed_keys(tx_state:tx_state(), state()) -> [client_key()].
 get_failed_keys(TxState, State) ->
