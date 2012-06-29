@@ -351,7 +351,7 @@ state_get_monitors(State)           -> element(6, State).
 -spec state_set_monitors(state(), [{comm:mypid(), reference()}]) -> state().
 state_set_monitors(State, Val)      -> setelement(6, State, Val).
 
--spec state_add_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> state().
+-spec state_add_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> state().
 state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
@@ -370,7 +370,7 @@ state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     end,
     State.
 
--spec state_del_entry(state(), {comm:mypid(), comm:mypid(), any()}) -> {deleted | unchanged, state()}.
+-spec state_del_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> {deleted | unchanged, state()}.
 state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% implement reference counting on subscriptions:
     %% instead of storing in the state, we silently store in a pdb for
@@ -410,7 +410,7 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
             {Changed, State}
     end.
 
--spec state_get_subscriptions(state(), comm:mypid()) -> [{pid(), any()}].
+-spec state_get_subscriptions(state(), comm:mypid()) -> [{pid(), fd:cookie()}].
 state_get_subscriptions(State, SearchedPid) ->
     Table = state_get_table(State),
     Entries = pdb:tab2list(Table),
@@ -447,7 +447,7 @@ state_add_watched_pid(State, WatchedPid) ->
               State, lists:keyreplace(WatchedPid, 1, RemPids, NewEntry))
     end.
 
--spec state_del_watched_pid(state(), comm:mypid(), comm:mypid()) -> state().
+-spec state_del_watched_pid(state(), comm:mypid(), pid()) -> state().
 state_del_watched_pid(State, WatchedPid, Subscriber) ->
     %% del watched pid remotely, if not longer necessary
     RemPids = state_get_rem_pids(State),
