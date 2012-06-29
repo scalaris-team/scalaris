@@ -52,9 +52,9 @@ subscribe(GlobalPids) ->
 -spec subscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 subscribe([], _Cookie)         -> ok;
 subscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
+    FD = my_fd_pid(),
     _ = [begin
-             HBPid = get_hbs(Pid),
-             comm:send_local(HBPid, {add_subscriber, self(), Pid, Cookie})
+             comm:send_local(FD, {add_subscriber_via_fd, self(), Pid, Cookie})
          end
          || Pid <- GlobalPids],
     ok;
@@ -70,9 +70,9 @@ unsubscribe(GlobalPids)->
 -spec unsubscribe(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 unsubscribe([], _Cookie)         -> ok;
 unsubscribe(GlobalPids, Cookie) when is_list(GlobalPids) ->
+    FD = my_fd_pid(),
     _ = [begin
-             HBPid = get_hbs(Pid),
-             comm:send_local(HBPid, {del_subscriber, self(), Pid, Cookie})
+             comm:send_local(FD, {del_subscriber_via_fd, self(), Pid, Cookie})
          end
          || Pid <- GlobalPids],
     ok;
@@ -98,30 +98,24 @@ start_link(ServiceGroup) ->
 -spec init([]) -> state().
 init([]) ->
     % local heartbeat processes
-    _ = ets:new(fd_hbs, [set, protected, named_table]),
+    _ = pdb:new(fd_hbs, [set, protected, named_table]),
     ok.
 
 %% @private
 -spec on(comm:message(), state()) -> state().
-on({create_hbs, Pid, ReplyTo}, State) ->
-    NewHBS = start_and_register_hbs(Pid),
-    comm:send_local(ReplyTo, {create_hbs_reply, NewHBS}),
-    State;
-
 on({hbs_finished, RemoteWatchedPid}, State) ->
-    ets:delete(fd_hbs, comm:get(fd, RemoteWatchedPid)),
+    pdb:delete(comm:get(fd, RemoteWatchedPid), fd_hbs),
     State;
 
 on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
     %% we establish the back-direction here, so we subscribe to the
     %% subscriber and add the TargetPid to the local monitoring.
     ?TRACE("FD: subscribe_heartbeats~n", []),
-    HBPid =
-        case ets:lookup(fd_hbs, comm:get(fd, Subscriber)) of
-            [] -> % synchronously create new hb process
-                start_and_register_hbs(Subscriber);
-            [Res] -> element(2, Res)
-        end,
+    SubscriberFDPid = comm:get(fd, Subscriber),
+    HBPid = case pdb:get(SubscriberFDPid, fd_hbs) of
+                undefined -> start_and_register_hbs(SubscriberFDPid);
+                Res -> element(2, Res)
+            end,
     comm:send_local(HBPid, {add_watching_of, TargetPid}),
     comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}, ?SEND_OPTIONS),
     State;
@@ -129,6 +123,16 @@ on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
 on({pong, RemHBSSubscriber, RemoteDelay}, State) ->
     ?TRACE("FD: pong, ~p~n", [RemHBSSubscriber]),
     forward_to_hbs(RemHBSSubscriber, {pong_via_fd, RemHBSSubscriber, RemoteDelay}),
+    State;
+
+on({add_subscriber_via_fd, Subscriber, WatchedPid, Cookie}, State) ->
+    ?TRACE("FD: subscribe ~p to ~p (cookie: ~p)~n", [Subscriber, WatchedPid, Cookie]),
+    forward_to_hbs(WatchedPid, {add_subscriber, Subscriber, WatchedPid, Cookie}),
+    State;
+
+on({del_subscriber_via_fd, Subscriber, WatchedPid, Cookie}, State) ->
+    ?TRACE("FD: unsubscribe ~p to ~p (cookie: ~p)~n", [Subscriber, WatchedPid, Cookie]),
+    forward_to_hbs(WatchedPid, {del_subscriber, Subscriber, WatchedPid, Cookie}),
     State;
 
 on({add_watching_of_via_fd, Subscriber, Pid}, State) ->
@@ -189,40 +193,20 @@ my_fd_pid() ->
         PID -> PID
     end.
 
-%@doc get hbs process in the context of a client process
--spec get_hbs(comm:mypid()) -> pid().
-get_hbs(Pid) ->
-    %% normalize for the table entry (just distinguish nodes)
-    FDPid = comm:get(fd, Pid),
-    case ets:lookup(fd_hbs, FDPid) of
-        [] -> % synchronously create new hb process
-            comm:send_local(my_fd_pid(), {create_hbs, Pid, self()}),
-            receive {create_hbs_reply, NewHBS} -> NewHBS end;
-        [Res] -> element(2, Res)
-    end.
-
-%@doc start a new hbs process inside the fd process context (ets owner)
--spec start_and_register_hbs(comm:mypid()) -> pid().
-start_and_register_hbs(Pid) ->
-    FDPid = comm:get(fd, Pid),
-    case ets:lookup(fd_hbs, FDPid) of
-        [] ->
-            NewHBS = element(2, fd_hbs:start_link(pid_groups:my_groupname(), Pid)),
-            ets:insert(fd_hbs, {FDPid, NewHBS}),
-            NewHBS;
-        [Res] -> element(2, Res)
-    end.
+%% @doc start a new hbs process inside the fd process context (ets owner)
+%%      precond: FDPid points to the fd process at the target node
+-spec start_and_register_hbs(FDPid::comm:mypid()) -> pid().
+start_and_register_hbs(FDPid) ->
+    {ok, NewHBS} = fd_hbs:start_link(pid_groups:my_groupname(), FDPid),
+    pdb:set({FDPid, NewHBS}, fd_hbs),
+    NewHBS.
 
 -spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
 forward_to_hbs(Pid, Msg) ->
-    case ets:lookup(fd_hbs, comm:get(fd,Pid)) of
-        %% [] -> hbs not yet started. This should not happen, as all
-        %% execution paths before this call should invoke the hbs
-        %% synchronously. Let gen_component report the error.
-        [Entry] ->
-            HBSPid = element(2, Entry),
-            comm:send_local(HBSPid, Msg);
-        [] ->
-            log:log(info,
-                    "[ FD ] outdated message? No hbs found to forward msg: ~p~n" ++ "Message dropped.", [Msg])
-    end, ok.
+    FDPid = comm:get(fd, Pid),
+    HBSPid = case pdb:get(FDPid, fd_hbs) of
+                 undefined -> % synchronously create new hb process
+                     start_and_register_hbs(FDPid);
+                 Entry -> element(2, Entry)
+             end,
+    comm:send_local(HBSPid, Msg).
