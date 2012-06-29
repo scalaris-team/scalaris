@@ -36,8 +36,8 @@
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
--type(cookie() :: '$fd_nil' | any()).
--type(state() :: ok).
+-type cookie() :: {pid(), '$fd_nil'} | any().
+-type state() :: ok.
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
