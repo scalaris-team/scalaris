@@ -12,6 +12,7 @@
 /.make-doc
 /config.log
 /variables-ct*@*
+/variables-nonode@nohost
 /erl_crash.dump
 /autom4te.cache
 /aclocal.m4

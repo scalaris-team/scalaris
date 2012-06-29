@@ -283,13 +283,7 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
                         % of the tx in the queue
                         delay;
                     false ->
-                        MessageCounts = count_messages_per_type(),
-                        NoIsDoneMsgs = lists:foldl(
-                                         fun(X,Acc) ->
-                                                 case element(1,X) of
-                                                     tx_tm_rtm_tid_isdone -> Acc;
-                                                     _ -> element(2,X) + Acc
-                                                 end end, 0, MessageCounts),
+                        {_IsDoneMsgs, NoIsDoneMsgs} = count_messages_for_type(tx_tm_rtm_tid_isdone),
                         case NoIsDoneMsgs > 10 of
                             true -> delay;
                             false ->
@@ -937,14 +931,16 @@ trigger_delete_if_done(TxState) ->
             end
     end, ok.
 
-count_messages_per_type() ->
+-spec count_messages_for_type(Type::term()) -> {TypeCount::pos_integer(), OtherCount::pos_integer()}.
+count_messages_for_type(Type) ->
     {_, Msg} = erlang:process_info(self(), messages),
-    lists:foldl(fun(X, Acc) ->
-                  Tag = element(1,X),
-                  case lists:keyfind(Tag, 1, Acc) of
-                      false -> [{Tag, 1} | Acc];
-                      {Tag, Num} -> lists:keyreplace(Tag, 1, Acc, {Tag, Num + 1})
-                  end end, [], Msg).
+    lists:foldl(fun(X, {AccType, AccOther}) ->
+                  Tag = element(1, X),
+                  case Tag of
+                      Type -> {AccType + 1, AccOther};
+                      _    -> {AccType, AccOther + 1}
+                  end
+                end, {0, 0}, Msg).
 
 %% enough_tps_registered(TxState, State) ->
 %%     BoolV =
