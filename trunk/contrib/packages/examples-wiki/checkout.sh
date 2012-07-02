@@ -69,7 +69,12 @@ if [ ${result} -eq 0 ]; then
   sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
       < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                  ./debian.control && \
-  cp  ${sourcefolder}/debian.rules                    ./debian.rules
+  cp  ${sourcefolder}/debian.rules                    ./debian.rules && \
+  cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat5.conffiles \
+                                                     ./debian.scalaris-examples-wiki-tomcat5.conffiles && \
+  cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat6.conffiles \
+                                                     ./debian.scalaris-examples-wiki-tomcat6.conffiles
+
   result=$?
 fi
 
