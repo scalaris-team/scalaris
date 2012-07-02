@@ -140,7 +140,8 @@ status() {
 }
 
 restart() {
-    return gstop && sleep 1 && start
+    gstop && sleep 1 && start
+    return $?
 }
 
 # See how we were called.
