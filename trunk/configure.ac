@@ -231,7 +231,7 @@ AC_RUN_IFELSE(
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([[-export_type([mytype/0]). -type(mytype()::ok).]], [ok])],
-       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_EDOC=", {with_export_type_support, true}"; EXPORTTYPESUPPORT_DIALYZER=" -Dwith_export_type_support"; DIALYZER_FLAGS="$DIALYZER_FLAGS -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
+       [EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_EDOC=", {with_export_type_support, true}"; EXPORTTYPESUPPORT_DIALYZER=" -Dwith_export_type_support"; AC_MSG_NOTICE([export_type is supported])],
        [EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_EDOC=""; EXPORTTYPESUPPORT_DIALYZER=""; AC_MSG_NOTICE([export_type is not supported])])
 
 if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
@@ -272,16 +272,73 @@ AC_RUN_IFELSE(
        [CALLBACKSUPPORT=", {d, have_callback_support}"; CALLBACKSUPPORT_EDOC=", {have_callback_support, true}"; CALLBACKSUPPORT_DIALYZER=" -Dhave_callback_support"; AC_MSG_NOTICE([-callback is available])],
        [CALLBACKSUPPORT=""; CALLBACKSUPPORT_EDOC=""; CALLBACKSUPPORT_DIALYZER=""; AC_MSG_NOTICE([-callback is not available])])
 
+###########################################################
+#
+# check for file:send_file/5 for yaws
+#
+###########################################################
+set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
+ERTS_MAJOR=$1
+ERTS_MINOR=$2
+ERTS_MAINT=${3:-0}
+
+HAVE_YAWS_SENDFILE=false
+
+case "$host_os" in
+        *linux*)
+           HAVE_YAWS_SENDFILE=true
+           ;;
+        *solaris*)
+           ;;
+        *bsd*)
+           case "$host_os" in
+                freebsd*)
+                    HAVE_YAWS_SENDFILE=true
+                    ;;
+                bsdi*)
+                    ;;
+           esac
+           ;;
+         *darwin*)
+           AC_LANG(C)
+           AC_CHECK_LIB([c],[sendfile],[HAVE_YAWS_SENDFILE=true])
+           ;;
+         *cygwin*)
+           ;;
+        *)
+           ;;
+esac
+
+file_sendfile=`"${ERL}" -noshell -eval 'io:format("~p~n",[[erlang:function_exported(file, sendfile, 5)]]), erlang:halt().' | tail -1`
+
+AS_IF([test "$file_sendfile" = true -a \
+           '(' $ERTS_MAJOR -gt 5 -o \
+           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
+           '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')' ')'],
+      [HAVE_YAWS_SENDFILE=false; AC_MSG_NOTICE(found file:sendfile/5)])
+
+AS_IF([test "$HAVE_YAWS_SENDFILE" = true],
+      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_EDOC=", {'HAVE_YAWS_SENDFILE', true}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is available for yaws])],
+      [HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"; HAVE_YAWS_SENDFILE_EDOC=", {'NO_FILE_SENDFILE', true}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is not available for yaws])])
+
+###########################################################
+#
+# all defines together...
+#
+###########################################################
+
 EMAKEFILEDEFINES="${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${ERLANG_NATIVE_FLAGS}"
-EDOCMACROS="${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}"
+EDOCMACROS="${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${HAVE_YAWS_SENDFILE_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}"
 EDOCMACROS="${EDOCMACROS#, }"
-DIALYZER_FLAGS="${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}"
+DIALYZER_FLAGS="${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}"
 
 AC_SUBST(EMAKEFILEDEFINES)
 AC_SUBST(EMAKEFILECOMPILECOMPAT)
 AC_SUBST(DIALYZER_FLAGS)
 AC_SUBST(CTHOOKS_FLAGS)
 AC_SUBST(EDOCMACROS)
+
+AC_SUBST(HAVE_YAWS_SENDFILE)
 
 ###########################################################
 #
