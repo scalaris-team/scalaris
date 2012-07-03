@@ -36,7 +36,7 @@
 
 %% Perform single operation transactions.
 -export([req_list_commit_each/1,
-         read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3]).
+         read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3, get_system_snapshot/0]).
 
 -ifdef(with_export_type_support).
 -export_type([request/0, read_result/0, write_result/0, commit_result/0, result/0,
@@ -181,3 +181,14 @@ req_list_commit_each(ReqList) ->
           {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
           _ -> {fail, abort}
       end || Req <- ReqList].
+
+%% @doc Get system snapshot
+-spec get_system_snapshot() -> list().
+get_system_snapshot() ->
+    snapshot_leader ! {init_snapshot,comm:this()},
+    receive
+        {global_snapshot_done,Data} ->
+            Data;
+        {global_snapshot_done_with_errors,ErrorInterval,Data} ->
+            {snapshot_failed,ErrorInterval,Data}
+    end.

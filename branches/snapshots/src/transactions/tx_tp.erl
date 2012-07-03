@@ -50,7 +50,7 @@ init() ->
                   tx_item_state:paxos_id()},
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
-on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_State) ->
+on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),

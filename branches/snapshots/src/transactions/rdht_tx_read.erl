@@ -264,6 +264,7 @@ get_entry(Id, Table) ->
 inform_client(Client, Entry) ->
     Id = rdht_tx_read_state:get_id(Entry),
     Msg = msg_reply(Id, make_tlog_entry(Entry)),
+    ?TRACE("rdht_tx_read:inform_client: informing ~p with msg ~p~n",[Client,Msg]),
     comm:send_local(Client, Msg), ok.
 
 -spec make_tlog_entry(rdht_tx_read_state:read_state()) ->

@@ -786,7 +786,10 @@ init_TPs(TxState, ItemStates) ->
           ItemId = tx_item_state:get_itemid(ItemState),
           [ begin
                 Key = tx_tlog:get_entry_key(RTLog),
-                Msg1 = {init_TP, {Tid, CleanRTMs, Accs, TM, RTLog, ItemId, PaxId}},
+                % hack to find out the dht_node's snapshot number
+                {_,Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
+                {_,LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
+                Msg1 = {init_TP, {Tid, CleanRTMs, Accs, TM, RTLog, ItemId, PaxId, LocalSnapNumber}},
                 %% delivers message to a dht_node process, which has
                 %% also the role of a TP
                 api_dht_raw:unreliable_lookup(Key, Msg1)

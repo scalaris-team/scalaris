@@ -75,7 +75,7 @@ work_phase(ClientPid, ReqId, Request) ->
 %%   [TransLogEntries] (replicas)
 -spec validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
-    ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLog]),
+    ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLogEntry]),
     Key = tx_tlog:get_entry_key(TLogEntry),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
@@ -104,6 +104,7 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
 %%%        false ->
     VersionOK = (RTVers =:= DBVers),
     Lockable = not db_entry:is_locked(DBEntry),
+    ?TRACE("rdht_tx_write:validate: local snapnumber is ~p; snapnumber in tlog entry is ~p~n",[LocalSnapNumber,tx_tlog:get_entry_snapshot(RTLogEntry)]),
     SnapNumbersOK = (tx_tlog:get_entry_snapshot(RTLogEntry) >= LocalSnapNumber),
     case (VersionOK andalso Lockable andalso SnapNumbersOK) of
         true ->
@@ -201,6 +202,7 @@ init([]) ->
 %% ClientPid and WriteValue could also be stored in local process state via ets
 -spec on(comm:message(), null) -> null.
 on({rdht_tx_read_reply, {Id, ClientPid, WriteValue}, TLogEntry}, State) ->
+    ?TRACE("~p rdht_tx_write:on(rdht_tx_read_reply) ID ~p~n", [self(), Id]),
     Key = tx_tlog:get_entry_key(TLogEntry),
     Request = {?MODULE, Key, WriteValue},
     NewTLogEntry = update_tlog_entry(TLogEntry, Request),
@@ -214,16 +216,17 @@ update_tlog_entry(TLogEntry, Request) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     Status = tx_tlog:get_entry_status(TLogEntry),
     Version = tx_tlog:get_entry_version(TLogEntry),
+    SnapNumber = tx_tlog:get_entry_snapshot(TLogEntry),
     WriteValue = element(3, Request),
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
     case Status of
         value ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, 0, WriteValue);
+            tx_tlog:new_entry(?MODULE, Key, Version, value, SnapNumber, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(?MODULE, Key, Version, value, 0, WriteValue)
+            tx_tlog:new_entry(?MODULE, Key, Version, value, SnapNumber, WriteValue)
 %        {fail, timeout} ->
-%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout}, 0,
+%            tx_tlog:new_entry(?MODULE, Key, Version, {fail, timeout}, SnapNumber,
 %                               WriteValue)
     end.
 

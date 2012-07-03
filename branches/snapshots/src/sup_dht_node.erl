@@ -80,6 +80,8 @@ init({DHTNodeGroup, Options}) ->
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     MonitorPerf =
         util:sup_worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
+    SnapshotLeader =
+        util:sup_worker_desc(snapshot_leader, snapshot_leader, start_link),
     %% order in the following list is the start order
     {ok, {{one_for_one, 10, 1},
           lists:flatten([
@@ -93,6 +95,7 @@ init({DHTNodeGroup, Options}) ->
                 DC_Clustering,
                 Gossip,
                 SupDHTNodeCore_AND,
-                MonitorPerf
+                MonitorPerf,
+                SnapshotLeader
           ])}}.
 %% userdevguide-end sup_dht_node:init
