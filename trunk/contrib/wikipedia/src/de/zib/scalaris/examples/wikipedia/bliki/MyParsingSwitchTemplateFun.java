@@ -49,11 +49,11 @@ public class MyParsingSwitchTemplateFun extends AbstractTemplateFunction {
             char[] src, int beginIndex, int endIndex, boolean isSubst) {
         if (list.size() > 2) {
             if (!isSubst) {
-                parse(list.get(0), model);
+                parseTrim(list.get(0), model);
             }
             StringBuilder result = new StringBuilder();
             for (int i = 1; i < list.size(); i++) {
-                String temp = isSubst ? list.get(i) : parse(list.get(i), model);
+                String temp = isSubst ? list.get(i) : parseTrim(list.get(i), model);
                 int index = temp.indexOf('=');
                 String leftHandSide;
                 if (index >= 0) {
@@ -62,7 +62,7 @@ public class MyParsingSwitchTemplateFun extends AbstractTemplateFunction {
                 } else {
                     leftHandSide = temp.trim();
                 }
-                String parsedLHS = isSubst ? leftHandSide.trim() : parse(leftHandSide, model);
+                String parsedLHS = isSubst ? leftHandSide.trim() : parseTrim(leftHandSide, model);
                 if (index < 0 && i == list.size() - 1) {
                     result.append(parsedLHS);
                 }

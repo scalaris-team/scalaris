@@ -51,12 +51,12 @@ public class MyParsingIfTemplateFun extends AbstractTemplateFunction {
             char[] src, int beginIndex, int endIndex, boolean isSubst) {
         if (list.size() > 1) {
             if (!isSubst) {
-                parse(list.get(0), model);
+                parseTrim(list.get(0), model);
             }
             // parse both parameters
-            String result = isSubst ? list.get(1) : parse(list.get(1), model);
+            String result = isSubst ? list.get(1) : parseTrim(list.get(1), model);
             if (list.size() >= 3) {
-                result += isSubst ? list.get(2) : parse(list.get(2), model);
+                result += isSubst ? list.get(2) : parseTrim(list.get(2), model);
             }
             return result;
         }
