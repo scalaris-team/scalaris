@@ -50,14 +50,14 @@ public class MyIfexistTemplateFun extends Ifexist {
         if (model instanceof MyWikiModel) {
             MyWikiModel myModel = (MyWikiModel) model;
             if (list.size() > 1) {
-                final String[] wikiTopicName = myModel.splitNsTitle(isSubst ? list.get(0) : parse(list.get(0), model));
+                final String[] wikiTopicName = myModel.splitNsTitle(isSubst ? list.get(0) : parseTrim(list.get(0), model));
                 if (myModel.isImageNamespace(wikiTopicName[0])
                         || myModel.isMediaNamespace(wikiTopicName[0])
                         || model.getRawWikiContent(wikiTopicName[0], wikiTopicName[1], null) != null) {
-                    return isSubst ? list.get(1) : parse(list.get(1), model);
+                    return isSubst ? list.get(1) : parseTrim(list.get(1), model);
                 } else { // non-existing page
                     if (list.size() >= 3) {
-                        return isSubst ? list.get(2) : parse(list.get(2), model);
+                        return isSubst ? list.get(2) : parseTrim(list.get(2), model);
                     }
                 }
             }

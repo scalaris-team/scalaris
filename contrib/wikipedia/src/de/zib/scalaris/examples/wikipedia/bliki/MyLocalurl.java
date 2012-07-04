@@ -37,7 +37,7 @@ public class MyLocalurl extends Localurl {
         if (model instanceof MyWikiModel) {
             MyWikiModel myModel = (MyWikiModel) model;
             if (list.size() > 0) {
-                String arg0 = isSubst ? list.get(0) : parse(list.get(0), model);
+                String arg0 = isSubst ? list.get(0) : parseTrim(list.get(0), model);
                 final String title = URLEncoder.encode(Character.toUpperCase(arg0.charAt(0)) + "", Connector.UTF8_CHARSET)
                         + URLEncoder.encode(arg0.substring(1), Connector.UTF8_CHARSET);
                 if (arg0.length() > 0 && list.size() == 1) {
@@ -50,7 +50,7 @@ public class MyLocalurl extends Localurl {
                         title));
                 for (int i = 1; i < list.size(); i++) {
                     builder.append("&");
-                    builder.append(isSubst ? list.get(i) : parse(list.get(i), model));
+                    builder.append(isSubst ? list.get(i) : parseTrim(list.get(i), model));
                 }
                 return builder.toString();
             }
