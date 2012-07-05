@@ -51,7 +51,7 @@ init() ->
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, DHT_Node_State) ->
-    ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
+    %?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
     Key = tx_tlog:get_entry_key(RTLogEntry),
@@ -99,7 +99,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, D
                          commit | abort, non_neg_integer, dht_node_state:state())
                         -> dht_node_state:state().
 on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, TMSnapNo, DHT_Node_State) ->
-    ?TRACE("tx_tp:on_do_commit_abort({, ...})~n", []),
+    %?TRACE("tx_tp:on_do_commit_abort({, ...})~n", []),
     %% inform callback on commit/abort to release locks etc.
     % get own proposal for lock release
     TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
@@ -148,6 +148,11 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
     OwnSnapNo = snapshot_state:get_number(dht_node_state:get(DHT_Node_State,snapshot_state)),
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
+            ?TRACE("~p tx_tp:update_db_or_forward before commit/abort~n",[comm:this()]),
+            ?TRACE("~p tx_tp:update_db_or_forward before db: ~p~n",[comm:this(),DB]),
+            ?TRACE("~p tx_tp:update_db_or_forward before db data: ~p~n",[comm:this(),?DB:get_data(DB)]),
+            ?TRACE("~p tx_tp:update_db_or_forward before snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(DB)]),
+            ?TRACE("~p tx_tp:update_db_or_forward incoming operation: ~p~n",[comm:this(),{tx_tlog:get_entry_operation(RTLogEntry), Result}]),
             Res =
                 case {tx_tlog:get_entry_operation(RTLogEntry), Result} of
                     {rdht_tx_read, abort} ->
@@ -161,12 +166,19 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
                 end,
             comm:send(TM, {tp_committed, TMItemId}),
             % check if snapshot is running and if so, if it's already done
-            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),
+            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),            
             case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(Res),?DB:snapshot_is_lockfree(Res)} of
-                {true,true,0} -> comm:send(self(), {local_snapshot_is_done});
-                _ -> ok
+                {true,true,true} ->
+                    ?TRACE("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
+                    comm:send_local(self(), {local_snapshot_is_done});
+                {true,true,_} ->
+                    ?TRACE("~p tx_tp:update_db_or_forward snapshot is still not done~n",[comm:this()]),
+                    ?TRACE("~p tx_tp:update_db_or_forward db: ~p~n",[comm:this(),Res]),
+                    ?TRACE("~p tx_tp:update_db_or_forward db data: ~p~n",[comm:this(),?DB:get_data(Res)]),
+                    ?TRACE("~p tx_tp:update_db_or_forward snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(Res)]);
+                _ ->                    
+                    ok
             end,
-                
             Res;
         false ->
             %% forward commit to now responsible node

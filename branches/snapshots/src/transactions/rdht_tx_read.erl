@@ -125,7 +125,8 @@ commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                 DBVers ->
                     NewEntry = db_entry:dec_readlock(DBEntry),
                     NewDB = ?DB:set_entry(DB, NewEntry),
-                    case (TMSnapNo < OwnSnapNo) of
+                    TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
+                    case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
                             case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
                                 {true, SnapEntry} -> 
@@ -135,8 +136,9 @@ commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                                     NewSnapEntry = db_entry:dec_readlock(SnapEntry),
                                     ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
                                 {false, _} ->
-                                    % key was not found in snapshot table -> both dbs are in sync for this key
-                                    NewDB
+                                    % key was not found in snapshot table -> dbs are in sync for this key,
+                                    % which means we only have to decrease the lockcount by 1
+                                    ?DB:decrease_snapshot_lockcount(NewDB)
                             end;
                         _ -> % no changes in the snapshot db
                             NewDB

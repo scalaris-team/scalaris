@@ -84,11 +84,12 @@ get_entry2_({DB, _Subscr, _SnapState}, Key) ->
 -spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_entry_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
-        true -> delete_entry_(State, Entry);
+        true -> 
+                delete_entry_(State, Entry);
         _    -> {_, OldEntry} = get_entry2_(State,db_entry:get_key(Entry)),
                 NewLiveLC = db_entry:update_lockcount(OldEntry,Entry,LiveLC),
                 ets:insert(DB, Entry),
-                call_subscribers({DB,_Subscr,{_SnapTable,_SnapLC,NewLiveLC}}, {write, Entry})
+                call_subscribers({DB,_Subscr,{_SnapTable,NewLiveLC,_SnapLC}}, {write, Entry})
     end.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -103,7 +104,7 @@ delete_entry_at_key_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Key) 
     {_, OldEntry} = get_entry2_(State,Key),
     NewLiveLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),LiveLC),
     ets:delete(DB, Key),
-    call_subscribers({DB,_Subscr,{_SnapTable,_SnapLC,NewLiveLC}}, {delete, Key}).
+    call_subscribers({DB,_Subscr,{_SnapTable,NewLiveLC,_SnapLC}}, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
@@ -215,12 +216,15 @@ copy_value_to_snapshot_table_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC
                             ets:insert(SnapTable,Entry);
         _               ->  NewSnapLC = SnapLC
     end,
-    {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}.
+    {_DB,_Subscr,{SnapTable,_LiveLC,NewSnapLC}}.
 
 %% @doc Returns snapshot data as is
 -spec get_snapshot_data_(DB::db_t()) -> db_as_list().
 get_snapshot_data_({_DB, _Subscr, {SnapTable, _, _}}) ->
-    ets:tab2list(SnapTable). 
+    case SnapTable of
+        false -> [];
+        _ -> ets:tab2list(SnapTable)
+    end.
 
 %% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
@@ -241,11 +245,18 @@ join_snapshot_data_(State) ->
 -spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_snapshot_entry_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
-        true -> delete_snapshot_entry_(State, Entry);
-        _    -> {_, OldEntry} = get_snapshot_entry_(State,db_entry:get_key(Entry)),
-                NewSnapLC = db_entry:update_lockcount(OldEntry,Entry,SnapLC),
+        true -> delete_snapshot_entry_(State, Entry);        
+        % if there is a snapshot entry for this key, we base our lock calculation off that,
+        % if not, we have to consider the live db because of the copy-on-write logic
+        _    -> case get_snapshot_entry_(State,db_entry:get_key(Entry)) of
+                    {true, OldEntry} ->
+                            NewSnapLC = db_entry:update_lockcount(OldEntry,Entry,SnapLC);
+                    {false, _} ->
+                            {_,LiveEntry} = get_entry2_(State,db_entry:get_key(Entry)),
+                            NewSnapLC = db_entry:update_lockcount(LiveEntry,Entry,SnapLC)
+                end,
                 ets:insert(SnapTable, Entry),
-                {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}
+                {_DB,_Subscr,{SnapTable,_LiveLC,NewSnapLC}}
     end.
 
 
@@ -258,10 +269,15 @@ get_snapshot_entry_({_DB, _Subscr, {SnapTable, _, _}}, Key) ->
 
 -spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 delete_snapshot_entry_at_key_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
-    {_, OldEntry} = get_snapshot_entry_(State,Key),
-    NewSnapLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),SnapLC),
+    case get_snapshot_entry_(State,Key) of
+        {true, OldEntry} ->
+            NewSnapLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),SnapLC);
+        {false, _} ->
+            {_,LiveEntry} = get_entry2_(State,Key),
+            NewSnapLC = db_entry:update_lockcount(LiveEntry,db_entry:new(Key),SnapLC)
+    end,
     ets:delete(SnapTable, Key),
-    {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}.
+    {_DB,_Subscr,{SnapTable,_LiveLC,NewSnapLC}}.
 
 %% @doc Removes all values with the given entry's key from the Snapshot DB.
 -spec delete_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
@@ -282,6 +298,10 @@ init_snapshot_({_DB, _Subscr, {SnapTable, LiveLC, _SnapLC}}) ->
 -spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
 snapshot_is_lockfree_({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
     SnapLC =:= 0.
+
+-spec decrease_snapshot_lockcount_(DB::db_t()) -> NewDB::db_t().
+decrease_snapshot_lockcount_({_DB,_Subscr,{_SnapTable,_LiveLC,SnapLC}}) ->
+    {_DB,_Subscr,{_SnapTable,_LiveLC,SnapLC-1}}.
 
 -spec snapshot_is_running_(DB::db_t()) -> boolean().
 snapshot_is_running_({_DB, _Subscr, {SnapTable, _LiveLC, _SnapLC}}) ->

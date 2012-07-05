@@ -19,8 +19,8 @@
 -author('keidel@informatik.hu-berlin.de').
 -vsn('$Id$').
 
--define(TRACE(X,Y), io:format(X,Y)).
-%-define(TRACE(_X,_Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 
 %% functions for gen_component module and supervisor callbacks
