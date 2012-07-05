@@ -58,7 +58,6 @@
 -type hash_fun()        :: fun((binary()) -> mt_node_key()).
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
 
-% INFO: on changes extend build_config function
 -record(mt_config,
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
@@ -140,8 +139,8 @@ lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
         true when ChildList =:= [] -> Node;
         true ->
-            IChilds = 
-                lists:filter(fun({_, _, _, CI, _}) -> intervals:is_subset(I, CI) end, ChildList),
+            IChilds = [C || C <- ChildList, 
+                            intervals:is_subset(I, get_interval(C))],
             case IChilds of
                 [] -> not_found;
                 [_] -> [IChild] = IChilds,
@@ -186,7 +185,7 @@ is_leaf(_) -> false.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns true if given term is a merkle tree otherwise false.
--spec is_merkle_tree(term()) -> boolean().
+-spec is_merkle_tree(any()) -> boolean().
 is_merkle_tree(Tree) when erlang:is_tuple(Tree) ->
     erlang:element(1, Tree) =:= merkle_tree;
 is_merkle_tree(_) -> false.
@@ -223,9 +222,21 @@ insert_to_node(Key, {Hash, Count, Bucket, Interval, []}, Config)
     %TODO: check if key is already in bucket
     {Hash, Count + 1, [Key | Bucket], Interval, []};
 
-insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config) 
-  when Count =:= Config#mt_config.bucket_size ->    
-    ChildI = intervals:split(Interval, Config#mt_config.branch_factor),
+insert_to_node(Key, {_, BucketSize, Bucket, Interval, []}, 
+               #mt_config{ branch_factor = BranchFactor, 
+                           bucket_size = BucketSize } = Config) ->    
+    ChildI = intervals:split(Interval, BranchFactor),
+    NewLeafs = [begin 
+                    {NewBucket, BCount} = 
+                        lists:foldl(fun (K, {List, Sum} = Acc) -> 
+                                             case intervals:in(K, I) of 
+                                                 true -> {[K | List], Sum + 1}; 
+                                                 false -> Acc 
+                                             end 
+                                    end, {[], 0}, Bucket), 
+                    {nil, BCount, NewBucket, I, []} 
+                end 
+                || I <- ChildI],
     NewLeafs = lists:map(fun(I) -> 
                                  {NewBucket, BCount} =
                                      lists:foldl(fun(K, {List, Sum} = Acc) -> 
@@ -236,7 +247,7 @@ insert_to_node(Key, {_, Count, Bucket, Interval, []}, Config)
                                                  end, {[], 0}, Bucket),
                               {nil, BCount, NewBucket, I, []}
                          end, ChildI),
-    insert_to_node(Key, {nil, 1 + Config#mt_config.branch_factor, [], Interval, NewLeafs}, Config);
+    insert_to_node(Key, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
 
 insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
     {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
@@ -294,9 +305,9 @@ gen_hash_node({_, Count, Bucket, I, []}, Config) ->
            end,
     {Hash, Count, Bucket, I, []};
 gen_hash_node({_, Count, [], I, List}, Config) ->    
-    NewChilds = lists:map(fun(X) -> gen_hash_node(X, Config) end, List),
+    NewChilds = [gen_hash_node(X, Config) || X <- List],
     InnerHf = Config#mt_config.inner_hf,
-    Hash = InnerHf(lists:map(fun({H, _, _, _, _}) -> H end, NewChilds)),
+    Hash = InnerHf([get_hash(C) || C <- NewChilds]),
     {Hash, Count, [], I, NewChilds}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -323,7 +334,7 @@ size_detail_node([], Result) ->
 size_detail_node([{_, _, _, _, []} | R], {Inner, Leafs}) ->
     size_detail_node(R, {Inner, Leafs+1});
 size_detail_node([{_, _, _, _, Childs} | R], {Inner, Leafs}) ->
-    size_detail_node(lists:append(Childs, R), {Inner+1, Leafs}).
+    size_detail_node(Childs ++ R, {Inner+1, Leafs}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -448,7 +459,7 @@ p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     is_subtype(I,     intervals:interval()),
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
-    IBucket = lists:map(fun(I) -> {I, 0, []} end, IList),
+    IBucket = [{I, 0, []} || I <- IList],
     lists:foldl(fun(Key, Acc) -> key_in_I(Key, Acc) end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -119,8 +119,7 @@ lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
     BF = ?IIF(merkle_tree:is_leaf(Node), LBF, IBF),
     ?TRACE("NodeHash=~p", [NodeHash]),
-    ?REP_BLOOM:is_element(BF, NodeHash) andalso
-        lookup_cf(L, Art);
+    ?REP_BLOOM:is_element(BF, NodeHash) andalso lookup_cf(L, Art);
 lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
     IsLeaf = merkle_tree:is_leaf(Node),
