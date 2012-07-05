@@ -87,7 +87,7 @@ calc_binomial({binom, N, P, K }) ->
     mathlib:binomial_coeff(N, K) * math:pow(P, K) * math:pow(1 - P, N - K).
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
-next_state({binom, N, _P, K}) when K =:= N -> 
+next_state({binom, K, _P, K}) -> 
     exit;
 next_state({binom, N, P, K}) -> 
     {binom, N, P, K + 1}.
