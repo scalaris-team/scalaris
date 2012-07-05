@@ -124,8 +124,8 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
     end.
 
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), prepared | abort, non_neg_integer(), non_neg_integer()) -> ?DB:db().
-commit(DB, RTLogEntry, _OwnProposalWas, TMSnapNo, OwnSnapNo) ->
-    ?TRACE("rdht_tx_write:commit)~n", []),
+commit(DB, RTLogEntry, _OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
+    ?TRACE("rdht_tx_write:commit)~n",[]),
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
@@ -140,16 +140,18 @@ commit(DB, RTLogEntry, _OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                 T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
                 db_entry:reset_locks(T3DBEntry)
         end,
-    NewDB = ?DB:set_entry(DB, NewEntry),
-    case (TMSnapNo < OwnSnapNo) of
+    TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
+    NewDB = case (TLogSnapNo < OwnSnapNo) of
         true ->
             ?DB:set_snapshot_entry(DB, NewEntry);
         _ -> 
-            NewDB
-    end.
+            DB
+    end,
+    ?DB:set_entry(NewDB, NewEntry).
+    
 
 -spec abort(?DB:db(), tx_tlog:tlog_entry(), prepared | abort, non_neg_integer(), non_neg_integer()) -> ?DB:db().
-abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
+abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
     %% release locks?
@@ -157,12 +159,13 @@ abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
         prepared ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+            TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
             case RTLogVers of
                 DBVers ->
                     NewEntry = db_entry:unset_writelock(DBEntry),
                     NewDB = ?DB:set_entry(DB, NewEntry),
-                    case (TMSnapNo < OwnSnapNo) of
+                    case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
                             case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
                                 {true, SnapEntry} -> 
@@ -172,8 +175,9 @@ abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                                     NewSnapEntry = db_entry:unset_writelock(SnapEntry),
                                     ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
                                 {false, _} ->
-                                    % key was not found in snapshot table -> dbs are in sync for this key
-                                    NewDB
+                                    % key was not found in snapshot table -> dbs are in sync for this key,
+                                    % which means we only have to decrease the lockcount by 1
+                                    ?DB:decrease_snapshot_lockcount(NewDB)
                             end;
                         _ -> % no changes in the snapshot db
                             NewDB

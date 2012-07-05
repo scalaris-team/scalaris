@@ -20,6 +20,7 @@
 -author('keidel@informatik.hu-berlin.de').
 -compile(export_all).
 -include("unittest.hrl").
+-include("scalaris.hrl").
 
 -vsn('$Id: snapshot_SUITE.erl 3244 2012-06-05 16:19:11Z stefankeidel85@gmail.com $').
 
@@ -34,10 +35,25 @@ all() ->
      test_rdht_tx_write_validate_should_abort,test_rdht_tx_write_validate_should_prepare,
      test_rdht_tx_write_validate_db_copy,test_rdht_tx_write_commit_with_snap,
      test_rdht_tx_write_commit_without_snap, test_rdht_tx_write_abort_without_snap,
-     test_rdht_tx_write_abort_with_snap
+     test_rdht_tx_write_abort_with_snap,
+     % lock counting
+     test_lock_counting_on_live_db,
+     %integration
+     test_basic_race_multiple_snapshots, test_single_snapshot_call,test_spam_transactions_and_snapshots
     ].
 
-suite() -> [ {timetrap, {seconds, 120}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
+
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
+
+end_per_testcase(_TestCase, Config) ->
+    unittest_helper:stop_ring(),
+    Config.
 
 -define(TEST_DB,db_ets).
 
@@ -254,7 +270,7 @@ test_rdht_tx_write_commit_without_snap(_) ->
     Entry = db_entry:new("key","val",1),
     TmpDb = ?TEST_DB:set_entry(Db,db_entry:set_writelock(Entry)),
     NewDb = ?TEST_DB:set_snapshot_entry(TmpDb,db_entry:set_writelock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write,"key",1,value,1,"new_val"),
+    TLogEntry = tx_tlog:new_entry(rdht_tx_write,"key",1,value,2,"new_val"),
     CommitDb = rdht_tx_write:commit(NewDb,TLogEntry,prepared,2,2),
     SnapEntry = ?TEST_DB:get_snapshot_entry(CommitDb,"key"),
     ?equals({true,{"key","val",true,0,1}},SnapEntry), % lock in snap db
@@ -286,11 +302,75 @@ test_rdht_tx_write_abort_without_snap(_) ->
     Entry = db_entry:new("key","val",1),
     TmpDb = ?TEST_DB:set_entry(Db,db_entry:set_writelock(Entry)),
     NewDb = ?TEST_DB:set_snapshot_entry(TmpDb,db_entry:set_writelock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write,"key",1,value,1,"new_val"),
-    CommitDb = rdht_tx_write:abort(NewDb,TLogEntry,prepared,2,2),
+    TLogEntry = tx_tlog:new_entry(rdht_tx_write,"key",1,value,2,"new_val"),
+    CommitDb = rdht_tx_write:abort(NewDb,TLogEntry,prepared,1,2),
     SnapEntry = ?TEST_DB:get_snapshot_entry(CommitDb,"key"),
     ?equals({true,{"key","val",true,0,1}},SnapEntry), % lock in snap db
     LiveEntry = ?TEST_DB:get_entry2(CommitDb,"key"),
     ?equals({true,{"key","val",false,0,1}},LiveEntry), % no lock in live db
     ok.
+
+%%%%% lock counting tests
+
+-spec test_lock_counting_on_live_db(any()) -> ok.
+test_lock_counting_on_live_db(_) ->
+    Db = ?TEST_DB:new(),
+    Entry = db_entry:new("foo","bar",0),
+    WriteLockEntry = db_entry:set_writelock(Entry),
+    NewDB = {_,_,{_,LiveLC,_SnapLC}} = ?TEST_DB:set_entry(Db,WriteLockEntry),
+    ?equals(LiveLC,1),
+    {_,_,{_,NewLiveLC,_}} = ?TEST_DB:set_entry(NewDB,Entry),
+    ?equals(NewLiveLC,0),
+    ok.
+    
+
+%%%%% integration tests
+
+-spec test_single_snapshot_call(any()) -> ok.
+test_single_snapshot_call(_) ->
+    unittest_helper:make_ring(10),
+    api_tx:req_list([{write,"A",1},{write,"B",2},{write,"C",3},{write,"D",4},{commit}]),
+    ActualSnap = api_tx:get_system_snapshot(),                        
+    ?equals_pattern(ActualSnap,[{_,_,0},{_,_,0},{_,_,0},{_,_,0}]),
+    ok.
+    
+-spec test_basic_race_multiple_snapshots(any()) -> ok.
+test_basic_race_multiple_snapshots(_) ->
+    unittest_helper:make_ring(4),
+    api_tx:req_list([{read,"A"},{read,"B"},{write,"A",8},
+                     {read,"A"},{read,"A"},{read,"A"},{write,"B", 9},{commit}]),
+    tester:test(api_tx, get_system_snapshot, 0, 100),
+    ok.
+
+-spec test_spam_transactions_and_snapshots(any()) -> ok.
+test_spam_transactions_and_snapshots(_) ->
+    unittest_helper:make_ring(4),
+    
+    % apply a couple of transactions beforehand
+    tester:test(?MODULE, do_transaction, 0, 100),
+    
+    % spam transactions in sepreate process
+    SpamPid = erlang:spawn(fun() ->
+               tester:test(?MODULE, do_transaction, 0, 100)
+          end),
+    
+    % spam snapshots here
+    tester:test(api_tx, get_system_snapshot, 0, 100),
+    
+    % wait for transaction spam
+    util:wait_for_process_to_die(SpamPid),
+    
+    % get a final snapshot and print it
+    Snap = api_tx:get_system_snapshot(),
+    ?equals_pattern(Snap,[{_,_,_},{_,_,_}]),
+    ct:pal("snapshot: ~p~n",[Snap]),
+    ok.
+
+-spec do_transaction() -> any().
+do_transaction() ->
+    api_tx:req_list([{read,"A"},{read,"B"},{write,"A",randoms:getRandomInt()},
+                     {read,"A"},{read,"A"},{read,"A"},{write,"B", randoms:getRandomInt()},
+                     {commit}]).
+ 
+
 
