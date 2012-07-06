@@ -153,13 +153,13 @@ checkinstallation() {
         exit 1
     fi
 
-    $ERL -noinput -name checkinstallation -eval 'halt(0).' > /dev/null
+    $ERL -noinput -name "checkinstallation@`hostname -f`" -eval 'halt(0).' > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation'"
         echo "Are you already running a Scalaris boot server?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
-        echo "We were trying to run: erl -noinput -name checkinstallation -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation@`hostname -f`\" -eval 'halt(0).'"
     fi
 
     $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
@@ -341,7 +341,7 @@ scalarisstart(){
 scalarisstop(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name ctl_$RANDOM \
+        -name "ctl_$RANDOM@`hostname -f`" \
         -pa $BEAMDIR \
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
@@ -353,7 +353,7 @@ scalarisstop(){
 scalariscall(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name ctl_$RANDOM \
+        -name "ctl_$RANDOM@`hostname -f`" \
         -pa $BEAMDIR \
         -noinput \
         -eval "$1"
@@ -378,7 +378,7 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name rem -remsh $NODE_NAME `echo $erl_flags`
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`hostname -f`" -remsh $NODE_NAME `echo $erl_flags`
 }
 
 fix_paths
