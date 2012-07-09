@@ -59,7 +59,11 @@ when "centos", "redhat", "fedora"
     notifies :run, resources(:execute => "create-yum-cache"), :immediately
     notifies :create, resources(:ruby_block => "reload-internal-yum-cache"), :immediately
   end
-# TODO: other distros?
+when "suse"
+  execute "create-zypper-repo" do
+    command "zypper --gpg-auto-import-keys addrepo --refresh \"" + scalaris_repo + "\" scalaris-svn"
+    action :run
+  end
 end
 
 scalaris_pkgs.each do |pkg|
