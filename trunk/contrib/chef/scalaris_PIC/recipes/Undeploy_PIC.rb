@@ -50,5 +50,9 @@ when "centos", "redhat", "fedora"
     notifies :run, resources(:execute => "clean-yum-cache"), :immediately
     notifies :create, resources(:ruby_block => "reload-internal-yum-cache"), :immediately
   end
-# TODO: other distros?
+when "suse"
+  execute "remove-zypper-repo" do
+    command "zypper removerepo scalaris-svn"
+    action :run
+  end
 end
