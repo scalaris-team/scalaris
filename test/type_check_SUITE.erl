@@ -107,7 +107,9 @@ tester_type_check_util(_Config) ->
                              {start_link, 0},
                              {init, 1}, %% tries to create existing ets table
                              {on, 2},
-                             {pids_to_names, 2} %% sends remote messages
+                             {pids_to_names, 2}, %% sends remote messages
+                             {join_as, 2}, %% tries to join with multiple groups/names
+                             {add, 3} %% same as above
                             ]},
                {randoms, [{start, 0}, {stop, 0}]}
 %%               {util, [
