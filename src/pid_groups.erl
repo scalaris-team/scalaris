@@ -397,6 +397,8 @@ on({pid_groups_add, GrpName, PidName, Pid, ReplyTo}, State) ->
             end,
             link(Pid),
             comm:send_local(ReplyTo, {pid_groups_add_done});
+        {GrpName, PidName} ->
+            comm:send_local(ReplyTo, {pid_groups_add_done});
         {OldGroup, OldName} ->
             comm:send_local(ReplyTo, {pid_groups_add_done, OldGroup, OldName})
     end,
