@@ -247,7 +247,7 @@ bp_del(Pid, BPName) ->
 
 -spec bp_step(pid()) -> {module(), On::atom(), comm:message()}.
 bp_step(Pid) ->
-    ?TRACE_BP_STEPS("Do step ~p ~p~n", [Pid, pid_groups:group_and_name_of(Pid)]),
+    ?TRACE_BP_STEPS("Do step ~p ~p~n", [Pid, catch pid_groups:group_and_name_of(Pid)]),
     Pid !  {'$gen_component', bp, breakpoint, step, self()},
     receive {'$gen_component', bp, breakpoint, step_done,
              _GCPid, Module, On, Msg} ->
@@ -483,7 +483,7 @@ on_unknown_event(UnknownMessage, State) ->
             [UnknownMessage,
              gc_mod(State),
              gc_hand(State),
-             self(), pid_groups:group_and_name_of(self()),
+             self(), catch pid_groups:group_and_name_of(self()),
              State]),
     State.
 
@@ -501,7 +501,7 @@ on_exception(Msg, Level, Reason, Stacktrace, State) ->
              Msg,
              gc_mod(State),
              gc_hand(State),
-             self(), pid_groups:group_and_name_of(self()),
+             self(), catch pid_groups:group_and_name_of(self()),
              erlang:get(test_server_loc),
              State,
              Stacktrace]),
@@ -516,7 +516,7 @@ on_post_op(Msg, State) ->
                             "    Process: ~p (~p)~n"
                             "    Handler: ~p:~p/2~n"
                             "    Message: ~.0p~n",
-                            [self(), pid_groups:group_and_name_of(self()),
+                            [self(), catch pid_groups:group_and_name_of(self()),
                              gc_mod(State), gc_hand(State), Msg]),
             self() ! {'$gen_component', bp, breakpoint, step,
                       gc_bpstepper(State)},
@@ -655,7 +655,7 @@ on_bp_req_in_bp(_Msg, State,
                     "*** Start handling message...~n"
                     "    Process: ~p (~p)~n"
                     "    Message: ~.0p~n",
-                    [self(), pid_groups:group_and_name_of(self()), _Msg]),
+                    [self(), catch pid_groups:group_and_name_of(self()), _Msg]),
     T2State;
 on_bp_req_in_bp(_Msg, State,
                 {'$gen_component', bp, breakpoint, cont},
