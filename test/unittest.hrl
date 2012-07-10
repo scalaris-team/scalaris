@@ -37,7 +37,7 @@
             _         ->
                 case config:read(no_print_ring_data) of
                     true -> ok;
-                    failed ->
+                    _ ->
                         unittest_helper:print_ring_data()
                 end
         end,
