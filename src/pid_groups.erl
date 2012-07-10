@@ -138,7 +138,7 @@ add(GrpName, PidName, Pid) ->
     receive
         {pid_groups_add_done} -> ok;
         {pid_groups_add_done, OldGroup, OldName} ->
-            throw({already_registered_as, OldGroup, OldName})
+            throw({Pid, already_registered_as, OldGroup, OldName, was_trying, GrpName, PidName})
     end.
 
 
