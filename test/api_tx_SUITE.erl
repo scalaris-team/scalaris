@@ -390,7 +390,8 @@ write_test(Config) ->
     {_, _, OnlyNewReg} =
         util:split_unique(OldRegistered, erlang:registered()),
     ct:pal("NewReg: ~.0p~n", [OnlyNewReg]),
-    ?equals_pattern(FirstWriteTime, X when X =< 1000000),
+    ?equals_pattern_w_note(FirstWriteTime, X when X =< 1000000,
+       "We need more than a second to become operational?!"),
     ?equals_pattern(SecondWriteTime, X when X =< 1000000).
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
