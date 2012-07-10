@@ -221,9 +221,17 @@ The epmd is a Erlang daemon which always listens on port 4369. It provides means
 
 `scalarisctl -e "-kernel inet_dist_listen_min 14194 inet_dist_listen_max 14194"`
 
+`scalarisctl` from svn trunk contains `the --dist-erl-port` to ease this procedure:
+
+`scalarisctl --dist-erl-port 14194`
+
 == How can I change the web server port/yaws port? ==
 
 For changing the yaws port of the first node or a normal node change the `YAWSPORT` variable in its start script, e.g. `bin/firstnode.sh` or `bin/joining_node.sh`.
+
+Using `scalarisctl`, the parameter `-y` influences the port used by yaws:
+
+`scalarisctl -y 8000`
 
 = Usage =
 
