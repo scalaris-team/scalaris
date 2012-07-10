@@ -70,13 +70,11 @@ on(Msg, State = {Module, Handler, ModuleState, MsgDropSpecs}) ->
 
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, {DHTNodeGroup, Options},
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
                              [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
 
--spec init({DHTNodeGroup::pid_groups:groupname(), Options::[tuple()]}) -> state().
-init({DHTNodeGroup, Options}) ->
-    % at first, join pid_groups - allow dht_node to overwrite my_pid (it will join as dht_node!):
-    pid_groups:join_as(DHTNodeGroup, mockup_dht_node),
+-spec init(Options::[tuple()]) -> state().
+init(Options) ->
     ModuleState = dht_node:init(Options),
     module_state_to_my_state(ModuleState, {dht_node, fun dht_node:on/2, ModuleState, []}).
 

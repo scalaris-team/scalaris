@@ -135,7 +135,11 @@ join_as(GrpName, PidName) ->
 add(GrpName, PidName, Pid) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_add, GrpName, PidName, Pid, self()}),
-    receive {pid_groups_add_done} -> ok end.
+    receive
+        {pid_groups_add_done} -> ok;
+        {pid_groups_add_done, OldGroup, OldName} ->
+            throw({already_registered_as, OldGroup, OldName})
+    end.
 
 
 %%% operations inside a group (PRE_COND: caller is group member):
@@ -382,15 +386,20 @@ init(_Args) ->
 %% @private
 -spec on(message(), null) -> null.
 on({pid_groups_add, GrpName, PidName, Pid, ReplyTo}, State) ->
-    case ets:insert_new(?MODULE, {{GrpName, PidName}, Pid}) of
-        true -> ok;
-        false ->
-            OldPid = ets:lookup_element(?MODULE, {GrpName, PidName}, 2),
-            unlink(OldPid),
-            ets:insert(?MODULE, {{GrpName, PidName}, Pid})
+    case group_and_name_of(Pid) of
+        failed ->
+            case ets:insert_new(?MODULE, {{GrpName, PidName}, Pid}) of
+                true -> ok;
+                false ->
+                    OldPid = ets:lookup_element(?MODULE, {GrpName, PidName}, 2),
+                    unlink(OldPid),
+                    ets:insert(?MODULE, {{GrpName, PidName}, Pid})
+            end,
+            link(Pid),
+            comm:send_local(ReplyTo, {pid_groups_add_done});
+        {OldGroup, OldName} ->
+            comm:send_local(ReplyTo, {pid_groups_add_done, OldGroup, OldName})
     end,
-    link(Pid),
-    comm:send_local(ReplyTo, {pid_groups_add_done}),
     State;
 
 on({drop_state}, State) ->
