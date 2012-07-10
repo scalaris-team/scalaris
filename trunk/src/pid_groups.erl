@@ -207,10 +207,28 @@ find_a(PidName) ->
     % try in my own group first
     case get_my(PidName) of
         failed ->
-            % search others
-            case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
-                [[Pid] | _] -> Pid;
-                []          -> failed
+            %% use process local cache
+            CachedName = {'$?scalaris_pid_groups_cache', PidName},
+            case erlang:get(CachedName) of
+                undefined ->
+                    %% search others
+                    case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
+                        [[Pid] | _] ->
+                            %% fill process local cache
+                            erlang:put(CachedName, Pid),
+                            Pid;
+                        [] ->
+                            io:format("***No pid registered for ~p~n",
+                                      [PidName]),
+                            failed
+                    end;
+                Pid ->
+                    %% clean process local cache if entry is outdated
+                    case erlang:is_process_alive(Pid) of
+                        true -> Pid;
+                        false -> erlang:erase(CachedName),
+                                 find_a(PidName)
+                    end
             end;
         Pid -> Pid
     end.
