@@ -278,7 +278,6 @@ wait_for_stable_ring_deep() ->
 
 -spec check_ring_size(non_neg_integer(), CheckFun::fun((DhtNodeState::term()) -> boolean())) -> ok.
 check_ring_size(Size, CheckFun) ->
-    DhtModule = config:read(dht_node),
     util:wait_for(
       fun() ->
               % note: we use a single VM in unit tests, therefore no
@@ -293,7 +292,7 @@ check_ring_size(Size, CheckFun) ->
               erlang:whereis(config) =/= undefined andalso
                   BootSize =:= Size andalso
                   Size =:= erlang:length(
-                [P || P <- pid_groups:find_all(DhtModule),
+                [P || P <- pid_groups:find_all(dht_node),
                       CheckFun(gen_component:get_state(P))])
       end, 500).
 
