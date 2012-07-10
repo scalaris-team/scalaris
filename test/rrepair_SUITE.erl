@@ -394,7 +394,6 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
     unittest_helper:make_ring_with_ids(
       fun() ->  get_symmetric_keys(NodeCount) end,
       [{config, lists:flatten([{log_path, PrivDir}, 
-                               {dht_node, mockup_dht_node},
                                RRConfig])}]),
     % wait for all nodes to finish their join 
     unittest_helper:check_ring_size_fully_joined(NodeCount),
