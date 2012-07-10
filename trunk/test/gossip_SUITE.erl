@@ -128,7 +128,18 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     This = comm:this(),
     
     pid_groups:join_as("gossip_group", dht_node),
-    pid_groups:join_as("gossip_group", cyclon),
+    
+    % recursive anonymous function:
+    CyclonRunFun =
+        fun(F) -> receive
+                      {expect_message, Msg} -> ?expect_message(Msg), F(F);
+                      {expect_no_message_done} -> ?expect_no_message(), ok
+                  end
+        end,
+    Cyclon = unittest_helper:start_subprocess(
+               fun() -> pid_groups:join_as("gossip_group", cyclon) end,
+               fun() -> CyclonRunFun(CyclonRunFun) end),
+    
     MyRange = node:mk_interval_between_ids(PredId, NodeId),
     
     config:write(gossip_min_triggers_per_round, MinTpR),
@@ -183,10 +194,12 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     % request for random node?
     case gossip_state:get(NewState, round) > 0 andalso
              gossip_state:get(NewState, initialized) of
-        true -> ?expect_message({get_subset_rand, 1, Self});
+        true -> Cyclon ! {expect_message, {get_subset_rand, 1, Self}};
         false -> ok
     end,
     % no further messages
+    Cyclon ! {expect_no_message_done},
+    ?expect_message({'EXIT', Cyclon, normal}),
     ?expect_no_message().
 
 test_on_trigger1() ->
