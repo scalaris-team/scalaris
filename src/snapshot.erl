@@ -80,8 +80,6 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
             ok
     end,
     % return
-    SS = dht_node_state:get(NewState, snapshot_state),
-    ?TRACE("~p snapshot:on_do_snapshot: NEW snapshot state is ~p~n",[comm:this(),SS]),
     NewState.
 
 -spec on_local_snapshot_is_done(dht_node_state:state()) -> dht_node_state:state().

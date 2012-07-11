@@ -202,7 +202,7 @@ test_rdht_tx_read_commit_without_snap(_) ->
     Entry = db_entry:new("key","val",1),
     TmpDb = ?TEST_DB:set_entry(Db,db_entry:inc_readlock(Entry)),
     NewDb = ?TEST_DB:set_snapshot_entry(TmpDb,db_entry:inc_readlock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read,"key",1,value,1,"val"),
+    TLogEntry = tx_tlog:new_entry(rdht_tx_read,"key",1,value,2,"val"),
     CommitDb = rdht_tx_read:commit(NewDb,TLogEntry,prepared,2,2),
     SnapEntry = ?TEST_DB:get_snapshot_entry(CommitDb,"key"),
     ?equals({true,{"key","val",false,1,1}},SnapEntry), % readlock in snap db
@@ -347,18 +347,22 @@ test_spam_transactions_and_snapshots(_) ->
     unittest_helper:make_ring(4),
     
     % apply a couple of transactions beforehand
-    tester:test(?MODULE, do_transaction, 0, 100),
+    tester:test(?MODULE, do_transaction_a, 0, 100),
     
-    % spam transactions in sepreate process
-    SpamPid = erlang:spawn(fun() ->
-               tester:test(?MODULE, do_transaction, 0, 100)
+    % spam transactions in two sepreate processes
+    SpamPid1 = erlang:spawn(fun() ->
+               tester:test(?MODULE, do_transaction_a, 0, 2500)
+          end),
+    SpamPid2 = erlang:spawn(fun() ->
+               tester:test(?MODULE, do_transaction_b, 0, 2500)
           end),
     
     % spam snapshots here
     tester:test(api_tx, get_system_snapshot, 0, 100),
     
     % wait for transaction spam
-    util:wait_for_process_to_die(SpamPid),
+    util:wait_for_process_to_die(SpamPid1),
+    util:wait_for_process_to_die(SpamPid2),
     
     % get a final snapshot and print it
     Snap = api_tx:get_system_snapshot(),
@@ -366,11 +370,12 @@ test_spam_transactions_and_snapshots(_) ->
     ct:pal("snapshot: ~p~n",[Snap]),
     ok.
 
--spec do_transaction() -> any().
-do_transaction() ->
-    api_tx:req_list([{read,"A"},{read,"B"},{write,"A",randoms:getRandomInt()},
-                     {read,"A"},{read,"A"},{read,"A"},{write,"B", randoms:getRandomInt()},
-                     {commit}]).
- 
+-spec do_transaction_a() -> any().
+do_transaction_a() ->
+    api_tx:req_list([{read,"B"},{write,"A",randoms:getRandomInt()},{write,"B",randoms:getRandomInt()},{commit}]).
+
+-spec do_transaction_b() -> any().
+do_transaction_b() ->
+    api_tx:req_list([{read,"A"},{write,"B",randoms:getRandomInt()},{write,"A",randoms:getRandomInt()},{commit}]).
 
 
