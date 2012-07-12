@@ -41,8 +41,8 @@
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
--define(TRACE_RECON(X,Y), ok).
-%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RECON(X,Y), ok).
+-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 -define(TRACE_RESOLVE(X,Y), ok).
 %-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -70,19 +70,19 @@
          }).
 -type state() :: #rrepair_state{}.
 
--type rr_state_field() :: round |           %next round id
-                          open_recon |      %number of open recon processes
-                          open_resolve |    %number of open resolve processes
-                          open_sync.        %open_recon + open_resolve
+-type state_field() :: round |           %next round id
+                       open_recon |      %number of open recon processes
+                       open_resolve |    %number of open resolve processes
+                       open_sync.        %open_recon + open_resolve
 
 -type message() ::
-    {?TRIGGER_NAME} |    
     % API
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
     {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
-    {get_state, Sender::comm:mypid(), Key::rr_state_field()} |
+    {get_state, Sender::comm:mypid(), Key::state_field()} |
     % internal
-    {continue_recon, SenderRRPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
+    {?TRIGGER_NAME} |    
+	{continue_recon, SenderRRPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
     {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -99,7 +99,12 @@
 
 on({?TRIGGER_NAME}, State) ->
     ?TRACE_KILL("RR: SYNC TRIGGER", []),
-    comm:send_local(self(), {request_sync, get_recon_method(), random}),
+	Prob = get_start_prob(),
+	Random = randoms:rand_uniform(1, 100),
+	if Random =< Prob ->		   
+		   comm:send_local(self(), {request_sync, get_recon_method(), random});
+	   true -> ok
+	end,
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
     State#rrepair_state{ trigger_state = NewTriggerState };
 
@@ -156,7 +161,7 @@ on({rr_stats, Msg}, State) ->
 on({recon_progress_report, _Sender, _Master, Stats}, State) ->
     OpenRecon = State#rrepair_state.open_recon - 1,
     rr_recon_stats:get(finish, Stats) andalso
-        ?TRACE_RECON("~nRECON OK - Round=~p - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
+        ?TRACE_RECON("~nRECON OK - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
                      [_Sender, _Master, rr_recon_stats:print(Stats), OpenRecon]),
     State#rrepair_state{ open_recon = OpenRecon };
 
@@ -213,6 +218,14 @@ init(Trigger) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
+%
+% USED CONFIG FIELDS
+%	I) 	 rr_trigger: module name of any trigger
+%	II)  rr_trigger_interval: integer duration until next triggering
+%	III) rr_recon_metod: set reconciliation algorithm name
+%   IV)  rr_trigger_probability: this is the probability of starting a synchronisation 
+%								 with a random node if trigger has fired. ]0,100]   
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether config parameters exist and are valid.
@@ -222,6 +235,9 @@ check_config() ->
         true ->
             config:cfg_is_module(rr_trigger) andalso
             config:cfg_is_atom(rr_recon_method) andalso
+			config:cfg_is_integer(rr_trigger_probability) andalso
+			config:cfg_is_greater_than(rr_trigger_probability, 0) andalso
+			config:cfg_is_less_than_equal(rr_trigger_probability, 100) andalso
             config:cfg_is_integer(rr_trigger_interval) andalso
             config:cfg_is_greater_than(rr_trigger_interval, 0);
         _ -> true
@@ -238,3 +254,7 @@ get_update_trigger() ->
 -spec get_update_interval() -> pos_integer().
 get_update_interval() ->
     config:read(rr_trigger_interval).
+
+-spec get_start_prob() -> pos_integer().
+get_start_prob() ->
+	config:read(rr_trigger_probability).
