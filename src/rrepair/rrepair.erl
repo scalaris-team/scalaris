@@ -119,7 +119,8 @@ on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round,
                          open_recon = OpenRecon + 1 };
 
 on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
-    _ = rr_resolve:start(Round, Operation, Options),
+    {ok, Pid} = rr_resolve:start(Round),
+	comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 % @doc request replica repair status
