@@ -41,8 +41,8 @@
 -define(TRACE_KILL(X,Y), ok).
 %-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
-%-define(TRACE_RECON(X,Y), ok).
--define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE_RECON(X,Y), ok).
+%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 -define(TRACE_RESOLVE(X,Y), ok).
 %-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -133,7 +133,7 @@ on({get_state, Sender, Key}, State =
                 round -> Round;
                 open_sync -> Recon + Resolve
             end,
-    ?TRACE_RESOLVE("RREPAIR - GET STATE - Recon=~p ; Resolve=~p", [Recon, Resolve]),
+    ?TRACE_RESOLVE("RREPAIR - GET STATE (Sender=~p) Recon=~p ; Resolve=~p", [Sender, Recon, Resolve]),
     comm:send(Sender, {get_state_response, Value}),
     State;
 
