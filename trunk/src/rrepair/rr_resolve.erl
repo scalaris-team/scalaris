@@ -33,7 +33,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/3]).
+-export([init/1, on/2, start/1]).
 -export([print_resolve_stats/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -80,7 +80,7 @@
          ownerLocalPid  = ?required(rr_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
          ownerRemotePid = ?required(rr_resolve_state, ownerRemotePid)   :: comm:mypid(),         
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
-         operation      = ?required(rr_resolve_state, operation)        :: operation(),
+         operation      = nil        									:: nil | operation(),
          stats          = #resolve_stats{}                              :: stats(),
          feedback       = {nil, []}                                     :: feedback(),           
          send_stats     = nil                                           :: nil | comm:mypid() 
@@ -88,6 +88,8 @@
 -type state() :: #rr_resolve_state{}.
 
 -type message() ::
+	% API
+	{start, operation(), options()} |
     % internal
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
@@ -97,6 +99,20 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
+
+on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid, 
+														   stats = Stats }) ->
+	FBDest = proplists:get_value(feedback, Options, nil),
+    FBResp = proplists:get_value(feedback_response, Options, false),
+    StatsDest = proplists:get_value(send_stats, Options, nil),
+	NewState = State#rr_resolve_state{ operation = Operation,
+									   stats = Stats#resolve_stats{ feedback_response = FBResp },
+									   feedback = {FBDest, []},
+									   send_stats = StatsDest },
+    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p", 
+           [element(1, Operation), FBDest, FBResp]),
+	comm:send_local(DhtPid, {get_state, comm:this(), my_range}),
+	NewState;
 
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
@@ -229,31 +245,15 @@ print_resolve_stats(Stats) ->
 % STARTUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc init module
 -spec init(state()) -> state().
-init(State) ->
-    comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
+init(State) ->    
     State.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec start(Round, Operation, Options) -> {ok, MyPid} when
-      is_subtype(Round,     rrepair:round()),                                                        
-      is_subtype(Operation, operation()),
-      is_subtype(Options,   options()),
-      is_subtype(MyPid,     pid()).
-start(Round, Operation, Options) ->        
-    FBDest = proplists:get_value(feedback, Options, nil),
-    FBResp = proplists:get_value(feedback_response, Options, false),
-    StatsDest = proplists:get_value(send_stats, Options, nil),
+-spec start(rrepair:round()) -> {ok, MyPid::pid()}.
+start(Round) ->        
     State = #rr_resolve_state{ ownerLocalPid = self(), 
                                ownerRemotePid = comm:this(), 
-                               dhtNodePid = pid_groups:get_my(dht_node),
-                               operation = Operation,
-                               stats = #resolve_stats{ round = Round, 
-                                                       feedback_response = FBResp },
-                               feedback = {FBDest, []},
-                               send_stats = StatsDest },
-    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p", 
-           [element(1, Operation), FBDest, FBResp]),
+                               dhtNodePid = pid_groups:get_my(dht_node),                               
+                               stats = #resolve_stats{ round = Round } 
+							 },
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
