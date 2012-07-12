@@ -127,14 +127,11 @@ get_rep_upd_config(Method) ->
      {rr_recon_method, Method},
      {rr_resolve_method, simple},
      {rr_bloom_fpr, 0.1},
+	 {rr_trigger_probability, 100},
      {rr_max_items, case Method of
                         bloom -> 10000;
                         _ -> 100000
-                    end},
-     {rr_negotiate_sync_interval, case Method of
-                                      bloom -> false;
-                                      _ -> true
-                                  end}].    
+                    end}].    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Replica Update tests
