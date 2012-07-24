@@ -39,6 +39,7 @@
 -type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}}.
 -type message() ::
     {bench} |
+    {collect_system_stats} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::uid:global_uid()}, Parents::[comm:mypid(),...]} |
@@ -72,18 +73,28 @@ run_bench() ->
 
 -spec init_system_stats() -> ok.
 init_system_stats() ->
-    monitor:proc_set_value(
-      ?MODULE, 'mem_total', rrd:create(60 * 1000000, 1, event)),
-    monitor:proc_set_value(
-      ?MODULE, 'mem_processes', rrd:create(60 * 1000000, 1, event)),
-    monitor:proc_set_value(
-      ?MODULE, 'mem_system', rrd:create(60 * 1000000, 1, event)),
-    monitor:proc_set_value(
-      ?MODULE, 'mem_atom', rrd:create(60 * 1000000, 1, event)),
-    monitor:proc_set_value(
-      ?MODULE, 'mem_binary', rrd:create(60 * 1000000, 1, event)),
-    monitor:proc_set_value(
-      ?MODULE, 'mem_ets', rrd:create(60 * 1000000, 1, event)).
+    % system stats in 10s intervals:
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_total', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_processes', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_system', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_atom', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_binary', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'mem_ets', rrd:create(10 * 1000000, 1, gauge)),
+    
+    monitor:client_monitor_set_value(
+      ?MODULE, 'rcv_count', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'rcv_bytes', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'send_count', rrd:create(10 * 1000000, 1, gauge)),
+    monitor:client_monitor_set_value(
+      ?MODULE, 'send_bytes', rrd:create(10 * 1000000, 1, gauge)).
 
 -spec collect_system_stats() -> ok.
 collect_system_stats() ->
@@ -91,18 +102,28 @@ collect_system_stats() ->
      {atom, MemAtom}, {binary, MemBin}, {ets, MemEts}] =
         erlang:memory([total, processes, system, atom, binary, ets]),
     
-    monitor:proc_set_value(?MODULE, 'mem_total',
+    monitor:client_monitor_set_value(?MODULE, 'mem_total',
                            fun(Old) -> rrd:add_now(MemTotal, Old) end),
-    monitor:proc_set_value(?MODULE, 'mem_processes',
+    monitor:client_monitor_set_value(?MODULE, 'mem_processes',
                            fun(Old) -> rrd:add_now(MemProcs, Old) end),
-    monitor:proc_set_value(?MODULE, 'mem_system',
+    monitor:client_monitor_set_value(?MODULE, 'mem_system',
                            fun(Old) -> rrd:add_now(MemSys, Old) end),
-    monitor:proc_set_value(?MODULE, 'mem_atom',
+    monitor:client_monitor_set_value(?MODULE, 'mem_atom',
                            fun(Old) -> rrd:add_now(MemAtom, Old) end),
-    monitor:proc_set_value(?MODULE, 'mem_binary',
+    monitor:client_monitor_set_value(?MODULE, 'mem_binary',
                            fun(Old) -> rrd:add_now(MemBin, Old) end),
-    monitor:proc_set_value(?MODULE, 'mem_ets',
-                           fun(Old) -> rrd:add_now(MemEts, Old) end).
+    monitor:client_monitor_set_value(?MODULE, 'mem_ets',
+                           fun(Old) -> rrd:add_now(MemEts, Old) end),
+    
+    {RcvCnt, RcvBytes, SendCnt, SendBytes} = comm_stats:get_stats(),
+    monitor:client_monitor_set_value(?MODULE, 'rcv_count',
+                           fun(Old) -> rrd:add_now(RcvCnt, Old) end),
+    monitor:client_monitor_set_value(?MODULE, 'rcv_bytes',
+                           fun(Old) -> rrd:add_now(RcvBytes, Old) end),
+    monitor:client_monitor_set_value(?MODULE, 'send_count',
+                           fun(Old) -> rrd:add_now(SendCnt, Old) end),
+    monitor:client_monitor_set_value(?MODULE, 'send_bytes',
+                           fun(Old) -> rrd:add_now(SendBytes, Old) end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
@@ -113,6 +134,10 @@ on({bench} = _Msg, State) ->
         I -> msg_delay:send_local(I, self(), {bench})
     end,
     run_bench(),
+    State;
+
+on({collect_system_stats} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     collect_system_stats(),
     State;
 
@@ -271,6 +296,7 @@ init(null) ->
     end,
     init_bench(),
     init_system_stats(),
+    {ok, _TRef} = timer:send_interval(1000, {collect_system_stats}),
     Now = os:timestamp(),
     State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
