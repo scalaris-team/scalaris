@@ -323,10 +323,10 @@ monitor_gauge_dump_fun_notexists(_DB, _From_us, To_us) ->
 %% @doc Gets monitor stats from 'gauge' values in an easy format for the web
 %%      interface. Scales the original values by dividing them by Div.
 -spec getGaugeMonitorStats
-        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], list, Div::pos_integer())
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], list, Div::number())
         -> [{Process::atom(), Key::monitor:key(),
              ValueD::time_list(non_neg_integer())}];
-        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], tuple, Div::pos_integer())
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], tuple, Div::number())
         -> [{Process::atom(), Key::monitor:key(),
              ValueD::tuple_list(non_neg_integer())}].
 getGaugeMonitorStats(Monitor, Keys, Type, Div) ->

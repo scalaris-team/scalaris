@@ -103,6 +103,9 @@ $(function() {
  function MbFormatter(v, axis) {
   return v.toFixed(axis.tickDecimals) + " MiB";
  }
+ function bFormatter(v, axis) {
+  return v.toFixed(axis.tickDecimals) + " B";
+ }
  var series = {
   lines: { show: true, lineWidth: 0.5 },
   points: { show: true, radius: 1 }
@@ -147,7 +150,7 @@ $(function() {
           {data: mem_system_data, label: "mem_system"},
           {data: mem_atom_data, label: "mem_atoms"},
           {data: mem_binary_data, label: "mem_binaries"},
-          {data: mem_ets_ms_data, label: "mem_ets_tables"},
+          {data: mem_ets_ms_data, label: "mem_ets_tables"}
 		], {
   series: series,
   xaxes: xaxes,
@@ -156,6 +159,23 @@ $(function() {
   grid: grid
  });
  $("#memory").bind("plothover", plotHover);
+
+ $.plot($("#io"),
+        [ //{data: io_rcv_count_data, label: "Received packets", yaxis: 1},
+          {data: io_rcv_bytes_data, label: "Received bytes", yaxis: 2},
+          //{data: io_send_count_data, label: "Sent packets", yaxis: 1},
+          {data: io_send_bytes_data, label: "Sent bytes", yaxis: 2}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [
+    { min: 0, tickFormatter: noneFormatter, position: "left", alignTicksWithAxis: 1 },
+    { min: 0, tickFormatter: bFormatter, position: "left", alignTicksWithAxis: 1 }
+   ],
+  legend: legend,
+  grid: grid
+ });
+ $("#io").bind("plothover", plotHover);
 
  var previousPoint = null;
  function plotHover(event, pos, obj) {
@@ -203,6 +223,8 @@ $(function() {
 <hr />
 <p>Memory</p>
 <div id="memory" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>I/O - Traffic (10s aggregates)</p>
+<div id="io" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 
 Last update:
 <erl>
