@@ -24,6 +24,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2]).
+-export([get_stats/0]).
 
 -type state() :: {StartTime::util:time(), RcvCnt::non_neg_integer(),
                   RcvBytes::non_neg_integer(), SendCnt::non_neg_integer(),
@@ -32,6 +33,14 @@
 -type message() ::
     {report_stat, RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
      SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
+
+-spec get_stats() -> {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
+     SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
+get_stats() ->
+    comm:send_local(?MODULE, {get_stats, self()}),
+    receive {get_stats_response, RcvCnt, RcvBytes, SendCnt, SendBytes} ->
+                {RcvCnt, RcvBytes, SendCnt, SendBytes}
+    end.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
@@ -54,6 +63,11 @@ on({report_stat, RcvCnt, RcvBytes, SendCnt, SendBytes},
     {StartTime,
      PrevRcvCnt + RcvCnt, PrevRcvBytes + RcvBytes,
      PrevSendCnt + SendCnt, PrevSendBytes + SendBytes};
+
+on({get_stats, Pid},
+   State = {_StartTime, RcvCnt, RcvBytes, SendCnt, SendBytes}) ->
+    comm:send_local(Pid, {get_stats_response, RcvCnt, RcvBytes, SendCnt, SendBytes}),
+    State;
 
 on({web_debug_info, Requestor}, State = {StartTime, RcvCnt, RcvBytes, SendCnt, SendBytes}) ->
     Now = erlang:now(),
