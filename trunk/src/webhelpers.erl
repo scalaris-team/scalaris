@@ -621,13 +621,26 @@ format_gossip_value(Value, Key, Fun) ->
 getMonitorClientData() ->
     ClientMonitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, CountPerSD, AvgMsD, MinMsD, MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(ClientMonitor, [{api_tx, 'req_list'}], list) of
+        case statistics:getTimingMonitorStats(ClientMonitor, [{api_tx, 'req_list'}], list) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
     AvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
+    
+    MemMonKeys = [{monitor_perf, X} || X <- [mem_total, mem_processes, mem_system,
+                                             mem_atom, mem_binary, mem_ets]],
+    case statistics:getGaugeMonitorStats(ClientMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
+        [] -> MemTotalD = MemProcD = MemSysD = MemAtomD = MemBinD = MemEtsD = [];
+        [{monitor_perf, mem_total, MemTotalD},
+         {monitor_perf, mem_processes, MemProcD},
+         {monitor_perf, mem_system, MemSysD},
+         {monitor_perf, mem_atom, MemAtomD},
+         {monitor_perf, mem_binary, MemBinD},
+         {monitor_perf, mem_ets, MemEtsD}] -> ok
+    end,
+    
     DataStr =
         lists:flatten(
           ["\n",
@@ -638,7 +651,14 @@ getMonitorClientData() ->
 %%            "var min_ms_data = ",      io_lib:format("~p", [MinMsD]), ";\n",
 %%            "var max_ms_data = ",      io_lib:format("~p", [MaxMsD]), ";\n",
 %%            "var hist_ms_data = ",     io_lib:format("~p", [HistMsD]), ";\n",
-           "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n"]),
+           "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n",
+    
+           "var mem_total_data = ",       io_lib:format("~p", [MemTotalD]), ";\n",
+           "var mem_processes_data = ",   io_lib:format("~p", [MemProcD]), ";\n",
+           "var mem_system_data = ",      io_lib:format("~p", [MemSysD]), ";\n",
+           "var mem_atom_data = ",        io_lib:format("~p", [MemAtomD]), ";\n",
+           "var mem_binary_data = ",      io_lib:format("~p", [MemBinD]), ";\n",
+           "var mem_ets_ms_data = ",      io_lib:format("~p", [MemEtsD]), ";\n"]),
     {script, [{type, "text/javascript"}], DataStr}.
 
 -spec getMonitorRingData() -> [html_type()].
@@ -651,7 +671,7 @@ getMonitorRingData() ->
         Monitor ->
             Prefix = [],
             ReqKeys = [{monitor_perf, 'read_read'}, {dht_node, 'lookup_hops'}, {api_tx, 'req_list'}],
-            case statistics:getMonitorStats(Monitor, ReqKeys, list) of
+            case statistics:getTimingMonitorStats(Monitor, ReqKeys, list) of
                 [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
                 [{monitor_perf, 'read_read', DataRR},
                  {dht_node, 'lookup_hops', DataLH},
