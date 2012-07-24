@@ -209,6 +209,8 @@ on({web_debug_info, Requestor}, State) ->
         notconnected ->
             MyAddress = MyPort = "n/a",
             PeerAddress = PeerPort = "n/a",
+            RcvAgv = RcvCnt = RcvBytes = "n/a",
+            SendAgv = SendCnt = SendBytes = "n/a",
             ok;
         Socket ->
             case inet:sockname(Socket) of
@@ -218,6 +220,14 @@ on({web_debug_info, Requestor}, State) ->
             case inet:peername(Socket) of
                 {ok, {PeerAddress, PeerPort}} -> ok;
                 {error, _Reason2}              -> PeerAddress = PeerPort = "n/a"
+            end,
+            case inet:getstat(Socket, [recv_avg, recv_cnt, recv_oct,
+                                       send_avg, send_cnt, send_oct]) of
+                {ok, [{recv_avg, RcvAgv}, {recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
+                      {send_avg, SendAgv}, {send_cnt, SendCnt}, {send_oct, SendBytes}]} -> ok;
+                {error, _Reason} ->
+                    RcvAgv = RcvCnt = RcvBytes = "n/a",
+                    SendAgv = SendCnt = SendBytes = "n/a"
             end
     end,
     KeyValueList =
@@ -238,12 +248,24 @@ on({web_debug_info, Requestor}, State) ->
           lists:flatten(io_lib:format("~p", [Runtime]))},
          {"sent_tcp_messages",
           lists:flatten(io_lib:format("~p", [s_msg_count(State)]))},
+         {"sent_tcp_packets",
+          lists:flatten(io_lib:format("~p", [SendCnt]))},
          {"~ sent messages/s",
           lists:flatten(io_lib:format("~p", [SentPerS]))},
-         {"received_tcp_messages",
+         {"~ sent avg packet size",
+          lists:flatten(io_lib:format("~p", [SendAgv]))},
+         {"sent total bytes",
+          lists:flatten(io_lib:format("~p", [SendBytes]))},
+         {"recv_tcp_messages",
           lists:flatten(io_lib:format("~p", [r_msg_count(State)]))},
-         {"~ received messages/s",
-          lists:flatten(io_lib:format("~p", [ReceivedPerS]))}
+         {"recv_tcp_packets",
+          lists:flatten(io_lib:format("~p", [RcvCnt]))},
+         {"~ recv messages/s",
+          lists:flatten(io_lib:format("~p", [ReceivedPerS]))},
+         {"~ recv avg packet size",
+          lists:flatten(io_lib:format("~p", [RcvAgv]))},
+         {"recv total bytes",
+          lists:flatten(io_lib:format("~p", [RcvBytes]))}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     send_bundle_if_ready(State);
