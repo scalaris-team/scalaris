@@ -4,8 +4,8 @@
 
 After starting a new \scalaris{}-System as described in
 Section~\sieheref{sec.boot}, ten additional local nodes can be started
-by typing \code{admin:add_nodes(10)} in the Erlang-Shell that the management
-server opened~\footnote{Increase the log level to {\tt info} to get
+by typing \code{api_vm:add_nodes(10)} in the Erlang-Shell that is
+opened during startup~\footnote{Increase the log level to {\tt info} to get
 more detailed startup logs. See Section~\sieheref{sec:logging}}.
 
 
@@ -13,16 +13,23 @@ more detailed startup logs. See Section~\sieheref{sec:logging}}.
 \begin{lstlisting}
 scalaris> ./bin/firstnode.sh 
 [...]
-(firstnode@csr-pc9)1> admin:add_nodes(10)
+(firstnode@csr-pc9)1> api_vm:add_nodes(10)
 \end{lstlisting}
 
 In the following we will trace what this function does in order to add
 additional nodes to the system.
-The function \code{admin:add_nodes(pos_integer())} is defined as follows.
+The function \erlfun{api\_vm}{add\_nodes}{pos\_integer()} is defined as follows.
+
+\codesnippet{api_vm.erl}{api_vm:add_nodes}{../src/api_vm.erl}
+
+It uses the \erlfun{admin}{add\_nodes}{/1} function to actually add the given
+number of nodes and then waits for all nodes to successfully complete their
+join phases.
 
 \codesnippet{admin.erl}{admin:add_nodes}{../src/admin.erl}
 
-It calls \erlfun{admin}{add\_node}{[]} Count times. This function starts a new
+The function \erlfun{admin}{add\_nodes}{/1} calls
+\erlfun{admin}{add\_node}{[]} Count times. This function starts a new
 child with the given options for the main supervisor \code{main_sup}.
 In particular, it sets a random ID that is passed to the new node as its
 suggested ID to join at.
