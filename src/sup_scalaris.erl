@@ -88,6 +88,8 @@ my_process_list(ServiceGroup, Options) ->
                              [ServiceGroup]),
     CommLayer =
         util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
+    CommStats =
+        util:sup_worker_desc(comm_stats, comm_stats, start_link, ["comm_layer"]),
     Config = util:sup_worker_desc(config, config, start_link2, [Options]),
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
@@ -128,6 +130,7 @@ my_process_list(ServiceGroup, Options) ->
                     ClientsMonitor,
                     Monitor,
                     Service,
+                    CommStats,
                     CommLayer,
                     FailureDetector,
                     AdminServer,

@@ -47,11 +47,14 @@
                               OQueue::[comm:send_options()]},
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
-     MsgsSinceBundleStart :: non_neg_integer()}.
+     MsgsSinceBundleStart :: non_neg_integer(),
+     LastStatReport       :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
+                              SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
     {tcp_closed, Socket::inet:socket()} |
+    {report_stats} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% be startable via supervisor, use gen_component
@@ -78,6 +81,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
             LocalListenPort::comm_server:tcp_port(), Channel::main | prio,
             Socket::inet:socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
+    {ok, _TRef} = timer:send_interval(1000, {report_stats}),
     state_new(DestIP, DestPort, LocalListenPort, Channel, Socket).
 
 %% @doc Forwards a message to the given PID or named process.
@@ -197,6 +201,31 @@ on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ] tcp closed info", []),
     gen_tcp:close(Socket),
     set_socket(State, notconnected);
+
+on({report_stats}, State) ->
+    case socket(State) of
+        notconnected -> State;
+        Socket ->
+            case inet:getstat(Socket, [recv_cnt, recv_oct,
+                                       send_cnt, send_oct]) of
+                {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
+                      {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
+                    PrevStat = last_stat_report(State),
+                    NewStat = {RcvCnt, RcvBytes, SendCnt, SendBytes},
+                    case PrevStat of
+                        NewStat -> State;
+                        _ ->
+                            {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
+                            comm:send_local(comm_stats,
+                                            {report_stat, RcvCnt - PrevRcvCnt,
+                                             RcvBytes - PrevRcvBytes,
+                                             SendCnt - PrevSendCnt,
+                                             SendBytes - PrevSendBytes}),
+                            set_last_stat_report(State, NewStat)
+                    end;
+                {error, _Reason} -> State
+            end
+    end;
 
 on({web_debug_info, Requestor}, State) ->
     Now = erlang:now(),
@@ -378,7 +407,8 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
     {DestIP, DestPort, LocalListenPort, Channel, Socket,
      _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
      _MsgQueue = {[], []}, _Len = 0,
-     _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0}.
+     _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
+     _LastStatReport = {0, 0, 0, 0} }.
 
 dest_ip(State)                 -> element(1, State).
 dest_port(State)               -> element(2, State).
@@ -403,6 +433,8 @@ inc_msgs_since_bundle_start(State) ->
     setelement(12, State, msgs_since_bundle_start(State) + 1).
 set_msgs_since_bundle_start(State, Val) ->
     setelement(12, State, Val).
+last_stat_report(State)          -> element(13, State).
+set_last_stat_report(State, Val) -> setelement(13, State, Val).
 
 status(State) ->
      case socket(State) of
