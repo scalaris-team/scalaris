@@ -641,25 +641,60 @@ getMonitorClientData() ->
          {monitor_perf, mem_ets, MemEtsD}] -> ok
     end,
     
+    IOMonKeys = [{monitor_perf, X} || X <- [%rcv_count, 
+                                            rcv_bytes, %send_count, 
+                                            send_bytes]],
+    case statistics:getGaugeMonitorStats(ClientMonitor, IOMonKeys, list, 1) of
+        [] -> %RcvCntD0 = SendCntD0 = 
+            RcvBytesD0 = SendBytesD0 = [];
+        [%{monitor_perf, rcv_count, RcvCntD0},
+         {monitor_perf, rcv_bytes, RcvBytesD0},
+         %{monitor_perf, send_count, SendCntD0},
+         {monitor_perf, send_bytes, SendBytesD0}] -> ok
+    end,
+%%     RcvCntD = get_diff_data(lists:reverse(RcvCntD0)),
+    RcvBytesD = get_diff_data(lists:reverse(RcvBytesD0)),
+%%     SendCntD = get_diff_data(lists:reverse(SendCntD0)),
+    SendBytesD = get_diff_data(lists:reverse(SendBytesD0)),
+    
     DataStr =
         lists:flatten(
           ["\n",
-%%            "var count_data = ",       io_lib:format("~p", [CountD]), ";\n",
-           "var count_per_s_data = ", io_lib:format("~p", [CountPerSD]), ";\n",
-           "var avg_min_max_ms_data = ",      io_lib:format("~p", [AvgMinMaxMsD]), ";\n",
-%%            "var avg_ms_data = ",      io_lib:format("~p", [AvgMsD]), ";\n",
-%%            "var min_ms_data = ",      io_lib:format("~p", [MinMsD]), ";\n",
-%%            "var max_ms_data = ",      io_lib:format("~p", [MaxMsD]), ";\n",
-%%            "var hist_ms_data = ",     io_lib:format("~p", [HistMsD]), ";\n",
-           "var stddev_ms_data = ",   io_lib:format("~p", [StddevMsD]), ";\n",
-    
+%%            "var count_data = ",           io_lib:format("~p", [CountD]), ";\n",
+           "var count_per_s_data = ",     io_lib:format("~p", [CountPerSD]), ";\n",
+           "var avg_min_max_ms_data = ",  io_lib:format("~p", [AvgMinMaxMsD]), ";\n",
+%%            "var avg_ms_data = ",          io_lib:format("~p", [AvgMsD]), ";\n",
+%%            "var min_ms_data = ",          io_lib:format("~p", [MinMsD]), ";\n",
+%%            "var max_ms_data = ",          io_lib:format("~p", [MaxMsD]), ";\n",
+%%            "var hist_ms_data = ",         io_lib:format("~p", [HistMsD]), ";\n",
+           "var stddev_ms_data = ",       io_lib:format("~p", [StddevMsD]), ";\n",
+
            "var mem_total_data = ",       io_lib:format("~p", [MemTotalD]), ";\n",
            "var mem_processes_data = ",   io_lib:format("~p", [MemProcD]), ";\n",
            "var mem_system_data = ",      io_lib:format("~p", [MemSysD]), ";\n",
            "var mem_atom_data = ",        io_lib:format("~p", [MemAtomD]), ";\n",
            "var mem_binary_data = ",      io_lib:format("~p", [MemBinD]), ";\n",
-           "var mem_ets_ms_data = ",      io_lib:format("~p", [MemEtsD]), ";\n"]),
+           "var mem_ets_ms_data = ",      io_lib:format("~p", [MemEtsD]), ";\n"
+
+%%            "var io_rcv_count_data = ",    io_lib:format("~p", [RcvCntD]), ";\n",
+           "var io_rcv_bytes_data = ",    io_lib:format("~p", [RcvBytesD]), ";\n",
+%%            "var io_send_count_data = ",   io_lib:format("~p", [SendCntD]), ";\n",
+           "var io_send_bytes_data = ",   io_lib:format("~p", [SendBytesD]), ";\n"
+          ]),
     {script, [{type, "text/javascript"}], DataStr}.
+
+%% @doc In a list containing [Time, Value] elements, compute the differences of
+%%      any two consecutive values and return a list of [Time, DiffToPrevious].
+%%      PreCond: values must increase monotonically!
+-spec get_diff_data([T]) -> [T].
+get_diff_data([]) -> [];
+get_diff_data([H | T]) -> lists:reverse([H | get_diff_data(H, T)]).
+
+-spec get_diff_data(Last::T, Rest::[T]) -> [T].
+get_diff_data([_TimeLast, _ValueLast], []) -> [];
+get_diff_data([_TimeLast, ValueLast], [Cur = [TimeCur, ValueCur] | Rest])
+  when ValueCur >= ValueLast ->
+    [[TimeCur, ValueCur - ValueLast] | get_diff_data(Cur, Rest)].
 
 -spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
