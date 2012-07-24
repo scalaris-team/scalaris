@@ -43,21 +43,9 @@ send(Target, Message, Options) ->
     {MyIP, MyPort} = comm_server:get_local_address_port(),
     case Target of
         {MyIP, MyPort, LocalTarget} ->
-            PID = case is_pid(LocalTarget) of
-                      true -> LocalTarget;
-                      false -> whereis(LocalTarget)
-                  end,
-            case PID of
-                undefined ->
-                    log:log(warn,
-                            "[ CC ] Cannot locally send msg to unknown named"
-                            " process ~p: ~.0p~n", [LocalTarget, Message]),
-                    report_send_error(Options, Target, Message, unknown_named_process);
-                _ ->
-                    case is_process_alive(PID) of
-                        false ->
-                            report_send_error(Options, Target, Message,
-                                              local_target_not_alive);
+            case is_pid(LocalTarget) of
+                true ->
+                    case is_process_alive(LocalTarget) of
                         true ->
                             %% minor gap of error reporting, if PID
                             %% dies at this moment, but better than a
@@ -65,10 +53,23 @@ send(Target, Message, Options) ->
                             %% sending and then checking, if message
                             %% leads to process termination (as in the
                             %% RPCs of the Java binding)
+                            LocalTarget ! Message, ok;
+                        false ->
+                            report_send_error(Options, Target, Message,
+                                              local_target_not_alive)
+                    end;
+                false ->
+                    case whereis(LocalTarget) of
+                        undefined ->
+                            log:log(warn,
+                                    "[ CC ] Cannot locally send msg to unknown named"
+                                        " process ~p: ~.0p~n", [LocalTarget, Message]),
+                            report_send_error(Options, Target, Message, unknown_named_process);
+                        PID ->
+                            % assume that whereis/1 does not report dead PIDs
                             PID ! Message, ok
                     end
-            end,
-            ok;
+            end;
         {{_IP1, _IP2, _IP3, _IP4} = _IP, _Port, _Pid} ->
             ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
             comm_server:send(Target, Message, Options);

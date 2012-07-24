@@ -81,22 +81,23 @@ init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
     state_new(DestIP, DestPort, LocalListenPort, Channel, Socket).
 
 %% @doc Forwards a message to the given PID or named process.
-%%      Logs a warning if the process does not exist.
+%%      Logs a warning if a named process does not exist.
 -spec forward_msg(Process::pid() | atom(), Message::comm:message(), State::state()) -> ok.
 forward_msg(Process, Message, _State) ->
     ?LOG_MESSAGE('rcv', Message, channel(_State)),
-    PID = case is_pid(Process) of
-              true -> Process;
-              false -> whereis(Process)
-          end,
-    case PID of
-        undefined ->
-            log:log(warn,
-                    "[ CC ] Cannot accept msg for unknown named"
-                        " process ~p: ~.0p~n", [Process, Message]);
-        _ -> PID ! Message
-    end,
-    ok.
+    case is_pid(Process) of
+        true ->
+            % TODO: report error if process is not alive?
+            Process ! Message, ok;
+        false ->
+            case whereis(Process) of
+                undefined ->
+                    log:log(warn,
+                            "[ CC ] Cannot accept msg for unknown named"
+                                " process ~p: ~.0p~n", [Process, Message]);
+                PID -> PID ! Message, ok
+            end
+    end.
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
