@@ -149,12 +149,18 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
                   DhtModule:is_alive_fully_joined(gen_component:get_state(Pid))]),
     util:random_subset(MaxVMs, lists:usort(RandomConns)).
 
-%% @doc Graceful shutdown of this VM.
--spec shutdown_vm() -> ok.
+%% @doc Graceful shutdown of this VM. If the last Scalaris node of this VM
+%%      cannot gracefully shut down because it doesn't know any other node to
+%%      move its data to, 'no_partner_found' will be returned.
+-spec shutdown_vm() -> ok | no_partner_found.
 shutdown_vm() ->
-    _ = shutdown_nodes(number_of_nodes()),
-    util:wait_for(fun() -> number_of_nodes() =:= 0 end),
-    kill_vm().
+    NodesToShutdown = number_of_nodes(),
+    Ok = shutdown_nodes(NodesToShutdown),
+    Rest = erlang:max(0, NodesToShutdown - length(Ok)), 
+    util:wait_for(fun() -> number_of_nodes() =:= Rest end),
+    if Rest =:= 0 -> kill_vm();
+       true       -> no_partner_found
+    end.
 
 %% @doc Kills this VM.
 -spec kill_vm() -> ok.
