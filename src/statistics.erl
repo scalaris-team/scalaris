@@ -23,7 +23,7 @@
          get_total_load/1, get_average_load/1, get_load_std_deviation/1,
          get_average_rt_size/1, get_rt_size_std_deviation/1,
          get_memory_usage/1, get_max_memory_usage/1,
-         getMonitorStats/3]).
+         getTimingMonitorStats/3, getGaugeMonitorStats/4]).
 
 -include("scalaris.hrl").
 
@@ -257,7 +257,9 @@ get_utc_local_diff_s() ->
                 calendar:now_to_local_time(SampleTime)),
     Local_s - UTC_s.
 
--spec getMonitorStats
+%% @doc Gets monitor stats from 'timing' and 'timing_with_hist' values in an
+%%      easy format for the web interface.
+-spec getTimingMonitorStats
         (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], list)
         -> [{Process::atom(), Key::monitor:key(),
              {CountD::time_list(non_neg_integer()),
@@ -272,7 +274,7 @@ get_utc_local_diff_s() ->
               MinD::tuple_list(float()), MaxD::tuple_list(float()),
               StddevD::tuple_list(float()),
               HistD::tuple_list(tuple_list(pos_integer()))}}].
-getMonitorStats(Monitor, Keys, Type) ->
+getTimingMonitorStats(Monitor, Keys, Type) ->
     UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
     [begin
          Dump = rrd:dump_with(DB, fun monitor_timing_dump_fun_exists/4,
@@ -305,5 +307,44 @@ getMonitorStats(Monitor, Keys, Type) ->
                         [AvgAcc | AvgD], [MinAcc | MinD], [MaxAcc | MaxD],
                         [StddevAcc | StddevD], [HistAcc | HistD]}
                end, {[], [], [], [], [], [], []}, Dump),
+         {Process, Key, Value}
+     end || {Process, Key, DB} <- getMonitorData(Monitor, Keys)].
+
+-spec monitor_gauge_dump_fun_exists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time(), Value)
+        -> {TimestampMs::integer(), Value}.
+monitor_gauge_dump_fun_exists(_DB, _From_us, To_us, Value) ->
+    {round(To_us / 1000), Value}.
+
+-spec monitor_gauge_dump_fun_notexists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time())
+        -> {keep, {TimestampMs::integer(), Value::0}}.
+monitor_gauge_dump_fun_notexists(_DB, _From_us, To_us) ->
+    {keep, {round(To_us / 1000), 0}}.
+
+%% @doc Gets monitor stats from 'gauge' values in an easy format for the web
+%%      interface. Scales the original values by dividing them by Div.
+-spec getGaugeMonitorStats
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], list, Div::pos_integer())
+        -> [{Process::atom(), Key::monitor:key(),
+             ValueD::time_list(non_neg_integer())}];
+        (Monitor::pid(), [{Process::atom(), Key::monitor:key()}], tuple, Div::pos_integer())
+        -> [{Process::atom(), Key::monitor:key(),
+             ValueD::tuple_list(non_neg_integer())}].
+getGaugeMonitorStats(Monitor, Keys, Type, Div) ->
+    UtcToLocalDiff_ms = get_utc_local_diff_s() * 1000,
+    [begin
+         Dump = rrd:dump_with(DB, fun monitor_gauge_dump_fun_exists/4,
+                              fun monitor_gauge_dump_fun_notexists/3),
+         Value =
+             lists:foldr(
+               fun({TimeUTC, ValueX}, ValueD) ->
+                       Time = TimeUTC + UtcToLocalDiff_ms,
+                       case Type of
+                           list ->
+                               ValueAcc = [Time, ValueX / Div];
+                           tuple ->
+                               ValueAcc = {Time, ValueX / Div}
+                       end,
+                       [ValueAcc | ValueD]
+               end, [], Dump),
          {Process, Key, Value}
      end || {Process, Key, DB} <- getMonitorData(Monitor, Keys)].

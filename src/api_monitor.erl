@@ -31,7 +31,7 @@
                           {dht_nodes, non_neg_integer()},...].
 get_node_info() ->
     %MyMonitor = pid_groups:pid_of("clients_group", monitor),
-    %statistics:getMonitorStats(MyMonitor, Keys, tuple),
+    %statistics:getTimingMonitorStats(MyMonitor, Keys, tuple),
     [{scalaris_version, ?SCALARIS_VERSION},
      {erlang_version, erlang:system_info(otp_release)},
      {dht_nodes, length(pid_groups:find_all(dht_node))}].
@@ -40,7 +40,7 @@ get_node_info() ->
 get_node_performance() ->
     Monitor = pid_groups:pid_of("clients_group", monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
+        case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
@@ -57,7 +57,7 @@ get_service_info() ->
 get_service_performance() ->
     Monitor = pid_groups:find_a(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
+        case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
