@@ -415,7 +415,7 @@ until [ -z "$1" ]; do
             h) usage 0;;
             i) echo "WARN: interactive is now default";;
             k) join_at=$OPTARG;;
-            n) NODE_NAME=$OPTARG ; fix_node_name;;
+            n) NODE_NAME=$OPTARG;;
             p) port=$OPTARG;;
             y) yaws_port=$OPTARG;;
             m) start_mgmt_server=1;;
@@ -432,6 +432,8 @@ until [ -z "$1" ]; do
       fi;;
   esac
 done
+
+fix_node_name
 
 case $cmd in
     checkinstallation)
