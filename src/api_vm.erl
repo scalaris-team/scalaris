@@ -62,6 +62,7 @@ get_nodes() ->
     [pid_groups:group_of(Pid) || Pid <- pid_groups:find_all(dht_node),
                                  DhtModule:is_alive(gen_component:get_state(Pid))].
 
+%% userdevguide-begin api_vm:add_nodes
 %% @doc Adds Number Scalaris nodes to this VM.
 -spec add_nodes(non_neg_integer()) -> {[pid_groups:groupname()], [{error, term()}]}.
 add_nodes(Number) when is_integer(Number) andalso Number >= 0 ->
@@ -77,6 +78,7 @@ add_nodes(Number) when is_integer(Number) andalso Number >= 0 ->
               [] =:= NotReady
       end),
     Result.
+%% userdevguide-end api_vm:add_nodes
 
 %% @doc Wait for the given nodes to disappear.
 -spec wait_for_nodes_to_disappear(Names::[pid_groups:groupname()]) -> ok.

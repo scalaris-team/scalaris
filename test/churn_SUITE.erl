@@ -90,7 +90,7 @@ transactions_1_failure_4_nodes_read(_) ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4
       end),
-    _ = admin:del_nodes(1),
+    _ = api_vm:kill_nodes(1),
     unittest_helper:check_ring_size(3),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
@@ -116,7 +116,7 @@ transactions_more_failures_4_nodes_read(FailedNodes) ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= 4
       end),
-    _ = admin:del_nodes(FailedNodes),
+    _ = api_vm:kill_nodes(FailedNodes),
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),

@@ -150,7 +150,7 @@ my_process_list(ServiceGroup, Options) ->
 add_additional_nodes() ->
     Size = config:read(nodes_per_vm),
     log:log(info, "Starting ~B nodes", [Size]),
-    _ = admin:add_nodes(Size - 1),
+    _ = api_vm:add_nodes(Size - 1),
     ok.
 
 %% @doc Checks whether config parameters of the cyclon process exist and are

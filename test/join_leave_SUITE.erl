@@ -98,18 +98,18 @@ add_9(Config) ->
     stop_time(fun add_9_test/0, "add_9").
 
 add_9_test() ->
-    _ = admin:add_nodes(9),
+    _ = api_vm:add_nodes(9),
     check_size(10).
 
 rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
-    _ = admin:add_nodes(9),
+    _ = api_vm:add_nodes(9),
     check_size(10),
     stop_time(fun rm_5_test/0, "rm_5").
 
 rm_5_test() ->
-    _ = admin:del_nodes(5),
+    _ = api_vm:kill_nodes(5),
     check_size(5).
 
 add_9_rm_5(Config) ->
@@ -118,9 +118,9 @@ add_9_rm_5(Config) ->
     stop_time(fun add_9_rm_5_test/0, "add_9_rm_5").
 
 add_9_rm_5_test() ->
-    _ = admin:add_nodes(9),
+    _ = api_vm:add_nodes(9),
     check_size(10),
-    _ = admin:del_nodes(5),
+    _ = api_vm:kill_nodes(5),
     check_size(5).
 
 add_2x3_load(Config) ->
@@ -132,10 +132,10 @@ add_2x3_load(Config) ->
 
 add_2x3_load_test() ->
     BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
-    _ = admin:add_nodes(3),
+    _ = api_vm:add_nodes(3),
     check_size(4),
     timer:sleep(500),
-    _ = admin:add_nodes(3),
+    _ = api_vm:add_nodes(3),
     check_size(7),
     util:wait_for_process_to_die(BenchPid).
 
@@ -162,7 +162,7 @@ add_x_rm_y_load(Config, X, Y) ->
 -spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer()) -> ok.
 add_x_rm_y_load_test(X, Y) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
-    _ = admin:add_nodes(X),
+    _ = api_vm:add_nodes(X),
     check_size(X + 1),
     timer:sleep(500),
     % let Y nodes gracefully leave
