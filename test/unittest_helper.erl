@@ -453,6 +453,7 @@ kill_new_processes(OldProcesses, Options) ->
                      not (InitCall =:= {test_server_sup, timetrap, 2} andalso
                               CurFun =:= {test_server_sup, timetrap, 2}),
                      X =/= self(),
+                     X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
     case lists:member(quiet, Options) of
         false ->
