@@ -58,7 +58,7 @@
         unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected)).
 
 -define(equals_w_note(Actual, Expected, Note),
-        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, lists:flatten(Note))).
+        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, Note)).
 
 -define(equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope
