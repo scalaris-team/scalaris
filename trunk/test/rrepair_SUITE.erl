@@ -257,6 +257,7 @@ prop_get_key_quadrant(Key) ->
                        io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
                                      [QI, Key, Q, TestQ])).
 tester_get_key_quadrant(_) ->
+    _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
     tester:test(?MODULE, prop_get_key_quadrant, 1, 4, [{threads, 4}]).
 
 -spec prop_mapInterval(?RT:key(), ?RT:key(), 1..4) -> true.
