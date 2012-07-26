@@ -598,7 +598,7 @@ macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr) ->
         Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr)
     end.
 
--spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> true | no_return().
+-spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::iolist()) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     case Actual of
         ExpectedVal -> true;
@@ -619,8 +619,9 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr) ->
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal]).
 
--spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::string()) -> no_return().
-macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note) ->
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string(), Note::iolist()) -> no_return().
+macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note0) ->
+    Note = lists:flatten(Note0),
     ct:pal("Failed~n"
            " Message    ~s evaluated to~n"
            "             \"~.0p\"~n"
