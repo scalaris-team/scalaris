@@ -403,7 +403,7 @@ tester_encode_decode(_Config) ->
 
 random_write_read2(0) -> ok;
 random_write_read2(Count) ->
-    Key = lists:flatten(io_lib:format("~p", [Count])),
+    Key = io_lib:format("~p", [Count]),
     ?equals_w_note(api_tx:write(Key, Count), {ok}, Key),
     ?equals_w_note(api_tx:read(Key), {ok, Count}, Key),
     random_write_read2(Count -1).
@@ -784,7 +784,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
             TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, ?value),
             ?equals_w_note(NRes,
                            element(2, api_tx:req_list([TmpTLogEntry], [Req])),
-                           {Req, RingVal}),
+                           io_lib:format("Req: ~.0p, RingVal: ~.0p", [Req, RingVal])),
             ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
         ?value ->
             case tx_tlog:get_entry_operation(OldEntry) of
