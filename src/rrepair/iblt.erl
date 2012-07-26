@@ -40,10 +40,9 @@
 
 -define(Check_sum_fun(X), erlang:crc32(integer_to_list(X))). %hash function for checksum building
 
--type key()     :: integer().
 -type value()   :: integer().
 -type cell()    :: {Count       :: non_neg_integer(),
-                    KeySum      :: key(),
+                    KeySum      :: integer(),
                     KeyHashSum  :: integer(),   %sum c(x) of all inserted keys x, for c = any hashfunction not in hfs
                     ValSum      :: value(),
                     ValHashSum  :: integer()}.  %sum c(y) of all inserted values y, for c = any hashfunction not in hfs
@@ -93,11 +92,11 @@ new(Hfs, CellCount, Options) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert(iblt(), key(), value()) -> iblt().
+-spec insert(iblt(), ?RT:key(), value()) -> iblt().
 insert(IBLT, Key, Value) ->
     change_table(IBLT, add, Key, Value).
 
--spec delete(iblt(), key(), value()) -> iblt().
+-spec delete(iblt(), ?RT:key(), value()) -> iblt().
 delete(IBLT, Key, Value) ->
     change_table(IBLT, remove, Key, Value).
 
@@ -107,22 +106,22 @@ delete(IBLT, Key, Value) ->
 operation_val(add) -> 1;
 operation_val(remove) -> -1.
 
--spec change_table(iblt(), cell_operation(), key(), value()) -> iblt().
+-spec change_table(iblt(), cell_operation(), ?RT:key(), value()) -> iblt().
 change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = ColSize } = IBLT, 
              Operation, Key, Value) ->
     NT = lists:foldl(
            fun({ColNr, Col}, NewT) ->
                    NCol = change_cell(Col, 
                                       ?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize,
-                                      Key, Value, Operation),
+                                      encode_key(Key), Value, Operation),
                    [{ColNr, NCol} | NewT]
            end, [], T),
     IBLT#iblt{ table = NT, item_count = ItemCount + operation_val(Operation)}.   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec change_cell([cell()], pos_integer(), key(), value(), cell_operation()) -> [cell()].
-change_cell(Column, CellNr, Key, Value, Operation) ->        
+-spec change_cell([cell()], pos_integer(), integer(), value(), cell_operation()) -> [cell()].
+change_cell(Column, CellNr, Key, Value, Operation) ->
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
     lists:flatten([HeadL, 
@@ -133,11 +132,11 @@ change_cell(Column, CellNr, Key, Value, Operation) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get(iblt(), key()) -> value() | not_found.
+-spec get(iblt(), ?RT:key()) -> value() | not_found.
 get(#iblt{ table = T, hfs = Hfs, col_size = ColSize }, Key) ->
     p_get(T, Hfs, ColSize, Key).
 
--spec p_get(table(), ?REP_HFS:hfs(), non_neg_integer(), key()) -> value() | not_found.
+-spec p_get(table(), ?REP_HFS:hfs(), non_neg_integer(), ?RT:key()) -> value() | not_found.
 p_get([], _, _, _) -> not_found;
 p_get([{ColNr, Col} | T], Hfs, ColSize, Key) ->
     Cell = lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
@@ -161,28 +160,28 @@ is_pure({Count, Key, KeyCheck, Val, ValCheck}) ->
 % @doc lists all correct entries of this structure
 %     correct entries can be retrieved out of pure cells
 %     a pure cell := count = 1 and check_sum(keySum)=keyHashSum and check_sum(valSum)=valHashSum
--spec list_entries(iblt()) -> [{key(), value()}].
+-spec list_entries(iblt()) -> [{?RT:key(), value()}].
 list_entries(IBLT) ->
     p_list_entries(IBLT, []).
 
--spec p_list_entries(iblt(), [{key(), value()}]) -> [{key(), value()}].
+-spec p_list_entries(iblt(), Acc) -> Acc when is_subtype(Acc, [{?RT:key(), value()} | [{?RT:key(), value()}]]).
 p_list_entries(#iblt{ table = T } = IBLT, Acc) ->
     case get_any_entry(T, []) of
-        [] -> Acc;
+        [] -> lists:flatten(Acc);
         L ->
             NewIBLT = lists:foldl(fun({Key, Val}, NT) -> 
                                           delete(NT, Key, Val) 
                                   end, IBLT, L),
-            p_list_entries(NewIBLT, lists:append([L, Acc]))
+            p_list_entries(NewIBLT, [L, Acc])
     end.
 
 % tries to find any pure entry 
--spec get_any_entry(table(), [{key(), value()}]) -> [{key() | value()}].
+-spec get_any_entry(table(), [{?RT:key(), value()}]) -> [{?RT:key(), value()}].
 get_any_entry([], Acc) -> 
     Acc;
 get_any_entry([{_, Col} | T], Acc) ->
-    Result = [{Key, Val} || {Count, Key, KCheck, Val, ValCheck} <- Col, 
-                            is_pure({Count, Key, KCheck, Val, ValCheck})],
+    Result = [{decode_key(Key), Val} || {_, Key, _, Val, _} = Cell <- Col,
+                                        is_pure(Cell)],
     if 
         Result =:= [] -> get_any_entry(T, lists:append([Result, Acc]));
         true -> Result
@@ -190,7 +189,7 @@ get_any_entry([{_, Col} | T], Acc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec is_element(iblt(), key()) -> boolean().
+-spec is_element(iblt(), ?RT:key()) -> boolean().
 is_element(#iblt{ hfs = Hfs, table = T, col_size = ColSize }, Key) ->
     Found = lists:foldl(
               fun({ColNr, Col}, Count) ->
@@ -228,3 +227,11 @@ resize(Val, Div) when Val rem Div == 0 ->
     Val;
 resize(Val, Div) when Val rem Div /= 0 -> 
     resize(Val + 1, Div).
+
+-spec encode_key(?RT:key()) -> integer().
+encode_key(Key) ->
+    binary:decode_unsigned(term_to_binary(Key)).
+
+-spec decode_key(integer()) -> ?RT:key().
+decode_key(IntKey) ->
+    binary_to_term(binary:encode_unsigned(IntKey)).
