@@ -38,11 +38,9 @@
 %% Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(Check_sum_fun(X), erlang:crc32(integer_to_list(X))). %hash function for checksum building
-
 -type value()   :: integer().
 -type cell()    :: {Count       :: non_neg_integer(),
-                    KeySum      :: integer(),
+                    KeySum      :: binary(),
                     KeyHashSum  :: integer(),   %sum c(x) of all inserted keys x, for c = any hashfunction not in hfs
                     ValSum      :: value(),
                     ValHashSum  :: integer()}.  %sum c(y) of all inserted values y, for c = any hashfunction not in hfs
@@ -80,7 +78,7 @@ new(Hfs, CellCount, Options) ->
                                 RCC = resize(CellCount, K),
                                 {RCC, erlang:round(RCC / K)}
                         end,
-    SubTable = [{0, 0 ,0, 0, 0} || _ <- lists:seq(1, ColSize)],
+    SubTable = [{0, <<0>> ,0, 0, 0} || _ <- lists:seq(1, ColSize)],
     Table = [ {I, SubTable} || I <- lists:seq(1, K)],
     #iblt{
           hfs = Hfs, 
@@ -120,14 +118,14 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec change_cell([cell()], pos_integer(), integer(), value(), cell_operation()) -> [cell()].
+-spec change_cell([cell()], pos_integer(), Key::binary(), value(), cell_operation()) -> [cell()].
 change_cell(Column, CellNr, Key, Value, Operation) ->
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
     lists:flatten([HeadL, 
                    {Count + operation_val(Operation), 
-                    KeySum bxor Key, KHSum bxor ?Check_sum_fun(Key),
-                    ValSum bxor Value, VHSum bxor ?Check_sum_fun(Value)}, 
+                    util:bin_xor(KeySum, Key), KHSum bxor checksum_fun(Key),
+                    ValSum bxor Value, VHSum bxor checksum_fun(Value)}, 
                    TailL]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -152,8 +150,8 @@ p_get([{ColNr, Col} | T], Hfs, ColSize, Key) ->
 -spec is_pure(cell()) -> boolean().
 is_pure({Count, Key, KeyCheck, Val, ValCheck}) ->
     (Count =:= 1 orelse Count =:= -1) andalso
-        ?Check_sum_fun(Key) =:= KeyCheck andalso
-        ?Check_sum_fun(Val) =:= ValCheck.
+        checksum_fun(Key) =:= KeyCheck andalso
+        checksum_fun(Val) =:= ValCheck.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -221,6 +219,11 @@ get_prop(Prop, IBLT) ->
 %% helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Hash function for checksum building.
+-spec checksum_fun(binary() | integer()) -> integer().
+checksum_fun(X) when is_integer(X) -> erlang:crc32(integer_to_list(X));
+checksum_fun(X) -> erlang:crc32(X).
+
 % @doc Increases Val until Val rem Div == 0.
 -spec resize(pos_integer(), pos_integer()) -> pos_integer().
 resize(Val, Div) when Val rem Div == 0 -> 
@@ -230,8 +233,8 @@ resize(Val, Div) when Val rem Div /= 0 ->
 
 -spec encode_key(?RT:key()) -> integer().
 encode_key(Key) ->
-    binary:decode_unsigned(term_to_binary(Key)).
+    term_to_binary(Key).
 
--spec decode_key(integer()) -> ?RT:key().
-decode_key(IntKey) ->
-    binary_to_term(binary:encode_unsigned(IntKey)).
+-spec decode_key(binary()) -> ?RT:key().
+decode_key(BinKey) ->
+    binary_to_term(BinKey).
