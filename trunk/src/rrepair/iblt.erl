@@ -231,7 +231,7 @@ resize(Val, Div) when Val rem Div == 0 ->
 resize(Val, Div) when Val rem Div /= 0 -> 
     resize(Val + 1, Div).
 
--spec encode_key(?RT:key()) -> integer().
+-spec encode_key(?RT:key()) -> binary().
 encode_key(Key) ->
     term_to_binary(Key).
 
