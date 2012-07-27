@@ -47,7 +47,8 @@
          for_to/3, for_to_ex/3, for_to_ex/4,
          collect_while/1]).
 -export([list_set_nth/3]).
--export([debug_info/0, debug_info/1, print_bits/2]).
+-export([debug_info/0, debug_info/1]).
+-export([print_bits/2, bin_xor/2]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -959,6 +960,16 @@ print_bits(FormatFun, Binary) ->
     <<BinNr:BitSize>> = Binary,
     NrBits = lists:flatten(io_lib:format("~B", [BitSize])),
     FormatFun("~" ++ NrBits ++ ".2B", [BinNr]).
+
+-spec bin_xor(binary(), binary()) -> binary().
+bin_xor(Binary1, Binary2) ->
+    BitSize1 = erlang:bit_size(Binary1),
+    BitSize2 = erlang:bit_size(Binary2),
+    <<BinNr1:BitSize1>> = Binary1,
+    <<BinNr2:BitSize2>> = Binary2,
+    ResNr = BinNr1 bxor BinNr2,
+    ResSize = erlang:max(BitSize1, BitSize2),
+    <<ResNr:ResSize>>.
 
 -spec extint2atom(atom() | integer()) -> atom().
 extint2atom(X) when is_atom(X) -> X;
