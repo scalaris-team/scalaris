@@ -84,11 +84,13 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
         true -> 
             [I1, I2] = intervals:split(I, 2),
             uniform_key_list([{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R], Acc, AccType);
-        false -> 
-            {_, IL, IR, _} = intervals:get_bounds(I),
-            ToAdd = util:for_to_ex(1, Add, 
+        false ->
+            {LBr, IL, IR, RBr} = intervals:get_bounds(I),
+            End = Add + ?IIF(RBr =:= ')', 1, 0),
+            ToAdd = util:for_to_ex(?IIF(LBr =:= '(', 1, 0), 
+                                   Add + ?IIF(LBr =:= '(', 0, -1),
                                    fun(Index) -> 
-                                           Key = ?RT:get_split_key(IL, IR, {Index, Add}),
+                                           Key = ?RT:get_split_key(IL, IR, {Index, End}),
                                            case AccType of
                                                list_key -> Key;
                                                list_key_val -> {Key, gen_value()}
