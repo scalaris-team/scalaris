@@ -96,7 +96,7 @@ get_root(_) -> undefined.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Insert on an empty tree fail. First operation on an empty tree should be set_interval.
+% @doc Insert on empty tree will fail. First operation on an empty tree should be set_interval.
 %      Returns an empty merkle tree ready for work.
 -spec empty() -> merkle_tree().
 empty() ->
@@ -439,9 +439,6 @@ build_config(ParamList) ->
 
 % @doc inserts key into its matching interval
 %      precondition: key fits into one of the given intervals
-key_in_I(Key, Intervals) ->
-    p_key_in_I(Key, [], Intervals).
-
 p_key_in_I(_Key, _Left, []) ->
     erlang:error(precondition_violated);
 p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
@@ -460,16 +457,10 @@ p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    lists:foldl(fun(Key, Acc) -> key_in_I(Key, Acc) end, IBucket, KList).
+    lists:foldl(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_XOR_fun() ->
-    (fun([H|T]) -> lists:foldl(fun(X, Acc) -> binary_xor(X, Acc) end, H, T) end).
+    (fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end).
 
--spec binary_xor(binary(), binary()) -> binary().
-binary_xor(A, B) ->
-    Size = bit_size(A),
-    <<X:Size>> = A,
-    <<Y:Size>> = B,
-    <<(X bxor Y):Size>>.
