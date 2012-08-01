@@ -10,7 +10,7 @@
     <pathelement location="contrib/scalaris.jar"/>
     <pathelement location="contrib/OtpErlang-${opterlang.version}.jar"/>
     <pathelement location="contrib/commons-compress-1.1.jar"/>
-    <pathelement location="contrib/commons-codec-1.4.jar"/>
+    <pathelement location="contrib/commons-codec-1.6.jar"/>
     <pathelement location="contrib/commons-lang-2.6.jar"/>
     <pathelement location="contrib/commons-logging-1.1.1.jar"/>
     <pathelement location="contrib/bliki-core-3.0.19-SNAPSHOT.jar"/>
