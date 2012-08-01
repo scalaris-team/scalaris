@@ -112,6 +112,10 @@ prop_lookup(L, R) ->
     true.
 
 tester_lookup(_) ->
+    case ?RT:get_replica_keys(?MINUS_INFINITY) of
+        [_K1, K2, _K3, K4] -> prop_lookup(K4, K2);
+        _ -> ok
+    end,
     tester:test(?MODULE, prop_lookup, 2, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
