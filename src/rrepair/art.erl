@@ -33,7 +33,7 @@
          lookup/2]).
 
 -ifdef(with_export_type_support).
--export_type([art/0, art_config/0]).
+-export_type([art/0, config/0]).
 -endif.
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
@@ -43,13 +43,13 @@
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type art_config_param() :: {correction_factor, non_neg_integer()} |
+-type config_param() :: {correction_factor, non_neg_integer()} |
                             {inner_bf_fpr,      float()} |
                             {leaf_bf_fpr,       float()}.
--type art_config()       :: [art_config_param()].
+-type config()       :: [config_param()].
 
 -type art() :: { art,
-                 Config     :: art_config(), 
+                 Config     :: config(), 
                  Interval   :: intervals:interval(),
                  InnerNodes :: ?REP_BLOOM:bloom_filter() | empty,
                  Leafs      :: ?REP_BLOOM:bloom_filter() | empty }.
@@ -59,8 +59,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns default art configuration.
--spec default_art_config() -> art_config().
-default_art_config() ->
+-spec default_config() -> config().
+default_config() ->
     [{correction_factor, 1},
      {inner_bf_fpr, 0.01},
      {leaf_bf_fpr, 0.1}].
@@ -68,15 +68,15 @@ default_art_config() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec new() -> art().
 new() -> 
-    {art, default_art_config(), intervals:empty(), empty, empty}.
+    {art, default_config(), intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
 new(Tree) ->
-    new(Tree, default_art_config()).
+    new(Tree, default_config()).
 
--spec new(merkle_tree:merkle_tree(), art_config()) -> art().
+-spec new(merkle_tree:merkle_tree(), config()) -> art().
 new(Tree, _Config) ->
-    Config = merge_prop_lists(default_art_config(), _Config),
+    Config = merge_prop_lists(default_config(), _Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
     InnerBF = ?REP_BLOOM:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
     LeafBF = ?REP_BLOOM:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
@@ -98,7 +98,7 @@ get_correction_factor({art, Config, _, _, _}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_config(art()) -> art_config().
+-spec get_config(art()) -> config().
 get_config({art, Config, _, _, _}) ->
     Config.
 

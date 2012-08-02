@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica reconcilication protocol
+%% @doc    replica reconcilication module
 %% @end
 %% @version $Id$
 
@@ -714,7 +714,7 @@ get_merkle_branch_factor() ->
 get_merkle_bucket_size() ->
     config:read(rr_merkle_bucket_size).
 
--spec get_art_config() -> art:art_config().
+-spec get_art_config() -> art:config().
 get_art_config() ->
     [{correction_factor, config:read(rr_art_correction_factor)},
      {inner_bf_fpr, config:read(rr_art_inner_fpr)},
