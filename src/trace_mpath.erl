@@ -66,7 +66,8 @@
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
--type passed_state() :: {trace_id(), logger()}.
+-type msg_map_fun()  :: fun((comm:message()) -> comm:message()).
+-type passed_state() :: {trace_id(), logger(), msg_map_fun()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 
@@ -80,23 +81,29 @@
 start() -> start(default).
 
 -spec start(trace_id() | passed_state()) -> ok.
-start(TraceName) when is_atom(TraceName) ->
+start(TraceId) when is_atom(TraceId) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
-    start(TraceName, comm:make_global(LoggerPid));
+    start(TraceId, comm:make_global(LoggerPid), fun(Msg) -> Msg end);
 start(PState) when is_tuple(PState) ->
-    start(passed_state_trace_id(PState), passed_state_logger(PState)).
+    start(passed_state_trace_id(PState), 
+          passed_state_logger(PState),
+          passed_state_msg_map_fun(PState)).
 
--spec start(trace_id(), logger() | comm:mypid()) -> ok.
+-spec start(trace_id(), logger() | comm:mypid() | msg_map_fun()) -> ok.
+start(TraceId, MsgMapFun) when is_function(MsgMapFun) ->
+    LoggerPid = pid_groups:find_a(trace_mpath),    
+    start(TraceId, comm:make_global(LoggerPid), MsgMapFun);
 start(TraceId, Logger) ->
-    case comm:is_valid(Logger) of
-        true -> %% just a pid was given
-            PState = passed_state_new(TraceId, {log_collector, Logger}),
-            own_passed_state_put(PState);
-        false ->
-            PState = passed_state_new(TraceId, Logger),
-            own_passed_state_put(PState)
-    end,
-    ok.
+    start(TraceId, Logger, fun(Msg) -> Msg end).
+
+-spec start(trace_id(), logger() | comm:mypid(), msg_map_fun()) -> ok.
+start(TraceId, _Logger, MsgMapFun) ->
+    Logger = case comm:is_valid(_Logger) of
+                 true -> {log_collector, _Logger}; %% just a pid was given                     
+                 false -> _Logger
+             end,
+    PState = passed_state_new(TraceId, Logger, MsgMapFun),
+    own_passed_state_put(PState).
 
 -spec stop() -> ok.
 stop() ->
@@ -179,20 +186,21 @@ log_send(PState, FromPid, ToPid, Msg) ->
     From = normalize_pidinfo(FromPid),
     To = normalize_pidinfo(ToPid),
     Now = os:timestamp(),
+    MsgMapFun = passed_state_msg_map_fun(PState),
     case passed_state_logger(PState) of
         io_format ->
             io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [util:readable_utc_time(Now), From, To, Msg]);
+                      [util:readable_utc_time(Now), From, To, MsgMapFun(Msg)]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_send, Now, TraceId, From, To, Msg})
+            send_log_msg(LoggerPid, {log_send, Now, TraceId, From, To, MsgMapFun(Msg)})
     end,
     epidemic_reply_msg(PState, From, To, Msg).
 
 -spec log_info(passed_state(), anypid(), term()) -> ok.
 log_info(PState, FromPid, Info) ->
     From = normalize_pidinfo(FromPid),
-    Now = os:timestamp(),
+    Now = os:timestamp(),    
     case passed_state_logger(PState) of
         io_format ->
             io:format("~p info ~.0p:~n  ~.0p.~n",
@@ -208,13 +216,14 @@ log_recv(PState, FromPid, ToPid, Msg) ->
     From = normalize_pidinfo(FromPid),
     To = normalize_pidinfo(ToPid),
     Now = os:timestamp(),
+    MsgMapFun = passed_state_msg_map_fun(PState),
     case  passed_state_logger(PState) of
         io_format ->
             io:format("~p recv ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [util:readable_utc_time(Now), From, To, Msg]);
+                      [util:readable_utc_time(Now), From, To, MsgMapFun(Msg)]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_recv, Now, TraceId, From, To, Msg})
+            send_log_msg(LoggerPid, {log_recv, Now, TraceId, From, To, MsgMapFun(Msg)})
     end,
     ok.
 
@@ -277,9 +286,12 @@ on({cleanup, TraceId}, State) ->
         false                       -> State
     end.
 
-passed_state_new(TraceId, Logger) -> {TraceId, Logger}.
+passed_state_new(TraceId, Logger, MsgMapFun) -> 
+    {TraceId, Logger, MsgMapFun}.
+
 passed_state_trace_id(State)      -> element(1, State).
 passed_state_logger(State)        -> element(2, State).
+passed_state_msg_map_fun(State)   -> element(3, State).
 
 own_passed_state_put(State)       -> erlang:put(trace_mpath, State), ok.
 own_passed_state_get()            -> erlang:get(trace_mpath).
