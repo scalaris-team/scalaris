@@ -103,7 +103,7 @@ merkle_build_time(I, DB, _DBSize, Iterations, Config) ->
                           Iterations, []).
 
 -spec art_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), 
-            merkle_tree:mt_config_params(), art:art_config()) -> result().
+            merkle_tree:mt_config_params(), art:config()) -> result().
 art_build_time(I, DB, _DBSize, Iterations, MerkleConfig, ArtConfig) ->    
     {Tree, TreeTime} = 
         measure_util:time_with_result(fun() -> merkle_tree:new(I, DB, MerkleConfig) end, Iterations, []),
