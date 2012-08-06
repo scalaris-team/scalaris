@@ -45,13 +45,16 @@ basic_tests() ->
 
 repair_tests() ->
     [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
-     min_nodes,      % sync in an single node ring
+     one_node,       % sync in ring with only one node
      %mpath
      dest,           % run one sync with a specified dest node 
      simple,         % run one sync round
-     multi_round,    % run multiple sync rounds
-     parts		 	 % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
-	].        
+     multi_round     % run multiple sync rounds
+	].
+
+bloom_tests() ->    
+    repair_tests() ++ 
+        [parts]. % get_chunk with limited items / leads to multiple bloom filters
 
 all() ->
     [{group, basic},
@@ -60,13 +63,13 @@ all() ->
 
 groups() ->
     [{basic,  [parallel], basic_tests()},
-     {repair, [sequence], [{upd_bloom,    [sequence], repair_tests()}, %{repeat_until_any_fail, 1000}
+     {repair, [sequence], [{upd_bloom,    [sequence], bloom_tests()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_tests()},
                            {upd_art,      [sequence], repair_tests()},
-                           {regen_bloom,  [sequence], repair_tests()},
+                           {regen_bloom,  [sequence], bloom_tests()},
                            {regen_merkle, [sequence], repair_tests()},
                            {regen_art,    [sequence], repair_tests()},
-                           {mixed_bloom,  [sequence], repair_tests()}, 
+                           {mixed_bloom,  [sequence], bloom_tests()}, 
                            {mixed_merkle, [sequence], repair_tests()},
                            {mixed_art,    [sequence], repair_tests()}]}
     ].
@@ -147,7 +150,7 @@ no_diff(Config) ->
                               1, 0.1, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) =:= sync_degree(End)).
 
-min_nodes(Config) ->
+one_node(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     {Start, End} = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
