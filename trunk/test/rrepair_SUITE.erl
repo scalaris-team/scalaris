@@ -32,7 +32,7 @@
 -include("record_helpers.hrl").
 
 -define(REP_FACTOR, 4).
--define(DBSizeKey, rr_admin_dbsize).    %Process Dictionary Key for generated db size
+-define(DBSizeKey, rrepair_SUITE_dbsize).    %Process Dictionary Key for generated db size
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -44,12 +44,14 @@ basic_tests() ->
      tester_minKeyInInterval].
 
 repair_tests() ->
-    [no_diff,       % ring is not out of sync e.g. no outdated or missing replicas
-     min_nodes,     % sync in an single node ring
-     simple,        % run one sync round
-     multi_round,   % run multiple sync rounds
-     dest,          % run one sync with a specified dest node 
-     parts].        % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
+    [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
+     min_nodes,      % sync in an single node ring
+     %mpath
+     dest,           % run one sync with a specified dest node 
+     simple,         % run one sync round
+     multi_round,    % run multiple sync rounds
+     parts		 	 % get_chunk with limited items / leads to multiple bloom filters and/or successive merkle tree building
+	].        
 
 all() ->
     [{group, basic},
@@ -125,7 +127,6 @@ get_rep_upd_config(Method) ->
      {rr_trigger, trigger_periodic},
      {rr_trigger_interval, 100000000}, %stop trigger
      {rr_recon_method, Method},
-     {rr_resolve_method, simple},
      {rr_bloom_fpr, 0.1},
 	 {rr_trigger_probability, 100},
      {rr_max_items, 10000},
@@ -152,6 +153,50 @@ min_nodes(Config) ->
     {Start, End} = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
                               1, 0.2, get_rep_upd_config(Method)),
     ?assert(sync_degree(Start) =:= sync_degree(End)).    
+
+mpath_map({request_resolve, _, {key_upd, L}, _}) ->
+    {key_upd, length(L)};
+mpath_map(Msg) ->
+    {element(1, Msg)}.
+
+mpath(Config) ->
+	%parameter
+    NodeCount = 4,
+    DataCount = 1000,
+    Fpr = 0.1,
+    Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
+	TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
+    %build and fill ring
+    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
+    config:write(rr_bloom_fpr, Fpr),
+    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
+                                               {fprob, 50}, 
+                                               {distribution, uniform}]),
+    %chose node pair    
+    SKey = ?RT:get_random_node_id(),
+    CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
+    %server starts sync
+	%trace_mpath:start(TraceName, fun mpath_map/1),
+    trace_mpath:start(TraceName),
+    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+                                              {request_sync, Method, CKey}}),
+    %waitForSyncRoundEnd(NodeKeys),
+	timer:sleep(3000),
+	trace_mpath:stop(),
+	%TRACE
+	A = trace_mpath:get_trace(TraceName),
+    trace_mpath:cleanup(TraceName),
+	B = [X || X = {log_send, _Time, _, 
+				   {{_FIP,_FPort,_FPid}, _FName}, 
+				   {{_TIP,_TPort,_TPid}, _TName}, 
+				   _Msg} <- A], 
+	file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
+	file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(A)])),
+    %file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),
+    %clean up
+    unittest_helper:stop_ring(),    
+	ok.
 
 simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -377,7 +422,7 @@ count_dbsize(Key) ->
 
 -spec get_db_status() -> db_generator:db_status().
 get_db_status() ->
-    DBSize = erlang:get(?DBSizeKey),
+    DBSize = erlang:get(?DBSizeKey),    
     Ring = statistics:get_ring_details(),
     Stored = statistics:get_total_load(Ring),
     {DBSize, Stored, DBSize - Stored, count_outdated()}.
@@ -412,13 +457,15 @@ startSyncRound(NodeKeys) ->
     ok.
 
 waitForSyncRoundEnd(NodeKeys) ->
-    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sync}},
+    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     lists:foreach(
       fun(Key) -> 
               util:wait_for(
                 fun() -> 
                         api_dht_raw:unreliable_lookup(Key, Req),
-                        receive {get_state_response, Val} -> Val =:= 0 end
+                        receive 
+							{get_state_response, Val} -> Val =:= 0
+						end
                 end)
       end, 
       NodeKeys),

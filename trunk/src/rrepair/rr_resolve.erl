@@ -33,7 +33,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/1]).
+-export([init/1, on/2, start/0, start/1]).
+-export([get_stats_session_id/1, get_stats_feedback/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -60,7 +61,7 @@
 
 -record(resolve_stats,
         {
-         round            = {0, 0} :: rrepair:round(),
+         session_id       = null   :: rrepair:session_id() | null,
          diff_size        = 0      :: non_neg_integer(),
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
@@ -101,11 +102,11 @@
 -spec on(message(), state()) -> state().
 
 on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid, 
-														   stats = Stats }) ->
-	FBDest = proplists:get_value(feedback, Options, nil),
+                                                           stats = Stats }) ->
+    FBDest = proplists:get_value(feedback, Options, nil),
     FBResp = proplists:get_value(feedback_response, Options, false),
     StatsDest = proplists:get_value(send_stats, Options, nil),
-	NewState = State#rr_resolve_state{ operation = Operation,
+    NewState = State#rr_resolve_state{ operation = Operation,
 									   stats = Stats#resolve_stats{ feedback_response = FBResp },
 									   feedback = {FBDest, []},
 									   send_stats = StatsDest },
@@ -158,7 +159,10 @@ on({get_entries_response, KVVList}, State =
                   nil -> [];
                   _ -> [{feedback, FB}]
               end,
-    comm:send(Dest, {request_resolve, Stats#resolve_stats.round, {key_upd, KVVList}, Options}),
+    case Stats#resolve_stats.session_id of
+        null -> comm:send(Dest, {request_resolve, {key_upd, KVVList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, KVVList}, Options})
+    end,
     comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
     State;
 
@@ -169,7 +173,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                   update_count = UpdOk, 
                                                   upd_fail_count = UpdFail,
                                                   regen_fail_count = RegenFail,
-                                                  round = Round
+                                                  session_id = SID
                                                 } = Stats,                          
                           feedback = FB = {DoFB, FBItems}
                         }) ->
@@ -188,7 +192,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
             end,
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
-                send_feedback(NewFB, Round),
+                send_feedback(NewFB, SID),
                 comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
         true -> ok
     end,
@@ -201,6 +205,46 @@ on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
     send_stats(SendStats, NStats),
     comm:send_local(Owner, {resolve_progress_report, self(), NStats}),
     kill.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% resolve stats operations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_stats_session_id(stats()) -> rrepair:session_id().
+get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
+
+-spec get_stats_feedback(stats()) -> boolean().
+get_stats_feedback(Stats) -> Stats#resolve_stats.feedback_response.
+
+%% @doc merges two stats records with identical session_id, otherwise error will be raised
+-spec merge_stats(stats(), stats()) -> stats() | error.
+merge_stats(#resolve_stats{ session_id = ASID,
+                            diff_size = ADiff,
+                            feedback_response = AFB,
+                            regen_count = ARC,
+                            regen_fail_count = AFC,
+                            upd_fail_count = AUFC,
+                            update_count = AUC }, 
+            #resolve_stats{ session_id = BSID,
+                            diff_size = BDiff,
+                            feedback_response = BFB,
+                            regen_count = BRC,
+                            regen_fail_count = BFC,
+                            upd_fail_count = BUFC,
+                            update_count = BUC }) ->
+    case rrepair:session_id_equal(ASID, BSID) of
+        true ->
+            #resolve_stats{ session_id = ASID,
+                            diff_size = ADiff + BDiff,
+                            feedback_response = AFB orelse BFB,
+                            regen_count = ARC + BRC,
+                            regen_fail_count = AFC + BFC,
+                            upd_fail_count = AUFC + BUFC,
+                            update_count = AUC + BUC };
+        false ->
+            log:log(error,"[ ~p ]: Trying to Merge stats with non identical rounds",[?MODULE]),
+            error
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
@@ -222,10 +266,12 @@ build_comment(#rr_resolve_state{ operation = Operation, feedback = {FBDest, _} }
               end,
     Stats#resolve_stats{ comment = Comment }.
 
--spec send_feedback(feedback(), rrepair:round()) -> ok.
+-spec send_feedback(feedback(), rrepair:session_id()) -> ok.
 send_feedback({nil, _}, _) -> ok;
-send_feedback({Dest, Items}, Round) ->
-    comm:send(Dest, {request_resolve, Round, {key_upd, Items}, [feedback_response]}).
+send_feedback({Dest, Items}, null) ->
+    comm:send(Dest, {request_resolve, {key_upd, Items}, [feedback_response]});
+send_feedback({Dest, Items}, SID) ->
+    comm:send(Dest, {request_resolve, SID, {key_upd, Items}, [feedback_response]}).
 
 -spec send_stats(nil | comm:mypid(), stats()) -> ok.
 send_stats(nil, _) -> ok;
@@ -249,11 +295,20 @@ print_resolve_stats(Stats) ->
 init(State) ->    
     State.
 
--spec start(rrepair:round()) -> {ok, MyPid::pid()}.
-start(Round) ->        
-    State = #rr_resolve_state{ ownerLocalPid = self(), 
-                               ownerRemotePid = comm:this(), 
-                               dhtNodePid = pid_groups:get_my(dht_node),                               
-                               stats = #resolve_stats{ round = Round } 
-							 },
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
+-spec start() -> {ok, MyPid::pid()}.
+start() ->        
+    gen_component:start(?MODULE, fun ?MODULE:on/2, get_start_state(), []).
+
+-spec start(rrepair:session_id()) -> {ok, MyPid::pid()}.
+start(SID) ->        
+    State = get_start_state(),
+    Stats = State#rr_resolve_state.stats,
+    gen_component:start(?MODULE, fun ?MODULE:on/2, 
+                        State#rr_resolve_state{ stats = Stats#resolve_stats{ session_id = SID } }, []).
+
+-spec get_start_state() -> state().
+get_start_state() ->
+    #rr_resolve_state{ ownerLocalPid = self(), 
+                       ownerRemotePid = comm:this(), 
+                       dhtNodePid = pid_groups:get_my(dht_node)
+                     }.

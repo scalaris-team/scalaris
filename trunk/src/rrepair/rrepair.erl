@@ -15,8 +15,8 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    replica repair module 
 %%         Replica sets will be synchronized in two steps.
-%%          I) reconciliation - find set differences  (rr_recon.erl)
-%%         II) resolution - resolve found differences (rr_resolve.erl)
+%%          I) reconciliation   - find set differences  (rr_recon.erl)
+%%         II) resolution       - resolve found differences (rr_resolve.erl)
 %%
 %%         Examples:
 %%            1) remote node should get a single kvv-pair (key,value,version)
@@ -32,20 +32,21 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([start_link/1, init/1, on/2, check_config/0]).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE_KILL(X,Y), ok).
-%-define(TRACE_KILL(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
--define(TRACE_RECON(X,Y), ok).
-%-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RECON(X,Y), ok).
+-define(TRACE_RECON(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
--define(TRACE_RESOLVE(X,Y), ok).
-%-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE_RESOLVE(X,Y), ok).
+-define(TRACE_RESOLVE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+
+%-define(TRACE_COMPLETE(X,Y), ok).
+-define(TRACE_COMPLETE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
@@ -53,102 +54,149 @@
 -define(TRIGGER_NAME, rr_trigger).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% type definitions
+% export
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-export([start_link/1, init/1, on/2, check_config/0,
+         fork_session/1, session_id_equal/2]).
+
 -ifdef(with_export_type_support).
--export_type([round/0]).
+-export_type([session_id/0]).
 -endif.
 
--type round() :: {non_neg_integer(), non_neg_integer()}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% type definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-type round()       :: {non_neg_integer(), non_neg_integer()}.
+-type session_id()  :: {round(), comm:mypid()}.
+% @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only 
+%      number of regenerated db items on the initator
+-record(session, 
+        { id                = ?required(session, id)            :: session_id(), 
+          rc_method         = ?required(session, rc_method)     :: rr_recon:method(), 
+          rc_stats          = none                              :: rr_recon_stats:stats() | none,
+          rs_stats          = none                              :: rr_resolve:stats() | none,
+          rs_called         = 0                                 :: non_neg_integer(),
+          rs_finish         = 0                                 :: non_neg_integer()
+        }).
+-type session() :: #session{}.
+%TODO Session TTL
 
 -record(rrepair_state,
         {
          trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state(),
          round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
-         open_resolve   = 0                                         :: non_neg_integer()
+         open_resolve   = 0                                         :: non_neg_integer(),
+         open_sessions  = []                                        :: [] | [session()]   % List of running request_sync calls (only rounds initiated by this process) 
          }).
 -type state() :: #rrepair_state{}.
 
 -type state_field() :: round |           %next round id
                        open_recon |      %number of open recon processes
                        open_resolve |    %number of open resolve processes
-                       open_sync.        %open_recon + open_resolve
+                       open_sessions.    %number of current running sync sessions
 
 -type message() ::
     % API
+    {request_sync, DestKey::random | ?RT:key()} |
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
-    {request_resolve, Round::round(), rr_resolve:operation(), rr_resolve:options()} |
+    {request_resolve, rr_resolve:operation(), rr_resolve:options()} |
     {get_state, Sender::comm:mypid(), Key::state_field()} |
     % internal
-    {?TRIGGER_NAME} |    
-	{continue_recon, SenderRRPid::comm:mypid(), Round::round(), ReqMsg::rr_recon:request()} |
+    {?TRIGGER_NAME} |
+	{continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
+    {request_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
+    {request_sync_complete, session()} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     % rr statistics
     {rr_stats, rr_statistics:requests()} |
     % report
-    {recon_progress_report, Sender::comm:erl_local_pid(), Master::boolean(), Stats::rr_recon_stats:stats()} |
+    {recon_progress_report, Sender::comm:erl_local_pid(), Initiator::boolean(), Stats::rr_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Stats::rr_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Message handling
+% API messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
-on({?TRIGGER_NAME}, State) ->
-    ?TRACE_KILL("RR: SYNC TRIGGER", []),
-	Prob = get_start_prob(),
-	Random = randoms:rand_uniform(1, 100),
-	if Random =< Prob ->		   
-		   comm:send_local(self(), {request_sync, get_recon_method(), random});
-	   true -> ok
-	end,
-    NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
-    State#rrepair_state{ trigger_state = NewTriggerState };
+% @doc Requests db sync with DestKey using default recon method (given in config).
+on({request_sync, DestKey}, State) ->
+    comm:send_local(self(), {request_sync, get_recon_method(), DestKey}),
+    State;
 
 % @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %      Random leads to sync with a node which is associated with this (e.g. symmetric partner)  
 on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round, 
-                                                            open_recon = OpenRecon }) ->
-    ?TRACE_KILL("RR: REQUEST SYNC WITH ~p", [DestKey]),
-    {ok, Pid} = rr_recon:start(Round),
+                                                            open_recon = OpenRecon,
+                                                            open_sessions = Sessions }) ->
+    ?TRACE("RR: REQUEST SYNC WITH ~p", [DestKey]),
+    S = new_session(Round, comm:this(), Method),
+    {ok, Pid} = rr_recon:start(S#session.id),
     comm:send_local(Pid, {start, Method, DestKey}),
     State#rrepair_state{ round = next_round(Round),
-                         open_recon = OpenRecon + 1 };
+                         open_recon = OpenRecon + 1,
+                         open_sessions = [S | Sessions] };
 
-on({request_resolve, Round, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
-    {ok, Pid} = rr_resolve:start(Round),
-	comm:send_local(Pid, {start, Operation, Options}),
+on({request_resolve, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+    {ok, Pid} = rr_resolve:start(),
+    comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 % @doc request replica repair status
 on({get_state, Sender, Key}, State = 
        #rrepair_state{ open_recon = Recon,
                        open_resolve = Resolve,
-                       round = Round }) ->
+                       round = Round,
+                       open_sessions = Sessions }) ->
     Value = case Key of
                 open_recon -> Recon;
                 open_resolve -> Resolve;
                 round -> Round;
-                open_sync -> Recon + Resolve
+                open_sessions -> length(Sessions)
             end,
-    ?TRACE_RESOLVE("RREPAIR - GET STATE (Sender=~p) Recon=~p ; Resolve=~p", [Sender, Recon, Resolve]),
     comm:send(Sender, {get_state_response, Value}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% internal messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({?TRIGGER_NAME}, State) ->
+    ?TRACE("RR: SYNC TRIGGER", []),
+    Prob = get_start_prob(),
+    Random = randoms:rand_uniform(1, 100),
+    if Random =< Prob ->           
+           comm:send_local(self(), {request_sync, get_recon_method(), random});
+       true -> ok
+    end,
+    NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
+    State#rrepair_state{ trigger_state = NewTriggerState };
+
+on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+    {ok, Pid} = rr_resolve:start(SessionID),
+    comm:send_local(Pid, {start, Operation, Options}),
+    State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
-on({continue_recon, Sender, Round, Msg}, State) ->
-    ?TRACE_KILL("CONTINUE RECON FROM ~p", [Sender]),
-    {ok, Pid} = rr_recon:start(Round, Sender),
+on({continue_recon, Sender, SessionID, Msg}, State) ->
+    ?TRACE("CONTINUE RECON FROM ~p", [Sender]),
+    {ok, Pid} = rr_recon:start(SessionID, Sender),
     comm:send_local(Pid, Msg),
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
 on({recon_forked}, State) ->
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
+
+%% @doc will be called after finishing a request_sync API call
+%%      Could be used to send request caller a finished Msg.
+on({request_sync_complete, Session}, State = #rrepair_state{ open_sessions = Sessions }) ->
+    ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [Session]),
+    NewOpen = lists:delete(Session, Sessions),
+    State#rrepair_state{ open_sessions = NewOpen };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -158,35 +206,62 @@ on({rr_stats, Msg}, State) ->
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-on({recon_progress_report, _Sender, _Master, Stats}, State) ->
-    OpenRecon = State#rrepair_state.open_recon - 1,
-    rr_recon_stats:get(finish, Stats) andalso
-        ?TRACE_RECON("~nRECON OK - Sender=~p - Master=~p~nStats=~p~nOpenRecon=~p", 
-                     [_Sender, _Master, rr_recon_stats:print(Stats), OpenRecon]),
-    State#rrepair_state{ open_recon = OpenRecon };
-
-on({resolve_progress_report, _Sender, _Stats}, State) ->
-    OpenResolve = State#rrepair_state.open_resolve - 1,
-    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p", 
-           [_Sender, rr_resolve:print_resolve_stats(_Stats),
-            State#rrepair_state.open_recon, OpenResolve]),
-    State#rrepair_state{ open_resolve = OpenResolve };
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Misc Info Messages
+% report messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({web_debug_info, Requestor}, State) ->
-    #rrepair_state{ round = Round, 
-                    open_recon = OpenRecon, 
-                    open_resolve = OpenResol } = State,
+on({recon_progress_report, _Sender, Initiator, Stats}, State = #rrepair_state{ open_recon = OpenRecon,
+                                                                             open_sessions = Sessions }) ->
+    %rr_recon_stats:get(status, Stats) =:= finish andalso
+        ?TRACE_RECON("~nRECON OK - Sender=~p - Initiator=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
+                     [_Sender, Initiator, rr_recon_stats:print(Stats), OpenRecon - 1, Sessions]),    
+    NSessions = case Initiator of
+                    true -> 
+                        case extract_session(rr_recon_stats:get(session_id, Stats), Sessions) of
+                            {S, TSessions} ->
+                                SUpd = update_session_recon(S, Stats),
+                                check_session_complete(SUpd),
+                                [SUpd | TSessions];
+                            not_found ->
+                                %caused by error or forked rc instances by bloom filter rc
+                                %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
+                                Sessions
+                        end;
+                    false -> Sessions
+                end,
+    State#rrepair_state{ open_recon = OpenRecon - 1,
+                         open_sessions = NSessions };
+
+on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolve = OpenResolve,
+                                                                     open_sessions = Sessions}) ->
+    NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), Sessions) of
+                    not_found -> Sessions;
+                    {S, T} -> 
+                        SUpd = update_session_resolve(S, Stats),
+                        check_session_complete(SUpd),
+                        [SUpd | T]
+                end,
+    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p ; OldSession=~p~nNewSessions=~p", 
+                   [_Sender, rr_resolve:print_resolve_stats(Stats),
+                    State#rrepair_state.open_recon, OpenResolve - 1, Sessions, NSessions]),        
+    State#rrepair_state{ open_resolve = OpenResolve - 1,
+                         open_sessions = NSessions };
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% misc info messages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({web_debug_info, Requestor}, #rrepair_state{ round = Round, 
+                                                open_recon = OpenRecon, 
+                                                open_resolve = OpenResol,
+                                                open_sessions = Sessions } = State) ->
+    ?TRACE("WEB DEBUG INFO", []),
     KeyValueList =
         [{"Recon Method:", get_recon_method()},
          {"Bloom Module:", ?REP_BLOOM},
          {"Sync Round:", Round},
          {"Open Recon Jobs:", OpenRecon},
-         {"Open Resolve Jobs:", OpenResol}
+         {"Open Resolve Jobs:", OpenResol},
+         {"Open Sessions:", length(Sessions)}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
@@ -196,7 +271,59 @@ on({web_debug_info, Requestor}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec next_round(round()) -> round().
-next_round({R, F}) -> {R + 1, F}.
+next_round({R, _Fork}) -> {R + 1, 0}.
+
+-spec new_session(round(), comm:mypid(), rr_recon:method()) -> session().
+new_session(Round, Pid, RCMethod) ->
+    #session{ id = {Round, Pid}, rc_method = RCMethod }.
+
+-spec session_id_equal(session_id(), session_id()) -> boolean().
+session_id_equal({{R, _}, Pid}, {{R, _}, Pid}) -> true;
+session_id_equal(_, _) -> false.
+
+-spec fork_session(session_id()) -> session_id().
+fork_session({{R, F}, Pid}) ->
+    {{R, F + 1}, Pid}.
+
+-spec extract_session(session_id(), [session()]) -> {session(), Remain::[session()]} | not_found.
+extract_session(Id, Sessions) ->
+    {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) -> 
+                                                session_id_equal(Id, I)
+                                        end, 
+                                        Sessions),
+    case length(Satis) of
+        1 -> {hd(Satis), NotSatis};
+        0 -> not_found;
+        _ -> 
+            log:log(error, "[ ~p ] SESSION NOT UNIQUE! ~p - OpenSessions=~p", [?MODULE, Id, Sessions]),
+            not_found
+    end.
+
+-spec update_session_recon(session(), rr_recon_stats:stats()) -> session().
+update_session_recon(Session, New) ->
+    case rr_recon_stats:get(status, New) of
+        wait -> Session;
+        _ -> Session#session{ rc_stats  = New,
+                              rs_called = rr_recon_stats:get(resolve_started, New) }
+    end.
+
+-spec update_session_resolve(session(), rr_resolve:stats()) -> session().
+update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount } = S, Stats) ->
+    S#session{ rs_stats = Stats, rs_finish = RSCount + 1 };
+update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New) ->
+    Merge = rr_resolve:merge_stats(Old, New),
+    S#session{ rs_stats = Merge, rs_finish = RSCount + 1 }.
+
+-spec check_session_complete(session()) -> ok.
+check_session_complete(#session{ rc_stats = RCStats, 
+                                 rs_called = C, rs_finish = C } = S) 
+  when RCStats =/= none->
+    case rr_recon_stats:get(status, RCStats) of
+        finish -> comm:send_local(self(), {request_sync_complete, S});
+        _ -> ok
+    end;
+check_session_complete(_Session) ->
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
