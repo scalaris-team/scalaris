@@ -398,15 +398,18 @@ public class ScalarisDataHandler {
                         return v.listValue();
                     }
                 });
+        ValueResult<NormalisedTitle> vResult;
         if (result.success) {
             String randomTitle = result.value.get(
                     random.nextInt(result.value.size())).stringValue();
-            return new ValueResult<NormalisedTitle>(result.involvedKeys,
+            vResult = new ValueResult<NormalisedTitle>(result.involvedKeys,
                     NormalisedTitle.fromNormalised(randomTitle));
         } else {
-            return new ValueResult<NormalisedTitle>(false, result.involvedKeys,
-                    result.message, result.connect_failed);
+            vResult = new ValueResult<NormalisedTitle>(false,
+                    result.involvedKeys, result.message, result.connect_failed);
         }
+        vResult.stats = result.stats;
+        return vResult;
     }
 
     /**
