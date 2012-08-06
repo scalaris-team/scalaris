@@ -67,8 +67,7 @@
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
          regen_fail_count = 0      :: non_neg_integer(),
-         feedback_response= false  :: boolean(),            %true if this is a feedback response
-         comment          = []     :: [any()]
+         feedback_response= false  :: boolean()            %true if this is a feedback response
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -200,10 +199,9 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
 
 on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner, 
                                      send_stats = SendStats,
-                                     stats = Stats } = State) ->
-    NStats = build_comment(State, Stats),
-    send_stats(SendStats, NStats),
-    comm:send_local(Owner, {resolve_progress_report, self(), NStats}),
+                                     stats = Stats }) ->
+    send_stats(SendStats, Stats),
+    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -249,22 +247,6 @@ merge_stats(#resolve_stats{ session_id = ASID,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec build_comment(state(), stats()) -> stats().
-build_comment(#rr_resolve_state{ operation = Operation, feedback = {FBDest, _} }, 
-              Stats) ->
-    Resp = Stats#resolve_stats.feedback_response,
-    Comment = case Operation of 
-                  {key_upd, _} when Resp ->
-                      "key_upd by feedback";
-                  {key_upd, _} when not Resp andalso FBDest =:= nil ->
-                      "key_upd without feedback"; 
-                  {key_upd, _} when not Resp andalso FBDest =/= nil -> 
-                      ["key_upd with feedback to ", FBDest];
-                  {key_upd_send, Dest, _} -> 
-                      ["key_upd_send to ", Dest]
-              end,
-    Stats#resolve_stats{ comment = Comment }.
 
 -spec send_feedback(feedback(), rrepair:session_id()) -> ok.
 send_feedback({nil, _}, _) -> ok;
