@@ -783,7 +783,7 @@ module Scalaris
     # Assumes en empty list if no value exists at key.
     def add_del_on_list(key, to_add, to_remove)
       result = req_list(new_req_list().add_add_del_on_list(key, to_add, to_remove))[0]
-      _process_result_add_del_on_list(result)
+      process_result_add_del_on_list(result)
     end
 
     # Issues a add_on_nr operation to scalaris and adds it to the
@@ -792,7 +792,7 @@ module Scalaris
     # Assumes 0 if no value exists at key.
     def add_on_nr(key, to_add)
       result = req_list(new_req_list().add_add_on_nr(key, to_add))[0]
-      _process_result_add_on_nr(result)
+      process_result_add_on_nr(result)
     end
 
     # Issues a test_and_set operation to scalaris and adds it to the
@@ -801,7 +801,7 @@ module Scalaris
     # write new_value.
     def test_and_set(key, old_value, new_value)
       result = req_list(new_req_list().add_test_and_set(key, old_value, new_value))[0]
-      _process_result_test_and_set(result)
+      process_result_test_and_set(result)
     end
 
     include InternalScalarisNopClose
