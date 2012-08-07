@@ -150,7 +150,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
             return new PageHistoryResult(false, involvedKeys,
-                    "unknown exception reading \"" + getPageKey(title)
+                    e.getClass().getCanonicalName() + " reading \"" + getPageKey(title)
                             + "\" or \"" + getRevListKey(title)
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
@@ -169,7 +169,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             return result;
         } catch (Exception e) {
             return new PageHistoryResult(false, involvedKeys,
-                    "unknown exception reading \"" + getPageKey(title)
+                    e.getClass().getCanonicalName() + " reading \"" + getPageKey(title)
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
                     System.currentTimeMillis() - timeAtStart);
@@ -187,7 +187,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             return result;
         } catch (Exception e) {
             return new PageHistoryResult(false, involvedKeys,
-                    "unknown exception reading \"" + getRevListKey(title)
+                    e.getClass().getCanonicalName() + " reading \"" + getRevListKey(title)
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, statName,
                     System.currentTimeMillis() - timeAtStart);
@@ -252,7 +252,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
             return new RevisionResult(false, involvedKeys,
-                    "unknown exception reading \"" + scalaris_key
+                    e.getClass().getCanonicalName() + " reading \"" + scalaris_key
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, title, page, revision, false,
                     false, title.toString(), System.currentTimeMillis() - timeAtStart);
@@ -271,7 +271,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
                         System.currentTimeMillis() - timeAtStart);
             } catch (Exception e) {
                 return new RevisionResult(false, involvedKeys,
-                        "unknown exception reading \"" + scalaris_key
+                        e.getClass().getCanonicalName() + " reading \"" + scalaris_key
                                 + "\" from Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, title, page,
                         revision, false, false, title.toString(),
@@ -320,7 +320,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             executor0.run();
         } catch (Exception e) {
             return new ValueResult<List<RevisionResult>>(false, involvedKeys,
-                    "unknown exception reading " + titles + " from Scalaris",
+                    e.getClass().getCanonicalName() + " reading " + titles + " from Scalaris",
                     e instanceof ConnectionException, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
@@ -468,7 +468,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
             return new ValueResult<Integer>(false, involvedKeys,
-                    "unknown exception updating \"" + pageList_key
+                    e.getClass().getCanonicalName() + " updating \"" + pageList_key
                             + "\" and \"" + pageCount_key + "\" in Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);

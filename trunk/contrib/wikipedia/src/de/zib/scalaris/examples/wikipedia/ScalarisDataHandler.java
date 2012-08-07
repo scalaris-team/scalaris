@@ -140,7 +140,7 @@ public class ScalarisDataHandler {
                     statName, System.currentTimeMillis() - timeAtStart);
         } catch (UnknownException e) {
             return new ValueResult<String>(false, involvedKeys,
-                    "unknown exception reading Scalaris version from node \""
+                    e.getClass().getCanonicalName() + " reading Scalaris version from node \""
                             + node + "\"", true, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
@@ -301,7 +301,7 @@ public class ScalarisDataHandler {
             executor.run();
         } catch (Exception e) {
             return new ValueResult<List<T>>(false, involvedKeys,
-                    "unknown exception reading page list at \""
+                    e.getClass().getCanonicalName() + " reading page list at \""
                             + involvedKeys.toString() + "\" from Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);
@@ -473,7 +473,7 @@ public class ScalarisDataHandler {
             results = scalaris_single.req_list(requests);
         } catch (Exception e) {
             return new ValueResult<BigInteger>(false, involvedKeys,
-                    "unknown exception reading (integral) number(s) at \""
+                    e.getClass().getCanonicalName() + " reading (integral) number(s) at \""
                             + scalaris_keys.toString() + "\" from Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);
@@ -486,14 +486,14 @@ public class ScalarisDataHandler {
             } catch (NotFoundException e) {
                 if (failNotFound) {
                     return new ValueResult<BigInteger>(false, involvedKeys,
-                            "unknown exception reading (integral) number at \""
+                            e.getClass().getCanonicalName() + " reading (integral) number at \""
                                     + scalaris_key + "\" from Scalaris: "
                                     + e.getMessage(), false, statName,
                                     System.currentTimeMillis() - timeAtStart);
                 }
             } catch (Exception e) {
                 return new ValueResult<BigInteger>(false, involvedKeys,
-                        "unknown exception reading (integral) number at \""
+                        e.getClass().getCanonicalName() + " reading (integral) number at \""
                                 + scalaris_key + "\" from Scalaris: "
                                 + e.getMessage(), e instanceof ConnectionException,
                                 statName, System.currentTimeMillis() - timeAtStart);
