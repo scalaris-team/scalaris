@@ -662,6 +662,28 @@ class TestTransaction < Test::Unit::TestCase
       
       conn.close_connection()
   end
+
+  # Various tests.
+  def testVarious()
+      _writeSingleTest("_0:" + [0x0160].pack("U*") + "arplaninac:page_", $_TEST_DATA[0])
+  end
+  
+  # Helper function for single write tests.
+  # Writes a strings to some key and tries to read it afterwards.
+  def _writeSingleTest(key, data)
+    t = Scalaris::Transaction.new()
+  
+    t.write(@testTime.to_s + key, data)
+    # now try to read the data:
+    assert_equal(data, t.read(@testTime.to_s + key))
+    # commit the transaction and try to read the data with a new one:
+    t.commit()
+    t = Scalaris::Transaction.new()
+    assert_equal(data, t.read(@testTime.to_s + key))
+    
+    t.close_connection()
+  end
+  private :_writeSingleTest
 end
 
   class TestPubSub < Test::Unit::TestCase

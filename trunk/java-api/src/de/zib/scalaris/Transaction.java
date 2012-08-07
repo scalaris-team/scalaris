@@ -439,7 +439,7 @@ public class Transaction extends
                 final OtpErlangList newTLogL = (OtpErlangList) newTLog;
                 for (int i = 0; i < newTLogL.arity(); ++i) {
                     final OtpErlangTuple entry = (OtpErlangTuple) newTLogL.elementAt(i);
-                    final OtpErlangString key = (OtpErlangString) entry.elementAt(1);
+                    final OtpErlangString key = ErlangValue.otpObjectToOtpString(entry.elementAt(1));
                     entries.put(key, entry);
                 }
             } catch (final ClassCastException e) {

@@ -591,6 +591,25 @@ class TestTransaction(unittest.TestCase):
         
         conn.close_connection()
 
+    # Various tests.
+    def testVarious(self):
+        self._writeSingleTest("_0:\u0160arplaninac:page_", _TEST_DATA[0])
+
+    # Helper function for single write tests.
+    # Writes a strings to some key and tries to read it afterwards.
+    def _writeSingleTest(self, key, data):
+        t = Transaction()
+        
+        t.write(str(self._testTime) + key, data)
+        # now try to read the data:
+        self.assertEqual(t.read(str(self._testTime) + key), data)
+        # commit the transaction and try to read the data with a new one:
+        t.commit()
+        t = Transaction()
+        self.assertEqual(t.read(str(self._testTime) + key), data)
+        
+        t.close_connection()
+
 class TestPubSub(unittest.TestCase):
     def setUp(self):
         # The time when the test suite was started.
