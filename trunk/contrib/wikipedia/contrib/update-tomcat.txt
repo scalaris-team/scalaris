@@ -11,5 +11,4 @@ URIEncoding="UTF-8"
 -> sets default parameter encoding to UTF-8 (required by the wiki app)
 maxHttpHeaderSize="131072"
 -> support redirect URLs with a lot of logged involved and failed keys
-5) change paths in <wiki-dir>/build.xml
-6) replace contents in <old-tomcat-dir> with contents of <new-tomcat-dir>
+5) replace <old-tomcat-dir> with <new-tomcat-dir>
