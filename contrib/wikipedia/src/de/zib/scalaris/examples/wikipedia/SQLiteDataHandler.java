@@ -388,11 +388,11 @@ public class SQLiteDataHandler {
             return new ValueResult<BigInteger>(
                     false,
                     involvedKeys,
-                    "unknown exception reading " + statName,
+                    "no result reading " + statName,
                     false, statName, System.currentTimeMillis() - timeAtStart);
         } catch (SQLiteException e) {
             return new ValueResult<BigInteger>(false, involvedKeys,
-                    "unknown exception reading " + statName + ": "
+                    e.getClass().getCanonicalName() + " reading " + statName + ": "
                             + e.getMessage(), false, statName,
                     System.currentTimeMillis() - timeAtStart);
         } finally {
@@ -522,7 +522,7 @@ public class SQLiteDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         } catch (SQLiteException e) {
             return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
-                    "unknown exception reading " + statName + ": "
+                    e.getClass().getCanonicalName() + " reading " + statName + ": "
                             + e.getMessage(), false, statName,
                     System.currentTimeMillis() - timeAtStart);
         } finally {

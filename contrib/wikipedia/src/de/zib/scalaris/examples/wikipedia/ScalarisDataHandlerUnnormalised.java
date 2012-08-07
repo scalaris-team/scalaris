@@ -333,7 +333,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             results = scalaris_tx.req_list(requests);
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
-                    "unknown exception getting page info (" + pageInfoKey
+                    e.getClass().getCanonicalName() + " getting page info (" + pageInfoKey
                             + ") from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
@@ -354,7 +354,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             oldRevId = 0;
         } catch (Exception e) {
             return new SavePageResult(false, involvedKeys,
-                    "unknown exception reading \"" + pageInfoKey
+                    e.getClass().getCanonicalName() + " reading \"" + pageInfoKey
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, oldPage, newPage,
                     newShortRevs, pageEdits, statName,
@@ -512,7 +512,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                 executor.getExecutor().run();
             } catch (Exception e) {
                 return new SavePageResult(false, involvedKeys,
-                        "unknown exception writing page \"" + title0
+                        e.getClass().getCanonicalName() + " writing page \"" + title0
                                 + "\" to Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, oldPage, newPage,
                         newShortRevs, pageEdits, statName,
