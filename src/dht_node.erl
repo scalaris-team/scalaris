@@ -110,7 +110,11 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     SupTx = pid_groups:get_my(sup_dht_node_core_tx),
     NewPid =
         if Pid =:= failed andalso SupTx =:= failed -> failed;
-           Pid =:= failed ->
+           Pid =:= failed andalso
+           Process =/= tx_rtm0 andalso
+           Process =/= tx_rtm1 andalso
+           Process =/= tx_rtm2 andalso
+           Process =/= tx_rtm3 ->
                %% start, if necessary
                RTM_desc = util:sup_worker_desc(
                             Process, tx_tm_rtm, start_link,
@@ -128,7 +132,17 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
            true -> Pid
         end,
     case NewPid of
-        failed -> State;
+        failed ->
+            %% we are in the startup phase, processes will come up in a moment
+            if Process =:= tx_rtm0 orelse
+               Process =:= tx_rtm1 orelse
+               Process =:= tx_rtm2 orelse
+               Process =:= tx_rtm3 ->
+                    comm:send_local(self(),
+                                    {get_rtm, Source_PID, Key, Process});
+               true -> ok
+            end,
+            State;
         _ ->
             GPid = comm:make_global(NewPid),
             GPidAcc = comm:make_global(tx_tm_rtm:get_my(Process, acceptor)),

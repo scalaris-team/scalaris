@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -51,11 +51,14 @@ add_node_at_id(Id) ->
 -spec add_node([tuple()]) -> pid_groups:groupname() | {error, term()}.
 add_node(Options) ->
     DhtNodeId = randoms:getRandomString(),
+    Group = pid_groups:new("dht_node_"),
     Desc = util:sup_supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
-             [[{my_sup_dht_node_id, DhtNodeId} | Options]]),
-    case supervisor:start_child(main_sup, Desc) of
-        {ok, _Child, Group}           -> Group;
+             [{Group,
+               [{my_sup_dht_node_id, DhtNodeId} | Options]}]),
+    Sup = erlang:whereis(main_sup),
+    case sup:start_sup_as_child([" +"], Sup, Desc) of
+        {ok, _Child}           -> Group;
         {error, already_present}      -> add_node(Options); % try again, different Id
         {error, {already_started, _}} -> add_node(Options); % try again, different Id
         {error, _Error} = X           -> X

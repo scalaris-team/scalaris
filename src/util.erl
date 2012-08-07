@@ -49,6 +49,7 @@
 -export([list_set_nth/3]).
 -export([debug_info/0, debug_info/1]).
 -export([print_bits/2, bin_xor/2]).
+-export([if_verbose/1, if_verbose/2]).
 -export([sup_worker_desc/3,
          sup_worker_desc/4,
          sup_supervisor_desc/3,
@@ -284,6 +285,7 @@ get_stacktrace() ->
           end) of
         % erlang < R15 : {util, get_stacktrace, 0}
         % erlang >= R15: {util, get_stacktrace, 0, _}
+        %% drop head element as it was generated just above
         [T | ST] when erlang:element(1, T) =:= util andalso
                           erlang:element(2, T) =:= get_stacktrace andalso
                           erlang:element(3, T) =:= 0 -> ok;
@@ -766,8 +768,8 @@ app_check_known() ->
         undefined ->
             case is_unittest() of
                 true -> ok;
-                _    -> 
-                    error_logger:warning_msg("undefined application but no unittest~n"),
+                _    ->
+                    %% error_logger:warning_msg("undefined application but no unittest~n"),
                     ok
             end;
         {ok, App} ->
@@ -960,6 +962,20 @@ print_bits(FormatFun, Binary) ->
     <<BinNr:BitSize>> = Binary,
     NrBits = lists:flatten(io_lib:format("~B", [BitSize])),
     FormatFun("~" ++ NrBits ++ ".2B", [BinNr]).
+
+-spec if_verbose(string()) -> ok.
+if_verbose(String) ->
+    case app_get_env(verbose, false) of
+        true ->  io:format(String);
+        false -> ok
+    end.
+
+-spec if_verbose(string(), list()) -> ok.
+if_verbose(String, Fmt) ->
+    case app_get_env(verbose, false) of
+        true ->  io:format(String, Fmt);
+        false -> ok
+    end.
 
 -spec bin_xor(binary(), binary()) -> binary().
 bin_xor(Binary1, Binary2) ->

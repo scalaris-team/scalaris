@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -29,23 +29,31 @@
 -behaviour(supervisor).
 
 -export([start_link/2, init/1, check_config/0]).
+-export([supspec/1, childs/1]).
 
 -spec start_link(pid_groups:groupname(), Options::[tuple()]) ->
                         {ok, Pid::pid()} | ignore |
                         {error, Error::{already_started, Pid::pid()} |
                                        shutdown | term()}.
 start_link(DHTNodeGroup, Options) ->
-    supervisor:start_link(?MODULE, {DHTNodeGroup, Options}).
+    supervisor:start_link(?MODULE, [DHTNodeGroup, Options]).
 
 %% userdevguide-begin sup_dht_node_core:init
--spec init({pid_groups:groupname(), Options::[tuple()]}) ->
+-spec init([{pid_groups:groupname(), Options::[tuple()]}]) ->
                   {ok, {{one_for_all, MaxRetries::pos_integer(),
                          PeriodInSeconds::pos_integer()},
                         [ProcessDescr::supervisor:child_spec()]}}.
-init({DHTNodeGroup, Options}) ->
+init([DHTNodeGroup, Options] = X) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
+    supspec(X).
+%% userdevguide-end sup_dht_node_core:init
+
+supspec(X) ->
+    {ok, {{one_for_all, 10, 1}, []}}.
+
+childs([DHTNodeGroup, Options]) ->
     PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
-                                              start_link, [DHTNodeGroup, []]),
+                                              start_link, [{DHTNodeGroup, []}]),
     DHTNodeModule = config:read(dht_node),
     DHTNode = util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
@@ -55,14 +63,13 @@ init({DHTNodeGroup, Options}) ->
     TX =
         util:sup_supervisor_desc(sup_dht_node_core_tx, sup_dht_node_core_tx, start_link,
                                  [DHTNodeGroup]),
-    {ok, {{one_for_all, 10, 1},
-          [
-           PaxosProcesses,
-           DHTNodeMonitor,
-           DHTNode,
-           TX
-          ]}}.
-%% userdevguide-end sup_dht_node_core:init
+    [
+     PaxosProcesses,
+     DHTNodeMonitor,
+     DHTNode,
+     TX
+    ].
+
 
 %% @doc Checks whether config parameters for the sup_dht_node_core supervisor
 %%      exist and are valid.
