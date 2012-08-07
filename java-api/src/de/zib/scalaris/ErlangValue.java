@@ -240,8 +240,8 @@ public class ErlangValue {
 
     /**
      * Converts an {@link OtpErlangObject} to a {@link String} taking special
-     * care of empty lists which can not be converted to strings using the OTP
-     * library .
+     * care of lists which have not be converted to strings automatically using
+     * the OTP library.
      *
      * @param value
      *            the value to convert
@@ -264,6 +264,35 @@ public class ErlangValue {
             return ((OtpErlangAtom) value).atomValue();
         } else {
             return ((OtpErlangString) value).stringValue();
+        }
+    }
+
+    /**
+     * Converts an {@link OtpErlangObject} to a {@link OtpErlangString} taking
+     * special care of lists which have not be converted to strings
+     * automatically using the OTP library.
+     *
+     * @param value
+     *            the value to convert
+     *
+     * @return the value as a String
+     *
+     * @throws ClassCastException
+     *             if the conversion fails
+     */
+    static OtpErlangString otpObjectToOtpString(final OtpErlangObject value)
+            throws ClassCastException {
+        // need special handling if OTP returned an empty list
+        if (value instanceof OtpErlangList) {
+            try {
+                return new OtpErlangString((OtpErlangList) value);
+            } catch (final OtpErlangException e) {
+                throw new ClassCastException("com.ericsson.otp.erlang.OtpErlangList cannot be cast to com.ericsson.otp.erlang.OtpErlangString: " + e.getMessage());
+            }
+        } else if (value instanceof OtpErlangAtom) {
+            return new OtpErlangString(((OtpErlangAtom) value).atomValue());
+        } else {
+            return ((OtpErlangString) value);
         }
     }
 
@@ -560,7 +589,7 @@ public class ErlangValue {
         final ErlangValue erlValue = (ErlangValue) obj;
         return value.equals(erlValue.value);
     }
-    
+
     @Override
     public int hashCode() {
         return value.hashCode();

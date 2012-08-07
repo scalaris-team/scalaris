@@ -34,7 +34,7 @@ import de.zib.scalaris.operations.WriteOp;
  * Unit test for the {@link Transaction} class.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.9
+ * @version 3.17
  * @since 2.0
  */
 public class TransactionTest {
@@ -345,8 +345,8 @@ public class TransactionTest {
         final String key = "_testWriteString2_";
         Transaction t = new Transaction();
         try {
-            for (int i = 0; i < testData.length; ++i) {
-                t.write(testTime + key, testData[i]);
+            for (final String element : testData) {
+                t.write(testTime + key, element);
             }
 
             // now try to read the data:
@@ -1286,6 +1286,53 @@ public class TransactionTest {
             }
         } finally {
             conn.closeConnection();
+        }
+    }
+
+    /**
+     * Various tests.
+     *
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws UnknownException
+     * @throws TimeoutException
+     * @throws AbortException
+     *
+     * @since 3.17
+     */
+    @Test
+    public void testVarious() throws ConnectionException,
+            TimeoutException, UnknownException, NotFoundException,
+            AbortException {
+        writeSingleTest("_0:Šarplaninac:page_", testData[0]);
+    }
+
+    protected void writeSingleTest(final String key, final String data)
+            throws ConnectionException, TimeoutException, UnknownException,
+            ClassCastException, NotFoundException, AbortException {
+        Transaction t = new Transaction();
+        try {
+            t.write(testTime + key, data);
+            // now try to read the data:
+            assertEquals(data, t.read(testTime + key).stringValue());
+            // try to read the data with another transaction (keys should not exist):
+            do {
+                final Transaction t2 = new Transaction();
+                try {
+                    t2.read(testTime + key).stringValue();
+                    // a not found exception must be thrown
+                    assertTrue(false);
+                } catch (final NotFoundException e) {
+                    t2.abort();
+                }
+            } while (false);
+
+            // commit the transaction and try to read the data with a new one:
+            t.commit();
+            t = new Transaction();
+            assertEquals(data, t.read(testTime + key).stringValue());
+        } finally {
+            t.closeConnection();
         }
     }
 
