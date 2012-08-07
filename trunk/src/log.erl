@@ -64,7 +64,7 @@ start_link() ->
             
             % remove the default error_logger's file and tty handlers
             error_logger:delete_report_handler(error_logger_file_h),
-            error_logger:delete_report_handler(error_logger_tty_h),
+%            error_logger:delete_report_handler(error_logger_tty_h),
             % there should not be any previous log4erl handler - just in case, delete it:
             error_logger:delete_report_handler(error_logger_log4erl_h),
             % add a log4erl handler instead:

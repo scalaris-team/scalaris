@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,37 +22,37 @@
 %% @version $Id$
 -module(sup_dht_node).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
 -include("scalaris.hrl").
 
--export([start_link/1, start_link/0, init/1]).
+-export([start_link/1, init/1]).
+-export([supspec/1, childs/1]).
 
--spec start_link([tuple()])
+-spec start_link(tuple())
         -> {ok, Pid::pid(), pid_groups:groupname()} | ignore |
                {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
-start_link(Options) ->
-    DHTNodeGroup = pid_groups:new("dht_node_"),
-    case supervisor:start_link(?MODULE, {DHTNodeGroup, Options}) of
+start_link({DHTNodeGroup, Options}) ->
+    case supervisor:start_link(?MODULE, [{DHTNodeGroup, Options}]) of
         {ok, Pid} -> {ok, Pid, DHTNodeGroup};
         X         -> X
     end.
 
--spec start_link()
-        -> {ok, Pid::pid(), pid_groups:groupname()} | ignore |
-               {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
-start_link() ->
-    start_link([]).
-
 %% userdevguide-begin sup_dht_node:init
--spec init({pid_groups:groupname(), [tuple()]})
-        -> {ok, {{one_for_one, MaxRetries::pos_integer(), PeriodInSeconds::pos_integer()},
-                 [ProcessDescr::supervisor:child_spec()]}}.
-init({DHTNodeGroup, Options}) ->
+-spec init([{pid_groups:groupname(), [tuple()]}])
+        -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                  PeriodInSeconds::pos_integer()}, []}}.
+init([{DHTNodeGroup, _Options}] = X) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     mgmt_server:connect(),
-    
+    supspec(X).
+%% userdevguide-end sup_dht_node:init
+
+supspec(_) ->
+    {ok, {{one_for_one, 10, 1}, []}}.
+
+childs([{DHTNodeGroup, Options}]) ->
     Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
@@ -80,25 +80,22 @@ init({DHTNodeGroup, Options}) ->
         util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     MonitorPerf =
         util:sup_worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
-    RepUpdate = 
+    RepUpdate =
         case config:read(rrepair_enabled) of
             true -> util:sup_worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
             _ -> []
         end,
-    %% order in the following list is the start order
-    {ok, {{one_for_one, 10, 1},
-          lists:flatten([
-                Monitor,
-                Delayer,
-                Reregister,
-                DeadNodeCache,
-                RoutingTable,
-                Cyclon,
-                Vivaldi,
-                DC_Clustering,
-                Gossip,
-                SupDHTNodeCore_AND,
-                MonitorPerf,
-                RepUpdate
-          ])}}.
-%% userdevguide-end sup_dht_node:init
+    lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
+                    Monitor,
+                    Delayer,
+                    Reregister,
+                    DeadNodeCache,
+                    RoutingTable,
+                    Cyclon,
+                    Vivaldi,
+                    DC_Clustering,
+                    Gossip,
+                    SupDHTNodeCore_AND,
+                    MonitorPerf,
+                    RepUpdate
+           ]).

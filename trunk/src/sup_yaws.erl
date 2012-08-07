@@ -1,4 +1,4 @@
-%% @copyright 2011 Zuse Institute Berlin
+%% @copyright 2011, 2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 %% @version $Id$
 -module(sup_yaws).
 -author('kruber@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
 
@@ -80,7 +80,6 @@ start_link() ->
 
     %% now configure Yaws
     ok = yaws_api:setconf(GC, SCList),
-
     X.
 
 -spec init(ChildSpecs) -> {ok, {{one_for_all, MaxRetries::pos_integer(),

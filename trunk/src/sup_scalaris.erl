@@ -22,54 +22,63 @@
 %% @version $Id$
 -module(sup_scalaris).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
+-export([init/1]).
 
--export([start_link/0, start_link/1, init/1, check_config/0]).
+-export([supspec/1, childs/1]).
 
--spec start_link()
-        -> {ok, Pid::pid()} | ignore |
-           {error, Error::{already_started, Pid::pid()} | term()}.
+-export([start_link/0, check_config/0]).
+
+%% used in unittest_helper.erl
+-export([start_link/1]).
+
+-spec start_link() -> {ok, Pid::pid()}
+                         | {error, Error::{already_started, Pid::pid()}
+                                        | term()}.
 start_link() -> start_link([]).
 
--spec start_link(list(tuple()))
-        -> {ok, Pid::pid()} | ignore |
+%% called by unittest_helper.erl
+-spec start_link([tuple()])
+        -> {ok, Pid::pid()} | 
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
-    Link = supervisor:start_link({local, main_sup}, ?MODULE, Options),
+    ServiceGroup = "basic_services",
+    Link = sup:sup_start({local, main_sup}, ?MODULE,
+                         [{service_group, ServiceGroup} | Options]),
     case Link of
-        {ok, _Pid} ->
+        {ok, _SupRef} ->
+            add_additional_nodes(),
             ok;
-        ignore ->
-            error_logger:error_msg("error in starting scalaris supervisor: supervisor should not return ignore~n",
-                      []);
+%%        ignore ->
+%%            error_logger:error_msg(
+%%              "error in starting sup_scalaris supervisor:"
+%%              " supervisor should not return ignore~n",
+%%              []);
         {error, Error} ->
-            error_logger:error_msg("error in starting scalaris supervisor: ~p~n",
-                      [Error])
-    end,
-    add_additional_nodes(),
+            error_logger:error_msg(
+              "error in starting sup_scalaris supervisor: ~p~n",
+              [Error])
+   end,
     Link.
 
 -spec init([tuple()])
         -> {ok, {{one_for_one, MaxRetries::pos_integer(),
-                  PeriodInSeconds::pos_integer()}, [ProcessDescr::supervisor:child_spec()]}}.
+                  PeriodInSeconds::pos_integer()},
+                 [ProcessDescr::supervisor:child_spec()]}}.
 init(Options) ->
-    randoms:start(),
-    _ = config:start_link2(Options),
-    ServiceGroup = "basic_services",
-    ErrorLoggerFile = filename:join(config:read(log_path),
-                                    config:read(log_file_name_errorlogger)),
-    case error_logger:logfile({open, ErrorLoggerFile}) of
-        ok -> ok;
-        {error, Reason} -> error_logger:error_msg("can not open logfile ~.0p: ~.0p",
-                                                  [ErrorLoggerFile, Reason])
-    end,
-    _ = inets:start(),
-    {ok, {{one_for_one, 10, 1}, my_process_list(ServiceGroup, Options)}}.
+    start_first_services(Options),
+    supspec(Options).
 
--spec my_process_list(pid_groups:groupname(), list(tuple())) -> [any()].
-my_process_list(ServiceGroup, Options) ->
+-spec supspec(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                  PeriodInSeconds::pos_integer()}, []}}.
+supspec(_) ->
+    {ok, {{one_for_one, 10, 1}, []}}.
+
+-spec childs(list(tuple())) -> [any()].
+childs(Options) ->
+    {service_group, ServiceGroup} = lists:keyfind(service_group, 1, Options),
     StartMgmtServer = case config:read(start_mgmt_server) of
                           failed -> false;
                           X -> X
@@ -102,12 +111,13 @@ my_process_list(ServiceGroup, Options) ->
                      end,
     DhtNodeId = randoms:getRandomString(),
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
+    DHTNodeGroup = pid_groups:new("dht_node_"),
     DHTNode = util:sup_supervisor_desc(DhtNodeId, sup_dht_node, start_link,
-                                       [[{my_sup_dht_node_id, DhtNodeId}
-                                         | DHTNodeOptions]]),
+                                       [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
+                                         | DHTNodeOptions]}]),
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
-    Logger = util:sup_supervisor_desc(logger, log, start_link),
+    Logger = util:sup_worker_desc(logger, log, start_link),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [ServiceGroup]),
     Service =
@@ -122,7 +132,7 @@ my_process_list(ServiceGroup, Options) ->
 
     ServicePaxosGroup = util:sup_supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
-                          [ServiceGroup, []]),
+                          [{ServiceGroup, []}]),
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
                     Config,
@@ -155,6 +165,25 @@ add_additional_nodes() ->
     log:log(info, "Starting ~B nodes", [Size]),
     _ = api_vm:add_nodes(Size - 1),
     ok.
+
+start_first_services(Options) ->
+    util:if_verbose("~p start first services...~n", [?MODULE]),
+    util:if_verbose("~p start randoms...~n", [?MODULE]),
+    randoms:start(),
+    util:if_verbose("~p start config...~n", [?MODULE]),
+    _ = config:start_link2(Options),
+    ErrorLoggerFile = filename:join(config:read(log_path),
+                                    config:read(log_file_name_errorlogger)),
+    util:if_verbose("~p error logger file ~p.~n", [?MODULE, ErrorLoggerFile]),
+    case error_logger:logfile({open, ErrorLoggerFile}) of
+        ok -> ok;
+        {error, Reason} ->
+            error_logger:error_msg("cannot open logfile ~.0p: ~.0p",
+                                   [ErrorLoggerFile, Reason])
+    end,
+    util:if_verbose("~p start inets~n", [?MODULE]),
+    _ = inets:start(),
+    util:if_verbose("~p start first services done.~n", [?MODULE]).
 
 %% @doc Checks whether config parameters of the cyclon process exist and are
 %%      valid.

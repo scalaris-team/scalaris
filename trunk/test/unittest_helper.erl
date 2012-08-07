@@ -361,7 +361,7 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                     {ok, _LogPid} = log:start_link(),
                     case StartCommServer of
                         true ->
-                            {ok, _CommPid} = sup_comm_layer:start_link(),
+                            {ok, _CommPid} = sup:sup_start(no_name, sup_comm_layer, []),
                             Port = unittest_helper:get_scalaris_port(),
                             comm_server:set_local_address({127,0,0,1}, Port);
                         false -> ok

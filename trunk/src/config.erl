@@ -46,14 +46,20 @@ read(Key) ->
     % config, it will override the config (see populate_db/1, process_term/1).
     % We can thus first check the ets table and fall back to the environment
     % check afterwards.
-    case ets:lookup(config_ets, Key) of
-        [{Key, Value}] -> Value;
-        [] -> Value = util:app_get_env(Key, failed),
-              case self() =:= erlang:whereis(config) of
-                  true -> ets:insert(config_ets, {Key, Value});
-                  _    -> write(Key, Value)
-              end,
-              Value
+    case ets:info(config_ets) of
+        undefined ->
+            io:format("config not started yet ~p\n", [Key]),
+            failed;
+        _ ->
+            case ets:lookup(config_ets, Key) of
+                [{Key, Value}] -> Value;
+                [] -> Value = util:app_get_env(Key, failed),
+                      case self() =:= erlang:whereis(config) of
+                          true -> ets:insert(config_ets, {Key, Value});
+                          _    -> write(Key, Value)
+                      end,
+                      Value
+            end
     end.
 
 %% @doc Writes a config parameter.

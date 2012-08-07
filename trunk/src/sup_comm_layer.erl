@@ -17,11 +17,12 @@
 %% @version $Id$
 -module(sup_comm_layer).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
 
 -export([start_link/0, init/1]).
+-export([supspec/1, childs/1]).
 
 -spec start_link() -> {ok, Pid::pid()} | ignore |
                       {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
@@ -31,9 +32,16 @@ start_link() ->
 -spec init([]) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
                                       PeriodInSeconds::pos_integer()},
                          [ProcessDescr::supervisor:child_spec()]}}.
-init([]) ->
+init(X) ->
     CommLayerGroup = "comm_layer",
     pid_groups:join_as(CommLayerGroup, ?MODULE),
+    supspec(X).
+
+supspec(_) ->
+    {ok, {{one_for_all, 10, 1}, []}}.
+
+childs(_) ->
+    CommLayerGroup = "comm_layer",
     CommServer =
         util:sup_worker_desc(comm_server, comm_server, start_link,
                              [CommLayerGroup]),
@@ -42,11 +50,8 @@ init([]) ->
                              [CommLayerGroup]),
     CommLogger =
         util:sup_worker_desc(comm_logger, comm_logger, start_link),
-    {ok, {{one_for_all, 10, 1},
-          [
-           CommServer,
-           CommLogger,
-           CommAcceptor
-          ]}}.
-
-
+    [
+     CommServer,
+     CommLogger,
+     CommAcceptor
+    ].
