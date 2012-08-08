@@ -269,8 +269,8 @@ on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
 on({web_debug_info, Requestor} = _Msg, {AllNodes, Leader} = State) ->
     ?TRACE1(_Msg, _State),
     KeyValueList =
-        [{"all nodes", lists:flatten(io_lib:format("~p", [AllNodes]))},
-         {"leader",    lists:flatten(io_lib:format("~p", [Leader]))}],
+        [{"all nodes", webhelpers:safe_html_string("~p", [AllNodes])},
+         {"leader",    webhelpers:safe_html_string("~p", [Leader])}],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 

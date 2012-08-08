@@ -27,7 +27,8 @@
          get_and_cache_ring/0, flush_ring_cache/0,
          getGossipRendered/0, getVivaldiMap/0,
          getMonitorClientData/0, getMonitorRingData/0,
-         lookup/1, set_key/2, delete_key/2, isPost/1]).
+         lookup/1, set_key/2, delete_key/2, isPost/1,
+         safe_html_string/1, safe_html_string/2]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
@@ -780,3 +781,20 @@ get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
     URL = "icons/" ++ Country ++ ".gif",
     {img, [{src, URL}, {width, 26}, {height, 16}], []}.
+
+%% @doc Formats the data with the format string and escapes angle brackets with
+%%      their HTML counter parts so that content is not mis-interpreted as HTML
+%%      tags.
+-spec safe_html_string(io:format(), Data::[term()]) -> string().
+safe_html_string(Format, Data) ->
+    safe_html_string(io_lib:format(Format, Data)).
+
+%% @doc Escapes angle brackets within the string with their HTML counter parts
+%%      so that content is not mis-interpreted as HTML tags.
+-spec safe_html_string(io_lib:chars() | [unicode:unicode_char()]) -> string().
+safe_html_string(String) ->
+    lists:flatten([case C of
+                       $< -> "&lt;";
+                       $> -> "&gt;";
+                       _ -> C
+                   end || C <- lists:flatten(String)]).

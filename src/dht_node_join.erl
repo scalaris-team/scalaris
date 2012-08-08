@@ -441,7 +441,7 @@ process_join_state({web_debug_info, Requestor} = _Msg,
                    {join, JoinState, QueuedMessages} = State) ->
     ?TRACE_JOIN1(_Msg, JoinState),
     % get a list of up to 50 queued messages to display:
-    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+    MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
                   || Message <- lists:sublist(QueuedMessages, 50)],
     MessageList = case length(QueuedMessages) > 50 of
                       true -> lists:append(MessageListTmp, [{"...", ""}]);
@@ -453,9 +453,9 @@ process_join_state({web_debug_info, Requestor} = _Msg,
             true ->
                 [{"phase",       Phase},
                  {"key_vers",    get_id_version(JoinState)},
-                 {"connections", lists:flatten(io_lib:format("~p", [get_connections(JoinState)]))},
-                 {"join_ids",    lists:flatten(io_lib:format("~p", [get_join_ids(JoinState)]))},
-                 {"candidates",  lists:flatten(io_lib:format("~p", [get_candidates(JoinState)]))}];
+                 {"connections", webhelpers:safe_html_string("~p", [get_connections(JoinState)])},
+                 {"join_ids",    webhelpers:safe_html_string("~p", [get_join_ids(JoinState)])},
+                 {"candidates",  webhelpers:safe_html_string("~p", [get_candidates(JoinState)])}];
             _ -> [{"phase",      Phase}]
         end,
     KeyValueList =

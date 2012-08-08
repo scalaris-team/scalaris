@@ -130,8 +130,8 @@ on({web_debug_info, Requestor}, {TimeTable, Counter} = State) ->
                           undefined -> none;
                           {_, Q}    -> Q
                       end,
-              {lists:flatten(io_lib:format("~p", [Seconds])),
-               lists:flatten(io_lib:format("~p", [Queue]))}
+              {webhelpers:safe_html_string("~p", [Seconds]),
+               webhelpers:safe_html_string("~p", [Queue])}
           end || Seconds <- lists:seq(0, 10)]],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.

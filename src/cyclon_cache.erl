@@ -268,4 +268,4 @@ trim(Cache, TargetSize) ->
 %%      used in the web interface.
 -spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::age(), Node::string()}].
 debug_format_by_age(Cache) ->
-    [{Age, lists:flatten(io_lib:format("~p", [Node]))} || {Node, Age} <- Cache].
+    [{Age, webhelpers:safe_html_string("~p", [Node])} || {Node, Age} <- Cache].

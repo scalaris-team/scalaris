@@ -109,9 +109,9 @@ on_active({register}, TriggerState) ->
 on_active({web_debug_info, Requestor}, TriggerState) ->
     KeyValueList =
         case config:read(register_hosts) of
-            failed -> [{"Hosts (mgmt_server):", lists:flatten(io_lib:format("~.0p", [mgmtServer()]))}];
+            failed -> [{"Hosts (mgmt_server):", webhelpers:safe_html_string("~.0p", [mgmtServer()])}];
             Hosts  -> [{"Hosts:", ""} |
-                           [{"", lists:flatten(io_lib:format("~.0p", [Host]))} || Host <- Hosts]]
+                           [{"", webhelpers:safe_html_string("~.0p", [Host])} || Host <- Hosts]]
         end,
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     TriggerState.
