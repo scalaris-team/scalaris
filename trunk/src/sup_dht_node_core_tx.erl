@@ -42,9 +42,13 @@ init([DHTNodeGroup]) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     supspec([DHTNodeGroup]).
 
+-spec supspec(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()}, []}}.
 supspec(_) ->
     {ok, {{one_for_one, 10, 1}, []}}.
 
+-spec childs([pid_groups:groupname()]) ->
+                    [ProcessDescr::supervisor:child_spec()].
 childs([DHTNodeGroup]) ->
     RDHT_tx_read = util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link,
                                         [DHTNodeGroup]),
