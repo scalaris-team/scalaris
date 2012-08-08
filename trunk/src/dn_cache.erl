@@ -120,7 +120,7 @@ on({web_debug_info, Requestor}, {Queue, Subscribers, _TriggerState} = State) ->
           [{"max_length", fix_queue:max_length(Queue)},
            {"queue length", fix_queue:length(Queue)},
            {"queue (node):", ""},
-           [{"", lists:flatten(io_lib:format("~p", [Node]))} || Node <- queue:to_list(fix_queue:queue(Queue))],
+           [{"", webhelpers:safe_html_string("~p", [Node])} || Node <- queue:to_list(fix_queue:queue(Queue))],
            {"subscribers", gb_sets:size(Subscribers)},
            {"subscribers (pid):", ""},
            [{"", pid_groups:pid_to_name(Pid)} || Pid <- gb_sets:to_list(Subscribers)]]),

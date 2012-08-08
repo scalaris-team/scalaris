@@ -231,7 +231,7 @@ on({crashed, WatchedPid} = Msg, State) ->
 %%         [{"subscriptions", length(Subscriptions)},
 %%          {"subscriptions (subscriber, {target, cookie}):", ""} |
 %%          [{pid_groups:pid_to_name(Pid),
-%%            lists:flatten(io_lib:format("~p", [X]))} || {Pid, X} <- S2]],
+%%            webhelpers:safe_html_string("~p", [X]))} || {Pid, X} <- S2]],
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 

@@ -185,7 +185,7 @@ on_inactive(Msg = {get_values_best, _SourcePid},
 on_inactive({web_debug_info, Requestor},
             {uninit, QueuedMessages, _TriggerState, PreviousState} = State) ->
     % get a list of up to 50 queued messages to display:
-    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+    MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
                   || Message <- lists:sublist(QueuedMessages, 50)],
     MessageList = case length(QueuedMessages) > 50 of
                       true -> lists:append(MessageListTmp, [{"...", ""}]);

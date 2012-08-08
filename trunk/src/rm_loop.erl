@@ -352,9 +352,9 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
                    end
                    || {{Pid, Tag}, _FilterFun, _ExecFun} <- ets:tab2list(SubscrTable)],
     [{"rm_state:", ""},
-     {"algorithm", lists:flatten(io_lib:format("~p", [?RM]))},
-     {"self", lists:flatten(io_lib:format("~p", [nodelist:node(Neighborhood)]))},
-     {"nc_subscr", lists:flatten(io_lib:format("~p", [Subscribers]))} |
+     {"algorithm", webhelpers:safe_html_string("~p", [?RM])},
+     {"self", webhelpers:safe_html_string("~p", [nodelist:node(Neighborhood)])},
+     {"nc_subscr", webhelpers:safe_html_string("~p", [Subscribers])} |
          lists:append(PredsSuccs, RM_Info)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

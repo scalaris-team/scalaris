@@ -353,25 +353,25 @@ on({web_debug_info, Requestor}, State) ->
     Load = dht_node_state:get(State, load),
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{"",
-                    lists:flatten(io_lib:format("~p", [DBEntry]))}
+                    webhelpers:safe_html_string("~p", [DBEntry])}
                   || DBEntry <- element(2, ?DB:get_chunk(dht_node_state:get(State, db), intervals:all(), 50))],
     DataList = case Load > 50 of
                    true  -> lists:append(DataListTmp, [{"...", ""}]);
                    false -> DataListTmp
                end,
     KVList1 =
-        [{"rt_algorithm", lists:flatten(io_lib:format("~p", [?RT]))},
+        [{"rt_algorithm", webhelpers:safe_html_string("~p", [?RT])},
          {"rt_size", ?RT:get_size(dht_node_state:get(State, rt))},
-         {"my_range", lists:flatten(io_lib:format("~p", [intervals:get_bounds(dht_node_state:get(State, my_range))]))},
-         {"db_range", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db_range)]))},
-         {"load", lists:flatten(io_lib:format("~p", [Load]))},
-         {"join_time", lists:flatten(io_lib:format("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))]))},
-%%          {"db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, db)]))},
-%%          {"proposer", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, proposer)]))},
-         {"tx_tp_db", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, tx_tp_db)]))},
-         {"slide_pred", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_pred)]))},
-         {"slide_succ", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, slide_succ)]))},
-         {"msg_fwd", lists:flatten(io_lib:format("~p", [dht_node_state:get(State, msg_fwd)]))}
+         {"my_range", webhelpers:safe_html_string("~p", [intervals:get_bounds(dht_node_state:get(State, my_range))])},
+         {"db_range", webhelpers:safe_html_string("~p", [dht_node_state:get(State, db_range)])},
+         {"load", webhelpers:safe_html_string("~p", [Load])},
+         {"join_time", webhelpers:safe_html_string("~p UTC", [calendar:now_to_universal_time(dht_node_state:get(State, join_time))])},
+%%          {"db", webhelpers:safe_html_string("~p", [dht_node_state:get(State, db)])},
+%%          {"proposer", webhelpers:safe_html_string("~p", [dht_node_state:get(State, proposer)])},
+         {"tx_tp_db", webhelpers:safe_html_string("~p", [dht_node_state:get(State, tx_tp_db)])},
+         {"slide_pred", webhelpers:safe_html_string("~p", [dht_node_state:get(State, slide_pred)])},
+         {"slide_succ", webhelpers:safe_html_string("~p", [dht_node_state:get(State, slide_succ)])},
+         {"msg_fwd", webhelpers:safe_html_string("~p", [dht_node_state:get(State, msg_fwd)])}
         ],
     KVList2 = lists:append(KVList1, [{"", ""} | rm_loop:get_web_debug_info(RMState)]),
     KVList3 = lists:append(KVList2, [{"", ""} , {"data (db_entry):", ""} | DataList]),

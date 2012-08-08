@@ -80,21 +80,21 @@ on({web_debug_info, Requestor}, State = {StartTime, RcvCnt, RcvBytes, SendCnt, S
     KeyValueList =
         [
          {"sent_tcp_packets",
-          lists:flatten(io_lib:format("~p", [SendCnt]))},
+          webhelpers:safe_html_string("~p", [SendCnt])},
          {"~ sent messages/s",
-          lists:flatten(io_lib:format("~p", [SendCntPerS]))},
+          webhelpers:safe_html_string("~p", [SendCntPerS])},
          {"sent total bytes",
-          lists:flatten(io_lib:format("~p", [SendBytes]))},
+          webhelpers:safe_html_string("~p", [SendBytes])},
          {"~ sent bytes/s",
-          lists:flatten(io_lib:format("~p", [SendBytesPerS]))},
+          webhelpers:safe_html_string("~p", [SendBytesPerS])},
          {"recv_tcp_packets",
-          lists:flatten(io_lib:format("~p", [RcvCnt]))},
+          webhelpers:safe_html_string("~p", [RcvCnt])},
          {"~ recv messages/s",
-          lists:flatten(io_lib:format("~p", [RcvCntPerS]))},
+          webhelpers:safe_html_string("~p", [RcvCntPerS])},
          {"recv total bytes",
-          lists:flatten(io_lib:format("~p", [RcvBytes]))},
+          webhelpers:safe_html_string("~p", [RcvBytes])},
          {"~ recv bytes/s",
-          lists:flatten(io_lib:format("~p", [RcvBytesPerS]))}
+          webhelpers:safe_html_string("~p", [RcvBytesPerS])}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.

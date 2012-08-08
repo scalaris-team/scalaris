@@ -469,9 +469,9 @@ on(Msg, State) ->
 on_unknown_event({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
-                                 {"module", lists:flatten(io_lib:format("~.0p", [gc_mod(State)]))},
-                                 {"handler", lists:flatten(io_lib:format("~.0p", [gc_hand(State)]))},
-                                 {"state", lists:flatten(io_lib:format("~.0p", [State]))}]}),
+                                 {"module", webhelpers:safe_html_string("~.0p", [gc_mod(State)])},
+                                 {"handler", webhelpers:safe_html_string("~.0p", [gc_hand(State)])},
+                                 {"state", webhelpers:safe_html_string("~.0p", [gc_ustate(State)])}]}),
     State;
 on_unknown_event(UnknownMessage, State) ->
     log:log(error,

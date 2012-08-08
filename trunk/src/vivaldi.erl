@@ -137,7 +137,7 @@ on_inactive(Msg = {get_coordinate, _Pid}, {inactive, QueuedMessages, TriggerStat
 
 on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
-    MessageListTmp = [{"", lists:flatten(io_lib:format("~p", [Message]))}
+    MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
                   || Message <- lists:sublist(QueuedMessages, 50)],
     MessageList = case length(QueuedMessages) > 50 of
                       true -> lists:append(MessageListTmp, [{"...", ""}]);
@@ -221,7 +221,7 @@ on_active({get_coordinate, Pid}, {Coordinate, Confidence, _TriggerState} = State
 on_active({web_debug_info, Requestor},
    {Coordinate, Confidence, _TriggerState} = State) ->
     KeyValueList =
-        [{"coordinate", lists:flatten(io_lib:format("~p", [Coordinate]))},
+        [{"coordinate", webhelpers:safe_html_string("~p", [Coordinate])},
          {"confidence", Confidence}],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
