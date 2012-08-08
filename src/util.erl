@@ -32,7 +32,7 @@
          randomelem/1, pop_randomelem/1, pop_randomelem/2,
          first_matching/2,
          get_stacktrace/0, get_linetrace/0, get_linetrace/1,
-         dump/0, dump2/0, dump3/0,
+         dump/0, dump2/0, dump3/0, dumpX/1, dumpX/2,
          minus_all/2, minus_first/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
@@ -354,6 +354,18 @@ dump3() ->
           fun(K, Value) ->
                   case K of
                       messages -> [element(1, V) || V <- Value];
+                      _        -> Value
+                  end
+          end).
+
+%% @doc Returns various data about all processes.
+-spec dumpX([ItemInfo::atom(),...]) -> [tuple(),...].
+dumpX(Keys) ->
+    dumpX(Keys,
+          fun(K, Value) ->
+                  case K of
+                      messages -> [element(1, V) || V <- Value];
+                      dictionary -> [element(1, V) || V <- Value];
                       _        -> Value
                   end
           end).
