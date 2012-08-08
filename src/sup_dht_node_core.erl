@@ -24,7 +24,7 @@
 %% @version $Id$
 -module(sup_dht_node_core).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -behaviour(supervisor).
 
@@ -43,14 +43,18 @@ start_link(DHTNodeGroup, Options) ->
                   {ok, {{one_for_all, MaxRetries::pos_integer(),
                          PeriodInSeconds::pos_integer()},
                         [ProcessDescr::supervisor:child_spec()]}}.
-init([DHTNodeGroup, Options] = X) ->
+init([DHTNodeGroup, _Options] = X) ->
     pid_groups:join_as(DHTNodeGroup, ?MODULE),
     supspec(X).
 %% userdevguide-end sup_dht_node_core:init
 
-supspec(X) ->
+-spec supspec(any()) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()}, []}}.
+supspec(_) ->
     {ok, {{one_for_all, 10, 1}, []}}.
 
+-spec childs([{pid_groups:groupname(), Options::[tuple()]}]) ->
+                    [ProcessDescr::supervisor:child_spec()].
 childs([DHTNodeGroup, Options]) ->
     PaxosProcesses = util:sup_supervisor_desc(sup_paxos, sup_paxos,
                                               start_link, [{DHTNodeGroup, []}]),

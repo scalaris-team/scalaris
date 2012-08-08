@@ -37,10 +37,14 @@ init(X) ->
     pid_groups:join_as(CommLayerGroup, ?MODULE),
     supspec(X).
 
+-spec supspec(any()) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()}, []}}.
 supspec(_) ->
     {ok, {{one_for_all, 10, 1}, []}}.
 
-childs(_) ->
+-spec childs([]) ->
+                    [ProcessDescr::supervisor:child_spec()].
+childs([]) ->
     CommLayerGroup = "comm_layer",
     CommServer =
         util:sup_worker_desc(comm_server, comm_server, start_link,

@@ -63,8 +63,7 @@ stop() ->
 %% functions called by application:start(scalaris)
 %% triggered by ?MODULE:start/0.
 -spec start(StartType::normal, StartArgs::[])
-        -> {ok, Pid::pid()} |
-           {error, Error::{already_started, Pid::pid()} | term()}.
+        -> {ok, Pid::pid()}.
 start(normal, []) ->
     case util:app_get_env(verbose, false) of
         true -> io:format("Running with node name ~p.~n", [node()]);

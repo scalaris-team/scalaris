@@ -77,7 +77,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
             ChildPrefix = last_prefix_to_space(Prefix),
             TotalRes = add_childs(ChildPrefix ++ ["  +-"], SupRef, Childs),
             case TotalRes of
-                {ok, _} ->
+                X when is_tuple(X) andalso element(1, X) =:= ok ->
                     io:format("Scalaris started successfully."
                               " Hit <return> to see the erlang shell prompt.~n");
                 Err ->
@@ -92,7 +92,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
 -spec start_sup_as_child(prefix(),
                          sup_ref() | no_name,
                          supervisor:child_spec())
-               -> startlink_ret().
+               -> supervisor:startchild_ret().
 start_sup_as_child(Prefix, AtSup, SupAsChild) ->
     progress(Prefix ++ "supervisor ~.0p ~.0p~n",
              [element(1, SupAsChild), element(2, SupAsChild)]),

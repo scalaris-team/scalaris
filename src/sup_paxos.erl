@@ -56,9 +56,13 @@ init([{PidGroup, Options}] = X) ->
     pid_groups:join_as(PidGroup, SupervisorName),
     supspec(X).
 
+-spec supspec(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()}, []}}.
 supspec(_) ->
     {ok, {{one_for_one, 10, 1}, []}}.
 
+-spec childs([{pid_groups:groupname(), Options::[tuple()]}]) ->
+                    [ProcessDescr::supervisor:child_spec()].
 childs([{PidGroup, Options}]) ->
     {ProposerName, AcceptorName, LearnerName} =
         case lists:keyfind(sup_paxos_prefix, 1, Options) of

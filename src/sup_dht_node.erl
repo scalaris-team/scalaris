@@ -49,9 +49,13 @@ init([{DHTNodeGroup, _Options}] = X) ->
     supspec(X).
 %% userdevguide-end sup_dht_node:init
 
+-spec supspec(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
+                         PeriodInSeconds::pos_integer()}, []}}.
 supspec(_) ->
     {ok, {{one_for_one, 10, 1}, []}}.
 
+-spec childs([{pid_groups:groupname(), Options::[tuple()]}]) ->
+                    [ProcessDescr::supervisor:child_spec()].
 childs([{DHTNodeGroup, Options}]) ->
     Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DC_Clustering =
