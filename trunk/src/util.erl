@@ -709,38 +709,44 @@ smerge2(L1, L2, Lte) ->
 
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X])) -> MergedList::[X].
 smerge2(L1, L2, Lte, EqSelect) ->
-    smerge2_helper(L1, L2, Lte, EqSelect, []).
+    smerge2(L1, L2, Lte, EqSelect, fun(X) -> [X] end, fun(X) -> [X] end).
+
+-spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X]),
+              FirstExist::fun((X) -> [X]), SecondExist::fun((X) -> [X])) -> MergedList::[X].
+smerge2(L1, L2, Lte, EqSelect, FirstExist, SecondExist) ->
+    smerge2_helper(L1, L2, Lte, EqSelect, FirstExist, SecondExist, []).
 
 %% @doc Helper function for merge2/4.
--spec smerge2_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X]), OldMergedList::[X]) -> MergedList::[X].
-smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, ML) ->
+-spec smerge2_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()),
+        EqSelect::fun((X, X) -> [X]), FirstExist::fun((X) -> [X]),
+        SecondExist::fun((X) -> [X]), OldMergedList::[X]) -> MergedList::[X].
+smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
     LteH1H2 = Lte(H1, H2),
     LteH2H1 = Lte(H2, H1),
-    case LteH1H2 andalso LteH2H1 of
-        true ->
-            smerge2_helper(T1, L2, Lte, EqSelect, lists:reverse(EqSelect(H1, H2)) ++ ML);
-        false when LteH1H2 ->
-            smerge2_helper(T1, L2, Lte, EqSelect, [H1 | ML]);
-        false when LteH2H1 ->
-            % the top of ML could be equal to the top of L2 (if so, the decision
-            % about H2 has already been made and we omit it here, otherwise H2
-            % needs to be added)
-            case (ML =:= []) orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
-                true  -> smerge2_helper(L1, T2, Lte, EqSelect, [H2 | ML]);
-                false -> smerge2_helper(L1, T2, Lte, EqSelect, ML) 
-            end
+    if LteH1H2 andalso LteH2H1 ->
+           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(EqSelect(H1, H2)) ++ ML);
+       LteH1H2 ->
+           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, FirstExist(H1) ++ ML);
+       LteH2H1 ->
+           % the top of ML could be equal to the top of L2 (if so, the decision
+           % about H2 has already been made and we omit it here, otherwise H2
+           % needs to be added)
+           case (ML =:= []) orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
+               true  -> smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, SecondExist(H2) ++ ML);
+               false -> smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, ML)
+           end
     end;
-smerge2_helper(L1, [], _Lte, _EqSelect, ML) ->
-    lists:reverse(ML, L1);
-smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, ML) ->
+smerge2_helper(L1, [], _Lte, _EqSelect, FirstExist, _SecondExist, ML) ->
+    lists:reverse(ML, lists:append([FirstExist(X) || X <- L1]));
+smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
     % The top of ML could be equal to the top of L2 (if so, the decision about
     % H2 has already been made and we omit it here, otherwise H2 needs to be
     % added).
     % This is because elements are only removed from L2 if an element of L1 is
     % larger.
     case ML =:= [] orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
-        true  -> lists:reverse(ML, L2);
-        false -> smerge2_helper([], T2, Lte, EqSelect, ML)
+        true  -> lists:reverse(ML, lists:append([SecondExist(X) || X <- L2]));
+        false -> smerge2_helper([], T2, Lte, EqSelect, FirstExist, SecondExist, ML)
     end.
 
 %% @doc Try to check whether common-test is running.
