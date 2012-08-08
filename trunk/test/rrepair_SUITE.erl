@@ -41,7 +41,8 @@ basic_tests() ->
      blobCoding,
      tester_get_key_quadrant,
      tester_mapInterval,
-     tester_minKeyInInterval].
+     tester_minKeyInInterval
+    ].
 
 repair_tests() ->
     [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
@@ -130,6 +131,8 @@ get_rep_upd_config(Method) ->
      {rr_trigger, trigger_periodic},
      {rr_trigger_interval, 100000000}, %stop trigger
      {rr_recon_method, Method},
+     {rr_session_ttl, 100000},
+     {rr_gc_interval, 60000},
      {rr_bloom_fpr, 0.1},
 	 {rr_trigger_probability, 100},
      {rr_max_items, 10000},
@@ -306,6 +309,7 @@ prop_get_key_quadrant(Key) ->
         ?equals_w_note(TestQ, Q, 
                        io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
                                      [QI, Key, Q, TestQ])).
+
 tester_get_key_quadrant(_) ->
     _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
     tester:test(?MODULE, prop_get_key_quadrant, 1, 4, [{threads, 4}]).
