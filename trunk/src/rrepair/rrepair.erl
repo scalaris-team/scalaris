@@ -51,7 +51,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--define(TRIGGER_NAME, rr_trigger).
+-define(TRIGGER_NAME,   rr_trigger).
+-define(GC_TRIGGER,     rr_gc_trigger).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % export
@@ -70,6 +71,7 @@
 
 -type round()       :: {non_neg_integer(), non_neg_integer()}.
 -type session_id()  :: {round(), comm:mypid()}.
+
 % @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only 
 %      number of regenerated db items on the initator
 -record(session, 
@@ -78,14 +80,15 @@
           rc_stats          = none                              :: rr_recon_stats:stats() | none,
           rs_stats          = none                              :: rr_resolve:stats() | none,
           rs_called         = 0                                 :: non_neg_integer(),
-          rs_finish         = 0                                 :: non_neg_integer()
+          rs_finish         = 0                                 :: non_neg_integer(),
+          ttl               = ?required(session, ttl)           :: pos_integer()    %time to live in milliseconds
         }).
 -type session() :: #session{}.
-%TODO Session TTL
 
 -record(rrepair_state,
         {
          trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state(),
+         gc_trigger     = ?required(rrepair_state, gc_trigger)      :: trigger:state(),     %garbage collector trigger to remove dead sessions
          round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer(),
@@ -106,6 +109,7 @@
     {get_state, Sender::comm:mypid(), Key::state_field()} |
     % internal
     {?TRIGGER_NAME} |
+    {?GC_TRIGGER} |
 	{continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
     {request_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
@@ -175,6 +179,15 @@ on({?TRIGGER_NAME}, State) ->
     end,
     NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
     State#rrepair_state{ trigger_state = NewTriggerState };
+
+on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
+                                           open_sessions = Sessions }) ->
+    Elapsed = get_gc_interval(),
+    NewSessions = [S#session{ ttl = S#session.ttl - Elapsed } 
+                            || S <- Sessions,
+                               S#session.ttl - Elapsed > 0],
+    State#rrepair_state{ gc_trigger = trigger:next(GCState),
+                         open_sessions = NewSessions };
 
 on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
     {ok, Pid} = rr_resolve:start(SessionID),
@@ -275,7 +288,7 @@ next_round({R, _Fork}) -> {R + 1, 0}.
 
 -spec new_session(round(), comm:mypid(), rr_recon:method()) -> session().
 new_session(Round, Pid, RCMethod) ->
-    #session{ id = {Round, Pid}, rc_method = RCMethod }.
+    #session{ id = {Round, Pid}, rc_method = RCMethod, ttl = get_session_ttl() }.
 
 -spec session_id_equal(session_id(), session_id()) -> boolean().
 session_id_equal({{R, _}, Pid}, {{R, _}, Pid}) -> true;
@@ -342,17 +355,21 @@ start_link(DHTNodeGroup) ->
 -spec init(module()) -> state().
 init(Trigger) ->	
     TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    #rrepair_state{trigger_state = trigger:next(TriggerState)}.
+    GCTrigger   = trigger:init(trigger_periodic, fun get_gc_interval/0, ?GC_TRIGGER),
+    #rrepair_state{ trigger_state = trigger:next(TriggerState),
+                    gc_trigger = trigger:next(GCTrigger) }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
 %
 % USED CONFIG FIELDS
 %	I) 	 rr_trigger: module name of any trigger
-%	II)  rr_trigger_interval: integer duration until next triggering
+%	II)  rr_trigger_interval: integer duration until next triggering (milliseconds)
 %	III) rr_recon_metod: set reconciliation algorithm name
 %   IV)  rr_trigger_probability: this is the probability of starting a synchronisation 
-%								 with a random node if trigger has fired. ]0,100]   
+%								 with a random node if trigger has fired. ]0,100]
+%   V)   rr_session_ttl: time to live for sessions until they are garbage collected (milliseconds)
+%   VI)  rr_gc_interval: garbage collector execution interval (milliseconds)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -363,26 +380,32 @@ check_config() ->
         true ->
             config:cfg_is_module(rr_trigger) andalso
             config:cfg_is_atom(rr_recon_method) andalso
+            config:cfg_is_integer(rr_session_ttl) andalso
+            config:cfg_is_greater_than(rr_session_ttl, 0) andalso
 			config:cfg_is_integer(rr_trigger_probability) andalso
 			config:cfg_is_greater_than(rr_trigger_probability, 0) andalso
 			config:cfg_is_less_than_equal(rr_trigger_probability, 100) andalso
+            config:cfg_is_integer(rr_gc_interval) andalso
+            config:cfg_is_greater_than(rr_gc_interval, 0) andalso                
             config:cfg_is_integer(rr_trigger_interval) andalso
             config:cfg_is_greater_than(rr_trigger_interval, 0);
         _ -> true
     end.
 
 -spec get_recon_method() -> rr_recon:method().
-get_recon_method() -> 
-	config:read(rr_recon_method).
+get_recon_method() ->  config:read(rr_recon_method).
 
 -spec get_update_trigger() -> Trigger::module().
-get_update_trigger() -> 
-	config:read(rr_trigger).
+get_update_trigger() ->  config:read(rr_trigger).
 
 -spec get_update_interval() -> pos_integer().
-get_update_interval() ->
-    config:read(rr_trigger_interval).
+get_update_interval() -> config:read(rr_trigger_interval).
 
 -spec get_start_prob() -> pos_integer().
-get_start_prob() ->
-	config:read(rr_trigger_probability).
+get_start_prob() -> config:read(rr_trigger_probability).
+
+-spec get_session_ttl() -> pos_integer().
+get_session_ttl() -> config:read(rr_session_ttl).
+
+-spec get_gc_interval() -> pos_integer().
+get_gc_interval() -> config:read(rr_gc_interval).
