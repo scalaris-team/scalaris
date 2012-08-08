@@ -236,7 +236,7 @@ bp_set(Pid, MsgTag, BPName) ->
 bp_set_cond(Pid, {_Module, _Function, _Params = 2} = Cond, BPName) ->
     Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
     ok;
-bp_set_cond(Pid, Cond, BPName) when is_function(Cond) ->
+bp_set_cond(Pid, Cond, BPName) when is_function(Cond, 2) ->
     Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
     ok.
 
