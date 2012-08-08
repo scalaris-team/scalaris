@@ -358,17 +358,19 @@ dump3() ->
                   end
           end).
 
+-spec default_dumpX_val_fun(K::atom(), Value::term()) -> term().
+default_dumpX_val_fun(K, Value) ->
+    case K of
+        messages -> [element(1, V) || V <- Value];
+        dictionary -> [element(1, V) || V <- Value];
+        registered_name when Value =:= [] -> undefined;
+        _        -> Value
+    end.
+
 %% @doc Returns various data about all processes.
 -spec dumpX([ItemInfo::atom(),...]) -> [tuple(),...].
 dumpX(Keys) ->
-    dumpX(Keys,
-          fun(K, Value) ->
-                  case K of
-                      messages -> [element(1, V) || V <- Value];
-                      dictionary -> [element(1, V) || V <- Value];
-                      _        -> Value
-                  end
-          end).
+    dumpX(Keys, fun default_dumpX_val_fun/2).
 
 %% @doc Returns various data about all processes.
 -spec dumpX([ItemInfo::atom(),...], ValueFun::fun((atom(), term()) -> term())) -> [tuple(),...].
