@@ -33,6 +33,8 @@
          first_matching/2,
          get_stacktrace/0, get_linetrace/0, get_linetrace/1,
          dump/0, dump2/0, dump3/0, dumpX/1, dumpX/2,
+         topDumpX/1, topDumpX/3,
+         topDumpXEvery/3, topDumpXEvery/5, topDumpXEvery_helper/4,
          minus_all/2, minus_first/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
@@ -375,15 +377,93 @@ dumpX(Keys) ->
 %% @doc Returns various data about all processes.
 -spec dumpX([ItemInfo::atom(),...], ValueFun::fun((atom(), term()) -> term())) -> [tuple(),...].
 dumpX(Keys, ValueFun) ->
-    Info = 
-        [begin
-             Values =
-                 [ValueFun(Key, dump_extract_from_list(Data, Key)) || Key <- Keys],
-             erlang:list_to_tuple([Pid, Values])
-         end || Pid <- processes(),
-                Data <- [process_info(Pid, Keys)],
-                Data =/= undefined],
-    lists:reverse(lists:keysort(2, Info)).
+    lists:reverse(lists:keysort(2, dumpXNoSort(Keys, ValueFun))).
+
+-spec dumpXNoSort([ItemInfo::atom(),...], ValueFun::fun((atom(), term()) -> term())) -> [tuple(),...].
+dumpXNoSort(Keys, ValueFun) ->
+    [begin
+         Values =
+             [ValueFun(Key, dump_extract_from_list(Data, Key)) || Key <- Keys],
+         erlang:list_to_tuple([Pid, Values])
+     end || Pid <- processes(),
+            Data <- [process_info(Pid, Keys)],
+            Data =/= undefined].
+
+%% @doc Convenience wrapper to topDumpX/3.
+-spec topDumpX(Keys | Seconds | ValueFun) -> [{pid(), [Reductions | RegName | term(),...]},...]
+        when is_subtype(Keys, [ItemInfo::atom()]),
+             is_subtype(Seconds, pos_integer()),
+             is_subtype(ValueFun, fun((atom(), term()) -> term())),
+             is_subtype(Reductions, non_neg_integer()),
+             is_subtype(RegName, atom()).
+topDumpX(Keys) when is_list(Keys) ->
+    topDumpX(Keys, fun default_dumpX_val_fun/2, 5);
+topDumpX(Seconds) when is_integer(Seconds) ->
+    topDumpX([], fun default_dumpX_val_fun/2, Seconds);
+topDumpX(ValueFun) when is_function(ValueFun, 2) ->
+    topDumpX([], ValueFun, 5).
+
+%% @doc Gets the number of reductions for each process within the next Seconds
+%%      and dumps some process data defined by Keys (sorted by the number of
+%%      reductions).
+-spec topDumpX(Keys, ValueFun, Seconds) -> [{pid(), [Reductions | RegName | term(),...]},...]
+        when is_subtype(Keys, [ItemInfo::atom()]),
+             is_subtype(Seconds, pos_integer()),
+             is_subtype(ValueFun, fun((atom(), term()) -> term())),
+             is_subtype(Reductions, non_neg_integer()),
+             is_subtype(RegName, atom()).
+topDumpX(Keys, ValueFun, Seconds) when is_integer(Seconds) andalso Seconds >= 1 ->
+    Start = lists:keysort(1, dumpXNoSort([reductions, registered_name], ValueFun)),
+    timer:sleep(1000 * Seconds),
+    End = lists:keysort(1, dumpX([reductions, registered_name | Keys], ValueFun)),
+    lists:reverse(
+      lists:keysort(
+        2, smerge2(Start, End,
+                   fun(T1, T2) -> element(1, T1) =< element(1, T2) end,
+                   fun(T1, T2) ->
+                           % {<0.77.0>,[250004113,comm_server,692064]}
+                           % io:format("T1=~.0p~nT2=~.0p~n", [T1, T2]),
+                           {Pid, [Red1, RName]} = T1,
+                           {Pid, [Red2, RName | Rest2]} = T2,
+                           [{Pid, [(Red2 - Red1), RName, Rest2]}]
+                   end,
+                   fun(_T1) -> [] end, % omit processes not alive at the end any more
+                   fun(T2) -> [T2] end))).
+
+%% @doc Convenience wrapper to topDumpXEvery/5.
+-spec topDumpXEvery(Keys | Seconds | ValueFun, Subset::pos_integer(), StopAfter::pos_integer()) -> timer:tref()
+        when is_subtype(Keys, [ItemInfo::atom()]),
+             is_subtype(Seconds, pos_integer()),
+             is_subtype(ValueFun, fun((atom(), term()) -> term())).
+topDumpXEvery(Keys, Subset, StopAfter) when is_list(Keys) ->
+    topDumpXEvery(Keys, fun default_dumpX_val_fun/2, 1, Subset, StopAfter);
+topDumpXEvery(Seconds, Subset, StopAfter) when is_integer(Seconds) ->
+    topDumpXEvery([], fun default_dumpX_val_fun/2, Seconds, Subset, StopAfter);
+topDumpXEvery(ValueFun, Subset, StopAfter) when is_function(ValueFun, 2) ->
+    topDumpXEvery([], ValueFun, 1, Subset, StopAfter).
+
+%% @doc Calls topDumpX/3 every Seconds and prints the top Subset processes with
+%%      the highest number of reductions. Stops after StopAfter seconds.
+-spec topDumpXEvery(Keys, ValueFun, Seconds, Subset::pos_integer(), StopAfter::pos_integer()) -> timer:tref()
+        when is_subtype(Keys, [ItemInfo::atom()]),
+             is_subtype(Seconds, pos_integer()),
+             is_subtype(ValueFun, fun((atom(), term()) -> term())).
+topDumpXEvery(Keys, ValueFun, IntervalS, Subset, StopAfter)
+  when is_integer(IntervalS) andalso IntervalS >= 1 andalso
+           is_integer(Subset) andalso Subset >= 1 andalso
+           is_integer(StopAfter) andalso StopAfter >= IntervalS ->
+    {ok, TRef} = timer:apply_interval(1000 * IntervalS, ?MODULE, topDumpXEvery_helper,
+                                      [Keys, ValueFun, IntervalS, Subset]),
+    {ok, _} = timer:apply_after(1000 * StopAfter, timer, cancel, [TRef]),
+    TRef.
+
+%% @doc Helper function for topDumpXEvery/5 (export needed for timer:apply_after/4).
+-spec topDumpXEvery_helper(Keys, ValueFun, Seconds, Subset::pos_integer()) -> ok
+        when is_subtype(Keys, [ItemInfo::atom()]),
+             is_subtype(Seconds, pos_integer()),
+             is_subtype(ValueFun, fun((atom(), term()) -> term())).
+topDumpXEvery_helper(Keys, ValueFun, Seconds, Subset) ->
+    io:format("-----~n~.0p~n", [lists:sublist(topDumpX(Keys, ValueFun, Seconds), Subset)]).
 
 %% @doc minus_all(M,N) : { x | x in M and x notin N}
 -spec minus_all(List::[T], Excluded::[T]) -> [T].
