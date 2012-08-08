@@ -73,7 +73,7 @@ start(normal, []) ->
     _ = pid_groups:start_link(),
     case sup_scalaris:start_link() of
         % ignore -> {error, ignore}; % no longer needed as dialyzer states
-        X      -> X
+        X = {ok, Pid} when is_pid(Pid) -> X
     end.
 
 -spec stop(any()) -> ok.
