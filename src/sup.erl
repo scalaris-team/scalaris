@@ -83,7 +83,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
                 Err ->
                     io:format("Startup raised ~p.~n", [Err])
             end,
-            TotalRes;
+            Res; %% return pid of supervisor as it may be linked to externally
         Error ->
             progress(Prefix ++ "~.0p", [Error]),
             Error
@@ -109,7 +109,9 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
     Res = supervisor:start_child(AtSup, SupAsChild),
 %%    io:format("Res is ~.0p", [Res]),
     case Res of
-        {ok, SupRef} ->
+        %% {ok, SupRef} | {ok, SupRef, _GroupInfo}:
+        X when is_tuple(X) andalso element(1, X) =:= ok ->
+            SupRef = element(2, X),
             case SupSpec of
                 unknown_supspec ->
                     progress(PipePrefix ++ "started childs at ~p:~n",
@@ -120,21 +122,9 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                     progress(PipePrefix
                              ++ "~.0p ~.0p~n", [SupSpec, SupRef]),
                     Childs = trycall(PipePrefix, Module, childs, Args, []),
-                    add_childs(PipePrefix ++ ["+-"], SupRef, Childs)
+                    {ok, _} = add_childs(PipePrefix ++ ["+-"], SupRef, Childs),
+                    Res
                end;
-        {ok, SupRef, _GroupInfo} ->
-            case SupSpec of
-                unknown_supspec ->
-                    progress(PipePrefix ++ "started childs at ~p:~n",
-                             [SupRef]),
-                    show_started_childs(PipePrefix ++ ["+-"], SupRef),
-                    Res;
-                _ ->
-                    progress(PipePrefix
-                             ++ "~.0p ~.0p~n", [SupSpec, SupRef]),
-                    Childs = trycall(PipePrefix, Module, childs, Args, _Default = []),
-                    add_childs(PipePrefix ++ ["+-"], SupRef, Childs)
-            end;
         Error ->
             progress(Prefix ++ " ~p~n", [Error]),
             Error

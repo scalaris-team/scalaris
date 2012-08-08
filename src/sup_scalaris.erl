@@ -48,7 +48,7 @@ start_link(Options) ->
     Link = sup:sup_start({local, main_sup}, ?MODULE,
                          [{service_group, ServiceGroup} | Options]),
     case Link of
-        {ok, _SupRef} ->
+        {ok, SupRef} when is_pid(SupRef) ->
             add_additional_nodes(),
             ok;
 %%        ignore ->
