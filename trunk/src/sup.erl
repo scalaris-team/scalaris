@@ -78,8 +78,12 @@ sup_start(Prefix, Supervisor, Module, Options) ->
             TotalRes = add_childs(ChildPrefix ++ ["  +-"], SupRef, Childs),
             case TotalRes of
                 X when is_tuple(X) andalso element(1, X) =:= ok ->
-                    io:format("Scalaris started successfully."
-                              " Hit <return> to see the erlang shell prompt.~n");
+                    case util:is_unittest() of
+                        true -> ok;
+                        _ ->
+                            io:format("Scalaris started successfully."
+                                      " Hit <return> to see the erlang shell prompt.~n")
+                    end;
                 Err ->
                     io:format("Startup raised ~p.~n", [Err])
             end,
