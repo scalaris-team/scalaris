@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Acceptor.
 %%
-%%      This module accepts new connections and starts corresponding 
+%%      This module accepts new connections and starts corresponding
 %%      comm_connection processes.
 %% @version $Id$
 -module(comm_acceptor).
@@ -37,19 +37,16 @@ init(Supervisor, GroupName) ->
         try
             erlang:register(comm_layer_acceptor, self()),
             pid_groups:join_as(GroupName, comm_acceptor),
-            
+
             IP = case config:read(listen_ip) of
                      undefined -> first_ip();
                      X         -> X
                  end,
             Port = config:read(port),
-            
+
             log:log(info,"[ CC ] listening on ~p:~p", [IP, Port]),
-            case util:app_get_env(verbose, false) of
-                true -> io:format("Listening on ~p:~p.~n", [IP, Port]);
-                false -> ok
-            end,
-            
+            util:if_verbose("Listening on ~p:~p.~n", [IP, Port]),
+
             LS = open_listen_port(Port, IP),
             {ok, {_LocalAddress, LocalPort}} = inet:sockname(LS),
             comm_server:set_local_address(undefined, LocalPort),
