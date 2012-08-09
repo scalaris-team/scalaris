@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -64,13 +64,15 @@ start_link() ->
             
             % remove the default error_logger's file and tty handlers
             error_logger:delete_report_handler(error_logger_file_h),
-%            error_logger:delete_report_handler(error_logger_tty_h),
+            error_logger:delete_report_handler(error_logger_tty_h),
+            error_logger:delete_report_handler(error_logger),
             % there should not be any previous log4erl handler - just in case, delete it:
             error_logger:delete_report_handler(error_logger_log4erl_h),
-            % add a log4erl handler instead:
+            % now register log4erl error logger:
             log4erl:error_logger_handler(),
-            ok;
-        _ -> ok
+            %% check whether erlang error_logger only reports to log4erl
+            [error_logger_log4erl_h] = gen_event:which_handlers(error_logger),
+            ok
     end,
     Link.
 
