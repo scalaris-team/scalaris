@@ -138,20 +138,43 @@ fill_ring(Type, DBSize, Params) ->
 fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
-    Keys = db_generator:get_db(I, DBSize, Distr),
-    insert_random_db(Keys, Params).
+    Keys = get_db(I, DBSize, Distr),
+    {DB, DBStatus} = gen_kvv(Keys, Params),
+    insert_db(DB),
+    DBStatus.
+
 fill_wiki(_DBSize, _Params) ->
     %TODO
     {0, 0, 0, 0}.
 
+-spec insert_db(?DB:db_as_list()) -> db_status().
+insert_db(KVV) ->
+    Nodes = get_node_list(),
+    lists:foldl(fun(Node, ActKVV) ->
+                        comm:send(Node, {get_state, comm:this(), my_range}),
+                        NRange = receive
+                                     {get_state_response, Range} -> Range
+                                 end,
+                        {NKVV, RestKVV} = lists:partition(fun(Entry) ->
+                                                                  intervals:in(db_entry:get_key(Entry), NRange)
+                                                          end, ActKVV),
+                        %ct:pal("Node=~p~nRange=~p~nKVV=~p", [Node, NRange, NKVV]),
+                        comm:send(Node, {add_data, comm:this(), NKVV}),
+                        receive {add_data_reply} -> ok end,
+                        RestKVV
+                end,
+                KVV, 
+                Nodes),
+    ok.
+
 % @doc Inserts a list of keys replicated into the ring
--spec insert_random_db([?RT:key()], [db_parameter()]) -> db_status().
-insert_random_db(Keys, Params) ->
+-spec gen_kvv([?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
+gen_kvv(Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
     FProb = proplists:get_value(fprob, Params, 50),    
-    {I, M, O} = 
+    {DB, {I, M, O}} = 
         lists:foldl(
-          fun(Key, {Ins, Mis, Out}) ->
+          fun(Key, {AccDb, {Ins, Mis, Out}}) ->
                   RepKeys = ?RT:get_replica_keys(Key),
                   %insert error?
                   EKey = case FProb >= randoms:rand_uniform(1, 100) of
@@ -159,41 +182,28 @@ insert_random_db(Keys, Params) ->
                              _ -> null
                          end,
                   %insert regen error
-                  {EType, WKeys} = case EKey =/= null of
-                                       true ->
-                                           EEType = case FType of 
-                                                        mixed -> 
-                                                            case randoms:rand_uniform(1, 3) of
-                                                                1 -> update;
-                                                                _ -> regen
-                                                            end;
-                                                        _ -> FType
-                                                    end,
-                                           {EEType, 
-                                            case EEType of
-                                                regen -> [X || X <- RepKeys, X =/= EKey];
-                                                _ -> RepKeys
-                                            end};
-                                       _ -> {FType, RepKeys}
-                                   end,
-                  %write replica group
-                  lists:foreach(
-                    fun(RKey) ->
-                            DBEntry = db_entry:new(RKey, val, 2),
-                            api_dht_raw:unreliable_lookup(RKey, 
-                                                          {set_key_entry, comm:this(), DBEntry}),
-                            receive {set_key_entry_reply, _} -> ok end
-                    end,
-                    WKeys),
+                  EType = case FType of 
+                              mixed -> 
+                                  case randoms:rand_uniform(1, 3) of
+                                      1 -> update;
+                                      _ -> regen
+                                  end;
+                              _ -> FType
+                          end,
+                  RGrp = [db_entry:new(X, val, 2) || X <- RepKeys, X =/= EKey],
                   %insert update error
-                  NewOut = if EType =:= update andalso EKey =/= null ->
-                                  Msg = {set_key_entry, comm:this(), db_entry:new(EKey, old, 1)},
-                                  api_dht_raw:unreliable_lookup(EKey, Msg),
-                                  receive {set_key_entry_reply, _} -> ok end,
-                                  Out + 1;
-                              true -> Out
-                           end,
-                  {Ins + length(WKeys), Mis + 4 - length(WKeys), NewOut}
+                  {NewOut, RList} = if EType =:= update andalso EKey =/= null ->
+                                           {Out + 1, [db_entry:new(EKey, old, 1) | RGrp]};
+                                       true -> {Out, RGrp}
+                                    end,
+                  {lists:append(RList, AccDb), {Ins + length(RGrp), Mis + 4 - length(RGrp), NewOut}}
           end, 
-          {0, 0, 0}, Keys),
-    {length(Keys) * ?ReplicationFactor, I, M, O}.
+          {[], {0, 0, 0}}, Keys),
+    {DB, {length(Keys) * ?ReplicationFactor, I, M, O}}.
+
+-spec get_node_list() -> [comm:mypid()].
+get_node_list() ->
+    mgmt_server:node_list(),
+    receive
+        {get_list_response, List} -> List
+    end.

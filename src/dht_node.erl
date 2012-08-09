@@ -49,7 +49,8 @@
       {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
       {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
       {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, uid:global_uid()}, HashedKey::?RT:key()} |
-      {drop_data, Data::list(db_entry:entry()), Sender::comm:mypid()}).
+      {add_data, Source_PID::comm:mypid(), ?DB:db_as_list()} |      
+      {drop_data, Data::?DB:db_as_list(), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
       {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
@@ -302,6 +303,11 @@ on({get_key_entry, Source_PID, HashedKey}, State) ->
 on({set_key_entry, Source_PID, Entry}, State) ->
     NewDB = ?DB:set_entry(dht_node_state:get(State, db), Entry),
     comm:send(Source_PID, {set_key_entry_reply, Entry}),
+    dht_node_state:set_db(State, NewDB);
+
+on({add_data, Source_PID, Data}, State) ->
+    NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
+    comm:send(Source_PID, {add_data_reply}),
     dht_node_state:set_db(State, NewDB);
 
 on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
