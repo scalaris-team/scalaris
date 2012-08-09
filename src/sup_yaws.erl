@@ -80,6 +80,8 @@ start_link() ->
 
     %% now configure Yaws
     ok = yaws_api:setconf(GC, SCList),
+    %% remove yaws error logger, as we have our own
+    error_logger:delete_report_handler(yaws_log_file_h),
     X.
 
 -spec init(ChildSpecs) -> {ok, {{one_for_all, MaxRetries::pos_integer(),
