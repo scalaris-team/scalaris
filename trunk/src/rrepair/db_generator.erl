@@ -147,24 +147,23 @@ fill_wiki(_DBSize, _Params) ->
     %TODO
     {0, 0, 0, 0}.
 
--spec insert_db(?DB:db_as_list()) -> db_status().
+-spec insert_db(?DB:db_as_list()) -> ok.
 insert_db(KVV) ->
     Nodes = get_node_list(),
-    lists:foldl(fun(Node, ActKVV) ->
-                        comm:send(Node, {get_state, comm:this(), my_range}),
-                        NRange = receive
-                                     {get_state_response, Range} -> Range
-                                 end,
-                        {NKVV, RestKVV} = lists:partition(fun(Entry) ->
-                                                                  intervals:in(db_entry:get_key(Entry), NRange)
-                                                          end, ActKVV),
-                        %ct:pal("Node=~p~nRange=~p~nKVV=~p", [Node, NRange, NKVV]),
-                        comm:send(Node, {add_data, comm:this(), NKVV}),
-                        receive {add_data_reply} -> ok end,
-                        RestKVV
-                end,
-                KVV, 
-                Nodes),
+    _ = lists:foldl(fun(Node, ActKVV) ->
+                            comm:send(Node, {get_state, comm:this(), my_range}),
+                            NRange = receive
+                                         {get_state_response, Range} -> Range
+                                     end,
+                            {NKVV, RestKVV} = lists:partition(fun(Entry) ->
+                                                                      intervals:in(db_entry:get_key(Entry), NRange)
+                                                              end, ActKVV),
+                            %ct:pal("Node=~p~nRange=~p~nKVV=~p", [Node, NRange, NKVV]),
+                            comm:send(Node, {add_data, comm:this(), NKVV}),
+                            receive {add_data_reply} -> ok end,
+                            RestKVV
+                    end,
+                    KVV, Nodes),
     ok.
 
 % @doc Inserts a list of keys replicated into the ring
