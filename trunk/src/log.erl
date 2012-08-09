@@ -35,8 +35,7 @@
 %%      error_logger_file_h report handlers and registers itself as the (only)
 %%      report handler. Note: requires a running config process and can only be
 %%      run once!
--spec start_link() -> {ok, Pid::pid()} | ignore |
-                      {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
+-spec start_link() -> {ok, Pid::pid()}.
 start_link() ->
     Link = log4erl:start(log4erl, []),
     case Link of
@@ -61,7 +60,7 @@ start_link() ->
 
 %%             log4erl:change_format(stdout, config:read(log_format)),
             log4erl:change_format(file, config:read(log_format_file)),
-            
+
             % remove the default error_logger's file and tty handlers
             error_logger:delete_report_handler(error_logger_file_h),
             error_logger:delete_report_handler(error_logger_tty_h),

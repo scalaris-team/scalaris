@@ -71,11 +71,7 @@ start_link() ->
     {ok, SCList, GC, ChildSpecs} =
         yaws_api:embedded_start_conf(Docroot, SconfList, GconfList, Id),
 
-    case util:app_get_env(verbose, false) of
-        true ->
-            io:format("Yaws listening at port ~p.~n", [config:read(yaws_port)]);
-        false -> ok
-    end,
+    util:if_verbose("Yaws listening at port ~p.~n", [config:read(yaws_port)]),
     X = supervisor:start_link(?MODULE, ChildSpecs),
 
     %% now configure Yaws
