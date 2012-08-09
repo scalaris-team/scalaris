@@ -415,7 +415,7 @@ topDumpX(ValueFun) when is_function(ValueFun, 2) ->
 topDumpX(Keys, ValueFun, Seconds) when is_integer(Seconds) andalso Seconds >= 1 ->
     Start = lists:keysort(1, dumpXNoSort([reductions, registered_name], ValueFun)),
     timer:sleep(1000 * Seconds),
-    End = lists:keysort(1, dumpX([reductions, registered_name | Keys], ValueFun)),
+    End = lists:keysort(1, dumpXNoSort([reductions, registered_name | Keys], ValueFun)),
     lists:reverse(
       lists:keysort(
         2, smerge2(Start, End,
