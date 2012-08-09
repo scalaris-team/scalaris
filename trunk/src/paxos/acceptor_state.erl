@@ -50,7 +50,7 @@ set_learners(State, Learners) -> setelement(2, State, Learners).
 get_rack(State) ->             element(3, State).
 -spec set_rack(acceptor_state(), non_neg_integer()) -> acceptor_state().
 set_rack(State, Round) ->      setelement(3, State, Round).
--spec get_raccepted(acceptor_state()) -> non_neg_integer().
+-spec get_raccepted(acceptor_state()) -> non_neg_integer() | -1.
 get_raccepted(State) ->        element(4, State).
 -spec set_raccepted(acceptor_state(), non_neg_integer()) -> acceptor_state().
 set_raccepted(State, Round) -> setelement(4, State, Round).

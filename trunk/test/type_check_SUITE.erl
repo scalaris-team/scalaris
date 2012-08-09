@@ -27,7 +27,7 @@
 -include("client_types.hrl").
 
 all()   -> [
-%%            tester_type_check_paxos,
+            tester_type_check_paxos,
             tester_type_check_api,
             tester_type_check_config,
             tester_type_check_util
@@ -140,14 +140,31 @@ tester_type_check_paxos(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
     Modules = [
-%                {acceptor, [
-%                            {msg_accepted, 4} %% tries to send messages
-%                           ]},
-%               {acceptor_state, []},
-%               {learner, []},
-%               {learner_state, []},
-%               {proposer, []},
-%               {proposer_state, []}
+               {acceptor, [
+                           {msg_accepted, 4}, %% tries to send messages
+                           {start_paxosid, 2}, %% tries to send messages
+                           {start_paxosid, 3}, %% tries to send messages
+                           {stop_paxosids,2}, %% tries to send messages
+                           {add_learner,3}, %% tries to send messages
+                           {start_link,2}, %% tries to spawn processes
+                           {on, 2} %% spec for messages not tight enough
+               ]},
+               {acceptor_state, []},
+               {learner, [
+                          {start_link,2}, %% tries to spawn processes
+                          {stop_paxosids,2}, %% tries to send messages
+                          {start_paxosid, 5} %% tries to send messages
+                         ]},
+               {learner_state, []},
+               {proposer, [
+                           {msg_accept, 5}, %% tries to send messages
+                           {stop_paxosids, 2}, %% tries to send messages
+                           {start_paxosid, 6}, %% tries to send messages
+                           {start_paxosid, 7}, %% tries to send messages
+                           {trigger, 2}, %% tries to send messages
+                           {start_link, 2} %% tries to spawn processes
+                          ]},
+               {proposer_state, []}
               ],
     [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
     true.
