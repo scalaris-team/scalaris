@@ -202,6 +202,10 @@ on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
                                      stats = Stats }) ->
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
+    kill;
+
+on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
+    log:log(info, "shutdown rr_resolve due to rrepair shut down", []),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -274,7 +278,8 @@ print_resolve_stats(Stats) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec init(state()) -> state().
-init(State) ->    
+init(State) ->
+    erlang:monitor(process, State#rr_resolve_state.ownerLocalPid),
     State.
 
 -spec start() -> {ok, MyPid::pid()}.
