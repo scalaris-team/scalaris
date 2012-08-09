@@ -46,7 +46,7 @@
          app_get_env/2,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          readable_utc_time/1,
-         for_to/3, for_to_ex/3, for_to_ex/4,
+         for_to/3, for_to_ex/3, for_to_ex/4, for_to_fold/5,
          collect_while/1]).
 -export([list_set_nth/3]).
 -export([debug_info/0, debug_info/1]).
@@ -903,6 +903,15 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
 readable_utc_time(TimeTriple) ->
     DateTime = calendar:now_to_universal_time(TimeTriple),
     erlang:append_element(DateTime, element(3, TimeTriple)).
+
+%% acc=AccIn, for(i; I<=n; i++) { acc=AccFun(fun(i), acc) }
+-spec for_to_fold(integer(), integer(), fun((integer()) -> X),
+                  AccFun::fun((X, Acc) -> Acc), AccIn::Acc) -> Acc.
+for_to_fold(I, N, Fun, AccFun, AccIn) when I =< N ->
+    AccOut = AccFun(Fun(I), AccIn),
+    for_to_fold(I + 1, N, Fun, AccFun, AccOut);
+for_to_fold(_I, _N, _Fun, _AccFun, AccIn) ->
+    AccIn.
 
 %% for(i; I<=n; i++) { fun(i) }
 -spec for_to(integer(), integer(), fun((integer()) -> any())) -> ok.
