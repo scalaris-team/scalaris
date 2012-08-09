@@ -168,10 +168,10 @@ run_helper(Module, Func, Arity, Iterations, {union_fun, FunTypes} = FunType,
 
 apply_args(Module, Func, Arity, Args, Iterations,
            {'fun', _ArgType, ResultType}, FunTypes, TypeInfos) ->
-    %ct:pal("~w:~w ~w", [Module, Func, Args]),
+%%    ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
     try erlang:apply(Module, Func, Args) of
         Result ->
-            %ct:pal("~w ~n~w", [Result, ResultType]),
+%%            ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
             case tester_type_checker:check(Result, ResultType, TypeInfos) of
                 true ->
                     run_helper(Module, Func, Arity, Iterations - 1, FunTypes,

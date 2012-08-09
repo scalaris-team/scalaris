@@ -46,7 +46,7 @@ check(Value, Type, ParseState) ->
     end.
 
 inner_check(Value, Type, CheckStack, ParseState) ->
-    %ct:pal("new inner_check(~w, ~w)", [Value, Type]),
+%%    ct:pal("new inner_check(~.0p, ~.0p)", [Value, Type]),
     case Type of
         atom ->
             check_basic_type(Value, Type, CheckStack, ParseState,
@@ -109,8 +109,10 @@ inner_check(Value, Type, CheckStack, ParseState) ->
             check_range(Value, Type, CheckStack, ParseState);
         {typedef, _Module, _TypeName} ->
             check_typedef(Value, Type, CheckStack, ParseState);
-        {tuple, _Tuple} ->
+        {tuple, Tuple} when is_list(Tuple) ->
             check_tuple(Value, Type, CheckStack, ParseState);
+        {tuple, Tuple} when is_tuple(Tuple) ->
+            inner_check(Value, Tuple, CheckStack, ParseState);
         {union, _Union} ->
             check_union(Value, Type, CheckStack, ParseState);
         _ ->
@@ -211,7 +213,7 @@ check_atom(Value, {atom, Atom} = T, CheckStack, _ParseState) ->
 check_tuple(Value, {tuple, Tuple} = T, CheckStack, ParseState) ->
     case is_tuple(Value) of
         true ->
-            case erlang:size(Value) =:= length(Tuple) of
+            case erlang:tuple_size(Value) =:= erlang:length(Tuple) of
                 true ->
                     check_tuple_iter(tuple_to_list(Value), Tuple,
                                      [{Value, T} | CheckStack], ParseState, 1);
