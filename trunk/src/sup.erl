@@ -166,8 +166,9 @@ add_child(Prefix, SupRef, Child) ->
             _ = case Res of
                 {ok, undefined} ->
                     progress("not started~n");
-                {ok, _Pid} -> ok;
-                {ok, _Pid, _GroupInfo} -> ok;
+                {ok, Pid} -> progress("~p.~n", [Pid]);
+                {ok, Pid, GroupInfo} ->
+                        progress("~.0p ~.0p.", [Pid, GroupInfo]);
                 Error ->
                     progress("~nFailed to start ~p reason ~p~n", [Child, Error]),
                     progress("Supervisor ~p has childs: ~p~n",

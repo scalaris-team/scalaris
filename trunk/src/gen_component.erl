@@ -285,11 +285,6 @@ start(Module, Handler, Args, Options) ->
 -spec start(module(), handler(), term(), list(), pid()) -> no_return() | ok.
 start(Module, DefaultHandler, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
-    case util:app_get_env(verbose, false) of
-        false -> ok;
-        _ -> io:format("Starting ~p with pid ~.0p.~n",
-                       [Module, self()])
-    end,
     case lists:keyfind(pid_groups_join_as, 1, Options) of
         {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
