@@ -416,6 +416,7 @@ topDumpX(Keys, ValueFun, Seconds) when is_integer(Seconds) andalso Seconds >= 1 
     Start = lists:keysort(1, dumpXNoSort([reductions, registered_name], ValueFun)),
     timer:sleep(1000 * Seconds),
     End = lists:keysort(1, dumpXNoSort([reductions, registered_name | Keys], ValueFun)),
+    Self = self(),
     lists:reverse(
       lists:keysort(
         2, smerge2(Start, End,
@@ -425,7 +426,10 @@ topDumpX(Keys, ValueFun, Seconds) when is_integer(Seconds) andalso Seconds >= 1 
                            % io:format("T1=~.0p~nT2=~.0p~n", [T1, T2]),
                            {Pid, [Red1, RName]} = T1,
                            {Pid, [Red2, RName | Rest2]} = T2,
-                           [{Pid, [(Red2 - Red1), RName, Rest2]}]
+                           case Pid of
+                               Self -> [];
+                               _    -> [{Pid, [(Red2 - Red1), RName | Rest2]}]
+                           end
                    end,
                    fun(_T1) -> [] end, % omit processes not alive at the end any more
                    fun(T2) -> [T2] end))).
