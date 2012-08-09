@@ -45,11 +45,16 @@
 
 
 -type(builtin_type() ::
-      dict
-    | gb_tree
+      array
+    | bitstring
+    | dict
     | gb_set
+    | gb_tree
+    | identifier
+    | iodata
+    | maybe_improper_list
     | module
-    | iodata).
+    | timeout).
 
 -type(type_name() ::
       {'fun', Module :: module(), FunName :: atom(), FunArity :: byte()}
