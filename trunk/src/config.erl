@@ -54,9 +54,12 @@ read(Key) ->
             case ets:lookup(config_ets, Key) of
                 [{Key, Value}] -> Value;
                 [] -> Value = util:app_get_env(Key, failed),
-                      case self() =:= erlang:whereis(config) of
-                          true -> ets:insert(config_ets, {Key, Value});
-                          _    -> write(Key, Value)
+                      case Value of
+                          failed -> ok;
+                          _ -> case self() =:= erlang:whereis(config) of
+                                   true -> ets:insert(config_ets, {Key, Value});
+                                   _    -> write(Key, Value)
+                               end
                       end,
                       Value
             end
