@@ -13,7 +13,7 @@
     <pathelement location="contrib/commons-codec-1.6.jar"/>
     <pathelement location="contrib/commons-lang-2.6.jar"/>
     <pathelement location="contrib/commons-logging-1.1.1.jar"/>
-    <pathelement location="contrib/bliki-core-3.0.19-SNAPSHOT.jar"/>
+    <pathelement location="contrib/bliki-core-3.0.19.jar"/>
     <pathelement location="contrib/java-bloomfilter-1.0.jar"/>
     <pathelement location="contrib/sqlite4java.jar"/>
   </path>
