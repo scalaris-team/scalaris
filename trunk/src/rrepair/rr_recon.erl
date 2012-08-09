@@ -289,6 +289,10 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
     comm:send_local(Owner, {recon_progress_report, self(), Initiator, NewStats}),
     kill;
 
+on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
+    log:log(info, "shutdown rr_recon due to rrepair shut down", []),
+    kill;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -650,6 +654,7 @@ rep_factor() ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
+    erlang:monitor(process, State#rr_recon_state.ownerLocalPid),
     State.
 
 -spec start(rrepair:session_id() | null) -> {ok, pid()}.
