@@ -369,7 +369,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
     build_symmetric_ring(NodeCount, Config, RRConfig),
     config:write(rr_bloom_fpr, Fpr),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
-    db_generator:fill_ring(random, DBSize, DBParams),
+    db_generator:fill_ring(random, DBSize, DBParams),    
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
     util:for_to_ex(1, Rounds, 
@@ -406,13 +406,11 @@ count_outdated() ->
       end, 
       0, get_node_list()).
 
+-spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
     mgmt_server:node_list(),
     receive
         {get_list_response, N} -> N
-        after 2000 ->
-            log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
-            throw('mgmt_server_timeout')
     end.
 
 % @doc counts db size on node responsible for key
