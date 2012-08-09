@@ -301,13 +301,13 @@ parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState
     {{bounded_fun, InternalFunType, Constraints}, ParseState3};
 parse_type({paren_type, _Line, [InnerType]}, Module, ParseState) ->
     parse_type(InnerType, Module, ParseState);
-parse_type({type, _Line, identifier, L}, erlang, ParseState) when is_list(L) ->
+parse_type({type, _Line, identifier, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, identifier}, ParseState};
-parse_type({type, _Line, timeout, L}, erlang, ParseState) when is_list(L) ->
+parse_type({type, _Line, timeout, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, timeout}, ParseState};
-parse_type({type, _Line, bitstring, L}, erlang, ParseState) when is_list(L) ->
+parse_type({type, _Line, bitstring, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, bitstring}, ParseState};
-parse_type({type, _Line, maybe_improper_list, L}, erlang, ParseState) when is_list(L) ->
+parse_type({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, maybe_improper_list}, ParseState};
 parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
