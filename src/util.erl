@@ -781,18 +781,22 @@ ssplit_unique_helper([], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, Uniqu
             ssplit_unique_helper([], T2, Lte, EqSelect, {UniqueL1, Shared, UniqueL2})
     end.
 
+%% @doc Merges two unique sorted lists into a single list.
 -spec smerge2(L1::[X], L2::[X]) -> MergedList::[X].
 smerge2(L1, L2) ->
     smerge2(L1, L2, fun erlang:'=<'/2).
 
+%% @doc Merges two unique Lte-sorted lists into a single list.
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> MergedList::[X].
 smerge2(L1, L2, Lte) ->
     smerge2(L1, L2, Lte, fun(E1, _E2) -> [E1] end).
 
+%% @doc Merges two unique Lte-sorted lists into a single list.
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X])) -> MergedList::[X].
 smerge2(L1, L2, Lte, EqSelect) ->
     smerge2(L1, L2, Lte, EqSelect, fun(X) -> [X] end, fun(X) -> [X] end).
 
+%% @doc Merges two unique Lte-sorted lists into a single list.
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X]),
               FirstExist::fun((X) -> [X]), SecondExist::fun((X) -> [X])) -> MergedList::[X].
 smerge2(L1, L2, Lte, EqSelect, FirstExist, SecondExist) ->
@@ -805,31 +809,18 @@ smerge2(L1, L2, Lte, EqSelect, FirstExist, SecondExist) ->
 smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
     LteH1H2 = Lte(H1, H2),
     LteH2H1 = Lte(H2, H1),
+    % note: need to reverse the results of EqSelect, FirstExist, SecondExist since ML is reversed
     if LteH1H2 andalso LteH2H1 ->
-           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(EqSelect(H1, H2)) ++ ML);
+           smerge2_helper(T1, T2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(EqSelect(H1, H2)) ++ ML);
        LteH1H2 ->
-           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, FirstExist(H1) ++ ML);
+           smerge2_helper(T1, L2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(FirstExist(H1)) ++ ML);
        LteH2H1 ->
-           % the top of ML could be equal to the top of L2 (if so, the decision
-           % about H2 has already been made and we omit it here, otherwise H2
-           % needs to be added)
-           case (ML =:= []) orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
-               true  -> smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, SecondExist(H2) ++ ML);
-               false -> smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, ML)
-           end
+           smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(SecondExist(H2)) ++ ML)
     end;
 smerge2_helper(L1, [], _Lte, _EqSelect, FirstExist, _SecondExist, ML) ->
     lists:reverse(ML, lists:append([FirstExist(X) || X <- L1]));
-smerge2_helper([], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
-    % The top of ML could be equal to the top of L2 (if so, the decision about
-    % H2 has already been made and we omit it here, otherwise H2 needs to be
-    % added).
-    % This is because elements are only removed from L2 if an element of L1 is
-    % larger.
-    case ML =:= [] orelse not (Lte(hd(ML), H2) andalso Lte(H2, hd(ML))) of
-        true  -> lists:reverse(ML, lists:append([SecondExist(X) || X <- L2]));
-        false -> smerge2_helper([], T2, Lte, EqSelect, FirstExist, SecondExist, ML)
-    end.
+smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist, ML) ->
+    lists:reverse(ML, lists:append([SecondExist(X) || X <- L2])).
 
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
