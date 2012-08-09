@@ -29,6 +29,7 @@
 all()   -> [
 %%            tester_type_check_paxos,
             tester_type_check_api,
+            tester_type_check_config,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
@@ -84,6 +85,30 @@ tester_type_check_api(_Config) ->
     [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
     true.
 
+tester_type_check_config(_Config) ->
+    Count = 1000,
+    %% [{modulename, [excludelist = {fun, arity}]}]
+    Modules = [
+               {config, [
+                         {check_config, 0},
+                         {cfg_is_tuple, 4}, %% needs a fun as parameter
+                         {cfg_is_list, 3}, %% needs a fun as parameter
+                         {cfg_test_and_error, 3}, %% needs a fun as parameter
+                         {start, 2},
+                         {write, 2},
+                         {start_link, 1}, {start_link, 2},
+                         {start_link2, 0}, {start_link2, 1},
+                         {loop, 0}
+                        ]}
+              ],
+    %% These tests generate errors which would be too verbose.
+    log:set_log_level(none),
+    [ begin
+          tester_type_check_module(Mod, Count)
+      end || Mod <- Modules ],
+    log:set_log_level(config:read(log_level)),
+    true.
+
 tester_type_check_util(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
@@ -91,16 +116,6 @@ tester_type_check_util(_Config) ->
     Modules = [
 %%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
                {db_entry, []},
-               {config, [
-                         {check_config, 0},
-                         {cfg_is_tuple, 4}, %% needs a fun as parameter
-                         {cfg_is_list, 3}, %% needs a fun as parameter
-                         {cfg_test_and_error, 3}, %% needs a fun as parameter
-                         {start, 2},
-                         {start_link, 1}, {start_link, 2},
-                         {start_link2, 0}, {start_link2, 1},
-                         {loop, 0}
-                        ]},
                {quorum, []},
                {pdb, []},
                {pid_groups, [
