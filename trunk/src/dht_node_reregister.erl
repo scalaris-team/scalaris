@@ -123,7 +123,7 @@ get_base_interval() ->
 
 %% @doc Gets the pid of the dht_node process in the same group as the calling
 %%      process.
--spec get_dht_node_this() -> comm:mypid_plain().
+-spec get_dht_node_this() -> comm:mypid().
 get_dht_node_this() ->
     comm:make_global(pid_groups:get_my(dht_node)).
 
