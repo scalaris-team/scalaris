@@ -58,11 +58,22 @@ end_per_testcase(_TestCase, Config) ->
 tester_type_check_module({Module, InExcludeList}, Count) ->
     ExpFuncs = Module:module_info(exports),
     ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
+    ErrList = [ case lists:member(X, ExpFuncs) of
+                    true -> true;
+                    false ->
+                        ct:pal("Excluded non exported function ~p:~p~n", [Module,X]),
+                        false
+                end || X <- ExcludeList ],
+    case lists:all(fun(X) -> X end, ErrList) of
+        true -> ok;
+        false -> throw(error)
+    end,
+
     [ begin
           ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
           tester:test(Module, Fun, Arity, Count)
       end
-     || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
+      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
 
 tester_type_check_api(_Config) ->
     Count = 1000,
@@ -90,15 +101,14 @@ tester_type_check_config(_Config) ->
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
                {config, [
-                         {check_config, 0},
-                         {cfg_is_tuple, 4}, %% needs a fun as parameter
                          {cfg_is_list, 3}, %% needs a fun as parameter
+                         {cfg_is_tuple, 4}, %% needs a fun as parameter
                          {cfg_test_and_error, 3}, %% needs a fun as parameter
+                         {check_config, 0},
                          {start, 2},
-                         {write, 2},
                          {start_link, 1}, {start_link, 2},
                          {start_link2, 0}, {start_link2, 1},
-                         {loop, 0}
+                         {write, 2}
                         ]}
               ],
     %% These tests generate errors which would be too verbose.
@@ -114,23 +124,67 @@ tester_type_check_util(_Config) ->
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
-%%               {intervals, [{get_bounds, 1}]}, %% throws exception on []
+               {intervals, [
+                            {get_bounds, 1}, %% throws exception on []
+                            {new, 4}, %% type spec to wide (would need overlapping contract support)
+                            {split, 2} %% throws exception
+                           ]},
                {db_entry, []},
                {quorum, []},
                {pdb, []},
                {pid_groups, [
-                             {start_link, 0},
+                             {add, 3}, %% same as above
                              {init, 1}, %% tries to create existing ets table
+                             {join_as, 2}, %% tries to join with multiple groups/names
                              {on, 2},
                              {pids_to_names, 2}, %% sends remote messages
-                             {join_as, 2}, %% tries to join with multiple groups/names
-                             {add, 3} %% same as above
+                             {start_link, 0}
                             ]},
-               {randoms, [{start, 0}, {stop, 0}]}
-%%               {util, [
-%%                       {collect_while, 1}
-%%                      ]}
-%%
+               {randoms, [{start, 0}, {stop, 0}]},
+               {util,
+                [
+                 {collect_while, 1}, %% cannot create funs
+                 {debug_info, 0}, %% type spec not valid?
+                 {debug_info, 1}, %% type spec not valid?
+                 {dump3, 0}, %% type spec not valid
+                 {dumpX, 1}, {dumpX, 2}, %% type spec not valid?
+                 {extint2atom, 1}, %% type spec too wide
+                 {first_matching, 2},
+                 {for_to, 3}, %% cannot create funs
+                 {for_to_ex, 3}, %% cannot create funs
+                 {for_to_ex, 4}, %% cannot create funs
+                 {for_to_fold, 5}, %% cannot create funs
+                 {gb_trees_foldl, 3}, %% cannot create funs
+                 {log, 2}, %% floats become to large and raise badarith
+                 {log2, 1}, %% floats become to large and raise badarith
+                 {logged_exec, 1}, %% not execute random strings
+                 {parallel_run, 4}, %% cannot create funs
+                 {pop_randomelem, 2}, %% list may be too short
+                 {pow, 2}, %% floats become to large and raise badarith
+                 {print_bits, 2}, %% cannot create funs
+                 {readable_utc_time, 1}, %% too slow for big ints
+                 {repeat, 3}, {repeat, 4}, %% cannot create funs
+                 {smerge2, 3}, %% cannot create funs
+                 {smerge2, 4}, %% cannot create funs
+                 {sleep_for_ever, 0},
+                 {split_unique, 3}, %% cannot create funs
+                 {split_unique, 4}, %% cannot create funs
+                 {ssplit_unique, 3}, %% cannot create funs
+                 {ssplit_unique, 4}, %% cannot create funs
+                 {supervisor_terminate, 1}, %% could destroy the system
+                 {supervisor_terminate_childs, 1}, %% tester not ready for gb_trees
+                 {tc, 1}, {tc, 2}, {tc, 3}, %% don't call arbitrary functions
+                 {topDumpX, 1},
+                 {topDumpX, 3},
+                 {topDumpXEvery, 3},
+                 {topDumpXEvery, 5},
+                 {topDumpXEvery_helper, 4},
+                 {wait_for, 1}, %% cannot create funs
+                 {wait_for, 2}, %% cannot create funs
+                 {wait_for_process_to_die, 1}, %% could wait forever
+                 {wait_for_table_to_disappear, 1}, %% cannot create tids
+                 {zipfoldl, 5} %% cannot create funs
+                ]}
               ],
     [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
     true.
@@ -141,30 +195,30 @@ tester_type_check_paxos(_Config) ->
     config:write(no_print_ring_data, true),
     Modules = [
                {acceptor, [
+                           {add_learner,3}, %% tries to send messages
                            {msg_accepted, 4}, %% tries to send messages
+                           {on, 2}, %% spec for messages not tight enough
+                           {start_link,2}, %% tries to spawn processes
                            {start_paxosid, 2}, %% tries to send messages
                            {start_paxosid, 3}, %% tries to send messages
-                           {stop_paxosids,2}, %% tries to send messages
-                           {add_learner,3}, %% tries to send messages
-                           {start_link,2}, %% tries to spawn processes
-                           {on, 2} %% spec for messages not tight enough
+                           {stop_paxosids,2} %% tries to send messages
                ]},
                {acceptor_state, []},
                {learner, [
+                          {on, 2}, %% spec for messages not tight enough
                           {start_link,2}, %% tries to spawn processes
-                          {stop_paxosids,2}, %% tries to send messages
                           {start_paxosid, 5}, %% tries to send messages
-                          {on, 2} %% spec for messages not tight enough
+                          {stop_paxosids,2} %% tries to send messages
                          ]},
                {learner_state, []},
                {proposer, [
                            {msg_accept, 5}, %% tries to send messages
-                           {stop_paxosids, 2}, %% tries to send messages
+                           {on, 2}, %% spec for messages not tight enough
+                           {start_link, 2}, %% tries to spawn processes
                            {start_paxosid, 6}, %% tries to send messages
                            {start_paxosid, 7}, %% tries to send messages
-                           {trigger, 2}, %% tries to send messages
-                           {on, 2}, %% spec for messages not tight enough
-                           {start_link, 2} %% tries to spawn processes
+                           {stop_paxosids, 2}, %% tries to send messages
+                           {trigger, 2} %% tries to send messages
                           ]},
                {proposer_state, []}
               ],

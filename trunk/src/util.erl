@@ -337,7 +337,7 @@ dump() ->
     lists:reverse(lists:keysort(2, FunCnt)).
 
 %% @doc Returns information about all processes' memory usage.
--spec dump2() -> [{PID::pid(), Mem::non_neg_integer(), Fun::mfa()}].
+-spec dump2() -> [{PID::pid(), [pos_integer() | mfa() | any()]}].
 dump2() ->
     dumpX([memory, current_function, dictionary],
           fun(K, Value) ->
@@ -842,7 +842,7 @@ is_unittest() ->
         ?SCALARIS_RECV({is_unittest, Result}, Result)
     end.
 
--spec make_filename(string()) -> string().
+-spec make_filename([byte()]) -> string().
 make_filename(Name) ->
     re:replace(Name, "[^a-zA-Z0-9\-_@\.]", "_", [{return, list}, global]).
 

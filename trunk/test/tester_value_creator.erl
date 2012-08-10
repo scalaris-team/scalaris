@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -147,7 +147,29 @@ create_value({typedef, Module, TypeName}, Size, ParseState) ->
             create_value(TypeSpec, Size, ParseState);
         none ->
             ?ct_fail("error: unknown type ~p:~p~n", [Module, TypeName])
-    end.
+    end;
+create_value({builtin_type, gb_tree}, Size, ParseState) ->
+    L = create_value({list,
+                      {tuple,
+                       [{typedef, tester, test_any},
+                        {typedef, tester, test_any}]}}, Size, ParseState),
+    T = gb_trees:empty(),
+    case L of
+        [] -> T;
+        _ -> lists:foldl(
+               fun(X, Acc) ->
+                       try gb_trees:insert(element(1, X), element(2,X), Acc) of
+                           Y -> Y
+                       catch _:_ -> Acc
+                       end
+               end, T, L)
+    end;
+create_value({builtin_type, module}, _Size, _ParseState) ->
+    Values = [element(1, X) || X <- code:all_loaded()],
+    lists:nth(crypto:rand_uniform(1, length(Values) + 1), Values);
+create_value(Unknown , _Size, _ParseState) ->
+    ct:pal("Cannot create type ~.0p~n", [Unknown]),
+    throw(function_clause).
 
 %% @doc creates a record value
 -spec create_record_value(RecordName :: type_name(),
