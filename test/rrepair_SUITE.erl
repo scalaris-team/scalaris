@@ -38,10 +38,10 @@
 
 basic_tests() ->
     [get_symmetric_keys_test,
-     blobCoding,
+     blobCoding,     
      tester_get_key_quadrant,
      tester_mapInterval,
-     tester_minKeyInInterval
+     tester_minKeyInInterval     
     ].
 
 repair_tests() ->
@@ -59,7 +59,8 @@ bloom_tests() ->
 
 all() ->
     [{group, basic},
-     {group, repair}
+     session_ttl,
+     {group, repair}     
      ].
 
 groups() ->
@@ -199,9 +200,7 @@ mpath(Config) ->
 				   _Msg} <- A], 
 	file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
 	file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(A)])),
-    %file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),
-    %clean up
-    unittest_helper:stop_ring(),    
+    %file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),  
 	ok.
 
 simple(Config) ->
@@ -256,7 +255,6 @@ dest(Config) ->
             SO, SONew, SM, SMNew, SO - SONew, SMNew - SM,
             CO, CONew, CM, CMNew, CO - CONew, CMNew - CM]),
     %clean up
-    unittest_helper:stop_ring(),
     ?implies(SO > 0 orelse CO > 0, SONew < SO orelse CONew < CO) andalso
         ?implies(SM =/= SMNew, SMNew > SM) andalso
         ?implies(CM =/= CMNew, CMNew > CM).
@@ -267,7 +265,7 @@ parts(Config) ->
     OldConf = get_rep_upd_config(Method),
     Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
     {Start, End} = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
-                              1, 0.1, Conf),
+                              2, 0.2, Conf),
     ?assert(sync_degree(Start) < sync_degree(End)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -290,6 +288,45 @@ blobCoding(_) ->
     {DA, DB} = rr_recon:decodeBlob(Coded),
     ?equals_w_note(A, DA, io_lib:format("A=~p ; Coded=~p ; DecodedA=~p", [A, Coded, DA])),
     ?equals_w_note(B, DB, io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])),
+    ok.
+
+session_ttl(Config) ->
+    %parameter
+    NodeCount = 7,
+    DataCount = 1000,
+    Method = bloom,
+    FType = mixed,
+    TTL = 2500,
+    
+    _R1 = get_rep_upd_config(Method),
+    _R2 = lists:keyreplace(rr_session_ttl, 1, _R1, {rr_session_ttl, TTL}),
+    RRConf = lists:keyreplace(rr_gc_interval, 1, _R2, {rr_gc_interval, erlang:round(TTL / 10)}),
+    
+    %build and fill ring
+    build_symmetric_ring(NodeCount, Config, RRConf),    
+    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
+                                               {fprob, 50}, 
+                                               {distribution, uniform}]),
+    %chose node pair
+    SKey = ?RT:get_random_node_id(),
+    CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
+    
+    api_dht_raw:unreliable_lookup(CKey, {get_pid_group, comm:this()}),    
+    CName = receive {get_pid_group_response, Key} -> Key end,
+    
+    %server starts sync
+    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+                                              {request_sync, Method, CKey}}),
+    api_vm:kill_node(CName),
+
+    %check timeout
+    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
+    api_dht_raw:unreliable_lookup(SKey, Req),
+    Open = receive {get_state_response, R1} -> R1 =/= 0 end,
+    timer:sleep(TTL),
+    api_dht_raw:unreliable_lookup(SKey, Req),
+    Open2 = receive {get_state_response, R2} -> R2 =:= 0 end,
+    ?equals_pattern_w_note(Open, Open2, io_lib:format("start session open = ~p - end session closed = ~p", [Open, Open2])),
     ok.
 
 -spec prop_get_key_quadrant(?RT:key()) -> boolean().
