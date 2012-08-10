@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(type_check_SUITE).
 -author('schintke@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -compile(export_all).
 
@@ -30,6 +30,7 @@ all()   -> [
             tester_type_check_api,
             tester_type_check_config,
             tester_type_check_paxos,
+            tester_type_check_tx,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
@@ -68,10 +69,7 @@ tester_type_check_api(_Config) ->
                {api_monitor, []},
                {api_pubsub, []},
                {api_rdht, []},
-               {api_tx, []},
-               {rdht_tx, [
-                          {decode_value, 1} %% not every binary is an erlterm
-                         ]}
+               {api_tx, []}
               ],
     [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
     true.
@@ -97,6 +95,91 @@ tester_type_check_config(_Config) ->
           tester:type_check_module(Mod, Count)
       end || Mod <- Modules ],
     log:set_log_level(config:read(log_level)),
+    true.
+
+tester_type_check_paxos(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    Modules = [
+               {acceptor, [
+                           {add_learner,3}, %% tries to send messages
+                           {msg_accepted, 4}, %% tries to send messages
+                           {on, 2}, %% spec for messages not tight enough
+                           {start_link,2}, %% tries to spawn processes
+                           {start_paxosid, 2}, %% tries to send messages
+                           {start_paxosid, 3}, %% tries to send messages
+                           {stop_paxosids,2} %% tries to send messages
+               ]},
+               {acceptor_state, []},
+               {learner, [
+                          {on, 2}, %% spec for messages not tight enough
+                          {start_link,2}, %% tries to spawn processes
+                          {start_paxosid, 5}, %% tries to send messages
+                          {stop_paxosids,2} %% tries to send messages
+                         ]},
+               {learner_state, []},
+               {proposer, [
+                           {msg_accept, 5}, %% tries to send messages
+                           {on, 2}, %% spec for messages not tight enough
+                           {start_link, 2}, %% tries to spawn processes
+                           {start_paxosid, 6}, %% tries to send messages
+                           {start_paxosid, 7}, %% tries to send messages
+                           {stop_paxosids, 2}, %% tries to send messages
+                           {trigger, 2} %% tries to send messages
+                          ]},
+               {proposer_state, []}
+              ],
+    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
+    true.
+
+tester_type_check_tx(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    Modules = [
+               {rdht_tx,
+                [ {decode_value, 1} ]}, %% not every binary is an erlterm
+               {rdht_tx_read,
+                [
+                 {abort, 3},
+                 {commit, 3},
+                 {init, 1},
+                 {on,2},
+                 {start_link, 1},
+                 {validate_prefilter, 1}, %% TODO: not a list error
+                 {validate, 2},
+                 {work_phase, 3}]},
+               {rdht_tx_read_state,[]},
+               {rdht_tx_write,
+                [
+                 {abort, 3},
+                 {commit, 3},
+                 {start_link, 1}, {init, 1}, {on,2},
+                 {validate_prefilter, 1}, %% TODO: not a list error
+                 {validate, 2},
+                 {work_phase, 3}]},
+               {tx_item_state,
+                [{new, 3}, %% TODO: not a list error
+                 {new, 6} %% cannot create same length lists for zip
+                ]},
+               {tx_op_beh,[]},
+               {tx_state, []},
+               {tx_tlog,
+                [{new_entry, 5}, %% split tlog types for client and rt:keys
+                 {set_entry_key, 2} %% split tlog types for client and rt:keys
+                ]},
+               {tx_tm_rtm,
+                [{commit, 4},
+                 {get_my, 2},
+                 {init, 1},
+                 {msg_commit_reply, 3},
+                 {on,2},
+                 {on_init,2},
+                 {start_link,2}
+                ]}
+               %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
+               %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},
+              ],
+    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
     true.
 
 tester_type_check_util(_Config) ->
@@ -179,37 +262,3 @@ tester_type_check_util(_Config) ->
     true.
 
 
-tester_type_check_paxos(_Config) ->
-    Count = 1000,
-    config:write(no_print_ring_data, true),
-    Modules = [
-               {acceptor, [
-                           {add_learner,3}, %% tries to send messages
-                           {msg_accepted, 4}, %% tries to send messages
-                           {on, 2}, %% spec for messages not tight enough
-                           {start_link,2}, %% tries to spawn processes
-                           {start_paxosid, 2}, %% tries to send messages
-                           {start_paxosid, 3}, %% tries to send messages
-                           {stop_paxosids,2} %% tries to send messages
-               ]},
-               {acceptor_state, []},
-               {learner, [
-                          {on, 2}, %% spec for messages not tight enough
-                          {start_link,2}, %% tries to spawn processes
-                          {start_paxosid, 5}, %% tries to send messages
-                          {stop_paxosids,2} %% tries to send messages
-                         ]},
-               {learner_state, []},
-               {proposer, [
-                           {msg_accept, 5}, %% tries to send messages
-                           {on, 2}, %% spec for messages not tight enough
-                           {start_link, 2}, %% tries to spawn processes
-                           {start_paxosid, 6}, %% tries to send messages
-                           {start_paxosid, 7}, %% tries to send messages
-                           {stop_paxosids, 2}, %% tries to send messages
-                           {trigger, 2} %% tries to send messages
-                          ]},
-               {proposer_state, []}
-              ],
-    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
-    true.
