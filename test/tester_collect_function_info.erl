@@ -46,29 +46,33 @@ collect_fun_info(Module, Func, Arity, ParseState) ->
         end,
     ParseState3 = case tester_parse_state:has_unknown_types(ParseState2) of
                       false -> ParseState2;
-                      true  -> collect_unknown_type_infos(ParseState2, 100)
+                      true  -> collect_unknown_type_infos(ParseState2, [])
                   end,
     case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState3) of
         {value, _} -> tester_parse_state:finalize(ParseState3);
         none -> ?ct_fail("unknown function ~p:~p/~p~n", [Module, Func, Arity])
     end.
 
--spec collect_unknown_type_infos(tester_parse_state:state(), non_neg_integer()) ->
+-spec collect_unknown_type_infos(tester_parse_state:state(), list()) ->
     tester_parse_state:state().
-collect_unknown_type_infos(ParseState, 0) ->
+collect_unknown_type_infos(ParseState, OldUnknownTypes) ->
     {_, UnknownTypes} = tester_parse_state:get_unknown_types(ParseState),
-    ct:pal("warning still looking for unknown types: ~p~n", [UnknownTypes]),
-    collect_unknown_type_infos(ParseState, 100);
-collect_unknown_type_infos(ParseState, Counter) ->
-    {_, UnknownTypes} = tester_parse_state:get_unknown_types(ParseState),
-    ParseState2 = tester_parse_state:reset_unknown_types(ParseState),
-    ParseState3 = lists:foldl(fun({type, Module, TypeName}, InnerParseState) ->
-                                      collect_type_info(Module, TypeName,
-                                                        InnerParseState)
-                              end, ParseState2, UnknownTypes),
-    case tester_parse_state:has_unknown_types(ParseState3) of
-        false -> ParseState3;
-        true  -> collect_unknown_type_infos(ParseState3, Counter - 1)
+    %ct:pal("unknown types: ~p~n", [UnknownTypes]),
+    case OldUnknownTypes =:= UnknownTypes of
+        true ->
+            ct:pal("never found the following types: ~p~n~n", [UnknownTypes]),
+            ?ct_fail("never found the following types: ~p~n~n", [UnknownTypes]),
+            error;
+        false ->
+            ParseState2 = tester_parse_state:reset_unknown_types(ParseState),
+            ParseState3 = lists:foldl(fun({type, Module, TypeName}, InnerParseState) ->
+                                              collect_type_info(Module, TypeName,
+                                                                InnerParseState)
+                                      end, ParseState2, UnknownTypes),
+            case tester_parse_state:has_unknown_types(ParseState3) of
+                false -> ParseState3;
+                true  -> collect_unknown_type_infos(ParseState3, UnknownTypes)
+            end
     end.
 
 -spec collect_type_info/3 :: (module(), atom(), tester_parse_state:state()) ->
