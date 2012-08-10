@@ -918,11 +918,8 @@ for_to(_I, _N, _Fun) ->
 
 %% for(i; i<=n; i++) { Acc = [fun(i)|Acc] }
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T), [T]) -> [T].
-for_to_ex(N, N, Fun, Acc) ->
-    [Fun(N) | Acc];
 for_to_ex(I, N, Fun, Acc) ->
-    R = Fun(I),
-    for_to_ex(I + 1, N, Fun, [R | Acc]).
+    for_to_fold(I, N, Fun, fun(X, XAcc) -> [X | XAcc] end, Acc).
 
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T)) -> [T].
 for_to_ex(I, N, Fun) ->
