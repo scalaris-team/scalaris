@@ -157,7 +157,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                     randoms:start(),
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
-                    _ = sup_scalaris:start_link(NewOptions),
+                    {ok, _} = sup_scalaris:start_link(NewOptions),
                     mgmt_server:connect(),
                     Ids = IdsFun(), % config may be needed
                     _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
@@ -199,12 +199,13 @@ make_ring(Size, Options) ->
                     randoms:start(),
                     {ok, _GroupsPid} = pid_groups:start_link(),
                     NewOptions = prepare_config(Options),
-                    _ = sup_scalaris:start_link(NewOptions),
+                    {ok, _} = sup_scalaris:start_link(NewOptions),
                     mgmt_server:connect(),
                     _ = admin:add_node([{first}]),
                     _ = admin:add_nodes(Size - 1),
                     ok
             end),
+    true = erlang:is_process_alive(Pid),
 %%     timer:sleep(1000),
     check_ring_size(Size),
     wait_for_stable_ring(),
