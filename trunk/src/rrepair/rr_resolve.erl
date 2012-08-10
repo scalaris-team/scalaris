@@ -78,7 +78,8 @@
 -record(rr_resolve_state,
         {
          ownerLocalPid  = ?required(rr_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
-         ownerRemotePid = ?required(rr_resolve_state, ownerRemotePid)   :: comm:mypid(),         
+         ownerRemotePid = ?required(rr_resolve_state, ownerRemotePid)   :: comm:mypid(),
+         ownerMonitor   = null                                          :: null | reference(),
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = nil        									:: nil | operation(),
          stats          = #resolve_stats{}                              :: stats(),
@@ -93,7 +94,7 @@
     % internal
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
-    {shutdown, {atom(), stats()}}.
+    {shutdown, atom()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -133,7 +134,7 @@ on({get_state_response, MyI}, State =
     %kill is done by update_key_entry_ack
     ?TRACE("GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p ; ToUpdate=~p", [MyI, length(KvvList), ToUpdate]),
     ToUpdate =:= 0 andalso
-        comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
+        comm:send_local(self(), {shutdown, resolve_ok}),
     State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
@@ -162,7 +163,7 @@ on({get_entries_response, KVVList}, State =
         null -> comm:send(Dest, {request_resolve, {key_upd, KVVList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {key_upd, KVVList}, Options})
     end,
-    comm:send_local(self(), {shutdown, {resolve_ok, Stats}}),
+    comm:send_local(self(), {shutdown, resolve_ok}),
     State;
 
 on({update_key_entry_ack, Entry, Exists, Done}, State =
@@ -192,14 +193,16 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
                 send_feedback(NewFB, SID),
-                comm:send_local(self(), {shutdown, {resolve_ok, NewStats}});
+                comm:send_local(self(), {shutdown, resolve_ok});
         true -> ok
     end,
     State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
-on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner, 
+on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
+                                     ownerMonitor = Mon, 
                                      send_stats = SendStats,
                                      stats = Stats }) ->
+    erlang:demonitor(Mon),
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
     kill;
@@ -279,8 +282,8 @@ print_resolve_stats(Stats) ->
 
 -spec init(state()) -> state().
 init(State) ->
-    erlang:monitor(process, State#rr_resolve_state.ownerLocalPid),
-    State.
+    Mon = erlang:monitor(process, State#rr_resolve_state.ownerLocalPid),
+    State#rr_resolve_state{ ownerMonitor = Mon }.
 
 -spec start() -> {ok, MyPid::pid()}.
 start() ->        
