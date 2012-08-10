@@ -28,6 +28,8 @@
 -export([test/4, test/5, test_log/4,
          test_with_scheduler/3, test_with_scheduler/4]).
 
+-export([type_check_module/2]).
+
 -include("tester.hrl").
 -include("unittest.hrl").
 
@@ -226,3 +228,25 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
          end(XResult) || XResult <- Results],
     %ct:pal("~w~n", [Results]),
     ok.
+
+-spec type_check_module({module(), [{atom(), non_neg_integer()}]},
+                       pos_integer()) -> ok.
+type_check_module({Module, InExcludeList}, Count) ->
+    ExpFuncs = Module:module_info(exports),
+    ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
+    ErrList = [ case lists:member(X, ExpFuncs) of
+                    true -> true;
+                    false ->
+                        ct:pal("Excluded non exported function ~p:~p~n", [Module,X]),
+                        false
+                end || X <- ExcludeList ],
+    case lists:all(fun(X) -> X end, ErrList) of
+        true -> ok;
+        false -> throw(error)
+    end,
+
+    [ begin
+          ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
+          test(Module, Fun, Arity, Count)
+      end
+      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].

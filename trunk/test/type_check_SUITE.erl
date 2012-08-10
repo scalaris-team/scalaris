@@ -55,26 +55,6 @@ end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
 
-tester_type_check_module({Module, InExcludeList}, Count) ->
-    ExpFuncs = Module:module_info(exports),
-    ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
-    ErrList = [ case lists:member(X, ExpFuncs) of
-                    true -> true;
-                    false ->
-                        ct:pal("Excluded non exported function ~p:~p~n", [Module,X]),
-                        false
-                end || X <- ExcludeList ],
-    case lists:all(fun(X) -> X end, ErrList) of
-        true -> ok;
-        false -> throw(error)
-    end,
-
-    [ begin
-          ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
-          tester:test(Module, Fun, Arity, Count)
-      end
-      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
-
 tester_type_check_api(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
@@ -93,7 +73,7 @@ tester_type_check_api(_Config) ->
                           {decode_value, 1} %% not every binary is an erlterm
                          ]}
               ],
-    [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
+    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
     true.
 
 tester_type_check_config(_Config) ->
@@ -114,7 +94,7 @@ tester_type_check_config(_Config) ->
     %% These tests generate errors which would be too verbose.
     log:set_log_level(none),
     [ begin
-          tester_type_check_module(Mod, Count)
+          tester:type_check_module(Mod, Count)
       end || Mod <- Modules ],
     log:set_log_level(config:read(log_level)),
     true.
@@ -186,7 +166,7 @@ tester_type_check_util(_Config) ->
                  {zipfoldl, 5} %% cannot create funs
                 ]}
               ],
-    [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
+    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
     true.
 
 
@@ -222,5 +202,5 @@ tester_type_check_paxos(_Config) ->
                           ]},
                {proposer_state, []}
               ],
-    [ tester_type_check_module(Mod, Count) || Mod <- Modules ],
+    [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
     true.
