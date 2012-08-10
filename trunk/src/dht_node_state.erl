@@ -45,8 +45,13 @@
          set_bulkowner_reply_timer/2]).
 
 -ifdef(with_export_type_support).
--export_type([state/0]).
+-export_type([state/0, name/0]).
 -endif.
+
+-type name() :: rt | rt_size | neighbors | succlist | succ | succ_id | succ_pid |
+                predlist | pred | pred_id | pred_pid | node | node_id | my_range |
+                succ_range | join_time | trans_log | db | tx_tp_db | proposer |
+                load | slide_pred | slide_succ | msg_fwd | rm_state | monitor_proc.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),

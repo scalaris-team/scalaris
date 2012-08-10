@@ -59,6 +59,17 @@
 -type(rt_message() ::
       {rt_update, RoutingTable::?RT:external_rt()}).
 
+-type(misc_message() ::
+      {get_yaws_info, Pid::comm:mypid()} |
+      {get_state, Pid::comm:mypid(), Which::dht_node_state:name()} |
+      {get_node_details, Pid::comm:mypid()} |
+      {get_node_details, Pid::comm:mypid(), Which::[node_details:node_details_name()]} |          
+      {get_pid_group, Pid::comm:mypid()} |
+      {dump} |
+      {web_debug_info, Requestor::comm:erl_local_pid()} |
+      {get_dht_nodes_response, KnownHosts::[comm:mypid()]} |
+      {unittest_get_bounds_and_data, SourcePid::comm:mypid()}).
+
 % accepted messages of dht_node processes
 -type message() ::
     bulkowner:bulkowner_msg() |
@@ -67,8 +78,10 @@
     dht_node_join:join_message() |
     rt_message() |
     dht_node_move:move_message() |
+    misc_message() |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
+    {crash, DeadPid::comm:mypid(), Cookie::tuple()} |
     {leave, SourcePid::comm:erl_local_pid() | null}.
 
 %% @doc message handler
@@ -348,6 +361,9 @@ on({get_node_details, Pid}, State) ->
     State;
 on({get_node_details, Pid, Which}, State) ->
     comm:send(Pid, {get_node_details_response, dht_node_state:details(State, Which)}),
+    State;
+on({get_pid_group, Pid}, State) ->
+    comm:send(Pid, {get_pid_group_response, pid_groups:my_groupname()}),
     State;
 
 on({dump}, State) ->
