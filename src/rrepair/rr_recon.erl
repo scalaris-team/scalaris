@@ -85,6 +85,7 @@
         {
          ownerLocalPid      = ?required(rr_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
          ownerRemotePid     = ?required(rr_recon_state, ownerRemotePid) :: comm:mypid(),
+         ownerMonitor       = null                                      :: null | reference(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_key           = random                                    :: recon_dest(),
          dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
@@ -279,13 +280,17 @@ on({crash, _Pid}, State) ->
     comm:send_local(self(), {shutdown, recon_node_crash}),
     State;
 
-on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner, 
+on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
+                                        ownerMonitor = OwnerMon,
                                         stats = Stats,
                                         initiator = Initiator }) ->
     ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
     
     Status = exit_reason_to_rc_status(Reason),
-    NewStats = rr_recon_stats:set([{status, Status}], Stats),        
+    NewStats = rr_recon_stats:set([{status, Status}], Stats),
+    if OwnerMon =/= null -> erlang:demonitor(OwnerMon);
+       true -> ok
+    end,
     comm:send_local(Owner, {recon_progress_report, self(), Initiator, NewStats}),
     kill;
 
@@ -654,8 +659,8 @@ rep_factor() ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
-    erlang:monitor(process, State#rr_recon_state.ownerLocalPid),
-    State.
+    Mon = erlang:monitor(process, State#rr_recon_state.ownerLocalPid),
+    State#rr_recon_state{ ownerMonitor = Mon }.
 
 -spec start(rrepair:session_id() | null) -> {ok, pid()}.
 start(SessionId) -> start(SessionId, undefined).
