@@ -153,7 +153,8 @@ tester_type_check_paxos(_Config) ->
                {learner, [
                           {start_link,2}, %% tries to spawn processes
                           {stop_paxosids,2}, %% tries to send messages
-                          {start_paxosid, 5} %% tries to send messages
+                          {start_paxosid, 5}, %% tries to send messages
+                          {on, 2} %% spec for messages not tight enough
                          ]},
                {learner_state, []},
                {proposer, [
@@ -162,6 +163,7 @@ tester_type_check_paxos(_Config) ->
                            {start_paxosid, 6}, %% tries to send messages
                            {start_paxosid, 7}, %% tries to send messages
                            {trigger, 2}, %% tries to send messages
+                           {on, 2}, %% spec for messages not tight enough
                            {start_link, 2} %% tries to spawn processes
                           ]},
                {proposer_state, []}
