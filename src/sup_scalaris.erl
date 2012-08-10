@@ -50,6 +50,11 @@ start_link(Options) ->
     case Link of
         {ok, SupRef} when is_pid(SupRef) ->
             add_additional_nodes(),
+            case util:is_unittest() of
+                true -> ok;
+                _    -> io:format("Scalaris started successfully."
+                                  " Hit <return> to see the erlang shell prompt.~n")
+            end,
             ok;
 %%        ignore ->
 %%            error_logger:error_msg(
@@ -61,7 +66,7 @@ start_link(Options) ->
               "error in starting sup_scalaris supervisor: ~p~n",
               [Error])
    end,
-    Link.
+   Link.
 
 -spec init([tuple()])
         -> {ok, {{one_for_one, MaxRetries::pos_integer(),
