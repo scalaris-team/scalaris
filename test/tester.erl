@@ -158,6 +158,7 @@ run_helper(Module, Func, Arity, Iterations, {union_fun, FunTypes} = FunType,
     Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
            catch
                Error:Reason ->
+                   ct:pal("Reason: ~p~n", [Reason]),
                    {fail, no_result, no_result_type, Error, tester_value_creator,
                     create_value,
                     [ArgType, Size, TypeInfos],

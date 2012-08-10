@@ -115,6 +115,8 @@ inner_check(Value, Type, CheckStack, ParseState) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
         {union, _Union} ->
             check_union(Value, Type, CheckStack, ParseState);
+        {builtin_type, module} ->
+            inner_check(Value, atom, CheckStack, ParseState);
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
             {false, [{type_checker_unsupported_type, Type} | CheckStack]}
