@@ -245,9 +245,16 @@ type_check_module({Module, InExcludeList}, Count) ->
         false -> throw(error)
     end,
 
-    [ begin
+    ResList = [ begin
           ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
           test(Module, Fun, Arity, Count)
       end
       || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ],
+    case ResList of
+        [] ->
+            ct:pal("Excluded all exported functions for module ~p?!~n",
+                   [Module]),
+            throw(error);
+        _ -> ok
+    end,
     ok.

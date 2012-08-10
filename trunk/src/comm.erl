@@ -153,11 +153,11 @@ send_local_after(Delay, Pid, Msg) ->
 
 %% @doc Convert a local erlang pid to a global pid of type mypid() for
 %%      use in send/2.
--spec make_global(erl_local_pid_plain()) -> mypid().
+-spec make_global(erl_local_pid_plain()) -> mypid_plain().
 make_global(Pid) -> get(Pid, this()).
 
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
--spec make_local(mypid()) -> erl_local_pid_plain().
+-spec make_local(mypid_plain()) -> erl_local_pid_plain().
 make_local(Pid) -> comm_layer:make_local(Pid).
 
 %% @doc Returns the global pid of the current process.
@@ -186,15 +186,21 @@ is_valid(Pid) -> comm_layer:is_valid(Pid).
 %% @doc Check whether a global mypid() can be converted to a local
 %%      pid of the current node.
 -spec is_local(mypid()) -> boolean().
-is_local(Pid) -> comm_layer:is_local(Pid).
+is_local(Pid) ->
+    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
+    comm_layer:is_local(CleanPid).
 
 %% @doc Gets the IP address of the given (global) mypid().
 -spec get_ip(mypid()) -> inet:ip_address().
-get_ip(Pid) -> comm_layer:get_ip(Pid).
+get_ip(Pid) ->
+    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
+    comm_layer:get_ip(CleanPid).
 
 %% @doc Gets the port of the given (global) mypid().
 -spec get_port(mypid()) -> non_neg_integer().
-get_port(Pid) -> comm_layer:get_port(Pid).
+get_port(Pid) ->
+    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
+    comm_layer:get_port(CleanPid).
 
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an

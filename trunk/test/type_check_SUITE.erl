@@ -27,9 +27,9 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_paxos,
             tester_type_check_api,
             tester_type_check_config,
+            tester_type_check_paxos,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
@@ -104,6 +104,15 @@ tester_type_check_util(_Config) ->
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules = [
+               {comm,
+                [{get_ip, 1}, %% cannot create correct envelopes
+                 {get_port, 1}, %% cannot create correct envelopes
+                 {init_and_wait_for_valid_pid, 0}, %% cannot start
+                 {is_local, 1}, %% cannot create correct envelopes
+                 {send, 2}, {send, 3}, %% cannot send msgs
+                 {send_local, 2}, {send_local_after, 3}, %% cannot send msgs
+                 {unpack_cookie, 2} %% cannot create correct envelopes
+                ]},
                {intervals, [
                             {get_bounds, 1}, %% throws exception on []
                             {new, 4}, %% type spec to wide (would need overlapping contract support)
