@@ -153,11 +153,15 @@ send_local_after(Delay, Pid, Msg) ->
 
 %% @doc Convert a local erlang pid to a global pid of type mypid() for
 %%      use in send/2.
--spec make_global(erl_local_pid_plain()) -> mypid_plain().
+-spec make_global(erl_local_pid()) -> mypid().
+make_global({Pid, e, Nth, Cookie}) ->
+    {get(Pid, this()), e, Nth, Cookie};
 make_global(Pid) -> get(Pid, this()).
 
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
--spec make_local(mypid_plain()) -> erl_local_pid_plain().
+-spec make_local(mypid()) -> erl_local_pid().
+make_local({Pid, e, Nth, Cookie}) ->
+    {comm_layer:make_local(Pid), e, Nth, Cookie};
 make_local(Pid) -> comm_layer:make_local(Pid).
 
 %% @doc Returns the global pid of the current process.
