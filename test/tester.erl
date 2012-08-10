@@ -249,4 +249,5 @@ type_check_module({Module, InExcludeList}, Count) ->
           ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
           test(Module, Fun, Arity, Count)
       end
-      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ].
+      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ],
+    ok.
