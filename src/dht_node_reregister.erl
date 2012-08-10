@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ get_base_interval() ->
 
 %% @doc Gets the pid of the dht_node process in the same group as the calling
 %%      process.
--spec get_dht_node_this() -> comm:mypid().
+-spec get_dht_node_this() -> comm:mypid_plain().
 get_dht_node_this() ->
     comm:make_global(pid_groups:get_my(dht_node)).
 
