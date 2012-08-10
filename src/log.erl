@@ -67,6 +67,8 @@ start_link() ->
             error_logger:delete_report_handler(error_logger),
             % there should not be any previous log4erl handler - just in case, delete it:
             error_logger:delete_report_handler(error_logger_log4erl_h),
+            % erlang >= R15B adds cth_log_redirect in common_test, delete it:
+            error_logger:delete_report_handler(cth_log_redirect),
             % now register log4erl error logger:
             log4erl:error_logger_handler(),
             %% check whether erlang error_logger only reports to log4erl
