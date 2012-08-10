@@ -75,19 +75,14 @@ sup_start(Prefix, Supervisor, Module, Options) ->
             progress(Prefix ++ "`-~p ~p~n", [SupSpec, SupRef]),
             Childs = trycall(Prefix, Module, childs, Options, []),
             ChildPrefix = last_prefix_to_space(Prefix),
-            TotalRes = add_childs(ChildPrefix ++ ["  +-"], SupRef, Childs),
-            case TotalRes of
-                X when is_tuple(X) andalso element(1, X) =:= ok ->
-                    case util:is_unittest() of
-                        true -> ok;
-                        _ ->
-                            io:format("Scalaris started successfully."
-                                      " Hit <return> to see the erlang shell prompt.~n")
-                    end;
-                Err ->
-                    io:format("Startup raised ~p.~n", [Err])
-            end,
-            Res; %% return pid of supervisor as it may be linked to externally
+            ChildsRes = add_childs(ChildPrefix ++ ["  +-"], SupRef, Childs),
+            if is_tuple(ChildsRes) andalso element(1, ChildsRes) =:= ok ->
+                   Res; %% return pid of supervisor as it may be linked to externally;
+               true ->
+                   io:format("Startup raised ~p.~n", [ChildsRes]),
+                   util:supervisor_terminate(SupRef),
+                   ChildsRes
+            end;
         Error ->
             progress(Prefix ++ "~.0p", [Error]),
             Error
@@ -126,8 +121,17 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                     progress(PipePrefix
                              ++ "~.0p ~.0p~n", [SupSpec, SupRef]),
                     Childs = trycall(PipePrefix, Module, childs, Args, []),
-                    {ok, _} = add_childs(PipePrefix ++ ["+-"], SupRef, Childs),
-                    Res
+                    ChildsRes = add_childs(PipePrefix ++ ["+-"], SupRef, Childs),
+                    if is_tuple(ChildsRes) andalso element(1, ChildsRes) =:= ok ->
+                           Res; %% return pid of supervisor as it may be linked to externally;
+                       true ->
+                           io:format("Startup raised ~p.~n", [ChildsRes]),
+                           SupName = element(1, SupAsChild),
+                           util:supervisor_terminate_childs(SupRef),
+                           supervisor:terminate_child(AtSup, SupName),
+                           supervisor:delete_child(AtSup, SupName),
+                           ChildsRes
+                    end
                end;
         Error ->
             progress(Prefix ++ " ~p~n", [Error]),
