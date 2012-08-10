@@ -48,7 +48,7 @@ read(Key) ->
     % check afterwards.
     case ets:info(config_ets) of
         undefined ->
-            io:format("config not started yet ~p\n", [Key]),
+            io:format("config not started yet (trying to read ~p)\n", [Key]),
             failed;
         _ ->
             case ets:lookup(config_ets, Key) of
