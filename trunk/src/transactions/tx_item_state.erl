@@ -63,7 +63,7 @@
    Numabort::non_neg_integer(), %%  9 number of received abort votes
    [{paxos_id(), RTLogEntry::tx_tlog:tlog_entry(), TP::comm:mypid() | unknown}], %% 10 involved PaxosIDs
    Status::new | uninitialized | ok, %% 11 item status
-   HoldBackQueue::[tuple()],         %% 12 when not initialized
+   HoldBackQueue::[comm:message()],         %% 12 when not initialized
    NumCommitted::non_neg_integer()  %% 13
  }.
 
@@ -137,7 +137,7 @@ inc_numabort(State) ->       setelement(9, State, element(9,State) + 1).
 
 -spec get_paxosids_rtlogs_tps(tx_item_state()) ->
                                      [{paxos_id(), tx_tlog:tlog_entry(),
-                                       comm:mypid()}].
+                                       comm:mypid() | unknown}].
 get_paxosids_rtlogs_tps(State) -> element(10, State).
 -spec set_paxosids_rtlogs_tps(tx_item_state(), [{paxos_id(), tx_tlog:tlog_entry(), comm:mypid()}]) -> tx_item_state().
 set_paxosids_rtlogs_tps(State, NewTPList) -> setelement(10, State, NewTPList).
@@ -171,7 +171,7 @@ newly_decided(State) ->
         _Any -> false
     end.
 
--spec set_tp_for_paxosid(tx_item_state(), any(), paxos_id()) -> tx_item_state().
+-spec set_tp_for_paxosid(tx_item_state(), comm:mypid(), paxos_id()) -> tx_item_state().
 set_tp_for_paxosid(State, TP, PaxosId) ->
     TPList = get_paxosids_rtlogs_tps(State),
     NewTPList = [case TPEntry of
@@ -180,7 +180,9 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
                  end || TPEntry <- TPList],
     set_paxosids_rtlogs_tps(State, NewTPList).
 
--spec add_learner_decide(tx_item_state(), comm:message()) ->
+-spec add_learner_decide(tx_item_state(),
+                         {learner_decide, tx_item_id(),
+                          paxos_id(), ?prepared | ?abort}) ->
                                 {hold_back
                                  | state_updated
                                  | {item_newly_decided, ?prepared | ?abort},

@@ -48,6 +48,8 @@ check(Value, Type, ParseState) ->
 inner_check(Value, Type, CheckStack, ParseState) ->
 %%    ct:pal("new inner_check(~.0p, ~.0p)", [Value, Type]),
     case Type of
+        arity ->
+            inner_check(Value, byte, CheckStack, ParseState);
         atom ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_atom/1, no_atom);
@@ -59,6 +61,9 @@ inner_check(Value, Type, CheckStack, ParseState) ->
         bool ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_boolean/1, no_boolean);
+        byte ->
+            inner_check(Value, {range, {integer, 0}, {integer, 255}},
+                        CheckStack, ParseState);
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_float/1, no_float);

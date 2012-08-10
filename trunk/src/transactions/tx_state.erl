@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin
+% @copyright 2009-2012 Zuse Institute Berlin
 %            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,7 +65,7 @@
          comm:mypid() | unknown,   %% Client
          any(),                    %% ClientsId,
          comm:mypid() | unknown,   %% TM
-         [tx_tm_rtm:rtms()], %% [{Key, RTM, Nth, Acceptor}]
+         tx_tm_rtm:rtms(), %% [{Key, RTM, Nth, Acceptor}]
          [{tx_tlog:tlog_entry(),
            tx_item_state:tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
          [comm:mypid()],           %% Learners,
@@ -77,7 +77,7 @@
          non_neg_integer(),        %% Number of items committed
          non_neg_integer(),        %% NumTpsRegistered
          new | uninitialized | ok, %% status: new / uninitialized / ok
-         [any()]                   %% HoldBack
+         [comm:message()]                   %% HoldBack
          }.
 %% @TODO also necessary?
 %%               Majority of RTMs,
@@ -92,7 +92,7 @@ is_tx_state(TxState) ->
 
 -spec new(tx_id(), comm:mypid() | unknown,
           comm:mypid() | unknown, comm:mypid() | unknown,
-          [comm:mypid()],
+          tx_tm_rtm:rtms(),
           [{tx_tlog:tlog_entry(), tx_item_state:tx_item_id()}],
           [comm:mypid()]) -> tx_state().
 new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->

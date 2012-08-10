@@ -73,7 +73,7 @@ set_client(State, Pid) ->    setelement(2, State, Pid).
 get_client(State) ->         element(2, State).
 -spec set_key(read_state(), ?RT:key()) -> read_state().
 set_key(State, Key) ->       setelement(3, State, Key).
--spec get_key(read_state()) -> ?RT:key().
+-spec get_key(read_state()) -> ?RT:key() | unknown.
 get_key(State) ->            element(3, State).
 -spec inc_numok(read_state()) -> read_state().
 inc_numok(State) ->          setelement(4, State, element(4, State) + 1).
@@ -85,9 +85,9 @@ inc_numfailed(State) ->      setelement(5, State, element(5, State) + 1).
 get_numfailed(State) ->      element(5, State).
 -spec get_result(read_state()) -> {any(), integer()}.
 get_result(State) ->         element(6, State).
--spec set_result(read_state(), {any(), integer()}) -> read_state().
+-spec set_result(read_state(), {?DB:value() | 0, integer()}) -> read_state().
 set_result(State, Val) ->    setelement(6, State, Val).
--spec get_decided(read_state()) -> tx_tlog:tx_status().
+-spec get_decided(read_state()) -> tx_tlog:tx_status() | false.
 get_decided(State) ->        element(7, State).
 -spec set_decided(read_state(), tx_tlog:tx_status()) -> read_state().
 set_decided(State, Val) ->   setelement(7, State, Val).
