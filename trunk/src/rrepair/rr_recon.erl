@@ -154,8 +154,6 @@ on({get_state_response, MyI}, State =
     SrcI = proplists:get_value(interval, Params),
     Intersec = find_intersection(MyI, SrcI),
     case intervals:is_empty(Intersec) of
-        false when Method =:= bloom -> 
-            send_chunk_req(DhtPid, self(), Intersec, mapInterval(Intersec, 1), get_max_items(Method));
         false -> send_chunk_req(DhtPid, self(), Intersec, Intersec, get_max_items(Method));
         true -> comm:send_local(self(), {shutdown, empty_interval})
     end,
@@ -191,8 +189,8 @@ on({get_state_response, MyI}, State =
     MySyncI = find_intersection(MyI, BloomI),
     ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n SynI=~p", [MyI, BloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
-        true -> comm:send_local(self(), {shutdown, empty_interval});
-        false -> send_chunk_req(DhtPid, self(), MySyncI, mapInterval(MySyncI, 1), get_max_items(bloom))
+        false -> send_chunk_req(DhtPid, self(), MySyncI, MySyncI, get_max_items(bloom));
+        true -> comm:send_local(self(), {shutdown, empty_interval})
     end,
     State;
 
@@ -218,12 +216,10 @@ on({get_chunk_response, {RestI, DBList}}, State =
         end,
     EmptyRest = intervals:is_empty(RestI),
     if not EmptyRest ->
-           Pid = if RMethod =:= bloom -> 
-                        erlang:element(2, fork_recon(State));
+           Pid = if RMethod =:= bloom -> erlang:element(2, fork_recon(State));
                     true -> self()
                  end,
-            send_chunk_req(DhtNodePid, Pid, RestI, 
-                           mapInterval(RestI, get_interval_quadrant(SyncI)), 
+            send_chunk_req(DhtNodePid, Pid, RestI, find_intersection(RestI, SyncI), 
                            get_max_items(RMethod));
         true -> ok
     end,
@@ -248,7 +244,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
-        send_chunk_req(DhtNodePid, self(), RestI, mapInterval(RestI, 1), get_max_items(bloom)),
+        send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(bloom)),
     Diff = [erlang:element(1, decodeBlob(KV)) || KV <- DBList,
                                                  not ?REP_BLOOM:is_element(BF, KV)],
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
@@ -545,8 +541,10 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
       DhtPid, 
       {get_chunk, SrcPid, I, 
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
-       fun(Item) -> encodeBlob(minKeyInInterval(db_entry:get_key(Item), DestI), 
-                               db_entry:get_version(Item)) 
+       fun(Item) ->
+               Key = minKeyInInterval(db_entry:get_key(Item), DestI),
+               %Key = map_key_to_interval(db_entry:get_key(Item), DestI),
+               encodeBlob(Key, db_entry:get_version(Item)) 
        end,
        MaxItems}).
 
