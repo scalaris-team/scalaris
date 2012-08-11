@@ -41,8 +41,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -84,7 +84,7 @@
          operation      = nil        									:: nil | operation(),
          stats          = #resolve_stats{}                              :: stats(),
          feedback       = {nil, []}                                     :: feedback(),           
-         send_stats     = nil                                           :: nil | comm:mypid() 
+         send_stats     = nil                                           :: nil | comm:mypid()
          }).
 -type state() :: #rr_resolve_state{}.
 
@@ -119,18 +119,25 @@ on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid,
                           stats = Stats
-                          }) ->    
+                          }) ->
     MyPid = comm:this(),
-    ToUpdate = 
-        lists:foldl(
-          fun({Key, Value, Vers}, Acc) ->
-                  UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
-                  lists:foreach(fun(UpdKey) ->
-                                        comm:send_local(DhtPid, 
-                                                        {update_key_entry, MyPid, UpdKey, Value, Vers})
-                                end, UpdKeys),
-                  Acc + length(UpdKeys)
-          end, 0, KvvList),
+    ?TRACE("Start KEY_UPD", []),
+    {T, ToUpdate} = util:tc(fun() -> lists:foldl(
+                                       fun({Key, Value, Vers}, Acc) ->
+                                               UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
+                                               _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, UKey, Value, Vers}) || UKey <- UpdKeys],
+                                               Acc + length(UpdKeys)
+                                       end, 0, KvvList) 
+                            end),
+    ?TRACE("KEY_UPD REQ SEND in ~p", [T]),
+    
+%%     ToUpdate = 
+%%         lists:foldl(
+%%           fun({Key, Value, Vers}, Acc) ->
+%%                   UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
+%%                   _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, UKey, Value, Vers}) || UKey <- UpdKeys],
+%%                   Acc + length(UpdKeys)
+%%           end, 0, KvvList),
     %kill is done by update_key_entry_ack
     ?TRACE("GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p ; ToUpdate=~p", [MyI, length(KvvList), ToUpdate]),
     ToUpdate =:= 0 andalso
@@ -140,15 +147,14 @@ on({get_state_response, MyI}, State =
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
                           dhtNodePid = DhtPid }) ->    
-    FilterKeyList = [K || X <- KeyList, 
-                          K <- ?RT:get_replica_keys(X), 
-                          intervals:in(K, MyI)],
-    UpdI = intervals:from_elements(FilterKeyList),
-    comm:send_local(DhtPid, {get_entries, self(), 
-                             fun(X) -> intervals:in(db_entry:get_key(X), UpdI) end,
+    FKeyList = [K || X <- KeyList, K <- ?RT:get_replica_keys(X), 
+                     intervals:in(K, MyI)],
+    KeyTree = gb_sets:from_list(FKeyList),
+    comm:send_local(DhtPid, {get_entries, self(),
+                             fun(X) -> gb_sets:is_element(db_entry:get_key(X), KeyTree) end,
                              fun(X) -> {db_entry:get_key(X),
                                         db_entry:get_value(X), 
-                                        db_entry:get_version(X)} end}),
+                                        db_entry:get_version(X)} end}),    
     State;
 
 on({get_entries_response, KVVList}, State =
@@ -274,7 +280,7 @@ print_resolve_stats(Stats) ->
                          fun(I) ->
                                  {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
                          end),    
-    [erlang:element(1, Stats), lists:flatten(lists:reverse(Res))].
+    [erlang:element(1, Stats), lists:flatten(Res)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
