@@ -36,12 +36,13 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+
 -define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %DETAIL DEBUG MESSAGES
-%-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE2(X,Y), ok).
+%-define(TRACE2(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -170,13 +171,13 @@ on({get_state_response, MyI}, State =
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
     case intervals:is_subset(MyIntersec, MyI) and not intervals:is_empty(MyIntersec) of
+        true ->
+            RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
+            send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod));
         false ->
             comm:send_local(self(), {shutdown, negotiate_interval}),
             DestReconPid =/= undefined andalso
-                comm:send(DestReconPid, {shutdown, empty_interval});
-        true ->
-            RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
-            send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod))
+                comm:send(DestReconPid, {shutdown, empty_interval})
     end,    
     State#rr_recon_state{ stage = build_struct, dest_recon_pid = DestReconPid };
 
@@ -187,9 +188,8 @@ on({get_state_response, MyI}, State =
                         struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
     MySyncI = find_intersection(MyI, BloomI),
-    ?TRACE("GET STATE - MyI=~p ~n BloomI=~p ~n SynI=~p", [MyI, BloomI, MySyncI]),
     case intervals:is_empty(MySyncI) of
-        false -> send_chunk_req(DhtPid, self(), MySyncI, MySyncI, get_max_items(bloom));
+        false -> send_chunk_req(DhtPid, self(), MySyncI, BloomI, get_max_items(bloom));
         true -> comm:send_local(self(), {shutdown, empty_interval})
     end,
     State;
@@ -216,10 +216,13 @@ on({get_chunk_response, {RestI, DBList}}, State =
         end,
     EmptyRest = intervals:is_empty(RestI),
     if not EmptyRest ->
-           Pid = if RMethod =:= bloom -> erlang:element(2, fork_recon(State));
+           SubSyncI = find_intersection(SyncI, RestI),
+           Pid = if RMethod =:= bloom -> 
+                        ForkParams = lists:keyreplace(interval, 1, Params, {interval, SubSyncI}),
+                        erlang:element(2, fork_recon(State#rr_recon_state{ struct = ForkParams }));
                     true -> self()
                  end,
-            send_chunk_req(DhtNodePid, Pid, RestI, find_intersection(RestI, SyncI), 
+            send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, SyncI), SubSyncI, 
                            get_max_items(RMethod));
         true -> ok
     end,
@@ -230,7 +233,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
     State#rr_recon_state{ stage = NStage, 
                           struct = SyncStruct, 
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
-    
+
 on({get_chunk_response, {RestI, DBList}}, State = 
        #rr_recon_state{ stage = reconciliation,
                         method = bloom,
@@ -543,7 +546,6 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
        fun(Item) ->
                Key = minKeyInInterval(db_entry:get_key(Item), DestI),
-               %Key = map_key_to_interval(db_entry:get_key(Item), DestI),
                encodeBlob(Key, db_entry:get_version(Item)) 
        end,
        MaxItems}).
