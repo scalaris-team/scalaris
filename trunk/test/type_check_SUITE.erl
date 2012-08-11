@@ -33,7 +33,7 @@ all()   -> [
             tester_type_check_tx,
             tester_type_check_util
            ].
-suite() -> [ {timetrap, {seconds, 200}} ].
+suite() -> [ {timetrap, {seconds, 300}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
