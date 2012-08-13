@@ -43,7 +43,7 @@
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm, buffer_response, OtherNeighbors::nodelist:neighborhood()}).
 
--define(SEND_OPTIONS, [{channel, prio}]).
+-define(SEND_OPTIONS, [{channel, prio}, quiet]).
 
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").
