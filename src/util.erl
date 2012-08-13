@@ -124,6 +124,16 @@ supervisor_terminate(SupPid) ->
 -spec supervisor_terminate_childs(Supervisor::pid() | atom()) -> ok.
 supervisor_terminate_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
+    Self = self(),
+    _ = [ begin
+              case Self =/= Pid andalso gen_component:is_gen_component(Pid) of
+                  true ->
+                      gen_component:bp_set_cond(Pid, fun(_M, _S) -> true end,
+                                                about_to_kill);
+                  _ -> ok
+              end
+          end ||  {_Id, Pid, _Type, _Module} <- ChildSpecs,
+                  Pid =/= undefined ],
     _ = [ begin
               case Type of
                   supervisor ->
