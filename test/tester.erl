@@ -257,8 +257,9 @@ type_check_module({Module, InExcludeList}, Count) ->
          %% itself, so no own tests necessary here.
          %% Silently drop it for modules that export it.
          not lists:member(FA, [{behaviour_info, 1} | ExcludeList]) ],
-    case ResList of
-        [] ->
+    case {ResList, InExcludeList} of
+        {[], []} -> ok;
+        {[], _} ->
             ct:pal("Excluded all exported functions for module ~p?!~n",
                    [Module]),
             throw(error);
