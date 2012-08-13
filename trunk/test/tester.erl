@@ -256,7 +256,7 @@ type_check_module({Module, InExcludeList}, Count) ->
          %% tester cannot find it. Erlang < R15 checks behaviour_info
          %% itself, so no own tests necessary here.
          %% Silently drop it for modules that export it.
-         not lists:member(FA, [{module_info, 1} | ExcludeList]) ],
+         not lists:member(FA, [{behaviour_info, 1} | ExcludeList]) ],
     case ResList of
         [] ->
             ct:pal("Excluded all exported functions for module ~p?!~n",
