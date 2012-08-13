@@ -41,12 +41,12 @@ public class MyLocalurl extends Localurl {
                 final String title = URLEncoder.encode(Character.toUpperCase(arg0.charAt(0)) + "", Connector.UTF8_CHARSET)
                         + URLEncoder.encode(arg0.substring(1), Connector.UTF8_CHARSET);
                 if (arg0.length() > 0 && list.size() == 1) {
-                    String result = myModel.getWikiBaseURL().replace(
+                    String result = myModel.getLinkBaseURL().replace(
                             "${title}", title);
                     return result;
                 }
                 StringBuilder builder = new StringBuilder(arg0.length() + 32);
-                builder.append(myModel.getWikiBaseURL().replace("${title}",
+                builder.append(myModel.getLinkBaseURL().replace("${title}",
                         title));
                 for (int i = 1; i < list.size(); i++) {
                     builder.append("&");
