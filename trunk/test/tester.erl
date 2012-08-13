@@ -234,12 +234,14 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads) ->
 type_check_module({Module, InExcludeList}, Count) ->
     ExpFuncs = Module:module_info(exports),
     ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
+
     ErrList = [ case lists:member(X, ExpFuncs) of
                     true -> true;
                     false ->
                         ct:pal("Excluded non exported function ~p:~p~n", [Module,X]),
                         false
-                end || X <- ExcludeList ],
+                end ||
+                  X <- ExcludeList ],
     case lists:all(fun(X) -> X end, ErrList) of
         true -> ok;
         false -> throw(error)
@@ -249,7 +251,12 @@ type_check_module({Module, InExcludeList}, Count) ->
           ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
           test(Module, Fun, Arity, Count)
       end
-      || {Fun, Arity} = FA <- ExpFuncs, not lists:member(FA, ExcludeList) ],
+      || {Fun, Arity} = FA <- ExpFuncs,
+         %% >= R15 generates behaviour_info without a type spec so
+         %% tester cannot find it. Erlang < R15 checks behaviour_info
+         %% itself, so no own tests necessary here.
+         %% Silently drop it for modules that export it.
+         not lists:member(FA, [{module_info, 1} | ExcludeList]) ],
     case ResList of
         [] ->
             ct:pal("Excluded all exported functions for module ~p?!~n",

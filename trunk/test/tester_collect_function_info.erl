@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +50,7 @@ collect_fun_info(Module, Func, Arity, ParseState) ->
                   end,
     case tester_parse_state:lookup_type({'fun', Module, Func, Arity}, ParseState3) of
         {value, _} -> tester_parse_state:finalize(ParseState3);
-        none -> ?ct_fail("unknown function ~p:~p/~p~n", [Module, Func, Arity])
+        none -> ?ct_fail("no function ~p:~p/~p found by tester~n", [Module, Func, Arity])
     end.
 
 -spec collect_unknown_type_infos(tester_parse_state:state(), list()) ->
