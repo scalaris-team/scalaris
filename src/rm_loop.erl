@@ -319,7 +319,7 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
         NewRM_State   ->
             NewNeighborhood = ?RM:get_neighbors(NewRM_State),
             call_subscribers(OldNeighborhood, NewNeighborhood, none, SubscrTable),
-            update_failuredetector(OldNeighborhood, NewNeighborhood),
+            update_failuredetector(OldNeighborhood, NewNeighborhood, null),
             NewState = {NewRM_State, HasLeft, SubscrTable},
             ?TRACE_STATE(_OldState, NewState),
             NewState
@@ -329,7 +329,7 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
 -spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
 crashed_node(State = {RM_State, _HasLeft, _SubscrTable}, DeadPid) ->
     RMFun = fun() -> ?RM:crashed_node(RM_State, DeadPid) end,
-    update_state(State, RMFun).
+    update_state(State, RMFun, DeadPid).
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type()) -> state().
@@ -363,14 +363,19 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 
 %% @doc Calls RMFun (which may update the Neighborhood), then calls all
 %%      subscribers and updates the failure detector if necessary.
--spec update_state(OldState::state_t(),
-                   RMFun::fun(() -> ?RM:state())) -> NewState::state().
-update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun) ->
+-spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()))
+        -> NewState::state().
+update_state(OldState, RMFun) ->
+    update_state(OldState, RMFun, null).
+
+-spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()),
+                   CrashedPid::comm:mypid() | null) -> NewState::state().
+update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
     NewRM_State = RMFun(),
     NewNeighborhood = ?RM:get_neighbors(NewRM_State),
     call_subscribers(OldNeighborhood, NewNeighborhood, none, SubscrTable),
-    update_failuredetector(OldNeighborhood, NewNeighborhood),
+    update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid),
     NewState = {NewRM_State, HasLeft, SubscrTable},
     ?TRACE_STATE(_OldState, NewState),
     NewState.
@@ -385,8 +390,9 @@ set_failuredetector(Neighborhood) ->
 % @doc Check if change of failuredetector is necessary and subscribe the new
 %%     nodes' pids.
 -spec update_failuredetector(OldNeighborhood::nodelist:neighborhood(),
-                             NewNeighborhood::nodelist:neighborhood()) -> ok.
-update_failuredetector(OldNeighborhood, NewNeighborhood) ->
+                             NewNeighborhood::nodelist:neighborhood(),
+                             CrashedPid::comm:mypid() | null) -> ok.
+update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid) ->
     % Note: nodelist:to_list/1 would provide similar functionality to determine
     % the view but at a higher cost and we need neither unique nor sorted lists.
     OldView = lists:append(nodelist:preds(OldNeighborhood),
@@ -394,7 +400,9 @@ update_failuredetector(OldNeighborhood, NewNeighborhood) ->
     NewView = lists:append(nodelist:preds(NewNeighborhood),
                            nodelist:succs(NewNeighborhood)),
     OldPids = [node:pidX(Node) || Node <- OldView,
-                                  not node:same_process(Node, nodelist:node(OldNeighborhood))],
+                                  not node:same_process(Node, nodelist:node(OldNeighborhood)),
+                                  % note: crashed pid already unsubscribed by fd, do not unsubscribe again
+                                  not node:same_process(Node, CrashedPid)],
     NewPids = [node:pidX(Node) || Node <- NewView,
                                   not node:same_process(Node, nodelist:node(NewNeighborhood))],
     fd:update_subscriptions(OldPids, NewPids),

@@ -110,7 +110,7 @@ unsubscribe_single(FD, GlobalPid, Cookie) ->
 
 %% @doc Deletes the failure detector for the given pid and cookie - uses
 %%      reference counting to be subscribed to a pid only once.
-%%      Subscribe with unsubscribe_refcount/2!
+%%      Subscribe with subscribe_refcount/2!
 -spec unsubscribe_refcount(comm:mypid() | [comm:mypid()], cookie()) -> ok.
 unsubscribe_refcount([], _Cookie)         -> ok;
 unsubscribe_refcount(GlobalPids, Cookie) when is_list(GlobalPids) ->
