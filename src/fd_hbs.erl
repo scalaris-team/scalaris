@@ -376,8 +376,7 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     %% instead of storing in the state, we silently store in a pdb for
     %% better performance.
     Table = state_get_table(State),
-    Entry = pdb:get({Subscriber, WatchedPid}, Table),
-    case Entry of
+    case pdb:get({Subscriber, WatchedPid}, Table) of
         undefined ->
             log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~p, Watching group and name ~p.~n",
                     [{unsubscribe, Subscriber, WatchedPid, Cookie},
@@ -388,21 +387,20 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
             %% delete cookie
             Cookies = element(2, Entry),
             Changed =
-                case lists:member(Cookie, Cookies) of
-                    true ->
-                        EntryWithoutCookie =
-                            setelement(2, Entry, lists:delete(Cookie, element(2, Entry))),
+                case util:delete_if_exists(Cookie, Cookies) of
+                    {true, NewCookies} ->
+                        EntryWithoutCookie = setelement(2, Entry, NewCookies),
                         NewEntry =
                             setelement(3, EntryWithoutCookie,
                                        element(3, EntryWithoutCookie) - 1),
                         deleted;
-                false ->
-                    log:log(warn,
-                            "got unsubscribe with non existing cookie ~p~n",
-                            [Cookie]),
+                    _ ->
+                        log:log(warn,
+                                "got unsubscribe with non existing cookie ~p~n",
+                                [Cookie]),
                         NewEntry = Entry,
                         unchanged
-            end,
+                end,
             case element(3, NewEntry) of
                 0 -> pdb:delete(element(1, Entry), Table);
                 _ -> pdb:set(NewEntry, Table)
