@@ -1,4 +1,4 @@
-%% @copyright 2007-2011 Zuse Institute Berlin
+%% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
             LocalListenPort::comm_server:tcp_port(), Channel::main | prio,
             Socket::inet:socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
-    {ok, _TRef} = timer:send_interval(1000, {report_stats}),
+    msg_delay:send_local(10, self(), {report_stats}),
     state_new(DestIP, DestPort, LocalListenPort, Channel, Socket).
 
 %% @doc Forwards a message to the given PID or named process.
@@ -203,6 +203,8 @@ on({tcp_closed, Socket}, State) ->
     set_socket(State, notconnected);
 
 on({report_stats}, State) ->
+    %% re-trigger
+    msg_delay:send_local(10, self(), {report_stats}),
     case socket(State) of
         notconnected -> State;
         Socket ->

@@ -75,26 +75,26 @@ run_bench() ->
 init_system_stats() ->
     % system stats in 10s intervals:
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_total', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_total', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_processes', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_processes', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_system', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_system', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_atom', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_atom', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_binary', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_binary', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'mem_ets', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'mem_ets', rrd:create(15 * 1000000, 1, gauge)),
     
     monitor:client_monitor_set_value(
-      ?MODULE, 'rcv_count', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'rcv_count', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'rcv_bytes', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'rcv_bytes', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'send_count', rrd:create(10 * 1000000, 1, gauge)),
+      ?MODULE, 'send_count', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'send_bytes', rrd:create(10 * 1000000, 1, gauge)).
+      ?MODULE, 'send_bytes', rrd:create(15 * 1000000, 1, gauge)).
 
 -spec collect_system_stats() -> ok.
 collect_system_stats() ->
@@ -138,6 +138,7 @@ on({bench} = _Msg, State) ->
 
 on({collect_system_stats} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    msg_delay:send_local(10, self(), {collect_system_stats}),
     collect_system_stats(),
     State;
 
@@ -296,7 +297,7 @@ init(null) ->
     end,
     init_bench(),
     init_system_stats(),
-    {ok, _TRef} = timer:send_interval(1000, {collect_system_stats}),
+    msg_delay:send_local(10, self(), {collect_system_stats}),
     Now = os:timestamp(),
     State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
