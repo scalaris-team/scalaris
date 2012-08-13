@@ -36,6 +36,7 @@
          topDumpX/1, topDumpX/3,
          topDumpXEvery/3, topDumpXEvery/5, topDumpXEvery_helper/4,
          minus_all/2, minus_first/2,
+         delete_if_exists/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -511,6 +512,11 @@ minus_first2([H | T], Excluded, Result) ->
         {true,  Excluded2} -> minus_first2(T, Excluded2, Result);
         {false, Excluded2} -> minus_first2(T, Excluded2, [H | Result])
     end.
+
+%% @doc Removes Del from List if it is found. Stops on first occurrence.
+-spec delete_if_exists(Del::T, List::[T]) -> {Found::boolean(), [T]}.
+delete_if_exists(Del, List) ->
+    delete_if_exists(List, Del, []).
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
 -spec delete_if_exists(List::[T], Del::T, Result::[T]) -> {Found::boolean(), [T]}.
