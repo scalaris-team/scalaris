@@ -992,9 +992,9 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
               case {InPid} =/= RTM of
                   true -> case RTM of
                               unknown -> ok;
-                              _ -> fd:unsubscribe(element(1, RTM))
+                              _ -> fd:unsubscribe(element(1, RTM), tx_tm_rtm_fd_cookie)
                           end,
-                          fd:subscribe(InPid);
+                          fd:subscribe(InPid, tx_tm_rtm_fd_cookie);
                   false -> ok
               end,
               rtm_entry_new(InKey, {InPid}, get_nth(Entry), {InAccPid});
