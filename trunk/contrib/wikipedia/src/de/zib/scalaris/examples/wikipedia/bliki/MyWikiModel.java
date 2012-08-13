@@ -506,6 +506,24 @@ public class MyWikiModel extends WikiModel {
         }
     }
 
+    /**
+     * Gets the base URL for images (can contain ${image} for replacement).
+     * 
+     * @return the base url for images
+     */
+    public String getImageBaseURL() {
+        return fExternalImageBaseURL;
+    }
+
+    /**
+     * Gets the base URL for links (can contain ${title} for replacement).
+     * 
+     * @return the base url for links
+     */
+    public String getLinkBaseURL() {
+        return fExternalWikiBaseURL;
+    }
+
     /* (non-Javadoc)
      * @see info.bliki.wiki.model.WikiModel#getNamespace()
      */
