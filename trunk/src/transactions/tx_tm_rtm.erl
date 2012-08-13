@@ -787,7 +787,7 @@ rtm_update(RTMs) ->
               api_dht_raw:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
           end
           || RTM <- RTMs],
-    comm:send_local_after(config:read(tx_rtm_update_interval),
+    msg_delay:send_local(config:read(tx_rtm_update_interval) div 1000,
                           self(), {update_RTMs}),
     ok.
 
