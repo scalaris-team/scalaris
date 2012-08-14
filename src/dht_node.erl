@@ -269,16 +269,16 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
     State;
 
 % send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
-on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
-    {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), HashedKey),
+on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
+    {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), Key),
     EntryVersion = db_entry:get_version(Entry),
     DoUpdate = Exists
         andalso EntryVersion =/= -1
         andalso EntryVersion < NewVersion
         andalso not db_entry:get_writelock(Entry)
-        andalso dht_node_state:is_responsible(HashedKey, State),
+        andalso dht_node_state:is_responsible(Key, State),
     DoRegen = not Exists
-        andalso dht_node_state:is_responsible(HashedKey, State),
+        andalso dht_node_state:is_responsible(Key, State),
     {NewState, NewEntry} =
         if
             DoUpdate ->
@@ -286,7 +286,7 @@ on({update_key_entry, Source_PID, HashedKey, NewValue, NewVersion}, State) ->
                 NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry),
                 {dht_node_state:set_db(State, NewDB), UpdEntry};
             DoRegen ->
-                RegenEntry = db_entry:new(HashedKey, NewValue, NewVersion),
+                RegenEntry = db_entry:new(Key, NewValue, NewVersion),
                 NewDB = ?DB:set_entry(dht_node_state:get(State, db), RegenEntry),
                 {dht_node_state:set_db(State, NewDB), RegenEntry};
             true -> {State, Entry}
