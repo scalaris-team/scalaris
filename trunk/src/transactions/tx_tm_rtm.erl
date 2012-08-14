@@ -615,44 +615,7 @@ on({crash, Pid, _Cookie}, State) ->
     on({crash, Pid}, State);
 on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    RTMs = state_get_RTMs(State),
-    NewRTMs = [ case get_rtmpid(RTM) of
-                    {Pid} ->
-                        I = get_nth(RTM),
-                        Name = get_nth_rtm_name(I),
-                        Key = get_rtmkey(RTM),
-                        api_dht_raw:unreliable_lookup(
-                          Key, {get_rtm, comm:this(), Key, Name}),
-                        rtm_entry_new(Key, unknown, I, unknown);
-                    _ -> RTM
-                end
-                || RTM <- RTMs ],
-    %% scan over all running transactions and delete this Pid
-    %% if necessary, takeover the tx and try deciding with abort
-    NewState = State,
-%%     NewState = lists:foldl(
-%%                  fun(X,StateIter) ->
-%%                          case tx_state:is_tx_state(X) of
-%%                              true ->
-%%                                  ct:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
-%%                                         [self(),
-%%                                          pid_groups:group_and_name_of(self()),
-%%                                          tx_state:get_tid(X)]),
-%%                                  on({tx_tm_rtm_propose_yourself, tx_state:get_tid(X)}, StateIter);
-%%                              false -> StateIter
-%%                          end
-%%                 end, State, pdb:tab2list(state_get_tablename(State))),
-
-    %% no longer use this RTM
-    ValidRTMs = [ X || X <- NewRTMs, unknown =/= get_rtmpid(X) ],
-    case length(ValidRTMs) < 3 andalso tx_tm =:= state_get_role(NewState) of
-        true ->
-            gen_component:change_handler(
-              state_set_RTMs(NewState, NewRTMs),
-              fun ?MODULE:on_init/2);
-        false -> state_set_RTMs(NewState, NewRTMs)
-    end;
-
+    handle_crash(Pid, State, on);
 %% on({crash, _Pid, _Cookie},
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
 %%     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
@@ -677,7 +640,10 @@ on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
     tx_tm = state_get_role(State),
     RTMs = state_get_RTMs(State),
-    rtm_update(RTMs),
+    rtm_update(RTMs, config:read(tx_rtm_update_interval) div 1000,
+               {update_RTMs}),
+    State;
+on({update_RTMs_on_init}, State) ->
     State;
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -713,12 +679,17 @@ on_init({get_node_details_response, NodeDetails}, State) ->
                   {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
                 end,
                 {[], length(RTM_ids) - 1}, RTM_ids),
-    rtm_update(NewRTMs),
+    rtm_update(NewRTMs, 1, {update_RTMs_on_init}),
     state_set_RTMs(State, NewRTMs);
 
 on_init({update_RTMs}, State) ->
+    rtm_update(state_get_RTMs(State),
+               config:read(tx_rtm_update_interval) div 1000,
+               {update_RTMs}),
+    State;
+on_init({update_RTMs_on_init}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
-    rtm_update(state_get_RTMs(State)),
+    rtm_update(state_get_RTMs(State), 1, {update_RTMs_on_init}),
     State;
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -771,24 +742,23 @@ on_init({?register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
         false ->
             on(Msg, State)
     end;
-
 on_init({crash, Pid, _Cookie}, State) ->
     on_init({crash, Pid}, State);
-on_init({crash, _Pid} = Msg, State) ->
+on_init({crash, Pid}, State) ->
     %% only in tx_tm
-    on(Msg, State).
+    handle_crash(Pid, State, on_init).
 
 %% functions for periodic RTM updates
--spec rtm_update(rtms()) -> ok.
-rtm_update(RTMs) ->
+-spec rtm_update(rtms(), pos_integer(), {update_RTMs} | {update_RTMs_on_init}) -> ok.
+rtm_update(RTMs, Delay, TriggerMsg) ->
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
               Key = get_rtmkey(RTM),
               api_dht_raw:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
           end
           || RTM <- RTMs],
-    msg_delay:send_local(config:read(tx_rtm_update_interval) div 1000,
-                          self(), {update_RTMs}),
+    msg_delay:send_local(Delay, %config:read(tx_rtm_update_interval) div 1000,
+                          self(), TriggerMsg),
     ok.
 
 %% functions for tx processing
@@ -992,9 +962,9 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
               case {InPid} =/= RTM of
                   true -> case RTM of
                               unknown -> ok;
-                              _ -> fd:unsubscribe(element(1, RTM), tx_tm_rtm_fd_cookie)
+                              _ -> fd:unsubscribe_refcount(element(1, RTM), tx_tm_rtm_fd_cookie)
                           end,
-                          fd:subscribe(InPid, tx_tm_rtm_fd_cookie);
+                          fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie);
                   false -> ok
               end,
               rtm_entry_new(InKey, {InPid}, get_nth(Entry), {InAccPid});
@@ -1075,6 +1045,54 @@ get_failed_keys(TxState, State) ->
                    [tx_state:get_numabort(TxState), length(Result)])
     end,
     Result.
+
+handle_crash(Pid, State, Handler) ->
+    RTMs = state_get_RTMs(State),
+    NewRTMs = [ case get_rtmpid(RTM) of
+                    X when unknown =:= X orelse {Pid} =:= X ->
+                        I = get_nth(RTM),
+                        Name = get_nth_rtm_name(I),
+                        Key = get_rtmkey(RTM),
+                        api_dht_raw:unreliable_lookup(
+                          Key, {get_rtm, comm:this(), Key, Name}),
+                        rtm_entry_new(Key, unknown, I, unknown);
+                    _ -> RTM
+                end
+                || RTM <- RTMs ],
+    
+
+    %% scan over all running transactions and delete this Pid
+    %% if necessary, takeover the tx and try deciding with abort
+    NewState = State,
+%%     NewState = lists:foldl(
+%%                  fun(X,StateIter) ->
+%%                          case tx_state:is_tx_state(X) of
+%%                              true ->
+%%                                  ct:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
+%%                                         [self(),
+%%                                          pid_groups:group_and_name_of(self()),
+%%                                          tx_state:get_tid(X)]),
+%%                                  on({tx_tm_rtm_propose_yourself, tx_state:get_tid(X)}, StateIter);
+%%                              false -> StateIter
+%%                          end
+%%                 end, State, pdb:tab2list(state_get_tablename(State))),
+
+    %% no longer use this RTM
+    ValidRTMs = [ X || X <- NewRTMs, unknown =/= get_rtmpid(X) ],
+    case length(ValidRTMs) < 3
+        andalso tx_tm =:= state_get_role(NewState)
+        andalso on =:= Handler of
+        true ->
+            comm:send_local(self(), {update_RTMs_on_init}),
+            gen_component:change_handler(
+              state_set_RTMs(NewState, NewRTMs),
+              fun ?MODULE:on_init/2);
+        false -> state_set_RTMs(NewState, NewRTMs)
+    end.
+
+
+
+
 
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
