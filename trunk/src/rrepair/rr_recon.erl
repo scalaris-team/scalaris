@@ -57,6 +57,7 @@
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
                           negotiate_interval |      %rc initiator has send its interval and exits
                           chunk_is_empty |          %db chunk is empty  
+                          build_struct |            %client send its struct (bloom/art) to initiator and exits
                           recon_node_crash |        %sync partner node crashed  
                           sync_finished |           %initiator finish recon
                           sync_finished_remote.     %client-side shutdown by merkle-tree recon initiator
@@ -283,7 +284,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
                                         ownerMonitor = OwnerMon,
                                         stats = Stats,
                                         initiator = Initiator }) ->
-    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),    
+    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
     Status = exit_reason_to_rc_status(Reason),
     NewStats = rr_recon_stats:set([{status, Status}], Stats),
     if OwnerMon =/= null -> erlang:demonitor(OwnerMon);
@@ -410,7 +411,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                                    {continue, art, res_shared_interval, ArtParams, true}}),
                         {no, Stats}
                 end,            
-            comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, client_art_send)}),
+            comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
             ARStats
     end.
 
