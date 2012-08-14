@@ -49,6 +49,10 @@
 empty(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_chord:empty
 
+% @doc Initialize the routing table. This function is allowed to send messages.
+-spec init(nodelist:neighborhood()) -> rt().
+init(Neighbors) -> empty(Neighbors).
+
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key()) -> key().
 hash_key(Key) -> hash_key_(Key).

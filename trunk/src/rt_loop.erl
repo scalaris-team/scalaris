@@ -104,7 +104,7 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages, TriggerState}) 
                       fun ?MODULE:rm_send_update/4, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Neighbors, ?RT:empty(Neighbors), TriggerState2}, fun ?MODULE:on_active/2);
+      {Neighbors, ?RT:init(Neighbors), TriggerState2}, fun ?MODULE:on_active/2);
 
 on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
@@ -144,10 +144,10 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, TriggerSt
             NewTriggerState = trigger:now(TriggerState),
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             new_state(NewNeighbors, NewRT, NewTriggerState)
-%%        ;
-%%        {ok, NewRT} ->
-%%            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-%%            new_state(NewNeighbors, NewRT, TriggerState)
+        ;
+        {ok, NewRT} ->
+            ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
+            new_state(NewNeighbors, NewRT, TriggerState)
     end;
 %% userdevguide-end rt_loop:update_rt
 

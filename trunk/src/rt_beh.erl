@@ -35,6 +35,7 @@
 
 -callback empty(nodelist:neighborhood()) -> rt().
 -callback empty_ext(nodelist:neighborhood()) -> external_rt().
+-callback init(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key()) -> key().
 -callback get_random_node_id() -> key().
 -callback next_hop(dht_node_state:state(), key()) -> comm:mypid().
@@ -72,6 +73,8 @@ behaviour_info(callbacks) ->
     [
      % create a default routing table
      {empty, 1}, {empty_ext, 1},
+     % initialize a routing table
+     {init, 1}
      % mapping: key space -> identifier space
      {hash_key, 1}, {get_random_node_id, 0},
      % routing
