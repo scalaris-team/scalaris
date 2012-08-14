@@ -142,6 +142,7 @@ childs(Options) ->
     BasicServers = [TraceMPath,
                     Config,
                     Logger,
+                    ClientsDelayer,
                     ClientsMonitor,
                     Monitor,
                     Service,
@@ -149,7 +150,6 @@ childs(Options) ->
                     CommLayer,
                     FailureDetector,
                     AdminServer,
-                    ClientsDelayer,
                     ServicePaxosGroup],
     Servers = [YAWS, BenchServer, Ganglia],
     MgmtServers =
