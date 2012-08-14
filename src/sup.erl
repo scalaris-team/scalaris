@@ -128,8 +128,8 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                            io:format("Startup raised ~p.~n", [ChildsRes]),
                            SupName = element(1, SupAsChild),
                            util:supervisor_terminate_childs(SupRef),
-                           supervisor:terminate_child(AtSup, SupName),
-                           supervisor:delete_child(AtSup, SupName),
+                           _ = supervisor:terminate_child(AtSup, SupName),
+                           _ = supervisor:delete_child(AtSup, SupName),
                            ChildsRes
                     end
                end;
