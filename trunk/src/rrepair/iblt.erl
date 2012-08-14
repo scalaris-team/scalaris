@@ -124,8 +124,10 @@ change_cell(Column, CellNr, Key, Value, Operation) ->
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
     lists:flatten([HeadL, 
                    {Count + operation_val(Operation), 
-                    util:bin_xor(KeySum, Key), KHSum bxor checksum_fun(Key),
-                    ValSum bxor Value, VHSum bxor checksum_fun(Value)}, 
+                    util:bin_xor(KeySum, Key), 
+                    KHSum bxor checksum_fun(Key),
+                    ValSum bxor Value, 
+                    VHSum bxor checksum_fun(Value)}, 
                    TailL]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
