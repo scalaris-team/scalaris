@@ -576,7 +576,7 @@ select_sync_node(Interval) ->
 map_key_to_interval(Key, I) ->
     RGrp = [K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)],
     case length(RGrp) of
-        0 -> error(e);
+        0 -> erlang:error(e);
         1 -> erlang:hd(RGrp);
         _ ->
             RGrpDis = [{X, ?RT:get_range(Key, X)} || X <- RGrp],
