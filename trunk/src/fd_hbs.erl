@@ -378,7 +378,7 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     Table = state_get_table(State),
     case pdb:get({Subscriber, WatchedPid}, Table) of
         undefined ->
-            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~p, Watching group and name ~p.~n",
+            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~.0p, Watching group and name: ~.0p.~n",
                     [{unsubscribe, Subscriber, WatchedPid, Cookie},
                      pid_groups:group_and_name_of(Subscriber),
                     pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
