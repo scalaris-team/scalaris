@@ -42,6 +42,8 @@
 %-define(RT, rt_simple).
 %% userdevguide-end scalaris:rt
 
+%%Flexible routingtable
+%-define(RT, rt_frtchord).
 
 %% userdevguide-begin scalaris:db
 %%Standard database backend
