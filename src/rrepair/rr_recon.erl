@@ -28,7 +28,7 @@
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
-         minKeyInInterval/2,
+         map_key_to_interval/2,
          mapInterval/2, map_key_to_quadrant/2, 
          get_key_quadrant/1, get_interval_quadrant/1]).
 
@@ -257,7 +257,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                        rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
                    true -> Stats
                end,
-    SyncFinished andalso        
+    SyncFinished andalso
         comm:send_local(self(), {shutdown, sync_finished}),
     State#rr_recon_state{ stats = NewStats };
 
@@ -283,8 +283,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
                                         ownerMonitor = OwnerMon,
                                         stats = Stats,
                                         initiator = Initiator }) ->
-    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
-    
+    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),    
     Status = exit_reason_to_rc_status(Reason),
     NewStats = rr_recon_stats:set([{status, Status}], Stats),
     if OwnerMon =/= null -> erlang:demonitor(OwnerMon);
@@ -294,7 +293,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
     kill;
 
 on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
-    log:log(info, "shutdown rr_recon due to rrepair shut down", []),
+    log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -444,7 +443,7 @@ reconcileNode(Node, Conf) ->
                              0, merkle_tree:get_childs(Node))
     end.
 
--spec reconcileLeaf(Node, {Dest::RPid, SID, OwnerLocal::LPid, OwnerRemote::RPid}) -> 1 when
+-spec reconcileLeaf(Node, {Dest::RPid, SID, OwnerLocal::LPid, OwnerRemote::RPid}) -> 0 | 1 when
     is_subtype(LPid,    comm:erl_local_pid()),
     is_subtype(RPid,    comm:mypid() | undefined),
     is_subtype(Node,    merkle_tree:mt_node()),
@@ -458,8 +457,11 @@ reconcileLeaf(Node, {Dest, SID, OwnerL, OwnerR}) ->
                             end
                        end, 
                        merkle_tree:get_bucket(Node)),
-    comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, Dest, ToSync}, [{feedback, OwnerR}]}),
-    1.
+    if ToSync =:= [] -> 0; %todo request client key_upd_send
+       true ->
+           comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, Dest, ToSync}, [{feedback, OwnerR}]}),
+           1
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% art recon
@@ -477,10 +479,12 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
     SID = rr_recon_stats:get(session_id, Stats),
     case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
         true -> 
-            {ASyncLeafs, NStats} = 
-                art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
-            _ = [reconcileLeaf(X, {DestPid, SID, OwnerL, OwnerR}) || X <- ASyncLeafs],
-            {ok, NStats};
+            {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
+            ResolveCalled = lists:foldl(fun(X, Acc) ->
+                                                Acc + reconcileLeaf(X, {DestPid, SID, OwnerL, OwnerR})
+                                        end, 0, ASyncLeafs),
+            Stats3 = rr_recon_stats:inc([{resolve_started, ResolveCalled * 2}], Stats2),
+            {ok, Stats3};
         false -> {ok, Stats}
     end.
 
@@ -489,14 +493,13 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
     is_subtype(Art,    art:art()),
     is_subtype(Stats,  rr_recon_stats:stats()).
 art_get_sync_leafs([], _Art, Stats, ToSyncAcc) ->
-    {ToSyncAcc, rr_recon_stats:inc([{resolve_started, length(ToSyncAcc) * 2}], Stats)};
+    {ToSyncAcc, Stats};
 art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
     Stats = rr_recon_stats:inc([{tree_nodesCompared, 1}], OStats),
     IsLeaf = merkle_tree:is_leaf(Node),
     case art:lookup(Node, Art) of
         true ->
-            NStats = rr_recon_stats:inc([{tree_compareSkipped, ?IIF(IsLeaf, 0, merkle_tree:size(Node))}], 
-                                         Stats),
+            NStats = rr_recon_stats:inc([{tree_compareSkipped, ?IIF(IsLeaf, 0, merkle_tree:size(Node))}], Stats),
             art_get_sync_leafs(ToCheck, Art, NStats, ToSyncAcc);
         false ->
             case IsLeaf of
@@ -545,7 +548,7 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
       {get_chunk, SrcPid, I, 
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
        fun(Item) ->
-               Key = minKeyInInterval(db_entry:get_key(Item), DestI),
+               Key = map_key_to_interval(db_entry:get_key(Item), DestI),
                encodeBlob(Key, db_entry:get_version(Item)) 
        end,
        MaxItems}).
@@ -568,9 +571,16 @@ select_sync_node(Interval) ->
     Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
     util:randomelem(Keys).
 
--spec minKeyInInterval(?RT:key(), intervals:interval()) -> ?RT:key().
-minKeyInInterval(Key, I) ->
-    erlang:hd([K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)]).
+-spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key().
+map_key_to_interval(Key, I) ->
+    RGrp = [K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)],
+    case length(RGrp) of
+        0 -> error(e);
+        1 -> erlang:hd(RGrp);
+        _ ->
+            RGrpDis = [{X, ?RT:get_range(Key, X)} || X <- RGrp],
+            element(1, erlang:hd(lists:keysort(2, RGrpDis)))
+    end.
 
 -spec map_key_to_quadrant(?RT:key(), pos_integer()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->

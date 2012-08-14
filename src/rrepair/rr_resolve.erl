@@ -118,30 +118,22 @@ on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid,
-                          stats = Stats
+                          stats = Stats                          
                           }) ->
     MyPid = comm:this(),
-    ?TRACE("Start KEY_UPD", []),
-    {T, ToUpdate} = util:tc(fun() -> lists:foldl(
-                                       fun({Key, Value, Vers}, Acc) ->
-                                               UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
-                                               _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, UKey, Value, Vers}) || UKey <- UpdKeys],
-                                               Acc + length(UpdKeys)
-                                       end, 0, KvvList) 
-                            end),
-    ?TRACE("KEY_UPD REQ SEND in ~p", [T]),
-    
-%%     ToUpdate = 
-%%         lists:foldl(
-%%           fun({Key, Value, Vers}, Acc) ->
-%%                   UpdKeys = [X || X <- ?RT:get_replica_keys(Key), intervals:in(X, MyI)],
-%%                   _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, UKey, Value, Vers}) || UKey <- UpdKeys],
-%%                   Acc + length(UpdKeys)
-%%           end, 0, KvvList),
+    FullKvvList = [{X, Value, Vers} 
+                   || {K, Value, Vers} <- KvvList,
+                      X <- ?RT:get_replica_keys(K),
+                      intervals:in(X, MyI)],
+    UpdList = make_unique_kvv(lists:keysort(1, FullKvvList), []),
+    _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, Key, Val, Vers}) || {Key, Val, Vers} <- UpdList],
+    ToUpdate = length(UpdList),
+
     %kill is done by update_key_entry_ack
-    ?TRACE("GET INTERVAL - KEY UPD - MYI=~p;KVVListLen=~p ; ToUpdate=~p", [MyI, length(KvvList), ToUpdate]),
-    ToUpdate =:= 0 andalso
-        comm:send_local(self(), {shutdown, resolve_ok}),
+    ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate]),
+    if ToUpdate =:= 0 -> comm:send_local(self(), {shutdown, resolve_ok});
+       true -> ok
+    end,
     State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
 on({get_state_response, MyI}, State =
@@ -152,22 +144,20 @@ on({get_state_response, MyI}, State =
     KeyTree = gb_sets:from_list(FKeyList),
     comm:send_local(DhtPid, {get_entries, self(),
                              fun(X) -> gb_sets:is_element(db_entry:get_key(X), KeyTree) end,
-                             fun(X) -> {db_entry:get_key(X),
+                             fun(X) -> {rr_recon:map_key_to_quadrant(db_entry:get_key(X), 1),
                                         db_entry:get_value(X), 
-                                        db_entry:get_version(X)} end}),    
+                                        db_entry:get_version(X)} end}),
     State;
 
 on({get_entries_response, KVVList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
                           feedback = {FB, _},
                           stats = Stats }) ->
-    Options = case FB of
-                  nil -> [];
-                  _ -> [{feedback, FB}]
-              end,
+    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
+    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),    
     case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {key_upd, KVVList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, KVVList}, Options})
+        null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
     end,
     comm:send_local(self(), {shutdown, resolve_ok}),
     State;
@@ -178,8 +168,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                   regen_count = RegenOk,
                                                   update_count = UpdOk, 
                                                   upd_fail_count = UpdFail,
-                                                  regen_fail_count = RegenFail,
-                                                  session_id = SID
+                                                  regen_fail_count = RegenFail
                                                 } = Stats,                          
                           feedback = FB = {DoFB, FBItems}
                         }) ->
@@ -191,14 +180,14 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                end,
     NewFB = if
                 not Done andalso Exists andalso DoFB =/= nil -> 
-                    {DoFB, [{db_entry:get_key(Entry),
+                    {DoFB, [{rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1), %db_entry:get_key(Entry),
                              db_entry:get_value(Entry),
                              db_entry:get_version(Entry)} | FBItems]};
                 true -> FB
             end,
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
-                send_feedback(NewFB, SID),
+                send_feedback(NewFB, Stats#resolve_stats.session_id),
                 comm:send_local(self(), {shutdown, resolve_ok});
         true -> ok
     end,
@@ -261,12 +250,24 @@ merge_stats(#resolve_stats{ session_id = ASID,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+make_unique_kvv([], Acc) -> Acc;
+make_unique_kvv([H | T], []) -> make_unique_kvv(T, [H]);
+make_unique_kvv([H | T], [AccH | AccT] = Acc) ->
+    case element(1, H) =:= element(1, AccH) of
+        true -> 
+            case element(3, H) > element(3, AccH) of
+                true -> make_unique_kvv(T, [H|AccT]);
+                false -> make_unique_kvv(T, Acc)
+            end;
+        false -> make_unique_kvv(T, [H|Acc])
+    end.
+
 -spec send_feedback(feedback(), rrepair:session_id()) -> ok.
 send_feedback({nil, _}, _) -> ok;
 send_feedback({Dest, Items}, null) ->
-    comm:send(Dest, {request_resolve, {key_upd, Items}, [feedback_response]});
+    comm:send(Dest, {request_resolve, {key_upd, gb_sets:to_list(gb_sets:from_list(Items))}, [feedback_response]});
 send_feedback({Dest, Items}, SID) ->
-    comm:send(Dest, {request_resolve, SID, {key_upd, Items}, [feedback_response]}).
+    comm:send(Dest, {request_resolve, SID, {key_upd, gb_sets:to_list(gb_sets:from_list(Items))}, [feedback_response]}).
 
 -spec send_stats(nil | comm:mypid(), stats()) -> ok.
 send_stats(nil, _) -> ok;
