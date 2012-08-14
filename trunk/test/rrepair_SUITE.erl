@@ -40,8 +40,8 @@ basic_tests() ->
     [get_symmetric_keys_test,
      blobCoding,     
      tester_get_key_quadrant,
-     tester_mapInterval,
-     tester_minKeyInInterval     
+     tester_mapInterval
+     %tester_map_key_to_interval     
     ].
 
 repair_tests() ->
@@ -371,18 +371,18 @@ prop_mapInterval(A, B, Q) ->
 tester_mapInterval(_) ->
     tester:test(?MODULE, prop_mapInterval, 3, 10, [{threads, 1}]).
 
--spec prop_minKeyInInterval(?RT:key(), ?RT:key()) -> true.
-prop_minKeyInInterval(L, L) -> true;
-prop_minKeyInInterval(LeftI, RightI) ->
-    I = intervals:new('[', LeftI, RightI, ']'),    
-    Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
-    AnyK = util:randomelem(Keys),
-    MinLeft = rr_recon:minKeyInInterval(AnyK, I),
-    ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
-    ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
-
-tester_minKeyInInterval(_) ->
-    tester:test(?MODULE, prop_minKeyInInterval, 2, 10, [{threads, 2}]).
+%% -spec prop_map_key_to_interval(?RT:key(), ?RT:key()) -> true.
+%% prop_map_key_to_interval(L, L) -> true;
+%% prop_map_key_to_interval(LeftI, RightI) ->
+%%     I = intervals:new('[', LeftI, RightI, ']'),    
+%%     Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
+%%     AnyK = util:randomelem(Keys),
+%%     MinLeft = rr_recon:map_key_to_interval(AnyK, I),
+%%     ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
+%%     ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
+%% 
+%% tester_map_key_to_interval(_) ->
+%%     tester:test(?MODULE, prop_map_key_to_interval, 2, 10, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
