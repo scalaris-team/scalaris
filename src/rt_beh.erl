@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ behaviour_info(callbacks) ->
      % create a default routing table
      {empty, 1}, {empty_ext, 1},
      % initialize a routing table
-     {init, 1}
+     {init, 1},
      % mapping: key space -> identifier space
      {hash_key, 1}, {get_random_node_id, 0},
      % routing
