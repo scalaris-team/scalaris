@@ -110,6 +110,8 @@ inner_check(Value, Type, CheckStack, ParseState) ->
             check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
                                        fun erlang:is_integer/1, no_pos_integer,
                                        fun(X) -> 0 < X end);
+        {product, TypeList} when is_list(TypeList) ->
+            check_tuple(Value, {tuple, TypeList}, CheckStack, ParseState);
         {range, {integer, _Min}, {integer, _Max}} ->
             check_range(Value, Type, CheckStack, ParseState);
         {typedef, _Module, _TypeName} ->
