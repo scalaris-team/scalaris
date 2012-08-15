@@ -925,7 +925,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         final int pageSaveServerTime = parseInt(getParam(request, "server_time"), -1);
         if (pageSaveServerTime >= 0) {
-            page.addStat("server_time saving " + title, pageSaveServerTime);
+            page.addStat("server_time (last op)", pageSaveServerTime);
         }
         page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
         for (int i = 1; i <= Options.getInstance().WIKI_SAVEPAGE_RETRIES; ++i) {
