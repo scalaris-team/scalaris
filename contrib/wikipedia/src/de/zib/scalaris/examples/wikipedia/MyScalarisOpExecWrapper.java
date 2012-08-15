@@ -136,15 +136,21 @@ public class MyScalarisOpExecWrapper {
             for (T t : toAdd) {
                 final String bucketStr = optimisation2.getBucketString(t);
                 final String key2 = key + bucketStr;
-                final String countKey2 = countKey + bucketStr;
-                countKeys.put(key2, countKey2);
+                if (countKey != null) {
+                    countKeys.put(key2, countKey + bucketStr);
+                } else {
+                    countKeys.put(key2, null);
+                }
                 kvAdd.put1(key2, t);
             }
             for (T t : toRemove) {
                 final String bucketStr = optimisation2.getBucketString(t);
                 final String key2 = key + bucketStr;
-                final String countKey2 = countKey + bucketStr;
-                countKeys.put(key2, countKey2);
+                if (countKey != null) {
+                    countKeys.put(key2, countKey + bucketStr);
+                } else {
+                    countKeys.put(key2, null);
+                }
                 kvRemove.put1(key2, t);
             }
             for (Entry<String, String> entry : countKeys.entrySet()) {
