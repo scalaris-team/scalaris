@@ -295,7 +295,7 @@ public class Options {
         @Override
         public <T> String getBucketString(final T value) {
             if (buckets > 1) {
-                return ":" + (value.hashCode() % buckets);
+                return ":" + Math.abs((value.hashCode() % buckets));
             } else {
                 return "";
             }
