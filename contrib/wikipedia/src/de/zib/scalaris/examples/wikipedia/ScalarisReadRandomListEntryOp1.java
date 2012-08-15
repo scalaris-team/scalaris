@@ -33,7 +33,7 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
     final Random random;
 
     /**
-     * Creates a new list change operation.
+     * Creates a new (random) list entry read operation.
      * 
      * @param keys
      *            the keys under which the list is stored in Scalaris
@@ -49,8 +49,8 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
      *            the random number generator to use
      */
     public ScalarisReadRandomListEntryOp1(final Collection<String> keys,
-            final Optimisation optimisation,
-            ErlangConverter<List<T>> conv, boolean failNotFound, Random random) {
+            final Optimisation optimisation, ErlangConverter<List<T>> conv,
+            boolean failNotFound, Random random) {
         this.keys = keys;
         if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
             APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
