@@ -33,6 +33,8 @@ integer_max() -> 5.
 
 %% @doc create a random value of the given type
 -spec create_value(type_spec(), non_neg_integer(), tester_parse_state:state()) -> term().
+create_value({product, []}, _Size, _ParseState) ->
+    [];
 create_value({product, Types}, Size, ParseState) ->
     NewSize = erlang:max(1, (Size - length(Types)) div length(Types)),
     [create_value(Type, NewSize, ParseState) || Type <- Types];

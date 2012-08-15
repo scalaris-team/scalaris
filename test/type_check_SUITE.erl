@@ -259,6 +259,7 @@ tester_type_check_util(_Config) ->
                 ]}
               ],
     [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
+    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
     true.
 
 

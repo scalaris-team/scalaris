@@ -71,6 +71,9 @@
 
 -export([extint2atom/1]).
 
+% feeder for tester
+-export([readable_utc_time_feeder/1]).
+
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
@@ -909,6 +912,10 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     MegaSecs1 = MegaSecs + (Secs1 div 1000000),
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
+
+-spec readable_utc_time_feeder({0..1000, 0..1000, 0..1000}) -> {erlang:timestamp()}.
+readable_utc_time_feeder({A, B, C}) ->
+    {{A, B, C}}.
 
 -spec readable_utc_time(erlang:timestamp()) -> tuple().
 readable_utc_time(TimeTriple) ->
