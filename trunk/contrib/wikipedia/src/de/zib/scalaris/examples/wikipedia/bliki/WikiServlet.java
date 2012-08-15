@@ -731,6 +731,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             redirectUrl.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
             redirectUrl.append("&random_times=" + StringUtils.join(times, "%2C"));
             redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
+            redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
             response.sendRedirect("http://" + Options.getInstance().SERVERNAME
                     + Options.getInstance().SERVERPATH
                     + response.encodeRedirectURL(redirectUrl.toString())
