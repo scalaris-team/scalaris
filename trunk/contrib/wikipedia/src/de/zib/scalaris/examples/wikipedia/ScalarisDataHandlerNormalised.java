@@ -420,8 +420,9 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        return getInteger2(connection, getCatPageCountKey(title), false,
-                timeAtStart, "page count in " + title);
+        return getInteger2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
+                getCatPageCountKey(title), false, timeAtStart,
+                "page count in " + title);
     }
     
     /**

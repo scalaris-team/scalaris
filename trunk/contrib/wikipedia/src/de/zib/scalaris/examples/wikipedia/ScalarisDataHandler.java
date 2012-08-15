@@ -28,11 +28,9 @@ import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.ErlangValue.ListElementConverter;
-import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.InvolvedKey.OP;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
@@ -328,7 +326,8 @@ public class ScalarisDataHandler {
         for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
             scalaris_keys.add(getPageCountKey(i));
         }
-        return getInteger2(connection, scalaris_keys, false, timeAtStart, "page count");
+        return getInteger2(connection, ScalarisOpType.PAGE_LIST, scalaris_keys,
+                false, timeAtStart, "page count");
     }
 
     /**
@@ -344,8 +343,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        return getInteger2(connection, getPageCountKey(namespace), false,
-                timeAtStart, "page count:" + namespace);
+        return getInteger2(connection, ScalarisOpType.PAGE_LIST,
+                getPageCountKey(namespace), false, timeAtStart,
+                "page count:" + namespace);
     }
 
     /**
@@ -359,8 +359,8 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getArticleCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        return getInteger2(connection, getArticleCountKey(), false,
-                timeAtStart, "article count");
+        return getInteger2(connection, ScalarisOpType.ARTICLE_COUNT,
+                getArticleCountKey(), false, timeAtStart, "article count");
     }
 
     /**
@@ -374,8 +374,8 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        return getInteger2(connection, getStatsPageEditsKey(), false,
-                timeAtStart, "page edits");
+        return getInteger2(connection, ScalarisOpType.EDIT_STAT,
+                getStatsPageEditsKey(), false, timeAtStart, "page edits");
     }
 
     /**
@@ -472,9 +472,10 @@ public class ScalarisDataHandler {
      * 
      * @return a result object with the number on success
      */
-    protected final static ValueResult<BigInteger> getInteger2(Connection connection,
-            String scalaris_key, boolean failNotFound, final long timeAtStart, String statName) {
-        return getInteger2(connection, Arrays.asList(scalaris_key),
+    protected final static ValueResult<BigInteger> getInteger2(
+            Connection connection, ScalarisOpType opType, String scalaris_key,
+            boolean failNotFound, final long timeAtStart, String statName) {
+        return getInteger2(connection, opType, Arrays.asList(scalaris_key),
                 failNotFound, timeAtStart, statName);
     }
 
@@ -483,6 +484,8 @@ public class ScalarisDataHandler {
      * 
      * @param connection
      *            the connection to Scalaris
+     * @param opType
+     *            operation type indicating what is being read
      * @param scalaris_keys
      *            the keys under which the number is stored in Scalaris
      * @param failNotFound
@@ -496,8 +499,9 @@ public class ScalarisDataHandler {
      * @return a result object with the number on success
      */
     protected final static ValueResult<BigInteger> getInteger2(
-            Connection connection, Collection<String> scalaris_keys,
-            boolean failNotFound, final long timeAtStart, String statName) {
+            Connection connection, ScalarisOpType opType,
+            Collection<String> scalaris_keys, boolean failNotFound,
+            final long timeAtStart, String statName) {
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
@@ -505,44 +509,23 @@ public class ScalarisDataHandler {
                     System.currentTimeMillis() - timeAtStart);
         }
         
-        TransactionSingleOp scalaris_single = new TransactionSingleOp(connection);
-        TransactionSingleOp.ResultList results;
+        final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
+                new TransactionSingleOp(connection), involvedKeys);
+
+        final ScalarisReadNumberOp1 readOp = new ScalarisReadNumberOp1(scalaris_keys,
+                Options.getInstance().OPTIMISATIONS.get(opType), failNotFound);
+        executor.addOp(readOp);
         try {
-            TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
-            for (String scalaris_key : scalaris_keys) {
-                involvedKeys.add(new InvolvedKey(OP.READ, scalaris_key));
-                requests.addOp(new ReadOp(scalaris_key));
-            }
-            results = scalaris_single.req_list(requests);
+            executor.run();
         } catch (Exception e) {
             return new ValueResult<BigInteger>(false, involvedKeys,
-                    e.getClass().getCanonicalName() + " reading (integral) number(s) at \""
-                            + scalaris_keys.toString() + "\" from Scalaris: "
+                    e.getClass().getCanonicalName() + " reading page list at \""
+                            + involvedKeys.toString() + "\" from Scalaris: "
                             + e.getMessage(), e instanceof ConnectionException,
                     statName, System.currentTimeMillis() - timeAtStart);
         }
-        BigInteger number = BigInteger.ZERO;
-        int curOp = 0;
-        for (String scalaris_key : scalaris_keys) {
-            try {
-                number = number.add(results.processReadAt(curOp++).bigIntValue());
-            } catch (NotFoundException e) {
-                if (failNotFound) {
-                    return new ValueResult<BigInteger>(false, involvedKeys,
-                            e.getClass().getCanonicalName() + " reading (integral) number at \""
-                                    + scalaris_key + "\" from Scalaris: "
-                                    + e.getMessage(), false, statName,
-                                    System.currentTimeMillis() - timeAtStart);
-                }
-            } catch (Exception e) {
-                return new ValueResult<BigInteger>(false, involvedKeys,
-                        e.getClass().getCanonicalName() + " reading (integral) number at \""
-                                + scalaris_key + "\" from Scalaris: "
-                                + e.getMessage(), e instanceof ConnectionException,
-                                statName, System.currentTimeMillis() - timeAtStart);
-            }
-        }
-        return new ValueResult<BigInteger>(involvedKeys, number, statName,
+        
+        return new ValueResult<BigInteger>(involvedKeys, readOp.getValue(), statName,
                 System.currentTimeMillis() - timeAtStart);
     }
 

@@ -1,12 +1,10 @@
 package de.zib.scalaris.examples.wikipedia;
 
-import java.util.ArrayList;
+import java.math.BigInteger;
 import java.util.Collection;
-import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangException;
 
-import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
@@ -17,36 +15,29 @@ import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
 
 /**
- * Implements a list read operation.
- *
- * @param <T> the type of objects in the list
+ * Implements a number read operation.
  *
  * @author Nico Kruber, kruber@zib.de
  */
-public class ScalarisReadListOp1<T> implements ScalarisOp {
+public class ScalarisReadNumberOp1 implements ScalarisOp {
     final Collection<String> keys;
     final int buckets;
-    final ErlangConverter<List<T>> conv;
     final boolean failNotFound;
-    final List<T> value = new ArrayList<T>();
+    BigInteger value = BigInteger.ZERO;
 
     /**
-     * Creates a new list read operation.
+     * Creates a new number read operation.
      * 
      * @param keys
-     *            the keys under which the list is stored in Scalaris
+     *            the keys under which the number is stored in Scalaris
      * @param optimisation
      *            the list optimisation to use
-     * @param conv
-     *            converter to make an {@link ErlangValue} to a {@link List} of
-     *            <tt>T</tt>
      * @param failNotFound
      *            whether to re-throw the {@link NotFoundException} if a list
      *            key was not found
      */
-    public ScalarisReadListOp1(final Collection<String> keys,
-            final Optimisation optimisation,
-            ErlangConverter<List<T>> conv, boolean failNotFound) {
+    public ScalarisReadNumberOp1(final Collection<String> keys,
+            final Optimisation optimisation, boolean failNotFound) {
         this.keys = keys;
         if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
             APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
@@ -54,7 +45,6 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         } else {
             this.buckets = 1;
         }
-        this.conv = conv;
         this.failNotFound = failNotFound;
     }
 
@@ -75,7 +65,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
     }
 
     /**
-     * Adds a read operation for the list to the request list.
+     * Adds a read operation for the number to the request list.
      *
      * @param requests the request list
      *
@@ -95,7 +85,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
     }
 
     /**
-     * Verifies the read operation(s) and creates the full list.
+     * Verifies the read operation(s) and creates the full number.
      *
      * @param firstOp   the first operation to process inside the result list
      * @param results   the result list
@@ -108,7 +98,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         for (@SuppressWarnings("unused") String key : keys) {
             for (int i = 0; i < buckets; ++i) {
                 try {
-                    value.addAll(conv.convert(results.processReadAt(firstOp++)));
+                    value = value.add(results.processReadAt(firstOp++).bigIntValue());
                 } catch (NotFoundException e) {
                     if (failNotFound) {
                         throw e;
@@ -120,12 +110,13 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
     }
 
     /**
-     * The full list that has been read (if {@link #failNotFound} is not set and
-     * none of the given keys was found, an empty list is returned).
+     * The (assembled) number that has been read (if {@link #failNotFound} is
+     * not set and none of the given keys was found, {@link BigInteger#ZERO} is
+     * returned).
      * 
-     * @return the value from Scalaris or an empty list
+     * @return the value from Scalaris or {@link BigInteger#ZERO}
      */
-    public List<T> getValue() {
+    public BigInteger getValue() {
         return value;
     }
 }
