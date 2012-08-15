@@ -30,7 +30,8 @@
 -export([encodeBlob/2, decodeBlob/1,
          map_key_to_interval/2,
          mapInterval/2, map_key_to_quadrant/2, 
-         get_key_quadrant/1, get_interval_quadrant/1]).
+         get_key_quadrant/1, get_interval_quadrant/1,
+         find_intersection/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -167,7 +168,7 @@ on({get_state_response, MyI}, State =
                         method = RMethod,
                         struct = Params,
                         dhtNodePid = DhtPid,
-                        dest_rr_pid = DestRRPid}) ->
+                        dest_rr_pid = DestRRPid}) ->    
     DestI = proplists:get_value(interval, Params),
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
@@ -242,7 +243,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         ownerLocalPid = Owner,
                         ownerRemotePid = OwnerR,
                         dest_rr_pid = DestRU_Pid,
-                        struct = #bloom_recon_struct{ bloom = BF},
+                        struct = #bloom_recon_struct{ bloom = BF },
                         stats = Stats }) ->
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
@@ -575,12 +576,13 @@ select_sync_node(Interval) ->
 -spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key().
 map_key_to_interval(Key, I) ->
     RGrp = [K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)],
-    case length(RGrp) of
-        0 -> erlang:error(e);
-        1 -> erlang:hd(RGrp);
-        _ ->
-            RGrpDis = [{X, ?RT:get_range(Key, X)} || X <- RGrp],
-            element(1, erlang:hd(lists:keysort(2, RGrpDis)))
+    case RGrp of
+        [R] -> R;
+        [_|_] -> RGrpDis = [case X of
+                                Key -> {X, 0};
+                                _ -> {X, min(?RT:get_range(Key, X), ?RT:get_range(X, Key))}
+                            end || X <- RGrp],
+                 element(1, erlang:hd(lists:keysort(2, RGrpDis)))
     end.
 
 -spec map_key_to_quadrant(?RT:key(), pos_integer()) -> ?RT:key().
@@ -625,22 +627,42 @@ mapInterval(I, Q) ->
     LQ = get_key_quadrant(LKey),
     RepFactor = rep_factor(),
     QDiff = (RepFactor - LQ + Q) rem RepFactor,
-    intervals:new(LBr,
-                  add_quadrants_to_key(LKey, QDiff, RepFactor),
-                  add_quadrants_to_key(RKey, QDiff, RepFactor),
-                  RBr).
+    NewLKey = add_quadrants_to_key(LKey, QDiff, RepFactor),
+    NewRKey = add_quadrants_to_key(RKey, QDiff, RepFactor),
+    case intervals:is_all(I) of
+        false -> intervals:new(LBr, NewLKey, NewRKey, RBr);
+        true when Q =/= 1 -> intervals:new('(', NewLKey, NewRKey, ']');
+        true -> intervals:all()
+    end.
 
 % @doc Gets intersection of two associated intervals as sub interval of A.
 -spec find_intersection(intervals:interval(), intervals:interval()) -> intervals:interval().
 find_intersection(A, B) ->
-    lists:foldl(fun(Q, Acc) ->
-                        Sec = intervals:intersection(A, mapInterval(B, Q)),
-                        case intervals:is_empty(Acc) 
-                                 andalso not intervals:is_empty(Sec) of
-                            true -> Sec;
-                            false -> Acc
-                        end
-                    end, intervals:empty(), lists:seq(1, rep_factor())).
+    SecI = lists:foldl(fun(Q, Acc) ->
+                               Sec = intervals:intersection(A, mapInterval(B, Q)),
+                               case intervals:is_empty(Sec) of
+                                   false -> [Sec | Acc];
+                                   true -> Acc
+                               end
+                       end, [], lists:seq(1, rep_factor())),
+    case SecI of
+        [I] -> I;
+        [H|T] ->
+            element(2, lists:foldl(fun(X, {ASize, _AI} = XAcc) ->
+                                           XSize = get_interval_size(X),
+                                           if XSize > ASize -> {XSize, X};
+                                              true -> XAcc
+                                           end
+                                   end, {get_interval_size(H), H}, T))
+    end.
+
+-spec get_interval_size(intervals:interval()) -> number().
+get_interval_size(I) ->
+    case intervals:is_all(I) of        
+        false -> {'(', LKey, RKey, ']'} = intervals:get_bounds(I),
+                 ?RT:get_range(LKey, RKey);
+        true -> ?RT:n()
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
