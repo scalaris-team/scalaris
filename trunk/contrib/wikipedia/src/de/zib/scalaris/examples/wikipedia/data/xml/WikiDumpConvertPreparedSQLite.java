@@ -54,6 +54,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     private static final int PRINT_SCALARIS_KV_PAIRS_EVERY = 5000;
     protected ArrayBlockingQueue<Runnable> sqliteJobs = new ArrayBlockingQueue<Runnable>(PRINT_SCALARIS_KV_PAIRS_EVERY);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
+    protected boolean errorDuringImport = false;
     
     /**
      * The time at the start of an import operation.
@@ -139,6 +140,17 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     @Override
     public int getImportCount() {
         return importedKeys;
+    }
+
+    @Override
+    public boolean isErrorDuringImport() {
+        return errorDuringImport;
+    }
+
+    @Override
+    public void error(String message) {
+        System.err.println(message);
+        errorDuringImport = true;
     }
 
     /**
@@ -241,8 +253,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         final String key;
         final byte[] value;
         protected final SQLiteStatement stWrite;
+        private final WikiDump importer;
         
-        public SQLiteWriteBytesJob(String key, byte[] value, SQLiteStatement stWrite) {
+        public SQLiteWriteBytesJob(WikiDump importer, String key, byte[] value,
+                SQLiteStatement stWrite) {
+            this.importer = importer;
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -257,7 +272,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     stWrite.reset();
                 }
             } catch (SQLiteException e) {
-                System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+                importer.error("write of " + key + " failed (sqlite error: " + e.toString() + ")");
             }
         }
     }
@@ -267,8 +282,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         protected final String countKey;
         protected final byte[] value;
         protected final SQLiteStatement stWrite;
+        private final WikiDump importer;
         
-        public SQLiteCopyList(String key, byte[] value, String countKey, SQLiteStatement stWrite) {
+        public SQLiteCopyList(WikiDump importer, String key, byte[] value,
+                String countKey, SQLiteStatement stWrite) {
+            this.importer = importer;
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -283,7 +301,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 try {
                     stWrite.bind(1, key).bind(2, value).stepThrough();
                 } catch (SQLiteException e) {
-                    System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+                    importer.error("write of " + key + " failed (sqlite error: " + e.toString() + ")");
                 }
                 // write count (if available)
                 if (countKey != null) {
@@ -292,18 +310,18 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         int listSize = WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue().size();
                         stWrite.bind(1, countKey).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(listSize)).stepThrough();
                     } catch (SQLiteException e) {
-                        System.err.println("write of " + countKey + " failed (sqlite error: " + e.toString() + ")");
+                        importer.error("write of " + countKey + " failed (sqlite error: " + e.toString() + ")");
                     } catch (IOException e) {
-                        System.err.println("write of " + countKey + " failed (error: " + e.toString() + ")");
+                        importer.error("write of " + countKey + " failed (error: " + e.toString() + ")");
                     } catch (ClassNotFoundException e) {
-                        System.err.println("write of " + countKey + " failed (error: " + e.toString() + ")");
+                        importer.error("write of " + countKey + " failed (error: " + e.toString() + ")");
                     }
                 }
             } finally {
                 try {
                     stWrite.reset();
                 } catch (SQLiteException e) {
-                    System.err.println("failed to reset write statement (error: " + e.toString() + ")");
+                    importer.error("failed to reset write statement (error: " + e.toString() + ")");
                 }
             }
         }
@@ -315,10 +333,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         protected final List<ErlangValue> value;
         protected final SQLiteStatement stWrite;
         protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
+        private final WikiDump importer;
         
-        public SQLiteWriteBucketListJob(String key, List<ErlangValue> value,
-                String countKey, SQLiteStatement stWrite,
+        public SQLiteWriteBucketListJob(WikiDump importer, String key,
+                List<ErlangValue> value, String countKey,
+                SQLiteStatement stWrite,
                 Options.APPEND_INCREMENT_BUCKETS optimisation) {
+            this.importer = importer;
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -347,9 +368,9 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     try {
                         stWrite.bind(1, key2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue())).stepThrough();
                     } catch (SQLiteException e) {
-                        System.err.println("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
+                        importer.error("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
                     } catch (IOException e) {
-                        System.err.println("write of " + key2 + " failed (error: " + e.toString() + ")");
+                        importer.error("write of " + key2 + " failed (error: " + e.toString() + ")");
                     }
                     // write count (if available)
                     if (countKey != null) {
@@ -358,16 +379,16 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                             stWrite.reset();
                             stWrite.bind(1, countKey2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue().size())).stepThrough();
                         } catch (SQLiteException e) {
-                            System.err.println("write of " + countKey2 + " failed (sqlite error: " + e.toString() + ")");
+                            importer.error("write of " + countKey2 + " failed (sqlite error: " + e.toString() + ")");
                         } catch (IOException e) {
-                            System.err.println("write of " + countKey2 + " failed (error: " + e.toString() + ")");
+                            importer.error("write of " + countKey2 + " failed (error: " + e.toString() + ")");
                         }
                     }
                 } finally {
                     try {
                         stWrite.reset();
                     } catch (SQLiteException e) {
-                        System.err.println("failed to reset write statement (error: " + e.toString() + ")");
+                        importer.error("failed to reset write statement (error: " + e.toString() + ")");
                     }
                 }
             }
@@ -379,10 +400,12 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         protected final int value;
         protected final SQLiteStatement stWrite;
         protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
+        private final WikiDump importer;
         
-        public SQLiteWriteBucketCounterJob(String key, int value,
-                SQLiteStatement stWrite,
+        public SQLiteWriteBucketCounterJob(WikiDump importer, String key,
+                int value, SQLiteStatement stWrite,
                 Options.APPEND_INCREMENT_BUCKETS optimisation) {
+            this.importer = importer;
             this.key = key;
             this.value = value;
             this.stWrite = stWrite;
@@ -409,15 +432,15 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         stWrite.reset();
                         stWrite.bind(1, key2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(curValue)).stepThrough();
                     } catch (SQLiteException e) {
-                        System.err.println("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
+                        importer.error("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
                     } catch (IOException e) {
-                        System.err.println("write of " + key2 + " failed (error: " + e.toString() + ")");
+                        importer.error("write of " + key2 + " failed (error: " + e.toString() + ")");
                     }
                 } finally {
                     try {
                         stWrite.reset();
                     } catch (SQLiteException e) {
-                        System.err.println("failed to reset write statement (error: " + e.toString() + ")");
+                        importer.error("failed to reset write statement (error: " + e.toString() + ")");
                     }
                 }
             }
@@ -552,27 +575,30 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     
                     if (copyValue) {
                         if (listOrCount == ListOrCountOp.LIST) {
-                            addSQLiteJob(new SQLiteCopyList(key, value, countKey, stWrite));
+                            addSQLiteJob(new SQLiteCopyList(this, key, value, countKey, stWrite));
                         } else {
-                            addSQLiteJob(new SQLiteWriteBytesJob(key, value, stWrite));
+                            addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                         }
                     } else if (optimisation2 != null) {
                         switch (listOrCount) {
                             case LIST:
-                                addSQLiteJob(new SQLiteWriteBucketListJob(
-                                        key,
-                                        WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue(),
-                                        countKey,
-                                        stWrite, optimisation2));
+                            addSQLiteJob(new SQLiteWriteBucketListJob(this,
+                                    key,
+                                    WikiDumpPrepareSQLiteForScalarisHandler
+                                            .objectFromBytes2(value)
+                                            .listValue(), countKey, stWrite,
+                                    optimisation2));
                                 break;
                             case COUNTER:
                                 if (optimisation2.getBuckets() > 1) {
-                                    addSQLiteJob(new SQLiteWriteBucketCounterJob(
-                                            key,
-                                            WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).intValue(),
-                                            stWrite, optimisation2));
+                                addSQLiteJob(new SQLiteWriteBucketCounterJob(
+                                        this, key,
+                                        WikiDumpPrepareSQLiteForScalarisHandler
+                                                .objectFromBytes2(value)
+                                                .intValue(), stWrite,
+                                        optimisation2));
                                 } else {
-                                    addSQLiteJob(new SQLiteWriteBytesJob(key, value, stWrite));
+                                    addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                                 }
                                 break;
                             default:
@@ -586,13 +612,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         } catch (FileNotFoundException e) {
             throw e;
         } catch (SQLiteException e) {
-            System.err.println("read failed (sqlite error: " + e.toString() + ")");
+            error("read failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
-            System.err.println("read failed (sqlite error: " + e.toString() + ")");
+            error("read failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         } catch (IOException e) {
-            System.err.println("read failed (error: " + e.toString() + ")");
+            error("read failed (error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
     }
@@ -610,7 +636,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             dbRead = SQLiteDataHandler.openDB(dbReadFileName, true, null);
             stRead = dbRead.prepare("SELECT scalaris_key, scalaris_value FROM objects");
         } catch (SQLiteException e) {
-            System.err.println("Cannot read database: " + dbReadFileName);
+            error("Cannot read database: " + dbReadFileName);
             throw new RuntimeException(e);
         }
         println("Converting prepared SQLite wiki dump ...");

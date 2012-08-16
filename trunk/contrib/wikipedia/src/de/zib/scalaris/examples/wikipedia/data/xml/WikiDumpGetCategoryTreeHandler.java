@@ -905,7 +905,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                 }
                 return pageId;
             } catch (SQLiteException e) {
-                System.err.println("write of " + pageTitle2 + " failed (sqlite error: " + e.toString() + ")");
+                error("write of " + pageTitle2 + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }
@@ -927,7 +927,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
                     stmt.reset();
                 }
             } catch (SQLiteException e) {
-                System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+                error("write of " + key + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }

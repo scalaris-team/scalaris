@@ -79,7 +79,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     protected final int numberOfImporters;
     protected final int myNumber;
     protected final ConnectionFactory cFactory;
-    
+    protected boolean errorDuringImport = false;
+
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
      * blacklist to Scalaris but with an additional pre-process phase.
@@ -264,15 +265,16 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                             .objectFromBytes(value);
                     writeToScalaris(key, valueOtp);
                 } catch (ClassNotFoundException e) {
-                    System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+                    error("read of " + key + " failed (error: " + e.toString() + ")");
                     throw new RuntimeException(e);
                 } catch (IOException e) {
-                    System.err.println("read of " + key + " failed (error: " + e.toString() + ")");
+                    error("read of " + key + " failed (error: " + e.toString() + ")");
                     throw new RuntimeException(e);
                 }
             }
             // some requests may be left over
-            Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "");
+            Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(
+                    this, requests, scalaris_single, "");
             executor.execute(worker);
             requests = new TransactionSingleOp.RequestList();
             executor.shutdown();
@@ -298,7 +300,8 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         requests.addOp(new WriteCompressedOp(key, value));
         // bundle requests:
         if (requests.size() >= REQUEST_BUNDLE_SIZE) {
-            Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(requests, scalaris_single, "keys up to " + key);
+            Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(
+                    this, requests, scalaris_single, "keys up to " + key);
             executor.execute(worker);
             requests = new TransactionSingleOp.RequestList();
         }
@@ -383,7 +386,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         try {
             db = SQLiteDataHandler.openDB(dbFileName, true, null);
         } catch (SQLiteException e) {
-            System.err.println("Cannot read database: " + dbFileName);
+            error("Cannot read database: " + dbFileName);
             throw new RuntimeException(e);
         }
 
@@ -394,10 +397,10 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 scalaris_single.put(new TransactionSingleOp(connection));
             }
         } catch (ConnectionException e) {
-            System.err.println("Connection to Scalaris failed");
+            error("Connection to Scalaris failed");
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
-            System.err.println("Interrupted while setting up multiple connections to Scalaris");
+            error("Interrupted while setting up multiple connections to Scalaris");
             throw new RuntimeException(e);
         }
     }
@@ -435,5 +438,16 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      */
     public void println(String message) {
         WikiDumpHandler.println(msgOut, message);
+    }
+
+    @Override
+    public boolean isErrorDuringImport() {
+        return errorDuringImport;
+    }
+
+    @Override
+    public void error(String message) {
+        System.err.println(message);
+        errorDuringImport = true;
     }
 }

@@ -97,10 +97,13 @@ public class Main {
             }
         } catch (SAXException e) {
             System.err.println(e.getMessage());
+            System.exit(-1);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
+            System.exit(-1);
         } catch (IOException e) {
             e.printStackTrace();
+            System.exit(-1);
         }
     }
 
@@ -156,6 +159,7 @@ public class Main {
                 handler.tearDown();
                 shutdownHook.run();
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
+                exitCheckHandler(handler);
             } else {
                 System.err.println("incorrect command line parameters");
                 System.exit(-1);
@@ -261,6 +265,18 @@ public class Main {
     }
 
     /**
+     * Exits from the VM if the handler had an error in the previous import
+     * step.
+     * 
+     * @param handler the handler used for the import
+     */
+    protected static void exitCheckHandler(WikiDump handler) {
+        if (handler.isErrorDuringImport()) {
+            System.exit(-1);
+        }
+    }
+
+    /**
      * Converts the default prepared SQLite dump to a different optimisation scheme.
      * 
      * @param dbReadFileName
@@ -310,6 +326,7 @@ public class Main {
         handler.tearDown();
         shutdownHook.run();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        exitCheckHandler(handler);
     }
 
     /**
@@ -336,6 +353,7 @@ public class Main {
         handler.tearDown();
         shutdownHook.run();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        exitCheckHandler(handler);
     }
 
     /**
@@ -402,8 +420,6 @@ public class Main {
         WikiDumpHandler.println(System.out, " allowed pages : " + allowedPagesFileName);
         WikiDumpHandler.println(System.out, " recursion lvl : " + recursionLvl);
         
-
-
         WikiDumpHandler.println(System.out, "creating list of pages to import (recursion level: " + recursionLvl + ") ...");
         Set<String> allowedCats0 = new HashSet<String>(rootCategories);
         
@@ -421,6 +437,7 @@ public class Main {
             }
             out.close();
         } while(false);
+        exitCheckHandler(handler);
     }
 
     /**
@@ -440,6 +457,7 @@ public class Main {
         handler.tearDown();
         shutdownHook.run();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        exitCheckHandler(handler);
     }
 
     /**

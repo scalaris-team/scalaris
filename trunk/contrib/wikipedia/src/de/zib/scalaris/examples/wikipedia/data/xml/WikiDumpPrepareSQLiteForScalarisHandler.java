@@ -479,7 +479,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 }
                 return pageId;
             } catch (SQLiteException e) {
-                System.err.println("write of " + pageTitle + " failed (sqlite error: " + e.toString() + ")");
+                error("write of " + pageTitle + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }
@@ -577,7 +577,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt.reset();
                 }
             } catch (SQLiteException e) {
-                System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+                error("write of " + key + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }
@@ -649,7 +649,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     stmt.dispose();
                 } while (false);
             } catch (SQLiteException e) {
-                System.err.println("sqlite error: " + e.toString());
+                error("sqlite error: " + e.toString());
                 throw new RuntimeException(e);
             } finally {
                 if (stmt != null) {
