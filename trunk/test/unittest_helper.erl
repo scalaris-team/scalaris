@@ -745,6 +745,8 @@ data_contains_all_replicas(Data, Key) ->
     Replicas = [E || E <- Data, lists:member(db_entry:get_key(E), Keys)],
     length(Keys) =:= length(Replicas).
 
+% @doc returns only left-open intervals or intervals:all() 
+%      rrepair relies on this
 -spec build_interval(intervals:key(), intervals:key()) -> intervals:interval().
 build_interval(?MINUS_INFINITY, ?PLUS_INFINITY) -> intervals:all();
 build_interval(?PLUS_INFINITY, ?MINUS_INFINITY) -> intervals:all();
