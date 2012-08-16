@@ -331,6 +331,7 @@ type_check_module({Module, InExcludeList}, Count) ->
     ExpFuncs = Module:module_info(exports),
     ExcludeList = [{module_info, 0}, {module_info, 1}] ++ InExcludeList,
 
+    %% only excluded exported functions?
     ErrList = [ case lists:member(X, ExpFuncs) of
                     true -> true;
                     false ->
@@ -343,22 +344,48 @@ type_check_module({Module, InExcludeList}, Count) ->
         false -> throw(error)
     end,
 
-    ResList = [ begin
-          ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
-          test(Module, Fun, Arity, Count)
-      end
-      || {Fun, Arity} = FA <- ExpFuncs,
-         %% >= R15 generates behaviour_info without a type spec so
-         %% tester cannot find it. Erlang < R15 checks behaviour_info
-         %% itself, so no own tests necessary here.
-         %% Silently drop it for modules that export it.
-         not lists:member(FA, [{behaviour_info, 1} | ExcludeList]) ],
-    case {ResList, InExcludeList} of
-        {[], []} -> ok;
-        {[], _} ->
+    FunsToTestNormally =
+        [X || X <- ExpFuncs,
+         not lists:member(X, [{behaviour_info, 1} | ExcludeList])],
+    %% perform the actual tests
+    ResList =
+        [ begin
+              %% test all non excluded funs with std. settings
+              %%
+              %% >= R15 generates behaviour_info without a type spec so
+              %% tester cannot find it. Erlang < R15 checks behaviour_info
+              %% itself, so no own tests necessary here.
+              %% Silently drop it for modules that export it.
+              Res1 = case lists:member(FA, FunsToTestNormally) of
+                         true ->
+                             ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
+                             test(Module, Fun, Arity, Count);
+                         false -> skipped
+              end,
+
+              %% if a feeder is found, test with feeder and ignore the
+              %% exclude list, as a feeder is expected to feed the
+              %% tested fun appropriately (will type check feeder
+              %% results for required input types anyhow).
+              FeederFun = list_to_atom(atom_to_list(Fun) ++ "_feeder"),
+              case lists:member({FeederFun, Arity}, ExpFuncs) of
+                  true ->
+                      ct:pal("Testing with feeder ~p:~p/~p~n",
+                             [Module, Fun, Arity]),
+                      [Res1 , test(Module, Fun, Arity, Count, [with_feeder])];
+                  false -> Res1
+              end
+          end
+      || {Fun, Arity} = FA <- ExpFuncs],
+
+    %% remained there anything to test?
+    case [] =:= InExcludeList orelse
+        lists:any(fun(X) -> skipped =/= X end,
+                  lists:flatten(ResList)) of
+        true -> ok;
+        _ ->
             ct:pal("Excluded all exported functions for module ~p?!~n",
                    [Module]),
-            throw(error);
-        _ -> ok
+            throw(error)
     end,
     ok.
