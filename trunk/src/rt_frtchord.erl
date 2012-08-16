@@ -42,14 +42,14 @@
 
     }).
 
--opaque(rt_entry() :: #rt_entry{}).
+-type(rt_entry() :: #rt_entry{}).
 
 -record(rt_t, {
         source = undefined :: key_t() | undefined
         , nodes = gb_trees:empty() :: gb_tree()
     }).
 
--opaque(rt_t() :: #rt_t{}).
+-type(rt_t() :: #rt_t{}).
 
 -type custom_message() :: {get_rt, SourcePID :: comm:mypid()}
                         | {get_rt_reply, RT::rt_t()}.
