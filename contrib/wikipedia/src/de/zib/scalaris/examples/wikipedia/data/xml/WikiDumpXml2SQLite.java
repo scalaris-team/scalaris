@@ -163,8 +163,10 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
             }
         } catch (SQLiteException e) {
             System.err.println("write of " + key + " failed (sqlite error: " + e.toString() + ")");
+            throw new RuntimeException(e);
         } catch (IOException e) {
             System.err.println("write of " + key + " failed");
+            throw new RuntimeException(e);
         }
     }
 
@@ -463,14 +465,14 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
                 stmt.bind(1, normTitle.namespace).bind(2, normTitle.title);
                 if (stmt.step()) {
                     // exists
-                    System.err.println("duplicate page in dump: "
+                    error("duplicate page in dump: "
                             + page.getTitle() + " (=" + normTitle.toString()
                             + ")");
                     return;
                 }
                 stmt.dispose();
             } catch (SQLiteException e) {
-                System.err.println("existance check of " + page.getTitle() + " failed (sqlite error: " + e.toString() + ")");
+                error("existance check of " + page.getTitle() + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
             
@@ -500,7 +502,7 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
                         }
                         stmt.dispose();
                     } catch (SQLiteException e) {
-                        System.err.println("write of text for " + page.getTitle() + ", rev " + rev.getId() + " failed (sqlite error: " + e.toString() + ")");
+                        error("write of text for " + page.getTitle() + ", rev " + rev.getId() + " failed (sqlite error: " + e.toString() + ")");
                         throw new RuntimeException(e);
                     } finally {
                         stWriteText.reset();
@@ -515,14 +517,14 @@ public class WikiDumpXml2SQLite extends WikiDumpHandler {
                                 .bind(8, rev.unpackedText().getBytes().length);
                         stWriteRevision.stepThrough();
                     } catch (SQLiteException e) {
-                        System.err.println("write of " + page.getTitle() + ", rev " + rev.getId() + " failed (sqlite error: " + e.toString() + ")");
+                        error("write of " + page.getTitle() + ", rev " + rev.getId() + " failed (sqlite error: " + e.toString() + ")");
                         throw new RuntimeException(e);
                     } finally {
                         stWriteRevision.reset();
                     }
                 }
             } catch (SQLiteException e) {
-                System.err.println("write of " + page.getTitle() + " failed (sqlite error: " + e.toString() + ")");
+                error("write of " + page.getTitle() + " failed (sqlite error: " + e.toString() + ")");
                 throw new RuntimeException(e);
             }
         }

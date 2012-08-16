@@ -69,6 +69,8 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     protected PrintStream msgOut = System.out;
     
     protected boolean stop = false;
+    
+    protected boolean errorDuringImport = false;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -343,6 +345,17 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
     @Override
     public int getImportCount() {
         return pageCount;
+    }
+
+    @Override
+    public boolean isErrorDuringImport() {
+        return errorDuringImport;
+    }
+
+    @Override
+    public void error(String message) {
+        System.err.println(message);
+        errorDuringImport = true;
     }
 
     /**

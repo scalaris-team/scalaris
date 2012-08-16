@@ -76,6 +76,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
     private SQLiteStatement stWriteLnk = null;
     private SQLiteStatement stWriteRedirect = null;
     private SQLiteStatement stWriteStats = null;
+    protected boolean errorDuringImport = false;
     
     /**
      * Constructor.
@@ -127,6 +128,17 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
     @Override
     public int getImportCount() {
         return importedPages;
+    }
+
+    @Override
+    public boolean isErrorDuringImport() {
+        return errorDuringImport ;
+    }
+
+    @Override
+    public void error(String message) {
+        System.err.println(message);
+        errorDuringImport = true;
     }
 
     /**
@@ -185,7 +197,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                 stWrite.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
+            error("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
             e.printStackTrace();
         }
     }
@@ -198,7 +210,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                 stWrite.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
+            error("write of " + tableName + "." + key + " failed (sqlite error: " + e.toString() + ")");
             e.printStackTrace();
         }
     }
@@ -211,7 +223,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                 stWriteStats.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("write of sitestats failed (sqlite error: " + e.toString() + ")");
+            error("write of sitestats failed (sqlite error: " + e.toString() + ")");
             e.printStackTrace();
         }
     }
@@ -240,7 +252,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                             .getRevision(connection, normTitle, namespace);
                     
                     if (!getRevResult.success) {
-                        System.err.println("read of current revision failed (error: " + getRevResult.message + ")");
+                        error("read of current revision failed (error: " + getRevResult.message + ")");
                         throw new RuntimeException();
                     }
                     
@@ -295,7 +307,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                 stGetPages.reset();
             }
         } catch (SQLiteException e) {
-            System.err.println("read failed (sqlite error: " + e.toString() + ")");
+            error("read failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
     }
@@ -541,7 +553,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
             }
             return pages;
         } catch (SQLiteException e) {
-            System.err.println("read of pages in categories failed (sqlite error: " + e.toString() + ")");
+            error("read of pages in categories failed (sqlite error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
     }

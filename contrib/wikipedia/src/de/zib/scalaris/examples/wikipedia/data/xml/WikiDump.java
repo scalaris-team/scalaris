@@ -82,4 +82,19 @@ public interface WikiDump {
      */
     public void println(String message);
 
+    /**
+     * Indicates an error with the given message. The implementation decides where and if to print it.
+     * 
+     * @param message
+     *            the error message
+     */
+    public void error(String message);
+    
+    /**
+     * Whether an error occurred during import.
+     * 
+     * @return <tt>true</tt> if an error occurred, <tt>false</tt> otherwise
+     */
+    public boolean isErrorDuringImport();
+
 }
