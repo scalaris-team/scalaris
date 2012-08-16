@@ -262,11 +262,11 @@ AC_RUN_IFELSE(
             end
           end,
           AbstractCode),
-          case Res of true -> ok; false -> exit(1) end])],
+          case Res of true -> ok; false -> halt(1) end])],
        [HAVE_ERLANG_TIMESTAMP=", {d, have_erlang_timestamp}";
         AC_MSG_NOTICE([erlang:timestamp() type is available])],
        [HAVE_ERLANG_TIMESTAMP="";
-        AC_MSG_FAILURE([the type erlang:timestamp() is not available])])
+        AC_MSG_NOTICE([the type erlang:timestamp() is not available])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([], [httpc:set_option(max_sessions, 1)])],
@@ -458,6 +458,15 @@ AC_ARG_ENABLE([opennebula],
               [ENABLEONEINSTALL="install-one"
                ONEPREFIX=$enableval])
 AC_SUBST(ENABLEONEINSTALL)
+
+###########################################################
+#
+# check for screen
+#
+###########################################################
+
+AC_CHECK_PROG([screen], [screen], ["found"], ["not_found"])
+AC_SUBST(ac_cv_prog_screen)
 
 ###########################################################
 #
