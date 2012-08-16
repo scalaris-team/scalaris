@@ -550,8 +550,10 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
       {get_chunk, SrcPid, I, 
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
        fun(Item) ->
-               Key = map_key_to_interval(db_entry:get_key(Item), DestI),
-               encodeBlob(Key, db_entry:get_version(Item)) 
+               case map_key_to_interval(db_entry:get_key(Item), DestI) of
+                   none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
+                   Key -> encodeBlob(Key, db_entry:get_version(Item))
+               end
        end,
        MaxItems}).
 
@@ -573,10 +575,14 @@ select_sync_node(Interval) ->
     Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
     util:randomelem(Keys).
 
--spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key().
+% @doc Maps any key (K) into a given interval (I). If K is already in I, K is returned.
+%      If K has more than one associated keys in I, the closest one is returned.
+%      If all associated keys of K are not in I, none is returned.
+-spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key() | none.
 map_key_to_interval(Key, I) ->
-    RGrp = [K || K <- lists:sort(?RT:get_replica_keys(Key)), intervals:in(K, I)],
+    RGrp = [K || K <- ?RT:get_replica_keys(Key), intervals:in(K, I)],
     case RGrp of
+        [] -> none;
         [R] -> R;
         [_|_] -> RGrpDis = [case X of
                                 Key -> {X, 0};
@@ -585,10 +591,12 @@ map_key_to_interval(Key, I) ->
                  element(1, erlang:hd(lists:keysort(2, RGrpDis)))
     end.
 
+% @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), pos_integer()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
     lists:nth(N, lists:sort(?RT:get_replica_keys(Key))).
 
+% @doc Returns the replication quadrant number (not null-based) in which key is located.
 -spec get_key_quadrant(?RT:key()) -> pos_integer().
 get_key_quadrant(Key) ->
     Keys = lists:sort(?RT:get_replica_keys(Key)),
@@ -618,9 +626,10 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
         0 -> map_key_to_quadrant(Key, Dest)
     end.            
 
-% @doc Maps an arbitrary Interval to an Interval laying or starting in 
-%      the given RepQuadrant. The replication degree X divides the keyspace into X replication qudrants.
-%      Interval has to be continuous!
+% @doc Maps an arbitrary Interval into the given replication quadrant. 
+%      The replication degree X divides the keyspace into X replication quadrants.
+%      Precondition: Interval (I) is continuous!
+%      Result: Continuous left-open interval starting or laying in given RepQuadrant.
 -spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
 mapInterval(I, Q) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
