@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -44,4 +44,10 @@
 -type queue() :: queue:queue().
 -type gb_tree() :: gb_trees:gb_tree().
 -type dict() :: dict:dictionary().
+-endif.
+
+-ifdef(have_erlang_timestamp).
+-type erlang_timestamp() :: erlang:timestamp().
+-else.
+-type erlang_timestamp() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}.
 -endif.
