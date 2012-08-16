@@ -35,7 +35,7 @@
 -type entry_type() :: normal | source | sticky.
 -record(rt_entry, {
         node :: node:node_type()
-        , id :: key()
+        , id :: key_t()
         , type :: entry_type()
         , spacing = 0.0 :: float() % canonical space around a node
         , adjacent_fingers = {undefined, undefined} ::
@@ -46,7 +46,7 @@
 -opaque(rt_entry() :: #rt_entry{}).
 
 -record(rt_t, {
-        source = undefined :: key() | undefined
+        source = undefined :: key_t() | undefined
         , nodes = gb_trees:empty() :: gb_tree()
     }).
 
