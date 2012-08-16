@@ -586,7 +586,7 @@ map_key_to_interval(Key, I) ->
         [R] -> R;
         [_|_] -> RGrpDis = [case X of
                                 Key -> {X, 0};
-                                _ -> {X, util:min(?RT:get_range(Key, X), ?RT:get_range(X, Key))}
+                                _ -> {X, erlang:min(?RT:get_range(Key, X), ?RT:get_range(X, Key))}
                             end || X <- RGrp],
                  element(1, erlang:hd(lists:keysort(2, RGrpDis)))
     end.
