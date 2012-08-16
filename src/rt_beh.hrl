@@ -28,7 +28,7 @@
 -export_type([key/0, rt/0, custom_message/0, external_rt/0]).
 -endif.
 
--export([empty/1, empty_ext/1, init/1,
+-export([empty_ext/1, init/1,
          hash_key/1, get_random_node_id/0, next_hop/2,
          init_stabilize/2, update/3,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
