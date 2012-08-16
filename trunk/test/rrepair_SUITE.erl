@@ -38,10 +38,10 @@
 
 basic_tests() ->
     [get_symmetric_keys_test,
-     blobCoding,     
+     tester_blob_coding,     
      tester_get_key_quadrant,
-     tester_mapInterval
-     %tester_map_key_to_interval     
+     tester_map_interval,
+     tester_map_key_to_interval     
     ].
 
 repair_tests() ->
@@ -281,14 +281,21 @@ get_symmetric_keys_test(Config) ->
                    io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
     ok.
 
-blobCoding(_) ->
-    A = 180000001,
-    B = 4,
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_blob_coding(?RT:key(), ?DB:value() | ?DB:version()) -> boolean().
+prop_blob_coding(A, B) ->
     Coded = rr_recon:encodeBlob(A, B),
     {DA, DB} = rr_recon:decodeBlob(Coded),
-    ?equals_w_note(A, DA, io_lib:format("A=~p ; Coded=~p ; DecodedA=~p", [A, Coded, DA])),
-    ?equals_w_note(B, DB, io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])),
-    ok.
+    ?equals_w_note(A, DA, 
+                   io_lib:format("A=~p ; Coded=~p ; DecodedA=~p", [A, Coded, DA])) 
+        andalso ?equals_w_note(B, DB, 
+                               io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])).
+
+tester_blob_coding(_) ->
+    tester:test(?MODULE, prop_blob_coding, 2, 50, [{threads, 4}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 session_ttl(Config) ->
     %parameter
@@ -329,6 +336,8 @@ session_ttl(Config) ->
     ?equals_pattern_w_note(Open, Open2, io_lib:format("start session open = ~p - end session closed = ~p", [Open, Open2])),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec prop_get_key_quadrant(?RT:key()) -> boolean().
 prop_get_key_quadrant(Key) ->
     Q = rr_recon:get_key_quadrant(Key),
@@ -349,44 +358,67 @@ prop_get_key_quadrant(Key) ->
 
 tester_get_key_quadrant(_) ->
     _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
-    tester:test(?MODULE, prop_get_key_quadrant, 1, 4, [{threads, 4}]).
+    tester:test(?MODULE, prop_get_key_quadrant, 1, 16, [{threads, 4}]).
 
--spec prop_mapInterval(?RT:key(), ?RT:key(), 1..4) -> true.
-prop_mapInterval(A, B, Q) ->
-    I = case A < B of
-            true -> intervals:new('[', A, B, ']');
-            false -> intervals:new('[', B, A, ']')
-        end,
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_map_interval(intervals:key(), intervals:key(), 1..4) -> boolean().
+prop_map_interval(L, R, Q) ->
+    I = build_interval(L, R),
     Mapped = rr_recon:mapInterval(I, Q),
     {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
     LQ = rr_recon:get_key_quadrant(L1),
-    RQ = rr_recon:get_key_quadrant(R1),    
-    ?implies(LBr =:= '(', LQ =/= Q) andalso
-        ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso
-        ?implies(RBr =:= ')', RQ =/= Q) andalso
+    RQ = rr_recon:get_key_quadrant(R1),
+    L2 = ?RT:get_split_key(L1, ?RT:get_split_key(L1, R1, {1, 100}), {1,100}),
+    L2Q = rr_recon:get_key_quadrant(L2),
+    ?equals(L2Q, Q) andalso
+        ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso        
         ?implies(RBr =:= ']', ?equals(RQ, Q)) andalso
         ?implies(LBr =:= '[' andalso RBr =:= LBr, ?equals(LQ, RQ) andalso ?equals(LQ, Q)) andalso
         ?equals(rr_recon:get_interval_quadrant(Mapped), Q).
     
-tester_mapInterval(_) ->
-    tester:test(?MODULE, prop_mapInterval, 3, 10, [{threads, 1}]).
+tester_map_interval(_) ->
+    _ = [prop_map_interval(?MINUS_INFINITY, ?PLUS_INFINITY, I) || I <- lists:seq(1, 4)],
+    tester:test(?MODULE, prop_map_interval, 3, 16, [{threads, 4}]).
 
-%% -spec prop_map_key_to_interval(?RT:key(), ?RT:key()) -> true.
-%% prop_map_key_to_interval(L, L) -> true;
-%% prop_map_key_to_interval(LeftI, RightI) ->
-%%     I = intervals:new('[', LeftI, RightI, ']'),    
-%%     Keys = [X || X <- ?RT:get_replica_keys(LeftI), X =/= LeftI],
-%%     AnyK = util:randomelem(Keys),
-%%     MinLeft = rr_recon:map_key_to_interval(AnyK, I),
-%%     ct:pal("I=~p~nKeys=~p~nAnyKey=~p~nMin=~p", [I, Keys, AnyK, MinLeft]),
-%%     ?implies(MinLeft =:= LeftI, MinLeft =/= AnyK).
-%% 
-%% tester_map_key_to_interval(_) ->
-%%     tester:test(?MODULE, prop_map_key_to_interval, 2, 10, [{threads, 2}]).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_map_key_to_interval(intervals:key(), intervals:key(), ?RT:key()) -> boolean().
+prop_map_key_to_interval(L, R, Key) ->
+    I = build_interval(L, R),
+    Mapped = rr_recon:map_key_to_interval(Key, I),
+    case intervals:in(Key, I) of
+        true -> ?equals_w_note(Mapped, Key,
+                               io_lib:format("Violation: if key is in i than mapped key equals key!~nKey=~p~nMapped=~p", [Key, Mapped]));
+        false when Mapped =/= none ->
+            RGrp = ?RT:get_replica_keys(Key),
+            InGrp = [X || X <- RGrp, intervals:in(X, I)],
+            case InGrp of
+                [] -> true;
+                [W] -> ?equals_w_note(Mapped, W, 
+                                      io_lib:format("Mapped key =/= the only key in dest i~nMapped=~p~n=/=~nOnly=~p~nDestI=~p", 
+                                                    [Mapped, W, I]));
+                [_|_] ->
+                    NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
+                    [?assert(rr_recon:map_key_to_interval(Z, I) =/= Mapped) || Z <- NotIn], 
+                    ?assert(intervals:in(Mapped, I))
+            end;
+        _ -> true
+    end.
+
+tester_map_key_to_interval(_) ->
+    tester:test(?MODULE, prop_map_key_to_interval, 3, 40, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec build_interval(intervals:key(), intervals:key()) -> boolean().
+build_interval(?MINUS_INFINITY, ?PLUS_INFINITY) -> intervals:all();
+build_interval(?PLUS_INFINITY, ?MINUS_INFINITY) -> intervals:all();
+build_interval(A, A) -> intervals:all();
+build_interval(A, B) when A < B -> intervals:new('(', A, B, ']');
+build_interval(A, B) when A > B -> intervals:new('(', B, A, ']').
 
 % @doc
 %    runs the bloom filter synchronization [Rounds]-times 
