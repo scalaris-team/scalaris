@@ -52,9 +52,8 @@ end_per_suite(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_new(intervals:key(), intervals:key()) -> boolean().
-prop_new(L, L) -> true;
 prop_new(L, R) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform),
     Art1 = art:new(),
     Conf1 = art:get_config(Art1),
@@ -75,10 +74,9 @@ tester_new(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_lookup(intervals:key(), intervals:key()) -> boolean().
-prop_lookup(L, L) -> true;    
+-spec prop_lookup(intervals:key(), intervals:key()) -> boolean().    
 prop_lookup(L, R) ->    
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform),
     Tree = merkle_tree:new(I, DB, []),
     Art = art:new(Tree),

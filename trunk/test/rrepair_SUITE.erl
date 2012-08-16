@@ -364,7 +364,7 @@ tester_get_key_quadrant(_) ->
 
 -spec prop_map_interval(intervals:key(), intervals:key(), 1..4) -> boolean().
 prop_map_interval(L, R, Q) ->
-    I = build_interval(L, R),
+    I = unittest_helper:build_interval(L, R),
     Mapped = rr_recon:mapInterval(I, Q),
     {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
     LQ = rr_recon:get_key_quadrant(L1),
@@ -385,7 +385,7 @@ tester_map_interval(_) ->
 
 -spec prop_map_key_to_interval(intervals:key(), intervals:key(), ?RT:key()) -> boolean().
 prop_map_key_to_interval(L, R, Key) ->
-    I = build_interval(L, R),
+    I = unittest_helper:build_interval(L, R),
     Mapped = rr_recon:map_key_to_interval(Key, I),
     case intervals:in(Key, I) of
         true -> ?equals_w_note(Mapped, Key,
@@ -412,13 +412,6 @@ tester_map_key_to_interval(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec build_interval(intervals:key(), intervals:key()) -> boolean().
-build_interval(?MINUS_INFINITY, ?PLUS_INFINITY) -> intervals:all();
-build_interval(?PLUS_INFINITY, ?MINUS_INFINITY) -> intervals:all();
-build_interval(A, A) -> intervals:all();
-build_interval(A, B) when A < B -> intervals:new('(', A, B, ']');
-build_interval(A, B) when A > B -> intervals:new('(', B, A, ']').
 
 % @doc
 %    runs the bloom filter synchronization [Rounds]-times 
