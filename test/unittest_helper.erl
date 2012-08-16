@@ -45,7 +45,8 @@
          expect_no_message_timeout/1,
          prepare_config/1,
          start_minimal_procs/3, stop_minimal_procs/1,
-         check_ring_load/1, check_ring_data/0, check_ring_data/2]).
+         check_ring_load/1, check_ring_data/0, check_ring_data/2,
+         build_interval/2]).
 
 -ifdef(with_export_type_support).
 -export_type([process_info/0, kv_opts/0]).
@@ -743,3 +744,10 @@ data_contains_all_replicas(Data, Key) ->
     Keys = ?RT:get_replica_keys(Key),
     Replicas = [E || E <- Data, lists:member(db_entry:get_key(E), Keys)],
     length(Keys) =:= length(Replicas).
+
+-spec build_interval(intervals:key(), intervals:key()) -> intervals:interval().
+build_interval(?MINUS_INFINITY, ?PLUS_INFINITY) -> intervals:all();
+build_interval(?PLUS_INFINITY, ?MINUS_INFINITY) -> intervals:all();
+build_interval(A, A) -> intervals:all();
+build_interval(A, B) when A < B -> intervals:new('(', A, B, ']');
+build_interval(A, B) when A > B -> intervals:new('(', B, A, ']').

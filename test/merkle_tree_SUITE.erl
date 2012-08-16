@@ -93,10 +93,9 @@ fprof(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_lookup(intervals:key(), intervals:key()) -> true.
-prop_lookup(L, L) -> true;
 prop_lookup(L, R) ->
     ToAdd = 200,
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, [], ToAdd, uniform),
     Branch = merkle_tree:get_branch_factor(Tree),
     SplitI = intervals:split(I, Branch),
@@ -132,9 +131,8 @@ test_empty(_) ->
 % @doc Tests branching and bucketing
 -spec prop_branch_bucket(intervals:key(), intervals:key(), 
                          BranchFactor::2..16, BucketSize::24..512) -> true.
-prop_branch_bucket(L, L, _, _) -> true;
 prop_branch_bucket(L, R, Branch, Bucket) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     Config = [{branch_factor, Branch}, {bucket_size, Bucket}],
     Tree1 = build_tree(I, Config, Bucket, uniform),
     Tree2 = build_tree(I, Config, Bucket + 1, uniform),
@@ -150,9 +148,8 @@ tester_branch_bucket(_) ->
 
 % @doc Tests hash generation
 -spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
-prop_tree_hash(L, L, _) -> true;
 prop_tree_hash(L, R, ToAdd) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, ToAdd, uniform),
     
     Tree1 = merkle_tree:new(I, DB, []),
@@ -173,9 +170,8 @@ tester_tree_hash(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_insert_list(intervals:key(), intervals:key(), 1..2500) -> true.
-prop_insert_list(L, L, _) -> true;
 prop_insert_list(L, R, Count) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, Count, uniform),
     Tree = merkle_tree:insert_list(DB, merkle_tree:new(I)),
     ItemCount = iterate(merkle_tree:iterator(Tree), 
@@ -195,9 +191,8 @@ tester_insert_list(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_bulk_insert(intervals:key(), intervals:key(), 1..50) -> true.
-prop_bulk_insert(L, L, _) -> true;
 prop_bulk_insert(L, R, BucketSize) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, BucketSize, uniform),
     Tree1 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),
     Tree2 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),    
@@ -214,9 +209,8 @@ tester_bulk_insert(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_size(intervals:key(), intervals:key(), 1..100) -> true.
-prop_size(L, L, _) -> true;
 prop_size(L, R, ToAdd) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
     Size = merkle_tree:size(Tree),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
@@ -232,9 +226,8 @@ tester_size(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_iter(intervals:key(), intervals:key(), 1000..2000) -> true.
-prop_iter(L, L, _) -> true;
 prop_iter(L, R, ToAdd) ->
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),    
     Count = iterate(merkle_tree:iterator(Tree), fun(_, Acc) -> Acc + 1 end, 0),
@@ -248,10 +241,9 @@ tester_iter(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_store_to_dot(intervals:key(), intervals:key(), 1..1000) -> true.
-prop_store_to_dot(L, L, _) -> true;
 prop_store_to_dot(L, R, ToAdd) ->
     ct:pal("PARAMS: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
-    I = intervals:new('[', L, R, ']'),
+    I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p
