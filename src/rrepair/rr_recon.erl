@@ -666,11 +666,11 @@ get_interval_size(I) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec encodeBlob(?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()) -> db_entry_enc().
+-spec encodeBlob(?RT:key(), ?DB:value() | ?DB:version()) -> db_entry_enc().
 encodeBlob(A, B) -> 
     term_to_binary([A, "#", B]).
 
--spec decodeBlob(db_entry_enc()) -> {?DB:version() | ?RT:key(), ?DB:value() | ?DB:version()} | fail.
+-spec decodeBlob(db_entry_enc()) -> {?RT:key(), ?DB:value() | ?DB:version()} | fail.
 decodeBlob(Blob) when is_binary(Blob) ->
     L = binary_to_term(Blob),
     case length(L) of
