@@ -58,11 +58,11 @@
                                         pid_groups:pidname()}}.
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
--type send_event()   :: {log_send, erlang:timestamp(), trace_id(),
+-type send_event()   :: {log_send, erlang_timestamp(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
--type info_event()   :: {log_info, erlang:timestamp(), trace_id(),
+-type info_event()   :: {log_info, erlang_timestamp(), trace_id(),
                          pidinfo(), comm:message()}.
--type recv_event()   :: {log_recv, erlang:timestamp(), trace_id(),
+-type recv_event()   :: {log_recv, erlang_timestamp(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].

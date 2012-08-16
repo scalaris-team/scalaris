@@ -50,7 +50,7 @@
           range   = ?required(lease, range  ) :: intervals:interval(),
           aux     = ?required(lease, aux    ) :: any(),
           version = ?required(lease, version) :: non_neg_integer(),
-          timeout = ?required(lease, timeout) :: erlang:timestamp()}).
+          timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease() :: #lease{}.
 -type leases() :: [lease()].
 
@@ -83,7 +83,7 @@ get_range(Lease) -> Lease#lease.range.
 get_aux(Lease) -> Lease#lease.aux.
 -spec get_version(lease()) -> non_neg_integer().
 get_version(Lease) -> Lease#lease.version.
--spec get_timeout(lease()) -> erlang:timestamp().
+-spec get_timeout(lease()) -> erlang_timestamp().
 get_timeout(Lease) -> Lease#lease.timeout.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -107,7 +107,7 @@ i_am_owner(#lease{owner=Owner}) ->
 set_owner_to_self(Lease) ->
     Lease#lease{owner = comm:make_global(pid_groups:get_my(data_node))}.
 
--spec set_timeout(lease(), erlang:timestamp()) -> lease().
+-spec set_timeout(lease(), erlang_timestamp()) -> lease().
 set_timeout(Lease, Timeout) ->
     Lease#lease{timeout = Timeout}.
 
@@ -162,7 +162,7 @@ is_valid(#lease{timeout=Timeout}) ->
 precision_time() ->
     os:timestamp().
 
--spec calc_timeout(erlang:timestamp()) -> erlang:timestamp().
+-spec calc_timeout(erlang_timestamp()) -> erlang_timestamp().
 calc_timeout(Time) ->
     {MegaSecs, Secs, MicroSecs} = Time,
     {MegaSecs, Secs + delta(), MicroSecs}.

@@ -913,11 +913,11 @@ time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, MicroSecs}.
 
--spec readable_utc_time_feeder({0..1000, 0..1000, 0..1000}) -> {erlang:timestamp()}.
+-spec readable_utc_time_feeder({0..1000, 0..1000, 0..1000}) -> {erlang_timestamp()}.
 readable_utc_time_feeder({A, B, C}) ->
     {{A, B, C}}.
 
--spec readable_utc_time(erlang:timestamp()) -> tuple().
+-spec readable_utc_time(erlang_timestamp()) -> tuple().
 readable_utc_time(TimeTriple) ->
     DateTime = calendar:now_to_universal_time(TimeTriple),
     erlang:append_element(DateTime, element(3, TimeTriple)).
