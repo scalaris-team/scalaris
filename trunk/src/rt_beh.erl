@@ -33,7 +33,6 @@
 -type external_rt() :: term().
 -type key() :: term().
 
--callback empty(nodelist:neighborhood()) -> rt().
 -callback empty_ext(nodelist:neighborhood()) -> external_rt().
 -callback init(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key()) -> key().
@@ -72,7 +71,7 @@
 behaviour_info(callbacks) ->
     [
      % create a default routing table
-     {empty, 1}, {empty_ext, 1},
+     {empty_ext, 1},
      % initialize a routing table
      {init, 1},
      % mapping: key space -> identifier space
