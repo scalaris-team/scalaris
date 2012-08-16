@@ -48,7 +48,6 @@ form({attribute,Line,import,{Mod,Is0}}) ->
     Is1 = erl_id_trans:farity_list(Is0),
     {attribute,Line,import,{Mod,Is1}};
 form({attribute,Line,compile,C}) ->
-    ct:pal("~p", [C]),
     {attribute,Line,compile,C};
 form({attribute,Line,record,{Name,Defs0}}) ->
     Defs1 = erl_id_trans:record_defs(Defs0),
