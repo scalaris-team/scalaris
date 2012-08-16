@@ -70,10 +70,10 @@ maximum_entries() -> 1000.
 
 %% userdevguide-begin rt_frtchord:empty
 %% @doc Creates an "empty" routing table containing the successor.
-add_sticky_nodes_to_rt([H|_] = List, RT) when is_tuple(H) ->
+add_sticky_nodes_to_rt(NodeList, RT) ->
     lists:foldl(fun(Entry, Acc) ->
                 add_sticky_entry(Entry, Acc)
-        end, RT, List).
+        end, RT, NodeList).
 
 -spec empty(nodelist:neighborhood()) -> rt().
 empty(Neighbors) -> 
@@ -355,7 +355,7 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 %% @doc Converts the (external) representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
 %%      third=next longer finger,...
--spec to_list(dht_node_state:state()) -> nodelist:snodelist().
+-spec to_list(dht_node_state:state() | rt_t()) -> nodelist:snodelist().
 to_list(#rt_t{} = RT) ->
     SourceNode = get_source_node(RT),
     % sort
@@ -450,12 +450,12 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 -spec add_entry(Entry :: rt_entry() | node:node_type(),
     entry_type(),
     RT :: rt()) -> rt().
-add_entry(#rt_entry{node=Entry}, Type, RT) ->
-    add_entry(Entry, Type, RT);
-add_entry(Entry, Type, RT) ->
+add_entry(#rt_entry{node=Node}, Type, RT) ->
+    add_entry(Node, Type, RT);
+add_entry(Node, Type, RT) ->
     NewNode = #rt_entry{
-        node = Entry,
-        id   = node:id(Entry),
+        node = Node,
+        id   = node:id(Node),
         type = Type
     },
     entry_learning_and_filtering(NewNode, RT)
