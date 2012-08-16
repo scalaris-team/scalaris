@@ -234,7 +234,8 @@ tester_type_check_util(_Config) ->
                  {pop_randomelem, 2}, %% list may be too short
                  {pow, 2}, %% floats become to large and raise badarith
                  {print_bits, 2}, %% cannot create funs
-                 {readable_utc_time, 1}, %% too slow for big ints
+                 {readable_utc_time, 1}, %% too slow for big ints; tested via feeder
+
                  {repeat, 3}, {repeat, 4}, %% cannot create funs
                  {smerge2, 3}, %% cannot create funs
                  {smerge2, 4}, %% cannot create funs
@@ -259,7 +260,8 @@ tester_type_check_util(_Config) ->
                 ]}
               ],
     [ tester:type_check_module(Mod, Count) || Mod <- Modules ],
-    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
+%% feeders are found automatically - sample explicit call would be:
+%%    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
     true.
 
 
