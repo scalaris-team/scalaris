@@ -69,13 +69,13 @@ reload_with_options(Module, MyOptions) ->
     case compile:file(Src, lists:append(MyOptions, Options)) of
         {ok,_ModuleName,Binary} ->
             code:soft_purge(Module),
-            Res = code:load_binary(Module, Src, Binary),
+            {module, Module} = code:load_binary(Module, Src, Binary),
             %ct:pal("~p", [code:is_loaded(Module)]),
             ok;
-        {ok,_ModuleName,Binary,Warnings} ->
-            %ct:pal("~p", [Warnings]),
+        {ok,_ModuleName,Binary,_Warnings} ->
+            %ct:pal("~p", [_Warnings]),
             code:soft_purge(Module),
-            _ = erlang:load_module(Module, Binary),
+            {module, Module} = erlang:load_module(Module, Binary),
             %ct:pal("~w", [erlang:load_module(Module, Binary)]),
             ok;
         X ->
