@@ -86,7 +86,7 @@ start_link(DHTNodeGroup, Role) ->
 
 -type rtm() :: {?RT:key(),
                 {comm:mypid()} | unknown,
-                Role :: non_neg_integer(),
+                Role :: 0..3, %% non_neg_integer(),
                 {Acceptor :: comm:mypid()} | unknown}.
 
 -type rtms() :: [rtm()].
@@ -898,7 +898,9 @@ trigger_delete_if_done(TxState) ->
             end
     end, ok.
 
--spec count_messages_for_type(Type::term()) -> {TypeCount::pos_integer(), OtherCount::pos_integer()}.
+-spec count_messages_for_type(Type::term()) ->
+                                     {TypeCount::non_neg_integer(),
+                                      OtherCount::non_neg_integer()}.
 count_messages_for_type(Type) ->
     {_, Msg} = erlang:process_info(self(), messages),
     lists:foldl(fun(X, {AccType, AccOther}) ->
@@ -924,8 +926,8 @@ count_messages_for_type(Type) ->
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
 rtms_of_same_dht_node(InRTMs) ->
     GetGroups = lists:usort([pid_groups:group_of(
-                            comm:make_local(element(1,get_rtmpid(X))))
-                          || X <- InRTMs, unknown =/= get_rtmpid(X)]),
+                               comm:make_local(element(1,get_rtmpid(X))))
+                             || X <- InRTMs, unknown =/= get_rtmpid(X)]),
     %% group_of may return failed, don't include these
     Groups = [ X || X <- GetGroups, X =/= failed ],
     case length(Groups) of
@@ -936,7 +938,7 @@ rtms_of_same_dht_node(InRTMs) ->
     end.
 
 -spec rtm_entry_new(?RT:key(), {comm:mypid()} | unknown,
-                    non_neg_integer(), {comm:mypid()} | unknown) -> rtm().
+                    0..3, {comm:mypid()} | unknown) -> rtm().
 rtm_entry_new(Key, RTMPid, Nth, AccPid) -> {Key, RTMPid, Nth, AccPid}.
 -spec get_rtmkey(rtm()) -> ?RT:key().
 get_rtmkey(RTMEntry) -> element(1, RTMEntry).
@@ -944,7 +946,7 @@ get_rtmkey(RTMEntry) -> element(1, RTMEntry).
 set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
 -spec get_rtmpid(rtm()) -> {comm:mypid()} | unknown.
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
--spec get_nth(rtm()) -> non_neg_integer().
+-spec get_nth(rtm()) -> 0..3.
 get_nth(RTMEntry)    -> element(3, RTMEntry).
 -spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
 get_accpid(RTMEntry) -> element(4, RTMEntry).
@@ -979,7 +981,7 @@ send_to_rtms(RTMs, MsgGen) ->
           end || RTM <- RTMs ],
     ok.
 
--spec get_nth_rtm_name(pos_integer()) -> atom(). %% pid_groups:pidname().
+-spec get_nth_rtm_name(0..3) -> atom(). %% pid_groups:pidname().
 get_nth_rtm_name(Nth) ->
     list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
 
@@ -1009,7 +1011,8 @@ state_get_opentxnum(State) -> element(6, State).
 -spec state_inc_opentxnum(state()) -> state().
 state_inc_opentxnum(State) -> setelement(6, State, element(6, State) + 1).
 -spec state_dec_opentxnum(state()) -> state().
-state_dec_opentxnum(State) -> setelement(6, State, element(6, State) - 1).
+state_dec_opentxnum(State) ->
+    setelement(6, State, erlang:max(0, element(6, State) - 1)).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
@@ -1046,6 +1049,11 @@ get_failed_keys(TxState, State) ->
     end,
     Result.
 
+-spec handle_crash(pid(), state(), on | on_init)
+                  -> state() |
+                     {'$gen_component',
+                      [{on_handler, fun((comm:message(), state()) -> state())}],
+                      state()}.
 handle_crash(Pid, State, Handler) ->
     RTMs = state_get_RTMs(State),
     NewRTMs = [ case get_rtmpid(RTM) of
@@ -1059,7 +1067,6 @@ handle_crash(Pid, State, Handler) ->
                     _ -> RTM
                 end
                 || RTM <- RTMs ],
-    
 
     %% scan over all running transactions and delete this Pid
     %% if necessary, takeover the tx and try deciding with abort

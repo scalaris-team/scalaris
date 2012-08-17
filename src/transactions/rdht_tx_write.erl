@@ -43,6 +43,8 @@
 -type req_id() :: {rdht_tx:req_id(), pid(), any()}.
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
+-spec msg_reply(req_id(), tx_tlog:tlog_entry())
+               -> comm:message().
 msg_reply(Id, TLogEntry) ->
     {rdht_tx_write_reply, Id, TLogEntry}.
 
@@ -173,7 +175,8 @@ on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
     comm:send_local(ClientPid, Msg),
     TableName.
 
--spec update_tlog_entry(tx_tlog:tlog_entry(), api_tx:request()) ->
+-spec update_tlog_entry(tx_tlog:tlog_entry(),
+                        api_tx:write_request()) ->
                                tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, Request) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -186,7 +189,9 @@ update_tlog_entry(TLogEntry, Request) ->
         ?value ->
             tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue)
+            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue);
+        {fail, abort} -> %% only for tester? never called this way?
+            TLogEntry
 %        {fail, timeout} ->
 %            tx_tlog:new_entry(?write, Key, Version, {fail, timeout},
 %                               WriteValue)

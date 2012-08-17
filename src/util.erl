@@ -189,7 +189,8 @@ ets_tables_of(Pid) ->
 escape_quotes(String) ->
     lists:foldr(fun escape_quotes_/2, [], String).
 
--spec escape_quotes_(String::string(), Rest::string()) -> string().
+%-spec escape_quotes_(String::string(), Rest::string()) -> string().
+-spec escape_quotes_(char(), string()) -> string().
 escape_quotes_($", Rest) -> [$\\, $" | Rest];
 escape_quotes_(Ch, Rest) -> [Ch | Rest].
 
@@ -705,6 +706,7 @@ zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
 safe_split(N, List) when is_integer(N), N >= 0, is_list(List) ->
     safe_split(N, List, []).
 
+-spec safe_split(non_neg_integer(), [T], [T]) -> {FirstN::[T], Rest::[T]}.
 safe_split(0, L, R) ->
     {lists:reverse(R, []), L};
 safe_split(N, [H | T], R) ->

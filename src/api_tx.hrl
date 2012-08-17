@@ -38,9 +38,11 @@
 -include("client_types.hrl").
 
 % Public Interface
+-type write_request() ::{write, client_key(), client_value()}.
+
 -type request_on_key() ::
           {read, client_key()}
-        | {write, client_key(), client_value()}
+        | write_request()
         | {add_del_on_list, client_key(),
            client_value(),  %% abort when not ToAdd::[client_value()],
            client_value()}  %% abort when not ToRemove::[client_value()]}

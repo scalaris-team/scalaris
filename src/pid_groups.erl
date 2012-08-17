@@ -177,6 +177,8 @@ pid_of(GrpName, PidName) ->
 
 %% @doc lookup group and pid name of a process via its pid.
 -spec group_and_name_of(pid()) -> {groupname(), pidname()} | failed.
+%% maybe used with reg_name() but '_' would violates result type.
+group_and_name_of('_') -> failed;
 group_and_name_of(Pid) ->
     case ets:match(?MODULE, {'$1',Pid}) of
         [[{GrpName, PidName}]] -> {GrpName, PidName};
@@ -443,6 +445,7 @@ on({'EXIT', FromPid, _Reason}, State) ->
 %% Internal functions
 -spec toString(atom() | nonempty_string()) -> nonempty_string().
 %%toString(X) -> io_lib:write_string(X).
+toString('') -> "''";
 toString(X) when is_atom(X) -> atom_to_list(X);
 toString(X)                 -> X.
 
