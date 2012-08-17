@@ -1,4 +1,4 @@
-%  @copyright 2010 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010-2012 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
 %  @end
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,12 +40,14 @@ load_with_export_all(Module) ->
     MyOptions = [return_errors,
                  {parse_transform, tester_helper_parse_transform},
                  binary],
+    ct:pal("Reload ~p with export_all.~n", [Module]),
     reload_with_options(Module, MyOptions).
 
 -spec load_without_export_all(Module::module()) -> ok.
 load_without_export_all(Module) ->
     MyOptions = [return_errors,
                  binary],
+    ct:pal("Reload ~p normally.~n", [Module]),
     reload_with_options(Module, MyOptions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,8 +60,6 @@ load_without_export_all(Module) ->
 % directory should be in ../ebin
 
 reload_with_options(Module, MyOptions) ->
-    code:delete(Module),
-    code:purge(Module),
     Src = get_file_for_module(Module),
     %ct:pal("~p", [file:get_cwd()]),
     Options = get_compile_flags_for_module(Module),
@@ -68,13 +68,14 @@ reload_with_options(Module, MyOptions) ->
     ok = fix_cwd_scalaris(),
     case compile:file(Src, lists:append(MyOptions, Options)) of
         {ok,_ModuleName,Binary} ->
+            code:soft_purge(Module),
             Res = code:load_binary(Module, Src, Binary),
-            ct:pal("Load binary: ~w", [Res]),
             %ct:pal("~p", [code:is_loaded(Module)]),
             ok;
         {ok,_ModuleName,Binary,Warnings} ->
             %ct:pal("~p", [Warnings]),
-            erlang:load_module(Module, Binary),
+            code:soft_purge(Module),
+            _ = erlang:load_module(Module, Binary),
             %ct:pal("~w", [erlang:load_module(Module, Binary)]),
             ok;
         X ->

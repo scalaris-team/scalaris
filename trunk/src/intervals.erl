@@ -126,8 +126,8 @@ intersection([all], B)  -> B;
 intersection(A, [all])  -> A;
 intersection([] = A, _) -> A;
 intersection(_, [] = B) -> B;
-intersection([{element, _}] = A, B) -> intersection_element(A, B);
-intersection(A, [{element, _}] = B) -> intersection_element(B, A);
+intersection([{element, _} = A], B) -> intersection_element(A, B);
+intersection(A, [{element, _} = B]) -> intersection_element(B, A);
 intersection(A, A) -> A;
 intersection(A, B) ->
     normalize_internal([intersection_simple(IA, IB)
@@ -135,10 +135,10 @@ intersection(A, B) ->
                              intersection_simple(IA, IB) =/= []]).
 
 %% @doc Intersection between an element and an interval.
--spec intersection_element(A::[{element, key()}], B::interval()) -> interval().
-intersection_element([{element, X}] = A, B) ->
+-spec intersection_element(A::{element, key()}, B::interval()) -> interval().
+intersection_element({element, X} = A, B) ->
     case in(X, B) of
-        true  -> A;
+        true  -> [A];
         false -> empty()
     end.
 
@@ -565,7 +565,7 @@ minus(A, B) ->
     normalize_internal(lists:flatten([minus2(IA, B) || IA <- A])).
 
 -spec minus2(A::simple_interval(), B::[simple_interval()]) -> [simple_interval()].
-minus2(A, []) -> A;
+minus2(A, []) -> [A];
 minus2(A, [HB | TB]) ->
     minus(minus_simple(A, HB), TB).
 
@@ -630,7 +630,7 @@ is_right_of(X, Y) ->
 
 %% @doc Splits an continuous interval in X roughly equally-sized subintervals
 %%      Returns: List of adjacent intervals
--spec split(interval(), pos_integer()) -> [interval()].
+-spec split(interval(), 1..255) -> [interval()].
 split(I, 1) -> [I];
 split(I, Parts) ->
     case is_continuous(I) of
@@ -648,7 +648,7 @@ split(I, Parts) ->
         false -> erlang:throw('interval is not continuous')
     end.
 
--spec split2(left_bracket(), key(), key(), right_bracket(), Parts::pos_integer(),
+-spec split2(left_bracket(), key(), key(), right_bracket(), Parts::1..255,
              InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]) -> [interval()].
 split2(LBr, Key, Key, RBr, _, _InnerLBr, _InnerRBr, Acc) ->
     [new(LBr, Key, Key, RBr) | Acc];

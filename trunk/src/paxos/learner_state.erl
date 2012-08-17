@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
+% @copyright 2009-2012 Zuse Institute Berlin,
 %                 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,6 +83,8 @@ get_value(State) -> element(7, State).
 -spec set_value(learner_state(), any()) -> learner_state().
 set_value(State, Value) -> setelement(7, State, Value).
 
+-spec reset_round_and_accepted(learner_state(), non_neg_integer())
+                              -> learner_state().
 reset_round_and_accepted(State, Round) ->
     TmpState = set_accepted_count(State, 0),
     set_round(TmpState, Round).

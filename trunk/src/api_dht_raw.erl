@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(api_dht_raw).
 -author('schintke@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -export([get_replica_keys/1, range_read/2]).
 

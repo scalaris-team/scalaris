@@ -85,7 +85,7 @@ req_list(TLog, ReqList, EnDecode) ->
 %%      Cut commit at end and inform caller via boolean (CommitAtEnd).
 -spec rl_chk_and_encode(
         InTodo::[api_tx:request()], Acc::[api_tx:request()], ok|abort)
-                       -> {Acc::[request_on_key()], ok|abort, CommitAtEnd::boolean()}.
+                       -> {Acc::[api_tx:request()], ok|abort, CommitAtEnd::boolean()}.
 rl_chk_and_encode([], Acc, OKorAbort) ->
     {lists:reverse(Acc), OKorAbort, false};
 rl_chk_and_encode([{commit}], Acc, OKorAbort) ->
@@ -367,7 +367,7 @@ tlog_write(Entry, _Key, Value1, EnDecode) ->
 %%      Update the TLog entry accordingly.
 -spec tlog_add_del_on_list(tx_tlog:tlog_entry(), client_key(),
                       client_value(), client_value(), EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                       {tx_tlog:tlog_entry(), api_tx:listop_result()}.
 tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel, true) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->
@@ -405,7 +405,7 @@ tlog_add_del_on_list(Entry, Key, ToAdd, ToDel, false) ->
 
 -spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
                      client_value(), EnDecode::boolean()) ->
-                             {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                             {tx_tlog:tlog_entry(), api_tx:numberop_result()}.
 tlog_add_on_nr(Entry, _Key, X, true) when (not erlang:is_number(X)) ->
     %% check type of input data
     {tx_tlog:set_entry_status(Entry, {fail, abort}),
@@ -440,7 +440,7 @@ tlog_add_on_nr(Entry, Key, X, false) ->
 
 -spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
                         client_value(), client_value(), EnDecode::boolean()) ->
-                               {tx_tlog:tlog_entry(), api_tx:write_result()}.
+                               {tx_tlog:tlog_entry(), api_tx:testandset_result()}.
 tlog_test_and_set(Entry, Key, Old, New, EnDecode) ->
     {_, Res0} = tlog_read(Entry, Key, EnDecode),
     case Res0 of
@@ -549,7 +549,11 @@ receive_answer() ->
           )
     end.
 
+-spec req_get_op(api_tx:request_on_key())
+                -> read | write | add_del_on_list | add_on_nr | test_and_set.
 req_get_op(Request) -> element(1, Request).
+-spec req_get_key(api_tx:request_on_key())
+                 -> api_tx:client_key().
 req_get_key(Request) -> element(2, Request).
 
 %% @doc Checks whether used config parameters exist and are valid.

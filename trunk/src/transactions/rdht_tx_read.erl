@@ -39,6 +39,8 @@
 -export([check_config/0]).
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
+-spec msg_reply(rdht_tx:req_id() | rdht_tx_write:req_id(),
+                tx_tlog:tlog_entry()) -> comm:message().
 msg_reply(Id, TLogEntry) ->
     {rdht_tx_read_reply, Id, TLogEntry}.
 
@@ -239,6 +241,14 @@ inform_client(Client, Entry) ->
     comm:send_local(Client, Msg),
     rdht_tx_read_state:set_client_informed(Entry).
 
+%% -spec make_tlog_entry_feeder(
+%%         {rdht_tx_read_state:read_state(), ?RT:key()})
+%%                             -> {rdht_tx_read_state:read_state()}.
+%% make_tlog_entry_feeder({State, Key}) ->
+%%     %% when make_tlog_entry is called, the key of the state is never
+%%     %% 'unknown'
+%%     {rdht_tx_read_state:set_key(State, Key)}.
+
 -spec make_tlog_entry(rdht_tx_read_state:read_state()) ->
                                 tx_tlog:tlog_entry().
 make_tlog_entry(Entry) ->
@@ -247,6 +257,9 @@ make_tlog_entry(Entry) ->
     Status = rdht_tx_read_state:get_decided(Entry),
     tx_tlog:new_entry(?read, Key, Vers, Status, Val).
 
+-spec delete_if_all_replied(rdht_tx_read_state:read_state(),
+                            pos_integer(), atom())
+                           -> rdht_tx_read_state:read_state() | ok.
 delete_if_all_replied(Entry, Reps, Table) ->
     ?TRACE("rdht_tx_read:delete_if_all_replied Reps: ~p =?= ~p, ClientInformed: ~p Client: ~p~n",
               [Reps, rdht_tx_read_state:get_numreplied(Entry), rdht_tx_read_state:is_client_informed(Entry), rdht_tx_read_state:get_client(Entry)]),
