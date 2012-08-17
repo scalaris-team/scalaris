@@ -218,7 +218,6 @@ tester_type_check_tx(_Config) ->
              {inform_rtms, 3}, %% tries to send
              {inform_tps, 3}, %% tries to send
              {send_to_rtms, 2}, %% tries to send
-             {handle_crash, 3}, %% cannot type-check funs, should weaken type ceck then?
              {state_subscribe, 2}, %% tries to create pids / envelopes
              {state_unsubscribe, 2} %% tries to create pids / envelopes
            ]}

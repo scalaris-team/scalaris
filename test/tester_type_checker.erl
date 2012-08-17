@@ -64,9 +64,13 @@ inner_check(Value, Type, CheckStack, ParseState) ->
         byte ->
             inner_check(Value, {range, {integer, 0}, {integer, 255}},
                         CheckStack, ParseState);
+        {builtin_type, module} ->
+            inner_check(Value, atom, CheckStack, ParseState);
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_float/1, no_float);
+        {'fun', {product, _ParamTypes}, _ResultType} ->
+            check_fun(Value, Type, CheckStack, ParseState);
         integer ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_integer/1, no_integer);
@@ -114,16 +118,14 @@ inner_check(Value, Type, CheckStack, ParseState) ->
             check_tuple(Value, {tuple, TypeList}, CheckStack, ParseState);
         {range, {integer, _Min}, {integer, _Max}} ->
             check_range(Value, Type, CheckStack, ParseState);
-        {typedef, _Module, _TypeName} ->
-            check_typedef(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_list(Tuple) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
+        {typedef, _Module, _TypeName} ->
+            check_typedef(Value, Type, CheckStack, ParseState);
         {union, _Union} ->
             check_union(Value, Type, CheckStack, ParseState);
-        {builtin_type, module} ->
-            inner_check(Value, atom, CheckStack, ParseState);
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
             {false, [{type_checker_unsupported_type, Type} | CheckStack]}
@@ -265,4 +267,19 @@ check_union(Value, {union, Union}, CheckStack, ParseState) ->
                      {Value, {union, Union}}| CheckStack]}
     end.
 
+check_fun(Value, {'fun', {product, ParamTypes} = Type, _ResultType},
+          CheckStack, _ParseState) ->
+    case is_function(Value) of
+        false ->
+            {false, [{Value, is_not_a_function, Type} | CheckStack]};
+        true ->
+            {arity, Arity} = erlang:fun_info(Value, arity),
+            case Arity =:= length(ParamTypes) of
+                false ->
+                    {false, [{{Value, Arity},
+                              fun_with_wrong_arity_for, Type}
+                             | CheckStack]};
+                true -> true
+            end
+    end.
 
