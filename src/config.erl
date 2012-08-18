@@ -32,7 +32,12 @@
          cfg_is_tuple/2, cfg_is_tuple/4, cfg_is_list/1, cfg_is_list/3, cfg_is_string/1,
          cfg_is_in_range/3, cfg_is_greater_than/2, cfg_is_greater_than_equal/2,
          cfg_is_less_than/2, cfg_is_less_than_equal/2, cfg_is_in/2, cfg_is_module/1,
-         cfg_test_and_error/3
+         cfg_test_and_error/3,
+
+         system_continue/3,
+         system_code_change/4,
+         system_terminate/4,
+         loop/0
         ]).
 
 %% public functions
@@ -140,15 +145,30 @@ start(Files, Owner) ->
     Owner ! done,
     loop().
 
+-spec loop() -> none().
 loop() ->
     receive
         {write, Pid, Key, Value} ->
             ets:insert(config_ets, {Key, Value}),
             comm:send_local(Pid, {write_done}),
             loop();
+        %% handle sys:suspend messages
+        {system, From, Msg} ->
+            sys:handle_system_msg(Msg, From, parent, config, [], no_state);
         _ ->
             loop()
     end.
+
+-spec system_continue(any(), any(), any()) -> none().
+system_continue(_, _, _) ->
+    %% need a full qualified function call to change to new code
+    config:loop().
+-spec system_code_change(any(), config, any(), any()) -> {ok, no_state}.
+system_code_change(_State, ?MODULE, _OldVsn, _Extra) ->
+    {ok, no_state}.
+-spec system_terminate(any(), any(), any(), any()) -> ok.
+system_terminate(_Reason, _Parent, _Debug, _State) ->
+    ok.
 
 %@private
 -spec populate_db(File::file:name()) -> ok | fail.

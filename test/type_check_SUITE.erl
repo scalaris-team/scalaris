@@ -92,10 +92,11 @@ tester_type_check_config(_Config) ->
              {start_link, 1}, {start_link, 2},
              {start_link2, 0}, {start_link2, 1},
              {write, 2}, %% cannot write to config_ets
-             {read, 1} %% cannot write to config
+             {read, 1}, %% cannot write to config
+             {system_continue, 3}, %% no return
+             {loop, 0} %% no return
            ],
-           [ {loop, 0}, %% no spec & receives & endless loop
-             {populate_db, 1}, %% cannot create config filenames
+           [ {populate_db, 1}, %% cannot create config filenames
              {process_term, 1} %% cannot write config_ets
            ]}
         ],

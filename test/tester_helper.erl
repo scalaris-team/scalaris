@@ -40,14 +40,14 @@ load_with_export_all(Module) ->
     MyOptions = [return_errors,
                  {parse_transform, tester_helper_parse_transform},
                  binary],
-    ct:pal("Reload ~p with export_all.~n", [Module]),
+    ct:pal("Reload ~p module with 'export_all'.~n", [Module]),
     reload_with_options(Module, MyOptions).
 
 -spec load_without_export_all(Module::module()) -> ok.
 load_without_export_all(Module) ->
     MyOptions = [return_errors,
                  binary],
-    ct:pal("Reload ~p normally.~n", [Module]),
+    ct:pal("Reload ~p module normally.~n", [Module]),
     reload_with_options(Module, MyOptions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -68,14 +68,30 @@ reload_with_options(Module, MyOptions) ->
     ok = fix_cwd_scalaris(),
     case compile:file(Src, lists:append(MyOptions, Options)) of
         {ok,_ModuleName,Binary} ->
+            case Module of
+                config -> sys:suspend(config);
+                _ -> ok
+            end,
             code:soft_purge(Module),
             {module, Module} = code:load_binary(Module, Src, Binary),
+            case Module of
+                config -> sys:resume(config);
+                _ -> ok
+            end,
             %ct:pal("~p", [code:is_loaded(Module)]),
             ok;
         {ok,_ModuleName,Binary,_Warnings} ->
             %ct:pal("~p", [_Warnings]),
+            case Module of
+                config -> sys:suspend(config);
+                _ -> ok
+            end,
             code:soft_purge(Module),
             {module, Module} = erlang:load_module(Module, Binary),
+            case Module of
+                config -> sys:resume(config);
+                _ -> ok
+            end,
             %ct:pal("~w", [erlang:load_module(Module, Binary)]),
             ok;
         X ->
