@@ -23,8 +23,6 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--compile(export_all).
-
 -export([binomial/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
