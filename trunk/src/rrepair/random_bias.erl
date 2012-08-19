@@ -23,6 +23,8 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
+-compile(export_all).
+
 -export([binomial/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -82,12 +84,19 @@ generator({ DS, CalcFun, NextFun }) ->
             end            
     end.
 
+-spec calc_normal(X::float(), M::float(), E::float()) -> float().
+calc_normal(X, M, Dev) ->
+    A = 1 / (Dev * math:sqrt(2 * math:pi())),
+    B = -1/2 * math:pow(((X-M) / Dev), 2),
+    A * math:pow(math:exp(1), B).
+
 -spec calc_binomial(binomial_state()) -> float().
-calc_binomial({binom, N, P, K }) ->
-    mathlib:binomial_coeff(N, K) * math:pow(P, K) * math:pow(1 - P, N - K).
+calc_binomial({binom, N, P, X }) ->
+    calc_normal(X, N*P, math:sqrt(N * P * (1-P))). %approximation
+    %mathlib:binomial_coeff(N, X) * math:pow(P, X) * math:pow(1 - P, N - X). %exact
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
-next_state({binom, K, _P, K}) -> 
+next_state({binom, X, _P, X}) -> 
     exit;
-next_state({binom, N, P, K}) -> 
-    {binom, N, P, K + 1}.
+next_state({binom, N, P, X}) -> 
+    {binom, N, P, X + 1}.
