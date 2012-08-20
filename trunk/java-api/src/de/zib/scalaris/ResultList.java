@@ -172,4 +172,9 @@ public abstract class ResultList {
     public abstract void processTestAndSetAt(final int pos)
             throws TimeoutException, NotFoundException, KeyChangedException,
             AbortException, UnknownException;
+
+    @Override
+    public String toString() {
+        return results.toString();
+    }
 }

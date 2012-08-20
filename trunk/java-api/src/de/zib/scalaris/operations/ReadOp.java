@@ -56,4 +56,9 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
     public OtpErlangString getKey() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "read(" + key + ")";
+    }
 }

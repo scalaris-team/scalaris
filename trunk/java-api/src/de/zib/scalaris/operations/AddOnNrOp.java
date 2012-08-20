@@ -91,4 +91,9 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
     public OtpErlangString getKey() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "add_on_nr(" + key + ", " + toAdd + ")";
+    }
 }

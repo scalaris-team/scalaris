@@ -76,4 +76,9 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
     public OtpErlangString getKey() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "add_del_on_list(" + key + ", " + toAdd + ", " + toRemove + ")";
+    }
 }

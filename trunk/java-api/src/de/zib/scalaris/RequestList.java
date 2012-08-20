@@ -457,4 +457,9 @@ public abstract class RequestList {
     public List<Operation> getRequests() {
         return requests;
     }
+
+    @Override
+    public String toString() {
+        return requests.toString();
+    }
 }
