@@ -69,7 +69,10 @@ rw_suite_runs(Desired) ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    unittest_helper:start_minimal_procs(Config2, [], false).
+    Config3 = unittest_helper:start_minimal_procs(Config2, [], false),
+    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    Config3.
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
@@ -476,8 +479,7 @@ tester_add_data(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries3_1(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_entries3_1(Data, Range_) ->
-    Range = intervals:normalize(Range_),
+prop_get_entries3_1(Data, Range) ->
     DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -509,8 +511,7 @@ tester_get_entries3_1(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries3_2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_entries3_2(Data, Range_) ->
-    Range = intervals:normalize(Range_),
+prop_get_entries3_2(Data, Range) ->
     DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -544,8 +545,7 @@ tester_get_entries3_2(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_entries2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_get_entries2(Data, Range_) ->
-    Range = intervals:normalize(Range_),
+prop_get_entries2(Data, Range) ->
     DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -574,8 +574,7 @@ tester_get_entries2(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get_load2(Data::?TEST_DB:db_as_list(), LoadInterval::intervals:interval()) -> true.
-prop_get_load2(Data, LoadInterval_) ->
-    LoadInterval = intervals:normalize(LoadInterval_),
+prop_get_load2(Data, LoadInterval) ->
     DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -606,8 +605,7 @@ tester_get_load2(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_split_data(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_split_data(Data, Range_) ->
-    Range = intervals:normalize(Range_),
+prop_split_data(Data, Range) ->
     DB = ?TEST_DB:new(),
     % lists:usort removes all but first occurrence of equal elements
     % -> reverse list since ?TEST_DB:add_data will keep the last element
@@ -698,9 +696,8 @@ tester_update_entries(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete_entries1(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_delete_entries1(Data, Range_) ->
+prop_delete_entries1(Data, Range) ->
     % use a range to delete entries
-    Range = intervals:normalize(Range_),
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     
@@ -719,9 +716,8 @@ prop_delete_entries1(Data, Range_) ->
     true.
 
 -spec prop_delete_entries2(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
-prop_delete_entries2(Data, Range_) ->
+prop_delete_entries2(Data, Range) ->
     % use a range to delete entries
-    Range = intervals:normalize(Range_),
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
@@ -754,8 +750,7 @@ tester_delete_entries2(_Config) ->
 -spec prop_changed_keys_get_entry(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
-prop_changed_keys_get_entry(Data, ChangesInterval_, Key) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -771,8 +766,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval_, Key) ->
 -spec prop_changed_keys_set_entry(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Entry::db_entry:entry()) -> true.
-prop_changed_keys_set_entry(Data, ChangesInterval_, Entry) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_set_entry(Data, ChangesInterval, Entry) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
@@ -791,8 +785,7 @@ prop_changed_keys_set_entry(Data, ChangesInterval_, Entry) ->
 -spec prop_changed_keys_update_entry(
         Data::[db_entry:entry(),...], ChangesInterval::intervals:interval(),
         UpdateVal::?TEST_DB:value()) -> true.
-prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     % lists:usort removes all but first occurrence of equal elements
@@ -822,8 +815,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval_, UpdateVal) ->
 -spec prop_changed_keys_delete_entry(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Entry::db_entry:entry()) -> true.
-prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_delete_entry(Data, ChangesInterval, Entry) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
@@ -841,8 +833,7 @@ prop_changed_keys_delete_entry(Data, ChangesInterval_, Entry) ->
 -spec prop_changed_keys_read(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
-prop_changed_keys_read(Data, ChangesInterval_, Key) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_read(Data, ChangesInterval, Key) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -858,8 +849,7 @@ prop_changed_keys_read(Data, ChangesInterval_, Key) ->
 -spec prop_changed_keys_write(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key(), Value::?TEST_DB:value(), Version::?TEST_DB:version()) -> true.
-prop_changed_keys_write(Data, ChangesInterval_, Key, Value, Version) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
@@ -878,8 +868,7 @@ prop_changed_keys_write(Data, ChangesInterval_, Key, Value, Version) ->
 -spec prop_changed_keys_delete(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Key::?RT:key()) -> true.
-prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_delete(Data, ChangesInterval, Key) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old = ?TEST_DB:get_entry2(DB2, Key),
@@ -897,9 +886,7 @@ prop_changed_keys_delete(Data, ChangesInterval_, Key) ->
 -spec prop_changed_keys_get_entries2(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Interval::intervals:interval()) -> true.
-prop_changed_keys_get_entries2(Data, ChangesInterval_, Interval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    Interval = intervals:normalize(Interval_),
+prop_changed_keys_get_entries2(Data, ChangesInterval, Interval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -915,9 +902,7 @@ prop_changed_keys_get_entries2(Data, ChangesInterval_, Interval_) ->
 -spec prop_changed_keys_get_entries4(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Interval::intervals:interval()) -> true.
-prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    Interval = intervals:normalize(Interval_),
+prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -936,8 +921,7 @@ prop_changed_keys_get_entries4(Data, ChangesInterval_, Interval_) ->
     true.
 
 -spec prop_get_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
-prop_get_chunk3(Keys2, Interval_, ChunkSize) ->
-    Interval = intervals:normalize(Interval_),
+prop_get_chunk3(Keys2, Interval, ChunkSize) ->
     case not intervals:is_empty(Interval) of
         true ->
             Keys = lists:usort(Keys2),
@@ -972,8 +956,7 @@ prop_get_chunk3(Keys2, Interval_, ChunkSize) ->
     end.
 
 -spec prop_delete_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
-prop_delete_chunk3(Keys2, Interval_, ChunkSize) ->
-    Interval = intervals:normalize(Interval_),
+prop_delete_chunk3(Keys2, Interval, ChunkSize) ->
     case not intervals:is_empty(Interval) of
         true ->
             Keys = lists:usort(Keys2),
@@ -994,8 +977,7 @@ prop_delete_chunk3(Keys2, Interval_, ChunkSize) ->
 -spec prop_changed_keys_update_entries(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Entry1::db_entry:entry(), Entry2::db_entry:entry()) -> true.
-prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     Old1 = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry1)),
@@ -1024,10 +1006,8 @@ prop_changed_keys_update_entries(Data, ChangesInterval_, Entry1, Entry2) ->
 -spec prop_changed_keys_delete_entries1(
         Data::?TEST_DB:db_as_list(), Range::intervals:interval(),
         ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_delete_entries1(Data, ChangesInterval_, Range_) ->
+prop_changed_keys_delete_entries1(Data, ChangesInterval, Range) ->
     % use a range to delete entries
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    Range = intervals:normalize(Range_),
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1051,10 +1031,8 @@ prop_changed_keys_delete_entries1(Data, ChangesInterval_, Range_) ->
 -spec prop_changed_keys_delete_entries2(
         Data::?TEST_DB:db_as_list(), Range::intervals:interval(),
         ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_delete_entries2(Data, ChangesInterval_, Range_) ->
+prop_changed_keys_delete_entries2(Data, ChangesInterval, Range) ->
     % use a range to delete entries
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    Range = intervals:normalize(Range_),
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
@@ -1078,8 +1056,7 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval_, Range_) ->
 
 -spec prop_changed_keys_get_load(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_get_load(Data, ChangesInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_get_load(Data, ChangesInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1095,9 +1072,7 @@ prop_changed_keys_get_load(Data, ChangesInterval_) ->
 -spec prop_changed_keys_get_load2(
         Data::?TEST_DB:db_as_list(), LoadInterval::intervals:interval(),
         ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_get_load2(Data, LoadInterval_, ChangesInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    LoadInterval = intervals:normalize(LoadInterval_),
+prop_changed_keys_get_load2(Data, LoadInterval, ChangesInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1114,9 +1089,7 @@ prop_changed_keys_get_load2(Data, LoadInterval_, ChangesInterval_) ->
         Data::?TEST_DB:db_as_list(),
         ChangesInterval::intervals:interval(),
         MyNewInterval1::intervals:interval()) -> true.
-prop_changed_keys_split_data1(Data, ChangesInterval_, MyNewInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    MyNewInterval = intervals:normalize(MyNewInterval_),
+prop_changed_keys_split_data1(Data, ChangesInterval, MyNewInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1133,9 +1106,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval_, MyNewInterval_) ->
         Data::?TEST_DB:db_as_list(),
         ChangesInterval::intervals:interval(),
         MyNewInterval1::intervals:interval()) -> true.
-prop_changed_keys_split_data2(Data, ChangesInterval_, MyNewInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
-    MyNewInterval = intervals:normalize(MyNewInterval_),
+prop_changed_keys_split_data2(Data, ChangesInterval, MyNewInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:record_changes(DB, ChangesInterval),
     DB3 = ?TEST_DB:add_data(DB2, Data),
@@ -1151,8 +1122,7 @@ prop_changed_keys_split_data2(Data, ChangesInterval_, MyNewInterval_) ->
 
 -spec prop_changed_keys_get_data(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_get_data(Data, ChangesInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_get_data(Data, ChangesInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
@@ -1168,8 +1138,7 @@ prop_changed_keys_get_data(Data, ChangesInterval_) ->
 -spec prop_changed_keys_add_data(
         Data::?TEST_DB:db_as_list(),
         ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_add_data(Data, ChangesInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_add_data(Data, ChangesInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:record_changes(DB, ChangesInterval),
     
@@ -1191,8 +1160,7 @@ prop_changed_keys_add_data(Data, ChangesInterval_) ->
 
 -spec prop_changed_keys_check_db(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval()) -> true.
-prop_changed_keys_check_db(Data, ChangesInterval_) ->
-    ChangesInterval = intervals:normalize(ChangesInterval_),
+prop_changed_keys_check_db(Data, ChangesInterval) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
