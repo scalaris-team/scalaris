@@ -281,6 +281,8 @@ tester_type_check_util(_Config) ->
              {log, 2}, %% floats become to large and raise badarith
              {log2, 1}, %% floats become to large and raise badarith
              {logged_exec, 1}, %% not execute random strings
+             {par_map, 2}, %% cannot create funs
+             {par_map, 3}, %% cannot create funs
              {parallel_run, 5}, %% cannot create funs
              {pop_randomelem, 2}, %% list may be too short
              {pow, 2}, %% floats become to large and raise badarith
@@ -318,6 +320,8 @@ tester_type_check_util(_Config) ->
              {smerge2_helper, 7}, %% needs fun
              {i_repeat,5}, %% needs fun
              {parallel_collect,3}, %% needs fun
+             {par_map_recv, 2}, %% receives messages
+             {par_map_recv2, 2}, %% receives messages
              {collect_while,2}, %% needs fun
              {gb_trees_foldl_iter,3}, %% needs fun
              {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
