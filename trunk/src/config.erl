@@ -94,7 +94,7 @@ start_link(Options) ->
 %% @doc Starts the config process. If Options contains a {config,
 %%      [{Key1, Value1},...]} tuple, each Key is set to its Value in
 %%      the config.
--spec start_link(Filename::[byte()], Options::[tuple()]) -> {ok, pid()}.
+-spec start_link(Filename::[file:name()], Options::[tuple()]) -> {ok, pid()}.
 start_link(Files, Options) ->
     case whereis(config) of
         Pid when is_pid(Pid) ->
