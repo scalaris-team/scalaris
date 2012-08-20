@@ -359,7 +359,7 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
                     ConfigOptions2 = unittest_helper:prepare_config(
                                        [{config, [{log_path, PrivDir} | ConfigOptions]}]),
-                    {ok, _ConfigPid} = config:start_link2(ConfigOptions2),
+                    {ok, _ConfigPid} = config:start_link(ConfigOptions2),
                     {ok, _LogPid} = log:start_link(),
                     case StartCommServer of
                         true ->
