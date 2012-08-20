@@ -145,7 +145,7 @@ start(Files, Owner) ->
     Owner ! done,
     loop().
 
--spec loop() -> none().
+-spec loop() -> no_return().
 loop() ->
     receive
         {write, Pid, Key, Value} ->
@@ -154,7 +154,7 @@ loop() ->
             loop();
         %% handle sys:suspend messages
         {system, From, Msg} ->
-            sys:handle_system_msg(Msg, From, parent, config, [], no_state);
+            sys:handle_system_msg(Msg, From, self(), config, [], no_state);
         _ ->
             loop()
     end.
