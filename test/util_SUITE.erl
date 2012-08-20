@@ -29,7 +29,8 @@ all() ->
      repeat, repeat_collect, repeat_accumulate,
      repeat_p, repeat_p_collect, repeat_p_accumulate,
      tester_minus_all, tester_minus_all_sort,
-     tester_minus_first, tester_minus_first_sort].
+     tester_minus_first, tester_minus_first_sort,
+     tester_par_map2, tester_par_map3].
 
 suite() ->
     [
@@ -199,3 +200,58 @@ tester_minus_first(_Config) ->
 
 tester_minus_first_sort(_Config) ->
     tester:test(?MODULE, prop_minus_first_sort, 2, 5000, [{threads, 2}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% util:par_map/2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec try_fun(Module::module(), Fun::atom(), Args::[term()]) -> {ok | throw | error | exit, term()}.
+try_fun(Module, Fun, Args) ->
+    try {ok, apply(Module, Fun, Args)}
+    catch Level:Reason -> {Level, Reason}
+    end.
+
+-spec prop_par_map2([integer()]) -> ok.
+prop_par_map2(List) ->
+    ParMapRes1 = try_fun(util, par_map, [fun(X) -> X * X end, List]),
+    ListsMapRes1 = try_fun(lists, map, [fun(X) -> X * X end, List]),
+    ?equals(ParMapRes1, ListsMapRes1),
+
+    ParMapRes2 = try_fun(util, par_map, [fun(_) -> erlang:throw(failed) end, List]),
+    ListsMapRes2 = try_fun(lists, map, [fun(_) -> erlang:throw(failed) end, List]),
+    ?equals(ParMapRes2, ListsMapRes2),
+
+    ParMapRes3 = try_fun(util, par_map, [fun(_) -> erlang:error(failed) end, List]),
+    ListsMapRes3 = try_fun(lists, map, [fun(_) -> erlang:error(failed) end, List]),
+    ?equals(ParMapRes3, ListsMapRes3),
+
+    ParMapRes4 = try_fun(util, par_map, [fun(_) -> erlang:exit(failed) end, List]),
+    ListsMapRes4 = try_fun(lists, map, [fun(_) -> erlang:exit(failed) end, List]),
+    ?equals(ParMapRes4, ListsMapRes4),
+    ok.
+
+tester_par_map2(_Config) ->
+    tester:test(?MODULE, prop_par_map2, 1, 5000, [{threads, 2}]).
+
+-spec prop_par_map3([integer()], 1..1000) -> ok.
+prop_par_map3(List, Partitions) ->
+    ParMapRes1 = try_fun(util, par_map, [fun(X) -> X * X end, List, Partitions]),
+    ListsMapRes1 = try_fun(lists, map, [fun(X) -> X * X end, List]),
+    ?equals(ParMapRes1, ListsMapRes1),
+
+    ParMapRes2 = try_fun(util, par_map, [fun(_) -> erlang:throw(failed) end, List, Partitions]),
+    ListsMapRes2 = try_fun(lists, map, [fun(_) -> erlang:throw(failed) end, List]),
+    ?equals(ParMapRes2, ListsMapRes2),
+
+    ParMapRes3 = try_fun(util, par_map, [fun(_) -> erlang:error(failed) end, List, Partitions]),
+    ListsMapRes3 = try_fun(lists, map, [fun(_) -> erlang:error(failed) end, List]),
+    ?equals(ParMapRes3, ListsMapRes3),
+
+    ParMapRes4 = try_fun(util, par_map, [fun(_) -> erlang:exit(failed) end, List, Partitions]),
+    ListsMapRes4 = try_fun(lists, map, [fun(_) -> erlang:exit(failed) end, List]),
+    ?equals(ParMapRes4, ListsMapRes4),
+    ok.
+
+tester_par_map3(_Config) ->
+    tester:test(?MODULE, prop_par_map3, 2, 5000, [{threads, 2}]).
