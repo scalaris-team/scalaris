@@ -33,9 +33,10 @@
 -endif.
 
 -type binomial_state() :: {binom,
-                           N::pos_integer(),
-                           P::float(),
-                           K::non_neg_integer()
+                           N         :: pos_integer(),
+                           P         :: float(),             %only works for ]0,1[
+                           X         :: non_neg_integer(),
+                           UseApprox :: boolean()
                           }.
 
 -type distribution_fun() :: fun(() -> {ok, float()} | {last, float()}).
@@ -51,7 +52,8 @@
 % creates a new binomial distribution generation fun.
 -spec binomial(pos_integer(), float()) -> distribution_fun().
 binomial(N, P) ->
-    create_distribution_fun({ {binom, N, P, 0},
+    UseApprox = approx_valid(N, P),
+    create_distribution_fun({ {binom, N, P, 0, UseApprox},
                               fun calc_binomial/1,
                               fun next_state/1 }).
 
@@ -89,12 +91,24 @@ calc_normal(X, M, Dev) ->
     A * math:pow(math:exp(1), B).
 
 -spec calc_binomial(binomial_state()) -> float().
-calc_binomial({binom, N, P, X }) ->
-    calc_normal(X, N*P, math:sqrt(N * P * (1-P))). %approximation
-    %mathlib:binomial_coeff(N, X) * math:pow(P, X) * math:pow(1 - P, N - X). %exact
+calc_binomial({binom, N, P, X, Approx }) ->
+    case Approx of
+        true -> calc_normal(X, N * P, math:sqrt(N * P * (1 - P)));
+        false -> mathlib:binomial_coeff(N, X) * math:pow(P, X) * math:pow(1 - P, N - X)
+    end.
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
-next_state({binom, X, _P, X}) -> 
+next_state({binom, N, _P, X, _}) when N =:= X + 1 -> 
     exit;
-next_state({binom, N, P, X}) -> 
-    {binom, N, P, X + 1}.
+next_state({binom, N, P, X, Approx}) -> 
+    {binom, N, P, X + 1, Approx}.
+
+% @doc apprxoimation is good if this conditions hold
+%      SRC: http://www.vosesoftware.com/ModelRiskHelp/index.htm#Distributions/Approximating_one_distribution_with_another/Approximations_to_the_Binomial_Distribution.htm
+-spec approx_valid(pos_integer, float()) -> boolean().
+approx_valid(_N, 0) -> false;
+approx_valid(_N, 1) -> false;
+approx_valid(N, P) ->
+    One = N > ((9 * P) / (1 - P)),
+    Two = N > ((9 * (1 - P)) / P),
+    One andalso Two.

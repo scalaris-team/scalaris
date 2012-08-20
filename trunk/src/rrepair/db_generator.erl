@@ -32,6 +32,8 @@
 
 -define(ReplicationFactor, 4).
 
+-compile(export_all).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -68,7 +70,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
-        {non_uniform, Fun} -> non_uniform_key_list(Interval, Fun, [], OutputType)
+        {non_uniform, Fun} -> non_uniform_key_list(Interval, 1, ItemCount, Fun, [], OutputType)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -87,6 +89,7 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
         false ->
             {LBr, IL, IR, RBr} = intervals:get_bounds(I),
             End = Add + ?IIF(RBr =:= ')', 1, 0),
+            %io:format("UNIFORM - Add=~p - I=~p~n", [Add, I]),
             ToAdd = util:for_to_ex(?IIF(LBr =:= '(', 1, 0), 
                                    Add + ?IIF(LBr =:= '(', 0, -1),
                                    fun(Index) -> 
@@ -96,7 +99,7 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
                                                list_key_val -> {Key, gen_value()}
                                            end
                                    end),
-            uniform_key_list(R, lists:append(ToAdd, Acc), AccType)                                  
+            uniform_key_list(R, lists:append(ToAdd, Acc), AccType)
     end.
 
 gen_value() ->
@@ -104,24 +107,30 @@ gen_value() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec non_uniform_key_list(Interval, Fun, Acc::Result, OutputType) -> Result when
+-spec non_uniform_key_list(Interval, Step::Int, ToAdd::Int, Fun, Acc::Result, OutputType) -> Result when
     is_subtype(Interval,    intervals:interval()),
+    is_subtype(Int,         pos_integer()),
     is_subtype(Fun,         random_bias:distribution_fun()),
     is_subtype(OutputType,  list_key_val | list_key),
     is_subtype(Result,      [result()]).
-non_uniform_key_list(I, Fun, Acc, AccType) ->
-    case Fun() of
-        {ok, V} -> non_uniform_key_list(I, Fun, non_uniform_add(V, I, Acc, AccType), AccType);
-        {last, V} -> non_uniform_add(V, I, Acc, AccType)
+non_uniform_key_list(I, Step, ToAdd, Fun, Acc, AccType) ->
+    {Status, V} = Fun(),
+    {_, LKey, RKey, _} = intervals:get_bounds(I),
+    Add = erlang:round(V * ToAdd),
+    NAcc = if Add >= 1 ->
+                  StepSize = erlang:round((RKey - LKey) / ToAdd),                  
+                  SubI = intervals:new('(', 
+                                       LKey + ((Step - 1) * StepSize),
+                                       LKey + (Step * StepSize),
+                                       ']'),
+                  ct:pal("Step ~p - I=~p - SubI=~p", [Step, I, SubI]),
+                  uniform_key_list([{SubI, Add}], Acc, AccType);
+              true -> Acc
+           end,
+    case Status of
+        ok -> non_uniform_key_list(I, Step + 1, ToAdd, Fun, NAcc, AccType);
+        last -> NAcc
     end.
-
-non_uniform_add(Value, I, Acc, OutType) ->
-    {_, LKey, RKey, _} = intervals:get_bounds(I),    
-    X = LKey + erlang:round(Value * (RKey - LKey)),
-    [case OutType of
-         list_key -> X;
-         list_key_val -> {X, gen_value()}
-     end | Acc].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
@@ -138,6 +147,7 @@ fill_ring(Type, DBSize, Params) ->
 fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
+    ct:pal("I=~p", [I]),
     Keys = get_db(I, DBSize, Distr),
     {DB, DBStatus} = gen_kvv(Keys, Params),
     insert_db(DB),

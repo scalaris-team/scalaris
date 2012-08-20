@@ -35,7 +35,9 @@
 
 all() ->
     [test1,
-     test2].
+     test2,
+     tester_sum_test,
+     tester_value_count].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -47,12 +49,12 @@ get_binom_values(X, Acc) ->
 
 test1(_) ->
     N = 5,
-    P = 0.2,
+    P = 0.3,
     R = random_bias:binomial(N, P),
     Vals = get_binom_values(R, []),
     EV = expected_value(Vals),
     ?equals_w_note(1, trunc(EV), io_lib:format("EV=~p~nVals=~p", [EV, Vals])).
-    
+
 test2(_) ->
     N = 10,
     P = 2/7,
@@ -63,9 +65,41 @@ test2(_) ->
            [N, P, Vals, lists:sum(Vals), EV]),
     ?assert(EV > 2.85) andalso ?assert(EV < 2.87).
 
+-spec sum_test(100..100000) -> boolean().
+sum_test(N) ->
+    P = 3/7,
+    R = random_bias:binomial(N, P),
+    Vals = get_binom_values(R, []),
+    Sum = lists:sum(Vals),
+    N2 = lists:foldl(fun(V, Acc) ->
+                             Acc + erlang:round(V * N)
+                     end, 0, Vals),
+    ?assert(1 - Sum =< 0.00001) andalso
+        ?assert_w_note(N2 >= 0.99*N, io_lib:format("N2=~p - N=~p", [N2, N])).
+
+tester_sum_test(_) ->
+    tester:test(?MODULE, sum_test, 1, 12, [{threads, 4}]).
+
+-spec prop_value_count(pos_integer()) -> boolean().
+prop_value_count(Count) ->
+    BFun = random_bias:binomial(Count, 0.3),
+    Values = gen_values(BFun, []),
+    Len = length(Values),
+    ?equals_w_note(Count, Len, io_lib:format("Count = ~p - Generated=~p", [Count, Len])).
+
+tester_value_count(_) ->
+    tester:test(?MODULE, prop_value_count, 1, 50, [{threads, 4}]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec gen_values(random_bias:distribution_fun(), [float()]) -> [float()].
+gen_values(Fun, Acc) ->
+    case Fun() of
+        {ok, V} -> gen_values(Fun, [V | Acc]);
+        {last, V} -> [V | Acc]
+    end.
 
 -spec expected_value([float()]) -> float().
 expected_value(List) ->
