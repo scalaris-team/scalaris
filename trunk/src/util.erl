@@ -37,6 +37,7 @@
          topDumpXEvery/3, topDumpXEvery/5, topDumpXEvery_helper/4,
          minus_all/2, minus_first/2,
          delete_if_exists/2,
+         par_map/2, par_map/3,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -65,7 +66,7 @@
          wait_for_table_to_disappear/1,
          ets_tables_of/1]).
 
--export([repeat/3, repeat/4, parallel_run/4]).
+-export([repeat/3, repeat/4, parallel_run/5]).
 
 -export([empty/1]).
 
@@ -950,6 +951,79 @@ for_to_ex(I, N, Fun, Acc) ->
 for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
 
+-type try_catch_result() :: ok | throw | error | exit.
+
+%% @doc Helper for par_map/2.
+-spec par_map_recv(Id::term(), {try_catch_result(), [B]}) -> {try_catch_result(), [B]}.
+par_map_recv(E, {ErrorX, ListX}) ->
+    case receive ?SCALARIS_RECV({parallel_result, E, R}, R) end of
+        {ok, ResultY} -> {ErrorX, [ResultY | ListX]};
+        ErrorY -> {ErrorY, ListX}
+    end.
+
+%% @doc Parallel version of lists:map/2. Spawns a new process for each element
+%%      in the list!
+-spec par_map(Fun::fun((A) -> B), List::[A]) -> [B].
+par_map(_Fun, []) -> [];
+par_map(Fun, [E]) -> [Fun(E)];
+par_map(Fun, [_|_] = List) ->
+    _ = [erlang:spawn(?MODULE, parallel_run, [self(), Fun, [E], true, E]) || E <- List],
+    case lists:foldr(fun par_map_recv/2, {{ok, ok}, []}, List) of
+        {{ok, ok}, Result}   -> Result;
+        {{Level, Reason}, _} -> erlang:Level(Reason) % throw the error here again
+    end.
+
+%% @doc Helper for par_map/3.
+-spec par_map_recv2(ListElem::term(), {try_catch_result(), [B], Id::non_neg_integer()})
+        -> {try_catch_result(), [B], Id::non_neg_integer()}.
+par_map_recv2(_E, {ErrorX, ListX, Id}) ->
+    case receive ?SCALARIS_RECV({parallel_result, Id, R}, R) end of
+        {ok, ResultY} -> {ErrorX, lists:reverse(ResultY, ListX), Id + 1};
+        ErrorY -> {ErrorY, ListX, Id + 1}
+    end.
+
+%% @doc Parallel version of lists:map/2 with the possibility to limit the
+%%      maximum number of processes being spawned.
+-spec par_map(Fun::fun((A) -> B), List::[A], MaxThreads::pos_integer()) -> [B].
+par_map(_Fun, [], _MaxThreads) -> [];
+par_map(Fun, [E], _MaxThreads) -> [Fun(E)];
+par_map(Fun, List, 1) -> lists:map(Fun, List);
+par_map(Fun, [_|_] = List, MaxThreads) ->
+    SplitList = lists_split(List, MaxThreads),
+    lists:foldl(
+      fun(E, Id) ->
+              erlang:spawn(?MODULE, parallel_run,
+                           [self(), fun(X) -> lists:map(Fun, X) end, [E], true, Id]),
+              Id + 1
+      end, 0, SplitList),
+    % note: lists are reversed!
+    case lists:foldl(fun par_map_recv2/2, {{ok, ok}, [], 0}, SplitList) of
+        {{ok, ok}, Result, _}   -> Result;
+        {{Level, Reason}, _, _} -> erlang:Level(Reason) % throw the error here again
+    end.
+
+%% @doc Splits the given list into several partitions, returning a list of parts
+%%      of the original list. Both the parts and their contents are reversed
+%%      compared to the original list!
+-spec lists_split([A], Partitions::pos_integer()) -> [[A]].
+lists_split([], _Partitions) -> [];
+lists_split([X], _Partitions) -> [X];
+lists_split(List, 1) -> List;
+lists_split([_|_] = List, Partitions) ->
+    BlockSize = length(List) div Partitions,
+    case BlockSize < 1 of
+        true -> lists:foldl(fun(E, Acc) -> [[E] | Acc] end, [], List);
+        _    -> lists_split(List, BlockSize, 0, [], [])
+    end.
+
+%% @doc Helper for lists_split/2.
+lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
+    [CurBlock | Result];
+lists_split(List, BlockSize, BlockSize, CurBlock, Result) ->
+    lists_split(List, BlockSize, 0, [], [CurBlock | Result]);
+lists_split([H | T], BlockSize, CurBlockSize, CurBlock, Result) ->
+    lists_split(T, BlockSize, CurBlockSize + 1, [H | CurBlock], Result).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -975,7 +1049,7 @@ repeat(Fun, Args, Times, Params) ->
     Acc = lists:keyfind(accumulate, 1, NewParams),
     case proplists:is_defined(parallel, NewParams) of
         true -> 
-            repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false]], Times),
+            repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false, ok]], Times),
             case Acc of
                 false -> ok;
                 {_, AccFun, AccInit} -> parallel_collect(Times, AccFun, AccInit)
@@ -1004,11 +1078,13 @@ i_repeat(Fun, Args, Times, Params, Acc) ->
 % parallel repeat helper functions 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec parallel_run(pid(), fun(), args(), boolean()) -> ok.
-parallel_run(SrcPid, Fun, Args, DoAnswer) ->
-    Res = (catch apply(Fun, Args)),
+-spec parallel_run(pid(), fun(), args(), boolean(), Id::any()) -> ok.
+parallel_run(SrcPid, Fun, Args, DoAnswer, Id) ->
+    Res = try {ok, apply(Fun, Args)}
+          catch Level:Reason -> {Level, Reason}
+          end,
     case DoAnswer of
-        true -> comm:send_local(SrcPid, {parallel_result, Res});
+        true -> comm:send_local(SrcPid, {parallel_result, Id, Res});
         _ -> ok 
     end,
     ok.
@@ -1016,10 +1092,11 @@ parallel_run(SrcPid, Fun, Args, DoAnswer) ->
 -spec parallel_collect(non_neg_integer(), accumulatorFun(any(), U), U) -> U.
 parallel_collect(0, _, Accumulator) ->
     Accumulator;
-parallel_collect(ExpectedResults, AccuFun, Accumulator) -> 
-    Result = receive
-                ?SCALARIS_RECV({parallel_result, R}, R)
-             end,
+parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
+    case receive ?SCALARIS_RECV({parallel_result, ok, R}, R) end of
+        {ok, Result} -> ok;
+        Result -> ok % TODO: throw the error here again?
+    end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
 
 -spec collect_while(GatherFun::fun((non_neg_integer()) -> {boolean(), T} | boolean())) -> [T].
