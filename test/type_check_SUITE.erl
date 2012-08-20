@@ -232,6 +232,10 @@ tester_type_check_tx(_Config) ->
 tester_type_check_util(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
+%%     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+%%     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
+%%     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+%%     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {comm,
