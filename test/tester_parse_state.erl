@@ -28,6 +28,9 @@
 
 -export([new_parse_state/0,
 
+         % add fun info to state
+         find_fun_info/4,
+
          get_type_infos/1, get_unknown_types/1, has_unknown_types/1,
 
 
@@ -49,6 +52,7 @@
          % compact state
          finalize/1]).
 
+-include("unittest.hrl").
 -include("tester.hrl").
 
 -ifdef(with_export_type_support).
@@ -68,6 +72,37 @@
         }).
 -opaque state() :: #parse_state{}.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% find fun info
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec find_fun_info(module(), atom(), non_neg_integer(), state()) -> state().
+find_fun_info(Module, Func, Arity, ParseState) ->
+    ParseState2 = try tester_collect_function_info:collect_fun_info(Module,
+                                                                    Func,
+                                                                    Arity,
+                                                                    ParseState)
+    catch
+        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n",
+                                [Module, Func,
+                                 {exception, {Term2, erlang:get_stacktrace(),
+                                              util:get_linetrace()}}]);
+        % special handling for exits that come from a ct:fail() call:
+        exit:{test_case_failed, Reason2} ->
+            ?ct_fail("error ~p:~p/~p failed with ~p~n",
+                     [Module, Func, Arity, {Reason2, erlang:get_stacktrace(),
+                                            util:get_linetrace()}]);
+        exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n",
+                                 [Module, Func,
+                                  {exception, {Reason2, erlang:get_stacktrace(),
+                                               util:get_linetrace()}}]);
+        error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n",
+                                  [Module, Func,
+                                   {exception, {Reason2, erlang:get_stacktrace(),
+                                                util:get_linetrace()}}])
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

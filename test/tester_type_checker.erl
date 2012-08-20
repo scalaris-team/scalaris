@@ -47,6 +47,25 @@ check(Value, Type, ParseState) ->
 
 inner_check(Value, Type, CheckStack, ParseState) ->
 %%    ct:pal("new inner_check(~.0p, ~.0p)", [Value, Type]),
+    case tester_global_state:get_type_checker(Type) of
+        failed ->
+            inner_check_(Value, Type, CheckStack, ParseState);
+        {Module, Function} ->
+            %ct:pal("using ~p:~p for checking ~p", [Module, Function, Value]),
+            case inner_check_(Value, Type, CheckStack, ParseState) of
+                true ->
+                    case apply(Module, Function, [Value]) of
+                        true ->
+                            true;
+                        false ->
+                            {false, [{Value, register_type_checker_failed, {Module, Function}}|CheckStack]}
+                    end;
+                X ->
+                    X
+            end
+    end.
+
+inner_check_(Value, Type, CheckStack, ParseState) ->
     case Type of
         arity ->
             inner_check(Value, byte, CheckStack, ParseState);

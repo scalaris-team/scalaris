@@ -26,7 +26,9 @@
 -vsn('$Id$').
 
 -export([test/4, test/5, test_log/4,
-         test_with_scheduler/3, test_with_scheduler/4]).
+         test_with_scheduler/3, test_with_scheduler/4,
+         register_type_checker/3, unregister_type_checker/1,
+         register_value_creator/4, unregister_value_creator/1]).
 
 -export([type_check_module/4]).
 
@@ -43,27 +45,7 @@ test(Module, Func, Arity, Iterations) ->
 -spec test/5 :: (module(), atom(), non_neg_integer(), non_neg_integer(), test_options()) -> ok.
 test(Module, Func, Arity, Iterations, Options) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
-    ParseState = try tester_collect_function_info:collect_fun_info(Module, Func, Arity,
-                                      EmptyParseState)
-    catch
-        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n",
-                                [Module, Func,
-                                 {exception, {Term2, erlang:get_stacktrace(),
-                                              util:get_linetrace()}}]);
-        % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason2} ->
-            ?ct_fail("error ~p:~p/~p failed with ~p~n",
-                     [Module, Func, Arity, {Reason2, erlang:get_stacktrace(),
-                                     util:get_linetrace()}]);
-        exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n",
-                                 [Module, Func,
-                                  {exception, {Reason2, erlang:get_stacktrace(),
-                                               util:get_linetrace()}}]);
-        error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n",
-                                  [Module, Func,
-                                   {exception, {Reason2, erlang:get_stacktrace(),
-                                                util:get_linetrace()}}])
-    end,
+    ParseState = tester_parse_state:find_fun_info(Module, Func, Arity, EmptyParseState),
     Threads = proplists:get_value(threads, Options, case proplists:get_bool(multi_threaded, Options) of
                                                        true -> erlang:system_info(schedulers);
                                                        false -> 1
@@ -74,27 +56,7 @@ test(Module, Func, Arity, Iterations, Options) ->
 -spec test_log/4 :: (module(), atom(), non_neg_integer(), non_neg_integer()) -> ok.
 test_log(Module, Func, Arity, Iterations) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
-    ParseState = try tester_collect_function_info:collect_fun_info(Module, Func, Arity,
-                                      EmptyParseState)
-    catch
-        throw:Term2 -> ?ct_fail("exception (throw) in ~p:~p(): ~p~n",
-                                [Module, Func,
-                                 {exception, {Term2, erlang:get_stacktrace(),
-                                              util:get_linetrace()}}]);
-        % special handling for exits that come from a ct:fail() call:
-        exit:{test_case_failed, Reason2} ->
-            ?ct_fail("error ~p:~p() failed with ~p~n", [Module, Func,
-                                                        {Reason2, erlang:get_stacktrace(),
-                                                         util:get_linetrace()}]);
-        exit:Reason2 -> ?ct_fail("exception (exit) in ~p:~p(): ~p~n",
-                                 [Module, Func,
-                                  {exception, {Reason2, erlang:get_stacktrace(),
-                                               util:get_linetrace()}}]);
-        error:Reason2 -> ?ct_fail("exception (error) in ~p:~p(): ~p~n",
-                                  [Module, Func,
-                                   {exception, {Reason2, erlang:get_stacktrace(),
-                                                util:get_linetrace()}}])
-    end,
+    ParseState = tester_parse_state:find_fun_info(Module, Func, Arity, EmptyParseState),
     io:format(""),
     _ = run(Module, Func, Arity, Iterations, ParseState, []),
     ok.
@@ -412,3 +374,21 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
     _ = type_check_module_funs(Module, PrivateFuns, ExcludePrivate, Count),
 
     tester_helper:load_without_export_all(Module).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% handle global state, e.g. specific handlers
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+register_type_checker(Type, Module, Function) ->
+    tester_global_state:register_type_checker(Type, Module, Function).
+
+unregister_type_checker(Type) ->
+    tester_global_state:unregister_type_checker(Type).
+
+register_value_creator(Type, Module, Function, Arity) ->
+    tester_global_state:register_value_creator(Type, Module, Function, Arity).
+
+unregister_value_creator(Type) ->
+    tester_global_state:unregister_value_creator(Type).
