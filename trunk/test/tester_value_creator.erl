@@ -214,13 +214,13 @@ create_val_50rand_50coll(ParseState, Getter, RandValFun) ->
 
 -spec custom_value_creator({module(), atom(), non_neg_integer()}, any(),
                            non_neg_integer(), tester_parse_state:state()) -> failed | {value, any()}.
-custom_value_creator({Module, Fun, Arity} = Creator, Type, Size, ParseState) ->
+custom_value_creator({Module, Fun, Arity} = _Creator, Type, Size, ParseState) ->
     % get spec of Creator
     case tester_parse_state:lookup_type({'fun', Module,
                                          Fun, Arity},
                                         ParseState) of
         {value, {union_fun, FunTypes}} ->
-            {'fun', ArgType, ResultType} = util:randomelem(FunTypes),
+            {'fun', ArgType, _ResultType} = util:randomelem(FunTypes),
             Args = try {value, tester_value_creator:create_value(ArgType, Size, ParseState)}
                    catch
                        Error:Reason ->

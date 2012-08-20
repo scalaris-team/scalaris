@@ -1,4 +1,4 @@
-%  Copyright 2010-2011 Zuse Institute Berlin
+%  Copyright 2010-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec find_fun_info(module(), atom(), non_neg_integer(), state()) -> state().
 find_fun_info(Module, Func, Arity, ParseState) ->
-    ParseState2 = try tester_collect_function_info:collect_fun_info(Module,
+    _ParseState2 = try tester_collect_function_info:collect_fun_info(Module,
                                                                     Func,
                                                                     Arity,
                                                                     ParseState)
