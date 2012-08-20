@@ -38,6 +38,7 @@
          minus_all/2, minus_first/2,
          delete_if_exists/2,
          par_map/2, par_map/3,
+         lists_split/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
