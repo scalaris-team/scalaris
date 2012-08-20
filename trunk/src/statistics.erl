@@ -156,7 +156,7 @@ compare_node_details({ok, _}, {failed, _}) ->
     false.
 
 -spec get_node_details(Pids::[comm:mypid()], ring(), TimeInMS::non_neg_integer()) -> ring().
-get_node_details([], Ring, _TimeInS) -> Ring;
+get_node_details([], Ring, _TimeInMS) -> Ring;
 get_node_details(Pids, Ring, TimeInMS) ->
     Continue =
         if
