@@ -65,4 +65,9 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
     public OtpErlangString getKey() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "write(" + key + ", " + value + ")";
+    }
 }

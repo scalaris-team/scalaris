@@ -74,4 +74,9 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
     public OtpErlangString getKey() {
         return key;
     }
+
+    @Override
+    public String toString() {
+        return "test_and_set(" + key + ", " + oldValue + ", " + newValue + ")";
+    }
 }
