@@ -63,7 +63,8 @@ all()   -> [
             tester_tlog_test_and_set,
             tester_req_list,
             tester_req_list_on_same_key,
-            tester_exported_functions
+            tester_exported_functions,
+            req_list_parallelism
            ].
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -944,3 +945,41 @@ tester_exported_functions(_Config) ->
     tester:test(api_tx, add_on_nr, 2, Count),
     tester:test(api_tx, test_and_set, 3, Count),
     true.
+
+req_list_parallelism(_Config) ->
+    Partitions = 25,
+    WriteReqsPart = [{write, lists:flatten(io_lib:format("articles:count:~B", [X])), 200}
+                      || X <- lists:seq(1, Partitions)],
+    ReadReqsPart = [{read, lists:flatten(io_lib:format("articles:count:~B", [X]))}
+                     || X <- lists:seq(1, Partitions)],
+
+    api_tx:req_list_commit_each(WriteReqsPart),
+    api_tx:write("articles:count", 200 * Partitions),
+
+    Iters = 500,
+
+    ReadResPart = lists:sum(util:for_to_ex(1, Iters, fun(_) -> element(1, util:tc(api_tx, req_list_commit_each, [ReadReqsPart])) end)),
+    ReadRes = lists:sum(util:for_to_ex(1, Iters, fun(_) -> element(1, util:tc(api_tx, req_list_commit_each, [[{read, "articles:count"}]])) end)),
+    AvgReadResPart = ReadResPart / Iters,
+    AvgReadRes = ReadRes / Iters,
+    ct:pal("api_tx:req_list_commit_each~n  1 key : ~.2f~n 25 keys: ~.2f~n", [AvgReadRes, AvgReadResPart]),
+
+    TxReadResPart = lists:sum(util:for_to_ex(1, Iters, fun(_) -> element(1, util:tc(api_tx, req_list, [ReadReqsPart])) end)),
+    TxReadRes = lists:sum(util:for_to_ex(1, Iters, fun(_) -> element(1, util:tc(api_tx, req_list, [[{read, "articles:count"}]])) end)),
+    AvgTxReadResPart = TxReadResPart / Iters,
+    AvgTxReadRes = TxReadRes / Iters,
+    ct:pal("api_tx:req_list~n  1 key : ~.2f~n 25 keys: ~.2f~n", [AvgTxReadRes, AvgTxReadResPart]),
+
+    % parallel reads should not be much slower than a single read (tolerate (Partitions / 2) * time)
+    if AvgReadResPart >= (Partitions / 2) * AvgReadRes ->
+           {comment, lists:flatten(
+              io_lib:format(
+                "api_tx:req_list_commit_each/1: 1 key: ~.2fus, ~B keys: ~.2fus~n",
+                [AvgReadRes, Partitions, AvgReadResPart]))};
+       AvgTxReadResPart >= (Partitions / 2) * AvgTxReadRes ->
+           {comment, lists:flatten(
+              io_lib:format(
+                "api_tx:req_list/1: 1 key: ~.2fus, ~B keys: ~.2fus~n",
+                [AvgTxReadRes, Partitions, AvgTxReadResPart]))};
+        true -> ok
+    end.

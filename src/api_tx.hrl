@@ -161,13 +161,17 @@ test_and_set(Key, OldValue, NewValue) ->
         _ -> Res2
     end.
 
+-spec commit_req(request()) -> result().
+commit_req(Request) ->
+    case Request of
+        {read, Key} -> read(Key);
+        {write, Key, Value} -> write(Key, Value);
+        {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
+        {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
+        {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
+        _ -> {fail, abort, []}
+    end.
+
 -spec req_list_commit_each([request()]) -> [result()].
 req_list_commit_each(ReqList) ->
-    [ case Req of
-          {read, Key} -> read(Key);
-          {write, Key, Value} -> write(Key, Value);
-          {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
-          {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
-          {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
-          _ -> {fail, abort, []}
-      end || Req <- ReqList].
+    util:par_map(fun commit_req/1, ReqList, 50).
