@@ -1,4 +1,4 @@
-%  Copyright 2008-2011 Zuse Institute Berlin
+%  Copyright 2008-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -51,6 +51,17 @@
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
                           UnittestAny, true, ??Boolean, true)
+                end
+        end()).
+
+-define(assert_w_note(Boolean, Note),
+        % wrap in function so that the internal variables are out of the calling function's scope
+        fun() ->
+                case Boolean of
+                    true  -> true;
+                    UnittestAny ->
+                        unittest_helper:macro_equals_failed(
+                          UnittestAny, true, ??Boolean, true, Note)
                 end
         end()).
 
