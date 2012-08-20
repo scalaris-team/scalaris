@@ -1008,8 +1008,8 @@ par_map(Fun, [_|_] = List, MaxThreads) ->
 %%      compared to the original list!
 -spec lists_split([A], Partitions::pos_integer()) -> [[A]].
 lists_split([], _Partitions) -> [];
-lists_split([X], _Partitions) -> [X];
-lists_split(List, 1) -> List;
+lists_split([X], _Partitions) -> [[X]];
+lists_split(List, 1) -> [lists:reverse(List)];
 lists_split([_|_] = List, Partitions) ->
     BlockSize = length(List) div Partitions,
     case BlockSize < 1 of
@@ -1018,6 +1018,7 @@ lists_split([_|_] = List, Partitions) ->
     end.
 
 %% @doc Helper for lists_split/2.
+-spec lists_split([A], BlockSize::pos_integer(), CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]].
 lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
     [CurBlock | Result];
 lists_split(List, BlockSize, BlockSize, CurBlock, Result) ->
