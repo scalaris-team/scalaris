@@ -88,9 +88,9 @@ tester_type_check_config(_Config) ->
              {cfg_is_tuple, 4}, %% needs a fun as parameter
              {cfg_test_and_error, 3}, %% needs a fun as parameter
              {check_config, 0},
-             {start, 2},
+             {init, 2},
              {start_link, 1}, {start_link, 2},
-             {start_link2, 0}, {start_link2, 1},
+
              {write, 2}, %% cannot write to config_ets
              {read, 1}, %% cannot write to config
              {system_continue, 3}, %% no return

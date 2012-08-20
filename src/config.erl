@@ -22,7 +22,7 @@
 -include("scalaris.hrl").
 
 -export([
-         start_link2/1, start_link2/0, start_link/1, start_link/2, start/2,
+         start_link/1, start_link/2, init/2,
          read/1, write/2,
          check_config/0,
 
@@ -80,15 +80,21 @@ write(Key, Value) ->
 
 %% gen_server setup
 
-%% @doc Short for start_link/2 with no options and the given files.
--spec start_link(Files::[file:name()]) -> {ok, pid()}.
-start_link(Files) ->
-    start_link(Files, []).
+%% @doc Starts the config process and determines the config files from
+%%      the application's environment. If there is no application,
+%%      "scalaris.cfg" and "scalaris.local.cfg" are used. If Options
+%%      contains a {config, [{Key1, Value1},...]} tuple, each Key is
+%%      set to its Value in the config.
+-spec start_link(Options::[tuple()]) -> {ok, pid()}.
+start_link(Options) ->
+    Files = [util:app_get_env(config, "scalaris.cfg"),
+             util:app_get_env(local_config, "scalaris.local.cfg")],
+    start_link(Files, Options).
 
-%% @doc Starts the config process. If Options contains a
-%%      {config, [{Key1, Value1},...]} tuple, each Key is set to its Value in
+%% @doc Starts the config process. If Options contains a {config,
+%%      [{Key1, Value1},...]} tuple, each Key is set to its Value in
 %%      the config.
--spec start_link(Files::[file:name()], Options::[tuple()]) -> {ok, pid()}.
+-spec start_link(Filename::[byte()], Options::[tuple()]) -> {ok, pid()}.
 start_link(Files, Options) ->
     case whereis(config) of
         Pid when is_pid(Pid) ->
@@ -101,7 +107,7 @@ start_link(Files, Options) ->
                        end,
 %%             error_logger:info_msg("Config files: ~p~n", [TheFiles]),
             Owner = self(),
-            Link = spawn_link(?MODULE, start, [TheFiles, Owner]),
+            Link = spawn_link(?MODULE, init, [TheFiles, Owner]),
             receive
                 done -> ok;
                 X    -> error_logger:error_msg("unknown config message  ~p", [X])
@@ -114,25 +120,9 @@ start_link(Files, Options) ->
             {ok, Link}
     end.
 
-%% @doc Short for start_link2/1 with no options.
--spec start_link2() -> {ok, pid()}.
-start_link2() ->
-    start_link2([]).
-
-%% @doc Starts the config process and determines the config files from the
-%%      application's environment. If there is no application, "scalaris.cfg"
-%%      and "scalaris.local.cfg" are used. If Options contains a
-%%      {config, [{Key1, Value1},...]} tuple, each Key is set to its Value in
-%%      the config.
--spec start_link2(Options::[tuple()]) -> {ok, pid()}.
-start_link2(Options) ->
-    Files = [util:app_get_env(config, "scalaris.cfg"),
-             util:app_get_env(local_config, "scalaris.local.cfg")],
-    start_link(Files, Options).
-
 %@private
--spec start(Files::[file:name()], Owner::pid()) -> no_return().
-start(Files, Owner) ->
+-spec init(Files::[file:name()], Owner::pid()) -> no_return().
+init(Files, Owner) ->
     erlang:register(config, self()),
     _ = ets:new(config_ets, [set, protected, named_table]),
     _ = [ populate_db(File) || File <- Files],
