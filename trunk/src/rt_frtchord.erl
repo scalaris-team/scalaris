@@ -635,7 +635,7 @@ rt_entry_node(#rt_entry{node=N}) -> N.
 rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
-%% @doc Get the node with the given Id. This function will crash if the node doesn't exist.
+%% Get the node with the given Id. This function will crash if the node doesn't exist.
 %-spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
 %rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
 
