@@ -76,6 +76,8 @@
 % feeder for tester
 -export([readable_utc_time_feeder/1]).
 
+-export([sets_map/2]).
+
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
@@ -1226,3 +1228,9 @@ extint2atom(X) when is_integer(X) ->
         ?init_TP -> ?init_TP_atom;
         ?tp_do_commit_abort_fwd -> ?tp_do_commit_abort_fwd_atom
     end.
+
+-spec sets_map(Fun :: fun((A :: any()) -> B :: any()), Set :: set()) -> [any()].
+sets_map(Fun, Set) ->
+    lists:reverse(sets:fold(fun (El, Acc) ->
+                [Fun(El) | Acc]
+        end, [], Set)).
