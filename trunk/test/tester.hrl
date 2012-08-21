@@ -54,6 +54,7 @@
     | iodata
     | maybe_improper_list
     | module
+    | set
     | timeout).
 
 -type(type_name() ::
