@@ -31,7 +31,8 @@
          map_key_to_interval/2,
          mapInterval/2, map_key_to_quadrant/2, 
          get_key_quadrant/1, get_interval_quadrant/1,
-         find_intersection/2]).
+         find_intersection/2,
+         get_interval_size/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -136,7 +137,7 @@ on({get_state_response, MyI}, State =
                         ownerRemotePid = OwnerPid }) ->    
     Msg = {send_to_group_member, rrepair, 
            {continue_recon, OwnerPid, rr_recon_stats:get(session_id, Stats), 
-            {continue, Method, req_shared_interval, [{interval, MyI}], false}}},    
+            {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI);        
                _ -> DestKey
@@ -219,13 +220,17 @@ on({get_chunk_response, {RestI, DBList}}, State =
     EmptyRest = intervals:is_empty(RestI),
     if not EmptyRest ->
            SubSyncI = find_intersection(SyncI, RestI),
-           Pid = if RMethod =:= bloom -> 
-                        ForkParams = lists:keyreplace(interval, 1, Params, {interval, SubSyncI}),
-                        erlang:element(2, fork_recon(State#rr_recon_state{ struct = ForkParams }));
-                    true -> self()
-                 end,
-            send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, SyncI), SubSyncI, 
-                           get_max_items(RMethod));
+           case intervals:is_empty(SubSyncI) of
+               false ->            
+                   Pid = if RMethod =:= bloom -> 
+                                ForkParams = lists:keyreplace(interval, 1, Params, {interval, SubSyncI}),
+                                erlang:element(2, fork_recon(State#rr_recon_state{ struct = ForkParams }));
+                            true -> self()
+                         end,
+                   send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, SyncI), SubSyncI, 
+                                  get_max_items(RMethod));
+               true -> ok
+           end;
         true -> ok
     end,
     {NStage, NStats} = if EmptyRest orelse RMethod =:= bloom -> {reconciliation, begin_sync(SyncStruct, State)};
@@ -649,27 +654,35 @@ mapInterval(I, Q) ->
 find_intersection(A, B) ->
     SecI = lists:foldl(fun(Q, Acc) ->
                                Sec = intervals:intersection(A, mapInterval(B, Q)),
-                               case intervals:is_empty(Sec) of
+                               case intervals:is_empty(Sec) orelse 
+                                         not intervals:is_continuous(Sec) of
                                    false -> [Sec | Acc];
                                    true -> Acc
                                end
                        end, [], lists:seq(1, rep_factor())),
     case SecI of
+        [] -> intervals:empty();
         [I] -> I;
         [H|T] ->
             element(2, lists:foldl(fun(X, {ASize, _AI} = XAcc) ->
                                            XSize = get_interval_size(X),
-                                           if XSize > ASize -> {XSize, X};
+                                           if XSize >= ASize -> {XSize, X};
                                               true -> XAcc
                                            end
                                    end, {get_interval_size(H), H}, T))
     end.
 
+% @doc Note: works only on continuous intervals
 -spec get_interval_size(intervals:interval()) -> number().
 get_interval_size(I) ->
     case intervals:is_all(I) of        
-        false -> {'(', LKey, RKey, ']'} = intervals:get_bounds(I),
-                 ?RT:get_range(LKey, RKey);
+        false ->
+            case intervals:is_empty(I) of
+                false ->
+                    {'(', LKey, RKey, ']'} = intervals:get_bounds(I),
+                    ?RT:get_range(LKey, RKey);
+                true -> 0
+            end;
         true -> ?RT:n()
     end.
 
