@@ -202,7 +202,7 @@ on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
     kill;
 
-on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
+on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "shutdown rr_resolve due to rrepair shut down", []),
     kill.
 

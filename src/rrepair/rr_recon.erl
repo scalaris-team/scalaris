@@ -294,7 +294,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
     comm:send_local(Owner, {recon_progress_report, self(), Initiator, NewStats}),
     kill;
 
-on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
+on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
     kill;
 
