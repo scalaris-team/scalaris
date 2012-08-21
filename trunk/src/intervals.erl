@@ -283,7 +283,7 @@ normalize_simple({interval, LeftBr, Begin, End, RightBr} = I) ->
     end.
 
 -spec normalize_simple_bounds({interval, left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE, right_bracket()} | {element, key()} | all)
-        -> simple_interval().
+        -> invalid_simple_interval().
 normalize_simple_bounds({element, X}) when X < ?MINUS_INFINITY ->
     {element, ?MINUS_INFINITY};
 normalize_simple_bounds({interval, _LeftBr, Begin, End, RightBr})
