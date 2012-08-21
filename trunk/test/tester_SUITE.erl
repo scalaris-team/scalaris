@@ -54,6 +54,8 @@ test_is_binary(_Config) ->
 % tester:test/3 with value-creator and custom type checker
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-type sorted_list() :: list(integer()).
+
 is_sorted_list([]) ->
     true;
 is_sorted_list([_I]) ->
@@ -65,8 +67,6 @@ is_sorted_list([I,J|L]) ->
 create_sorted_list(L1, L2) ->
     %ct:pal("creating sorted list from ~p ~p", [L1, L2]),
     lists:sort(lists:append(L1, L2)).
-
--type sorted_list() :: list(integer()).
 
 -spec do_sort(sorted_list()) -> sorted_list().
 do_sort(L) ->
