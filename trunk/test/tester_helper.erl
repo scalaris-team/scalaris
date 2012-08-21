@@ -74,11 +74,13 @@ reload_with_options(Module, MyOptions) ->
             end,
             {module, Module} = code:load_binary(Module, Src, Binary),
             code:soft_purge(Module), %% remove old code
-            Old = [ X || X <- erlang:loaded(), true =:= erlang:check_old_code(X)],
-            case Old of
-                [] -> ok;
-                _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
-            end,
+%% check_old_code not available in Erlang < R14B04
+%%             Old = [ X || X <- erlang:loaded(),
+%%                          true =:= erlang:check_old_code(X)],
+%%             case Old of
+%%                 [] -> ok;
+%%                 _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
+%%             end,
             case Module of
                 config -> sys:resume(config);
                 _ -> ok
@@ -93,11 +95,12 @@ reload_with_options(Module, MyOptions) ->
             end,
             {module, Module} = erlang:load_module(Module, Binary),
             code:soft_purge(Module), %% remove old code
-            Old = [ X || X <- erlang:loaded(), true =:= erlang:check_old_code(X)],
-            case Old of
-                [] -> ok;
-                _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
-            end,
+%% check_old_code not available in Erlang < R14B04
+            %% Old = [ X || X <- erlang:loaded(), true =:= erlang:check_old_code(X)],
+            %% case Old of
+            %%     [] -> ok;
+            %%     _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
+            %% end,
             case Module of
                 config -> sys:resume(config);
                 _ -> ok
