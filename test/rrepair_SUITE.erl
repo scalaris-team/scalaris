@@ -41,7 +41,8 @@ basic_tests() ->
      tester_blob_coding,     
      tester_get_key_quadrant,
      tester_map_interval,
-     tester_map_key_to_interval     
+     tester_map_key_to_interval,
+     tester_find_intersection
     ].
 
 repair_tests() ->
@@ -59,13 +60,12 @@ bloom_tests() ->
 
 all() ->
     [{group, basic},
-     {group, ttl}
-     %{group, repair}     
+     session_ttl,
+     {group, repair}     
      ].
 
 groups() ->
-    [{basic,  [parallel], basic_tests()},
-     {ttl,    [sequence, {repeat_until_any_fail, 20}], [session_ttl]},
+    [{basic,  [parallel], basic_tests()},     
      {repair, [sequence], [{upd_bloom,    [sequence], bloom_tests()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_tests()},
                            {upd_art,      [sequence], repair_tests()},
@@ -198,9 +198,9 @@ mpath(Config) ->
 	B = [X || X = {log_send, _Time, _, 
 				   {{_FIP,_FPort,_FPid}, _FName}, 
 				   {{_TIP,_TPort,_TPid}, _TName}, 
-				   _Msg} <- A], 
+				   _Msg} <- A],
 	file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
-	file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(A)])),
+	file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
     %file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),  
 	ok.
 
@@ -396,9 +396,7 @@ prop_map_key_to_interval(L, R, Key) ->
             InGrp = [X || X <- RGrp, intervals:in(X, I)],
             case InGrp of
                 [] -> true;
-                [W] -> ?equals_w_note(Mapped, W, 
-                                      io_lib:format("Mapped key =/= the only key in dest i~nMapped=~p~n=/=~nOnly=~p~nDestI=~p", 
-                                                    [Mapped, W, I]));
+                [W] -> ?equals(Mapped, W);
                 [_|_] ->
                     NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
                     [?assert(rr_recon:map_key_to_interval(Z, I) =/= Mapped) || Z <- NotIn], 
@@ -409,6 +407,33 @@ prop_map_key_to_interval(L, R, Key) ->
 
 tester_map_key_to_interval(_) ->
     tester:test(?MODULE, prop_map_key_to_interval, 3, 40, [{threads, 4}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_find_intersection(ALeft::intervals:key(), ARight::intervals:key(), 
+                             BLeft::intervals:key(), BRight::intervals:key()) -> boolean().
+prop_find_intersection(KeyA, KeyB, KeyC, KeyD) ->
+    A = unittest_helper:build_interval(KeyA, KeyB),
+    B = unittest_helper:build_interval(KeyC, KeyD),
+    SA = rr_recon:find_intersection(A, B),
+    SB = rr_recon:find_intersection(B, A),
+    IS = intervals:intersection(A, B),
+    SizeSA = rr_recon:get_interval_size(SA),
+    SizeSB = rr_recon:get_interval_size(SB),
+    ?implies(A =/= B, SA =/= SB) andalso
+        ?assert(rr_recon:find_intersection(A, A) =:= A) andalso
+        ?assert(rr_recon:find_intersection(B, B) =:= B) andalso
+        ?implies(intervals:is_subset(B, A), SB =:= SA) andalso
+        ?implies(intervals:is_subset(A, B), SB =:= SA) andalso
+        ?assert(intervals:is_subset(SA, A)) andalso
+        ?assert(intervals:is_subset(SB, B)) andalso
+        ?assert_w_note(SizeSA =:= SizeSB, 
+                       [{a, A}, {b, B}, {sa, SA}, {sb, SB}, {sizeSa, SizeSA}, {sizeSb, SizeSB}]) andalso
+        ?implies(IS =/= [], IS =:= SA andalso IS =:= SB) andalso
+        ?implies(not intervals:is_empty(SA), not intervals:is_empty(SB)).
+
+tester_find_intersection(_) ->
+    tester:test(?MODULE, prop_find_intersection, 4, 120, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
