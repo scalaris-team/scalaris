@@ -32,8 +32,6 @@
 
 -define(ReplicationFactor, 4).
 
--compile(export_all).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,7 +87,6 @@ uniform_key_list([{I, Add} | R], Acc, AccType) ->
         false ->
             {LBr, IL, IR, RBr} = intervals:get_bounds(I),
             End = Add + ?IIF(RBr =:= ')', 1, 0),
-            %io:format("UNIFORM - Add=~p - I=~p~n", [Add, I]),
             ToAdd = util:for_to_ex(?IIF(LBr =:= '(', 1, 0), 
                                    Add + ?IIF(LBr =:= '(', 0, -1),
                                    fun(Index) -> 
@@ -123,7 +120,6 @@ non_uniform_key_list(I, Step, ToAdd, Fun, Acc, AccType) ->
                                        LKey + ((Step - 1) * StepSize),
                                        LKey + (Step * StepSize),
                                        ']'),
-                  ct:pal("Step ~p - I=~p - SubI=~p", [Step, I, SubI]),
                   uniform_key_list([{SubI, Add}], Acc, AccType);
               true -> Acc
            end,
@@ -147,7 +143,6 @@ fill_ring(Type, DBSize, Params) ->
 fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
-    ct:pal("I=~p", [I]),
     Keys = get_db(I, DBSize, Distr),
     {DB, DBStatus} = gen_kvv(Keys, Params),
     insert_db(DB),
@@ -168,7 +163,6 @@ insert_db(KVV) ->
                             {NKVV, RestKVV} = lists:partition(fun(Entry) ->
                                                                       intervals:in(db_entry:get_key(Entry), NRange)
                                                               end, ActKVV),
-                            %ct:pal("Node=~p~nRange=~p~nKVV=~p", [Node, NRange, NKVV]),
                             comm:send(Node, {add_data, comm:this(), NKVV}),
                             receive {add_data_reply} -> ok end,
                             RestKVV
