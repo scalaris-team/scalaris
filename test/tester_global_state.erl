@@ -89,8 +89,9 @@ check_whether_table_exists() ->
 
 create_table() ->
     P = self(),
-    spawn(fun() ->
-                  try ets:new(?MODULE, [set, public, named_table])
+    spawn(
+      fun() ->
+              _ = try ets:new(?MODULE, [set, public, named_table])
                   catch
                       % is there a race-condition?
                       Error:Reason ->
@@ -102,9 +103,9 @@ create_table() ->
                                   ok
                           end
                   end,
-                  P ! go,
-                  util:sleep_for_ever()
-          end),
+              P ! go,
+              util:sleep_for_ever()
+      end),
     receive
         go ->
             ok
