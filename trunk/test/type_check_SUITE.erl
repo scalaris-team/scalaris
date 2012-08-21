@@ -289,6 +289,7 @@ tester_type_check_util(_Config) ->
              {print_bits, 2}, %% cannot create funs
              {readable_utc_time, 1}, %% too slow for big ints; tested via feeder
              {repeat, 3}, {repeat, 4}, %% cannot create funs
+             {sets_map, 2}, %% cannot create funs
              {smerge2, 3}, %% cannot create funs
              {smerge2, 4}, %% cannot create funs
              {sleep_for_ever, 0},
