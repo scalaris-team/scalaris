@@ -226,6 +226,8 @@ parse_type({type, _Line, gb_set, []}, _Module, ParseState) ->
     {{builtin_type, gb_set}, ParseState};
 parse_type({type, _Line, gb_tree, []}, _Module, ParseState) ->
     {{builtin_type, gb_tree}, ParseState};
+parse_type({type, _Line, set, []}, _Module, ParseState) ->
+    {{builtin_type, set}, ParseState};
 parse_type({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
 parse_type({type, _Line, iodata, []}, _Module, ParseState) ->
