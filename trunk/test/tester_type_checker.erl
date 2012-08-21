@@ -58,7 +58,7 @@ inner_check(Value, Type, CheckStack, ParseState) ->
                         true ->
                             true;
                         false ->
-                            {false, [{Value, register_type_checker_failed, {Module, Function}}|CheckStack]}
+                            {false, [{Value, registered_type_checker_failed, {Module, Function}}|CheckStack]}
                     end;
                 X ->
                     X
