@@ -59,7 +59,7 @@
 -type key() :: ?RT:key() | ?MINUS_INFINITY_TYPE. % ?MINUS_INFINITY_TYPE unnecessary (should be included in ?RT:key()) but needed for fewer dialyzer warnings
 -type simple_interval2() :: {interval, left_bracket(), key(), key(), right_bracket()} | {interval, left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
 -type simple_interval() :: {element, key()} | all | simple_interval2().
--type invalid_simple_interval() :: simple_interval().
+-type invalid_simple_interval() :: {element, key()} | all | simple_interval2().
 -opaque interval() :: [simple_interval()].
 -opaque invalid_interval() :: [simple_interval()].
 
