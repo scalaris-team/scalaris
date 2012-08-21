@@ -39,10 +39,10 @@
                            UseApprox :: boolean()
                           }.
 
--type distribution_fun() :: fun(() -> {ok, float()} | {last, float()}).
+-type distribution_fun() :: fun(() -> {ok | last, float()}).
 -type distribution_state() :: binomial_state(). %or others
 -type generator_state() :: { State       :: distribution_state(),
-                             CalcFun     :: fun((distribution_state()) -> any()),
+                             CalcFun     :: fun((distribution_state()) -> float()),
                              NewStateFun :: fun((distribution_state()) -> distribution_state() | exit)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,7 +72,7 @@ create_distribution_fun(State) ->
             end
     end.
 
--spec generator(generator_state()) -> any().
+-spec generator(generator_state()) -> ok.
 generator({ DS, CalcFun, NextFun }) ->
     receive
         {next, Pid} ->
@@ -105,7 +105,7 @@ next_state({binom, N, P, X, Approx}) ->
 
 % @doc apprxoimation is good if this conditions hold
 %      SRC: http://www.vosesoftware.com/ModelRiskHelp/index.htm#Distributions/Approximating_one_distribution_with_another/Approximations_to_the_Binomial_Distribution.htm
--spec approx_valid(pos_integer, float()) -> boolean().
+-spec approx_valid(pos_integer(), float()) -> boolean().
 approx_valid(_N, 0) -> false;
 approx_valid(_N, 1) -> false;
 approx_valid(N, P) ->
