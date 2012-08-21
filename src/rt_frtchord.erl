@@ -450,7 +450,6 @@ to_list(State) -> % match external RT
 -spec internal_to_list(rt()) -> nodelist:snodelist().
 internal_to_list(#rt_t{} = RT) ->
     SourceNode = get_source_node(RT),
-    io:format("My RT is ~p~n", [RT]),
     ListOfNodes = [rt_entry_node(N) || N <- gb_trees:values(get_rt_tree(RT))],
     sorted_nodelist(ListOfNodes, node:id(rt_entry_node(SourceNode)))
     .
@@ -476,6 +475,7 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 % @doc Filter one element from a set of nodes. Do it in a way that filters such a node
 % that the resulting routing table is the best one under all _possible_ routing tables.
 -spec entry_filtering(rt(),[rt_entry()]) -> rt().
+entry_filtering(RT, []) -> RT;
 entry_filtering(RT, AllowedNodes) ->
     Spacings = [
         begin
