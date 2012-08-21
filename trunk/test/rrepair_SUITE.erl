@@ -59,12 +59,13 @@ bloom_tests() ->
 
 all() ->
     [{group, basic},
-     session_ttl,
-     {group, repair}     
+     {group, ttl}
+     %{group, repair}     
      ].
 
 groups() ->
     [{basic,  [parallel], basic_tests()},
+     {ttl,    [sequence, {repeat_until_any_fail, 20}], [session_ttl]},
      {repair, [sequence], [{upd_bloom,    [sequence], bloom_tests()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_tests()},
                            {upd_art,      [sequence], repair_tests()},
@@ -306,7 +307,7 @@ session_ttl(Config) ->
     TTL = 2500,
     
     _R1 = get_rep_upd_config(Method),
-    _R2 = lists:keyreplace(rr_session_ttl, 1, _R1, {rr_session_ttl, TTL}),
+    _R2 = lists:keyreplace(rr_session_ttl, 1, _R1, {rr_session_ttl, TTL / 2}),
     RRConf = lists:keyreplace(rr_gc_interval, 1, _R2, {rr_gc_interval, erlang:round(TTL / 10)}),
     
     %build and fill ring
