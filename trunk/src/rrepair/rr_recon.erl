@@ -646,7 +646,7 @@ mapInterval(I, Q) ->
     case intervals:is_all(I) of
         false -> intervals:new(LBr, NewLKey, NewRKey, RBr);
         true when Q =/= 1 -> intervals:new('(', NewLKey, NewRKey, ']');
-        true -> intervals:all()
+        true -> I
     end.
 
 % @doc Gets intersection of two associated intervals as sub interval of A.
