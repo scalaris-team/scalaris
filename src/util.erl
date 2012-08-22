@@ -75,6 +75,7 @@
 
 % feeder for tester
 -export([readable_utc_time_feeder/1]).
+-export([par_map_feeder/2]).
 
 -export([sets_map/2]).
 
@@ -963,6 +964,13 @@ par_map_recv(E, {ErrorX, ListX}) ->
         {ok, ResultY} -> {ErrorX, [ResultY | ListX]};
         ErrorY -> {ErrorY, ListX}
     end.
+
+-spec par_map_feeder(1..2, [number()])
+                    -> {Fun::fun((A) -> term()), List::[A]}.
+par_map_feeder(1, List) ->
+    {fun(X) -> X * X end, List};
+par_map_feeder(2, List) ->
+    {fun(X) -> X + X end, List}.
 
 %% @doc Parallel version of lists:map/2. Spawns a new process for each element
 %%      in the list!
