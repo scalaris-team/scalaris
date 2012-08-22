@@ -376,7 +376,7 @@ tester_get_key_quadrant(_) ->
 -spec prop_map_interval(intervals:key(), intervals:key(), 1..4) -> boolean().
 prop_map_interval(L, R, Q) ->
     I = unittest_helper:build_interval(L, R),
-    Mapped = rr_recon:mapInterval(I, Q),
+    Mapped = rr_recon:map_interval(I, Q),
     {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
     LQ = rr_recon:get_key_quadrant(L1),
     RQ = rr_recon:get_key_quadrant(R1),
