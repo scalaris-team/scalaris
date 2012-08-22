@@ -636,16 +636,16 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 %      Precondition: Interval (I) is continuous!
 %      Result: Continuous left-open interval starting or laying in given RepQuadrant.
 -spec map_interval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
-map_interval(I, Q) ->
-    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
-    LQ = get_key_quadrant(LKey),
-    RepFactor = rep_factor(),
-    QDiff = (RepFactor - LQ + Q) rem RepFactor,
-    NewLKey = add_quadrants_to_key(LKey, QDiff, RepFactor),
-    NewRKey = add_quadrants_to_key(RKey, QDiff, RepFactor),
+map_interval(I, Q) ->    
     case intervals:is_all(I) of
-        false -> intervals:new(LBr, NewLKey, NewRKey, RBr);
-        true when Q =/= 1 -> intervals:new('(', NewLKey, NewRKey, ']');
+        false ->
+            {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+            LQ = get_key_quadrant(LKey),
+            RepFactor = rep_factor(),
+            QDiff = (RepFactor - LQ + Q) rem RepFactor,
+            NewLKey = add_quadrants_to_key(LKey, QDiff, RepFactor),
+            NewRKey = add_quadrants_to_key(RKey, QDiff, RepFactor),
+            intervals:new(LBr, NewLKey, NewRKey, RBr);
         true -> I
     end.
 

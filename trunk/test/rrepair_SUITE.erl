@@ -377,16 +377,20 @@ tester_get_key_quadrant(_) ->
 prop_map_interval(L, R, Q) ->
     I = unittest_helper:build_interval(L, R),
     Mapped = rr_recon:map_interval(I, Q),
-    {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
-    LQ = rr_recon:get_key_quadrant(L1),
-    RQ = rr_recon:get_key_quadrant(R1),
-    L2 = ?RT:get_split_key(L1, ?RT:get_split_key(L1, R1, {1, 100}), {1,100}),
-    L2Q = rr_recon:get_key_quadrant(L2),
-    ?equals(L2Q, Q) andalso
-        ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso        
-        ?implies(RBr =:= ']', ?equals(RQ, Q)) andalso
-        ?implies(LBr =:= '[' andalso RBr =:= LBr, ?equals(LQ, RQ) andalso ?equals(LQ, Q)) andalso
-        ?equals(rr_recon:get_interval_quadrant(Mapped), Q).
+    case intervals:is_all(I) of
+        false ->
+            {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
+            LQ = rr_recon:get_key_quadrant(L1),
+            RQ = rr_recon:get_key_quadrant(R1),
+            L2 = ?RT:get_split_key(L1, ?RT:get_split_key(L1, R1, {1, 100}), {1,100}),
+            L2Q = rr_recon:get_key_quadrant(L2),
+            ?equals(L2Q, Q) andalso
+                ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso        
+                ?implies(RBr =:= ']', ?equals(RQ, Q)) andalso
+                ?implies(LBr =:= '[' andalso RBr =:= LBr, ?equals(LQ, RQ) andalso ?equals(LQ, Q)) andalso
+                ?equals(rr_recon:get_interval_quadrant(Mapped), Q);
+        true -> ?assert(intervals:is_all(Mapped))
+    end.
     
 tester_map_interval(_) ->
     _ = [prop_map_interval(?MINUS_INFINITY, ?PLUS_INFINITY, I) || I <- lists:seq(1, 4)],
