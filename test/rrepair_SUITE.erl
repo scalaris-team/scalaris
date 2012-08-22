@@ -51,7 +51,8 @@ repair_tests() ->
      %mpath
      dest,           % run one sync with a specified dest node 
      simple,         % run one sync round
-     multi_round     % run multiple sync rounds
+     multi_round,    % run multiple sync rounds with sync probability 1
+     multi_round2    % run multiple sync rounds with sync probability 0.4
 	].
 
 bloom_tests() ->    
@@ -214,8 +215,17 @@ simple(Config) ->
 multi_round(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
+    {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
                               3, 0.1, get_rep_upd_config(Method)),
+    ?assert(sync_degree(Start) < sync_degree(End)).
+
+multi_round2(Config) ->
+    Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
+    _RUConf = get_rep_upd_config(Method),
+    RUConf = [{rr_trigger_probability, 40} | proplists:delete(rr_trigger_probability, _RUConf)],
+    {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
+                              3, 0.1, RUConf),
     ?assert(sync_degree(Start) < sync_degree(End)). 
 
 dest(Config) ->
