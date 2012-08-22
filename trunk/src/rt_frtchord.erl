@@ -38,7 +38,7 @@
         node :: node:node_type()
         , type :: entry_type()
         , adjacent_fingers = {undefined, undefined} ::
-        {key() | 'undefined', key() | 'undefined'}
+        {key_t() | 'undefined', key_t() | 'undefined'}
 
     }).
 
