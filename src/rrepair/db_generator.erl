@@ -47,10 +47,11 @@
 
 -type failure_type()    :: update | regen | mixed.
 -type failure_quadrant():: 1..4.
+-type failure_dest()    :: all | [failure_quadrant()]. 
 -type db_type()         :: wiki | random.
 -type db_parameter()    :: {ftype, failure_type()} |
                            {fprob, 0..100} |                                %failure probability
-                           {fdest, [failure_quadrant()]} |                  %quadrants in which failures are inserted / if missing all is assumed
+                           {fdest, failure_dest()} |                        %quadrants in which failures are inserted / if missing all is assumed
                            {distribution, db_generator:distribution()}.     %in every quadrant
 -type db_status() :: {Entries   :: non_neg_integer(),
                       Existing  :: non_neg_integer(),
