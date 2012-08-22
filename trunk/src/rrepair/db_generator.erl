@@ -45,11 +45,13 @@
                   {?RT:key(), ?DB:value()}.
 -type option() :: {output, list_key_val | list_key}.
 
--type failure_type() :: update | regen | mixed.
--type db_type()      :: wiki | random.
--type db_parameter() :: {ftype, failure_type()} |
-                        {fprob, 0..100} |            %failure probability
-                        {distribution, db_generator:distribution()}.
+-type failure_type()    :: update | regen | mixed.
+-type failure_quadrant():: 1..4.
+-type db_type()         :: wiki | random.
+-type db_parameter()    :: {ftype, failure_type()} |
+                           {fprob, 0..100} |                                %failure probability
+                           {fdest, [failure_quadrant()]} |                  %quadrants in which failures are inserted / if missing all is assumed
+                           {distribution, db_generator:distribution()}.     %in every quadrant
 -type db_status() :: {Entries   :: non_neg_integer(),
                       Existing  :: non_neg_integer(),
                       Missing   :: non_neg_integer(),
@@ -174,14 +176,20 @@ insert_db(KVV) ->
 -spec gen_kvv([?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
 gen_kvv(Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
-    FProb = proplists:get_value(fprob, Params, 50),    
+    FProb = proplists:get_value(fprob, Params, 50),
+    FDest = proplists:get_value(fdest, Params, all),
     {DB, {I, M, O}} = 
         lists:foldl(
           fun(Key, {AccDb, {Ins, Mis, Out}}) ->
                   RepKeys = ?RT:get_replica_keys(Key),
                   %insert error?
                   EKey = case FProb >= randoms:rand_uniform(1, 100) of
-                             true -> util:randomelem(RepKeys);
+                             true ->
+                                 %error destination
+                                 case FDest of
+                                     all -> util:randomelem(RepKeys);
+                                     QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
+                                 end;
                              _ -> null
                          end,
                   %insert regen error
