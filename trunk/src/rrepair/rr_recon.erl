@@ -29,7 +29,7 @@
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
          map_key_to_interval/2,
-         mapInterval/2, map_key_to_quadrant/2, 
+         map_interval/2, map_key_to_quadrant/2, 
          get_key_quadrant/1, get_interval_quadrant/1,
          find_intersection/2,
          get_interval_size/1]).
@@ -635,8 +635,8 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 %      The replication degree X divides the keyspace into X replication quadrants.
 %      Precondition: Interval (I) is continuous!
 %      Result: Continuous left-open interval starting or laying in given RepQuadrant.
--spec mapInterval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
-mapInterval(I, Q) ->
+-spec map_interval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
+map_interval(I, Q) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
     LQ = get_key_quadrant(LKey),
     RepFactor = rep_factor(),
@@ -653,7 +653,7 @@ mapInterval(I, Q) ->
 -spec find_intersection(intervals:interval(), intervals:interval()) -> intervals:interval().
 find_intersection(A, B) ->
     SecI = lists:foldl(fun(Q, Acc) ->
-                               Sec = intervals:intersection(A, mapInterval(B, Q)),
+                               Sec = intervals:intersection(A, map_interval(B, Q)),
                                case intervals:is_empty(Sec) orelse 
                                          not intervals:is_continuous(Sec) of
                                    false -> [Sec | Acc];
