@@ -57,6 +57,7 @@ time_with_result(Fun, Iterations, Options) ->
 
 % @doc Measures average execution time with possibiliy of skipping 
 %      the first measured value.
+%      i.e.: time_avg(fun() -> myFun(A, B, C) end, 100, []).
 -spec time_avg(fun(), pos_integer(), [options()]) -> result().
 time_avg(Fun, Iterations, Options) ->
     L = util:repeat(fun() -> erlang:element(1, util:tc(Fun, [])) end, [], Iterations, [collect]),
