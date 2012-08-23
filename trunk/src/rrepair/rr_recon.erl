@@ -25,11 +25,11 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/1, start/2, check_config/0]).
+-export([map_key_to_interval/2, map_key_to_quadrant/2]).
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
-         map_key_to_interval/2,
-         map_interval/2, map_key_to_quadrant/2, 
+         map_interval/2, 
          get_key_quadrant/1, get_interval_quadrant/1,
          find_intersection/2,
          get_interval_size/1]).
@@ -495,17 +495,12 @@ resolve_node(Node, Conf) ->
     is_subtype(SID,     rrepair:session_id()).
 resolve_leaf(_, {undefined, _, _, _}) -> erlang:error("Recon Destination PID undefined");
 resolve_leaf(Node, {Dest, SID, OwnerL, OwnerR}) ->
-    ToSync = [begin
-                  case decodeBlob(Blob) of
-                      {K, _} -> K;
-                      _ -> Blob
-                  end
-              end || Blob <- merkle_tree:get_bucket(Node)],
-    if ToSync =:= [] ->
-           comm:send(Dest, {request_resolve, SID, {interval_upd_send, OwnerR, merkle_tree:get_interval(Node)}, []}),
+    case merkle_tree:get_item_count(Node) of
+        0 ->
+           comm:send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
            1;
-       true ->
-           comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, Dest, ToSync}, [{feedback, OwnerR}]}),
+       _ ->
+           comm:send_local(OwnerL, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), Dest}, [{feedback, OwnerR}]}),
            2
     end.
 
