@@ -175,7 +175,8 @@ check_config() ->
                                 fun({Mask1, Mask2}) ->
                                         erlang:is_integer(Mask1) andalso
                                             erlang:is_integer(Mask2) end,
-                                "{int(), int()}")
+                                "{int(), int()}");
+            _ -> false
         end.
 
 %% userdevguide-begin rt_simple:handle_custom_message
