@@ -73,7 +73,8 @@
 
 -type operation() ::
     {key_upd, ?DB:kvv_list()} |
-    {key_upd_send, DestPid::comm:mypid(), [?RT:key()]}.
+    {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
+    {interval_upd_send, DestPid::comm:mypid(), intervals:interval()}.     %use: only for small intervals (sends all kvv items in given interval to dest)
 
 -record(rr_resolve_state,
         {
@@ -144,9 +145,29 @@ on({get_state_response, MyI}, State =
     KeyTree = gb_sets:from_list(FKeyList),
     comm:send_local(DhtPid, {get_entries, self(),
                              fun(X) -> gb_sets:is_element(db_entry:get_key(X), KeyTree) end,
-                             fun(X) -> {rr_recon:map_key_to_quadrant(db_entry:get_key(X), 1),
-                                        db_entry:get_value(X), 
-                                        db_entry:get_version(X)} end}),
+                             fun(X) -> entry_to_kvv(X) end}),
+    State;
+
+on({get_state_response, MyI}, State = #rr_resolve_state{ operation = {interval_upd_send, _, I},
+                                                         dhtNodePid = DhtPid }) ->
+    ISec = rr_recon:find_intersection(MyI, I),
+    case intervals:is_empty(ISec) of
+        false -> comm:send_local(DhtPid, {get_entries, self(), ISec});
+        true -> comm:send_local(self(), {shutdown, resolve_abort})
+    end,
+    State;
+
+on({get_entries_response, EntryList}, State =
+       #rr_resolve_state{ operation = {interval_upd_send, Dest, _},
+                          feedback = {FB, _},
+                          stats = Stats }) ->
+    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
+    SendList = [entry_to_kvv(X) || X <- EntryList],
+    case Stats#resolve_stats.session_id of
+        null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
+    end,
+    comm:send_local(self(), {shutdown, resolve_ok}),
     State;
 
 on({get_entries_response, KVVList}, State =
@@ -180,9 +201,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                end,
     NewFB = if
                 not Done andalso Exists andalso DoFB =/= nil -> 
-                    {DoFB, [{rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1), %db_entry:get_key(Entry),
-                             db_entry:get_value(Entry),
-                             db_entry:get_version(Entry)} | FBItems]};
+                    {DoFB, [entry_to_kvv(Entry) | FBItems]};
                 true -> FB
             end,
     if
@@ -249,6 +268,12 @@ merge_stats(#resolve_stats{ session_id = ASID,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec entry_to_kvv(?DB:db_entry()) -> {?RT:key(), ?DB:value(), ?DB:version()}.
+entry_to_kvv(Entry) ->
+    {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
+     db_entry:get_value(Entry), 
+     db_entry:get_version(Entry)}.
 
 make_unique_kvv([], Acc) -> Acc;
 make_unique_kvv([H | T], []) -> make_unique_kvv(T, [H]);
