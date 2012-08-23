@@ -231,12 +231,12 @@ checkinstallation() {
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
-        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0)."`
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0)."`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "$CHECKCONFIGMSG"
         echo "ERROR: some parameters in the config files are wrong or missing"
-        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"]), halt(0).\""
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0).\""
         exit 1
     fi
 
