@@ -38,7 +38,6 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
@@ -503,7 +502,7 @@ resolve_leaf(Node, {Dest, SID, OwnerL, OwnerR}) ->
                   end
               end || Blob <- merkle_tree:get_bucket(Node)],
     if ToSync =:= [] ->
-           comm:send(Dest, {request_resolve, SID, {interval_upd_send, OwnerR, merkle_tree:get_interval(Node)}}),
+           comm:send(Dest, {request_resolve, SID, {interval_upd_send, OwnerR, merkle_tree:get_interval(Node)}, []}),
            1;
        true ->
            comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, Dest, ToSync}, [{feedback, OwnerR}]}),
