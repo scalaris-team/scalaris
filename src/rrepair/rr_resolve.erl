@@ -15,9 +15,13 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    replica update resolve module
 %%         Updates local and/or remote Key-Value-Pairs (kv-pair)
-%%         Sync-Modes:
-%%           1) key_upd: updates local kv-pairs with received kv-list, if received kv is newer
-%%           2) key_upd_send: creates kv-list out of a given key-list and sends it to dest
+%%         Modes:
+%%           1) key_upd: updates local db entries with received kvv-list, if received kv is newer
+%%           2) key_upd_send: creates kvv-list out of a given key-list and sends it to dest
+%%           3) interval_upd: works like key_upd +
+%%                            sends all own db entries which are not in received kvv-list
+%%                            to the feedback pid (if given)
+%%           4) interval_upd_send: creates kvv-list from given interval and sends it to dest
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
@@ -36,13 +40,6 @@
 -export([init/1, on/2, start/0, start/1]).
 -export([get_stats_session_id/1, get_stats_feedback/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% debug
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -74,7 +71,8 @@
 -type operation() ::
     {key_upd, ?DB:kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd_send, DestPid::comm:mypid(), intervals:interval()}.     %use: only for small intervals (sends all kvv items in given interval to dest)
+    {interval_upd, intervals:interval(), ?DB:kvv_list()} |
+    {interval_upd_send, intervals:interval(), DestPid::comm:mypid()}.
 
 -record(rr_resolve_state,
         {
@@ -84,7 +82,8 @@
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = nil        									:: nil | operation(),
          stats          = #resolve_stats{}                              :: stats(),
-         feedback       = {nil, []}                                     :: feedback(),           
+         my_range       = nil                                           :: nil | intervals:interval(),
+         feedback       = {nil, []}                                     :: feedback(),
          send_stats     = nil                                           :: nil | comm:mypid()
          }).
 -type state() :: #rr_resolve_state{}.
@@ -96,6 +95,13 @@
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {shutdown, atom()}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% debug
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-define(TRACE(X,Y,State), ok).
+%-define(TRACE(X,Y,State), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerLocalPid] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -112,28 +118,23 @@ on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
 									   feedback = {FBDest, []},
 									   send_stats = StatsDest },
     ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p", 
-           [element(1, Operation), FBDest, FBResp]),
+           [element(1, Operation), FBDest, FBResp], State),
 	comm:send_local(DhtPid, {get_state, comm:this(), my_range}),
 	NewState;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MODE: key_upd
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid,
                           stats = Stats                          
                           }) ->
-    MyPid = comm:this(),
-    FullKvvList = [{X, Value, Vers} 
-                   || {K, Value, Vers} <- KvvList,
-                      X <- ?RT:get_replica_keys(K),
-                      intervals:in(X, MyI)],
-    UpdList = make_unique_kvv(lists:keysort(1, FullKvvList), []),
-    _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, Key, Val, Vers}) || {Key, Val, Vers} <- UpdList],
-    ToUpdate = length(UpdList),
-
-    %kill is done by update_key_entry_ack
-    ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate]),
+    ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
+    ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate], State),
     if ToUpdate =:= 0 -> comm:send_local(self(), {shutdown, resolve_ok});
-       true -> ok
+       true -> ok %shutdown handled by update_key_entry_ack
     end,
     State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
 
@@ -146,28 +147,6 @@ on({get_state_response, MyI}, State =
     comm:send_local(DhtPid, {get_entries, self(),
                              fun(X) -> gb_sets:is_element(db_entry:get_key(X), KeyTree) end,
                              fun(X) -> entry_to_kvv(X) end}),
-    State;
-
-on({get_state_response, MyI}, State = #rr_resolve_state{ operation = {interval_upd_send, _, I},
-                                                         dhtNodePid = DhtPid }) ->
-    ISec = rr_recon:find_intersection(MyI, I),
-    case intervals:is_empty(ISec) of
-        false -> comm:send_local(DhtPid, {get_entries, self(), ISec});
-        true -> comm:send_local(self(), {shutdown, resolve_abort})
-    end,
-    State;
-
-on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {interval_upd_send, Dest, _},
-                          feedback = {FB, _},
-                          stats = Stats }) ->
-    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
-    SendList = [entry_to_kvv(X) || X <- EntryList],
-    case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
-    end,
-    comm:send_local(self(), {shutdown, resolve_ok}),
     State;
 
 on({get_entries_response, KVVList}, State =
@@ -183,8 +162,58 @@ on({get_entries_response, KVVList}, State =
     comm:send_local(self(), {shutdown, resolve_ok}),
     State;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MODE: interval_upd 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
+                                                         dhtNodePid = DhtPid }) 
+  when element(1, Op) =:= interval_upd;
+       element(1, Op) =:= interval_upd_send ->
+    ISec = rr_recon:find_intersection(MyI, element(2, Op)),
+    case intervals:is_empty(ISec) of
+        false -> comm:send_local(DhtPid, {get_entries, self(), ISec});
+        true -> comm:send_local(self(), {shutdown, resolve_abort})
+    end,
+    State#rr_resolve_state{ my_range = MyI };
+
+on({get_entries_response, EntryList}, State =
+       #rr_resolve_state{ operation = {interval_upd, _I, KvvList},
+                          my_range = MyI,
+                          dhtNodePid = DhtPid,
+                          feedback = {FBDest, _},
+                          stats = Stats }) ->
+    ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
+    %Send entries not in sender interval
+    EntryMapped = [entry_to_kvv(X) || X <- EntryList],
+    SendList = lists:filter(
+                 fun(Y) ->
+                         [] =:= [Z || Z <- KvvList, element(1, Y) =:= element(1, Z)]
+                 end, EntryMapped),
+    FBDest =/= nil andalso
+        comm:send(FBDest, {request_resolve, {key_upd, SendList}, []}), %without session id 
+    if ToUpdate =:= 0 -> comm:send_local(self(), {shutdown, resolve_ok});
+       true -> ok %shutdown handled by update_key_entry_ack
+    end,
+    State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
+
+on({get_entries_response, EntryList}, State =
+       #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
+                          feedback = {FB, _},
+                          stats = Stats }) ->
+    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
+    SendList = [entry_to_kvv(X) || X <- EntryList],
+    case Stats#resolve_stats.session_id of
+        null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
+    end,
+    comm:send_local(self(), {shutdown, resolve_ok}),
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 on({update_key_entry_ack, Entry, Exists, Done}, State =
-       #rr_resolve_state{ operation = {key_upd, _},
+       #rr_resolve_state{ operation = Op,
                           stats = #resolve_stats{ diff_size = Diff,
                                                   regen_count = RegenOk,
                                                   update_count = UpdOk, 
@@ -192,7 +221,9 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                   regen_fail_count = RegenFail
                                                 } = Stats,                          
                           feedback = FB = {DoFB, FBItems}
-                        }) ->
+                        }) 
+  when element(1, Op) =:= key_upd;
+       element(1, Op) =:= interval_upd ->
     NewStats = if
                    Done andalso Exists -> Stats#resolve_stats{ update_count = UpdOk +1 };
                    Done andalso not Exists -> Stats#resolve_stats{ regen_count = RegenOk +1 };
@@ -206,6 +237,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
             end,
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
+                ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFB], State),
                 send_feedback(NewFB, Stats#resolve_stats.session_id),
                 comm:send_local(self(), {shutdown, resolve_ok});
         true -> ok
@@ -215,7 +247,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
 on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
                                      ownerMonitor = Mon, 
                                      send_stats = SendStats,
-                                     stats = Stats }) ->
+                                     stats = Stats }) ->    
     erlang:demonitor(Mon),
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
@@ -224,6 +256,19 @@ on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "shutdown rr_resolve due to rrepair shut down", []),
     kill.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc returns number of send update requests
+-spec start_update_key_entry(?DB:kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
+start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
+    FullKvvList = [{X, Value, Vers} 
+                   || {K, Value, Vers} <- KvvList,
+                      X <- ?RT:get_replica_keys(K),
+                      intervals:in(X, MyI)],
+    UpdList = make_unique_kvv(lists:keysort(1, FullKvvList), []),
+    _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, Key, Val, Vers}) || {Key, Val, Vers} <- UpdList],
+    length(UpdList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % resolve stats operations
@@ -269,7 +314,7 @@ merge_stats(#resolve_stats{ session_id = ASID,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec entry_to_kvv(?DB:db_entry()) -> {?RT:key(), ?DB:value(), ?DB:version()}.
+-spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), ?DB:value(), ?DB:version()}.
 entry_to_kvv(Entry) ->
     {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
      db_entry:get_value(Entry), 
