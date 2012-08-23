@@ -170,6 +170,7 @@ get_childs({_, _, _, _, Childs}) -> Childs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% @doc returns number of items in a bucket / returns 0 if requested node is not a leaf node
 -spec get_item_count(merkle_tree() | mt_node()) -> non_neg_integer().
 get_item_count({merkle_tree, _, Node}) -> get_item_count(Node);
 get_item_count({_, C, _, _, []}) -> C;
