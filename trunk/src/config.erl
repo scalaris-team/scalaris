@@ -126,9 +126,14 @@ init(Files, Owner) ->
     erlang:register(config, self()),
     _ = ets:new(config_ets, [set, protected, named_table]),
     _ = [ populate_db(File) || File <- Files],
-    case check_config() of
+    try check_config() of
         true -> ok;
         _    -> % wait so the error output can be written:
+            init:stop(1),
+            receive nothing -> ok end
+    catch Err:Reason -> % wait so the error output can be written:
+            error_logger:error_msg("check_config/0 crashed with: ~.0p:~.0p~nStacktrace:~p~n",
+                                   [Err, Reason, erlang:get_stacktrace()]),
             init:stop(1),
             receive nothing -> ok end
     end,
