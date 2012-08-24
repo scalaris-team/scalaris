@@ -212,7 +212,8 @@ tester_type_check_tx(_Config) ->
              {on_init,2},
              {start_link,2}
            ],
-           [ {msg_tp_do_commit_abort,3}, %% tries to send
+           [ {get_paxos_ids, 2}, %% requires item entries in dictionary
+             {msg_tp_do_commit_abort,3}, %% tries to send
              {init_RTMs, 2}, %% tries to send
              {init_TPs, 2}, %% tries to send
              {inform_client, 3}, %% tries to send

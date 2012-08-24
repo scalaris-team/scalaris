@@ -122,13 +122,11 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
 change_cell(Column, CellNr, Key, Value, Operation) ->
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
-    lists:flatten([HeadL, 
-                   {Count + operation_val(Operation), 
-                    util:bin_xor(KeySum, Key), 
-                    KHSum bxor checksum_fun(Key),
-                    ValSum bxor Value, 
-                    VHSum bxor checksum_fun(Value)}, 
-                   TailL]).
+    lists:append(HeadL, [{Count + operation_val(Operation), 
+                          util:bin_xor(KeySum, Key), 
+                          KHSum bxor checksum_fun(Key),
+                          ValSum bxor Value, 
+                          VHSum bxor checksum_fun(Value)} | TailL]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -168,7 +166,7 @@ list_entries(IBLT) ->
 p_list_entries(#iblt{ table = T } = IBLT, Acc) ->
     case get_any_entry(T, []) of
         [] -> lists:flatten(Acc);
-        L ->
+        [_|_] = L ->
             NewIBLT = lists:foldl(fun({Key, Val}, NT) -> 
                                           delete(NT, Key, Val) 
                                   end, IBLT, L),
@@ -183,7 +181,7 @@ get_any_entry([{_, Col} | T], Acc) ->
     Result = [{decode_key(Key), Val} || {_, Key, _, Val, _} = Cell <- Col,
                                         is_pure(Cell)],
     if 
-        Result =:= [] -> get_any_entry(T, lists:append([Result, Acc]));
+        Result =:= [] -> get_any_entry(T, lists:append(Result, Acc));
         true -> Result
     end.
 

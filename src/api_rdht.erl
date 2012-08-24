@@ -55,9 +55,9 @@ delete(Key, Timeout) ->
                              Results::[ok | locks_set | undef])
                             -> delete_result().
 delete_collect_results([], _ClientsId, Results) ->
-    OKs = length([ok || R <- Results, R =:= ok]),
+    OKs = length([ok || ok <- Results]),
     {ok, OKs, Results};
-delete_collect_results(ReplicaKeys, ClientsId, Results) ->
+delete_collect_results([_|_] = ReplicaKeys, ClientsId, Results) ->
     receive
         ?SCALARIS_RECV({delete_key_response, ClientsId, Key, Result}, %% ->
             case lists:member(Key, ReplicaKeys) of
@@ -69,7 +69,7 @@ delete_collect_results(ReplicaKeys, ClientsId, Results) ->
             end);
         ?SCALARIS_RECV({timeout, ClientsId}, %% ->
             begin
-               OKs = length([ok || R <- Results, R =:= ok]),
+               OKs = length([ok || ok <- Results]),
                {fail, timeout, OKs, Results}
             end);
         ?SCALARIS_RECV({delete_key_response, _, _, _}, %% ->

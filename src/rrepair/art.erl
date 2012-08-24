@@ -130,9 +130,9 @@ lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
         true -> case IsLeaf of
                     true -> lookup_cf(L, Art);
                     false ->
-                        NL = lists:append(lists:map(fun(X) -> {X, CF - 1} end, 
-                                                    merkle_tree:get_childs(Node)), 
-                                          L),
+                        NL = lists:append(
+                               [{X, CF - 1} || X <- merkle_tree:get_childs(Node)],
+                               L),
                         lookup_cf(NL, Art)
                 end                        
     end.

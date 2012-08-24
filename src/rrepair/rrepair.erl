@@ -304,9 +304,9 @@ extract_session(Id, Sessions) ->
                                                 session_id_equal(Id, I)
                                         end, 
                                         Sessions),
-    case length(Satis) of
-        1 -> {hd(Satis), NotSatis};
-        0 -> not_found;
+    case Satis of
+        [X] -> {X, NotSatis};
+        [] -> not_found;
         _ -> 
             log:log(error, "[ ~p ] SESSION NOT UNIQUE! ~p - OpenSessions=~p", [?MODULE, Id, Sessions]),
             not_found

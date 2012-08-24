@@ -728,9 +728,8 @@ encodeBlob(A, B) ->
 
 -spec decodeBlob(db_entry_enc()) -> {?RT:key(), ?DB:value() | ?DB:version()} | fail.
 decodeBlob(Blob) when is_binary(Blob) ->
-    L = binary_to_term(Blob),
-    case length(L) of
-        3 -> {hd(L), lists:last(L)};
+    case binary_to_term(Blob) of
+        [Key, "#", X] ->  {Key, X};
         _ -> fail
     end;
 decodeBlob(_) -> fail.

@@ -318,12 +318,10 @@ check_state({Cache, Node, _Cycles, _TriggerState} = _State) ->
                      true  -> []
                  end,
     NeedsInfo = NeedsInfo1 ++ NeedsInfo2,
-    if 
-        length(NeedsInfo) > 0 ->
-            request_node_details(NeedsInfo),
-            fail;
-        true ->
-            ok
+    case NeedsInfo of
+        [_|_] -> request_node_details(NeedsInfo),
+                 fail;
+        []    -> ok
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

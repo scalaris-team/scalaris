@@ -454,5 +454,5 @@ call_subscribers_check(OldNeighborhood, NewNeighborhood, IsSlide,
 -spec make_indexed_nodelist(NodeList::[node:node_type()]) -> [{Index::string(), Node::string()}].
 make_indexed_nodelist(NodeList) ->
     IndexedList = lists:zip(lists:seq(1, length(NodeList)), NodeList),
-    [{lists:flatten(io_lib:format("~p", [Index])),
-      lists:flatten(io_lib:format("~p", [Node]))} || {Index, Node} <- IndexedList].
+    [{webhelpers:safe_html_string("~p", [Index]),
+      webhelpers:safe_html_string("~p", [Node])} || {Index, Node} <- IndexedList].

@@ -251,19 +251,18 @@ on({bulkowner, deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Ms
     {AllNodes1, Leader};
 
 on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
-    MyData = lists:flatten(
-               [begin
-                    Value = case FullKey of
-                                {?MODULE, 'read_read'} ->
-                                    AllNodes#state.perf_rr;
-                                {dht_node, 'lookup_hops'} ->
-                                    AllNodes#state.perf_lh;
-                                {api_tx, 'req_list'} ->
-                                    AllNodes#state.perf_tx;
-                                _ -> undefined
-                            end,
-                    {Process, Key, Value}
-                end || {Process, Key} = FullKey <- KeyList]),
+    MyData = [begin
+                  Value = case FullKey of
+                              {?MODULE, 'read_read'} ->
+                                  AllNodes#state.perf_rr;
+                              {dht_node, 'lookup_hops'} ->
+                                  AllNodes#state.perf_lh;
+                              {api_tx, 'req_list'} ->
+                                  AllNodes#state.perf_tx;
+                              _ -> undefined
+                          end,
+                  {Process, Key, Value}
+              end || {Process, Key} = FullKey <- KeyList],
     comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 

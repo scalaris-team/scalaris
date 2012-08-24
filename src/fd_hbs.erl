@@ -413,11 +413,11 @@ state_get_subscriptions(State, SearchedPid) ->
     Table = state_get_table(State),
     Entries = pdb:tab2list(Table),
     Res = [ [ {Subscriber, Cookie} || Cookie <- Cookies ]
-      || {{Subscriber, WatchedPid}, Cookies, _Num} <- Entries,
-         %% pdb:tab2list may contain unrelated entries, but <- lets
-         %% only pass structurally matching entries here without an
-         %% assignment exception.
-         SearchedPid =:= WatchedPid],
+            || {{Subscriber, WatchedPid}, Cookies, _Num} <- Entries,
+               %% pdb:tab2list may contain unrelated entries, but <- lets
+               %% only pass structurally matching entries here without an
+               %% assignment exception.
+               SearchedPid =:= WatchedPid],
     lists:flatten(Res).
 
 -spec state_add_watched_pid(state(), comm:mypid()) -> state().

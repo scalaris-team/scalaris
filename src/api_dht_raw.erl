@@ -68,7 +68,9 @@ range_read(Interval) ->
                                      {range_read_timeout, Id}),
     range_read_loop(Interval, Id, intervals:empty(), [], TimerRef).
 
--spec range_read_loop(Interval::intervals:interval(), Id::uid:global_uid(), Done::intervals:interval(), Data::[db_entry:entry()], TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
+-spec range_read_loop(Interval::intervals:interval(), Id::uid:global_uid(),
+        Done::intervals:interval(), Data::[db_entry:entry() | [db_entry:entry()]],
+        TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Id, Done, Data, TimerRef) ->
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, %% ->

@@ -300,7 +300,7 @@ mk_neighborhood(NodeList, Node) ->
             Preds = lists:reverse(EqualSorted),
             Succs = EqualSorted;
         _ ->
-            Neighbors = lists:append([LargerSorted, SmallerSorted]),
+            Neighbors = lists:append(LargerSorted, SmallerSorted),
             Preds = lists:reverse(Neighbors),
             Succs = Neighbors
     end,
@@ -575,7 +575,7 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
                     true ->
                         [N || N <- EqualSorted, not node:same_process(N, Node)];
                     false ->
-                        lists:append([LargerSorted, SmallerSorted])
+                        lists:append(LargerSorted, SmallerSorted)
                 end,
     lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength).
 
