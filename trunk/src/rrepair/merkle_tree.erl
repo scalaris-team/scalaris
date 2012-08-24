@@ -448,8 +448,8 @@ p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
                    _ -> Key
                end,
     case intervals:in(CheckKey, Interval) of
-        true -> [{Interval, C + 1, [Key | L]} | Left] ++ Right;
-        false -> p_key_in_I(Key, [P | Left], Right)
+        true -> lists:append([Left, [{Interval, C + 1, [Key | L]}], Right]);
+        false -> p_key_in_I(Key, lists:append(Left, [P]), Right)
     end.
 
 -spec keys_to_intervals([Key], [I]) -> [{I, Count, [Key]}] when
@@ -458,7 +458,7 @@ p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    lists:foldl(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList).
+    lists:reverse(lists:foldl(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
