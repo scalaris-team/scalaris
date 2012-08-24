@@ -845,17 +845,19 @@ inform_client(TxState, State, Result) ->
 inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
     %% inform TPs
-    X = [ begin
-              {ok, ItemState} = get_item_entry(ItemId, State),
-              length(
-                [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
-                                              comm:this(), ItemId},
-                                         Result)
-                    || {PaxId, RTLogEntry, TP}
-                           <- tx_item_state:get_paxosids_rtlogs_tps(ItemState),
-                       comm:is_valid(TP) ])
-          end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
-    tx_state:set_numinformed(TxState, lists:sum(X)).
+    Informed =
+        lists:foldl(
+          fun({_TLogEntry, ItemId}, Sum) ->
+                  {ok, ItemState} = get_item_entry(ItemId, State),
+                  Sum + length(
+                    [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
+                                                  comm:this(), ItemId},
+                                             Result)
+                        || {PaxId, RTLogEntry, TP}
+                               <- tx_item_state:get_paxosids_rtlogs_tps(ItemState),
+                           comm:is_valid(TP) ])
+          end, 0, tx_state:get_tlog_txitemids(TxState)),
+    tx_state:set_numinformed(TxState, Informed).
 
 -spec inform_rtms(tx_state:tx_id(), state(), ?commit | ?abort) -> ok.
 inform_rtms(TxId, State, Result) ->
