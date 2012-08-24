@@ -351,8 +351,8 @@ iterator({merkle_tree, _, Root}) -> [Root].
       is_subtype(Iter, mt_iter()).
 iterator_node({_, _, _, _, []}, Iter1) ->
     Iter1;
-iterator_node({_, _, _, _, Childs}, Iter1) ->
-    lists:flatten([Childs | Iter1]).
+iterator_node({_, _, _, _, [_|_] = Childs}, Iter1) ->
+    lists:append(Childs, Iter1).
 
 -spec next(Iter) -> none | {Node, Iter} when
       is_subtype(Iter, mt_iter()),

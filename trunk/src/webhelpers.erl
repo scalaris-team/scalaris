@@ -529,17 +529,17 @@ renderGossip([V1, V2, V3 | Rest]) ->
 renderGossip2(PV1, PVE2, PVE3) ->
     [renderGossipHead(PV1, PVE2, PVE3),
      renderGossipData(PV1, PVE2, PVE3, "Size (leader election)",
-                      size_ldr, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
+                      size_ldr, fun(V) -> safe_html_string("~.2f", [V]) end),
      renderGossipData(PV1, PVE2, PVE3, "Size (key range)",
-                      size_kr, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
+                      size_kr, fun(V) -> safe_html_string("~.2f", [V]) end),
      renderGossipData(PV1, PVE2, PVE3, "Average load",
-                      avgLoad, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end),
+                      avgLoad, fun(V) -> safe_html_string("~.2f", [V]) end),
      renderGossipData(PV1, PVE2, PVE3, "Maximum load",
-                      maxLoad, fun(V) -> lists:flatten(io_lib:format("~B", [V])) end),
+                      maxLoad, fun(V) -> safe_html_string("~B", [V]) end),
      renderGossipData(PV1, PVE2, PVE3, "Minimum load",
-                      minLoad, fun(V) -> lists:flatten(io_lib:format("~B", [V])) end),
+                      minLoad, fun(V) -> safe_html_string("~B", [V]) end),
      renderGossipData(PV1, PVE2, PVE3, "Standard deviation of the load",
-                      stddev, fun(V) -> lists:flatten(io_lib:format("~.2f", [V])) end)
+                      stddev, fun(V) -> safe_html_string("~.2f", [V]) end)
      ].
 
 -spec renderGossipHead(gossip_pv(), {boolean(), gossip_pv()}, {boolean(), gossip_pv()}) -> html_type().

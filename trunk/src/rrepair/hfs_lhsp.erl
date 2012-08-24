@@ -47,7 +47,7 @@ new_(HFCount) ->
     new_([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
 
 -spec new_([function()], integer()) -> hfs_t().
-new_([H1, H2] = HFList, HFCount) when length(HFList) =:= 2 -> 
+new_([H1, H2], HFCount) -> 
     {hfs_lhsp, HFCount, H1, H2};
 new_(_, _) ->
     erlang:error("hash function list length =/= 2").

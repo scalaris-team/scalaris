@@ -322,21 +322,16 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                 RTMs = tx_state:get_rtms(TxState),
                 send_to_rtms(RTMs, fun(_X) -> Msg end),
                 %% inform used learner to delete paxosids.
-                AllPaxIds =
-                    [ begin
-                          {ok, ItemState} = get_item_entry(ItemId, State),
-                          [ PaxId || {PaxId, _RTLog, _TP}
-                                         <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
-                      end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
+                AllPaxIds = get_paxos_ids(State, TxState),
                 %% We could delete immediately, but we still miss the
                 %% minority of learner_decides, which would re-create the
                 %% id in the learner, which then would have to be deleted
                 %% separately, so we give the minority a second to arrive
                 %% and then send the delete request.
-                %% learner:stop_paxosids(GLLearner, lists:flatten(AllPaxIds)),
+                %% learner:stop_paxosids(GLLearner, AllPaxIds),
                 GLLearner = state_get_gllearner(State),
                 msg_delay:send_local(1, comm:make_local(GLLearner),
-                                     {learner_deleteids, lists:flatten(AllPaxIds)}),
+                                     {learner_deleteids, AllPaxIds}),
                 {_DeleteIt = true, State};
             ok ->
                 %% the test trigger_delete was passed, at least by the TM
@@ -355,17 +350,11 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
                         false -> State
                     end,
                 %% inform used acceptors to delete paxosids.
-                AllPaxIds =
-                    [ begin
-                          {ok, ItemState} = get_item_entry(ItemId, State),
-                          [ PaxId || {PaxId, _RTlog, _TP}
-                                         <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
-                      end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
+                AllPaxIds = get_paxos_ids(State, TxState),
                 LAcceptor = state_get_lacceptor(State),
-                %%            msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
-                %%                                 {acceptor_deleteids, lists:flatten(AllPaxIds)});
-                comm:send_local(LAcceptor,
-                                {acceptor_deleteids, lists:flatten(AllPaxIds)}),
+                %% msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, LAcceptor,
+                %%                      {acceptor_deleteids, AllPaxIds});
+                comm:send_local(LAcceptor, {acceptor_deleteids, AllPaxIds}),
                 {Delete, TmpState};
             new -> {false, State}; %% already deleted
             uninitialized ->
@@ -568,6 +557,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             RTMs = tx_state:get_rtms(TxState),
             Role = state_get_role(State),
             ValidAccs = [ X || {X} <- rtms_get_accpids(RTMs)],
+            ValidAccsL = length(ValidAccs),
             This = comm:this(),
             case comm:is_valid(This) of
                 false ->
@@ -595,7 +585,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                       || X <- ValidAccs],
                                 proposer:start_paxosid(
                                   Proposer, PaxId, _Acceptors = ValidAccs, ?abort,
-                                  Maj, length(ValidAccs) + 1, ThisRTMsNumber),
+                                  Maj, ValidAccsL + 1, ThisRTMsNumber),
                                 ok
                             end
                             || {PaxId, _RTLog, _TP}
@@ -826,6 +816,15 @@ set_entry(NewEntry, State) ->
     pdb:set(NewEntry, state_get_tablename(State)),
     State.
 
+-spec get_paxos_ids(State::state(), TxState::tx_state:tx_state()) -> [tx_item_state:paxos_id()].
+get_paxos_ids(State, TxState) ->
+    lists:append(
+      [ begin
+            {ok, ItemState} = get_item_entry(ItemId, State),
+            [ PaxId || {PaxId, _RTLog, _TP}
+                           <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
+        end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ]).
+
 -spec inform_client(tx_state:tx_state(), state(), ?commit | ?abort) -> ok.
 inform_client(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform client~n", []),
@@ -1038,11 +1037,10 @@ get_failed_keys(TxState, State) ->
               || {TLogEntr, TxItem} <- TLog_TxItems,
                  ?abort =:= tx_item_state:get_decided(TxItem)]
     end,
-    case NumAbort =:= length(Result) of
-        true -> ok;
-        false ->
-            ct:pal("This should not happen: ~p =/= ~p~n",
-                   [NumAbort, length(Result)])
+    case length(Result) of
+        NumAbort -> ok;
+        _ -> ct:pal("This should not happen: ~p =/= ~p~n",
+                    [NumAbort, length(Result)])
     end,
     Result.
 
