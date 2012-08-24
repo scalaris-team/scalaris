@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -227,13 +227,13 @@ get(#state{values=InternalValues, initialized=Initialized, triggered=Triggered,
 %%        <li>maxLoad = maximum load,</li>
 %%        <li>round = gossip round the node is in,</li>
 %%      </ul>
--spec set(values_internal() | state(), avgLoad, avg()) -> values_internal();
-         (values_internal() | state(), minLoad, min()) -> values_internal();
-         (values_internal() | state(), maxLoad, max()) -> values_internal();
-         (values_internal() | state(), avgLoad2, avg2()) -> values_internal();
-         (values_internal() | state(), size_inv, size_inv()) -> values_internal();
-         (values_internal() | state(), avg_kr, avg_kr()) -> values_internal();
-         (values_internal() | state(), round, round()) -> values_internal().
+-spec set(values_internal() | state(), avgLoad, avg()) -> values_internal() | state();
+         (values_internal() | state(), minLoad, min()) -> values_internal() | state();
+         (values_internal() | state(), maxLoad, max()) -> values_internal() | state();
+         (values_internal() | state(), avgLoad2, avg2()) -> values_internal() | state();
+         (values_internal() | state(), size_inv, size_inv()) -> values_internal() | state();
+         (values_internal() | state(), avg_kr, avg_kr()) -> values_internal() | state();
+         (values_internal() | state(), round, round()) -> values_internal() | state().
 set(InternalValues, Key, Value) when is_record(InternalValues, values_internal) ->
     case Key of
         avgLoad -> InternalValues#values_internal{avg = Value};

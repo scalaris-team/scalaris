@@ -29,6 +29,7 @@
 all()   -> [
             tester_type_check_api,
             tester_type_check_config,
+            tester_type_check_gossip,
             tester_type_check_paxos,
             tester_type_check_tx,
             tester_type_check_util
@@ -105,6 +106,16 @@ tester_type_check_config(_Config) ->
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
     log:set_log_level(config:read(log_level)),
+    true.
+
+tester_type_check_gossip(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    Modules =
+        [ {gossip_state, [], []}
+        ],
+    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+      || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 tester_type_check_paxos(_Config) ->

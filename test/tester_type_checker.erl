@@ -137,6 +137,10 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_tuple(Value, {tuple, TypeList}, CheckStack, ParseState);
         {range, {integer, _Min}, {integer, _Max}} ->
             check_range(Value, Type, CheckStack, ParseState);
+        {record, _Module, _Typedef} ->
+            check_record(Value, Type, CheckStack, ParseState);
+        {record, FieldList} when is_list(FieldList) ->
+            check_record_fields(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_list(Tuple) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
@@ -197,6 +201,27 @@ check_range(Value, {range, {integer, Min}, {integer, Max}} = T,
         false ->
             {false, [{Value, no_integer_in_range, T} | CheckStack]}
     end.
+
+check_record(Value, {record, Module, TypeName} = T, CheckStack, ParseState) ->
+    case tester_parse_state:lookup_type(T, ParseState) of
+        none ->
+            {false, [{tester_lookup_type_failed,
+                      {Module, TypeName}} | CheckStack]};
+        {value, {record, FieldList} = _InnerType} ->
+            %% check record name here (add it as record field in front)
+            inner_check(Value, {record,
+                        [ {typed_record_field, tag, {atom, TypeName}}
+                          | FieldList ]},
+                        [{Value, T} | CheckStack], ParseState)
+    end.
+
+
+check_record_fields(Value, {record, FieldList}, CheckStack, ParseState)
+  when is_list(FieldList) ->
+    %% [{typed_record_field,FieldName, Type}]
+    {_, _, TypeList} = lists:unzip3(FieldList),
+    check_tuple(Value, {tuple, TypeList},
+                CheckStack, ParseState).
 
 check_list(Value, {list, InnerType} = T, CheckStack, ParseState) ->
     case is_list(Value) of
