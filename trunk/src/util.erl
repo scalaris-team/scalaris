@@ -960,9 +960,10 @@ for_to_ex(I, N, Fun) ->
 %% @doc Helper for par_map/2.
 -spec par_map_recv(Id::term(), {try_catch_result(), [B]}) -> {try_catch_result(), [B]}.
 par_map_recv(E, {ErrorX, ListX}) ->
-    case receive ?SCALARIS_RECV({parallel_result, E, R}, R) end of
-        {ok, ResultY} -> {ErrorX, [ResultY | ListX]};
-        ErrorY -> {ErrorY, ListX}
+    receive ?SCALARIS_RECV({parallel_result, E, {ok, ResultY}},
+                           {ErrorX, [ResultY | ListX]});
+            ?SCALARIS_RECV({parallel_result, E, ErrorY},
+                           {ErrorY, ListX})
     end.
 
 -spec par_map_feeder(1..2, [number()]) -> {Fun::fun((number()) -> number()), List::[number()]}.
@@ -987,9 +988,10 @@ par_map(Fun, [_|_] = List) ->
 -spec par_map_recv2(ListElem::term(), {try_catch_result(), [B], Id::non_neg_integer()})
         -> {try_catch_result(), [B], Id::non_neg_integer()}.
 par_map_recv2(_E, {ErrorX, ListX, Id}) ->
-    case receive ?SCALARIS_RECV({parallel_result, Id, R}, R) end of
-        {ok, ResultY} -> {ErrorX, lists:reverse(ResultY, ListX), Id + 1};
-        ErrorY -> {ErrorY, ListX, Id + 1}
+    receive ?SCALARIS_RECV({parallel_result, Id, {ok, ResultY}},
+                           {ErrorX, lists:reverse(ResultY, ListX), Id + 1});
+            ?SCALARIS_RECV({parallel_result, Id, ErrorY},
+                           {ErrorY, ListX, Id + 1})
     end.
 
 -spec par_map_feeder(1..2, [number()], 1..50) -> {Fun::fun((number()) -> number()), List::[number()], 1..50}.
@@ -1109,9 +1111,8 @@ parallel_run(SrcPid, Fun, Args, DoAnswer, Id) ->
 parallel_collect(0, _, Accumulator) ->
     Accumulator;
 parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
-    case receive ?SCALARIS_RECV({parallel_result, ok, R}, R) end of
-        {ok, Result} -> ok;
-        Result -> ok % TODO: throw the error here again?
+    receive ?SCALARIS_RECV({parallel_result, ok, {ok, Result}}, ok);
+            ?SCALARIS_RECV({parallel_result, ok, Result}, ok) % TODO: throw the error here again?
     end,
     parallel_collect(ExpectedResults - 1, AccuFun, AccuFun(Result, Accumulator)).
 
