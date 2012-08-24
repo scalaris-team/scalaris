@@ -651,9 +651,13 @@ is_right_of(X, Y) ->
 
 %% @doc Splits an continuous interval in X roughly equally-sized subintervals
 %%      Returns: List of adjacent intervals
--spec split(interval(), 1..255) -> [interval()].
-split(I, 1) -> [I];
+-spec split(interval(), pos_integer()) -> [interval()].
 split(I, Parts) ->
+    p_split([{I, Parts}], []).
+
+-spec p_split([{interval(), pos_integer()}], [interval()]) -> [interval()].
+p_split([], Acc) -> Acc;
+p_split([{I, Parts} | R], Acc) ->
     case is_continuous(I) of
         true ->
             {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
@@ -665,7 +669,13 @@ split(I, Parts) ->
                        (LBr =:= '(' andalso RBr =:= ')') -> {'[', ')'};
                    true -> {LBr, RBr}
                 end,
-            lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, []));
+            if LKey =/= RKey andalso Parts > 100 ->
+                   [I1, I2] = intervals:split(I, 2),
+                   p_split([{I2, (Parts div 2) + (Parts rem 2)}, {I1, Parts div 2} | R], Acc);
+               true ->
+                   p_split(R, lists:append(lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])), 
+                                           Acc))
+            end;
         false -> erlang:throw('interval is not continuous')
     end.
 

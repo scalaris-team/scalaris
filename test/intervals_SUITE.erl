@@ -681,13 +681,13 @@ tester_get_elements(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_split_is_well_formed(intervals:key(), intervals:key(), 1..100) -> boolean().
+-spec prop_split_is_well_formed(intervals:key(), intervals:key(), 1..1000) -> boolean().
 prop_split_is_well_formed(X, Y, Parts) ->
     I = intervals:new('[', X, Y, ']'),
     S = intervals:split(I, Parts),
     lists:foldl(fun(SubI, Acc) -> Acc andalso intervals:is_well_formed(SubI) end, true, S).
 
--spec prop_split_is_continuous(intervals:key(), intervals:key(), 1..100) -> boolean().
+-spec prop_split_is_continuous(intervals:key(), intervals:key(), 1..1000) -> boolean().
 prop_split_is_continuous(X, Y, Parts) ->
     I = intervals:new('[', X, Y, ']'),
     S = intervals:split(I, Parts),
@@ -697,7 +697,7 @@ prop_split_is_continuous(X, Y, Parts) ->
 
 %% @doc Checks that each split interval is a subset of the original,
 %%      the union of all is the original, split-off intervals do not overlap.
--spec prop_split(intervals:key(), intervals:key(), 1..100) -> true.
+-spec prop_split(intervals:key(), intervals:key(), 1..1000) -> true.
 prop_split(X, Y, Parts) ->
     I = intervals:new('[', X, Y, ']'),
     S = intervals:split(I, Parts),
