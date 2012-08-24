@@ -75,7 +75,8 @@ groups() ->
                            {regen_art,    [sequence], repair_tests()},
                            {mixed_bloom,  [sequence], bloom_tests()}, 
                            {mixed_merkle, [sequence], repair_tests()},
-                           {mixed_art,    [sequence], repair_tests()}]}
+                           {mixed_art,    [sequence], repair_tests()}
+                          ]}
     ].
 
 suite() ->

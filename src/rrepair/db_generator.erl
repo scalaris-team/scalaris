@@ -208,7 +208,7 @@ gen_kvv(Keys, Params) ->
                                            {Out + 1, [db_entry:new(EKey, old, 1) | RGrp]};
                                        true -> {Out, RGrp}
                                     end,
-                  {lists:append(RList, AccDb), {Ins + length(RGrp), Mis + 4 - length(RGrp), NewOut}}
+                  {lists:append(RList, AccDb), {Ins + length(RList), Mis + 4 - length(RList), NewOut}}
           end, 
           {[], {0, 0, 0}}, Keys),
     {DB, {length(Keys) * ?ReplicationFactor, I, M, O}}.

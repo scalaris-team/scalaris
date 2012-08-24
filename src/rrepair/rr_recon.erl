@@ -322,14 +322,14 @@ on({check_nodes_response, CmpResults}, State =
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, Res, NStats} = process_tree_cmp_result(CmpResults, Tree, Stats),
     Req =/= [] andalso
-        comm:send(DestReconPid, {check_nodes, comm:this(), Req}),
+        comm:send(DestReconPid, {check_nodes, comm:this(), Req}),    
     {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
                                             {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL, OwnerR}),
                                             {AccL + LCount, AccR + RCount}
                                     end, {0, 0}, Res),
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs}, {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
-    if CompLeft =< 1 ->
+    if CompLeft =:= 0 ->
            comm:send(DestReconPid, {shutdown, sync_finished_remote}),
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
