@@ -1429,8 +1429,12 @@ notify_source_pid(SourcePid, Message) ->
         Reason::abort_reason(), NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, SlideOp, Reason, NotifyNode) ->
     % write to log when aborting an already set-up slide:
-    log:log(warn, "[ dht_node_move ~.0p ] abort_slide(op: ~.0p, reason: ~.0p)~n",
-            [comm:this(), SlideOp, Reason]),
+    case slide_op:is_setup_at_other(SlideOp) of
+        true ->
+            log:log(warn, "[ dht_node_move ~.0p ] abort_slide(op: ~.0p, reason: ~.0p)~n",
+                    [comm:this(), SlideOp, Reason]);
+        _ -> ok
+    end,
     SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
     % potentially set up for joining nodes (slide with pred) or
     % nodes sending data to their predecessor:
