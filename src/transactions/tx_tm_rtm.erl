@@ -578,11 +578,12 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
             TxItemIDs = [ TxItemId || {_, TxItemId} <- tx_state:get_tlog_txitemids(TxState)],
+            GLLearner = state_get_gllearner(State),
+            Proposer = comm:make_global(get_my(Role, proposer)),
             [ begin
                   {_, ItemState} = get_item_entry(ItemId, State),
                   case tx_item_state:get_decided(ItemState) of
                       false ->
-                          GLLearner = state_get_gllearner(State),
 %%                          ct:pal("initiating proposer~n"),
                           [ begin
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
@@ -592,8 +593,6 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                                 {acceptor_add_learner,
                                                  PaxId, GLLearner})
                                       || X <- ValidAccs],
-                                Proposer =
-                                    comm:make_global(get_my(Role, proposer)),
                                 proposer:start_paxosid(
                                   Proposer, PaxId, _Acceptors = ValidAccs, ?abort,
                                   Maj, length(ValidAccs) + 1, ThisRTMsNumber),
@@ -785,7 +784,7 @@ init_TPs(TxState, ItemStates) ->
     %% be used
     Tid = tx_state:get_tid(TxState),
     RTMs = tx_state:get_rtms(TxState),
-    CleanRTMs = [ X || {X} <-rtms_get_rtmpids(RTMs) ],
+    CleanRTMs = [ X || {X} <- rtms_get_rtmpids(RTMs) ],
     Accs = [ X || {X} <- rtms_get_accpids(RTMs) ],
     TM = comm:this(),
     _ = [ begin
@@ -849,18 +848,15 @@ inform_tps(TxState, State, Result) ->
     %% inform TPs
     X = [ begin
               {ok, ItemState} = get_item_entry(ItemId, State),
-              [ case comm:is_valid(TP) of
-                    false -> unknown;
-                    true ->
-                        msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
-                                                    comm:this(), ItemId},
-                                               Result), ok
-                end
-                || {PaxId, RTLogEntry, TP}
-                       <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
+              length(
+                [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
+                                              comm:this(), ItemId},
+                                         Result)
+                    || {PaxId, RTLogEntry, TP}
+                           <- tx_item_state:get_paxosids_rtlogs_tps(ItemState),
+                       comm:is_valid(TP) ])
           end || {_TLogEntry, ItemId} <- tx_state:get_tlog_txitemids(TxState) ],
-    Y = [ Z || Z <- lists:flatten(X), Z =:= ok ],
-    tx_state:set_numinformed(TxState, length(Y)).
+    tx_state:set_numinformed(TxState, lists:sum(X)).
 
 -spec inform_rtms(tx_state:tx_id(), state(), ?commit | ?abort) -> ok.
 inform_rtms(TxId, State, Result) ->
@@ -1026,8 +1022,9 @@ state_unsubscribe(State, Pid) ->
 
 -spec get_failed_keys(tx_state:tx_state(), state()) -> [client_key()].
 get_failed_keys(TxState, State) ->
+    NumAbort = tx_state:get_numabort(TxState),
     Result =
-    case tx_state:get_numabort(TxState) of
+    case NumAbort of
         0 -> [];
         _ ->
             TLogTxItemIds = tx_state:get_tlog_txitemids(TxState),
@@ -1041,11 +1038,11 @@ get_failed_keys(TxState, State) ->
               || {TLogEntr, TxItem} <- TLog_TxItems,
                  ?abort =:= tx_item_state:get_decided(TxItem)]
     end,
-    case tx_state:get_numabort(TxState) =:= length(Result) of
+    case NumAbort =:= length(Result) of
         true -> ok;
         false ->
             ct:pal("This should not happen: ~p =/= ~p~n",
-                   [tx_state:get_numabort(TxState), length(Result)])
+                   [NumAbort, length(Result)])
     end,
     Result.
 
