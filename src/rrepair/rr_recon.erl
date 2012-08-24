@@ -307,7 +307,7 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) ->
+on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) ->    
     Result = [check_node(X, Tree) || X <- ToCheck], %afraid of parallel (util:par_map) which causes lots tree copies
     comm:send(SenderPid, {check_nodes_response, Result}),
     State#rr_recon_state{ dest_recon_pid = SenderPid };
@@ -400,7 +400,7 @@ check_node({I, Hash}, Tree) ->
                 true when not IsLeaf -> {I, ok_inner};
                 false when IsLeaf -> {I, fail_leaf};
                 false when not IsLeaf ->
-                    {I, fail_inner, [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]}
+                    {I, fail_inner, [merkle_tree:get_hash(N) || N <- merkle_tree:get_childs(Node)]} 
             end
     end.
 
