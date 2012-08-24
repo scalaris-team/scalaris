@@ -1289,7 +1289,8 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
 %% @doc Checks if a slide operation with the given MoveFullId exists and
 %%      executes WorkerFun if everything is ok. If the successor/predecessor
 %%      information in the slide operation is incorrect, the slide is aborted
-%%      (a message to the pred/succ is send, too).
+%%      (a message to the pred/succ is send, too). An exception is made for a
+%%      crashed_node message which would naturally result in a wrong_neighbor!
 -spec safe_operation(
     WorkerFun::fun((SlideOp::slide_op:slide_op(), PredOrSucc::pred | succ,
                     State::dht_node_state:state()) -> dht_node_state:state()),
@@ -1298,6 +1299,8 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
     MoveMsgTag::atom()) -> dht_node_state:state().
 safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgTag) ->
     case get_slide(State, MoveFullId) of
+        {_, PredOrSucc, SlideOp} when MoveMsgTag =:= crashed_node ->
+            WorkerFun(SlideOp, PredOrSucc, State);
         {ok, PredOrSucc, SlideOp} ->
             case PredOrSuccExp =:= both orelse PredOrSucc =:= PredOrSuccExp of
                 true ->
