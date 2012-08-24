@@ -115,7 +115,8 @@ set_move_config_parameters() ->
     config:write(move_use_incremental_slides, false),
     config:write(move_symmetric_incremental_slides, false),
     config:write(move_wait_for_reply_timeout, 1000),
-    config:write(move_send_msg_retries, 2).
+    config:write(move_send_msg_retries, 2),
+    config:write(move_send_msg_retry_delay, 0).
 
 %% @doc Sets tighter timeouts for slides
 -spec set_move_config_parameters_incremental_symm() -> ok.
@@ -123,7 +124,8 @@ set_move_config_parameters_incremental_symm() ->
     set_move_config_parameters(),
     config:write(move_use_incremental_slides, true),
     config:write(move_symmetric_incremental_slides, true),
-    config:write(move_max_transport_entries, 2).
+    config:write(move_max_transport_entries, 2),
+    config:write(move_send_msg_retry_delay, 0).
 
 %% @doc Sets tighter timeouts for slides
 -spec set_move_config_parameters_incremental() -> ok.
@@ -131,7 +133,8 @@ set_move_config_parameters_incremental() ->
     set_move_config_parameters(),
     config:write(move_use_incremental_slides, true),
     config:write(move_symmetric_incremental_slides, false),
-    config:write(move_max_transport_entries, 2).
+    config:write(move_max_transport_entries, 2),
+    config:write(move_send_msg_retry_delay, 0).
 
 %% @doc Test slide with successor, receiving data from it (using api_tx in the bench server).
 symm4_slide_succ_rcv_load(_Config) ->
