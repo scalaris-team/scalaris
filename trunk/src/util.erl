@@ -75,7 +75,7 @@
 
 % feeder for tester
 -export([readable_utc_time_feeder/1]).
--export([par_map_feeder/2]).
+-export([par_map_feeder/2, par_map_feeder/3]).
 
 -export([sets_map/2]).
 
@@ -965,8 +965,7 @@ par_map_recv(E, {ErrorX, ListX}) ->
         ErrorY -> {ErrorY, ListX}
     end.
 
--spec par_map_feeder(1..2, [number()])
-                    -> {Fun::fun((A) -> term()), List::[A]}.
+-spec par_map_feeder(1..2, [number()]) -> {Fun::fun((number()) -> number()), List::[number()]}.
 par_map_feeder(1, List) ->
     {fun(X) -> X * X end, List};
 par_map_feeder(2, List) ->
@@ -992,6 +991,11 @@ par_map_recv2(_E, {ErrorX, ListX, Id}) ->
         {ok, ResultY} -> {ErrorX, lists:reverse(ResultY, ListX), Id + 1};
         ErrorY -> {ErrorY, ListX, Id + 1}
     end.
+
+-spec par_map_feeder(1..2, [number()], 1..50) -> {Fun::fun((number()) -> number()), List::[number()], 1..50}.
+par_map_feeder(FunNr, List, MaxThreads) ->
+    {Fun, List} = par_map_feeder(FunNr, List),
+    {Fun, List, MaxThreads}.
 
 %% @doc Parallel version of lists:map/2 with the possibility to limit the
 %%      maximum number of processes being spawned.
