@@ -85,6 +85,7 @@ end_per_testcase(_TestCase, Config) ->
 join_parameters_list() ->
     [{move_wait_for_reply_timeout, 300},
      {move_send_msg_retries, 3},
+     {move_send_msg_retry_delay, 0},
      {join_request_timeout, 100},
      {join_request_timeouts, 3},
      {join_lookup_timeout, 300},

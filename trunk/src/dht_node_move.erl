@@ -417,6 +417,13 @@ process_move_msg({move, {send_error, Target, Message, _Reason}, {timeouts, Timeo
 
 process_move_msg({move, {send_error, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
+    % delay the actual re-try (it may be a crash or a temporary failure)
+    comm:send_local_after(config:read(move_send_msg_retry_delay), self(),
+                          {move, {send_error_retry, Target, Message, _Reason}, MoveFullId}),
+    MyState;
+
+process_move_msg({move, {send_error_retry, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->
+    ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
                 NewSlideOp = slide_op:inc_timeouts(SlideOp),
@@ -1338,6 +1345,8 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                              dht_node_state:get(State, slide_succ)])
             end,
             State;
+        not_found when MoveMsgTag =:= send_error_retry ->
+            State;
         not_found ->
             log:log(warn,"[ dht_node_move ~.0p ] ~.0p received with no matching "
                    "slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
@@ -1589,6 +1598,9 @@ check_config() ->
 
     config:cfg_is_integer(move_send_msg_retries) and
     config:cfg_is_greater_than(move_send_msg_retries, 0) and
+
+    config:cfg_is_integer(move_send_msg_retry_delay) and
+    config:cfg_is_greater_than_equal(move_send_msg_retry_delay, 0) and
 
     config:cfg_is_bool(move_use_incremental_slides) and
     config:cfg_is_bool(move_symmetric_incremental_slides).
