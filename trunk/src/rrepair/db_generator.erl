@@ -146,7 +146,9 @@ fill_ring(Type, DBSize, Params) ->
 fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
-    Keys = get_db(I, DBSize, Distr),
+    {_LBr, LKey, RKey, _RBr} = intervals:get_bounds(I),
+    I2 = intervals:new('(', LKey, RKey, ')'),
+    Keys = get_db(I2, DBSize, Distr),
     {DB, DBStatus} = gen_kvv(Keys, Params),
     insert_db(DB),
     DBStatus.
