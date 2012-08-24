@@ -110,7 +110,19 @@ public class Transaction extends
     /**
      * Erlang transaction log.
      */
-    private final Translog transLog = new FilteringTransLog();
+    protected final Translog transLog = getTranslogImpl();
+
+    /**
+     * Gets the {@link Translog} implementation to use for {@link #transLog}.
+     * Will be executed only once during construction of the object!
+     *
+     * Re-define in sub-classes to use a different implementation.
+     *
+     * @return a translog object
+     */
+    protected Translog getTranslogImpl() {
+        return new FilteringTransLog();
+    }
 
     /**
      * Constructor, uses the default connection returned by
