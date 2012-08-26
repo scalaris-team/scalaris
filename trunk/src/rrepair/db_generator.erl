@@ -39,7 +39,8 @@
 -export_type([distribution/0, db_type/0, db_parameter/0, db_status/0, failure_type/0]).
 -endif.
 
--type distribution() :: uniform |
+-type distribution() :: random |
+                        uniform |
                         {non_uniform, random_bias:distribution_fun()}.
 -type result() :: ?RT:key() | 
                   {?RT:key(), ?DB:value()}.
@@ -52,7 +53,8 @@
 -type db_parameter()    :: {ftype, failure_type()} |
                            {fprob, 0..100} |                                %failure probability
                            {fdest, failure_dest()} |                        %quadrants in which failures are inserted / if missing all is assumed
-                           {distribution, db_generator:distribution()}.     %in every quadrant
+                           {fdistribution, db_generator:distribution()} |   %distribution of failures
+                           {distribution, db_generator:distribution()}.     %data distribution in every quadrant
 -type db_status() :: {Entries   :: non_neg_integer(),
                       Existing  :: non_neg_integer(),
                       Missing   :: non_neg_integer(),
@@ -70,6 +72,7 @@ get_db(I, Count, Distribution) ->
 get_db(Interval, ItemCount, Distribution, Options) ->
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
+        random -> log:log(error, "random_data_distribution is not implemented");
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         {non_uniform, Fun} -> non_uniform_key_list(Interval, 1, ItemCount, Fun, [], OutputType)
     end.
@@ -149,13 +152,15 @@ fill_random(DBSize, Params) ->
     {_LBr, LKey, RKey, _RBr} = intervals:get_bounds(I),
     I2 = intervals:new('(', LKey, RKey, ')'),
     Keys = get_db(I2, DBSize, Distr),
-    {DB, DBStatus} = gen_kvv(Keys, Params),
+    {DB, DBStatus} = gen_kvv(proplists:get_value(fdistribution, Params, uniform), Keys, Params),
     insert_db(DB),
     DBStatus.
 
 fill_wiki(_DBSize, _Params) ->
     %TODO
     {0, 0, 0, 0}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec insert_db(?DB:db_as_list()) -> ok.
 insert_db(KVV) ->
@@ -175,46 +180,157 @@ insert_db(KVV) ->
                     KVV, Nodes),
     ok.
 
-% @doc Inserts a list of keys replicated into the ring
--spec gen_kvv([?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
-gen_kvv(Keys, Params) ->
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc Generates a consistent db with errors
+-spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
+gen_kvv(random, Keys, Params) ->
+    FType = proplists:get_value(ftype, Params, update),
+    FProb = proplists:get_value(fprob, Params, 50),
+    FDest = proplists:get_value(fdest, Params, all),    
+    KeyCount = length(Keys),
+    FCount =  erlang:round(KeyCount * (FProb / 100)),
+    {FKeys, GoodKeys} = select_random_keys(Keys, FCount, []),    
+    GoodDB = lists:foldl(fun(Key, AccDb) -> 
+                                 lists:append(get_rep_group(Key), AccDb)
+                         end, 
+                         [], GoodKeys),
+    {BadDB, O} = lists:foldl(fun(FKey, {AccBad, Out}) ->
+                                     {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
+                                     {lists:append(RList, AccBad), Out + NewOut}
+                             end, 
+                             {[], 0}, FKeys),
+    Insert = length(GoodDB) + length(BadDB),
+    DBSize = KeyCount * ?ReplicationFactor,
+    {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
+gen_kvv({non_uniform, Fun}, Keys, Params) ->
+    FType = proplists:get_value(ftype, Params, update),
+    FDest = proplists:get_value(fdest, Params, all),
+    FProb = proplists:get_value(fprob, Params, 50),
+    FProbList = get_non_uniform_probs(Fun, []),
+    KeysL = length(Keys),
+    FCount = erlang:round(KeysL * (FProb / 100)),
+    NextCell = case length(FProbList) of
+                   0 -> KeysL + 1;
+                   FProbL -> erlang:round(KeysL / FProbL)
+               end,
+    FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, NextCell, []))),
+    {DB, _, Out} = 
+        lists:foldl(fun({_P, Cell}, {DB, RestF, ROut}) ->
+                            {NewEntry, NewOut, NewF} = add_failures_to_cell(Cell, RestF, FType, FDest, {[], ROut}),
+                            {lists:append(NewEntry, DB), NewF, NewOut}
+                    end, 
+                    {[], FCount, 0}, FCells),
+    Insert = length(DB),
+    DBSize = KeysL * ?ReplicationFactor,
+    {DB, {DBSize, Insert, DBSize - Insert, Out}};
+gen_kvv(uniform, Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
     FProb = proplists:get_value(fprob, Params, 50),
     FDest = proplists:get_value(fdest, Params, all),
-    {DB, {I, M, O}} = 
+    KeyL = length(Keys),
+    FRate = case FProb of 
+                0 -> KeyL + 1;
+                _ -> erlang:round(100 / FProb)
+            end,
+    {DB, O, _} = 
         lists:foldl(
-          fun(Key, {AccDb, {Ins, Mis, Out}}) ->
-                  RepKeys = ?RT:get_replica_keys(Key),
-                  %insert error?
-                  EKey = case FProb >= randoms:rand_uniform(1, 100) of
-                             true ->
-                                 %error destination
-                                 case FDest of
-                                     all -> util:randomelem(RepKeys);
-                                     QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
-                                 end;
-                             _ -> null
-                         end,
-                  %insert regen error
-                  EType = case FType of 
-                              mixed -> 
-                                  case randoms:rand_uniform(1, 3) of
-                                      1 -> update;
-                                      _ -> regen
-                                  end;
-                              _ -> FType
-                          end,
-                  RGrp = [db_entry:new(X, val, 2) || X <- RepKeys, X =/= EKey],
-                  %insert update error
-                  {NewOut, RList} = if EType =:= update andalso EKey =/= null ->
-                                           {Out + 1, [db_entry:new(EKey, old, 1) | RGrp]};
-                                       true -> {Out, RGrp}
+          fun(Key, {AccDb, Out, Count}) ->
+                  {RList, AddOut} = case Count rem FRate of
+                                        0 -> get_failure_rep_group(Key, FType, FDest);
+                                        _ -> {get_rep_group(Key), 0}
                                     end,
-                  RListL = length(RList),
-                  {lists:append(RList, AccDb), {Ins + RListL, Mis + 4 - RListL, NewOut}}
+                  {lists:append(RList, AccDb), Out + AddOut, Count + 1}
           end, 
-          {[], {0, 0, 0}}, Keys),
-    {DB, {length(Keys) * ?ReplicationFactor, I, M, O}}.
+          {[], 0, 1}, Keys),
+    Insert = length(DB),
+    DBSize = KeyL * ?ReplicationFactor,    
+    {DB, {DBSize, Insert, DBSize - Insert, O}}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec add_failures_to_cell([?RT:key()], non_neg_integer(), failure_type(), failure_dest(), Acc) -> Result
+    when is_subtype(Acc,    {[db_entry:entry()], Outdated::non_neg_integer()}),
+         is_subtype(Result, {[db_entry:entry()], Outdated::non_neg_integer(), RestFCount::non_neg_integer()}).
+add_failures_to_cell([], FCount, _FType, _FDest, {AccE, AccO}) ->
+    {AccE, AccO, FCount};
+add_failures_to_cell([H | T], 0, FType, FDest, {DB, Out}) ->
+    add_failures_to_cell(T, 0, FType, FDest, 
+                         {lists:append(get_rep_group(H), DB), Out});
+add_failures_to_cell([H | T], FCount, FType, FDest, {AccEntry, AccOut}) ->
+    {AddEntrys, AddOut} = get_failure_rep_group(H, FType, FDest),
+    add_failures_to_cell(T, FCount - 1, FType, FDest, 
+                         {lists:append(AddEntrys, AccEntry), AddOut + AccOut}).
+
+-spec build_failure_cells([float()], [?RT:key()], non_neg_integer(), Acc::Res) -> Result::Res
+    when is_subtype(Res, [{float(), [?RT:key()]}]).
+build_failure_cells([], [], Next, Acc) ->
+    Acc;
+build_failure_cells([], T, Next, [{P, Cell} | Acc]) ->
+    [{P, lists:append(T, Cell)} | Acc];
+build_failure_cells(P, [], Next, Acc) ->
+    Acc;
+build_failure_cells([P | T], List, Next, Acc) ->
+    Cell = lists:sublist(List, Next),
+    RLen = length(List),
+    LT = if Next > RLen -> [];
+            true -> lists:nthtail(Next, List)
+         end,
+    build_failure_cells(T, LT, Next, [{P, Cell}|Acc]).
+
+-spec get_non_uniform_probs(random_bias:distribution_fun(), [float()]) -> [float()].
+get_non_uniform_probs(Fun, Acc) ->
+    case Fun() of
+        {ok, V} -> get_non_uniform_probs(Fun, [V|Acc]);
+        {last, V} -> lists:reverse([V|Acc])
+    end.
+
+-spec get_synthetic_entry(?RT:key(), old | new) -> db_entry:entry().
+get_synthetic_entry(Key, new) ->
+    db_entry:new(Key, val, 2);
+get_synthetic_entry(Key, old) ->
+    db_entry:new(Key, old, 1).
+
+-spec get_rep_group(?RT:key()) -> [db_entry:entry()].
+get_rep_group(Key) ->
+    [get_synthetic_entry(X, new) || X <- ?RT:get_replica_keys(Key)].
+
+-spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) -> 
+          {[db_entry:entry()], Outdated::non_neg_integer()}.
+get_failure_rep_group(Key, FType, FDest) ->
+    RepKeys = ?RT:get_replica_keys(Key),
+    EKey = get_error_key(Key, FDest),
+    EType = get_failure_type(FType),
+    RGrp = [get_synthetic_entry(X, new) || X <- RepKeys, X =/= EKey],
+    if EType =:= update andalso EKey =/= null ->
+           {[get_synthetic_entry(EKey, old) | RGrp], 1};
+       true -> {RGrp, 0}
+    end.
+
+% @doc Resolves failure type mixed.
+-spec get_failure_type(failure_type()) -> failure_type().
+get_failure_type(mixed) ->
+    case randoms:rand_uniform(1, 3) of
+        1 -> update;
+        _ -> regen
+    end;
+get_failure_type(Type) -> Type.
+
+% @doc Returns one key of KeyList which is in any quadrant out of DestList.
+-spec get_error_key(?RT:key(), failure_dest()) -> ?RT:key(). 
+get_error_key(Key, Dest) ->
+    case Dest of
+        all -> util:randomelem(?RT:get_replica_keys(Key));
+        QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
+    end.
+
+-spec select_random_keys(L, non_neg_integer(), AccFail::L) -> {Fail::L, Rest::L}
+    when is_subtype(L, [?RT:key()]).
+select_random_keys(RestKeys, 0, Acc) -> 
+    {Acc, RestKeys};
+select_random_keys(Keys, Count, Acc) ->
+    FRep = util:randomelem(Keys),
+    select_random_keys([X || X <- Keys, X =/= FRep], Count - 1, [FRep | Acc]).
 
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
