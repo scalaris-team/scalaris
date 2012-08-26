@@ -184,12 +184,18 @@ insert_db(KVV) ->
 
 % @doc Generates a consistent db with errors
 -spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
-gen_kvv(random, Keys, Params) ->
+gen_kvv(EDist, Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
     FProb = proplists:get_value(fprob, Params, 50),
     FDest = proplists:get_value(fdest, Params, all),    
     KeyCount = length(Keys),
     FCount =  erlang:round(KeyCount * (FProb / 100)),
+    p_gen_kvv(EDist, Keys, KeyCount, FType, FDest, FCount).
+
+-spec p_gen_kvv(ErrorDist::distribution(), [?RT:key()], 
+                KeyCount::non_neg_integer(), failure_type(), 
+                failure_dest(), FailCount::non_neg_integer()) -> {?DB:db_as_list(), db_status()}.
+p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     {FKeys, GoodKeys} = select_random_keys(Keys, FCount, []),    
     GoodDB = lists:foldl(fun(Key, AccDb) -> 
                                  lists:append(get_rep_group(Key), AccDb)
@@ -203,16 +209,11 @@ gen_kvv(random, Keys, Params) ->
     Insert = length(GoodDB) + length(BadDB),
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
-gen_kvv({non_uniform, Fun}, Keys, Params) ->
-    FType = proplists:get_value(ftype, Params, update),
-    FDest = proplists:get_value(fdest, Params, all),
-    FProb = proplists:get_value(fprob, Params, 50),
+p_gen_kvv({non_uniform, Fun}, Keys, KeyCount, FType, FDest, FCount) ->
     FProbList = get_non_uniform_probs(Fun, []),
-    KeysL = length(Keys),
-    FCount = erlang:round(KeysL * (FProb / 100)),
     NextCell = case length(FProbList) of
-                   0 -> KeysL + 1;
-                   FProbL -> erlang:round(KeysL / FProbL)
+                   0 -> KeyCount + 1;
+                   FProbL -> erlang:round(KeyCount / FProbL)
                end,
     FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, NextCell, []))),
     {DB, _, Out} = 
@@ -222,29 +223,23 @@ gen_kvv({non_uniform, Fun}, Keys, Params) ->
                     end, 
                     {[], FCount, 0}, FCells),
     Insert = length(DB),
-    DBSize = KeysL * ?ReplicationFactor,
+    DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
-gen_kvv(uniform, Keys, Params) ->
-    FType = proplists:get_value(ftype, Params, update),
-    FProb = proplists:get_value(fprob, Params, 50),
-    FDest = proplists:get_value(fdest, Params, all),
-    KeyL = length(Keys),
-    FRate = case FProb of 
-                0 -> KeyL + 1;
-                _ -> erlang:round(100 / FProb)
-            end,
-    {DB, O, _} = 
+p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
+    FRate = util:floor(KeyCount / FCount),
+    {DB, O, _, _} = 
         lists:foldl(
-          fun(Key, {AccDb, Out, Count}) ->
-                  {RList, AddOut} = case Count rem FRate of
-                                        0 -> get_failure_rep_group(Key, FType, FDest);
-                                        _ -> {get_rep_group(Key), 0}
-                                    end,
-                  {lists:append(RList, AccDb), Out + AddOut, Count + 1}
+          fun(Key, {AccDb, Out, Count, FCRest}) ->
+                  {{RList, AddOut}, FCNew} = case Count rem FRate of
+                                                 0 when FCRest > 0 -> 
+                                                     {get_failure_rep_group(Key, FType, FDest), FCRest - 1};
+                                                 _ -> {{get_rep_group(Key), 0}, FCRest}
+                                             end,
+                  {lists:append(RList, AccDb), Out + AddOut, Count + 1, FCNew}
           end, 
-          {[], 0, 1}, Keys),
+          {[], 0, 1, FCount}, Keys),
     Insert = length(DB),
-    DBSize = KeyL * ?ReplicationFactor,    
+    DBSize = KeyCount * ?ReplicationFactor,    
     {DB, {DBSize, Insert, DBSize - Insert, O}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -264,11 +259,11 @@ add_failures_to_cell([H | T], FCount, FType, FDest, {AccEntry, AccOut}) ->
 
 -spec build_failure_cells([float()], [?RT:key()], non_neg_integer(), Acc::Res) -> Result::Res
     when is_subtype(Res, [{float(), [?RT:key()]}]).
-build_failure_cells([], [], Next, Acc) ->
+build_failure_cells([], [], _Next, Acc) ->
     Acc;
-build_failure_cells([], T, Next, [{P, Cell} | Acc]) ->
+build_failure_cells([], T, _Next, [{P, Cell} | Acc]) ->
     [{P, lists:append(T, Cell)} | Acc];
-build_failure_cells(P, [], Next, Acc) ->
+build_failure_cells(_P, [], _Next, Acc) ->
     Acc;
 build_failure_cells([P | T], List, Next, Acc) ->
     Cell = lists:sublist(List, Next),
