@@ -38,8 +38,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %DETAIL DEBUG MESSAGES
 -define(TRACE2(X,Y), ok).
@@ -56,8 +56,7 @@
 -type stage()          :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
 
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
-                          negotiate_interval |      %rc initiator has send its interval and exits
-                          chunk_is_empty |          %db chunk is empty  
+                          negotiate_interval |      %rc initiator has send its interval and exits  
                           build_struct |            %client send its struct (bloom/art) to initiator and exits
                           recon_node_crash |        %sync partner node crashed  
                           sync_finished |           %initiator finish recon
