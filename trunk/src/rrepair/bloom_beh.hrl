@@ -82,9 +82,9 @@ join(Bloom1, Bloom2) -> join_(Bloom1, Bloom2).
 
 % @doc  Calculates optimal number of hash functions for
 %       an M-bit large BloomFilter with a maximum of N Elements.
--spec calc_HF_num(pos_integer(), pos_integer()) -> pos_integer().
+-spec calc_HF_num(pos_integer(), non_neg_integer()) -> pos_integer().
 calc_HF_num(M, N) ->
-    calc_HF_num(util:ceil(M / N)).
+    calc_HF_num(util:ceil(M / erlang:max(N, 1))).
 
 % @doc Calculates optimal number of hash functions for 
 %      a given compression rate of C.
@@ -109,8 +109,9 @@ calc_HF_numEx(N, FPR) ->
 
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate FPR up to N-Elements.
--spec calc_least_size(pos_integer(), float()) -> pos_integer().
+-spec calc_least_size(non_neg_integer(), float()) -> pos_integer().
 calc_least_size(_, FPR) when FPR =:= 0 -> 1;
+calc_least_size(0, _) -> 1;
 calc_least_size(N, FPR) ->
     util:ceil((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
 
