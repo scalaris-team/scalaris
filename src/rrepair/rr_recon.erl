@@ -38,8 +38,8 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %DETAIL DEBUG MESSAGES
 -define(TRACE2(X,Y), ok).
@@ -195,10 +195,6 @@ on({get_state_response, MyI}, State =
         false -> send_chunk_req(DhtPid, self(), MySyncI, BloomI, get_max_items(bloom));
         true -> comm:send_local(self(), {shutdown, empty_interval})
     end,
-    State;
-
-on({get_chunk_response, {_, []}}, State) ->
-    comm:send_local(self(), {shutdown, chunk_is_empty}),
     State;
 
 on({get_chunk_response, {RestI, DBList}}, State =
