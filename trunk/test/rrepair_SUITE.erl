@@ -45,19 +45,25 @@ basic_tests() ->
      tester_find_intersection
     ].
 
-repair_tests() ->
+repair_default() ->
     [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
      one_node,       % sync in ring with only one node
      %mpath
-     dest,           % run one sync with a specified dest node 
+     dest,           % run one sync with a specified dest node
      simple,         % run one sync round
      multi_round,    % run multiple sync rounds with sync probability 1
-     multi_round2    % run multiple sync rounds with sync probability 0.4
+     multi_round2    % run multiple sync rounds with sync probability 0.4     
 	].
 
-bloom_tests() ->    
-    repair_tests() ++ 
-        [parts]. % get_chunk with limited items / leads to multiple bloom filters
+regen_special() ->
+    [
+     dest_empty_node % run one sync with empty dest node
+    ].
+
+bloom_special() ->
+    [
+     parts           % get_chunk with limited items / leads to multiple bloom filters
+    ].     
 
 all() ->
     [{group, basic},
@@ -67,15 +73,15 @@ all() ->
 
 groups() ->
     [{basic,  [parallel], basic_tests()},     
-     {repair, [sequence], [{upd_bloom,    [sequence], bloom_tests()}, %{repeat_until_any_fail, 1000}
-                           {upd_merkle,   [sequence], repair_tests()},
-                           {upd_art,      [sequence], repair_tests()},
-                           {regen_bloom,  [sequence], bloom_tests()},
-                           {regen_merkle, [sequence], repair_tests()},
-                           {regen_art,    [sequence], repair_tests()},
-                           {mixed_bloom,  [sequence], bloom_tests()}, 
-                           {mixed_merkle, [sequence], repair_tests()},
-                           {mixed_art,    [sequence], repair_tests()}
+     {repair, [sequence], [{upd_bloom,    [sequence], repair_default() ++ bloom_special()}, %{repeat_until_any_fail, 1000}
+                           {upd_merkle,   [sequence], repair_default()},
+                           {upd_art,      [sequence], repair_default()},
+                           {regen_bloom,  [sequence], repair_default() ++ bloom_special() ++ regen_special()},
+                           {regen_merkle, [sequence], repair_default() ++ regen_special()},
+                           {regen_art,    [sequence], repair_default() ++ regen_special()},
+                           {mixed_bloom,  [sequence], repair_default() ++ bloom_special()}, 
+                           {mixed_merkle, [sequence], repair_default()},
+                           {mixed_art,    [sequence], repair_default()}
                           ]}
     ].
 
@@ -270,6 +276,43 @@ dest(Config) ->
     ?implies(SO > 0 orelse CO > 0, SONew < SO orelse CONew < CO) andalso
         ?implies(SM =/= SMNew, SMNew > SM) andalso
         ?implies(CM =/= CMNew, CMNew > CM).
+
+dest_empty_node(Config) ->
+    %parameter
+    NodeCount = 4,
+    DataCount = 1000,
+    Fpr = 0.1,
+    Method = proplists:get_value(ru_method, Config),
+    %build and fill ring
+    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
+    config:write(rr_bloom_fpr, Fpr),
+    db_generator:fill_ring(random, DataCount, [{ftype, regen}, 
+                                               {fprob, 100}, 
+                                               {distribution, uniform},
+                                               {fdest, [1]}]),
+    %chose any node not in quadrant 1    
+    KeyGrp = ?RT:get_replica_keys(?RT:get_random_node_id()),
+    IKey = util:randomelem([X || X <- KeyGrp, rr_recon:get_key_quadrant(X) =/= 1]),
+    CKey = hd([Y || Y <- KeyGrp, rr_recon:get_key_quadrant(Y) =:= 1]),
+    %measure initial sync degree
+    IM = count_dbsize(IKey),
+    CM = count_dbsize(CKey),
+    %server starts sync
+    api_dht_raw:unreliable_lookup(IKey, {send_to_group_member, rrepair, 
+                                              {request_sync, Method, CKey}}),
+    %waitForSyncRoundEnd(NodeKeys),
+    waitForSyncRoundEnd([IKey, CKey]),
+    %measure sync degree
+    IMNew = count_dbsize(IKey),
+    CMNew = count_dbsize(CKey),
+    ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p~n"
+           "Server DBSize=[~p -> ~p] - Regen=~p~n"
+           "Client DBSize=[~p -> ~p] - Regen=~p", 
+           [Method, IKey, CKey, 
+            IM, IMNew, IMNew - IM,
+            CM, CMNew, CMNew - CM]),
+    %clean up
+    ?assert(CM =:= 0) andalso ?assert(CMNew > CM).
 
 parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
