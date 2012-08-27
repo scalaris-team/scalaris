@@ -203,5 +203,4 @@ fake_dht_node(Suffix) ->
 
 -spec call_helper_fun(Fun::atom(), Args::list()) -> term().
 call_helper_fun(Fun, Args) ->
-    RTSuite = util:list_to_atom("rt_SUITE_" ++ erlang:atom_to_list(?RT)),
-    erlang:apply(RTSuite, Fun, Args).
+    erlang:apply(erlang:list_to_atom("rt_SUITE_" ++ erlang:atom_to_list(?RT)), Fun, Args).
