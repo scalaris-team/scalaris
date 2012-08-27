@@ -45,7 +45,9 @@
          %
          % for unit testing only
          is_well_formed/1, tester_create_interval/1,
-         is_well_formed_simple/1, tester_create_simple_interval/1
+         is_well_formed_simple/1, tester_create_simple_interval/1,
+         tester_create_continuous_interval/4,
+         split_feeder/2, split2_feeder/8, p_split_feeder/2
         ]).
 
 -ifdef(with_export_type_support).
@@ -62,6 +64,7 @@
 -type invalid_simple_interval() :: {element, key()} | all | simple_interval2().
 -opaque interval() :: [simple_interval()].
 -opaque invalid_interval() :: [simple_interval()].
+-opaque continuous_interval() :: [simple_interval()].
 
 % @type interval() = [simple_interval()].
 % [] -> empty interval
@@ -240,6 +243,16 @@ tester_create_interval(List) ->
                % filter out {element, X >= ?PLUS_INFINITY} which is invalid:
                not (is_tuple(I) andalso element(1, I) =:= element andalso element(2, I) >= ?PLUS_INFINITY)],
     normalize_internal(List1).
+
+-spec tester_create_continuous_interval(left_bracket(), key(), key(), right_bracket()) -> continuous_interval().
+tester_create_continuous_interval('[' = LBr, Key, Key, ']' = RBr) ->
+    new(LBr, Key, Key, RBr);
+tester_create_continuous_interval(_LBr, Key, Key, _RBr) ->
+    new('[', Key, Key, ']');
+tester_create_continuous_interval('(' = LBr, ?PLUS_INFINITY, ?MINUS_INFINITY, ')') ->
+    new(LBr, ?PLUS_INFINITY, ?MINUS_INFINITY, ']');
+tester_create_continuous_interval(LBr, LKey, RKey, RBr) ->
+    new(LBr, LKey, RKey, RBr).
 
 %% @doc Brings a simple interval into normal form, i.e. if it is a real
 %%      interval, its keys must be in order.
@@ -649,11 +662,21 @@ is_left_of(X, Y) ->
 is_right_of(X, Y) ->
     is_left_of(Y, X).
 
+-spec split_feeder(continuous_interval(), 1..255)
+        -> {continuous_interval(), pos_integer()}.
+split_feeder(I, Parts) ->
+    {I, Parts}.
+
 %% @doc Splits an continuous interval in X roughly equally-sized subintervals
 %%      Returns: List of adjacent intervals
 -spec split(interval(), pos_integer()) -> [interval()].
 split(I, Parts) ->
     p_split([{I, Parts}], []).
+
+-spec p_split_feeder([{continuous_interval(), 1..255}], [continuous_interval()])
+        -> {[{continuous_interval(), pos_integer()}], [continuous_interval()]}.
+p_split_feeder(Jobs, Acc) ->
+    {Jobs, Acc}.
 
 -spec p_split([{interval(), pos_integer()}], [interval()]) -> [interval()].
 p_split([], Acc) -> Acc;
@@ -685,7 +708,14 @@ p_split([{I, Parts} | R], Acc) ->
         false -> erlang:throw('interval is not continuous')
     end.
 
--spec split2(left_bracket(), key(), key(), right_bracket(), Parts::1..255,
+-spec split2_feeder(left_bracket(), key(), key(), right_bracket(), Parts::1..255,
+                    InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
+        -> {left_bracket(), key(), key(), right_bracket(), Parts::pos_integer(),
+            InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]}.
+split2_feeder(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
+    {LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc}.
+
+-spec split2(left_bracket(), key(), key(), right_bracket(), Parts::pos_integer(),
              InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]) -> [interval()].
 split2(LBr, Key, Key, RBr, _, _InnerLBr, _InnerRBr, Acc) ->
     [new(LBr, Key, Key, RBr) | Acc];
