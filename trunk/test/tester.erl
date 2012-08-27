@@ -97,7 +97,7 @@ repeat(F, Repetitions) ->
 -spec run/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
                 tester_parse_state:state(), test_options()) -> any().
 run(Module, Func, Arity, Iterations, ParseState, Options) ->
-    FeederFun = list_to_atom(atom_to_list(Func) ++ "_feeder"),
+    FeederFun = util:list_to_atom(atom_to_list(Func) ++ "_feeder"),
     case proplists:get_bool(with_feeder, Options) of
         true ->
             % get spec from feeder

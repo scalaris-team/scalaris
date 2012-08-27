@@ -50,7 +50,7 @@ init([{PidGroup, Options}] = X) ->
         case lists:keyfind(sup_paxos_prefix, 1, Options) of
             {sup_paxos_prefix, Prefix} ->
                 PrefixS = atom_to_list(Prefix),
-                list_to_atom(PrefixS ++ "_" ++ atom_to_list(?MODULE));
+                util:list_to_atom(PrefixS ++ "_" ++ atom_to_list(?MODULE));
             false -> ?MODULE
         end,
     pid_groups:join_as(PidGroup, SupervisorName),
@@ -68,9 +68,9 @@ childs([{PidGroup, Options}]) ->
         case lists:keyfind(sup_paxos_prefix, 1, Options) of
             {sup_paxos_prefix, Prefix} ->
                 PrefixS = atom_to_list(Prefix),
-                {list_to_atom(PrefixS ++ atom_to_list('_proposer')),
-                 list_to_atom(PrefixS ++ atom_to_list('_acceptor')),
-                 list_to_atom(PrefixS ++ atom_to_list('_learner'))};
+                {util:list_to_atom(PrefixS ++ atom_to_list('_proposer')),
+                 util:list_to_atom(PrefixS ++ atom_to_list('_acceptor')),
+                 util:list_to_atom(PrefixS ++ atom_to_list('_learner'))};
             false -> {paxos_proposer, paxos_acceptor, paxos_learner}
         end,
     Proposer = util:sup_worker_desc(proposer, proposer,
