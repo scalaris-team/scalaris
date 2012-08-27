@@ -104,27 +104,26 @@ start_link(DHTNodeGroup, Role) ->
                              state()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
-    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
-           [pid_groups:my_groupname(), Role]),
+    DHTNodeGroup = pid_groups:my_groupname(),
+    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n", [DHTNodeGroup, Role]),
     %% For easier debugging, use a named table (generates an atom)
-    TableName = list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_rtm_"
-                             ++ atom_to_list(Role)),
-    pdb:new(TableName, [set, protected, named_table]),
+    Table = pdb:new(DHTNodeGroup ++ "_tx_tm_rtm_" ++ atom_to_list(Role),
+                    [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% TableName = pdb:new(?MODULE, [set, private]),
+    %% Table = pdb:new(?MODULE, [set, private]),
     LAcceptor = get_my(Role, acceptor),
     GLLearner = comm:make_global(get_my(Role, learner)),
     %% start getting rtms and maintain them.
     case Role of
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
-            State = {_RTMs = [], TableName, Role, LAcceptor, GLLearner, 0},
+            State = {_RTMs = [], Table, Role, LAcceptor, GLLearner, 0},
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
             gen_component:change_handler(State, fun ?MODULE:on_init/2);
-        _ -> {_RTMs = [], TableName, Role, LAcceptor, GLLearner, 0}
+        _ -> {_RTMs = [], Table, Role, LAcceptor, GLLearner, 0}
     end.
 
 -spec on(comm:message(), state()) -> state().

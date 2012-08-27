@@ -69,7 +69,7 @@ start_link(DHTNodeGroup, PidName) ->
 init([]) ->
     ?TRACE("Starting learner for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    %%TableName = list_to_atom(pid_groups:my_groupname() ++ "_learner"),
+    %%TableName = pid_groups:my_groupname() ++ "_learner",
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
     TableName = pdb:new(?MODULE, [set, protected]),

@@ -32,11 +32,10 @@
 -export([init/0, on_init_TP/2]).
 -export([on_do_commit_abort/3, on_do_commit_abort_fwd/6]).
 
--spec init() -> atom().
+-spec init() -> pdb:tableid().
 init() ->
     InstanceID = pid_groups:my_groupname(),
-    Table = list_to_atom(InstanceID ++ "_tx_tp"),
-    pdb:new(Table, [set, private, named_table]).
+    pdb:new(InstanceID ++ "_tx_tp", [set, private, named_table]).
 
 %%
 %% Attention: this is not a separate process!!
