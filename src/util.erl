@@ -1249,7 +1249,7 @@ sets_map(Fun, Set) ->
                 [Fun(El) | Acc]
         end, [], Set)).
 
--spec list_to_atom(string()) -> atom().
+-spec list_to_atom([0..255]) -> atom().
 list_to_atom(String) when is_list(String) ->
     try erlang:list_to_existing_atom(String)
     catch _:_ -> erlang:list_to_atom(String)
