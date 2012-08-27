@@ -246,8 +246,10 @@ tester_type_check_util(_Config) ->
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {comm,
@@ -262,9 +264,12 @@ tester_type_check_util(_Config) ->
           {intervals,
            [ {get_bounds, 1}, %% throws exception on []
              {new, 4}, %% type spec to wide (would need overlapping contract support)
-             {split, 2} %% throws exception
+             {split, 2} %% integers too large; tested via feeder
            ],
-           [ {minus_simple2, 2} ]}, %% second is subset of first param
+           [ {minus_simple2, 2}, %% second is subset of first param
+             {p_split, 2}, %% integers too large; tested via feeder
+             {split2, 8} %% integers too large; tested via feeder
+           ]},
           {db_entry, [], []},
           {quorum, [], []},
           {pdb, [], []},
