@@ -31,22 +31,25 @@
 -include("scalaris.hrl").
 
 -ifdef(PDB_ERL).
--type tableid() :: atom().
+-type tableid() :: atom() | nonempty_string().
 -endif.
 -ifdef(PDB_ETS).
 -type tableid() :: tid() | atom().
 -endif.
--spec new(TableName::atom(), [set | ordered_set | bag | duplicate_bag |
-                              public | protected | private |
-                              named_table | {keypos, integer()} |
-                              {heir, pid(), term()} | {heir,none} |
-                              {write_concurrency, boolean()}]) -> tableid().
+-spec new(TableName::atom() | nonempty_string(),
+          [set | ordered_set | bag | duplicate_bag |
+           public | protected | private |
+           named_table | {keypos, integer()} |
+           {heir, pid(), term()} | {heir,none} |
+           {write_concurrency, boolean()}]) -> tableid().
 -ifdef(PDB_ERL).
 new(TableName, _Params) ->
     TableName.
 -endif.
 -ifdef(PDB_ETS).
-new(TableName, Params) ->
+new([_|_] = TableName, Params) ->
+    new(util:list_to_atom(TableName), Params);
+new(TableName, Params) when is_atom(TableName) ->
     ets:new(TableName, Params).
 -endif.
 

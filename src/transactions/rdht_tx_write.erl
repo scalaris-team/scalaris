@@ -153,9 +153,8 @@ init([]) ->
     ?TRACE("rdht_tx_write: Starting rdht_tx_write for DHT node: ~p~n",
            [pid_groups:my_groupname()]),
     DHTNodeGroup = pid_groups:my_groupname(),
-    Table = list_to_atom(DHTNodeGroup ++ "_rdht_tx_write"),
-    pdb:new(Table, [set, private, named_table]),
-    Table.
+    _Table = pdb:new(DHTNodeGroup ++ "_rdht_tx_write",
+                     [set, private, named_table]).
 
 -spec on(comm:message(), pdb:tableid()) -> pdb:tableid().
 on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->

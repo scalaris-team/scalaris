@@ -73,10 +73,9 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     MyGroup = pid_groups:my_groupname(),
     ?TRACE("msg_delay:init for pid group ~p~n", [MyGroup]),
-    TimeTableName = list_to_atom(MyGroup ++ "_msg_delay"),
+    TimeTable = pdb:new(MyGroup ++ "_msg_delay", [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% TableName = pdb:new(?MODULE, [set, private]),
-    TimeTable = pdb:new(TimeTableName, [set, protected, named_table]),
+    %% TimeTable = pdb:new(?MODULE, [set, private]),
     comm:send_local(self(), {msg_delay_periodic}),
     _State = {TimeTable, _Round = 0}.
 
