@@ -512,7 +512,7 @@ end_per_suite(Config) ->
 
 -spec testcase_to_groupname(TestCase::atom()) -> atom().
 testcase_to_groupname(TestCase) ->
-    erlang:list_to_atom(erlang:atom_to_list(TestCase) ++ "_grp").
+    util:list_to_atom(erlang:atom_to_list(TestCase) ++ "_grp").
 
 -spec create_ct_all(TestCases::[atom()]) -> [{group, atom()}].
 create_ct_all(TestCases) ->
