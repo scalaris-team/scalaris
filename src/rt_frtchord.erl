@@ -25,6 +25,9 @@
 -behaviour(rt_beh).
 -include("scalaris.hrl").
 
+% exports for unit tests
+-export([check_rt_integrity/1]).
+
 %% userdevguide-begin rt_frtchord:types
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type external_rt_t() :: gb_tree().
@@ -182,7 +185,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
             end
             ;
         _Else -> % source node changed, rebuild the complete table
-            {trigger_rebuild, OldRT}
+            {trigger_rebuild, OldRT} % XXX this triggers init_stabilize
     end
     .
 %% userdevguide-end rt_frtchord:update
@@ -310,6 +313,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                 fun(Key, Entry, Acc) ->
                         %% TODO send an async message to check if entry is valid; if it
                         %isn't, delete it later
+                        %% TODO if an entry exist, we might have to update the fingers
                         case entry_exists(Key, Acc) of
                             true -> Acc;
                             false -> 
@@ -500,8 +504,9 @@ create_entry(Node, Type, RT) ->
     Tree = get_rt_tree(RT),
     % search the adjacent fingers using the routing table
     PredLookup = util:gb_trees_largest_smaller_than(NodeId, Tree),
+    RTSize = get_size(RT),
     case PredLookup of
-        nil -> % this is the first entry of the RT
+        nil when RTSize =:= 0 -> % this is the first entry of the RT
             NewEntry = #rt_entry{
                 node=Node,
                 type=Type,
@@ -509,15 +514,36 @@ create_entry(Node, Type, RT) ->
             },
             {NewEntry, NewEntry, NewEntry}
             ;
+        nil -> % largest finger
+            {PredId, Pred} = gb_trees:largest(Tree),
+            get_adjacent_fingers_from(PredId, Pred, Node, Type, RT)
+            ;
         {value, PredId, Pred} ->
-            Succ = successor_node(RT, Pred),
-            % construct the node
-            NewEntry = #rt_entry{
-                node=Node,
-                type=Type,
-                adjacent_fingers={PredId, entry_nodeid(Succ)}
-            },
-            {set_adjacent_succ(Pred, NodeId), NewEntry, set_adjacent_pred(Succ, NodeId)}
+            get_adjacent_fingers_from(PredId, Pred, Node, Type, RT)
+    end
+    .
+
+% Get the tuple of adjacent finger ids with Node being in the middle:
+% {Predecessor, Node, Successor}
+get_adjacent_fingers_from(PredId, Pred, Node, Type, RT) ->
+    Succ = successor_node(RT, Pred),
+    SuccId = entry_nodeid(Succ),
+    NodeId = node:id(Node),
+    % construct the node
+    NewEntry = #rt_entry{
+        node=Node,
+        type=Type,
+        adjacent_fingers={PredId, entry_nodeid(Succ)}
+    },
+    case PredId =:= SuccId of
+        false -> {set_adjacent_succ(Pred, NodeId),
+                NewEntry,
+                set_adjacent_pred(Succ, NodeId)
+            };
+        true -> {set_adjacent_fingers(Pred, NodeId, NodeId),
+                NewEntry,
+                set_adjacent_fingers(Succ, NodeId, NodeId)
+            }
     end
     .
 
@@ -626,8 +652,8 @@ rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 %% Get the node with the given Id. This function will crash if the node doesn't exist.
-%-spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
-%rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
+-spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
+rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
 
 %% @doc Check if the given routing table entry is of the given entry type.
 -spec entry_is_of_type(rt_entry(), Type::entry_type()) -> boolean().
@@ -649,8 +675,9 @@ entry_type(Entry) -> Entry#rt_entry.type.
 -spec entry_nodeid(Node :: rt_entry()) -> key().
 entry_nodeid(#rt_entry{node=Node}) -> node:id(Node).
 
-% -spec adjacent_fingers(rt_entry()) -> {key(), key()}.
-% adjacent_fingers(#rt_entry{adjacent_fingers=Fingers}) -> Fingers.
+% @doc Get the adjacent fingers from a routing table entry
+-spec adjacent_fingers(rt_entry()) -> {key(), key()}.
+adjacent_fingers(#rt_entry{adjacent_fingers=Fingers}) -> Fingers.
 
 %% @doc Get the adjacent predecessor key() of the current node.
 -spec adjacent_pred(rt_entry()) -> key().
@@ -696,3 +723,25 @@ spacing(Node, RT) ->
 %%  S_i = log_2(distance(SourceNode, SuccId) / distance(SourceNode, Node))
 canonical_spacing(SourceId, NodeId, SuccId) ->
     util:log2(get_range(SourceId, SuccId) / get_range(SourceId, NodeId)).
+
+% @doc Check that all entries in an rt are well connected by their adjacent fingers
+-spec check_rt_integrity(RT :: rt()) -> boolean().
+check_rt_integrity(RT) ->
+    Nodes = [node:id(N) || N <- internal_to_list(RT)],
+
+    %  make sure that the entries are well-connected
+    Currents = Nodes,
+    Last = lists:last(Nodes),
+    Preds = [Last| lists:filter(fun(E) -> E =/= Last end, Nodes)],
+    Succs = tl(Nodes) ++ [hd(Nodes)],
+
+    % for each 3-tuple of pred, current, succ, check if the RT obeys the fingers
+    Checks = [begin Node = rt_get_node(C, RT),
+                case adjacent_fingers(Node) of
+                    {P, S} ->
+                        true;
+                    _Else ->
+                        false
+                end end || {P, C, S} <- lists:zip3(Preds, Currents, Succs)],
+    lists:all(fun(X) -> X end, Checks)
+    .
