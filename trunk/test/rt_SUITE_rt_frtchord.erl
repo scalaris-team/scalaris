@@ -63,4 +63,39 @@ check_split_key(Begin, End, SplitKey, SplitFraction) ->
                       [(FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction), SplitKey])).
 
 additional_tests(_Config) ->
-    ok.
+    test_rt_integrity().
+
+% set up routing tables and check that the entries are well connected
+test_rt_integrity() ->
+    MyNode = node:new(self(), number_to_key(0), 0),
+    pid_groups:join_as("rt_SUITE", dht_node),
+    Neighbors = nodelist:new_neighborhood(MyNode),
+    RT = ?RT:init(Neighbors), % this will send a message which we will ignore
+    test_rt_integrity_init(RT, MyNode),
+    test_rt_integrity_init_stabilize_1(RT, MyNode),
+    test_rt_integrity_init_stabilize_2(RT, MyNode)
+    .
+
+assert_connected(RT) -> 
+    ?assert_w_note(rt_frtchord:check_rt_integrity(RT), true)
+    .
+
+test_rt_integrity_init(RT, _SourceNode) ->
+    assert_connected(RT).
+
+test_rt_integrity_init_stabilize_1(RT, SourceNode) ->
+    % change the neighborhood and recheck the rt integrity
+    Pred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
+    Neighbors = nodelist:new_neighborhood(Pred, SourceNode),
+    NewRT = ?RT:init_stabilize(Neighbors, RT),
+    assert_connected(NewRT)
+    .
+
+test_rt_integrity_init_stabilize_2(RT, SourceNode) ->
+    % change the neighborhood and recheck the rt integrity
+    Succ = node:new(rt_SUITE:fake_dht_node(".succ"), number_to_key(random:uniform(10000)), 0),
+    Pred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
+    Neighbors = nodelist:new_neighborhood(Pred, SourceNode, Succ),
+    NewRT = ?RT:init_stabilize(Neighbors, RT),
+    assert_connected(NewRT)
+    .
