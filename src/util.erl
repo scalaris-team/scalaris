@@ -50,8 +50,7 @@
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          readable_utc_time/1,
          for_to/3, for_to_ex/3, for_to_ex/4, for_to_fold/5,
-         collect_while/1,
-         list_to_atom/1]).
+         collect_while/1]).
 -export([list_set_nth/3]).
 -export([debug_info/0, debug_info/1]).
 -export([print_bits/2, bin_xor/2]).
@@ -1248,9 +1247,3 @@ sets_map(Fun, Set) ->
     lists:reverse(sets:fold(fun (El, Acc) ->
                 [Fun(El) | Acc]
         end, [], Set)).
-
--spec list_to_atom([0..255]) -> atom().
-list_to_atom(String) when is_list(String) ->
-    try erlang:list_to_existing_atom(String)
-    catch _:_ -> erlang:list_to_atom(String)
-    end.
