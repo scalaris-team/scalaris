@@ -226,7 +226,10 @@ p_gen_kvv({non_uniform, Fun}, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
-    FRate = util:floor(KeyCount / FCount),
+    FRate = case FCount of
+                0 -> KeyCount + 1;
+                _ -> util:floor(KeyCount / FCount)
+            end,
     {DB, O, _, _} = 
         lists:foldl(
           fun(Key, {AccDb, Out, Count, FCRest}) ->
