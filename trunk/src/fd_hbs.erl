@@ -64,7 +64,7 @@
 -spec start_link(pid_groups:groupname(), comm:mypid()) -> {ok, pid()}.
 start_link(ServiceGroup, RemotePid) ->
     RemoteFDPid = comm:get(fd, RemotePid),
-    Name = list_to_atom(lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid]))),
+    Name = lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [RemotePid],
                              [wait_for_init,
                               {pid_groups_join_as, ServiceGroup, Name}]).
