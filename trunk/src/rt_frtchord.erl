@@ -69,21 +69,10 @@ maximum_entries() -> 10.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin rt_frtchord:empty
-%% @doc Creates an "empty" routing table containing the successor.
+%% @doc Creates an "empty" routing table.
 -spec empty(nodelist:neighborhood()) -> rt().
 empty(Neighbors) ->
-    RT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
-    Preds = nodelist:preds(Neighbors),
-    Succs = nodelist:succs(Neighbors),
-
-    % coyping the preds and succs silences dialyzer
-    StickyPreds = [N || N <- Preds],
-    StickySuccs = [N || N <- Succs],
-
-    % insert preds and succs as sticky entries to the routing table
-    % TODO We should always be able to add sticky nodes -> don't check the RT size
-    TmpRT = lists:foldl(fun add_sticky_entry/2, RT, StickyPreds),
-    lists:foldl(fun add_sticky_entry/2, TmpRT, StickySuccs)
+    add_source_entry(nodelist:node(Neighbors), #rt_t{})
     .
 %% userdevguide-end rt_frtchord:empty
 
@@ -136,13 +125,11 @@ get_random_node_id() ->
 -spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) -> 
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
-        true -> % replace sticky entries
-            StickyEntries = sets:from_list(get_sticky_entries(RT)),
-            remove_and_ping_entries(StickyEntries, Neighbors, RT)
-            ;
+        true -> remove_and_ping_entries(Neighbors, RT) ;
         _Else -> % source node changed, replace the complete table
             init(Neighbors)
-    end.
+    end
+    .
 
 
 %% userdevguide-end rt_frtchord:init_stabilize
@@ -159,18 +146,18 @@ get_node_neighbors(Neighborhood) ->
 %% This function removes sticky nodes from the RT which aren't in the neighborhood
 %% anymore. Additionally, it pings all entries to make sure that the IDs of the entries
 %% haven't changed.
-%% TODO do we delete living sticky entries here?
--spec remove_and_ping_entries(OldStickyNodes :: set(),
-                              NewNeighbors :: nodelist:neighborhood(),
+-spec remove_and_ping_entries(NewNeighbors :: nodelist:neighborhood(),
                               RT :: rt()) -> rt().
-remove_and_ping_entries(OldStickyNodes, NewNeighbors, RT) ->
+remove_and_ping_entries(NewNeighbors, RT) ->
+    OldStickyNodes = sets:from_list(lists:map(fun rt_entry_node/1,
+            get_sticky_entries(RT))),
     NewStickyNodes = get_node_neighbors(NewNeighbors),
     DeadStickyNodes = sets:subtract(OldStickyNodes, NewStickyNodes),
-    DeadStickyNodesIds = util:sets_map(fun entry_nodeid/1, DeadStickyNodes),
-    % filter dead nodes
+    DeadStickyNodesIds = util:sets_map(fun node:id/1, DeadStickyNodes),
+    ToBeAddedNodes = sets:subtract(NewStickyNodes, OldStickyNodes),
+    % filter dead nodes and add sticky nodes
     FilteredRT = lists:foldl(fun entry_delete/2, RT, DeadStickyNodesIds),
-    % add new sticky nodes
-    NewRT = sets:fold(fun add_sticky_entry/2, FilteredRT, NewStickyNodes),
+    NewRT = sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes),
     %% TODO ping entries
     NewRT.
 
@@ -180,12 +167,12 @@ remove_and_ping_entries(OldStickyNodes, NewNeighbors, RT) ->
 %% - If only the preds/succs changed, adapt the old routing table
 -spec update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
     NewNeighbors::nodelist:neighborhood()) -> {trigger_rebuild, rt()} | {ok, rt()}.
+update(OldRT, Neighbors, Neighbors) -> {ok, OldRT};
 update(OldRT, OldNeighbors, NewNeighbors) ->
     case nodelist:node(OldNeighbors) =:= nodelist:node(NewNeighbors) of
         true -> % source node didn't change
             % update the sticky nodes: delete old nodes and add new nodes
-            OldStickyNodes = get_node_neighbors(OldNeighbors),
-            NewRT = remove_and_ping_entries(OldStickyNodes, NewNeighbors, OldRT),
+            NewRT = remove_and_ping_entries(NewNeighbors, OldRT),
             
             case NewRT of % only trigger a rebuild if something changed
                 OldRT -> 
@@ -310,10 +297,15 @@ handle_custom_message({get_rt_reply, RT}, State) ->
     %% merge the routing tables. Note: We don't care if this message is not from our
     %current successor. We just have to make sure that the merged entries are valid.
     LocalRT = rt_loop:get_rt(State),
-    NewRT = case LocalRT =:= RT of
+    NewRT = case LocalRT =/= RT of
         true ->
+            % Merge the smaller table into the bigger one
             % - add each entry from the other RT if it doesn't already exist
             % - entries to be added have to be normal entries
+            {From, To} = case get_size(RT) < get_size(LocalRT) of
+                true -> {RT, LocalRT};
+                false -> {LocalRT, RT}
+            end,
             util:gb_trees_foldl(
                 fun(Key, Entry, Acc) ->
                         %% TODO send an async message to check if entry is valid; if it
@@ -321,12 +313,13 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                         case entry_exists(Key, Acc) of
                             true -> Acc;
                             false -> 
-                                io:format("Adding normal entry ~p~n", [Entry]),
                                 add_normal_entry(Entry, Acc)
                         end
                 end,
-                LocalRT, get_rt_tree(RT)
-            );
+                To, get_rt_tree(From)
+            )
+            ;
+
         false -> LocalRT
     end,
     rt_loop:set_rt(State, NewRT)
@@ -358,7 +351,6 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
         true -> ok;
         _Else -> % update the exported routing table
             Pid = pid_groups:get_my(dht_node),
-            io:format("And the Pid is....~p~n", [Pid]),
             case Pid of
                 failed -> ok;
                 _E     -> RTExt = export_rt_to_dht_node(NewRT, NewNeighbors),
@@ -565,12 +557,9 @@ entry_learning_and_filtering(Entry, Type, RT) ->
     SizeOfRT = get_size(IntermediateRT),
     MaxEntries = maximum_entries(),
     if SizeOfRT >= MaxEntries ->
-            io:format("Have to filter...~nRT:~p~n", [IntermediateRT]),
             AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(RT)),
                 not is_sticky(N) and not is_source(N)],
-            NewRT = entry_filtering(IntermediateRT, AllowedNodes),
-            io:format("NewRT:~p~n", [NewRT]),
-            NewRT;
+            entry_filtering(IntermediateRT, AllowedNodes);
        true -> IntermediateRT
     end.
 
@@ -660,6 +649,9 @@ entry_type(Entry) -> Entry#rt_entry.type.
 -spec entry_nodeid(Node :: rt_entry()) -> key().
 entry_nodeid(#rt_entry{node=Node}) -> node:id(Node).
 
+% -spec adjacent_fingers(rt_entry()) -> {key(), key()}.
+% adjacent_fingers(#rt_entry{adjacent_fingers=Fingers}) -> Fingers.
+
 %% @doc Get the adjacent predecessor key() of the current node.
 -spec adjacent_pred(rt_entry()) -> key().
 adjacent_pred(#rt_entry{adjacent_fingers={Pred,_Succ}}) -> Pred.
@@ -668,15 +660,20 @@ adjacent_pred(#rt_entry{adjacent_fingers={Pred,_Succ}}) -> Pred.
 -spec adjacent_succ(rt_entry()) -> key().
 adjacent_succ(#rt_entry{adjacent_fingers={_Pred,Succ}}) -> Succ.
 
+%% @doc Set the adjacent fingers of a node
+-spec set_adjacent_fingers(rt_entry(), key(), key()) -> rt_entry().
+set_adjacent_fingers(#rt_entry{} = Entry, PredId, SuccId) ->
+    Entry#rt_entry{adjacent_fingers={PredId, SuccId}}.
+
 %% @doc Set the adjacent successor of the finger
 -spec set_adjacent_succ(rt_entry(), key()) -> rt_entry().
 set_adjacent_succ(#rt_entry{adjacent_fingers={PredId, _Succ}} = Entry, SuccId) ->
-    Entry#rt_entry{adjacent_fingers={PredId, SuccId}}.
+    set_adjacent_fingers(Entry, PredId, SuccId).
 
 %% @doc Set the adjacent predecessor of the finger
 -spec set_adjacent_pred(rt_entry(), key()) -> rt_entry().
 set_adjacent_pred(#rt_entry{adjacent_fingers={_Pred, SuccId}} = Entry, PredId) ->
-    Entry#rt_entry{adjacent_fingers={PredId, SuccId}}.
+    set_adjacent_fingers(Entry, PredId, SuccId).
 
 %% @doc Get the adjacent predecessor rt_entry() of the given node.
 -spec predecessor_node(RT :: rt(), Node :: rt_entry()) -> rt_entry().
@@ -685,7 +682,9 @@ predecessor_node(RT, Node) ->
 
 -spec successor_node(RT :: rt(), Node :: rt_entry()) -> rt_entry().
 successor_node(RT, Node) ->
-    gb_trees:get(adjacent_succ(Node), get_rt_tree(RT)).
+    try gb_trees:get(adjacent_succ(Node), get_rt_tree(RT)) catch
+         error:function_clause -> exit('stale adjacent fingers')
+    end.
 
 -spec spacing(Node :: rt_entry(), RT :: rt()) -> float().
 spacing(Node, RT) ->
