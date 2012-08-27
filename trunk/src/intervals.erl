@@ -671,10 +671,16 @@ p_split([{I, Parts} | R], Acc) ->
                 end,
             if LKey =/= RKey andalso Parts > 100 ->
                    [I1, I2] = intervals:split(I, 2),
-                   p_split([{I2, (Parts div 2) + (Parts rem 2)}, {I1, Parts div 2} | R], Acc);
+                   I1Parts = Parts div 2,
+                   I2Parts = I1Parts + (Parts rem 2),
+                   p_split([{I2, I2Parts}, {I1, I1Parts} | R], Acc);
                true ->
-                   p_split(R, lists:append(lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])), 
-                                           Acc))
+                   CurSplit = lists:reverse(
+                                split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])),
+                   NewAcc = if Acc =:= [] -> CurSplit;
+                               true -> lists:append(CurSplit, Acc)
+                            end,
+                   p_split(R, NewAcc)
             end;
         false -> erlang:throw('interval is not continuous')
     end.
