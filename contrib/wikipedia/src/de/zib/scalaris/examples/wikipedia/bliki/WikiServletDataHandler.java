@@ -261,13 +261,11 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to the DB
      * @param title
      *            the title of the category
-     * @param nsObject
-     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
     public ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
-            String title, final MyNamespace nsObject);
+            NormalisedTitle title);
     
     /**
      * Retrieves a list of pages using the given template from the DB.
@@ -276,13 +274,11 @@ public interface WikiServletDataHandler<Connection> {
      *            the connection to the DB
      * @param title
      *            the title of the template
-     * @param nsObject
-     *            the namespace for page title normalisation
      * 
      * @return a result object with the page list on success
      */
     public ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
-            String title, final MyNamespace nsObject);
+            NormalisedTitle title);
     
     /**
      * Retrieves a list of pages linking to the given page from the DB.
