@@ -379,7 +379,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
         return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
-                Arrays.asList(getTplPageListKey(title)), true,
+                Arrays.asList(getTplPageListKey(title)), false,
                 timeAtStart, "pages in " + title);
     }
 
