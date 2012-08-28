@@ -624,7 +624,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     println("  creating category lists");
                     stmt = db.prepare("SELECT cat.title, page.title FROM categories as categories " +
                             "INNER JOIN pages AS cat ON categories.category == cat.id " +
-                            "INNER JOIN pages AS page ON categories.page == page.id;");
+                            "INNER JOIN pages AS page ON categories.page == page.id ORDER BY cat.title;");
                     writeToScalarisKV(stmt, ListType.CAT_LIST);
                     stmt.dispose();
                 } while (false);
@@ -634,7 +634,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     println("  creating template lists");
                     stmt = db.prepare("SELECT tpl.title, page.title FROM templates as templates " +
                             "INNER JOIN pages AS tpl ON templates.template == tpl.id " +
-                            "INNER JOIN pages AS page ON templates.page == page.id;");
+                            "INNER JOIN pages AS page ON templates.page == page.id ORDER BY tpl.title;");
                     writeToScalarisKV(stmt, ListType.TPL_LIST);
                     stmt.dispose();
                 } while (false);
@@ -644,7 +644,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                     println("  creating backlink lists");
                     stmt = db.prepare("SELECT lnkDest.title, lnkSrc.title FROM links as links " +
                             "INNER JOIN pages AS lnkDest ON links.lnkDest == lnkDest.id " +
-                            "INNER JOIN pages AS lnkSrc ON links.lnkSrc == lnkSrc.id;");
+                            "INNER JOIN pages AS lnkSrc ON links.lnkSrc == lnkSrc.id ORDER BY lnkDest.title;");
                     writeToScalarisKV(stmt, ListType.LNK_LIST);
                     stmt.dispose();
                 } while (false);
@@ -671,7 +671,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
          * @throws RuntimeException
          */
         private void writeToScalarisKV(SQLiteStatement stmt, ListType listType) throws SQLiteException, RuntimeException {
-            NormalisedTitle listKey = null;
+            String listKey = null;
             List<String> pageList = new ArrayList<String>(1000);
             while (stmt.step()) {
                 // note: both titles are already normalised!
@@ -679,7 +679,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 final String stmtPage = stmt.columnString(1);
                 if (listKey == null) {
                     // first row
-                    listKey = NormalisedTitle.fromNormalised(stmtKey);
+                    listKey = stmtKey;
                     pageList.add(stmtPage);
                 } else if (listKey.equals(stmtKey)) {
                     // next item with the same list key
@@ -687,13 +687,13 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 } else {
                     // new item, i.e. different list key
                     // -> write old list, then accumulate new
-                    writeToScalarisKV(listKey, pageList, listType);
-                    listKey = NormalisedTitle.fromNormalised(stmtKey);
+                    writeToScalarisKV(NormalisedTitle.fromNormalised(listKey), pageList, listType);
+                    listKey = stmtKey;
                     pageList.add(stmtPage);
                 }
             }
             if (listKey != null && !pageList.isEmpty()) {
-                writeToScalarisKV(listKey, pageList, listType);
+                writeToScalarisKV(NormalisedTitle.fromNormalised(listKey), pageList, listType);
             }
         }
 
