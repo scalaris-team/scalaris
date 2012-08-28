@@ -834,8 +834,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         wikiModel.setPageName(title);
         if (renderer > 0) {
             String mainText = wikiModel.renderPageWithCache(revision.unpackedText());
-            if (wikiModel.isCategoryNamespace(wikiModel.getNamespace(title))) {
-                ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, title, namespace);
+            NormalisedTitle titleN = NormalisedTitle.fromUnnormalised(title, namespace);
+            if (titleN.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, titleN);
                 page.addStats(catPagesResult.stats);
                 page.getInvolvedKeys().addAll(catPagesResult.involvedKeys);
                 if (catPagesResult.success) {
@@ -843,13 +844,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
                     final List<String> catPageList = new ArrayList<String>(catPagesResult.value.size());
                     wikiModel.denormalisePageTitles(catPagesResult.value, catPageList);
-                    for (String pageInCat: catPageList) {
-                        String pageNamespace = wikiModel.getNamespace(pageInCat);
-                        if (wikiModel.isCategoryNamespace(pageNamespace)) {
-                            subCategories.add(wikiModel.getTitleName(pageInCat));
-                        } else if (wikiModel.isTemplateNamespace(pageNamespace)) {
-                            // all pages using a template are in the category, too
-                            ValueResult<List<NormalisedTitle>> tplResult = getPagesInTemplate(connection, pageInCat, namespace);
+
+                    for (NormalisedTitle pageInCat: catPagesResult.value) {
+                        if (pageInCat.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                            subCategories.add(pageInCat.title);
+                        } else if (pageInCat.namespace == MyNamespace.TEMPLATE_NAMESPACE_KEY) {
+                            // all pages using a template are in the category of the template, too
+                            ValueResult<List<NormalisedTitle>> tplResult = getPagesInTemplate(connection, pageInCat);
                             page.addStats(tplResult.stats);
                             page.getInvolvedKeys().addAll(tplResult.involvedKeys);
                             if (tplResult.success) {
@@ -865,7 +866,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                                 addToParam_notice(request, "error getting pages using template: " + tplResult.message);
                             }
                         } else {
-                            categoryPages.add(pageInCat);
+                            categoryPages.add(pageInCat.denormalise(namespace));
                         }
                     }
                     page.setSubCategories(subCategories);

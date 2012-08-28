@@ -49,6 +49,7 @@ import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
+import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
@@ -507,13 +508,13 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
-    public ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerUnnormalised.getPagesInCategory(connection, title, nsObject);
+    public ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection, NormalisedTitle title) {
+        return ScalarisDataHandlerNormalised.getPagesInCategory(connection, title);
     }
 
     @Override
-    public ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection, String title, final MyNamespace nsObject) {
-        return ScalarisDataHandlerUnnormalised.getPagesInTemplate(connection, title, nsObject);
+    public ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection, NormalisedTitle title) {
+        return ScalarisDataHandlerNormalised.getPagesInTemplate(connection, title);
     }
 
     @Override
