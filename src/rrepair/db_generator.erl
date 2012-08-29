@@ -157,6 +157,15 @@ fill_random(DBSize, Params) ->
     DBStatus.
 
 fill_wiki(_Params) ->
+    fill_wiki(_Params, "barwiki-latest-pages-meta-current.db").
+
+fill_wiki(_Params, DBFile) ->
+    Result = os:cmd("ant -buildfile ../contrib/wikipedia/build.xml import-db "
+                   "-Ddata=\"../contrib/wikipedia/" ++ DBFile ++ "\" "
+                   "-Dnumber_of_importers=1 -Dmy_import_number=1 "
+                   "-Dscalaris.node=\"" ++ atom_to_list(erlang:node()) ++ "\" "
+                   "-Dscalaris.cookie=\"" ++ atom_to_list(erlang:get_cookie()) ++ "\""),
+    io:format("~s~n", [Result]),
     %TODO
     {0, 0, 0, 0}.
 
