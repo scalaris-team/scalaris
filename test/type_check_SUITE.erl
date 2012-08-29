@@ -30,6 +30,8 @@ all()   -> [
             tester_type_check_api,
             tester_type_check_config,
             tester_type_check_gossip,
+            tester_type_check_math,
+            tester_type_check_node,
             tester_type_check_paxos,
             tester_type_check_tx,
             tester_type_check_util
@@ -113,6 +115,85 @@ tester_type_check_gossip(_Config) ->
     config:write(no_print_ring_data, true),
     Modules =
         [ {gossip_state, [], []}
+        ],
+    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+      || {Mod, Excl, ExclPriv} <- Modules ],
+    true.
+
+tester_type_check_math(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    Modules =
+        [ {intervals,
+           [ {get_bounds, 1}, %% throws exception on []
+             {new, 4}, %% type spec to wide (would need overlapping contract support)
+             {split, 2} %% integers too large; tested via feeder
+           ],
+           [ {minus_simple2, 2}, %% second is subset of first param
+             {p_split, 2}, %% integers too large; tested via feeder
+             {split2, 8} %% integers too large; tested via feeder
+           ]},
+          {mathlib,
+           [ {vecWeightedAvg,4}, %% needs same length lists
+             {closestPoints, 1}, %% needs same length lists
+             {binomial_coeff, 2}, %% needs N > K, done by feeder
+             {aggloClustering, 3}, %% needs same length lists
+             {vecAdd, 2}, %% needs same length lists
+             {vecSub, 2}, %% needs same length lists
+             {euclideanDistance, 2}, %% needs same length lists
+             {u, 1} %% needs non zero number in list
+           ],
+           [ {closestPointsForJ, 7}, %% needs same length lists and funs
+             {aggloClusteringHelper, 6}, %% spec suspicious (-1 for lists:nth())
+             {choose, 4} %% slow for large integers
+           ]},
+          %% {math_pos, [], []}, %% needs valid pos fields
+          {prime, [],
+           [ {find_bigger_prime, 3} ]}, %% too slow for large integers
+          {randoms, [{start, 0}, {stop, 0}], []}
+        ],
+    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+      || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, intervals, interval}),
+    tester:unregister_type_checker({typedef, intervals, simple_interval}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
+    tester:unregister_value_creator({typedef, intervals, interval}),
+    tester:unregister_value_creator({typedef, intervals, simple_interval}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    true.
+
+tester_type_check_node(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    Modules =
+        [
+         {node,
+          [ {is_newer, 2}, %% throws function clause (same pid as input needed)
+            {newer, 2} %% throws function clause (same pid as input needed)
+          ], []},
+         {node_details,
+          [ {get, 2}], %% throws 'not_available' on empty nodelist
+          [ {get_list, 2}]}, %% throws 'not_available'
+         {nodelist,
+          [ {throw_if_newer, 2}, %% throws
+            {lremove, 3}, %% cannot create funs
+            {lfilter_min_length, 3}, %% cannot create funs
+            {filter_min_length, 4}, %% cannot create funs
+            {lfilter, 2}, %% cannot create funs
+            {lfilter, 3}, %% cannot create funs
+            {filter, 2}, %% cannot create funs
+            {filter, 3}, %% cannot create funs
+            {update_node, 2}, %% needs node in certain interval
+            {ets_insert_newer_node,2}, %% cannot create tid()
+            {remove, 3} %% cannot create funs
+          ],
+          [ ]}
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
@@ -244,12 +325,6 @@ tester_type_check_tx(_Config) ->
 tester_type_check_util(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {comm,
@@ -261,17 +336,11 @@ tester_type_check_util(_Config) ->
              {send_local, 2}, {send_local_after, 3}, %% cannot send msgs
              {unpack_cookie, 2} %% cannot create correct envelopes
            ], []},
-          {intervals,
-           [ {get_bounds, 1}, %% throws exception on []
-             {new, 4}, %% type spec to wide (would need overlapping contract support)
-             {split, 2} %% integers too large; tested via feeder
-           ],
-           [ {minus_simple2, 2}, %% second is subset of first param
-             {p_split, 2}, %% integers too large; tested via feeder
-             {split2, 8} %% integers too large; tested via feeder
-           ]},
           {db_entry, [], []},
-          {quorum, [], []},
+          %% {fix_queue, [], []}, %% queue as builtin type not supported yet
+
+          %% {histogram, [], []}, %% error in add?
+          {msg_queue, [], []},
           {pdb, [], []},
           {pid_groups,
            [ {add, 3}, %% same as above
@@ -281,7 +350,27 @@ tester_type_check_util(_Config) ->
              {pids_to_names, 2}, %% sends remote messages
              {start_link, 0}
            ], []},
-          {randoms, [{start, 0}, {stop, 0}], []},
+          {quorum, [], []},
+          %% {rrd,
+          %%  [ {dump, 1}, %% eats memory?!
+          %%    {dump_with, 2}, %% needs fun
+          %%    {dump_with, 3}, %% needs fun
+          %%    {add, 3}, %% to slow for large timestamps?
+          %%    {add_now, 2}, %% bad arith
+          %%    {add_with, 4}, %% needs fun
+          %%    {check_timeslot, 2}, %% to slow for large timestamps?
+          %%    {check_timeslot_now, 1}, %% to slow for testing?
+          %%    {get_value, 2}, %% returns more than the spec expects
+          %%    {get_value_by_offset, 2}, %% returns more than the spec expects
+          %%    {timing_with_hist_merge_fun, 3}, %% function_clause
+          %%    {merge, 2}, %% needs same rrd type twice
+          %%    {add_nonexisting_timeslots, 2} %% needs same rrd type twice
+          %%  ],
+          %%  [ {update_with, 5} %% needs fun
+          %%    ...
+          %%  ]},
+          %%{statistics, [], []},
+          {uid, [], []},
           {util,
            [ {collect_while, 1}, %% cannot create funs
              {debug_info, 0}, %% type spec not valid?

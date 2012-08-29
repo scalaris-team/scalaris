@@ -50,6 +50,7 @@ find_in_cache(N, [P | Cache]) ->
         false -> find_in_cache(N, Cache)
     end.
 
+-spec find_bigger_prime(pos_integer(), pos_integer(), [pos_integer()]) -> pos_integer().
 find_bigger_prime(I, N, Primes) ->
     case is_prime(I, Primes) of
         true when I < N -> find_bigger_prime(I + 2, N, [I | Primes]);
@@ -66,6 +67,7 @@ is_prime(V) ->
         false -> is_prime_p(V, ?MODULE:get(V))
     end.
 
+-spec is_prime_p(pos_integer(), [pos_integer()]) -> boolean().
 is_prime_p(V, Primes) ->
     lists:any(fun(P) -> P =:= V end, Primes).
 

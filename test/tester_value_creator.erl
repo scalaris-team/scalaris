@@ -160,6 +160,12 @@ create_value_({typedef, Module, TypeName}, Size, ParseState) ->
         none ->
             ?ct_fail("error: unknown type ~p:~p~n", [Module, TypeName])
     end;
+create_value_({builtin_type, array}, Size, ParseState) ->
+    L = create_value({list,
+                      {tuple,
+                       [{typedef, tester, test_any},
+                        {typedef, tester, test_any}]}}, Size, ParseState),
+    array:from_list(L);
 create_value_({builtin_type, gb_tree}, Size, ParseState) ->
     L = create_value({list,
                       {tuple,
