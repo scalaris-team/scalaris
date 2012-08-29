@@ -667,25 +667,22 @@ is_right_of(X, Y) ->
 split_feeder(I, Parts) ->
     {I, Parts}.
 
-%% @doc Splits a continuous interval in X roughly equally-sized subintervals.
+%% @doc Splits a continuous interval in X roughly equally-sized subintervals,
+%%      the result of non-continuous intervals is undefined.
 %%      Returns: List of adjacent intervals
 -spec split(interval(), Parts::pos_integer()) -> [interval()].
 split(I, 1) -> [I];
 split(I, Parts) ->
-    case is_continuous(I) of
-        true ->
-            {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
-            % keep brackets inside the split interval if they are different
-            % (i.e. one closed, the other open), otherwise exclude split keys
-            % from each first interval at each split
-            {InnerLBr, InnerRBr} =
-                if (LBr =:= '[' andalso RBr =:= ']') orelse
-                       (LBr =:= '(' andalso RBr =:= ')') -> {'[', ')'};
-                   true -> {LBr, RBr}
-                end,
-            lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, []));
-        false -> erlang:throw('interval is not continuous')
-    end.
+    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    % keep brackets inside the split interval if they are different
+    % (i.e. one closed, the other open), otherwise exclude split keys
+    % from each first interval at each split
+    {InnerLBr, InnerRBr} =
+        if (LBr =:= '[' andalso RBr =:= ']') orelse
+               (LBr =:= '(' andalso RBr =:= ')') -> {'[', ')'};
+           true -> {LBr, RBr}
+        end,
+    lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])).
 
 -spec split2_feeder(left_bracket(), key(), key(), right_bracket(), Parts::1..255,
                     InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
