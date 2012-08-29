@@ -62,7 +62,9 @@ init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     Config3 = unittest_helper:start_minimal_procs(Config2, [], false),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     Config3.
 
 end_per_suite(Config) ->
@@ -681,15 +683,13 @@ tester_get_elements(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_split_is_well_formed(intervals:key(), intervals:key(), 1..1000) -> boolean().
-prop_split_is_well_formed(X, Y, Parts) ->
-    I = intervals:new('[', X, Y, ']'),
+-spec prop_split_is_well_formed(intervals:continuous_interval(), 1..1000) -> boolean().
+prop_split_is_well_formed(I, Parts) ->
     S = intervals:split(I, Parts),
     lists:foldl(fun(SubI, Acc) -> Acc andalso intervals:is_well_formed(SubI) end, true, S).
 
--spec prop_split_is_continuous(intervals:key(), intervals:key(), 1..1000) -> boolean().
-prop_split_is_continuous(X, Y, Parts) ->
-    I = intervals:new('[', X, Y, ']'),
+-spec prop_split_is_continuous(intervals:continuous_interval(), 1..1000) -> boolean().
+prop_split_is_continuous(I, Parts) ->
     S = intervals:split(I, Parts),
     lists:foldl(fun(SubI, Acc) -> 
                         Acc andalso ?implies(not intervals:is_empty(SubI), intervals:is_continuous(SubI)) 
@@ -697,9 +697,8 @@ prop_split_is_continuous(X, Y, Parts) ->
 
 %% @doc Checks that each split interval is a subset of the original,
 %%      the union of all is the original, split-off intervals do not overlap.
--spec prop_split(intervals:key(), intervals:key(), 1..1000) -> true.
-prop_split(X, Y, Parts) ->
-    I = intervals:new('[', X, Y, ']'),
+-spec prop_split(intervals:continuous_interval(), 1..1000) -> true.
+prop_split(I, Parts) ->
     S = intervals:split(I, Parts),
     lists:foreach(fun(SubI) -> ?equals(intervals:is_subset(SubI, I), true) end, S),
     ?equals(lists:foldl(fun(SubI, UI) -> intervals:union(SubI, UI) end, intervals:empty(), S), I),
@@ -711,13 +710,13 @@ prop_split(X, Y, Parts) ->
     true.
 
 tester_split_is_continuous(_Config) ->
-    tester:test(?MODULE, prop_split_is_continuous, 3, 5000, [{threads, 2}]).
+    tester:test(?MODULE, prop_split_is_continuous, 2, 5000, [{threads, 2}]).
 
 tester_split_is_well_formed(_Config) ->
-    tester:test(?MODULE, prop_split_is_well_formed, 3, 5000, [{threads, 2}]).
+    tester:test(?MODULE, prop_split_is_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_split(_Config) ->
-    tester:test(?MODULE, prop_split, 3, 5000, [{threads, 2}]).
+    tester:test(?MODULE, prop_split, 2, 5000, [{threads, 2}]).
 
 split_bounds(_) ->
     Q = intervals:split(intervals:all(), 4), %4=ReplicationFactor
