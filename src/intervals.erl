@@ -47,7 +47,7 @@
          is_well_formed/1, tester_create_interval/1,
          is_well_formed_simple/1, tester_create_simple_interval/1,
          tester_create_continuous_interval/4,
-         split_feeder/2, split2_feeder/8, p_split_feeder/2
+         split_feeder/2, split2_feeder/8
         ]).
 
 -ifdef(with_export_type_support).
@@ -667,20 +667,11 @@ is_right_of(X, Y) ->
 split_feeder(I, Parts) ->
     {I, Parts}.
 
-%% @doc Splits an continuous interval in X roughly equally-sized subintervals
+%% @doc Splits a continuous interval in X roughly equally-sized subintervals.
 %%      Returns: List of adjacent intervals
--spec split(interval(), pos_integer()) -> [interval()].
+-spec split(interval(), Parts::pos_integer()) -> [interval()].
+split(I, 1) -> [I];
 split(I, Parts) ->
-    p_split([{I, Parts}], []).
-
--spec p_split_feeder([{continuous_interval(), 1..255}], [continuous_interval()])
-        -> {[{continuous_interval(), pos_integer()}], [continuous_interval()]}.
-p_split_feeder(Jobs, Acc) ->
-    {Jobs, Acc}.
-
--spec p_split([{interval(), pos_integer()}], [interval()]) -> [interval()].
-p_split([], Acc) -> Acc;
-p_split([{I, Parts} | R], Acc) ->
     case is_continuous(I) of
         true ->
             {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
@@ -692,19 +683,7 @@ p_split([{I, Parts} | R], Acc) ->
                        (LBr =:= '(' andalso RBr =:= ')') -> {'[', ')'};
                    true -> {LBr, RBr}
                 end,
-            if LKey =/= RKey andalso Parts > 100 ->
-                   [I1, I2] = intervals:split(I, 2),
-                   I1Parts = Parts div 2,
-                   I2Parts = I1Parts + (Parts rem 2),
-                   p_split([{I2, I2Parts}, {I1, I1Parts} | R], Acc);
-               true ->
-                   CurSplit = lists:reverse(
-                                split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])),
-                   NewAcc = if Acc =:= [] -> CurSplit;
-                               true -> lists:append(CurSplit, Acc)
-                            end,
-                   p_split(R, NewAcc)
-            end;
+            lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, []));
         false -> erlang:throw('interval is not continuous')
     end.
 
