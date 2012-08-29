@@ -136,7 +136,6 @@ tester_type_check_math(_Config) ->
              {split, 2} %% integers too large; tested via feeder
            ],
            [ {minus_simple2, 2}, %% second is subset of first param
-             {p_split, 2}, %% integers too large; tested via feeder
              {split2, 8} %% integers too large; tested via feeder
            ]},
           {mathlib,
