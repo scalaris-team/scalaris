@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@
         aggloClustering/3]).
 
 -export([factorial/1, binomial_coeff/2]).
+
+%% for type_check_SUITE
+-export([binomial_coeff_feeder/2]).
 
 -type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
@@ -158,6 +161,13 @@ binomial_coeff(_, 0) -> 1;
 binomial_coeff(N, K) when N >= K ->
   choose(N, K, 1, 1).
 
+-spec binomial_coeff_feeder(non_neg_integer(), non_neg_integer()) ->
+                                   {non_neg_integer(), non_neg_integer()}.
+binomial_coeff_feeder(X, Y) ->
+    {erlang:max(X, Y), erlang:min(X, Y)}.
+
+-spec choose(non_neg_integer(), non_neg_integer(),
+             non_neg_integer(), non_neg_integer()) -> non_neg_integer().
 choose(N, K, K, Acc) ->
   (Acc * (N-K+1)) div K;
 choose(N, K, I, Acc) ->
