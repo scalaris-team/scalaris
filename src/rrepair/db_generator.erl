@@ -143,7 +143,7 @@ non_uniform_key_list(I, Step, ToAdd, Fun, Acc, AccType) ->
 fill_ring(Type, DBSize, Params) ->
     case Type of
         random -> fill_random(DBSize, Params);
-        wiki -> fill_wiki(DBSize, Params)
+        wiki -> fill_wiki(Params)
     end.
 
 fill_random(DBSize, Params) ->    
@@ -156,7 +156,7 @@ fill_random(DBSize, Params) ->
     insert_db(DB),
     DBStatus.
 
-fill_wiki(_DBSize, _Params) ->
+fill_wiki(_Params) ->
     %TODO
     {0, 0, 0, 0}.
 
