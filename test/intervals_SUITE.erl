@@ -702,12 +702,22 @@ prop_split(I, Parts) ->
     S = intervals:split(I, Parts),
     lists:foreach(fun(SubI) -> ?equals(intervals:is_subset(SubI, I), true) end, S),
     ?equals(lists:foldl(fun(SubI, UI) -> intervals:union(SubI, UI) end, intervals:empty(), S), I),
-    [FirstI | RestI] = S,
+    S_nonempty = [X || X <- S, not intervals:is_empty(X)],
     _ = lists:foldl(fun(SubI, LastI) -> 
-                            ?equals(?implies(not intervals:is_empty(SubI), intervals:is_adjacent(SubI, LastI)), true),
+                            ?assert(intervals:is_adjacent(SubI, LastI)),
                             SubI 
-                    end, FirstI, RestI),
-    true.
+                    end, hd(S_nonempty), tl(S_nonempty)),
+    UniqueRanges = gb_sets:from_list(
+                     [begin
+                          {_, Begin, End, _} = intervals:get_bounds(X),
+                          ?RT:get_range(Begin, End)
+                      end || X <- S_nonempty]),
+    case gb_sets:fold(fun(X, Acc) -> Acc andalso is_integer(X) end, true, UniqueRanges) of
+        true ->
+            ?assert_w_note(lists:member(gb_sets:size(UniqueRanges), [1, 2]),
+                           io_lib:format("UniqueRanges: ~.0p", [gb_sets:to_list(UniqueRanges)]));
+        false -> true
+    end.
 
 tester_split_is_continuous(_Config) ->
     tester:test(?MODULE, prop_split_is_continuous, 2, 5000, [{threads, 2}]).
