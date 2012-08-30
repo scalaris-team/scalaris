@@ -272,6 +272,8 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
             %% actually reported.
             QLen = element(2, erlang:process_info(self(), message_queue_len)),
 
+            %% TODO: check if any messages in the queue contribute to this TxId,
+            %%       then, delay, otherwise trigger take over
             WhatToDo =
                 case QLen > state_get_opentxnum(State) of
                     true ->
@@ -279,15 +281,19 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
                         % of the tx in the queue
                         delay;
                     false ->
-                        {_IsDoneMsgs, NoIsDoneMsgs} = count_messages_for_type(tx_tm_rtm_tid_isdone),
-                        case NoIsDoneMsgs > 10 of
-                            true -> delay;
-                            false ->
-                                case (QLen - NoIsDoneMsgs) < (state_get_opentxnum(State) div 2) of
-                                    true -> requeue;
-                                    false -> takeover
-                                end
-                        end
+                        takeover
+                        %% may lead to endless loops and may delay failed tx
+                        %% indefinitely,
+                        %% e.g. 100 open tx, 49 tx_tm_rtm_tid_isdone messages:
+%%                         {IsDoneMsgs, NoIsDoneMsgs} = count_messages_for_type(tx_tm_rtm_tid_isdone),
+%%                         case NoIsDoneMsgs > 10 of
+%%                             true -> delay;
+%%                             false ->
+%%                                 case IsDoneMsgs < (state_get_opentxnum(State) div 2) of
+%%                                     true -> requeue;
+%%                                     false -> takeover
+%%                                 end
+%%                         end
                 end,
             case WhatToDo of
                 requeue ->
@@ -894,18 +900,21 @@ trigger_delete_if_done(TxState) ->
             end
     end, ok.
 
--spec count_messages_for_type(Type::term()) ->
-                                     {TypeCount::non_neg_integer(),
-                                      OtherCount::non_neg_integer()}.
-count_messages_for_type(Type) ->
-    {_, Msg} = erlang:process_info(self(), messages),
-    lists:foldl(fun(X, {AccType, AccOther}) ->
-                  Tag = element(1, X),
-                  case Tag of
-                      Type -> {AccType + 1, AccOther};
-                      _    -> {AccType, AccOther + 1}
-                  end
-                end, {0, 0}, Msg).
+%% -spec count_messages_for_type(Type::term()) ->
+%%                                      {TypeCount::non_neg_integer(),
+%%                                       OtherCount::non_neg_integer()}.
+%% count_messages_for_type(Type) ->
+%%     {_, Msg} = erlang:process_info(self(), messages),
+%%     lists:foldl(fun(X, {AccType, AccOther} = Acc) ->
+%%                         if is_tuple(X) ->
+%%                                Tag = element(1, X),
+%%                                case Tag of
+%%                                    Type -> {AccType + 1, AccOther};
+%%                                    _    -> {AccType, AccOther + 1}
+%%                                end;
+%%                            true -> Acc
+%%                         end
+%%                 end, {0, 0}, Msg).
 
 %% enough_tps_registered(TxState, State) ->
 %%     BoolV =
