@@ -22,7 +22,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import de.zib.scalaris.AbortException;
@@ -36,8 +36,8 @@ import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerUnnormalised;
-import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.ScalarisOpType;
+import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Page;
@@ -56,8 +56,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
     private static final int MAX_SCALARIS_CONNECTIONS = Runtime.getRuntime().availableProcessors() * 2;
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
     private ArrayBlockingQueue<Transaction> scalaris_tx = new ArrayBlockingQueue<Transaction>(MAX_SCALARIS_CONNECTIONS);
-    private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
-    private ExecutorService pageListExecutor = Executors.newFixedThreadPool(1);
+    private ExecutorService executor = createExecutor(MAX_SCALARIS_CONNECTIONS);
+    private ExecutorService pageListExecutor = createExecutor(1);
     protected boolean errorDuringImport = false;
 
     /**
@@ -151,6 +151,24 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             error("Interrupted while setting up multiple connections to Scalaris");
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Creates a new {@link ThreadPoolExecutor} used during the import to
+     * process import jobs.
+     * 
+     * @param nThreads
+     *            the (fixed) number of threads to use
+     * 
+     * @return a {@link ThreadPoolExecutor} with a bounded queue of length
+     *         <tt>nThreads * 10</tt> that runs the job in the calling task if
+     *         the queue is full
+     */
+    public static ThreadPoolExecutor createExecutor(int nThreads) {
+        return new ThreadPoolExecutor(nThreads, nThreads, 0L,
+                TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(
+                        nThreads * 10),
+                new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     @Override
@@ -277,8 +295,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             } catch (InterruptedException e) {
             }
         }
-        executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
-        pageListExecutor = Executors.newFixedThreadPool(1);
+        executor = createExecutor(MAX_SCALARIS_CONNECTIONS);
+        pageListExecutor = createExecutor(1);
     }
 
     @Override
