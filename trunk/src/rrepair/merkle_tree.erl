@@ -306,7 +306,7 @@ gen_hash({merkle_tree, Config, Root}) ->
 -spec gen_hash_node(Node, Config) -> Node when
       is_subtype(Node,   mt_node()),
       is_subtype(Config, mt_config()).
-gen_hash_node({_, _Count, _Bucket, _I, []} = N, Config) ->
+gen_hash_node({_, _Count, _Bucket, _I, []} = N, _Config) ->
     N;
 gen_hash_node({_, Count, [], I, List}, Config) ->    
     NewChilds = [gen_hash_node(X, Config) || X <- List],
