@@ -62,8 +62,9 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = get_XOR_fun()     :: inner_hash_fun() %hash function for inner node signature creation -          
+         leaf_hf        = get_small_sha()   :: hash_fun(),      %hash function for leaf signature creation
+         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
+         keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled          
          }).
 -type mt_config() :: #mt_config{}.
 -type mt_config_params() :: [{atom(), term()}] | [].    %only key value pairs of mt_config allowed
@@ -283,9 +284,16 @@ build_childs([], _, Acc) ->
     Acc;
 build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     BucketSize = Config#mt_config.bucket_size,
+    KeepBucket = Config#mt_config.keep_bucket,
     Node = case Count > BucketSize of
                true -> p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
-               false -> {nil, Count, Bucket, Interval, []}
+               false -> 
+                   LeafHf = Config#mt_config.leaf_hf,
+                   Hash = case Count > 0 of
+                              true -> LeafHf(erlang:term_to_binary(Bucket));
+                              _ -> LeafHf(term_to_binary(0))
+                          end,                    
+                   {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]).
 
@@ -298,13 +306,8 @@ gen_hash({merkle_tree, Config, Root}) ->
 -spec gen_hash_node(Node, Config) -> Node when
       is_subtype(Node,   mt_node()),
       is_subtype(Config, mt_config()).
-gen_hash_node({_, Count, Bucket, I, []}, Config) ->
-    LeafHf = Config#mt_config.leaf_hf,
-    Hash = case Count > 0 of
-               true -> LeafHf(erlang:term_to_binary(Bucket));
-               _ -> LeafHf(term_to_binary(0))
-           end,
-    {Hash, Count, Bucket, I, []};
+gen_hash_node({_, _Count, _Bucket, _I, []} = N, Config) ->
+    N;
 gen_hash_node({_, Count, [], I, List}, Config) ->    
     NewChilds = [gen_hash_node(X, Config) || X <- List],
     InnerHf = Config#mt_config.inner_hf,
@@ -464,4 +467,11 @@ keys_to_intervals(KList, IList) ->
 
 get_XOR_fun() ->
     (fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end).
+
+get_small_sha() ->
+    (fun(B) ->
+             Sha = crypto:sha(B),
+             ByteSize = erlang:byte_size(Sha),
+             binary_part(Sha, {ByteSize, -2})
+     end).
 
