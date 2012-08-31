@@ -23,7 +23,6 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.almworks.sqlite4java.SQLiteConnection;
@@ -53,7 +52,10 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     private static final int REQUEST_BUNDLE_SIZE = 10;
     private static final int PRINT_SCALARIS_KV_PAIRS_EVERY = 5000;
     private ArrayBlockingQueue<TransactionSingleOp> scalaris_single = new ArrayBlockingQueue<TransactionSingleOp>(MAX_SCALARIS_CONNECTIONS);
-    private ExecutorService executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
+    
+    private ExecutorService executor = WikiDumpToScalarisHandler
+            .createExecutor(MAX_SCALARIS_CONNECTIONS);
+    
     protected TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
     
     /**
@@ -316,7 +318,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 } catch (InterruptedException e) {
                 }
             }
-            executor = Executors.newFixedThreadPool(MAX_SCALARIS_CONNECTIONS);
+            executor = WikiDumpToScalarisHandler.createExecutor(MAX_SCALARIS_CONNECTIONS);
             
             println("imported K/V pairs to Scalaris: " + importedKeys);
         }
