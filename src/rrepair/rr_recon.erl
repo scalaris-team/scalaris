@@ -81,7 +81,7 @@
                   merkle_tree:merkle_tree() |
                   art:art() |                        
                   [internal_params()] |
-                  [merkle_tree:mt_nodes()].
+                  [merkle_tree:mt_node()].
 -type recon_dest() :: ?RT:key() | random.
 
 -record(rr_recon_state,
@@ -394,7 +394,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
 check_node(L, Tree) ->
     case merkle_tree:is_merkle_tree(Tree) of
         false -> p_check_node(L, Tree, {[], []});
-        true -> p_check_node(L, [Tree], {[], []})
+        true -> p_check_node(L, [merkle_tree:get_root(Tree)], {[], []})
     end.
 
 -spec p_check_node([merkle_cmp_request()], [merkle_tree:mt_node()], Acc::Res) -> Res
@@ -429,10 +429,10 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
                                  {tree_nodesCompared, Compared}], Stats),
     case merkle_tree:is_merkle_tree(Tree) of
         false -> p_process_tree_cmp_result(CmpResult, Tree, BranchSize, NStats, {[], [], []});
-        true -> p_process_tree_cmp_result(CmpResult, [Tree], BranchSize, NStats, {[], [], []})
+        true -> p_process_tree_cmp_result(CmpResult, [merkle_tree:get_root(Tree)], BranchSize, NStats, {[], [], []})
     end.
 
--spec p_process_tree_cmp_result([merkle_tree:mt_node_key()], RestTree, BranchSize, Stats, {Acc::Req, Acc::Res, AccRTree::Res}) 
+-spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize, Stats, {Acc::Req, Acc::Res, AccRTree::Res}) 
         -> {Req, Res, Stats, RestTree::Res}           
     when
       is_subtype(BranchSize,pos_integer()),
