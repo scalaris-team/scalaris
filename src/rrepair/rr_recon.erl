@@ -81,7 +81,7 @@
                   merkle_tree:merkle_tree() |
                   art:art() |                        
                   [internal_params()] |
-                  {merkle_nl, [merkle_tree:mt_nodes()]}.
+                  [merkle_tree:mt_nodes()].
 -type recon_dest() :: ?RT:key() | random.
 
 -record(rr_recon_state,
@@ -107,8 +107,8 @@
 -define(fail_inner,  4).
 -define(omit,        9).
 
--type merkle_cmp_result() :: ?ok_inner | ?ok_leaf | ?fail_leaf | ?fail_inner.
--type merkle_cmp_requst() :: merkle_tree:mt_node_key() | ?omit.
+-type merkle_cmp_result()  :: ?ok_inner | ?ok_leaf | ?fail_leaf | ?fail_inner.
+-type merkle_cmp_request() :: merkle_tree:mt_node_key() | ?omit.
 
 -type request() :: 
     {start, method(), DestKey::recon_dest()} |
@@ -118,7 +118,7 @@
     %API
     request() |
     %tree sync msgs
-    {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_requst()]} |
+    {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_request()]} |
     {check_nodes_response, [merkle_cmp_result()]} |
     %dht node response
     {get_state_response, intervals:interval()} |
@@ -308,8 +308,6 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) ->
-    %not merkle_tree:is_merkle_tree(Tree) andalso
-    %    ct:pal("Parter: ~p", [[{merkle_tree:get_hash(X), merkle_tree:get_interval(X)} || X <- Tree]]),
     {Result, RestTree} = check_node(ToCheck, Tree),
     comm:send(SenderPid, {check_nodes_response, Result}),
     State#rr_recon_state{ dest_recon_pid = SenderPid, struct = RestTree };
@@ -323,7 +321,6 @@ on({check_nodes_response, CmpResults}, State =
                         struct = Tree }) ->
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
-    %ct:pal("CmpRes=~p~nReq=~p~nRes=~p", [CmpResults, Req, Res]),
     Req =/= [] andalso
         comm:send(DestReconPid, {check_nodes, comm:this(), Req}),    
     {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
@@ -334,7 +331,6 @@ on({check_nodes_response, CmpResults}, State =
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
     if CompLeft =:= 0 ->
-           %ct:pal("MERKLE - ~p", [FStats]),
            comm:send(DestReconPid, {shutdown, sync_finished_remote}),
            comm:send_local(self(), {shutdown, sync_finished});
        true -> ok
@@ -391,7 +387,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec check_node([merkle_cmp_requst()], merkle_tree:merkle_tree() | RestTree) 
+-spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | RestTree) 
         -> {[merkle_cmp_result()], RestTree}
     when
         is_subtype(RestTree, [merkle_tree:mt_node()]).
@@ -401,7 +397,7 @@ check_node(L, Tree) ->
         true -> p_check_node(L, [Tree], {[], []})
     end.
 
--spec p_check_node([merkle_cmp_requst()], [merkle_tree:mt_node()], Acc::Res) -> Res
+-spec p_check_node([merkle_cmp_request()], [merkle_tree:mt_node()], Acc::Res) -> Res
     when
         is_subtype(Res, {[merkle_cmp_result()], [merkle_tree:mt_node()]}).
 p_check_node([], [], {AccR, AccN}) ->
@@ -425,7 +421,7 @@ p_check_node([Hash | TK], [Node | TN], {AccR, AccN}) ->
     when
       is_subtype(RestTree,  [merkle_tree:mt_node()]),
       is_subtype(Stats,     rr_recon_stats:stats()),
-      is_subtype(Requests,  [merkle_cmp_requst()]),
+      is_subtype(Requests,  [merkle_cmp_request()]),
       is_subtype(Resolve,   [merkle_tree:mt_node()]).
 process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
     Compared = length(CmpResult),
