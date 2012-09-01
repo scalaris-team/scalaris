@@ -513,16 +513,16 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                                       ownerRemotePid = OwnerR,
                                       stats = Stats }) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
-        true -> 
-            {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
-            ResolveCalled = lists:foldl(fun(X, Acc) ->
-                                                Acc + resolve_leaf(X, {DestPid, SID, OwnerL, OwnerR})
-                                        end, 0, ASyncLeafs),
-            Stats3 = rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2),
-            {ok, Stats3};
-        false -> {ok, Stats}
-    end.
+    NStats = case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
+                 true -> 
+                     {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
+                     ResolveCalled = lists:foldl(fun(X, Acc) ->
+                                                         Acc + resolve_leaf(X, {DestPid, SID, OwnerL, OwnerR})
+                                                 end, 0, ASyncLeafs),
+                     rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2);
+                 false -> Stats
+             end,
+    {ok, rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats)}.
 
 -spec art_get_sync_leafs(Nodes::NodeL, Art, Stats, Acc::NodeL) -> {ToSync::NodeL, Stats} when
     is_subtype(NodeL,   [merkle_tree:mt_node()]),
