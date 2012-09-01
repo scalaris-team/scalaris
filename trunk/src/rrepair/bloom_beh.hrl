@@ -35,18 +35,18 @@
 
 %% Functions
 
+% @doc Creates new bloom filter with default hash function set
+-spec new(integer(), float()) -> bloom_filter().
+new(MaxItems, FPR) ->
+    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
+    new(MaxItems, FPR, Hfs).
+
 -spec new(integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
 new(MaxItems, FPR, Hfs) when is_float(FPR) ->
     Size = resize(calc_least_size(MaxItems, FPR), 8),
     new_(Size, MaxItems, Hfs);
 new(BitPerItem, MaxItems, Hfs) ->
     new_(resize(BitPerItem * MaxItems, 8), MaxItems, Hfs).
-
-% @doc Creates new bloom filter with default hash function set
--spec new(integer(), float()) -> bloom_filter().
-new(MaxItems, FPR) when is_float(FPR) ->
-    Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
-    new(MaxItems, FPR, Hfs).
 
 -spec new(integer(), float(), ?REP_HFS:hfs(), [key()]) -> bloom_filter().
 new(MaxItems, FPR, Hfs, Items) ->
