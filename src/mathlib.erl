@@ -27,7 +27,7 @@
 
 %% for type_check_SUITE
 -export([binomial_coeff_feeder/2,
-         factorial_feeder/1, factorial_feeder/2]).
+         factorial_feeder/1]).
 
 -type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
