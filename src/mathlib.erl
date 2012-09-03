@@ -26,7 +26,8 @@
 -export([factorial/1, binomial_coeff/2]).
 
 %% for type_check_SUITE
--export([binomial_coeff_feeder/2]).
+-export([binomial_coeff_feeder/2,
+         factorial_feeder/1, factorial_feeder/2]).
 
 -type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
@@ -173,9 +174,15 @@ choose(N, K, K, Acc) ->
 choose(N, K, I, Acc) ->
   choose(N, K, I+1, (Acc * (N-I+1)) div I).
 
+-spec factorial_feeder(0..20) -> {0..20}.
+factorial_feeder(N) -> {N}.
+
 % @doc calculates N!
 -spec factorial(non_neg_integer()) -> pos_integer().
 factorial(N) -> factorial(N, 1).
+
+-spec factorial_feeder(0..20, pos_integer()) -> {0..20, pos_integer()}.
+factorial_feeder(N, Acc) -> {N, Acc}.
 
 -spec factorial(non_neg_integer(), pos_integer()) -> pos_integer().
 factorial(0, Acc) -> Acc;
