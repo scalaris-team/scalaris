@@ -142,6 +142,7 @@ tester_type_check_math(_Config) ->
            [ {vecWeightedAvg,4}, %% needs same length lists
              {closestPoints, 1}, %% needs same length lists
              {binomial_coeff, 2}, %% needs N > K, done by feeder
+             {factorial, 1}, %% slow for large integers, done by feeder
              {aggloClustering, 3}, %% needs same length lists
              {vecAdd, 2}, %% needs same length lists
              {vecSub, 2}, %% needs same length lists
@@ -150,7 +151,8 @@ tester_type_check_math(_Config) ->
            ],
            [ {closestPointsForJ, 7}, %% needs same length lists and funs
              {aggloClusteringHelper, 6}, %% spec suspicious (-1 for lists:nth())
-             {choose, 4} %% slow for large integers
+             {choose, 4}, %% slow for large integers
+             {factorial, 2} %% slow for large integers, done by feeder
            ]},
           %% {math_pos, [], []}, %% needs valid pos fields
           {prime, [],
