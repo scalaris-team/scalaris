@@ -471,7 +471,8 @@ get_XOR_fun() ->
 get_small_sha() ->
     (fun(B) ->
              Sha = crypto:sha(B),
-             ByteSize = erlang:byte_size(Sha),
-             binary_part(Sha, {ByteSize, -2})
+             Start = erlang:byte_size(Sha) - 2,
+             <<_:Start/binary, SmallSha:2/binary>> = Sha,
+             SmallSha
      end).
 
