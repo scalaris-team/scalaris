@@ -47,7 +47,7 @@
          is_well_formed/1, tester_create_interval/1,
          is_well_formed_simple/1, tester_create_simple_interval/1,
          tester_create_continuous_interval/4,
-         split_feeder/2, split2_feeder/8
+         split_feeder/2
         ]).
 
 -ifdef(with_export_type_support).
