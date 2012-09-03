@@ -296,8 +296,8 @@ on({tx_tm_rtm_tid_isdone, TxId}, State) ->
 %%                         end
                 end,
             case WhatToDo of
-                requeue ->
-                    comm:send_local(self(), {tx_tm_rtm_tid_isdone, TxId});
+%%                 requeue ->
+%%                     comm:send_local(self(), {tx_tm_rtm_tid_isdone, TxId});
                 delay ->
                     msg_delay:send_local((config:read(tx_timeout) * 2)
                                              div 1000,
