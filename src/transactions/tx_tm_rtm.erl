@@ -432,73 +432,46 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     %% lookup transaction id locally and merge with given TxState
     Tid = tx_state:get_tid(TxState),
     {LocalTxStatus, LocalTxEntry} = get_tx_entry(Tid, State),
-    {TmpEntry, NewState} =
+    {TmpEntry, NewEntryHoldBackQ, NewState} =
         case LocalTxStatus of
             new ->
+                %% nothing known locally
                 TmpState = state_subscribe(State, tx_state:get_tm(TxState)),
-                {TxState, TmpState}; %% nothing known locally
+                {TxState, [], TmpState};
             uninitialized ->
-                %% take over hold back from existing entry
                 %%io:format("initRTM takes over hold back queue for id ~p in ~p~n", [Tid, Role]),
-                HoldBackQ = tx_state:get_hold_back(LocalTxEntry),
-                {tx_state:set_hold_back(TxState, HoldBackQ), State};
+                %% take hold back from existing entry
+                {TxState, tx_state:get_hold_back(LocalTxEntry), State};
             ok ->
                 log:log(error, "Duplicate init_RTM", []),
-                {LocalTxEntry, State}
+                %% hold back queue should be empty!
+                {LocalTxEntry, [], State}
         end,
+    % note: do not need to set the holdback queue for the entry
+    %       -> we will process it below
     NewEntry = tx_state:set_status(TmpEntry, ok),
     _ = set_entry(NewEntry, NewState),
 
-    %% lookup items locally and merge with given ItemStates
-    ItemStatesWithTLog = lists:zip(
-                           tx_state:get_tlog_txitemids(NewEntry), ItemStates),
-    NewItemStates =
-        [ begin
-              {LocalItemStatus, LocalItem} = get_item_entry(EntryId, NewState),
-              TmpItem = case LocalItemStatus of
-                            new -> %% nothing known locally
-                                tx_item_state:new(
-                                  EntryId, Tid, TLogEntry, Maj_for_prepared,
-                                  Maj_for_abort, PaxosIds);
-                            uninitialized ->
-                                %% take over hold back from existing entry
-                                IHoldBQ = tx_item_state:get_hold_back(LocalItem),
-                                Entry = tx_item_state:new(
-                                          EntryId, Tid, TLogEntry, Maj_for_prepared,
-                                          Maj_for_abort, PaxosIds),
-                                tx_item_state:set_hold_back(Entry, IHoldBQ);
-                            ok ->
-                                log:log(error, "Duplicate init_RTM for an item", []),
-                                LocalItem
-                        end,
-              NewItem = tx_item_state:set_status(TmpItem, ok),
-              _ = set_entry(NewItem, NewState),
-              NewItem
-          end || {{TLogEntry, EntryId}, {EntryId, Maj_for_prepared, Maj_for_abort, PaxosIds}} <- ItemStatesWithTLog],
-
+    %% lookup items locally, merge with given ItemStates,
     %% initiate local paxos acceptors (with received paxos_ids)
     Learners = tx_state:get_learners(TxState),
     LAcceptor = state_get_lacceptor(NewState),
-    _ = [ [ acceptor:start_paxosid_local(LAcceptor, PaxId, Learners)
-        || {PaxId, _RTlog, _TP}
-               <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ]
-      || ItemState <- NewItemStates ],
+    NewItemsHoldBackQ = lists:flatten(
+                          merge_item_states(Tid, tx_state:get_tlog_txitemids(NewEntry),
+                                            ItemStates, NewState, Learners, LAcceptor)),
 
     %% process hold back messages for tx_state
-    %% @TODO better use a foldr
     %% io:format("Starting hold back queue processing~n"),
-    _ = [ on(OldMsg, NewState) || OldMsg <- lists:reverse(tx_state:get_hold_back(NewEntry)) ],
+    NewState2 = lists:foldr(fun on/2, NewState, NewEntryHoldBackQ),
     %% process hold back messages for tx_items
-    _ = [ [ on(OldMsg, NewState)
-        || OldMsg <- lists:reverse(tx_item_state:get_hold_back(Item)) ]
-      || Item <- NewItemStates],
+    NewState3 = lists:foldr(fun on/2, NewState2, NewItemsHoldBackQ),
     %% io:format("Stopping hold back queue processing~n"),
 
     %% set timeout and remember timerid to cancel, if finished earlier?
     %%msg_delay:send_local(1 + InRole, self(), {tx_tm_rtm_propose_yourself, Tid}),
     %% after timeout take over and initiate new paxos round as proposer
     %% done in on({tx_tm_rtm_propose_yourself...}) handler
-    NewState;
+    NewState3;
 
 % received by RTMs
 on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
@@ -901,6 +874,47 @@ trigger_delete_if_done(TxState, State) ->
                 false -> ok
             end
     end, ok.
+
+%% @doc Merges the item states transferred in a ?tx_tm_rtm_init_RTM message
+%%      into the locally known state, initiates nex paxos processes and
+%%      returns the holdback (message) queue. 
+-spec merge_item_states(Tid::tx_state:tx_id(),
+                        [{tx_tlog:tlog_entry(), tx_item_state:tx_item_id()}],
+                        [{EntryId::tx_item_state:tx_item_id(),
+                          Maj_for_prepared::non_neg_integer(),
+                          Maj_for_abort::non_neg_integer(),
+                          PaxosIds::[tx_item_state:paxos_id()] | unknown}],
+                         State::state(), Learners::[comm:mypid()], LAcceptor::pid())
+        -> HoldBackQ::[comm:message()].
+merge_item_states(_Tid, [], [], _State, _Learners, _LAcceptor) -> [];
+merge_item_states(Tid, [{TLogEntry, EntryId} | RestLocal],
+                  [{EntryId, Maj_for_prepared, Maj_for_abort, PaxosIds} | RestNew],
+                  State, Learners, LAcceptor) ->
+    {LocalItemStatus, LocalItem} = get_item_entry(EntryId, State),
+    {TmpItem, TmpItemHoldBackQ} =
+        case LocalItemStatus of
+            new -> %% nothing known locally
+                {tx_item_state:new(
+                  EntryId, Tid, TLogEntry, Maj_for_prepared,
+                  Maj_for_abort, PaxosIds), []};
+            uninitialized ->
+                %% take over hold back from existing entry
+                IHoldBQ = tx_item_state:get_hold_back(LocalItem),
+                Entry = tx_item_state:new(
+                          EntryId, Tid, TLogEntry, Maj_for_prepared,
+                          Maj_for_abort, PaxosIds),
+                {Entry, IHoldBQ};
+            ok ->
+                log:log(error, "Duplicate init_RTM for an item", []),
+                %% hold back queue should be empty!
+                {LocalItem, []}
+        end,
+    NewItem = tx_item_state:set_status(TmpItem, ok),
+    _ = set_entry(NewItem, State),
+    _ = [ acceptor:start_paxosid_local(LAcceptor, PaxId, Learners)
+            || {PaxId, _RTlog, _TP} <- tx_item_state:get_paxosids_rtlogs_tps(NewItem) ],
+    [lists:reverse(TmpItemHoldBackQ) |
+         merge_item_states(Tid, RestLocal, RestNew, State, Learners, LAcceptor)].
 
 %% -spec count_messages_for_type(Type::term()) ->
 %%                                      {TypeCount::non_neg_integer(),
