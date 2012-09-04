@@ -118,6 +118,9 @@ init([]) ->
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
             State = {_RTMs = [], Table, Role, LAcceptor, GLLearner, 0},
+            rtm_update(state_get_RTMs(State),
+                       config:read(tx_rtm_update_interval) div 1000,
+                       {update_RTMs}),
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
