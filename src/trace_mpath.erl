@@ -41,6 +41,7 @@
 
 %% trace analysis
 -export([send_histogram/1]).
+-export([to_texfile/2]).
 
 %% report tracing events from other modules
 -export([log_send/4]).
@@ -171,6 +172,168 @@ send_histogram(Trace) ->
                               end,
                               [], SortedTags),
     lists:reverse(lists:keysort(2, CountedTags)).
+
+%% sample call sequence to get a tx trace:
+%% tex traces have to be relatively short, so paste all at once to the
+%% erlang shell.
+%% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
+
+-spec to_texfile(trace(), string()) -> list().
+to_texfile(Trace, Filename) ->
+    {ok, File} = file:open(Filename, write),
+    io:format(File,
+      "\\documentclass{article}~n"
+      "\\usepackage[paperwidth=\\maxdimen,paperheight=\\maxdimen]{geometry}~n"
+      "\\usepackage{tikz}~n"
+      "\\usetikzlibrary{arrows}~n"
+      "\\usepackage[T1]{fontenc}~n"
+      "\\usepackage[tightpage,active]{preview}~n"
+      "\\PreviewEnvironment{tikzpicture}~n"
+      "\\begin{document}~n"
+      "\\pagestyle{empty}\\sf\\scriptsize"
+      "\\begin{tikzpicture}~n",
+              []),
+    %% create nodes for processes:
+    %% all processes in that order, but only once
+    NodesR = lists:foldl(
+               fun(X, Acc) ->
+                       Pid = case element(1, X) of
+                                 log_send -> element(4, X);
+                                 log_recv -> element(5, X);
+                                 log_info -> element(4, X)
+                             end,
+                       case lists:member(Pid, Acc) of
+                           true -> Acc;
+                           false -> [ Pid | Acc ]
+                       end
+               end,
+               [], Trace),
+    Nodes = lists:reverse(NodesR),
+    SortedTrace = lists:keysort(2, Trace),
+    StartTime = element(2, hd(SortedTrace)),
+    DrawTrace = [ setelement(2, X, timer:now_diff(element(2, X), StartTime))
+      || X <- SortedTrace],
+
+    EndTime =  element(2, lists:last(DrawTrace)),
+
+    %% draw nodes and timelines
+    lists:foldl(
+      fun(X, Acc) ->
+              Node = io_lib:format("~p", [X]),
+              LatexNode = lists:reverse(quote_latex(lists:flatten(Node), [])),
+              io:format(File,
+                        "\\draw (0, -~p) node[anchor=east] {\"~s\"};~n",
+                        [length(Acc)/2, LatexNode]),
+              io:format(File,
+                        "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
+                        [length(Acc)/2, (EndTime+10)/100, length(Acc)/2]),
+              [X | Acc]
+      end,
+      [], Nodes),
+    %% draw key
+    EndSlot = (EndTime div 100),
+    io:format(File,
+              "\\foreach \\i in {1, 2, ..., ~p}~n"
+              "{~n"
+%%              "  \\draw[color=gray,very thin] (\\i, 0.7) node[above] {\\i 00$\\mu$s} -- ++(0, -0.2) -- ++(1,0) -- ++(0, 0.2);~n"
+              "  \\draw[color=gray, very thin] (\\i, 0.5)  node[above] {\\i 00$\\mu$s}-- (\\i, -~p);"
+              "}~n",
+              [EndSlot, length(Nodes)/2]),
+
+    draw_messages(File, Nodes, DrawTrace),
+
+    io:format(
+      File,
+      "\\end{tikzpicture}~n"
+      "\\end{document}~n",
+      []),
+    file:close(File).
+
+quote_latex([], Acc) -> Acc;
+quote_latex([Char | Tail], Acc) ->
+    NewAcc =
+        case Char of
+            $_ ->  "_" ++ "\\" ++ Acc;
+             ${ ->  "{" ++ "\\" ++ Acc;
+             $} ->  "}" ++ "\\" ++ Acc;
+             $[ ->  "[" ++ "\\" ++ Acc;
+             $] ->  "]" ++ "\\" ++ Acc;
+             %% $< ->  lists:reverse("$\lt$") ++ Acc;
+             %% $> ->  lists:reverse("$\gt$") ++ Acc;
+            _ -> [Char | Acc]
+        end,
+    quote_latex(Tail, NewAcc).
+
+
+draw_messages(_File, _Nodes, []) -> ok;
+draw_messages(File, Nodes, [X | DrawTrace]) ->
+    RemainingTrace =
+    case element(1, X) of
+        log_send ->
+            %% search for corresponding receive and draw a line
+            SrcNum = length(lists:takewhile(
+                              fun(Y) -> element(4, X) =/= Y end, Nodes)),
+            DestNum = length(lists:takewhile(
+                               fun(Y) -> element(5, X) =/= Y end, Nodes)),
+            Recv = [ Y || Y <- DrawTrace,
+                          log_recv =:= element(1, Y),
+                          element(4, X) =:= element(4, Y),
+                          element(5, X) =:= element(5, Y),
+                          %% element(6, X) =:= element(6, Y), %% we have fifo
+                          element(2, X) =< element(2, Y)
+                   ],
+            RecTime = case Recv of
+                          [] -> element(2, X) + 10;
+                          _ -> element(2, hd(Recv))
+                      end,
+            MsgTag = lists:reverse(
+                       quote_latex(
+                         lists:flatten(
+                           io_lib:format(
+                             "~p", [element(1, element(6, X))])), [])),
+            case SrcNum of
+                SrcNum when (SrcNum < DestNum) ->
+                    io:format(File,
+                              "\\draw[->] (~pcm, -~p)"
+                              " to node[anchor=west,sloped,rotate=90]"
+                              "{\\tiny ~s} (~pcm, -~p);~n",
+                              [element(2, X)/100, SrcNum/2,
+                               MsgTag,
+                               RecTime/100, DestNum/2]);
+                SrcNum when (SrcNum > DestNum) ->
+                    io:format(File,
+                              "\\draw[->] (~pcm, -~p)"
+                              " to node[anchor=west,sloped,rotate=-90]"
+                              "{\\tiny ~s} (~pcm, -~p);~n",
+                              [element(2, X)/100, SrcNum/2,
+                               MsgTag,
+                               RecTime/100, DestNum/2]);
+                SrcNum when (SrcNum =:= DestNum) ->
+                    io:format(File,
+                              "\\draw[->] (~pcm, -~p)"
+                              " .. controls +(~pcm,-0.3) .."
+                              " node[anchor=west,sloped,rotate=-90]"
+                              "{\\tiny ~s} (~pcm, -~p);~n",
+                              [element(2, X)/100, SrcNum/2,
+                               (RecTime - element(2, X))/200,
+                               MsgTag,
+                               RecTime/100, DestNum/2])
+            end,
+            case Recv of
+                [] -> DrawTrace;
+                _ -> lists:delete(hd(Recv), DrawTrace)
+            end;
+        log_recv ->
+            %% found a receive without a send?
+            %% not yet implemented
+            _ = element(5, X),
+            DrawTrace;
+        log_info ->
+            %% print info somewhere
+            %% not yet implemented
+            DrawTrace
+    end,
+    draw_messages(File, Nodes, RemainingTrace).
 
 %% Functions used to report tracing events from other modules
 -spec epidemic_reply_msg(passed_state(), anypid(), anypid(), comm:message()) ->
