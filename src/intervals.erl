@@ -632,12 +632,12 @@ wraps_around(_LeftBr, _First, _Last, _RightBr) ->
 % @doc Begin &lt;= X &lt;= End
 % precondition Begin &lt;= End
 -spec is_between(BeginBr::left_bracket(), Begin::key(), X::key(), End::key(), EndBr::right_bracket()) -> boolean().
+is_between('(', Begin, X, End, ']') ->
+    X > Begin andalso End >= X;
 is_between('[', Begin, X, End, ')') ->
     X >= Begin andalso End > X;
 is_between('[', Begin, X, End, ']') ->
     X >= Begin andalso End >= X;
-is_between('(', Begin, X, End, ']') ->
-    X > Begin andalso End >= X;
 is_between('(', Begin, X, End, ')') ->
     X > Begin andalso End > X.
 
