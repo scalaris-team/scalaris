@@ -180,51 +180,7 @@ on({?lookup_aux, Key, Hops, Msg}, State) ->
     State;
 
 on({?lookup_fin, Key, Hops, Msg}, State) ->
-    MsgFwd = dht_node_state:get(State, msg_fwd),
-    FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
-    case FwdList of
-        []    ->
-            case dht_node_state:is_db_responsible(Key, State) of
-                true ->
-                    comm:send_local(dht_node_state:get(State, monitor_proc),
-                                    {lookup_hops, Hops}),
-                    gen_component:post_op(State, Msg);
-                false ->
-                    % it is possible that we received the message due to a
-                    % forward while sliding and before the other node removed
-                    % the forward -> do not warn then
-                    SlidePred = dht_node_state:get(State, slide_pred),
-                    SlideSucc = dht_node_state:get(State, slide_succ),
-                    Neighbors = dht_node_state:get(State, neighbors),
-                    case ((SlidePred =/= null andalso
-                               slide_op:get_sendORreceive(SlidePred) =:= 'send' andalso
-                               intervals:in(Key, slide_op:get_interval(SlidePred)))
-                         orelse
-                              (SlideSucc =/= null andalso
-                                   slide_op:get_sendORreceive(SlideSucc) =:= 'send' andalso
-                                   intervals:in(Key, slide_op:get_interval(SlideSucc)))
-                         orelse
-                              intervals:in(Key, nodelist:succ_range(Neighbors))) of
-                        true -> ok;
-                        false ->
-                            DBRange = dht_node_state:get(State, db_range),
-                            DBRange2 = [begin
-                                            case intervals:is_continuous(Interval) of
-                                                true -> {intervals:get_bounds(Interval), Id};
-                                                _    -> {Interval, Id}
-                                            end
-                                        end || {Interval, Id} <- DBRange],
-                            log:log(warn,
-                                    "[ ~.0p ] Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p",
-                                    [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
-                                     DBRange2, MsgFwd, Key])
-                    end,
-                    dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
-                    State
-            end;
-        [Pid] -> comm:send(Pid, {?lookup_fin, Key, Hops + 1, Msg}),
-                 State
-    end;
+    dht_node_lookup:lookup_fin(State, Key, Hops, Msg);
 
 on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
