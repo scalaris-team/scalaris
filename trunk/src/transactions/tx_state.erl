@@ -42,7 +42,7 @@
 -export([get_numprepared/1, inc_numprepared/1]).
 -export([get_numabort/1, inc_numabort/1]).
 -export([get_numinformed/1, set_numinformed/2, inc_numinformed/1]).
--export([get_numcommitack/1, inc_numcommitack/1]).
+-export([get_numcommitack/1]).
 -export([get_numtpsregistered/1, inc_numtpsregistered/1]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).

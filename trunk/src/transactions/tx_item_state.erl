@@ -39,7 +39,7 @@
 -export([set_tp_for_paxosid/3]).
 -export([get_status/1, set_status/2]).
 -export([hold_back/2, get_hold_back/1, set_hold_back/2]).
--export([get_numcommitted/1, inc_numcommitted/1]).
+-export([get_numcommitted/1]).
 -export([add_learner_decide/2]).
 -export([add_commit_ack/1]).
 
