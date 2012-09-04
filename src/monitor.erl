@@ -62,19 +62,17 @@
 to_internal_key(Process, Key) -> {'$monitor$', Process, Key}.
 
 -spec check_report(Process::atom(), Key::key(), Old::Value, New::Value) -> ok.
+check_report(_Process, _Key, undefined, _NewValue) -> ok;
+check_report(_Process, _Key, _OldValue, undefined) -> ok;
 check_report(Process, Key, OldValue, NewValue) ->
-    case OldValue =:= undefined orelse NewValue =:= undefined of
-        true -> ok;
-        _ ->
-            % check whether to report to the monitor
-            % (always report if a new time slot was started)
-            SlotOld = rrd:get_slot_start(0, OldValue),
-            SlotNew = rrd:get_slot_start(0, NewValue),
-            case SlotNew of
-                SlotOld -> ok; %nothing to do
-                _  -> % new slot -> report to monitor:
-                    proc_report_to_my_monitor(Process, Key, OldValue, NewValue)
-            end
+    % check whether to report to the monitor
+    % (always report if a new time slot was started)
+    SlotOld = rrd:get_slot_start(0, OldValue),
+    SlotNew = rrd:get_slot_start(0, NewValue),
+    case SlotNew of
+        SlotOld -> ok; %nothing to do
+        _  -> % new slot -> report to monitor:
+            proc_report_to_my_monitor(Process, Key, OldValue, NewValue)
     end.
 
 %% @doc Keep track of the available keys by adding Key to the list of keys
