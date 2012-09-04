@@ -144,7 +144,7 @@ on({?tp_committed, ItemId} = _Msg, State) ->
             _ = case ItemResult of
                     state_updated ->
                         _ = set_entry(TxState, State),
-                        trigger_delete_if_done(TxState);
+                        trigger_delete_if_done(TxState, State);
                     item_newly_safe ->
                         {TxResult, TmpTxState} = tx_state:add_item_acked(TxState),
                         NewTxState =
@@ -158,7 +158,7 @@ on({?tp_committed, ItemId} = _Msg, State) ->
                                     TmpTxState
                             end,
                         _ = set_entry(NewTxState, State),
-                        trigger_delete_if_done(NewTxState)
+                        trigger_delete_if_done(NewTxState, State)
                 end,
             State
     end;
@@ -523,7 +523,7 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
                     %% store TP info to corresponding PaxosId
                     NewEntry =
                         tx_item_state:set_tp_for_paxosid(ItemState, TP, PaxosID),
-                    trigger_delete_if_done(TxState),
+                    trigger_delete_if_done(TxState, State),
                     set_entry(NewEntry, State);
                 Decision when Role =:= tx_tm ->
                     %% if ?register_TP arrives after tx decision, inform the
@@ -535,11 +535,11 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
                     msg_tp_do_commit_abort(TP, {PaxosID, RTLogEntry, comm:this(), ItemId}, Decision),
                     %% record in txstate and try to delete entry?
                     NewTxState = tx_state:inc_numinformed(TxState),
-                    trigger_delete_if_done(NewTxState),
+                    trigger_delete_if_done(NewTxState, State),
                     set_entry(NewTxState, State);
                 _ ->
                     %% RTMs check whether everything is done
-                    trigger_delete_if_done(TxState)
+                    trigger_delete_if_done(TxState, State)
             end
     end,
     State;
@@ -879,8 +879,8 @@ inform_rtms(TxId, TxState, Result) ->
           || RTM <- RTMs ],
     ok.
 
--spec trigger_delete_if_done(tx_state:tx_state()) -> ok.
-trigger_delete_if_done(TxState) ->
+-spec trigger_delete_if_done(tx_state:tx_state(), state()) -> ok.
+trigger_delete_if_done(TxState, State) ->
     ?TRACE("tx_tm_rtm:trigger delete?~n", []),
     case (tx_state:is_decided(TxState)) of
         ?undecided -> ok;
@@ -888,8 +888,8 @@ trigger_delete_if_done(TxState) ->
         Decision -> %% commit / abort
             %% @TODO majority informed is sufficient?!
             case tx_state:all_tps_informed(TxState)
-                andalso tx_state:get_numids(TxState)
-                    =:= tx_state:get_numcommitack(TxState)
+                     andalso ((tx_state:get_numids(TxState) =:= tx_state:get_numcommitack(TxState))
+                             orelse (tx_tm =/= state_get_role(State)))
                 %%    andalso tx_state:all_tps_registered(TxState)
             of
                 true ->
