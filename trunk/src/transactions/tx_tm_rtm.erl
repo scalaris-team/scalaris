@@ -154,7 +154,7 @@ on({?tp_committed, ItemId} = _Msg, State) ->
                                     %% to inform, we do not need to know the new state
                                     Result = tx_state:is_decided(TmpTxState),
                                     inform_client(TmpTxState, State, Result),
-                                    inform_rtms(TxId, State, Result),
+                                    inform_rtms(TxId, TmpTxState, Result),
                                     TmpTxState
                             end,
                         _ = set_entry(NewTxState, State),
@@ -211,7 +211,7 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
                             %% client and rtms are informed, when
                             %% maj. of tps comitted
                             %% inform_client(T1TxState, State, Result),
-                            %% inform_rtms(TxId, State, Result),
+                            %% inform_rtms(TxId, TmpTxState, Result),
                             T1TxState
                     end,
                 set_entry(NewTxState, State)
@@ -864,14 +864,13 @@ inform_tps(TxState, State, Result) ->
           end, 0, tx_state:get_tlog_txitemids(TxState)),
     tx_state:set_numinformed(TxState, Informed).
 
--spec inform_rtms(tx_state:tx_id(), state(), ?commit | ?abort) -> ok.
-inform_rtms(TxId, State, Result) ->
+-spec inform_rtms(tx_state:tx_id(), tx_state:tx_state(), ?commit | ?abort) -> ok.
+inform_rtms(TxId, TxState, Result) ->
     ?TRACE("tx_tm_rtm:inform rtms~n", []),
-    %% TODO: better inform the rtms stored in the txid?!
-    RTMs = state_get_RTMs(State),
+    %% inform the rtms stored in the txid:
+    RTMs = tx_state:get_rtms(TxState),
     _ = [ begin
-              Pid = get_rtmpid(RTM),
-              case Pid of
+              case get_rtmpid(RTM) of
                   unknown -> ok;
                   {RTMPid} -> comm:send(RTMPid,
                                         {?tx_tm_rtm_delete, TxId, Result})
