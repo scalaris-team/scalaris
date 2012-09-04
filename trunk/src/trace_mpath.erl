@@ -222,7 +222,7 @@ to_texfile(Trace, Filename) ->
               Node = io_lib:format("~p", [X]),
               LatexNode = lists:reverse(quote_latex(lists:flatten(Node), [])),
               io:format(File,
-                        "\\draw (0, -~p) node[anchor=east] {\"~s\"};~n",
+                        "\\draw (0, -~p) node[anchor=east] {~s};~n",
                         [length(Acc)/2, LatexNode]),
               io:format(File,
                         "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
