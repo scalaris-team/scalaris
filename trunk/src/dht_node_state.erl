@@ -199,9 +199,7 @@ is_responsible(Key, #state{rm_state=RMState}) ->
 %%      Beware of race conditions sing the neighborhood may have changed at
 %%      the next call.
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_db_responsible(Key, State = #state{db_range=[]}) ->
-    is_responsible(Key, State);
-is_db_responsible(Key, State = #state{db_range=DBRange=[_|_]}) ->
+is_db_responsible(Key, State = #state{db_range = DBRange}) ->
     is_responsible(Key, State) orelse
         lists:any(fun({Interval, _Id}) ->
                           intervals:in(Key, Interval)
