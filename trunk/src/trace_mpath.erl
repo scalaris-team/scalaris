@@ -178,9 +178,9 @@ send_histogram(Trace) ->
 %% erlang shell.
 %% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
 
--spec to_texfile(trace(), string()) -> list().
+-spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
-    {ok, File} = file:open(Filename, write),
+    {ok, File} = file:open(Filename, [write]),
     io:format(File,
       "\\documentclass{article}~n"
       "\\usepackage[paperwidth=\\maxdimen,paperheight=\\maxdimen]{geometry}~n"
@@ -217,19 +217,19 @@ to_texfile(Trace, Filename) ->
     EndTime =  element(2, lists:last(DrawTrace)),
 
     %% draw nodes and timelines
-    lists:foldl(
-      fun(X, Acc) ->
-              Node = io_lib:format("~p", [X]),
-              LatexNode = lists:reverse(quote_latex(lists:flatten(Node), [])),
-              io:format(File,
-                        "\\draw (0, -~p) node[anchor=east] {~s};~n",
-                        [length(Acc)/2, LatexNode]),
-              io:format(File,
-                        "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
-                        [length(Acc)/2, (EndTime+10)/100, length(Acc)/2]),
-              [X | Acc]
-      end,
-      [], Nodes),
+    _ = lists:foldl(
+          fun(X, Acc) ->
+                  Node = io_lib:format("~p", [X]),
+                  LatexNode = lists:reverse(quote_latex(lists:flatten(Node), [])),
+                  io:format(File,
+                            "\\draw (0, -~p) node[anchor=east] {~s};~n",
+                            [length(Acc)/2, LatexNode]),
+                  io:format(File,
+                            "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
+                            [length(Acc)/2, (EndTime+10)/100, length(Acc)/2]),
+                  [X | Acc]
+          end,
+          [], Nodes),
     %% draw key
     EndSlot = (EndTime div 100),
     io:format(File,
