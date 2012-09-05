@@ -41,6 +41,7 @@
 
 %% trace analysis
 -export([send_histogram/1]).
+-export([time_delta/1]).
 -export([to_texfile/2]).
 
 %% report tracing events from other modules
@@ -53,17 +54,18 @@
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
 
+-type time()         :: erlang_timestamp() | non_neg_integer().
 -type logger()       :: io_format                       %% | ctpal
                       | {log_collector, comm:mypid()}.
 -type pidinfo()      :: {comm:mypid(), {pid_groups:groupname(),
                                         pid_groups:pidname()}}.
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
--type send_event()   :: {log_send, erlang_timestamp(), trace_id(),
+-type send_event()   :: {log_send, time(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
--type info_event()   :: {log_info, erlang_timestamp(), trace_id(),
+-type info_event()   :: {log_info, time(), trace_id(),
                          pidinfo(), comm:message()}.
--type recv_event()   :: {log_recv, erlang_timestamp(), trace_id(),
+-type recv_event()   :: {log_recv, time(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
@@ -86,13 +88,13 @@ start(TraceId) when is_atom(TraceId) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
     start(TraceId, comm:make_global(LoggerPid), fun(Msg) -> Msg end);
 start(PState) when is_tuple(PState) ->
-    start(passed_state_trace_id(PState), 
+    start(passed_state_trace_id(PState),
           passed_state_logger(PState),
           passed_state_msg_map_fun(PState)).
 
 -spec start(trace_id(), logger() | comm:mypid() | msg_map_fun()) -> ok.
 start(TraceId, MsgMapFun) when is_function(MsgMapFun) ->
-    LoggerPid = pid_groups:find_a(trace_mpath),    
+    LoggerPid = pid_groups:find_a(trace_mpath),
     start(TraceId, comm:make_global(LoggerPid), MsgMapFun);
 start(TraceId, Logger) ->
     start(TraceId, Logger, fun(Msg) -> Msg end).
@@ -100,7 +102,7 @@ start(TraceId, Logger) ->
 -spec start(trace_id(), logger() | comm:mypid(), msg_map_fun()) -> ok.
 start(TraceId, _Logger, MsgMapFun) ->
     Logger = case comm:is_valid(_Logger) of
-                 true -> {log_collector, _Logger}; %% just a pid was given                     
+                 true -> {log_collector, _Logger}; %% just a pid was given
                  false -> _Logger
              end,
     PState = passed_state_new(TraceId, Logger, MsgMapFun),
@@ -121,11 +123,16 @@ get_trace(TraceId) ->
     [case Event of
          {SendOrRcv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
            when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
-             {SendOrRcv, Time, TraceId, Source, Dest,
+             {SendOrRcv, Time, TraceId,
+              normalize_pidinfo(Source),
+              normalize_pidinfo(Dest),
               convert_msg({Tag, Key, Hops, convert_msg(Msg)})};
          {SendOrRcv, Time, TraceId, Source, Dest, Msg} ->
-             {SendOrRcv, Time, TraceId, Source, Dest, convert_msg(Msg)};
-         {log_info, _Time, _TraceId, _Pid, _Msg} = X -> X
+             {SendOrRcv, Time, TraceId,
+              normalize_pidinfo(Source),
+              normalize_pidinfo(Dest), convert_msg(Msg)};
+         {log_info, Time, TraceId, Pid, Msg} ->
+             {log_info, Time, TraceId, normalize_pidinfo(Pid), convert_msg(Msg)}
      end || Event <- LogRaw].
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
@@ -173,6 +180,13 @@ send_histogram(Trace) ->
                               [], SortedTags),
     lists:reverse(lists:keysort(2, CountedTags)).
 
+-spec time_delta(trace()) -> trace().
+time_delta(Trace) ->
+    SortedTrace = lists:keysort(2, Trace),
+    StartTime = element(2, hd(SortedTrace)),
+    [ setelement(2, X, timer:now_diff(element(2, X), StartTime))
+      || X <- SortedTrace].
+
 %% sample call sequence to get a tx trace:
 %% tex traces have to be relatively short, so paste all at once to the
 %% erlang shell.
@@ -180,21 +194,29 @@ send_histogram(Trace) ->
 
 -spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
+    ScaleX = 30, %% 1 cm is ScaleX microseconds in the plot
+    TicsFreq = 50, %% draw x-tics every TicsFreq microseconds
+
     {ok, File} = file:open(Filename, [write]),
     io:format(File,
-      "\\documentclass{article}~n"
+      "\\documentclass[10pt]{article}~n"
       "\\usepackage[paperwidth=\\maxdimen,paperheight=\\maxdimen]{geometry}~n"
       "\\usepackage{tikz}~n"
       "\\usetikzlibrary{arrows}~n"
       "\\usepackage[T1]{fontenc}~n"
+      "\\usepackage{lmodern}~n"
       "\\usepackage[tightpage,active]{preview}~n"
       "\\PreviewEnvironment{tikzpicture}~n"
       "\\begin{document}~n"
+      "\\makeatletter~n"
+      "\\renewcommand{\\tiny}{\\@setfontsize\\miniscule{4}{5}}~n"
+      "\\makeatother~n"
       "\\pagestyle{empty}\\sf\\scriptsize"
       "\\begin{tikzpicture}~n",
               []),
     %% create nodes for processes:
     %% all processes in that order, but only once
+
     NodesR = lists:foldl(
                fun(X, Acc) ->
                        Pid = case element(1, X) of
@@ -209,38 +231,38 @@ to_texfile(Trace, Filename) ->
                end,
                [], Trace),
     Nodes = lists:reverse(NodesR),
-    SortedTrace = lists:keysort(2, Trace),
-    StartTime = element(2, hd(SortedTrace)),
-    DrawTrace = [ setelement(2, X, timer:now_diff(element(2, X), StartTime))
-      || X <- SortedTrace],
+    DrawTrace = time_delta(Trace),
 
     EndTime =  element(2, lists:last(DrawTrace)),
 
     %% draw nodes and timelines
     _ = lists:foldl(
           fun(X, Acc) ->
-                  Node = io_lib:format("~p", [X]),
-                  LatexNode = lists:reverse(quote_latex(lists:flatten(Node), [])),
+                  LatexNode = term_to_latex_string(X),
                   io:format(File,
                             "\\draw (0, -~p) node[anchor=east] {~s};~n",
                             [length(Acc)/2, LatexNode]),
                   io:format(File,
                             "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
-                            [length(Acc)/2, (EndTime+10)/100, length(Acc)/2]),
+                            [length(Acc)/2, (EndTime+10)/ScaleX, length(Acc)/2]),
                   [X | Acc]
           end,
           [], Nodes),
     %% draw key
-    EndSlot = (EndTime div 100),
-    io:format(File,
-              "\\foreach \\i in {1, 2, ..., ~p}~n"
-              "{~n"
-%%              "  \\draw[color=gray,very thin] (\\i, 0.7) node[above] {\\i 00$\\mu$s} -- ++(0, -0.2) -- ++(1,0) -- ++(0, 0.2);~n"
-              "  \\draw[color=gray, very thin] (\\i, 0.5)  node[above] {\\i 00$\\mu$s}-- (\\i, -~p);"
-              "}~n",
-              [EndSlot, length(Nodes)/2]),
+    EndSlot = (EndTime div TicsFreq),
+    util:for_to(
+      1, EndSlot,
+      fun(I) ->
+              io:format(File,
+              "  \\draw[color=gray, very thin] (~pcm, 0.5)"
+              "  node[above] {~p$\\mu$s} --"
+              " (~p, -~p);~n",
+              [I*TicsFreq/ScaleX,
+               I*TicsFreq,
+               I*TicsFreq/ScaleX, length(Nodes)/2])
+      end),
 
-    draw_messages(File, Nodes, DrawTrace),
+    draw_messages(File, Nodes, ScaleX, DrawTrace),
 
     io:format(
       File,
@@ -249,7 +271,10 @@ to_texfile(Trace, Filename) ->
       []),
     file:close(File).
 
-quote_latex([], Acc) -> Acc;
+term_to_latex_string(Term) ->
+    quote_latex(lists:flatten(io_lib:format("~p", [Term])), []).
+
+quote_latex([], Acc) -> lists:reverse(Acc);
 quote_latex([Char | Tail], Acc) ->
     NewAcc =
         case Char of
@@ -264,9 +289,8 @@ quote_latex([Char | Tail], Acc) ->
         end,
     quote_latex(Tail, NewAcc).
 
-
-draw_messages(_File, _Nodes, []) -> ok;
-draw_messages(File, Nodes, [X | DrawTrace]) ->
+draw_messages(_File, _Nodes, _ScaleX, []) -> ok;
+draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
     RemainingTrace =
     case element(1, X) of
         log_send ->
@@ -282,42 +306,39 @@ draw_messages(File, Nodes, [X | DrawTrace]) ->
                           %% element(6, X) =:= element(6, Y), %% we have fifo
                           element(2, X) =< element(2, Y)
                    ],
+            SendTime = element(2, X),
             RecTime = case Recv of
-                          [] -> element(2, X) + 10;
+                          [] -> SendTime + 10;
                           _ -> element(2, hd(Recv))
                       end,
-            MsgTag = lists:reverse(
-                       quote_latex(
-                         lists:flatten(
-                           io_lib:format(
-                             "~p", [element(1, element(6, X))])), [])),
+            MsgTag = term_to_latex_string(element(1, element(6, X))),
             case SrcNum of
                 SrcNum when (SrcNum < DestNum) ->
                     io:format(File,
                               "\\draw[->] (~pcm, -~p)"
                               " to node[anchor=west,sloped,rotate=90]"
                               "{\\tiny ~s} (~pcm, -~p);~n",
-                              [element(2, X)/100, SrcNum/2,
+                              [SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecTime/100, DestNum/2]);
+                               RecTime/ScaleX, DestNum/2]);
                 SrcNum when (SrcNum > DestNum) ->
                     io:format(File,
                               "\\draw[->] (~pcm, -~p)"
                               " to node[anchor=west,sloped,rotate=-90]"
                               "{\\tiny ~s} (~pcm, -~p);~n",
-                              [element(2, X)/100, SrcNum/2,
+                              [SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecTime/100, DestNum/2]);
+                               RecTime/ScaleX, DestNum/2]);
                 SrcNum when (SrcNum =:= DestNum) ->
                     io:format(File,
                               "\\draw[->] (~pcm, -~p)"
                               " .. controls +(~pcm,-0.3) .."
                               " node[anchor=west,sloped,rotate=-90]"
                               "{\\tiny ~s} (~pcm, -~p);~n",
-                              [element(2, X)/100, SrcNum/2,
-                               (RecTime - element(2, X))/200,
+                              [element(2, X)/ScaleX, SrcNum/2,
+                               (RecTime - element(2, X))/ScaleX/2,
                                MsgTag,
-                               RecTime/100, DestNum/2])
+                               RecTime/ScaleX, DestNum/2])
             end,
             case Recv of
                 [] -> DrawTrace;
@@ -330,69 +351,79 @@ draw_messages(File, Nodes, [X | DrawTrace]) ->
             DrawTrace;
         log_info ->
             %% print info somewhere
+            SrcNum = length(lists:takewhile(
+                              fun(Y) -> element(4, X) =/= Y end, Nodes)),
+            EventTime = element(2, X),
+            io:format(
+              File, "\\draw [color=blue] (~pcm, -~p) ++(0, 0.1cm) node[rotate=60, anchor=west] {\\tiny ~s}-- ++(0, -0.2cm);~n",
+              [EventTime/ScaleX, SrcNum/2, term_to_latex_string(element(1, element(5, X)))]),
             %% not yet implemented
             DrawTrace
     end,
-    draw_messages(File, Nodes, RemainingTrace).
+    draw_messages(File, Nodes, ScaleX, RemainingTrace).
 
 %% Functions used to report tracing events from other modules
 -spec epidemic_reply_msg(passed_state(), anypid(), anypid(), comm:message()) ->
                                 gc_mpath_msg().
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
-    From = normalize_pidinfo(FromPid),
-    To = normalize_pidinfo(ToPid),
-    {'$gen_component', trace_mpath, PState, From, To, Msg}.
+    {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
 -spec log_send(passed_state(), anypid(), anypid(), comm:message()) ->
                       gc_mpath_msg().
 log_send(PState, FromPid, ToPid, Msg) ->
-    From = normalize_pidinfo(FromPid),
-    To = normalize_pidinfo(ToPid),
     Now = os:timestamp(),
     MsgMapFun = passed_state_msg_map_fun(PState),
     case passed_state_logger(PState) of
         io_format ->
             io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [util:readable_utc_time(Now), From, To, MsgMapFun(Msg)]);
+                      [util:readable_utc_time(Now),
+                       normalize_pidinfo(FromPid),
+                       normalize_pidinfo(ToPid), MsgMapFun(Msg)]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_send, Now, TraceId, From, To, MsgMapFun(Msg)})
+            send_log_msg(
+              LoggerPid,
+              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)})
     end,
-    epidemic_reply_msg(PState, From, To, Msg).
+    epidemic_reply_msg(PState, FromPid, ToPid, Msg).
 
--spec log_info(anypid(), term()) -> ok.
+-spec log_info(anypid(), comm:message()) -> ok.
 log_info(FromPid, Info) ->
     case own_passed_state_get() of
         undefined -> ok;
         PState -> log_info(PState, FromPid, Info)
     end.
--spec log_info(passed_state(), anypid(), term()) -> ok.
+-spec log_info(passed_state(), anypid(), comm:message()) -> ok.
 log_info(PState, FromPid, Info) ->
-    From = normalize_pidinfo(FromPid),
-    Now = os:timestamp(),    
+    Now = os:timestamp(),
     case passed_state_logger(PState) of
         io_format ->
             io:format("~p info ~.0p:~n  ~.0p.~n",
-                      [util:readable_utc_time(Now), From, Info]);
+                      [util:readable_utc_time(Now),
+                       normalize_pidinfo(FromPid),
+                       Info]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_info, Now, TraceId, From, Info})
+            send_log_msg(LoggerPid, {log_info, Now, TraceId, FromPid, Info})
     end,
     ok.
 
 -spec log_recv(passed_state(), anypid(), anypid(), comm:message()) -> ok.
 log_recv(PState, FromPid, ToPid, Msg) ->
-    From = normalize_pidinfo(FromPid),
-    To = normalize_pidinfo(ToPid),
     Now = os:timestamp(),
     MsgMapFun = passed_state_msg_map_fun(PState),
     case  passed_state_logger(PState) of
         io_format ->
             io:format("~p recv ~.0p -> ~.0p:~n  ~.0p.~n",
-                      [util:readable_utc_time(Now), From, To, MsgMapFun(Msg)]);
+                      [util:readable_utc_time(Now),
+                       normalize_pidinfo(FromPid),
+                       normalize_pidinfo(ToPid),
+                       MsgMapFun(Msg)]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_recv, Now, TraceId, From, To, MsgMapFun(Msg)})
+            send_log_msg(
+              LoggerPid,
+              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)})
     end,
     ok.
 
@@ -455,7 +486,7 @@ on({cleanup, TraceId}, State) ->
         false                       -> State
     end.
 
-passed_state_new(TraceId, Logger, MsgMapFun) -> 
+passed_state_new(TraceId, Logger, MsgMapFun) ->
     {TraceId, Logger, MsgMapFun}.
 
 passed_state_trace_id(State)      -> element(1, State).
