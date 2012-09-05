@@ -71,19 +71,21 @@ test_rt_integrity() ->
     pid_groups:join_as("rt_SUITE", dht_node),
     Neighbors = nodelist:new_neighborhood(MyNode),
     RT = ?RT:init(Neighbors), % this will send a message which we will ignore
-    test_rt_integrity_init(RT, MyNode),
-    test_rt_integrity_init_stabilize_1(RT, MyNode),
-    test_rt_integrity_init_stabilize_2(RT, MyNode)
+    test_rt_integrity_init(RT, Neighbors, MyNode),
+    test_rt_integrity_init_stabilize_1(RT, Neighbors, MyNode),
+    test_rt_integrity_init_stabilize_2(RT, Neighbors, MyNode),
+    test_rt_integrity_update_1(RT, Neighbors, MyNode),
+    test_rt_integrity_update_2(RT, Neighbors, MyNode)
     .
 
 assert_connected(RT) -> 
     ?assert_w_note(rt_frtchord:check_rt_integrity(RT), true)
     .
 
-test_rt_integrity_init(RT, _SourceNode) ->
+test_rt_integrity_init(RT, _Neighbors, _SourceNode) ->
     assert_connected(RT).
 
-test_rt_integrity_init_stabilize_1(RT, SourceNode) ->
+test_rt_integrity_init_stabilize_1(RT, _Neighbors, SourceNode) ->
     % change the neighborhood and recheck the rt integrity
     Pred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
     Neighbors = nodelist:new_neighborhood(Pred, SourceNode),
@@ -91,11 +93,31 @@ test_rt_integrity_init_stabilize_1(RT, SourceNode) ->
     assert_connected(NewRT)
     .
 
-test_rt_integrity_init_stabilize_2(RT, SourceNode) ->
+test_rt_integrity_init_stabilize_2(RT, _Neighbors, SourceNode) ->
     % change the neighborhood and recheck the rt integrity
     Succ = node:new(rt_SUITE:fake_dht_node(".succ"), number_to_key(random:uniform(10000)), 0),
     Pred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
     Neighbors = nodelist:new_neighborhood(Pred, SourceNode, Succ),
     NewRT = ?RT:init_stabilize(Neighbors, RT),
     assert_connected(NewRT)
+    .
+
+test_rt_integrity_update_1(RT, Neighbors, SourceNode) ->
+    NewSucc = node:new(rt_SUITE:fake_dht_node(".succ"), number_to_key(random:uniform(10000)), 0),
+    NewPred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
+    NewNeighbors = nodelist:new_neighborhood(NewPred, SourceNode, NewSucc),
+    % we don't expect a trigger_rebuild, as the source node didn't change
+    {ok, NewRT} = ?RT:update(RT, Neighbors, NewNeighbors),
+    assert_connected(NewRT)
+    .
+
+test_rt_integrity_update_2(RT, Neighbors, _SourceNode) ->
+    NewSource = node:new(rt_SUITE:fake_dht_node(".succ"), number_to_key(random:uniform(10000)), 0),
+    NewSucc = node:new(rt_SUITE:fake_dht_node(".succ"), number_to_key(random:uniform(10000)), 0),
+    NewPred = node:new(rt_SUITE:fake_dht_node(".pred"), number_to_key(random:uniform(10000)), 0),
+    NewNeighbors = nodelist:new_neighborhood(NewPred, NewSource, NewSucc),
+    % we expect a trigger_rebuild, as the source node changed
+    {trigger_rebuild, NewRT} = ?RT:update(RT, Neighbors, NewNeighbors),
+    assert_connected(NewRT)
+
     .

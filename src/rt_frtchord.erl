@@ -130,17 +130,26 @@ init_stabilize(Neighbors, RT) ->
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
         true -> remove_and_ping_entries(Neighbors, RT) ;
         _Else -> % source node changed, replace the complete table
-            init(Neighbors)
+            EmptyRT = init(Neighbors),
+            remove_and_ping_entries(Neighbors, EmptyRT)
     end
     .
 
 
 %% userdevguide-end rt_frtchord:init_stabilize
 
+% Get the adjacent nodes. The source node is filtered.
 -spec get_node_neighbors(nodelist:neighborhood()) -> set().
 get_node_neighbors(Neighborhood) ->
-    lists:foldl(fun sets:add_element/2,
-        lists:foldl(fun sets:add_element/2, sets:new(),
+    Source = nodelist:node(Neighborhood),
+    % filter the source node and add other nodes to a set
+    Filter = fun(Entry, Acc) -> case Entry of
+                Source -> Acc;
+                _Else -> sets:add_element(Entry, Acc) end
+    end,
+
+    lists:foldl(Filter,
+        lists:foldl(Filter, sets:new(),
             nodelist:preds(Neighborhood)),
         nodelist:succs(Neighborhood))
     .
@@ -176,13 +185,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
         true -> % source node didn't change
             % update the sticky nodes: delete old nodes and add new nodes
             NewRT = remove_and_ping_entries(NewNeighbors, OldRT),
-            
-            case NewRT of % only trigger a rebuild if something changed
-                OldRT -> 
-                    {ok, NewRT};
-                _Else ->
-                    {trigger_rebuild, NewRT}
-            end
+            {ok, NewRT}
             ;
         _Else -> % source node changed, rebuild the complete table
             {trigger_rebuild, OldRT} % XXX this triggers init_stabilize
@@ -318,7 +321,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                         case entry_exists(Key, Acc) of
                             true -> Acc;
                             false -> 
-                                add_normal_entry(Entry, Acc)
+                                add_normal_entry(rt_entry_node(Entry), Acc)
                         end
                 end,
                 To, get_rt_tree(From)
@@ -378,7 +381,7 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
 
 %% userdevguide-begin rt_frtchord:empty_ext
 -spec empty_ext(nodelist:neighborhood()) -> external_rt().
-empty_ext(Neighbors) -> export_rt_to_dht_node(empty(Neighbors), Neighbors).
+empty_ext(_Neighbors) -> gb_trees:empty().
 %% userdevguide-end rt_frtchord:empty_ext
 
 %% userdevguide-begin rt_frtchord:next_hop
@@ -475,26 +478,53 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 -spec entry_filtering(rt(),[rt_entry()]) -> rt().
 entry_filtering(RT, []) -> RT;
 entry_filtering(RT, AllowedNodes) ->
+    % XXX ensure that the allowed nodes are actually contained in the routing table
+    false = lists:any(fun(none) -> true; (_) -> false end,
+            [rt_lookup_node(entry_nodeid(N), RT) || N
+                <- AllowedNodes]),
     Spacings = [
-        begin
-            PredNode = predecessor_node(RT,Node),
-            {Node, spacing(Node, RT) + spacing(PredNode, RT)}
+        begin PredNode = predecessor_node(RT,Node),
+              {Node, spacing(Node, RT) + spacing(PredNode, RT)}
         end || Node <- AllowedNodes],
     % remove the element with the smallest canonical spacing range between its predecessor
     % and its successor. TODO beware of numerical errors!
     {FilterEntry, _Spacing} = hd(lists:sort(
             fun ({_,SpacingA}, {_, SpacingB})
-                        -> SpacingA =< SpacingB
+                -> SpacingA =< SpacingB
             end, Spacings)
-      ),
+    ),
     entry_delete(entry_nodeid(FilterEntry), RT)
     .
 
 % @doc Delete an entry from the routing table
+% TODO stale fingers, delete pointers
 -spec entry_delete(EntryKey :: key(), RT :: rt()) -> RefinedRT :: rt().
 entry_delete(EntryKey, RT) ->
     Tree = gb_trees:delete(EntryKey, get_rt_tree(RT)),
-    RT#rt_t{nodes=Tree}.
+
+    % update affected routing table entries (adjacent fingers)
+    {PredId, SuccId} = adjacent_fingers(rt_get_node(EntryKey, RT)),
+    Pred = rt_get_node(PredId, RT),
+    Succ = rt_get_node(SuccId, RT),
+
+    UpdatedTree = case PredId =:= SuccId of
+        true ->
+            Entry = set_adjacent_fingers(Pred, PredId, PredId),
+            gb_trees:enter(PredId, Entry, Tree);
+        false ->
+            NewPred = set_adjacent_succ(Pred, SuccId),
+            NewSucc = set_adjacent_pred(Succ, PredId),
+            gb_trees:enter(PredId, NewPred,
+                gb_trees:enter(SuccId, NewSucc, Tree))
+    end,
+    Ns = gb_trees:values(UpdatedTree),
+
+    %% TODO DELETE ASSERT
+    Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- Ns],
+    Ids = lists:flatten(Adjs),
+    false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
+                UpdatedTree) || N <- Ids]),
+    RT#rt_t{nodes=UpdatedTree}.
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
@@ -572,6 +602,14 @@ entry_learning(Entry, Type, RT) ->
                 source -> set_source_node(entry_nodeid(NewNode), RT);
                 _else  -> RT
             end,
+            %% XXX DELETE
+            %% assert that the ids of the adjacent nodes are still in the new table
+            %% So: check that no ID exists which is not contained in the RT
+            Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- [NewPred, NewNode,
+                    NewSucc]],
+            Ids = lists:flatten(Adjs),
+            false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
+                        Nodes) || N <- Ids]),
             rt_set_nodes(NewRT, Nodes);
         _else -> RT
     end
@@ -581,6 +619,14 @@ entry_learning(Entry, Type, RT) ->
 -spec entry_learning_and_filtering(node:node_type(), entry_type(), rt()) -> rt().
 entry_learning_and_filtering(Entry, Type, RT) ->
     IntermediateRT = entry_learning(Entry, Type, RT),
+
+    %% TODO DELETE ASSERT
+    Ns = gb_trees:values(get_rt_tree(IntermediateRT)),
+    Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- Ns],
+    Ids = lists:flatten(Adjs),
+    false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
+                get_rt_tree(IntermediateRT)) || N <- Ids]),
+
     SizeOfRT = get_size(IntermediateRT),
     MaxEntries = maximum_entries(),
     if SizeOfRT >= MaxEntries ->
@@ -656,6 +702,9 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 -spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
 rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
 
+-spec rt_lookup_node(NodeId :: key(), RT :: rt()) -> {value, rt_entry()} | nil.
+rt_lookup_node(NodeId, RT) -> gb_trees:lookup(NodeId, get_rt_tree(RT)).
+
 %% @doc Check if the given routing table entry is of the given entry type.
 -spec entry_is_of_type(rt_entry(), Type::entry_type()) -> boolean().
 entry_is_of_type(#rt_entry{type=Type}, Type) -> true;
@@ -727,7 +776,7 @@ canonical_spacing(SourceId, NodeId, SuccId) ->
 
 % @doc Check that all entries in an rt are well connected by their adjacent fingers
 -spec check_rt_integrity(RT :: rt()) -> boolean().
-check_rt_integrity(RT) ->
+check_rt_integrity(#rt_t{} = RT) ->
     Nodes = [node:id(N) || N <- internal_to_list(RT)],
 
     %  make sure that the entries are well-connected
