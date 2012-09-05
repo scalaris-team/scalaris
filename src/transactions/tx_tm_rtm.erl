@@ -225,29 +225,31 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p as ~p~n",
            [TransLog, state_get_role(State)]),
     Maj = config:read(quorum_factor),
-    RTMs = state_get_RTMs(State),
     GLLearner = state_get_gllearner(State),
     NewTid = {?tx_id, uid:get_global_uid()},
     TLogTxItemIds = [ {TLogEntry, {?tx_item_id, uid:get_global_uid()}} || TLogEntry <- TransLog ],
-    TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
-                              TLogTxItemIds, [GLLearner]),
-    TxState = tx_state:set_status(TmpTxState, ok),
-    _ = set_entry(TxState, State),
-
     ItemStates =
         [ begin
               TItemState = tx_item_state:new(ItemId, NewTid, TLogEntry),
               ItemState = tx_item_state:set_status(TItemState, ok),
-              _ = set_entry(ItemState, State),
               %% initialize local learner
               _ = [ learner:start_paxosid(GLLearner, element(1, X),
                                           Maj, comm:this(), ItemId)
                     || X <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ],
-              ItemState
+                  ItemState
           end || {TLogEntry, ItemId} <- TLogTxItemIds ],
 
-    init_RTMs(TxState, ItemStates),
+    RTMs = state_get_RTMs(State),
+    TmpTxState = tx_state:new(NewTid, Client, ClientsID, comm:this(), RTMs,
+                              TLogTxItemIds, [GLLearner]),
+    TxState = tx_state:set_status(TmpTxState, ok),
+
     init_TPs(TxState, ItemStates),
+    init_RTMs(TxState, ItemStates),
+
+    _ = [ set_entry(ItemState, State) || ItemState <- ItemStates ],
+    _ = set_entry(TxState, State),
+
     %% send a weak timeout to ourselves to take further care
     %% if the tx is slow (or a majority of tps failed)
     msg_delay:send_local((config:read(tx_timeout) * 2) div 1000, self(),

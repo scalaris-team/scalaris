@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(tx_tp).
 -author('schintke@onscale.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 
@@ -65,10 +65,6 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                         ?write ->
                             rdht_tx_write:validate(DB, RTLogEntry)
                     end,
-                %% remember own proposal for lock release
-                TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
-                pdb:set({PaxId, Proposal}, TP_DB),
-
                 %% initiate a paxos proposer round 0 with the proposal
                 Proposer = comm:make_global(dht_node_state:get(DHT_Node_State,
                                                                proposer)),
@@ -81,6 +77,10 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
                                                   comm:this()}})
                       || X <- [TM | RTMs], unknown =/= X],
                 %% (optimized: embed the proposer's accept message in registerTP message)
+                %% remember own proposal for lock release
+                TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
+                pdb:set({PaxId, Proposal}, TP_DB),
+
                 TmpDB;
             false ->
                 %% forward commit to now responsible node
