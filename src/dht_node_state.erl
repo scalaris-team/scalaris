@@ -147,16 +147,16 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         rt_size      -> ?RT:get_size(RT);
         neighbors    -> rm_loop:get_neighbors(RMState);
         my_range     -> Neighbors = rm_loop:get_neighbors(RMState),
-                      nodelist:node_range(Neighbors);
+                        nodelist:node_range(Neighbors);
         db_range     -> DBRange;
         succ_range   -> Neighbors = rm_loop:get_neighbors(RMState),
-                      nodelist:succ_range(Neighbors);
+                        nodelist:succ_range(Neighbors);
         msg_fwd      -> MsgFwdPred = slide_op:get_msg_fwd(SlidePred),
-                      MsgFwdSucc = slide_op:get_msg_fwd(SlideSucc),
-                      if MsgFwdPred =:= [] -> MsgFwdSucc;
-                         MsgFwdSucc =:= [] -> MsgFwdPred;
-                         true -> lists:append(MsgFwdPred, MsgFwdSucc)
-                      end;
+                        MsgFwdSucc = slide_op:get_msg_fwd(SlideSucc),
+                        if MsgFwdPred =:= [] -> MsgFwdSucc;
+                           MsgFwdSucc =:= [] -> MsgFwdPred;
+                           true -> lists:append(MsgFwdPred, MsgFwdSucc)
+                        end;
         db           -> DB;
         tx_tp_db     -> TxTpDb;
         proposer     -> Proposer;
