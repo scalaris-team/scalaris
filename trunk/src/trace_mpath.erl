@@ -45,7 +45,7 @@
 
 %% report tracing events from other modules
 -export([log_send/4]).
--export([log_info/3]).
+-export([log_info/2, log_info/3]).
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
 
@@ -176,7 +176,7 @@ send_histogram(Trace) ->
 %% sample call sequence to get a tx trace:
 %% tex traces have to be relatively short, so paste all at once to the
 %% erlang shell.
-%% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
+%% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace2.tex").
 
 -spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
@@ -360,6 +360,12 @@ log_send(PState, FromPid, ToPid, Msg) ->
     end,
     epidemic_reply_msg(PState, From, To, Msg).
 
+-spec log_info(anypid(), term()) -> ok.
+log_info(FromPid, Info) ->
+    case own_passed_state_get() of
+        undefined -> ok;
+        PState -> log_info(PState, FromPid, Info)
+    end.
 -spec log_info(passed_state(), anypid(), term()) -> ok.
 log_info(PState, FromPid, Info) ->
     From = normalize_pidinfo(FromPid),
