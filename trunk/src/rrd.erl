@@ -193,15 +193,22 @@ add_with(Time, Value, DB, F) ->
     case is_current_slot(Time, CurrentTime, SlotLength) of
         true ->
             CurrentIndex = DB#rrd.current_index,
-            update_with(DB, CurrentIndex, Time, Value, F);
+            Data = DB#rrd.data,
+            case array:get(CurrentIndex, Data) of
+                undefined ->
+                    DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, Value), Data)};
+                OldValue ->
+                    DB#rrd{data = array:set(CurrentIndex, F(Time, OldValue, Value), Data)}
+            end;
         _ ->
             case is_future_slot(Time, CurrentTime, SlotLength) of
                 true ->
                     Count = DB#rrd.count,
                     CurrentIndex = DB#rrd.current_index,
+                    Data = DB#rrd.data,
                     FillPolicy = DB#rrd.fill_policy,
                     Delta = (Time - CurrentTime) div SlotLength,
-                            NewIndex = (CurrentIndex + Delta) rem Count,
+                    NewIndex = (CurrentIndex + Delta) rem Count,
                     FilledData =
                         case Delta > Count of
                             true when FillPolicy =:= set_undefined ->
@@ -211,15 +218,15 @@ add_with(Time, Value, DB, F) ->
                                 array:new(Count);
                             true ->
                                 % fill everything:
-                                fill(DB#rrd.data, FillPolicy, Count,
+                                fill(Data, FillPolicy, Count,
                                      (CurrentIndex + 1) rem Count,
                                      CurrentIndex,
-                                     array:get(CurrentIndex, DB#rrd.data));
+                                     array:get(CurrentIndex, Data));
                             _ ->
-                                fill(DB#rrd.data, FillPolicy, Count,
+                                fill(Data, FillPolicy, Count,
                                      (CurrentIndex + 1) rem Count,
                                      NewIndex,
-                                     array:get(CurrentIndex, DB#rrd.data))
+                                     array:get(CurrentIndex, Data))
                         end,
                     DB#rrd{data = array:set(NewIndex, F(Time, undefined, Value), FilledData),
                            current_index = NewIndex,
@@ -227,15 +234,6 @@ add_with(Time, Value, DB, F) ->
                 _ -> % PastTimeSlot; ignore
                     DB
             end
-    end.
-
--spec update_with(rrd(), CurrentIndex::non_neg_integer(), Time::internal_time(), NewV, update_fun(data_type(), NewV)) -> rrd().
-update_with(DB, CurrentIndex, Time, NewValue, F) ->
-    case array:get(CurrentIndex, DB#rrd.data) of
-        undefined ->
-            DB#rrd{data = array:set(CurrentIndex, F(Time, undefined, NewValue), DB#rrd.data)};
-        OldValue ->
-            DB#rrd{data = array:set(CurrentIndex, F(Time, OldValue, NewValue), DB#rrd.data)}
     end.
 
 -spec fill(array(), fill_policy_type(), pos_integer(), non_neg_integer(), non_neg_integer(), data_type() | undefined) -> array().
@@ -356,13 +354,13 @@ is_future_slot(Time, CurrentTime, StepSize) ->
                    StepSize::timespan(), CurrentSlot::non_neg_integer(),
                    SlotCount::pos_integer()) -> non_neg_integer()| future | past.
 time2slotidx(Time, CurrentTime, StepSize, CurrentSlot, SlotCount) ->
-    case is_future_slot(Time, CurrentTime, StepSize) of
-        true -> future;
+    case is_current_slot(Time, CurrentTime, StepSize) of
+        true -> CurrentSlot;
         _ ->
-            case is_current_slot(Time, CurrentTime, StepSize) of
-                true -> CurrentSlot;
+            case is_future_slot(Time, CurrentTime, StepSize) of
+                true -> future;
                 _ ->
-                    SlotOffset = SlotCount + util:floor((Time - CurrentTime) / StepSize),
+                    SlotOffset = SlotCount + (Time - CurrentTime) div StepSize,
                     if SlotOffset > 0 -> (CurrentSlot + SlotOffset) rem SlotCount;
                        true           -> past
                     end
