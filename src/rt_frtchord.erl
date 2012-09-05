@@ -371,8 +371,8 @@ handle_custom_message({trigger_random_lookup}, State) ->
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
     api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
                                         {rt_get_node, comm:this()}}),
-    % TODO read period for active learning lookup from config
-    msg_delay:send_local(10, self(), {trigger_random_lookup}),
+    Interval = config:read(active_learning_lookup_interval),
+    msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
     State
     ;
 
