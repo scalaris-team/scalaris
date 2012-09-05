@@ -54,39 +54,41 @@
 -spec send(process_id(), comm:message(), comm:send_options()) -> ok.
 send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
      Message, Options) ->
-    % integrated checks is_valid/1, is_local/1 and make_local/1
-    {MyIP, MyPort} = get_local_address_port(),
-    if TargetIP =:= MyIP andalso TargetPort =:= MyPort ->
-            case is_pid(TargetPid) of
-                true ->
-                    case is_process_alive(TargetPid) of
-                        true ->
-                            %% minor gap of error reporting, if PID
-                            %% dies at this moment, but better than a
-                            %% false positive reporting when first
-                            %% sending and then checking, if message
-                            %% leads to process termination (as in the
-                            %% RPCs of the Java binding)
-                            TargetPid ! Message, ok;
-                        false ->
-                            report_send_error(Options, Target, Message,
-                                              local_target_not_alive)
-                    end;
-                false ->
-                    case whereis(TargetPid) of
-                        undefined ->
-                            log:log(warn,
-                                    "[ CC ] Cannot locally send msg to unknown named"
-                                        " process ~p: ~.0p~n", [TargetPid, Message]),
-                            report_send_error(Options, Target, Message, unknown_named_process);
-                        PID ->
-                            % assume that whereis/1 does not report dead PIDs
-                            PID ! Message, ok
-                    end
-            end;
-        true ->
-            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
-            ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options}
+    % integrated is_local/1 and make_local/1:
+    if is_pid(TargetPid) andalso node(TargetPid) =:= node() ->
+           case is_process_alive(TargetPid) of
+               true ->
+                   %% minor gap of error reporting, if PID
+                   %% dies at this moment, but better than a
+                   %% false positive reporting when first
+                   %% sending and then checking, if message
+                   %% leads to process termination (as in the
+                   %% RPCs of the Java binding)
+                   TargetPid ! Message, ok;
+               false ->
+                   report_send_error(Options, Target, Message,
+                                     local_target_not_alive)
+           end;
+       is_pid(TargetPid) ->
+           ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
+           ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options};
+       is_atom(TargetPid) -> % named process
+           {MyIP, MyPort} = get_local_address_port(),
+           if MyIP =:= TargetIP andalso MyPort =:= TargetPort ->
+                  case whereis(TargetPid) of
+                      undefined ->
+                          log:log(warn,
+                                  "[ CC ] Cannot locally send msg to unknown named"
+                                      " process ~p: ~.0p~n", [TargetPid, Message]),
+                          report_send_error(Options, Target, Message, unknown_named_process);
+                      PID ->
+                          % assume that whereis/1 does not report dead PIDs
+                          PID ! Message, ok
+                  end;
+              true ->
+                  ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
+                  ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options}
+           end
     end.
 
 %% @doc returns process descriptor for the calling process
