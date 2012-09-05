@@ -25,6 +25,7 @@
 -define(TRACE(X,Y), ok).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -behaviour(tx_op_beh).
 -export([work_phase/3,
@@ -89,9 +90,8 @@ validate(DB, RTLogEntry) ->
 %%%            NewDB = ?DB:set_entry(DB, T3Entry),
 %%%            {NewDB, ?prepared};
 %%%        false ->
-    VersionOK = (RTVers =:= DBVers),
-    Lockable = not db_entry:is_locked(DBEntry),
-    case (VersionOK andalso Lockable) of
+    case ((RTVers =:= DBVers)
+          andalso (not db_entry:is_locked(DBEntry))) of
         true ->
             %% set locks on entry
             NewEntry = db_entry:set_writelock(DBEntry),
@@ -160,35 +160,31 @@ init([]) ->
 on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->
     %% PRE: No entry for key in TLog
     %% build translog entry from quorum read
-    pdb:set({ReqId, ClientPid, element(3, Request)}, TableName),
     rdht_tx_read:work_phase_key(self(), ReqId, element(2, Request), HashedKey),
+    pdb:set({ReqId, ClientPid, element(3, Request)}, TableName),
     TableName;
 
 %% reply triggered by rdht_tx_write:work_phase/3
 on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
     {Id, ClientPid, WriteValue} = pdb:get(Id, TableName),
-    Key = tx_tlog:get_entry_key(TLogEntry),
-    Request = {write, Key, WriteValue},
-    NewTLogEntry = update_tlog_entry(TLogEntry, Request),
+    NewTLogEntry = update_tlog_entry(TLogEntry, WriteValue),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
     TableName.
 
 -spec update_tlog_entry(tx_tlog:tlog_entry(),
-                        api_tx:write_request()) ->
+                        client_value()) ->
                                tx_tlog:tlog_entry().
-update_tlog_entry(TLogEntry, Request) ->
-    Key = tx_tlog:get_entry_key(TLogEntry),
-    Status = tx_tlog:get_entry_status(TLogEntry),
-    Version = tx_tlog:get_entry_version(TLogEntry),
-    WriteValue = element(3, Request),
+update_tlog_entry(TLogEntry, WriteValue) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
-    case Status of
+    T2 = tx_tlog:set_entry_operation(TLogEntry, ?write),
+    case tx_tlog:get_entry_status(TLogEntry) of
         ?value ->
-            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue);
+            tx_tlog:set_entry_value(T2, WriteValue);
         {fail, not_found} ->
-            tx_tlog:new_entry(?write, Key, Version, ?value, WriteValue);
+            T3 = tx_tlog:set_entry_status(T2, ?value),
+            tx_tlog:set_entry_value(T3, WriteValue);
         {fail, abort} -> %% only for tester? never called this way?
             TLogEntry
 %        {fail, timeout} ->

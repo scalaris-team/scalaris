@@ -57,12 +57,11 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
-
     CollectorPid = pid_groups:find_a(?MODULE),
-    %% inform CollectorPid on whom to inform after quorum reached
-    comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
     %% trigger quorum read
     quorum_read(comm:make_global(CollectorPid), ReqId, HashedKey),
+    %% inform CollectorPid on whom to inform after quorum reached
+    comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
     ok.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),

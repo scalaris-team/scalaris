@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
+% @copyright 2009-2012 Zuse Institute Berlin,
 %            2009-2010 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -96,11 +96,11 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
                     TmpState = learner_state:set_majority(StateForID, Majority),
                     Tmp2State = learner_state:set_process_to_inform(TmpState, ProcessToInform),
                     NewState = learner_state:set_client_cookie(Tmp2State, ClientCookie),
-                    pdb:set(NewState, ETSTableName),
                     case (Majority =< learner_state:get_accepted_count(NewState)) of
                         true -> decide(PaxosID, NewState);
                         false -> ok
-                    end
+                    end,
+                    pdb:set(NewState, ETSTableName)
             end
     end,
     State;
