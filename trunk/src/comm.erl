@@ -115,11 +115,11 @@ send(Pid, Msg, Options) ->
     RealMsg = pack_group_member(RealMsg1, Options),
     case erlang:get(trace_mpath) of
         undefined ->
-            comm_layer:send(RealPid, RealMsg, Options);
+            comm_server:send(RealPid, RealMsg, Options);
         Logger ->
             LogEpidemicMsg =
                 trace_mpath:log_send(Logger, self(), RealPid, RealMsg),
-            comm_layer:send(RealPid, LogEpidemicMsg, Options)
+            comm_server:send(RealPid, LogEpidemicMsg, Options)
     end.
 
 %% @doc Sends a message to a local process given by its local pid
@@ -161,12 +161,12 @@ make_global(Pid) -> get(Pid, this()).
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
 -spec make_local(mypid()) -> erl_local_pid().
 make_local({Pid, e, Nth, Cookie}) ->
-    {comm_layer:make_local(Pid), e, Nth, Cookie};
-make_local(Pid) -> comm_layer:make_local(Pid).
+    {comm_server:make_local(Pid), e, Nth, Cookie};
+make_local(Pid) -> comm_server:make_local(Pid).
 
 %% @doc Returns the global pid of the current process.
 -spec this() -> mypid_plain().
-this() -> comm_layer:this().
+this() -> comm_server:this().
 
 %% @doc Create the PID a process with name Name would have on node _Node.
 -spec get(erl_local_pid_plain(), mypid()) -> mypid().
@@ -185,26 +185,26 @@ reply_as(Target, Nth, Envelope) -> {Target, e, Nth, Envelope}.
 %% @doc Check whether the given pid is well formed.
 -spec is_valid(mypid() | any()) -> boolean().
 is_valid({Pid, e, _Nth, _Cookie}) -> is_valid(Pid);
-is_valid(Pid) -> comm_layer:is_valid(Pid).
+is_valid(Pid) -> comm_server:is_valid(Pid).
 
 %% @doc Check whether a global mypid() can be converted to a local
 %%      pid of the current node.
 -spec is_local(mypid()) -> boolean().
 is_local(Pid) ->
     {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_layer:is_local(CleanPid).
+    comm_server:is_local(CleanPid).
 
 %% @doc Gets the IP address of the given (global) mypid().
 -spec get_ip(mypid()) -> inet:ip_address().
 get_ip(Pid) ->
     {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_layer:get_ip(CleanPid).
+    comm_server:get_ip(CleanPid).
 
 %% @doc Gets the port of the given (global) mypid().
 -spec get_port(mypid()) -> non_neg_integer().
 get_port(Pid) ->
     {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_layer:get_port(CleanPid).
+    comm_server:get_port(CleanPid).
 
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
@@ -229,7 +229,7 @@ unpack_cookie({Pid, e, Nth, Envelope}, Msg) ->
 unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 
 %% @doc Creates a group member message and filter out the send options for the
-%%      comm_layer process.
+%%      comm_server process.
 -spec pack_group_member(message(), send_options()) -> message().
 pack_group_member(Msg, [])                      -> Msg;
 pack_group_member(Msg, [{shepherd, _Shepherd}]) -> Msg;
@@ -239,7 +239,7 @@ pack_group_member(Msg, Options)                 ->
         {group_member, Process} -> {send_to_group_member, Process, Msg}
     end.
 
-%% @doc Initializes the comm_layer by sending a message to known_hosts. A
+%% @doc Initializes the comm layer by sending a message to known_hosts. A
 %%      valid PID for comm:this/0 will be available afterwards.
 %%      (ugly hack to get a valid ip-address into the comm-layer)
 -spec init_and_wait_for_valid_pid() -> ok.

@@ -117,7 +117,7 @@ on({send, DestPid, Message, Options}, State) ->
              end,
     case Socket of
         fail ->
-            comm_layer:report_send_error(Options,
+            comm_server:report_send_error(Options,
                                          {dest_ip(State), dest_port(State), DestPid},
                                          Message, tcp_connect_failed),
             %%reconnect
@@ -452,11 +452,11 @@ status(State) ->
 report_bundle_error(Options, {Address, Port, unpack_msg_bundle}, Message, Reason) ->
     zip_and_foldr(
       fun (OptionsX, {DestPid, MessageX}) ->
-               comm_layer:report_send_error(
+               comm_server:report_send_error(
                  OptionsX, {Address, Port, DestPid}, MessageX, Reason)
       end, Options, Message);
 report_bundle_error(Options, {Address, Port, Pid}, Message, Reason) ->
-    comm_layer:report_send_error(Options, {Address, Port, Pid}, Message, Reason).
+    comm_server:report_send_error(Options, {Address, Port, Pid}, Message, Reason).
 
 zip_and_foldr(_F, [], []) ->
     ok;
