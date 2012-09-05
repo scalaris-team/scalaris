@@ -63,7 +63,7 @@ comm_send(Pid, Message) ->
             ok
     end,
     % assume TCP
-    comm_layer:send(RealPid, RealMessage, []),
+    comm_server:send(RealPid, RealMessage, []),
     ok.
 
 comm_send_local(Pid, Message) ->
