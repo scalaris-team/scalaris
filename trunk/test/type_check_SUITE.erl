@@ -314,7 +314,8 @@ tester_type_check_tx(_Config) ->
              {inform_tps, 3}, %% tries to send
              {send_to_rtms, 2}, %% tries to send
              {state_subscribe, 2}, %% tries to create pids / envelopes
-             {state_unsubscribe, 2} %% tries to create pids / envelopes
+             {state_unsubscribe, 2}, %% tries to create pids / envelopes
+             {merge_item_states, 6} %% needs specially-crafted lists
            ]}
           %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
           %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},
