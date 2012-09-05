@@ -518,6 +518,12 @@ on_post_op(Msg, State) ->
             ok;
         false -> ok
     end,
+    case erlang:get(trace_mpath) of
+        undefined ->
+            ok;
+        Logger ->
+            trace_mpath:log_info(Logger, self(), Msg)
+    end,
     on(Msg, State).
 
 -spec on_gc_msg(gc_msg(), gc_state()) -> gc_state() | ok.

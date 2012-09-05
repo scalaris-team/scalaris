@@ -84,7 +84,7 @@
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
 
 % Replica Repair
--define(REP_BLOOM, bloom). % bloom filter implemenation selection 
+-define(REP_BLOOM, bloom). % bloom filter implemenation selection
 -define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
 
 % Back-end of the pdb module
@@ -99,13 +99,17 @@
 -endif.
 
 -define(SCALARIS_RECV(X,Y),
-       {'$gen_component', trace_mpath,
-        _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
+        {'$gen_component', trace_mpath,
+         _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
                trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
-               trace_mpath:log_info(_ScalPState, _ScalTo, {"Tracing ends at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
+               case erlang:get(trace_mpath) of
+                   undefined ->
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {tracing_ends, "Tracing ends at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE});
+                   _ -> ok
+               end,
                Y;
-       X -> Y
-       ).
+            X -> Y
+        ).
 
 -define(IIF(C, A, B), case C of
                           true -> A;
