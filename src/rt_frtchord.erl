@@ -17,7 +17,6 @@
 %% @end
 %% @version $Id$
 
-%% TODO check if calls to empty/1 should be replaced with calles to init/1
 -module(rt_frtchord).
 -author('mamuelle@informatik.hu-berlin.de').
 -vsn('$Id$').
@@ -55,7 +54,11 @@
 -type(rt_t() :: #rt_t{}).
 
 -type custom_message() :: {get_rt, SourcePID :: comm:mypid()}
-                        | {get_rt_reply, RT::rt_t()}.
+                        | {get_rt_reply, RT::rt_t()}
+                        | {trigger_random_lookup}
+                        | {rt_get_node, From :: comm:mypid()}
+                        | {rt_get_node_response, NewNode :: node:node_type()}
+                        .
 
 %% userdevguide-end rt_frtchord:types
 
@@ -75,7 +78,8 @@ maximum_entries() -> 10.
 %% @doc Creates an "empty" routing table.
 -spec empty(nodelist:neighborhood()) -> rt().
 empty(Neighbors) ->
-    add_source_entry(nodelist:node(Neighbors), #rt_t{})
+    EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
+    remove_and_ping_entries(Neighbors, EmptyRT)
     .
 %% userdevguide-end rt_frtchord:empty
 
@@ -83,10 +87,9 @@ empty(Neighbors) ->
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) -> 
     % ask the successor node for its routing table
-    % XXX i have to wrap the message as the Pid given as the succ is actually the dht
-    % node, but the message should be send to the routing table
     Msg = {send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
+    comm:send_local(self(), {trigger_random_lookup}),
     empty(Neighbors).
 
 %% @doc Hashes the key to the identifier space.
@@ -288,6 +291,30 @@ check_config() ->
             _ -> false
         end.
 
+
+
+%% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
+% TODO unit test that the generator doesn't generate keys from outside ?MINUS_INFINITY
+% to ?PLUS_INFINITY
+%% TODO
+%I floor the key for now; the key generator should return ints, but returns
+%float. It is currently unclear if this is a bug in the original paper by Nagao and
+%Shudo. Using erlang:trunc/1 should be enough for flooring, as X >= 0
+% TODO using the remainder might destroy the CDF. why can X > 2^128?
+-spec get_random_key_from_generator(SourceNodeId :: key(),
+                                    PredId :: key(),
+                                    SuccId :: key()
+                                   ) -> key().
+get_random_key_from_generator(SourceNodeId, PredId, SuccId) ->
+    Rand = random:uniform(),
+    X = SourceNodeId + get_range(SourceNodeId, SuccId) *
+        math:pow(get_range(SourceNodeId, PredId) /
+                    get_range(SourceNodeId, SuccId),
+                    Rand
+                ),
+    erlang:trunc(X) rem 16#100000000000000000000000000000000
+    .
+
 %% userdevguide-begin rt_frtchord:handle_custom_message
 %% @doc Handle custom messages. The following messages can occur:
 %%      - TODO explain messages
@@ -332,6 +359,36 @@ handle_custom_message({get_rt_reply, RT}, State) ->
     end,
     rt_loop:set_rt(State, NewRT)
     ;
+
+% lookup a random key chosen with a pdf:
+% x = sourcenode + d(s,succ)*(d(s,pred)/d(s,succ))^rnd
+% where rnd is chosen uniformly from [0,1)
+handle_custom_message({trigger_random_lookup}, State) ->
+    RT = rt_loop:get_rt(State),
+    SourceNode = get_source_node(RT),
+    SourceNodeId = entry_nodeid(SourceNode),
+    {PredId, SuccId} = adjacent_fingers(SourceNode),
+    Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
+    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
+                                        {rt_get_node, comm:this()}}),
+    % TODO read period for active learning lookup from config
+    msg_delay:send_local(10, self(), {trigger_random_lookup}),
+    State
+    ;
+
+handle_custom_message({rt_get_node, From}, State) ->
+    MyNode = nodelist:node(rt_loop:get_neighb(State)),
+    comm:send(From, {rt_get_node_response, MyNode}),
+    State
+    ;
+
+handle_custom_message({rt_get_node_response, NewNode}, State) ->
+    OldRT = rt_loop:get_rt(State),
+    NewRT = add_normal_entry(NewNode, OldRT),
+    check(OldRT, NewRT, rt_loop:get_neighb(State), true),
+    rt_loop:set_rt(State, NewRT)
+    ;
+
 
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
@@ -497,7 +554,6 @@ entry_filtering(RT, AllowedNodes) ->
     .
 
 % @doc Delete an entry from the routing table
-% TODO stale fingers, delete pointers
 -spec entry_delete(EntryKey :: key(), RT :: rt()) -> RefinedRT :: rt().
 entry_delete(EntryKey, RT) ->
     Tree = gb_trees:delete(EntryKey, get_rt_tree(RT)),
@@ -517,13 +573,7 @@ entry_delete(EntryKey, RT) ->
             gb_trees:enter(PredId, NewPred,
                 gb_trees:enter(SuccId, NewSucc, Tree))
     end,
-    Ns = gb_trees:values(UpdatedTree),
 
-    %% TODO DELETE ASSERT
-    Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- Ns],
-    Ids = lists:flatten(Adjs),
-    false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
-                UpdatedTree) || N <- Ids]),
     RT#rt_t{nodes=UpdatedTree}.
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
@@ -602,14 +652,6 @@ entry_learning(Entry, Type, RT) ->
                 source -> set_source_node(entry_nodeid(NewNode), RT);
                 _else  -> RT
             end,
-            %% XXX DELETE
-            %% assert that the ids of the adjacent nodes are still in the new table
-            %% So: check that no ID exists which is not contained in the RT
-            Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- [NewPred, NewNode,
-                    NewSucc]],
-            Ids = lists:flatten(Adjs),
-            false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
-                        Nodes) || N <- Ids]),
             rt_set_nodes(NewRT, Nodes);
         _else -> RT
     end
@@ -619,13 +661,6 @@ entry_learning(Entry, Type, RT) ->
 -spec entry_learning_and_filtering(node:node_type(), entry_type(), rt()) -> rt().
 entry_learning_and_filtering(Entry, Type, RT) ->
     IntermediateRT = entry_learning(Entry, Type, RT),
-
-    %% TODO DELETE ASSERT
-    Ns = gb_trees:values(get_rt_tree(IntermediateRT)),
-    Adjs = [tuple_to_list(adjacent_fingers(N)) || N <- Ns],
-    Ids = lists:flatten(Adjs),
-    false = lists:any(fun (none) -> true; (_) -> false end, [gb_trees:lookup(N,
-                get_rt_tree(IntermediateRT)) || N <- Ids]),
 
     SizeOfRT = get_size(IntermediateRT),
     MaxEntries = maximum_entries(),
