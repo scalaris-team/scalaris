@@ -422,8 +422,8 @@ on(Msg, State) ->
                     _ ->
                         {'$gc_exception',
                          on_exception(Msg, Level, Reason, Stacktrace, T1State)}
-            end
-    end,
+                end
+        end,
     case T2State of
         kill ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
