@@ -236,7 +236,7 @@ on({crashed, WatchedPid} = Msg, State) ->
 %%     State;
 
 on({unittest_report_down, Pid}, State) ->
-    ?TRACE("FD: unittest_report_down p~n", [Pid]),
+    ?TRACE("FD: unittest_report_down ~p~n", [Pid]),
     forward_to_hbs(
       Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
     State.
