@@ -1147,7 +1147,7 @@ collect_while(GatherFun, Count) ->
 
 -spec list_set_nth([A], pos_integer(), B) -> [A | B].
 list_set_nth(L, Pos, Val) ->
-    list_set_nth(L, Pos, Val, 0).
+    list_set_nth(L, Pos, Val, 1).
 
 -spec list_set_nth([A], pos_integer(), B, pos_integer()) -> [A | B].
 list_set_nth([_H | T], Pos, Val, Pos) ->
