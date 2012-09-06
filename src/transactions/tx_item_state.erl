@@ -174,10 +174,7 @@ newly_decided(State) ->
 -spec set_tp_for_paxosid(tx_item_state(), comm:mypid(), paxos_id()) -> tx_item_state().
 set_tp_for_paxosid(State, TP, PaxosId) ->
     TPList = get_paxosids_rtlogs_tps(State),
-    NewTPList = [case TPEntry of
-                     {PaxosId, TLogEntry, _Pid} -> {PaxosId, TLogEntry, TP};
-                     _ -> TPEntry
-                 end || TPEntry <- TPList],
+    NewTPList = util:lists_keystore2(PaxosId, 1, TPList, 3, TP),
     set_paxosids_rtlogs_tps(State, NewTPList).
 
 -spec add_learner_decide(tx_item_state(),

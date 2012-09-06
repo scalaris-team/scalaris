@@ -386,6 +386,7 @@ tester_type_check_util(_Config) ->
              {for_to_ex, 4}, %% cannot create funs
              {for_to_fold, 5}, %% cannot create funs
              {gb_trees_foldl, 3}, %% cannot create funs
+             {lists_keystore2, 5}, %% key id may not be larger than the tuple size in the list
              {log, 2}, %% floats become to large and raise badarith
              {log2, 1}, %% floats become to large and raise badarith
              {logged_exec, 1}, %% not execute random strings

@@ -39,7 +39,7 @@
          delete_if_exists/2,
          map_with_nr/3,
          par_map/2, par_map/3,
-         lists_split/2,
+         lists_split/2, lists_keystore2/5,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -1057,6 +1057,15 @@ lists_split([H | T], BlockSize, CurBlockSize, CurBlock, Result) ->
     lists_split(T, BlockSize, CurBlockSize + 1, [H | CurBlock], Result);
 lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
     [CurBlock | Result].
+
+-spec lists_keystore2(Key::term(), NC::pos_integer(), List::[tuple()],
+                      NS::pos_integer(), NewValue::term()) -> [tuple()].
+lists_keystore2(Key, NC, [H | T], NS, NewValue) when element(NC, H) == Key ->
+    [setelement(NS, H, NewValue) | T];
+lists_keystore2(Key, NC, [H | T], NS, NewValue) ->
+    [H | lists_keystore2(Key, NC, T, NS, NewValue)];
+lists_keystore2(_Key, _N, [], _NS, _NewValue) ->
+    [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
