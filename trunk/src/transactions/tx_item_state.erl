@@ -48,8 +48,8 @@
 -export_type([paxos_id/0]).
 -endif.
 
--opaque paxos_id() :: {uid:global_uid()}.
--type tx_item_id() :: {?tx_item_id, uid:global_uid()}.
+-opaque paxos_id() :: {?paxos_id, uid:global_uid(), non_neg_integer(), non_neg_integer()}.
+-type tx_item_id() :: {?tx_item_id, uid:global_uid(), non_neg_integer()}.
 -type tx_item_state() ::
  {
    TxItemId::tx_item_id(), %%  1 id of the item
@@ -99,14 +99,18 @@ new(ItemId, TxId, TLogEntry, Maj_for_prepared, Maj_for_abort, PaxosIds0) ->
             ?write ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
-    PaxosIds =
+    PaxIDsRTLogsTPs =
         case PaxosIds0 of
-            unknown -> [ {uid:get_global_uid()} || _ <- RTLogEntries ];
-%%          unknown -> [ {paxos_id, uid:get_global_uid()} || _ <- RTLogEntries ];
-            _ -> PaxosIds0
+            unknown ->
+                {?tx_item_id, TLogUid, ItemNr} = ItemId,
+                util:map_with_nr(
+                  fun(RTLogEntry, NrX) ->
+                          {{?paxos_id, TLogUid, ItemNr, NrX}, RTLogEntry, unknown}
+                  end, RTLogEntries, 0);
+            PaxosIds ->
+                TPs = [ unknown || _ <- PaxosIds ],
+                lists:zip3(PaxosIds, RTLogEntries, TPs)
         end,
-    TPs = [ unknown || _ <- PaxosIds ],
-    PaxIDsRTLogsTPs = lists:zip3(PaxosIds, RTLogEntries, TPs),
     {ItemId, ?tx_item_state, TxId, TLogEntry,
      Maj_for_prepared, Maj_for_abort,
      false, 0, 0, PaxIDsRTLogsTPs,

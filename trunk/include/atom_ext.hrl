@@ -50,6 +50,9 @@
 -define(acceptor_accept_atom, acceptor_accept).
 -define(acceptor_accept, ?int_or_atom(42, ?acceptor_accept_atom)).
 
+-define(paxos_id_atom, paxos_id).
+-define(paxos_id, ?int_or_atom(43, ?paxos_id_atom)).
+
 %% transactions
 -define(register_TP_atom, register_TP).
 -define(register_TP, ?int_or_atom(61, ?register_TP_atom)).
