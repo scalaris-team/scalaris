@@ -794,10 +794,9 @@ get_item_entry(Id, State) ->
     end.
 
 -spec set_entry(tx_state:tx_state() | tx_item_state:tx_item_state(),
-                   state()) -> state().
+                   state()) -> ok.
 set_entry(NewEntry, State) ->
-    pdb:set(NewEntry, state_get_tablename(State)),
-    State.
+    pdb:set(NewEntry, state_get_tablename(State)).
 
 -spec get_paxos_ids(State::state(), TxState::tx_state:tx_state()) -> [tx_item_state:paxos_id()].
 get_paxos_ids(State, TxState) ->
