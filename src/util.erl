@@ -1146,7 +1146,8 @@ list_set_nth(L, Pos, Val) ->
 list_set_nth([_H | T], Pos, Val, Pos) ->
     [Val | T];
 list_set_nth([H | T], Pos, Val, Cur) ->
-    [H | list_set_nth(T, Pos, Val, Cur + 1)].
+    [H | list_set_nth(T, Pos, Val, Cur + 1)];
+list_set_nth([], _Pos, _Val, _Cur) -> [].
 
 -spec debug_info() -> [[{string(), term()}]].
 debug_info() ->
