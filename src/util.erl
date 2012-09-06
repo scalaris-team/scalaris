@@ -1138,15 +1138,15 @@ collect_while(GatherFun, Count) ->
         false         -> []
     end.
 
--spec list_set_nth(list(), pos_integer(), any()) -> list().
+-spec list_set_nth([A], pos_integer(), B) -> [A | B].
 list_set_nth(L, Pos, Val) ->
-    {Result, _} = lists:foldr(fun(X, {Acc, Iter}) ->
-                                      case Iter == Pos of
-                                          true -> {[Val|Acc], Iter-1};
-                                          false -> {[X|Acc], Iter-1}
-                                      end
-                              end, {[], length(L)}, L),
-    Result.
+    list_set_nth(L, Pos, Val, 0).
+
+-spec list_set_nth([A], pos_integer(), B, pos_integer()) -> [A | B].
+list_set_nth([_H | T], Pos, Val, Pos) ->
+    [Val | T];
+list_set_nth([H | T], Pos, Val, Cur) ->
+    [H | list_set_nth(T, Pos, Val, Cur + 1)].
 
 -spec debug_info() -> [[{string(), term()}]].
 debug_info() ->
