@@ -88,12 +88,12 @@ resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = Actu
     end.
 
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
-insert(DataItem, []) ->
-    [DataItem];
 insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value < Value2 ->
     [DataItem | Data];
 insert(DataItem, [DataItem2 | Rest]) ->
-    [DataItem2 | insert(DataItem, Rest)].
+    [DataItem2 | insert(DataItem, Rest)];
+insert(DataItem, []) ->
+    [DataItem].
 
 %% @doc Finds the smallest interval between two consecutive values and returns
 %%      the second value (in the list's order).
@@ -103,8 +103,6 @@ find_smallest_interval([{Value, _}, {Value2, _} | Rest]) ->
     find_smallest_interval_loop(Value2 - Value, Value2, Value2, Rest).
 
 -spec find_smallest_interval_loop(MinInterval::float(), MinSecondValue::float(), LastValue::float(), Data::data_list()) -> MinSecondValue::float().
-find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
-    MinSecondValue;
 find_smallest_interval_loop(MinInterval, MinSecondValue, LastValue, [{Value, _} | Rest]) ->
     Diff = Value - LastValue,
     case MinInterval =< Diff of
@@ -113,7 +111,9 @@ find_smallest_interval_loop(MinInterval, MinSecondValue, LastValue, [{Value, _} 
         _    -> NewMinInterval = Diff,
                 NewMinSecondValue = Value
     end,
-    find_smallest_interval_loop(NewMinInterval, NewMinSecondValue, Value, Rest).
+    find_smallest_interval_loop(NewMinInterval, NewMinSecondValue, Value, Rest);
+find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
+    MinSecondValue.
 
 %% @doc Merges two consecutive values if the second of them is MinSecondValue.
 %%      Stops after the first match.

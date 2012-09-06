@@ -75,11 +75,11 @@ is_valid(_) -> false.
                   (node_type(), comm:mypid() | pid()) -> boolean();
                   (null | unknown, node_type() | comm:mypid() | pid()) -> false;
                   (node_type() | comm:mypid() | pid(), null | unknown) -> false.
-same_process(Node1, Node2) when ((Node1 =:= null) orelse (Node1 =:= unknown) orelse
-                           (Node2 =:= null) orelse (Node2 =:= unknown)) ->
-    false;
 same_process(Node1, Node2) when is_record(Node1, node) andalso is_record(Node2, node) ->
     pidX(Node1) =:= pidX(Node2);
+same_process(Node1, Node2) when (Node1 =:= null) orelse (Node1 =:= unknown) orelse
+                           (Node2 =:= null) orelse (Node2 =:= unknown) ->
+    false;
 same_process(Pid1, Node2) when is_record(Node2, node) andalso is_pid(Pid1) ->
     comm:make_global(Pid1) =:= pidX(Node2);
 same_process(Pid1, Node2) when is_record(Node2, node) ->
@@ -99,13 +99,13 @@ is_me(Node) ->
 %%      Note: Both nodes need to share the same PID, otherwise an exception of
 %%      type 'throw' is thrown!
 -spec is_newer(Node1::node_type(), Node2::node_type()) -> boolean().
-is_newer(#node{pid=PID, id=Id1, id_version=IdVersion1}, #node{pid=PID, id=Id2, id_version=IdVersion2}) ->
+is_newer(#node{pid=PID, id=Id1, id_version=IdVersion1},
+         #node{pid=PID, id=Id2, id_version=IdVersion2}) ->
     if
         (IdVersion1 > IdVersion2) -> true;
-        (IdVersion1 =:= IdVersion2) andalso (Id1 =:= Id2) -> false;
-        IdVersion1 =:= IdVersion2 ->
-            throw('got two nodes with same IDversion but different ID');
-        true -> false
+        IdVersion1 < IdVersion2 -> false;
+        Id1 =:= Id2 -> false;
+        true -> throw('got two nodes with same IDversion but different ID')
     end.
 
 %% @doc Creates an interval that covers all keys a node with MyKey is

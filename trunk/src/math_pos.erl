@@ -36,13 +36,13 @@ plus(A, B, Base) ->
 -spec plus_rev(A_rev::position_var(), B_rev::position_var(),
         Carry::non_neg_integer(), Sum::position_var(), Base::pos_integer())
     -> Sum::position_var().
-% note: forget first carry (don't change length of lists)
-plus_rev([], [], _Carry, Sum, _Base) -> Sum;
 plus_rev([A1 | A_rev_Rest], [D1 | D_rev_Rest], Carry, Sum, Base) ->
     S1_new1 = A1 + D1 + Carry,
     NewCarry = S1_new1 div Base,
     S1_new = S1_new1 - NewCarry * Base,
-    plus_rev(A_rev_Rest, D_rev_Rest, NewCarry, [S1_new | Sum], Base).
+    plus_rev(A_rev_Rest, D_rev_Rest, NewCarry, [S1_new | Sum], Base);
+% note: forget first carry (don't change length of lists)
+plus_rev([], [], _Carry, Sum, _Base) -> Sum.
 
 %% @doc A - B
 -spec minus(A::position_var(), B::position_var(), Base::pos_integer()) -> position_var().
@@ -51,50 +51,49 @@ minus(A, B, Base) ->
   
 -spec minus_rev(A_rev::position_var(), B_rev::position_var(), Carry::non_neg_integer(),
         Diff::position_var(), Base::pos_integer()) -> Diff::position_var().
-% note: forget first carry (only important inside the subtraction)
-minus_rev([], [], _Carry, Diff, _Base) -> Diff;
 minus_rev([A1 | A_rev_Rest], [B1 | B_rev_Rest], Carry, Diff, Base) ->
     {CurChar, NewCarry} = case (A1 - Carry - B1) of
                               X when X >= 0 -> {X, 0};
                               X when X < (-Base) -> {X + 2 * Base, 2};
                               X -> {X + Base, 1}
                           end,
-    minus_rev(A_rev_Rest, B_rev_Rest, NewCarry, [CurChar | Diff], Base).
+    minus_rev(A_rev_Rest, B_rev_Rest, NewCarry, [CurChar | Diff], Base);
+% note: forget first carry (only important inside the subtraction)
+minus_rev([], [], _Carry, Diff, _Base) -> Diff.
 
 
 %% @doc A * Factor, if Factor is a non-negative integer smaller than Base.
 % TODO: implement other multiplications
 -spec multiply(A::position_var(), Factor::non_neg_integer(), Base::pos_integer()) -> position_var().
-multiply([], _Factor, _Base) -> [];
 multiply(A = [_|_], 0, _Base) -> lists:duplicate(erlang:length(A), 0);
 multiply(A = [_|_], 1, _Base) -> A;
 multiply(A = [_|_], Factor, Base)
   when is_integer(Factor) andalso Factor > 0 andalso Factor < Base ->
-    multiply_rev1(lists:reverse(A), Factor, 0, [], Base).
+    multiply_rev1(lists:reverse(A), Factor, 0, [], Base);
+multiply([], _Factor, _Base) -> [].
 
 -spec multiply_rev1(A_rev::position_var(), Factor::non_neg_integer(),
         Carry::non_neg_integer(), Prod::position_var(), Base::pos_integer())
     -> Prod::position_var().
-% note: forget first carry (don't change length of lists)
-multiply_rev1([], _Factor, _Carry, Prod, _Base) -> Prod;
 multiply_rev1([A1 | A_rev_Rest], Factor, Carry, Prod, Base) ->
     P1_new1 = A1 * Factor + Carry,
     NewCarry = P1_new1 div Base,
     P1_new = P1_new1 - NewCarry * Base,
-    multiply_rev1(A_rev_Rest, Factor, NewCarry, [P1_new | Prod], Base).
+    multiply_rev1(A_rev_Rest, Factor, NewCarry, [P1_new | Prod], Base);
+% note: forget first carry (don't change length of lists)
+multiply_rev1([], _Factor, _Carry, Prod, _Base) -> Prod.
 
 %% @doc A / Divisor (with rounding to nearest integer not larger than the
 %%      result in the last component). Divisor must be a positive integer.
 % TODO: implement other divisions
 -spec divide(A::position_var(), Divisor::pos_integer(), Base::pos_integer()) -> position_var().
-divide([], _Divisor, _Base) -> [];
+divide(A = [_|_], Divisor, Base) when is_integer(Divisor) andalso Divisor > 1 ->
+    lists:reverse(divide_torev(A, Divisor, 0, [], Base));
 divide(A = [_|_], 1, _Base) -> A;
-divide(A = [_|_], Divisor, Base) when is_integer(Divisor) andalso Divisor > 0 ->
-    lists:reverse(divide_torev(A, Divisor, 0, [], Base)).
+divide([], _Divisor, _Base) -> [].
 
 -spec divide_torev(Diff::position_var(), Divisor::pos_integer(), Carry::non_neg_integer(),
         Product_rev::position_var(), _Base) -> position_var().
-divide_torev([], _Divisor, _Carry, Product_rev, _Base) -> Product_rev;
 divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
     Diff0 = Carry * Base + D1,
     Diff1 = Diff0 / Divisor,
@@ -104,7 +103,8 @@ divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
                    _    -> % tolerate minor mis-calculations by rounding:
                            erlang:round((Diff1 - Diff2) * Divisor)
                end,
-    divide_torev(DR, Divisor, NewCarry, [Diff2 | Product_rev], Base).
+    divide_torev(DR, Divisor, NewCarry, [Diff2 | Product_rev], Base);
+divide_torev([], _Divisor, _Carry, Product_rev, _Base) -> Product_rev.
 
 %% @doc Bring two lists to the same length by appending or prepending zeros.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back)
@@ -138,7 +138,7 @@ remove_zeros(A, front, C) -> remove_zeros_front(A, C).
 
 -spec remove_zeros_front(A::position_var(), MaxToRemove::non_neg_integer() | all) -> position_var().
 remove_zeros_front(A, 0) -> A;
-remove_zeros_front([], _) -> [];
 remove_zeros_front([0 | R], all) -> remove_zeros_front(R, all);
 remove_zeros_front([0 | R], C) -> remove_zeros_front(R, C - 1);
-remove_zeros_front(A, _) -> A.
+remove_zeros_front([_|_] = A, _) -> A;
+remove_zeros_front([], _) -> [].

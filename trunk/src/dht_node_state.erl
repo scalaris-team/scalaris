@@ -215,14 +215,13 @@ is_db_responsible(Key, State = #state{db_range = DBRange}) ->
         {Type::pred | succ, SlideOp::slide_op:slide_op()} |
         not_found.
 get_slide(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
-    IsSlidePred = SlidePred =/= null andalso
-                      slide_op:get_id(SlidePred) =:= MoveFullId,
-    IsSlideSucc = SlideSucc =/= null andalso
-                      slide_op:get_id(SlideSucc) =:= MoveFullId,
-    if
-        IsSlidePred -> {pred, SlidePred};
-        IsSlideSucc -> {succ, SlideSucc};
-        true        -> not_found
+    case SlidePred =/= null andalso slide_op:get_id(SlidePred) =:= MoveFullId of
+        true -> {pred, SlidePred};
+        _ ->
+            case SlideSucc =/= null andalso slide_op:get_id(SlideSucc) =:= MoveFullId of
+                true -> {succ, SlideSucc};
+                _ -> not_found
+            end
     end.
 
 -spec set_tx_tp_db(State::state(), NewTxTpDb::any()) -> state().
@@ -309,9 +308,10 @@ details(State, Which) ->
 %%      routing table size, memory usage.
 -spec details(state()) -> node_details:node_details().
 details(State) ->
-    PredList = get(State, predlist),
-    SuccList = get(State, succlist),
-    Node = get(State, node),
+    Neighbors = get(State, neighbors),
+    PredList = nodelist:preds(Neighbors),
+    SuccList = nodelist:succs(Neighbors),
+    Node = nodelist:node(Neighbors),
     Load = get(State, load),
     Hostname = net_adm:localhost(),
     RTSize = get(State, rt_size),

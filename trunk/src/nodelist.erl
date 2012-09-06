@@ -142,18 +142,14 @@ new(Preds, Node, Succs) ->
 %%      non-empty predecessor and successor lists (fills them with itself if
 %%      necessary).
 -spec ensure_lists_not_empty(Preds::snodelist(), Node::node:node_type(), Succs::snodelist()) -> neighborhood().
+ensure_lists_not_empty([_|_] = Preds, Node, [_|_] = Succs) ->
+    add_intervals(Preds, Node, Succs);
 ensure_lists_not_empty([], Node, []) ->
     add_intervals([Node], Node, [Node]);
-ensure_lists_not_empty(Preds, Node, Succs) ->
-    NewPreds = case Preds of
-                   [] -> [lists:last(Succs)];
-                   _  -> Preds
-               end,
-    NewSuccs = case Succs of
-                   [] -> [lists:last(Preds)];
-                   _  -> Succs
-               end,
-    add_intervals(NewPreds, Node, NewSuccs).
+ensure_lists_not_empty([], Node, [_|_] = Succs) ->
+    add_intervals([lists:last(Succs)], Node, Succs);
+ensure_lists_not_empty([_|_] = Preds, Node, []) ->
+    add_intervals(Preds, Node, [lists:last(Preds)]).
 
 %% @doc Truncates the given neighborhood's predecessor and successor lists to
 %%      the given sizes.
@@ -420,13 +416,13 @@ filter_min_length({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, MinPred
 %% @doc Helper function that removes the head of NodeList if is is equal to
 %%      Node (using node:same_process/2).
 -spec lremove_head_if_eq(NodeList::snodelist(), Node::node:node_type()) -> snodelist().
-lremove_head_if_eq([] = NodeList, _Node) ->
-    NodeList;
 lremove_head_if_eq([H | T] = NodeList, Node) ->
     case node:same_process(H, Node) of
         true  -> T;
         false -> NodeList
-    end.
+    end;
+lremove_head_if_eq([] = NodeList, _Node) ->
+    NodeList.
 
 %% @doc Converts a neighborhood to a sorted list of nodes including the
 %%      predecessors, the node and its successors. The first element of the
@@ -445,17 +441,17 @@ to_list({Preds, Node, Succs, _NodeIntv, _SuccIntv}) ->
 -spec lget_last_and_remove(NodeList::snodelist(), NodeToRemove::node:node_type(), ResultList::snodelist()) ->
         {LastNode::node:node_type(), FilteredList::non_empty_snodelist()} |
         {null, []}.
-lget_last_and_remove([], _NodeToRemove, []) ->
-    {node:null(), []};
-lget_last_and_remove([], _NodeToRemove, [Last | _] = ResultList) ->
-    {Last, lists:reverse(ResultList)};
 lget_last_and_remove([H | T], NodeToRemove, ResultList) ->
     case node:same_process(H, NodeToRemove) of
         true ->
             lget_last_and_remove(T, NodeToRemove, ResultList);
         false ->
             lget_last_and_remove(T, NodeToRemove, [H | ResultList])
-    end.
+    end;
+lget_last_and_remove([], _NodeToRemove, []) ->
+    {node:null(), []};
+lget_last_and_remove([], _NodeToRemove, [Last | _] = ResultList) ->
+    {Last, lists:reverse(ResultList)}.
 
 %% @doc Helper function that adds NewHead to the head of NodeList if is is not
 %%      equal to Node (using node:same_process/2).
@@ -472,8 +468,8 @@ ladd_head_if_noteq(NewHead, NodeList, Node) ->
 -spec lrebase_list(non_empty_snodelist(), NewFirstNode::node:node_type()) -> snodelist().
 lrebase_list([First] = NodeList, NewFirstNode) ->
     case node:same_process(First, NewFirstNode) of
-        true  -> [];
-        false -> NodeList
+        false -> NodeList;
+        true  -> []
     end;
 lrebase_list([NewFirstNode | T], NewFirstNode) ->
     lremove(NewFirstNode, T); % just to be sure, remove NewFirstNode from the Tail
@@ -560,8 +556,6 @@ add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength,
 %%      list may now also appear in the successor (predecessor) list if a list
 %%      has been too small.
 -spec add_nodes(Neighbors::neighborhood(), NodeList::[node:node_type()], PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
-add_nodes(Neighbors, [], PredsLength, SuccsLength) ->
-    trunc(Neighbors, PredsLength, SuccsLength);
 add_nodes(Neighbors, [NodeToAdd], PredsLength, SuccsLength) ->
     add_node(Neighbors, NodeToAdd, PredsLength, SuccsLength);
 add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
@@ -577,16 +571,16 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
                     false ->
                         lists:append(LargerSorted, SmallerSorted)
                 end,
-    lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength).
+    lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength);
+add_nodes(Neighbors, [], PredsLength, SuccsLength) ->
+    trunc(Neighbors, PredsLength, SuccsLength).
 
 %% @doc Updates the node IDs of the nodes in the neighborhood with the most
 %%      up-to-date ID in either its own lists or the given node list.
 %%      Note: throws if any node in the NodeList is the same as the base node
 %%      but with an updated ID!
 -spec update_ids(Neighbors::neighborhood(), NodeList::[node:node_type()]) -> neighborhood().
-update_ids(Neighbors, []) ->
-    Neighbors;
-update_ids({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeList) ->
+update_ids({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, [_|_] = NodeList) ->
     {PredsUpd, _} = lupdate_ids(Preds, NodeList),
     {SuccsUpd, _} = lupdate_ids(Succs, NodeList),
     _ = [throw_if_newer(N, BaseNode) || N <- NodeList, node:same_process(BaseNode, N)],
@@ -595,7 +589,9 @@ update_ids({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeList) ->
     PredOrd = fun(N1, N2) -> succ_ord_node(N2, N1, BaseNode) end,
     SuccsUpdSorted = lists:usort(SuccOrd, SuccsUpd),
     PredsUpdSorted = lists:usort(PredOrd, PredsUpd),
-    ensure_lists_not_empty(PredsUpdSorted, BaseNode, SuccsUpdSorted).
+    ensure_lists_not_empty(PredsUpdSorted, BaseNode, SuccsUpdSorted);
+update_ids(Neighbors, []) ->
+    Neighbors.
 
 %% @doc Defines that N1 is less than or equal to N2 if their IDs are (provided
 %%      for convenience).
@@ -724,7 +720,6 @@ less_than_id(NId, Id, MyId) ->
 %%      with succ_ord is (slightly) faster. Also this is faster than a
 %%      lists:fold*/3.
 -spec best_node_maxfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst(_MyId, _Id, [], LastFound) -> LastFound;
 best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
     HId = node:id(H),
@@ -733,23 +728,23 @@ best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
         true        -> H;
         _ when LTId -> best_node_maxfirst2(Id, T, LastFound);
         _           -> best_node_maxfirst(MyId, Id, T, LastFound)
-    end.
+    end;
+best_node_maxfirst(_MyId, _Id, [], LastFound) -> LastFound.
 %% @doc Helper for best_node_maxfirst/4 which assumes that all nodes in
 %%      NodeList are in a valid range, i.e. between MyId and the target Id.
 -spec best_node_maxfirst2(Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst2(_Id, [], LastFound) -> LastFound;
 best_node_maxfirst2(Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
     case succ_ord_id(node:id(LastFound), node:id(H), Id) of
         true        -> H;
         _           -> best_node_maxfirst2(Id, T, LastFound)
-    end.
+    end;
+best_node_maxfirst2(_Id, [], LastFound) -> LastFound.
 
 %% @doc Similar to best_node_maxfirst/4 but with a NodeList that must be sorted
 %%      with the smallest key first (reverse order of a neighborhood's
 %%      predecessor list).
 -spec best_node_minfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_minfirst(_MyId, _Id, [], LastFound) -> LastFound;
 best_node_minfirst(MyId, Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
     HId = node:id(H),
@@ -759,7 +754,8 @@ best_node_minfirst(MyId, Id, [H | T], LastFound) ->
         true        -> best_node_minfirst(MyId, Id, T, H);
         _ when LTId -> best_node_minfirst(MyId, Id, T, LastFound);
         _           -> LastFound
-    end.
+    end;
+best_node_minfirst(_MyId, _Id, [], LastFound) -> LastFound.
 
 %% @doc Returns the node among all know neighbors (including the base node)
 %%      with the largest id smaller than Id.
