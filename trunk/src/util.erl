@@ -37,6 +37,7 @@
          topDumpXEvery/3, topDumpXEvery/5, topDumpXEvery_helper/4,
          minus_all/2, minus_first/2,
          delete_if_exists/2,
+         map_with_nr/3,
          par_map/2, par_map/3,
          lists_split/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
@@ -954,6 +955,14 @@ for_to_ex(I, N, Fun, Acc) ->
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T)) -> [T].
 for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
+
+%% @doc Similar to lists:map/2 but also passes the current number to the fun:
+%%      <tt>[a, b, c,...]</tt> maps to
+%%      <tt>[fun(a, StartNr), fun(b, StartNr+1), fun(c, StartNr+2),...]</tt>
+-spec map_with_nr(fun((A, integer()) -> B), List::[A], StartNr::integer()) -> [B].
+map_with_nr(F, [H | T], Nr) ->
+    [F(H, Nr) | map_with_nr(F, T, Nr + 1)];
+map_with_nr(F, [], _Nr) when is_function(F, 2) -> [].
 
 -type try_catch_result() :: ok | throw | error | exit.
 
