@@ -226,8 +226,12 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
            [TransLog, state_get_role(State)]),
     Maj = config:read(quorum_factor),
     GLLearner = state_get_gllearner(State),
-    NewTid = {?tx_id, uid:get_global_uid()},
-    TLogTxItemIds = [ {TLogEntry, {?tx_item_id, uid:get_global_uid()}} || TLogEntry <- TransLog ],
+    TLogUid = uid:get_global_uid(),
+    NewTid = {?tx_id, TLogUid},
+    TLogTxItemIds = util:map_with_nr(
+                      fun(TLogEntry, NrX) ->
+                              {TLogEntry, {?tx_item_id, TLogUid, NrX}}
+                      end, TransLog, 0),
     ItemStates =
         [ begin
               TItemState = tx_item_state:new(ItemId, NewTid, TLogEntry),
@@ -235,8 +239,8 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
               %% initialize local learner
               _ = [ learner:start_paxosid(GLLearner, element(1, X),
                                           Maj, comm:this(), ItemId)
-                    || X <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ],
-                  ItemState
+                      || X <- tx_item_state:get_paxosids_rtlogs_tps(ItemState) ],
+              ItemState
           end || {TLogEntry, ItemId} <- TLogTxItemIds ],
 
     RTMs = state_get_RTMs(State),
