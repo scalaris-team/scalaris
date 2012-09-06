@@ -156,8 +156,7 @@ compare_node_details({ok, _}, {failed, _}) ->
     false.
 
 -spec get_node_details(Pids::[comm:mypid()], ring(), TimeInMS::non_neg_integer()) -> ring().
-get_node_details([], Ring, _TimeInMS) -> Ring;
-get_node_details(Pids, Ring, TimeInMS) ->
+get_node_details([_|_] = Pids, Ring, TimeInMS) ->
     Continue =
         if
             TimeInMS =:= 2000 ->
@@ -181,7 +180,8 @@ get_node_details(Pids, Ring, TimeInMS) ->
             end;
         _ -> Failed = [{failed, Pid} || Pid <- Pids],
              lists:append(Failed, Ring)
-    end.
+    end;
+get_node_details([], Ring, _TimeInMS) -> Ring.
 
 %%%-------------------------------RT----------------------------------
 

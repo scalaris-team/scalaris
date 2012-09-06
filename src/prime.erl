@@ -38,17 +38,18 @@
 
 % @doc returns first prime bigger N
 -spec get_nearest(pos_integer()) -> pos_integer().
-get_nearest(N) when N > ?PrimeCache-> find_bigger_prime(3, N, []);
+get_nearest(N) when N > ?PrimeCache ->
+    find_bigger_prime(3, N, []);
 get_nearest(N) when N =< ?PrimeCache ->
     find_in_cache(N, prime_cache()).
 
 -spec find_in_cache(pos_integer(), prime_list()) -> pos_integer().
-find_in_cache(_, []) -> 1;
 find_in_cache(N, [P | Cache]) ->
     case P > N of
         true -> P;
         false -> find_in_cache(N, Cache)
-    end.
+    end;
+find_in_cache(_, []) -> 1.
 
 -spec find_bigger_prime(pos_integer(), pos_integer(), [pos_integer()]) -> pos_integer().
 find_bigger_prime(I, N, Primes) ->
@@ -69,7 +70,7 @@ is_prime(V) ->
 
 -spec is_prime_p(pos_integer(), [pos_integer()]) -> boolean().
 is_prime_p(V, Primes) ->
-    lists:any(fun(P) -> P =:= V end, Primes).
+    lists:member(V, Primes).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -81,19 +82,20 @@ get(N) ->
 -spec find_primes(pos_integer(), pos_integer(), prime_list()) -> prime_list().
 find_primes(I, N, Primes) when I > N -> Primes;
 find_primes(I, N, Primes) ->
-    find_primes(I + 2, N, case is_prime(I, Primes) of
-                              true -> [I | Primes];
-                              false -> Primes
-                          end).
+    NewPrimes = case is_prime(I, Primes) of
+                    true -> [I | Primes];
+                    false -> Primes
+                end,
+    find_primes(I + 2, N, NewPrimes).
 
 -spec is_prime(pos_integer(), prime_list()) -> boolean().
-is_prime(_, []) -> true;
 is_prime(I, [Prime | L]) when Prime * Prime > I -> is_prime(I, L);
 is_prime(I, [Prime | L]) ->
     case I rem Prime of
         0 -> false;
         _ -> is_prime(I, L)
-    end.
+    end;
+is_prime(_, []) -> true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -101,7 +103,7 @@ is_prime(I, [Prime | L]) ->
 %      http://primes.utm.edu/lists/small/10000.txt
 -spec prime_cache() -> prime_list().
 prime_cache() ->
-    [2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
+    [ 2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
      31,     37,     41,     43,     47,     53,     59,     61,     67,     71,
      73,     79,     83,     89,     97,    101,    103,    107,    109,    113,
     127,    131,    137,    139,    149,    151,    157,    163,    167,    173,
@@ -168,4 +170,3 @@ prime_cache() ->
    4759,   4783,   4787,   4789,   4793,   4799,   4801,   4813,   4817,   4831,
    4861,   4871,   4877,   4889,   4903,   4909,   4919,   4931,   4933,   4937,
    4943,   4951,   4957,   4967,   4969,   4973,   4987,   4993,   4999,   5003].
-

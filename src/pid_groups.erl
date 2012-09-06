@@ -204,8 +204,8 @@ group_with(PidName) ->
 -spec groups_with(pidname()) -> [groupname()] | failed.
 groups_with(PidName) ->
     case ets:match(?MODULE, {{'$1', PidName}, '_'}) of
-        []   -> failed;
-        Groups -> lists:append(Groups)
+        [_|_] = Groups -> lists:append(Groups);
+        []   -> failed
     end.
 
 -spec find_a(pidname()) -> pid() | failed.

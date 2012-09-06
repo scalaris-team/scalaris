@@ -123,10 +123,7 @@ condExchange(_, _, _, Dist, I, J) ->
 %% @doc Create a list with N zeros.
 -spec zeros(N::0) -> [];
            (N::pos_integer()) -> [0,...].
-zeros(0) ->
-    [];
-zeros(N) ->
-    [0 || _ <- lists:seq(1,N)].
+zeros(N) -> lists:duplicate(N, 0).
 
 %% @doc Get closest centroids and merge them if their distance is within Radius.
 -spec aggloClustering(Centroids::[centroid()], Sizes::vector(),
