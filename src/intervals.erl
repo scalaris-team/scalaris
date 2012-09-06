@@ -146,19 +146,13 @@ intersection(A, B) ->
 -spec intersection_element(A::{element, key()}, B::interval()) -> interval().
 intersection_element({element, X} = A, B) ->
     case in(X, B) of
-        true  -> [A];
-        false -> empty()
+        false -> empty();
+        true  -> [A]
     end.
 
 %% @doc Creates the intersection of two simple intervals or empty lists.
 -spec intersection_simple(A::simple_interval() | [], B::simple_interval() | []) -> simple_interval() | [].
-intersection_simple(all, B)    -> B;
-intersection_simple(A, all)    -> A;
-intersection_simple([] = A, _) -> A;
-intersection_simple(_, [] = B) -> B;
-intersection_simple(A, A)      -> A;
-intersection_simple({element, _} = A, B) -> intersection_simple_element(A, B);
-intersection_simple(A, {element, _} = B) -> intersection_simple_element(B, A);
+intersection_simple(A, A) -> A;
 intersection_simple({interval, A0Br, A0, A1, A1Br},
                     {interval, B0Br, B0, B1, B1Br}) ->
     B0_in_A = is_between(A0Br, A0, B0, A1, A1Br),
@@ -197,14 +191,20 @@ intersection_simple({interval, A0Br, A0, A1, A1Br},
                 false -> {interval, NewLeftBr, NewLeft, NewRight, NewRightBr}
             end;
         true -> []
-    end.
+    end;
+intersection_simple(all, B)    -> B;
+intersection_simple(A, all)    -> A;
+intersection_simple([] = A, _) -> A;
+intersection_simple(_, [] = B) -> B;
+intersection_simple({element, _} = A, B) -> intersection_simple_element(A, B);
+intersection_simple(A, {element, _} = B) -> intersection_simple_element(B, A).
 
 %% @doc Intersection between an element and a simple interval.
 -spec intersection_simple_element(A::{element, key()}, B::simple_interval()) -> {element, key()} | [].
 intersection_simple_element({element, X} = A, B) ->
     case in_simple(X, B) of
-        true  -> A;
-        false -> []
+        false -> [];
+        true  -> A
     end.
 
 %% @doc Returns true if A is a subset of B, i.e. the intersection of both is A.
@@ -222,8 +222,8 @@ in_simple(_, {element, _}) -> false.
 
 %% @doc X \in I. Precondition: is_well_formed(I).
 -spec in(X::key(), I::interval()) -> boolean().
-in(_, [])         -> false;
-in(X, [I | Rest]) -> in_simple(X, I) orelse in(X, Rest).
+in(X, [I | Rest]) -> in_simple(X, I) orelse in(X, Rest);
+in(_, [])         -> false.
 
 %% @doc Brings a list of intervals into normal form, i.e. sort, eliminate empty
 %%      intervals from the list, convert intervals that wrap around into a set
@@ -277,8 +277,6 @@ normalize_internal(List) ->
 
 %% @doc Normalizes simple intervals (see normalize_internal/1).
 -spec normalize_simple(invalid_simple_interval()) -> [simple_interval()].
-normalize_simple(all) -> [all];
-normalize_simple({element, _A} = I) -> [I];
 normalize_simple({interval, '(', X, X, _RightBr}) -> [];
 normalize_simple({interval, _LeftBr, X, X, ')'}) -> [];
 normalize_simple({interval, '[', X, X, ']'}) -> normalize_simple({element, X});
@@ -293,12 +291,12 @@ normalize_simple({interval, LeftBr, Begin, End, RightBr} = I) ->
         true ->  [{interval, '[', ?MINUS_INFINITY, End, RightBr},
                   {interval, LeftBr, Begin, ?PLUS_INFINITY, ')'}];
         false -> [I]
-    end.
+    end;
+normalize_simple({element, _A} = I) -> [I];
+normalize_simple(all) -> [all].
 
 -spec normalize_simple_bounds({interval, left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE, right_bracket()} | {element, key()} | all)
         -> invalid_simple_interval().
-normalize_simple_bounds({element, X}) when X < ?MINUS_INFINITY ->
-    {element, ?MINUS_INFINITY};
 normalize_simple_bounds({interval, _LeftBr, Begin, End, RightBr})
   when Begin < ?MINUS_INFINITY orelse Begin >= ?PLUS_INFINITY ->
     normalize_simple_bounds({interval, '[', ?MINUS_INFINITY, End, RightBr});
@@ -307,6 +305,8 @@ normalize_simple_bounds({interval, _LeftBr, _Begin, ?PLUS_INFINITY, ')'} = I) ->
 normalize_simple_bounds({interval, LeftBr, Begin, End, _RightBr})
   when End < ?MINUS_INFINITY orelse End >= ?PLUS_INFINITY ->
     {interval, LeftBr, Begin, ?PLUS_INFINITY, ')'};
+normalize_simple_bounds({element, X}) when X < ?MINUS_INFINITY ->
+    {element, ?MINUS_INFINITY};
 normalize_simple_bounds(I) ->
     I.
   
@@ -327,13 +327,13 @@ is_well_formed([_|_] = List) ->
 %% @doc Checks whether a given simple interval is normalized. Complex intervals
 %%      or any other value are considered 'not normalized'.
 -spec is_well_formed_simple(simple_interval()) ->  boolean().
-is_well_formed_simple({element, _X}) -> true;
 is_well_formed_simple({interval, _LeftBr, _X, ?MINUS_INFINITY, ')'}) ->
     false;
 is_well_formed_simple({interval, _LeftBr, _X, ?PLUS_INFINITY, ')'}) ->
     true;
 is_well_formed_simple({interval, _LeftBr, X, Y, _RightBr}) ->
     X < Y;
+is_well_formed_simple({element, _X}) -> true;
 is_well_formed_simple(all) -> true;
 is_well_formed_simple(_) -> false.
 
@@ -344,34 +344,34 @@ is_well_formed_simple(_) -> false.
 %%      intervals' first components compare equal the one with '[' is smaller
 %%      (to ease merge_adjacent/2), otherwise normal &lt;= from erlang is used.
 -spec interval_sort(I1::simple_interval(), I2::simple_interval()) -> boolean().
-interval_sort(all, _Interval2) ->
-    true;
-interval_sort({element, A}, {element, B}) ->
-    B >= A;
-interval_sort({element, A}, {interval, _B0Br, B0, _B1, _B1Br}) ->
-    B0 >= A;
-interval_sort({interval, _A0Br, A0, _A1, _A1Br}, {element, B}) ->
-    B > A0;
 interval_sort({interval, A0Br, A0, _A1, _A1Br} = A, {interval, B0Br, B0, _B1, _B1Br} = B) ->
     % beware of not accidentally making two intervals equal, which is defined
     % as A==B <=> interval_sort(A, B) andalso interval_sort(B, A)
     B0 > A0 orelse
         (A0 =:= B0 andalso A0Br =:= '[' andalso B0Br =:= '(') orelse
         (A0 =:= B0 andalso (not (A0Br =:= '(' andalso B0Br =:= '[')) andalso A =< B);
+interval_sort({element, A}, {interval, _B0Br, B0, _B1, _B1Br}) ->
+    B0 >= A;
+interval_sort({interval, _A0Br, A0, _A1, _A1Br}, {element, B}) ->
+    B > A0;
+interval_sort({element, A}, {element, B}) ->
+    B >= A;
+interval_sort(all, _Interval2) ->
+    true;
 interval_sort(_Interval1, _Interval2) ->
     false.
 
 %% @doc Merges adjacent intervals in a sorted list of simple intervals using
 %%      union_simple/2.
 -spec merge_adjacent([simple_interval()], [simple_interval()]) -> [simple_interval()].
-merge_adjacent([], Results) ->
-    lists:reverse(Results);
 merge_adjacent([all | _T], _Results) ->
     [all];
 merge_adjacent([H | T], []) ->
     merge_adjacent(T, [H]);
 merge_adjacent([HI | TI], [HR | TR]) ->
-    merge_adjacent(TI, union_simple(HI, HR) ++ TR).
+    merge_adjacent(TI, union_simple(HI, HR) ++ TR);
+merge_adjacent([], Results) ->
+    lists:reverse(Results).
 
 %% @doc Creates the union of two intervals.
 -spec union(A::interval(), B::interval()) -> interval().
@@ -386,28 +386,6 @@ union(A, B)          -> normalize_internal(lists:append(A, B)).
 -spec union_simple(A::simple_interval(), B::simple_interval()) -> [simple_interval()].
 union_simple(all, _B) -> [all];
 union_simple(_A, all) -> [all];
-union_simple({element, B0}, {interval, _B0Br, B0, B1, B1Br}) ->
-    new('[', B0, B1, B1Br);
-union_simple({element, B1}, {interval, B0Br, B0, B1, _B1Br}) ->
-    new(B0Br, B0, B1, ']');
-union_simple({interval, A0Br, A0, A1, _A1Br}, {element, A1}) ->
-    new(A0Br, A0, A1, ']');
-union_simple({interval, _A0Br, A0, A1, A1Br}, {element, A0}) ->
-    new('[', A0, A1, A1Br);
-union_simple({element, A_Value} = A, B) ->
-    % note: always place the first element (A) before the second
-    % element (B) in a union for merge_adjacent/2
-    case in_simple(A_Value, B) of
-        true  -> [B];
-        false -> [A, B]
-    end;
-union_simple(A, {element, B_Value} = B) ->
-    % note: always place the first element (A) before the second
-    % element (B) in a union for merge_adjacent/2
-    case in_simple(B_Value, A) of
-        true  -> [A];
-        false -> [A, B]
-    end;
 union_simple({interval, A0Br, A0, A1, ']'}, {interval, _B0Br, A1, B1, B1Br}) ->
     new(A0Br, A0, B1, B1Br);
 union_simple({interval, A0Br, A0, A1, _A1Br}, {interval, '[', A1, B1, B1Br}) ->
@@ -456,6 +434,28 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
                 false -> new(NewLeftBr, NewLeft, NewRight, NewRightBr)
             end;
         true -> [A, B]
+    end;
+union_simple({element, B0}, {interval, _B0Br, B0, B1, B1Br}) ->
+    new('[', B0, B1, B1Br);
+union_simple({element, B1}, {interval, B0Br, B0, B1, _B1Br}) ->
+    new(B0Br, B0, B1, ']');
+union_simple({interval, A0Br, A0, A1, _A1Br}, {element, A1}) ->
+    new(A0Br, A0, A1, ']');
+union_simple({interval, _A0Br, A0, A1, A1Br}, {element, A0}) ->
+    new('[', A0, A1, A1Br);
+union_simple({element, A_Value} = A, B) ->
+    % note: always place the first element (A) before the second
+    % element (B) in a union for merge_adjacent/2
+    case in_simple(A_Value, B) of
+        true  -> [B];
+        false -> [A, B]
+    end;
+union_simple(A, {element, B_Value} = B) ->
+    % note: always place the first element (A) before the second
+    % element (B) in a union for merge_adjacent/2
+    case in_simple(B_Value, A) of
+        true  -> [A];
+        false -> [A, B]
     end.
 
 %% @doc Checks whether the given interval is a continuous interval, i.e. simple
@@ -463,8 +463,6 @@ union_simple({interval, A0Br, A0, A1, A1Br} = A, {interval, B0Br, B0, B1, B1Br} 
 %%      they contain 2 simple intervals which are adjacent and wrap around.
 %%      Note: empty intervals are not continuous!
 -spec is_continuous(interval()) -> boolean().
-is_continuous([all]) -> true;
-is_continuous([{element, _Key}]) -> true;
 is_continuous([{interval, _LBr, _L, _R, _RBr}]) -> true;
 % complex intervals have adjacent intervals merged except for those wrapping around
 % -> if it contains only two simple intervals which are adjacent, it is continuous!
@@ -472,6 +470,8 @@ is_continuous([{interval, '[', ?MINUS_INFINITY, _B1, _B1Br},
                {interval, _A0Br, _A0, ?PLUS_INFINITY, ')'}]) -> true;
 is_continuous([{element, ?MINUS_INFINITY},
                {interval, _A0Br, _A0, ?PLUS_INFINITY, ')'}]) -> true;
+is_continuous([all]) -> true;
+is_continuous([{element, _Key}]) -> true;
 is_continuous(_) -> false.
 
 %% @doc Gets the outer bounds of a given non-empty interval including
@@ -486,13 +486,13 @@ is_continuous(_) -> false.
 %%      and will throw an exception otherwise!
 -spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()} |
                                 {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
-get_bounds([all]) -> {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'};
-get_bounds([{element, Key}]) -> {'[', Key, Key, ']'};
 get_bounds([{interval, LBr, L, R, RBr}]) -> {LBr, L, R, RBr};
 get_bounds([{interval, '[', ?MINUS_INFINITY, B1, B1Br},
             {interval, A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, B1, B1Br};
 get_bounds([{element, ?MINUS_INFINITY},
             {interval, A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, ?MINUS_INFINITY, ']'};
+get_bounds([all]) -> {'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'};
+get_bounds([{element, Key}]) -> {'[', Key, Key, ']'};
 get_bounds([]) -> erlang:throw('no bounds in empty interval');
 % fast creation of bounds by using the first and last value of the interval:
 get_bounds([H | T]) ->
@@ -513,12 +513,12 @@ get_elements(I) -> get_elements_list(I, [], []).
 
 %% @doc Helper for get_elements/1.
 -spec get_elements_list(Interval::interval(), Elements::[key()], RestInt::[simple_interval()]) -> {Elements::[key()], RestInt::[simple_interval()]}.
-get_elements_list([], Elements, RestInt) ->
-    {lists:reverse(Elements), lists:reverse(RestInt)};
 get_elements_list([{element, Key} | T], Elements, RestInt) ->
     get_elements_list(T, [Key | Elements], RestInt);
 get_elements_list([I | T], Elements, RestInt) ->
-    get_elements_list(T, Elements, [I | RestInt]).
+    get_elements_list(T, Elements, [I | RestInt]);
+get_elements_list([], Elements, RestInt) ->
+    {lists:reverse(Elements), lists:reverse(RestInt)}.
 
 %% @doc Checks whether two intervals are adjacent, i.e. the intervals are both
 %%      continuous, their union is continuous and their intersection is empty,
@@ -533,15 +533,15 @@ is_adjacent(A, B) ->
 %% @doc Subtracts the second from the first simple interval.
 -spec minus_simple(simple_interval(), simple_interval()) -> interval().
 minus_simple(A, A)   -> empty();
-minus_simple(_, all) -> empty();
-minus_simple(all, {element, B0}) ->
-    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY) as 'all' and [B0, B0] as element - minus_simple2 can handle this though
-    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'},
-                  {interval, '[', B0, B0, ']'});
-minus_simple(all, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
-    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY) as 'all' and [B0, B0] as element - minus_simple2 can handle this though
-    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}, B);
-minus_simple(A = {element, _}, {element, _}) -> [A];
+minus_simple(A = {interval, _A0Br, _A0, _A1, _A1Br},
+             B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
+    B_ = intersection_simple(A, B),
+    case B_ of
+        A                      -> empty();
+        {interval, _, _, _, _} -> minus_simple2(A, B_);
+        []                     -> [A];
+        _                      -> minus_simple(A, B_)
+    end;
 minus_simple(A = {element, A0}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
     case in_simple(A0, B) of
         true -> empty();
@@ -556,14 +556,15 @@ minus_simple(A = {interval, A0Br, A0, A1, A1Br}, {element, B0}) ->
         false -> [A];
         true  -> union(new(A0Br, A0, B0, ')'), new('(', B0, A1, A1Br))
     end;
-minus_simple(A = {interval, _A0Br, _A0, _A1, _A1Br}, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
-    B_ = intersection_simple(A, B),
-    case B_ of
-        []                     -> [A];
-        A                      -> empty();
-        {interval, _, _, _, _} -> minus_simple2(A, B_);
-        _                      -> minus_simple(A, B_)
-    end.
+minus_simple(A = {element, _}, {element, _}) -> [A];
+minus_simple(_, all) -> empty();
+minus_simple(all, B = {interval, _B0Br, _B0, _B1, _B1Br}) ->
+    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY) as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}, B);
+minus_simple(all, {element, B0}) ->
+    % hack: use [?MINUS_INFINITY, ?PLUS_INFINITY) as 'all' and [B0, B0] as element - minus_simple2 can handle this though
+    minus_simple2({interval, '[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'},
+                  {interval, '[', B0, B0, ']'}).
 
 %% @doc Subtracts the second from the first simple interval (no elements, no
 %%      'all', no empty interval). The second interval must be a subset of the
@@ -579,12 +580,12 @@ minus_simple2({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1Br}) ->
                 '['                -> new(A0Br, A0, B0, ')')
                end,
     Second = case B1Br of
+                 ']' when B1 =:= A1 -> empty();
+                 ']'                -> new('(', B1, A1, A1Br);
                  ')' when B1 =:= A1 andalso A1Br =:= ']' ->
                      new(A1);
                  ')' when B1 =:= A1 -> empty();
-                 ')'                -> new('[', B1, A1, A1Br);
-                 ']' when B1 =:= A1 -> empty();
-                 ']'                -> new('(', B1, A1, A1Br)
+                 ')'                -> new('[', B1, A1, A1Br)
                end,
     union(First, Second).
 
@@ -599,9 +600,9 @@ minus(A, B) ->
     normalize_internal(lists:flatten([minus2(IA, B) || IA <- A])).
 
 -spec minus2(A::simple_interval(), B::[simple_interval()]) -> [simple_interval()].
-minus2(A, []) -> [A];
 minus2(A, [HB | TB]) ->
-    minus(minus_simple(A, HB), TB).
+    minus(minus_simple(A, HB), TB);
+minus2(A, []) -> [A].
 
 %% @private
 %% @doc Determines whether an interval with the given borders wraps around,
@@ -651,7 +652,7 @@ is_left_of(X, Y) ->
             % in(B, X) =/= in(B, Y) implied by is_adjacent
             (B =:= C andalso (in(B, X) orelse in(B, Y)))
                 orelse
-            ({B, C} =:= {?PLUS_INFINITY, ?MINUS_INFINITY} andalso
+            (B =:= ?PLUS_INFINITY andalso C =:= ?MINUS_INFINITY andalso
              in(?MINUS_INFINITY, Y));
         false ->
             false

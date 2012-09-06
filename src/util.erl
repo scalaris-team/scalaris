@@ -492,36 +492,36 @@ topDumpXEvery_helper(Keys, ValueFun, Seconds, Subset) ->
 
 %% @doc minus_all(M,N) : { x | x in M and x notin N}
 -spec minus_all(List::[T], Excluded::[T]) -> [T].
-minus_all([], _ExcludeList) ->
-    [];
 minus_all([_|_] = L, [Excluded]) ->
     [E || E <- L, E =/= Excluded];
 minus_all([_|_] = L, ExcludeList) ->
     ExcludeSet = sets:from_list(ExcludeList),
-    [E || E <- L, not sets:is_element(E, ExcludeSet)].
+    [E || E <- L, not sets:is_element(E, ExcludeSet)];
+minus_all([], _ExcludeList) ->
+    [].
 
 %% @doc Deletes the first occurrence of each element in Excluded from List.
 %%      Similar to lists:foldl(fun lists:delete/2, NewValue1, ToDel) but more
 %%      performant for out case.
 -spec minus_first(List::[T], Excluded::[T]) -> [T].
-minus_first([], _ExcludeList) ->
-    [];
 minus_first([_|_] = L, [Excluded]) ->
     lists:delete(Excluded, L);
 minus_first([_|_] = L, ExcludeList) ->
-    minus_first2(L, ExcludeList, []).
+    minus_first2(L, ExcludeList, []);
+minus_first([], _ExcludeList) ->
+    [].
 
 %% @doc Removes every item in Excluded only once from List.
 -spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T].
-minus_first2([], _Excluded, Result) ->
-    lists:reverse(Result);
-minus_first2(L, [], Result) ->
-    lists:reverse(Result, L);
-minus_first2([H | T], Excluded, Result) ->
+minus_first2([H | T], [_|_] = Excluded, Result) ->
     case delete_if_exists(Excluded, H, []) of
         {true,  Excluded2} -> minus_first2(T, Excluded2, Result);
         {false, Excluded2} -> minus_first2(T, Excluded2, [H | Result])
-    end.
+    end;
+minus_first2([], _Excluded, Result) ->
+    lists:reverse(Result);
+minus_first2(L, [], Result) ->
+    lists:reverse(Result, L).
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
 -spec delete_if_exists(Del::T, List::[T]) -> {Found::boolean(), [T]}.
@@ -530,12 +530,12 @@ delete_if_exists(Del, List) ->
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
 -spec delete_if_exists(List::[T], Del::T, Result::[T]) -> {Found::boolean(), [T]}.
-delete_if_exists([], _Del, Result) ->
-    {false, lists:reverse(Result)};
 delete_if_exists([Del | T], Del, Result) ->
     {true, lists:reverse(Result, T)};
 delete_if_exists([H | T], Del, Result) ->
-    delete_if_exists(T, Del, [H | Result]).
+    delete_if_exists(T, Del, [H | Result]);
+delete_if_exists([], _Del, Result) ->
+    {false, lists:reverse(Result)}.
 
 -spec get_proc_in_vms(atom()) -> [comm:mypid()].
 get_proc_in_vms(Proc) ->
@@ -593,21 +593,21 @@ shuffle(List) ->
 %% @doc Fisher-Yates shuffling for lists helper function: creates a shuffled
 %%      list of length ShuffleSize.
 -spec shuffle_helper(List::[T], AccResult::[T], ShuffleSize::non_neg_integer(), ListSize::non_neg_integer()) -> [T].
-shuffle_helper([], Acc, _Size, _ListSize) ->
-    Acc;
 shuffle_helper([_|_] = _List, Acc, 0, _ListSize) ->
     Acc;
 shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, ListSize), List),
-    shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1).
+    shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1);
+shuffle_helper([], Acc, _Size, _ListSize) ->
+    Acc.
 
 -spec first_matching(List::[T], Pred::fun((T) -> boolean())) -> {ok, T} | failed.
-first_matching([], _Pred) -> failed;
 first_matching([H | R], Pred) ->
     case Pred(H) of
         true -> {ok, H};
         _    -> first_matching(R, Pred)
-    end.
+    end;
+first_matching([], _Pred) -> failed.
 
 %% @doc Find the largest key in GBTree that is smaller than Key.
 %%      Note: gb_trees offers only linear traversal or lookup of exact keys -
@@ -620,8 +620,6 @@ gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree}) ->
     gb_trees_largest_smaller_than_iter(MyKey, InnerTree, true).
 
 -spec gb_trees_largest_smaller_than_iter(Key, {Key, Value, Smaller::term(), Bigger::term()}, RightTree::boolean()) -> {value, Key, Value} | nil.
-gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
-    nil;
 gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, Smaller, Bigger}, RightTree) ->
     case Key < SearchKey of
         true when RightTree andalso Bigger =:= nil ->
@@ -635,7 +633,9 @@ gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, Smaller, Bigger}, Rig
             end;
         _ ->
             gb_trees_largest_smaller_than_iter(SearchKey, Smaller, false)
-    end.
+    end;
+gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
+    nil.
 
 %% @doc Foldl over gb_trees.
 -spec gb_trees_foldl(fun((Key::any(), Value::any(), Acc) -> Acc), Acc, gb_tree()) -> Acc.
@@ -699,12 +699,12 @@ zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
 
 %% @doc Compare two lists which are equal based on erlang:'=='/2.
 -spec '=:<_lists'(T::list(), T::list()) -> boolean().
-'=:<_lists'([], []) -> true;
 '=:<_lists'([H1 | R1], [H2 | R2]) ->
     case (H1 == H2) andalso (H1 =/= H2) of
         true  -> '=:<'(H1, H2);
         false -> '=:<_lists'(R1, R2)
-    end.
+    end;
+'=:<_lists'([], []) -> true.
 
 %% @doc Splits off N elements from List. If List is not large enough, the whole
 %%      list is returned.
@@ -984,14 +984,14 @@ par_map_feeder(2, List) ->
 %% @doc Parallel version of lists:map/2. Spawns a new process for each element
 %%      in the list!
 -spec par_map(Fun::fun((A) -> B), List::[A]) -> [B].
-par_map(_Fun, []) -> [];
 par_map(Fun, [E]) -> [Fun(E)];
 par_map(Fun, [_|_] = List) ->
     _ = [erlang:spawn(?MODULE, parallel_run, [self(), Fun, [E], true, E]) || E <- List],
     case lists:foldr(fun par_map_recv/2, {{ok, ok}, []}, List) of
         {{ok, ok}, Result}   -> Result;
         {{Level, Reason}, _} -> erlang:Level(Reason) % throw the error here again
-    end.
+    end;
+par_map(Fun, []) when is_function(Fun, 1)-> [].
 
 %% @doc Helper for par_map/3.
 -spec par_map_recv2(ListElem::term(), {try_catch_result(), [B], Id::non_neg_integer()})
@@ -1011,9 +1011,8 @@ par_map_feeder(FunNr, List, MaxThreads) ->
 %% @doc Parallel version of lists:map/2 with the possibility to limit the
 %%      maximum number of processes being spawned.
 -spec par_map(Fun::fun((A) -> B), List::[A], MaxThreads::pos_integer()) -> [B].
-par_map(_Fun, [], _MaxThreads) -> [];
 par_map(Fun, [E], _MaxThreads) -> [Fun(E)];
-par_map(Fun, List, 1) -> lists:map(Fun, List);
+par_map(Fun, [_|_] = List, 1) -> lists:map(Fun, List);
 par_map(Fun, [_|_] = List, MaxThreads) ->
     SplitList = lists_split(List, MaxThreads),
     lists:foldl(
@@ -1026,30 +1025,31 @@ par_map(Fun, [_|_] = List, MaxThreads) ->
     case lists:foldl(fun par_map_recv2/2, {{ok, ok}, [], 0}, SplitList) of
         {{ok, ok}, Result, _}   -> Result;
         {{Level, Reason}, _, _} -> erlang:Level(Reason) % throw the error here again
-    end.
+    end;
+par_map(Fun, [], _MaxThreads) when is_function(Fun, 1) -> [].
 
 %% @doc Splits the given list into several partitions, returning a list of parts
 %%      of the original list. Both the parts and their contents are reversed
 %%      compared to the original list!
 -spec lists_split([A], Partitions::pos_integer()) -> [[A]].
-lists_split([], _Partitions) -> [];
 lists_split([X], _Partitions) -> [[X]];
-lists_split(List, 1) -> [lists:reverse(List)];
+lists_split([_|_] = List, 1) -> [lists:reverse(List)];
 lists_split([_|_] = List, Partitions) ->
     BlockSize = length(List) div Partitions,
     case BlockSize < 1 of
         true -> lists:foldl(fun(E, Acc) -> [[E] | Acc] end, [], List);
         _    -> lists_split(List, BlockSize, 0, [], [])
-    end.
+    end;
+lists_split([], _Partitions) -> [].
 
 %% @doc Helper for lists_split/2.
 -spec lists_split([A], BlockSize::pos_integer(), CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]].
-lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
-    [CurBlock | Result];
-lists_split(List, BlockSize, BlockSize, CurBlock, Result) ->
+lists_split([_|_] = List, BlockSize, BlockSize, CurBlock, Result) ->
     lists_split(List, BlockSize, 0, [], [CurBlock | Result]);
 lists_split([H | T], BlockSize, CurBlockSize, CurBlock, Result) ->
-    lists_split(T, BlockSize, CurBlockSize + 1, [H | CurBlock], Result).
+    lists_split(T, BlockSize, CurBlockSize + 1, [H | CurBlock], Result);
+lists_split([], _BlockSize, _CurBlockSize, CurBlock, Result) ->
+    [CurBlock | Result].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
