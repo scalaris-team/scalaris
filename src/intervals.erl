@@ -138,9 +138,9 @@ intersection([{element, _} = A], B) -> intersection_element(A, B);
 intersection(A, [{element, _} = B]) -> intersection_element(B, A);
 intersection(A, A) -> A;
 intersection(A, B) ->
-    normalize_internal([intersection_simple(IA, IB)
-                          || IA <- A, IB <- B,
-                             intersection_simple(IA, IB) =/= []]).
+    normalize_internal([IS || IA <- A, IB <- B,
+                              IS <- [intersection_simple(IA, IB)],
+                              IS =/= []]).
 
 %% @doc Intersection between an element and an interval.
 -spec intersection_element(A::{element, key()}, B::interval()) -> interval().
