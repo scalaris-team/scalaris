@@ -76,6 +76,7 @@
 
 % feeder for tester
 -export([readable_utc_time_feeder/1]).
+-export([map_with_nr_feeder/3]).
 -export([par_map_feeder/2, par_map_feeder/3]).
 
 -export([sets_map/2]).
@@ -955,6 +956,12 @@ for_to_ex(I, N, Fun, Acc) ->
 -spec for_to_ex(integer(), integer(), fun((integer()) -> T)) -> [T].
 for_to_ex(I, N, Fun) ->
     for_to_ex(I, N, Fun, []).
+
+-spec map_with_nr_feeder(1..2, [number()], integer()) -> {Fun::fun((number(), integer()) -> number()), List::[number()], integer()}.
+map_with_nr_feeder(1, List, StartNr) ->
+    {fun(X, I) -> X * I end, List, StartNr};
+map_with_nr_feeder(2, List, StartNr) ->
+    {fun(X, I) -> X + I end, List, StartNr}.
 
 %% @doc Similar to lists:map/2 but also passes the current number to the fun:
 %%      <tt>[a, b, c,...]</tt> maps to

@@ -389,6 +389,7 @@ tester_type_check_util(_Config) ->
              {log, 2}, %% floats become to large and raise badarith
              {log2, 1}, %% floats become to large and raise badarith
              {logged_exec, 1}, %% not execute random strings
+             {map_with_nr, 3}, %% cannot create funs; tested via feeder
              {par_map, 2}, %% cannot create funs; tested via feeder
              {par_map, 3}, %% cannot create funs; tested via feeder
              {parallel_run, 5}, %% cannot create funs
