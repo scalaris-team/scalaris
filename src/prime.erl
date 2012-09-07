@@ -40,7 +40,7 @@
 
 -type prime() :: pos_integer().
 -type prime_list() :: [prime()].
--opaque rev_prime_list() :: [prime()].
+-type rev_prime_list() :: [prime()].
 
 % last prime in prime_cache/0
 -define(PrimeCache, 5003).
