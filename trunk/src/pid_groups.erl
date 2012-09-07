@@ -210,13 +210,12 @@ groups_with(PidName) ->
 
 -spec find_a(pidname()) -> pid() | failed.
 find_a(PidName) ->
-    % try in my own group first
-    case get_my(PidName) of
-        failed ->
-            %% use process local cache
-            CachedName = {'$?scalaris_pid_groups_cache', PidName},
-            case erlang:get(CachedName) of
-                undefined ->
+    CachedName = {'$?scalaris_pid_groups_cache', PidName},
+    case erlang:get(CachedName) of
+        undefined ->
+            %% try in my own group first
+            case get_my(PidName) of
+                failed ->
                     %% search others
                     case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
                         [[Pid] | _] ->
@@ -229,14 +228,16 @@ find_a(PidName) ->
                             failed
                     end;
                 Pid ->
-                    %% clean process local cache if entry is outdated
-                    case erlang:is_process_alive(Pid) of
-                        true -> Pid;
-                        false -> erlang:erase(CachedName),
-                                 find_a(PidName)
-                    end
+                    erlang:put(CachedName, Pid),
+                    Pid
             end;
-        Pid -> Pid
+        Pid ->
+            %% clean process local cache if entry is outdated
+            case erlang:is_process_alive(Pid) of
+                true -> Pid;
+                false -> erlang:erase(CachedName),
+                         find_a(PidName)
+            end
     end.
 
 -spec find_all(pidname()) -> [pid()].
