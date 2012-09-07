@@ -177,11 +177,10 @@ run_test_ttt(Module, Func,
             Result = apply_feeder(Module, Func, Args, ResultType, TypeInfos),
             case Result of
                 {ok, FeededArgs} ->
-                    FunResultTypes = [InnerResultType || {'fun', InnerArgType, InnerResultType} <- FunTypes,
-                                                         case tester_type_checker:check(FeededArgs, InnerArgType, TypeInfos) of
-                                                             true -> true;
-                                                             {false, _} -> false
-                                                         end],
+                    FunResultTypes =
+                        [InnerResultType
+                         || {'fun', InnerArgType, InnerResultType} <- FunTypes,
+                            tester_type_checker:check(FeededArgs, InnerArgType, TypeInfos) =:= true],
                     case FunResultTypes of
                         [] ->
                             {fail, no_result, no_result_type,
@@ -224,18 +223,18 @@ apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
     end.
 
 apply_args(Module, Func, Args, ResultType, TypeInfos) ->
-%%    ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
-    try erlang:apply(Module, Func, Args) of
-        Result ->
-%%            ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
-            case tester_type_checker:check(Result, ResultType, TypeInfos) of
-                true ->
-                    ok;
-                {false, ErrorMsg} ->
-                    % @todo give good error message
-                    {fail, Result, ResultType, type_check_failed_on_fun_result, Module, Func,
-                     Args, ErrorMsg, no_stacktrace, util:get_linetrace()}
-            end
+%%     ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
+    try
+        Result = erlang:apply(Module, Func, Args),
+%%         ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
+        case tester_type_checker:check(Result, ResultType, TypeInfos) of
+            true ->
+                ok;
+            {false, ErrorMsg} ->
+                % @todo give good error message
+                {fail, Result, ResultType, type_check_failed_on_fun_result, Module, Func,
+                 Args, ErrorMsg, no_stacktrace, util:get_linetrace()}
+        end
     catch
         exit:{test_case_failed, Reason} ->
             {fail, no_result, no_result_type, test_case_failed, Module, Func,
