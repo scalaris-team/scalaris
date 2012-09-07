@@ -190,12 +190,14 @@ time_delta(Trace) ->
 %% sample call sequence to get a tx trace:
 %% tex traces have to be relatively short, so paste all at once to the
 %% erlang shell.
-%% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
+%% api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). timer:sleep(10). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
+%%  P = pid_groups:find_a(trace_mpath). gen_component:bp_set_cond(P, fun(_,_) -> true end, mybp). api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). timer:sleep(1). gen_component:bp_del(P, mybp). gen_component:bp_cont(P). timer:sleep(10).  T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
+%% P = pid_groups:find_a(trace_mpath). gen_component:bp_set_cond(P, fun(_,_)-> true end, mybp). rbrcseq:qread(self(), "b"). receive _ -> ok end. trace_mpath:start(). rbrcseq:qread(self(), "a"). receive _ -> ok end. trace_mpath:stop(). gen_component:bp_del(P, mybp). gen_component:bp_cont(P). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
 
 -spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
-    ScaleX = 30, %% 1 cm is ScaleX microseconds in the plot
-    TicsFreq = 50, %% draw x-tics every TicsFreq microseconds
+    ScaleX = 20, %% 1 cm is ScaleX microseconds in the plot
+    TicsFreq = 20, %% draw x-tics every TicsFreq microseconds
 
     {ok, File} = file:open(Filename, [write]),
     io:format(File,
@@ -347,7 +349,8 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
         log_recv ->
             %% found a receive without a send?
             %% not yet implemented
-            _ = element(5, X),
+            io:format("Found receive without send?~n"),
+          _ = element(5, X),
             DrawTrace;
         log_info ->
             %% print info somewhere
@@ -438,14 +441,24 @@ send_log_msg(LoggerPid, Msg) ->
 -spec normalize_pidinfo(anypid()) -> pidinfo().
 normalize_pidinfo(Pid) ->
     case is_pid(Pid) of
-        true -> {comm:make_global(Pid), pid_groups:group_and_name_of(Pid)};
+        true ->
+            PidName = case pid_groups:group_and_name_of(Pid) of
+                          failed -> no_pid_name;
+                          Name -> Name
+                      end,
+            {comm:make_global(Pid), PidName};
         false ->
             case comm:is_valid(Pid) of
                 true ->
                     case comm:is_local(Pid) of
-                        true -> {Pid,
-                                 pid_groups:group_and_name_of(
-                                   comm:make_local(Pid))};
+                        true ->
+                            PidName =
+                                case pid_groups:group_and_name_of(
+                                       comm:make_local(Pid)) of
+                                    failed -> no_pid_name;
+                                    Name -> Name
+                                end,
+                            {Pid, PidName};
                         false -> {Pid, non_local_pid_name_unknown}
                     end;
                 false -> %% already a pidinfo()
