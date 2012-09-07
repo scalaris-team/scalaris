@@ -92,14 +92,14 @@ forward_msg(Process, Message, _State) ->
     case is_pid(Process) of
         true ->
             % TODO: report error if process is not alive?
-            Process ! Message, ok;
+            comm:send_local(Process, Message), ok;
         false ->
             case whereis(Process) of
                 undefined ->
                     log:log(warn,
                             "[ CC ] Cannot accept msg for unknown named"
                                 " process ~p: ~.0p~n", [Process, Message]);
-                PID -> PID ! Message, ok
+                PID -> comm:send_local(PID, Message), ok
             end
     end.
 
