@@ -24,63 +24,85 @@
 
 -module(prime).
 
+-compile({no_auto_import,[get/1]}).
+%-compile(export_all).
+
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
 -export([get/1, get_nearest/1, is_prime/1]).
 -export([prime_cache/0]).
 
--type prime_list() :: [pos_integer()].
+% feeder for tester
+-export([get_feeder/1]).
+-export([tester_create_prime_list/1, tester_create_rev_prime_list/1,
+         tester_is_prime_list/1]).
 
--define(PrimeCache, 5000).
+-type prime() :: pos_integer().
+-type prime_list() :: [prime()].
+-opaque rev_prime_list() :: [prime()].
+
+% last prime in prime_cache/0
+-define(PrimeCache, 5003).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns first prime bigger N
--spec get_nearest(pos_integer()) -> pos_integer().
-get_nearest(N) when N > ?PrimeCache ->
-    find_bigger_prime(3, N, []);
-get_nearest(N) when N =< ?PrimeCache ->
+% @doc returns first prime larger than N
+-spec get_nearest(pos_integer()) -> prime().
+get_nearest(N) when N >= ?PrimeCache ->
+    find_bigger_prime(?PrimeCache, N, lists:reverse(prime_cache()));
+get_nearest(N) when N < ?PrimeCache ->
     find_in_cache(N, prime_cache()).
 
--spec find_in_cache(pos_integer(), prime_list()) -> pos_integer().
-find_in_cache(N, [P | Cache]) ->
-    case P > N of
-        true -> P;
-        false -> find_in_cache(N, Cache)
-    end;
-find_in_cache(_, []) -> 1.
+-spec find_in_cache(pos_integer(), prime_list()) -> prime().
+find_in_cache(N, [P | _Cache]) when P > N -> P;
+find_in_cache(N, [_ | Cache])             -> find_in_cache(N, Cache);
+find_in_cache(_, [])                      -> 2.
 
--spec find_bigger_prime(pos_integer(), pos_integer(), [pos_integer()]) -> pos_integer().
+-spec find_bigger_prime(pos_integer(), pos_integer(), rev_prime_list()) -> prime().
 find_bigger_prime(I, N, Primes) ->
     case is_prime(I, Primes) of
-        true when I < N -> find_bigger_prime(I + 2, N, [I | Primes]);
-        true when I >= N -> I;
-        false -> find_bigger_prime(I + 2, N, Primes)
+        false -> find_bigger_prime(I + 2, N, Primes);
+        true when I =< N -> find_bigger_prime(I + 2, N, [I | Primes]);
+        true when I > N -> I
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec is_prime(pos_integer()) -> boolean().
+is_prime(V) when V =< ?PrimeCache ->
+    is_prime_p(V, prime_cache());
 is_prime(V) ->
-    case V =< ?PrimeCache of
-        true -> is_prime_p(V, prime_cache());
-        false -> is_prime_p(V, ?MODULE:get(V))
-    end.
+    is_prime_p(V, get(V)).
 
--spec is_prime_p(pos_integer(), [pos_integer()]) -> boolean().
+-spec is_prime_p(pos_integer(), prime_list() | rev_prime_list()) -> boolean().
 is_prime_p(V, Primes) ->
     lists:member(V, Primes).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns all primes less than N
+-spec get_feeder(1..2000) -> {pos_integer()}.
+get_feeder(N) ->
+    {N}.
+    
+% @doc returns all primes less than or equal to N
 -spec get(pos_integer()) -> prime_list().
+get(N) when N =< ?PrimeCache ->
+    [P || P <- prime_cache(), P =< N];
 get(N) ->
-    [2 | find_primes(3, N, [])].
+    find_primes(?PrimeCache, N, lists:reverse(prime_cache())).
 
--spec find_primes(pos_integer(), pos_integer(), prime_list()) -> prime_list().
-find_primes(I, N, Primes) when I > N -> Primes;
+-spec find_primes_feeder(0 | 2, pos_integer(), rev_prime_list())
+        -> {pos_integer(), pos_integer(), rev_prime_list()}.
+find_primes_feeder(_Add, N, [] = Primes) ->
+    {2, N, Primes};
+find_primes_feeder(Add, N, [H|_] = Primes) ->
+    {H + Add, N, Primes}.
+
+%% @doc Extends the prime list with all primes up to N.
+%%      PreCond: no prime between the largest prime in Primes and I
+-spec find_primes(pos_integer(), pos_integer(), rev_prime_list()) -> prime_list().
+find_primes(I, N, Primes) when I > N -> lists:reverse(Primes);
 find_primes(I, N, Primes) ->
     NewPrimes = case is_prime(I, Primes) of
                     true -> [I | Primes];
@@ -88,14 +110,14 @@ find_primes(I, N, Primes) ->
                 end,
     find_primes(I + 2, N, NewPrimes).
 
--spec is_prime(pos_integer(), prime_list()) -> boolean().
+-spec is_prime(pos_integer(), rev_prime_list()) -> boolean().
 is_prime(I, [Prime | L]) when Prime * Prime > I -> is_prime(I, L);
 is_prime(I, [Prime | L]) ->
     case I rem Prime of
         0 -> false;
         _ -> is_prime(I, L)
     end;
-is_prime(_, []) -> true.
+is_prime(I, []) -> I > 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -170,3 +192,18 @@ prime_cache() ->
    4759,   4783,   4787,   4789,   4793,   4799,   4801,   4813,   4817,   4831,
    4861,   4871,   4877,   4889,   4903,   4909,   4919,   4931,   4933,   4937,
    4943,   4951,   4957,   4967,   4969,   4973,   4987,   4993,   4999,   5003].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec tester_create_prime_list(1..2500) -> prime_list().
+tester_create_prime_list(N) -> get(N).
+
+-spec tester_create_rev_prime_list(1..2500) -> rev_prime_list().
+tester_create_rev_prime_list(N) -> lists:reverse(tester_create_prime_list(N)).
+
+-spec tester_is_prime_list(prime_list()) -> boolean().
+tester_is_prime_list([_|_] = List) ->
+    Largest = lists:max(List),
+    PrimeList = get(Largest),
+    lists:all(fun(X) -> is_prime_p(X, PrimeList) end, List);
+tester_is_prime_list([]) -> true.

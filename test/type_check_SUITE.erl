@@ -126,9 +126,13 @@ tester_type_check_math(_Config) ->
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_type_checker({typedef, prime, prime_list}, prime, tester_is_prime_list),
+    tester:register_type_checker({typedef, prime, prime}, prime, is_prime),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, prime, prime_list}, prime, tester_create_prime_list, 1),
+    tester:register_value_creator({typedef, prime, rev_prime_list}, prime, tester_create_rev_prime_list, 1),
     Modules =
         [ {intervals,
            [ {get_bounds, 1}, %% throws exception on []
@@ -155,8 +159,12 @@ tester_type_check_math(_Config) ->
              {factorial, 2} %% slow for large integers, done by feeder
            ]},
           %% {math_pos, [], []}, %% needs valid pos fields
-          {prime, [],
-           [ {find_bigger_prime, 3} ]}, %% too slow for large integers
+          {prime,
+           [ {get, 1}  %% too slow for large integers, tested via feeder
+           ],
+           [ {find_bigger_prime, 3}, %% too slow for large integers
+             {find_primes, 3} %% special precond; tested via feeder
+           ]},
           {randoms, [{start, 0}, {stop, 0}], []}
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
@@ -164,9 +172,12 @@ tester_type_check_math(_Config) ->
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, simple_interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
+    tester:unregister_type_checker({typedef, prime, prime_list}),
+    tester:unregister_type_checker({typedef, prime, prime}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    tester:unregister_value_creator({typedef, prime, prime_list}),
     true.
 
 tester_type_check_node(_Config) ->
