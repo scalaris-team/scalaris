@@ -69,18 +69,14 @@ empty() -> [].
 -spec add_entry(tlog(), tlog_entry()) -> tlog().
 add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 
--spec add_or_update_status_by_key(tlog(),
-                                  tlog_key(),
-                                  tx_status()) -> tlog().
-add_or_update_status_by_key(TLog, Key, Status) ->
-    case lists:keyfind(Key, 2, TLog) of
-        false ->
-            Entry = new_entry(?write, Key, _Vers = 0, Status, _Val = 0),
-            add_entry(TLog, Entry);
-        Entry ->
-            NewEntry = set_entry_status(Entry, Status),
-            update_entry(TLog, NewEntry)
-    end.
+-spec add_or_update_status_by_key(tlog(), tlog_key(), tx_status()) -> tlog().
+add_or_update_status_by_key([], Key, Status) ->
+    [new_entry(?write, Key, _Vers = 0, Status, _Val = 0)];
+add_or_update_status_by_key([Entry | T], Key, Status)
+  when element(2, Entry) =:= Key ->
+    [set_entry_status(Entry, Status) | T];
+add_or_update_status_by_key([Entry | T], Key, Status) ->
+    [Entry | add_or_update_status_by_key(T, Key, Status)].
 
 -spec update_entry(tlog(), tlog_entry()) -> tlog().
 update_entry(TLog, Entry) ->

@@ -424,7 +424,9 @@ state_get_subscriptions(State, SearchedPid) ->
 state_add_watched_pid(State, WatchedPid) ->
     %% add watched pid remotely, if not already watched
     RemPids = state_get_rem_pids(State),
-    case lists:keyfind(WatchedPid, 1, RemPids) of
+    case lists:keytake(WatchedPid, 1, RemPids) of
+        {value, Entry, RestRemPids} ->
+            state_set_rem_pids(State, [rempid_inc(Entry) | RestRemPids]);
         false ->
             %% add to remote site
             RemHBS = state_get_rem_hbs(State),
@@ -438,24 +440,15 @@ state_add_watched_pid(State, WatchedPid) ->
             end,
             %% add to list
             state_set_rem_pids(
-              State, [rempid_inc(rempid_new(WatchedPid)) | RemPids]);
-        Entry ->
-            NewEntry = rempid_inc(Entry),
-            state_set_rem_pids(
-              State, lists:keyreplace(WatchedPid, 1, RemPids, NewEntry))
+              State, [rempid_inc(rempid_new(WatchedPid)) | RemPids])
     end.
 
 -spec state_del_watched_pid(state(), comm:mypid(), pid()) -> state().
 state_del_watched_pid(State, WatchedPid, Subscriber) ->
     %% del watched pid remotely, if not longer necessary
     RemPids = state_get_rem_pids(State),
-    case lists:keyfind(WatchedPid, 1, RemPids) of
-        false -> log:log(warn,
-                         "req. from ~p (~p) to delete non watched pid ~p.~n",
-                        [Subscriber, pid_groups:group_and_name_of(Subscriber),
-                         WatchedPid]),
-                 State;
-        Entry ->
+    case lists:keytake(WatchedPid, 1, RemPids) of
+        {value, Entry, RestRemPids} ->
             TmpEntry = rempid_dec(Entry),
             NewEntry =
                 case {rempid_refcount(TmpEntry),
@@ -466,8 +459,12 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
                         TmpEntry;
                     _ -> TmpEntry
                 end,
-            NewRemPids = lists:keyreplace(WatchedPid, 1, RemPids, NewEntry),
-            state_set_rem_pids(State, NewRemPids)
+            state_set_rem_pids(State, [NewEntry | RestRemPids]);
+        false -> log:log(warn,
+                         "req. from ~p (~p) to delete non watched pid ~p.~n",
+                        [Subscriber, pid_groups:group_and_name_of(Subscriber),
+                         WatchedPid]),
+                 State
     end.
 
 -spec state_add_monitor(state(), comm:mypid()) -> state().
@@ -479,12 +476,11 @@ state_add_monitor(State, WatchedPid) ->
 -spec state_del_monitor(state(), comm:mypid()) -> state().
 state_del_monitor(State, WatchedPid) ->
     Monitors = state_get_monitors(State),
-    case lists:keyfind(WatchedPid, 1, Monitors) of
-        false -> State;
-        {WatchedPid, MonRef} ->
+    case lists:keytake(WatchedPid, 1, Monitors) of
+        {value, {WatchedPid, MonRef}, RestMonitors} ->
             erlang:demonitor(MonRef),
-            state_set_monitors(State,
-                               lists:delete({WatchedPid, MonRef}, Monitors))
+            state_set_monitors(State, RestMonitors);
+        false -> State
     end.
 
 -spec rempid_new(comm:mypid()) -> rempid().

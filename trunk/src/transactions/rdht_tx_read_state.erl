@@ -104,10 +104,10 @@ get_numreplied(State) ->
                 non_neg_integer(), non_neg_integer()) -> read_state().
 add_reply(State, Val, Vers, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
-    {OldVal, OldVers} = get_result(State),
+    {_OldVal, OldVers} = OldResult = get_result(State),
     NewResult = case Vers > OldVers of
                     true -> {Val, Vers};
-                    false -> {OldVal, OldVers}
+                    false -> OldResult
                 end,
     TmpState = set_result(State, NewResult),
     NewState = case Vers >= 0 of

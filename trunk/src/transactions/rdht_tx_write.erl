@@ -109,14 +109,14 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
     DBVers = db_entry:get_version(DBEntry),
     NewEntry =
-        case DBVers > RTLogVers of
+        case DBVers =< RTLogVers of
             true ->
-                DBEntry; %% outdated commit
-            false ->
                 T2DBEntry = db_entry:set_value(
                               DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
                 T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
-                db_entry:reset_locks(T3DBEntry)
+                db_entry:reset_locks(T3DBEntry);
+            false ->
+                DBEntry %% outdated commit
         end,
     ?DB:set_entry(DB, NewEntry).
 
@@ -172,9 +172,8 @@ on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
     comm:send_local(ClientPid, Msg),
     TableName.
 
--spec update_tlog_entry(tx_tlog:tlog_entry(),
-                        client_value()) ->
-                               tx_tlog:tlog_entry().
+-spec update_tlog_entry(tx_tlog:tlog_entry(), client_value())
+        -> tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, WriteValue) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
