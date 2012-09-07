@@ -228,15 +228,14 @@ collect_replies(TLog, []) -> TLog;
 collect_replies(TLog, ReqIdsReqList) ->
     ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsReqList]),
     {_, ReqId, RdhtTlogEntry} = receive_answer(),
-    case lists:keyfind(ReqId, 1, ReqIdsReqList) of
-        false ->
-            %% Drop outdated result...
-            collect_replies(TLog, ReqIdsReqList);
-        _ ->
+    case lists:keytake(ReqId, 1, ReqIdsReqList) of
+        {value, _ReqIdReq, NewReqIdsReqList} ->
             %% add TLog entry, as it is guaranteed a necessary entry
             NewTLog = [RdhtTlogEntry | TLog],
-            NewReqIdsReqList = lists:keydelete(ReqId, 1, ReqIdsReqList),
-            collect_replies(NewTLog, NewReqIdsReqList)
+            collect_replies(NewTLog, NewReqIdsReqList);
+        false ->
+            %% Drop outdated result...
+            collect_replies(TLog, ReqIdsReqList)
     end.
 
 %% @doc Merge TLog entries, if same key. Check for version mismatch,
