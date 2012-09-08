@@ -224,9 +224,10 @@ initiate_rdht_ops(ReqList) ->
 
 %% @doc Collect replies from the quorum DHT operations.
 -spec collect_replies(tx_tlog:tlog(), [{req_id(), request_on_key()}]) -> tx_tlog:tlog().
-collect_replies(TLog, []) -> tx_tlog:sort_by_key(TLog);
-collect_replies(TLog, ReqIdsReqList) ->
+collect_replies(TLog, [_|_] = ReqIdsReqList) ->
     ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsReqList]),
+    % TODO: receive only matching replies?!
+    % (as a result we would not need to parse through the reqlist over and over again!)
     {_, ReqId, RdhtTlogEntry} = receive_answer(),
     case lists:keytake(ReqId, 1, ReqIdsReqList) of
         {value, _ReqIdReq, NewReqIdsReqList} ->
@@ -236,7 +237,8 @@ collect_replies(TLog, ReqIdsReqList) ->
         false ->
             %% Drop outdated result...
             collect_replies(TLog, ReqIdsReqList)
-    end.
+    end;
+collect_replies(TLog, []) -> tx_tlog:sort_by_key(TLog).
 
 %% @doc Merge TLog entries, if same key. Check for version mismatch,
 %%      take over values.
@@ -542,8 +544,8 @@ receive_answer() ->
              receive_answer()
           );
         ?SCALARIS_RECV(
-           {Op, RdhtId, RdhtTlog}, %% ->
-             {Op, RdhtId, RdhtTlog}
+           {_Op, _RdhtId, _RdhtTlog} = Msg, %% ->
+             Msg
           )
     end.
 
