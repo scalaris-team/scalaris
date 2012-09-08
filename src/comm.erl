@@ -117,8 +117,9 @@ send(Pid, Msg, Options) ->
         undefined ->
             comm_server:send(RealPid, RealMsg, Options);
         Logger ->
-            LogEpidemicMsg =
-                trace_mpath:log_send(Logger, self(), RealPid, RealMsg),
+            trace_mpath:log_send(Logger, self(), RealPid, Msg, global),
+            LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                               Logger, self(), RealPid, RealMsg),
             comm_server:send(RealPid, LogEpidemicMsg, Options)
     end.
 
@@ -131,8 +132,9 @@ send_local(Pid, Msg) ->
             undefined ->
                 RealPid ! RealMsg;
             Logger ->
-                LogEpidemicMsg =
-                    trace_mpath:log_send(Logger, self(), RealPid, RealMsg),
+                trace_mpath:log_send(Logger, self(), RealPid, Msg, local),
+                LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                                   Logger, self(), RealPid, RealMsg),
                 RealPid ! LogEpidemicMsg
         end,
     ok.
@@ -146,8 +148,9 @@ send_local_after(Delay, Pid, Msg) ->
         undefined ->
             erlang:send_after(Delay, RealPid, RealMsg);
         Logger ->
-            LogEpidemicMsg =
-                trace_mpath:log_send(Logger, self(), RealPid, RealMsg),
+            trace_mpath:log_send(Logger, self(), RealPid, Msg, local),
+            LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                               Logger, self(), RealPid, RealMsg),
             erlang:send_after(Delay, RealPid, LogEpidemicMsg)
     end.
 

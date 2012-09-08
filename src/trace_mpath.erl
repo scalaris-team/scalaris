@@ -45,7 +45,7 @@
 -export([to_texfile/2]).
 
 %% report tracing events from other modules
--export([log_send/4]).
+-export([log_send/5]).
 -export([log_info/2, log_info/3]).
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
@@ -62,7 +62,8 @@
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
 -type send_event()   :: {log_send, time(), trace_id(),
-                         Source::pidinfo(), Dest::pidinfo(), comm:message()}.
+                         Source::pidinfo(), Dest::pidinfo(), comm:message(),
+                         local | global}.
 -type info_event()   :: {log_info, time(), trace_id(),
                          pidinfo(), comm:message()}.
 -type recv_event()   :: {log_recv, time(), trace_id(),
@@ -121,14 +122,24 @@ get_trace() -> get_trace(default).
 get_trace(TraceId) ->
     LogRaw = get_trace_raw(TraceId),
     [case Event of
-         {SendOrRcv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
+         {log_send, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}, LorG}
            when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
-             {SendOrRcv, Time, TraceId,
+             {log_send, Time, TraceId,
+              normalize_pidinfo(Source),
+              normalize_pidinfo(Dest),
+              convert_msg({Tag, Key, Hops, convert_msg(Msg)}), LorG};
+         {log_send, Time, TraceId, Source, Dest, Msg, LorG} ->
+             {log_send, Time, TraceId,
+              normalize_pidinfo(Source),
+              normalize_pidinfo(Dest), convert_msg(Msg), LorG};
+         {log_recv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
+           when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
+             {log_recv, Time, TraceId,
               normalize_pidinfo(Source),
               normalize_pidinfo(Dest),
               convert_msg({Tag, Key, Hops, convert_msg(Msg)})};
-         {SendOrRcv, Time, TraceId, Source, Dest, Msg} ->
-             {SendOrRcv, Time, TraceId,
+         {log_recv, Time, TraceId, Source, Dest, Msg} ->
+             {log_recv, Time, TraceId,
               normalize_pidinfo(Source),
               normalize_pidinfo(Dest), convert_msg(Msg)};
          {log_info, Time, TraceId, Pid, Msg} ->
@@ -264,6 +275,12 @@ to_texfile(Trace, Filename) ->
                I*TicsFreq/ScaleX, length(Nodes)/2])
       end),
 
+    io:format(File,
+              "  \\draw[color=green!30!black,->] (-4cm, 0.5)"
+              "  -- (-3.5cm, 0.5) node[anchor=west] {local send};~n"
+              "  \\draw[color=red!50!black,->] (-2cm, 0.5)"
+              "  -- (-1.5cm, 0.5) node[anchor=west] {global send};~n", []),
+
     draw_messages(File, Nodes, ScaleX, DrawTrace),
 
     io:format(
@@ -309,38 +326,60 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                           element(2, X) =< element(2, Y)
                    ],
             SendTime = element(2, X),
-            RecTime = case Recv of
-                          [] -> SendTime + 10;
-                          _ -> element(2, hd(Recv))
-                      end,
-            MsgTag = term_to_latex_string(element(1, element(6, X))),
+            RecvEvent =
+                case Recv of
+                    [] -> setelement(2, X, SendTime + 10);
+                    _ -> hd(Recv)
+                end,
+            RecvTime = element(2, RecvEvent),
+            SendTag = term_to_latex_string(element(1, element(6, X))),
+            RecvTag = term_to_latex_string(element(1, element(6, RecvEvent))),
+            Color = case element(7, X) of
+                        local -> "green!30!black";
+                        global -> "red!50!black"
+                    end,
             case SrcNum of
                 SrcNum when (SrcNum < DestNum) ->
+                    MsgTag =
+                        case SendTag =:= RecvTag of
+                            true -> SendTag;
+                            false -> SendTag ++ "\\\\[-0.5em]\\tiny " ++ RecvTag
+                        end,
                     io:format(File,
-                              "\\draw[->] (~pcm, -~p)"
-                              " to node[anchor=west,sloped,rotate=90]"
+                              "\\draw[->, color=~s] (~pcm, -~p)"
+                              " to node[anchor=west,sloped,rotate=90,align=left]"
                               "{\\tiny ~s} (~pcm, -~p);~n",
-                              [SendTime/ScaleX, SrcNum/2,
+                              [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecTime/ScaleX, DestNum/2]);
+                               RecvTime/ScaleX, DestNum/2]);
                 SrcNum when (SrcNum > DestNum) ->
+                    MsgTag =
+                        case SendTag =:= RecvTag of
+                            true -> SendTag;
+                            false -> RecvTag ++ "\\\\[-0.5em]\\tiny " ++ SendTag
+                        end,
                     io:format(File,
-                              "\\draw[->] (~pcm, -~p)"
-                              " to node[anchor=west,sloped,rotate=-90]"
+                              "\\draw[->, color=~s] (~pcm, -~p)"
+                              " to node[anchor=west,sloped,rotate=-90, align=left]"
                               "{\\tiny ~s} (~pcm, -~p);~n",
-                              [SendTime/ScaleX, SrcNum/2,
+                              [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecTime/ScaleX, DestNum/2]);
+                               RecvTime/ScaleX, DestNum/2]);
                 SrcNum when (SrcNum =:= DestNum) ->
+                    MsgTag =
+                        case SendTag =:= RecvTag of
+                            true -> SendTag;
+                            false -> RecvTag ++ "\\\\[-0.5em]\\tiny " ++ SendTag
+                        end,
                     io:format(File,
-                              "\\draw[->] (~pcm, -~p)"
+                              "\\draw[->, color=~s] (~pcm, -~p)"
                               " .. controls +(~pcm,-0.3) .."
-                              " node[anchor=west,sloped,rotate=-90]"
-                              "{\\tiny ~s} (~pcm, -~p);~n",
-                              [element(2, X)/ScaleX, SrcNum/2,
-                               (RecTime - element(2, X))/ScaleX/2,
+                              " node[anchor=west,sloped,rotate=-90, align=left]"
+                              "{\\tiny{~s}} (~pcm, -~p);~n",
+                              [Color, element(2, X)/ScaleX, SrcNum/2,
+                               (RecvTime - element(2, X))/ScaleX/2,
                                MsgTag,
-                               RecTime/ScaleX, DestNum/2])
+                               RecvTime/ScaleX, DestNum/2])
             end,
             case Recv of
                 [] -> DrawTrace;
@@ -371,9 +410,9 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message()) ->
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) ->
                       gc_mpath_msg().
-log_send(PState, FromPid, ToPid, Msg) ->
+log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     Now = os:timestamp(),
     MsgMapFun = passed_state_msg_map_fun(PState),
     case passed_state_logger(PState) of
@@ -386,7 +425,7 @@ log_send(PState, FromPid, ToPid, Msg) ->
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               LoggerPid,
-              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)})
+              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal})
     end,
     epidemic_reply_msg(PState, FromPid, ToPid, Msg).
 
@@ -478,7 +517,7 @@ start_link(ServiceGroup) ->
 init(_Arg) -> [].
 
 -spec on(trace_event() | comm:message(), state()) -> state().
-on({log_send, _Time, TraceId, _From, _To, _UMsg} = Msg, State) ->
+on({log_send, _Time, TraceId, _From, _To, _UMsg, _LorG} = Msg, State) ->
     state_add_log_event(State, TraceId, Msg);
 on({log_recv, _Time, TraceId, _From, _To, _UMsg} = Msg, State) ->
     state_add_log_event(State, TraceId, Msg);
