@@ -51,7 +51,7 @@ req_list(TLog, ReqList, EnDecode) ->
     %%      we only generate sorted TLogs.
     ?TRACE("rdht_tx:req_list(~p, ~p, ~p)~n", [TLog, ReqList, EnDecode]),
 
-    %% (0) Check TLog? Consts performance, may save some requests
+    %% (0) Check TLog? Costs performance, may save some requests
 
     %% (1) Ensure commit is only at end of req_list (otherwise abort),
     %% (2) encode write values to ?DB:value format
@@ -138,7 +138,7 @@ upd_tlog_via_rdht(TLog, ReqList) ->
 
     %% merge TLogs (insert fail, abort, when version mismatch
     %% in reads for same key is detected)
-    _MTLog = merge_tlogs(TLog, tx_tlog:sort_by_key(RTLog)).
+    _MTLog = merge_tlogs(TLog, RTLog).
 
 %% @doc Requests, that need information from the DHT.
 -spec first_req_per_key_not_in_tlog(tx_tlog:tlog(), [request_on_key()]) ->
@@ -224,7 +224,7 @@ initiate_rdht_ops(ReqList) ->
 
 %% @doc Collect replies from the quorum DHT operations.
 -spec collect_replies(tx_tlog:tlog(), [{req_id(), request_on_key()}]) -> tx_tlog:tlog().
-collect_replies(TLog, []) -> TLog;
+collect_replies(TLog, []) -> tx_tlog:sort_by_key(TLog);
 collect_replies(TLog, ReqIdsReqList) ->
     ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsReqList]),
     {_, ReqId, RdhtTlogEntry} = receive_answer(),
