@@ -737,6 +737,12 @@ prop_tester_req_list(ReqList) ->
     ?equals(TLogAll, TLogSeq).
 
 tester_req_list(_Config) ->
+    prop_tester_req_list([{add_del_on_list,[354334],{},[-1]},
+                          {test_and_set,[677315],{[]},3},
+                          {read,[677315]}]),
+    prop_tester_req_list([{add_del_on_list,[354334],{},[-1]},
+                          {read,[677315]},
+                          {read,[677315]}]),
     tester:test(?MODULE, prop_tester_req_list, 1, 5000).
 
 check_op_on_tlog([], _Req, _NTLog, _NRes, _RingVal) -> true;
