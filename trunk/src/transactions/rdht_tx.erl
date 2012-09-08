@@ -248,43 +248,42 @@ merge_tlogs(SortedTLog, SortedRTLog) ->
 
 -spec merge_tlogs_iter(tx_tlog:tlog(), tx_tlog:tlog(), tx_tlog:tlog()) ->
                               tx_tlog:tlog().
-merge_tlogs_iter([], [], Acc)          -> Acc;
-merge_tlogs_iter([], SortedRTLog, [])  -> SortedRTLog;
-merge_tlogs_iter([], SortedRTLog, Acc) -> lists:reverse(Acc) ++ SortedRTLog;
-merge_tlogs_iter(SortedTLog, [], Acc)  -> lists:reverse(Acc) ++ SortedTLog;
 merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                  [RTEntry | RTTail] = SortedRTLog,
                  Acc) ->
     TKey = tx_tlog:get_entry_key(TEntry),
     RTKey = tx_tlog:get_entry_key(RTEntry),
-    case TKey =:= RTKey of
-        true ->
-            %% key was in TLog, new entry is newer and contains value
-            %% for read?
-            case tx_tlog:get_entry_operation(TEntry) of
-                ?read ->
-                    %% check versions: if mismatch -> change status to abort
-                    NewTLogEntry =
-                        case tx_tlog:get_entry_version(TEntry)
-                            =/= tx_tlog:get_entry_version(RTEntry) of
-                            true ->
-                                tx_tlog:set_entry_status(RTEntry, {fail, abort});
-                            false ->
-                                Val = tx_tlog:get_entry_value(RTEntry),
-                                tx_tlog:set_entry_value(TEntry, Val)
-                        end,
-                    merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
-                _ ->
-                    log:log(warn,
-                            "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
-                    merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
-            end;
-        false ->
-            case TKey < RTKey of
-                true  -> merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
-                false -> merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc])
-            end
-    end.
+    if TKey =:= RTKey ->
+           %% key was in TLog, new entry is newer and contains value
+           %% for read?
+           case tx_tlog:get_entry_operation(TEntry) of
+               ?read ->
+                   %% check versions: if mismatch -> change status to abort
+                   NewTLogEntry =
+                       case tx_tlog:get_entry_version(TEntry)
+                                =/= tx_tlog:get_entry_version(RTEntry) of
+                           true ->
+                               tx_tlog:set_entry_status(RTEntry, {fail, abort});
+                           false ->
+                               Val = tx_tlog:get_entry_value(RTEntry),
+                               tx_tlog:set_entry_value(TEntry, Val)
+                       end,
+                   merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
+               _ ->
+                   log:log(warn,
+                           "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
+                   merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
+           end;
+       TKey < RTKey ->
+           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
+       true ->
+           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc])
+    end;
+merge_tlogs_iter([], [], Acc)                 -> lists:reverse(Acc);
+merge_tlogs_iter([], [_|_] = SortedRTLog, []) -> SortedRTLog;
+merge_tlogs_iter([], [_|_] = SortedRTLog, [_|_] = Acc) -> lists:reverse(Acc) ++ SortedRTLog;
+merge_tlogs_iter([_|_] = SortedTLog, [], [])  -> SortedTLog;
+merge_tlogs_iter([_|_] = SortedTLog, [], [_|_] = Acc)  -> lists:reverse(Acc) ++ SortedTLog.
 
 %% @doc Perform all operations on the TLog and generate list of results.
 -spec do_reqs_on_tlog(tx_tlog:tlog(), [request_on_key()], EnDecode::boolean()) ->
