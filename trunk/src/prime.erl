@@ -24,9 +24,6 @@
 
 -module(prime).
 
--compile({no_auto_import,[get/1]}).
-%-compile(export_all).
-
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
@@ -73,7 +70,7 @@ find_bigger_prime(I, N, Primes) ->
 is_prime(V) when V =< ?PrimeCache ->
     is_prime_p(V, prime_cache());
 is_prime(V) ->
-    is_prime_p(V, get(V)).
+    is_prime_p(V, ?MODULE:get(V)).
 
 -spec is_prime_p(pos_integer(), prime_list() | rev_prime_list()) -> boolean().
 is_prime_p(V, Primes) ->
@@ -196,7 +193,7 @@ prime_cache() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec tester_create_prime_list(1..2500) -> prime_list().
-tester_create_prime_list(N) -> get(N).
+tester_create_prime_list(N) -> ?MODULE:get(N).
 
 -spec tester_create_rev_prime_list(1..2500) -> rev_prime_list().
 tester_create_rev_prime_list(N) -> lists:reverse(tester_create_prime_list(N)).
@@ -204,6 +201,6 @@ tester_create_rev_prime_list(N) -> lists:reverse(tester_create_prime_list(N)).
 -spec tester_is_prime_list(prime_list()) -> boolean().
 tester_is_prime_list([_|_] = List) ->
     Largest = lists:max(List),
-    PrimeList = get(Largest),
+    PrimeList = ?MODULE:get(Largest),
     lists:all(fun(X) -> is_prime_p(X, PrimeList) end, List);
 tester_is_prime_list([]) -> true.
