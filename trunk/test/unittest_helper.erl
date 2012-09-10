@@ -255,9 +255,10 @@ stop_ring(Pid) ->
 
 -spec stop_pid_groups() -> ok.
 stop_pid_groups() ->
-    gen_component:kill(pid_groups),
-    util:wait_for_table_to_disappear(pid_groups),
-    util:wait_for_table_to_disappear(pid_groups_hidden),
+    PidGroups = whereis(pid_groups),
+    gen_component:kill(PidGroups),
+    util:wait_for_table_to_disappear(PidGroups, pid_groups),
+    util:wait_for_table_to_disappear(PidGroups, pid_groups_hidden),
     catch unregister(pid_groups),
     ok.
 
@@ -455,7 +456,7 @@ kill_new_processes(OldProcesses, Options) ->
                           _ = [begin
 %%                                    ct:pal("waiting for table ~.0p to disappear~n~p",
 %%                                           [Tab, ets:info(Tab)]),
-                                   util:wait_for_table_to_disappear(Tab)
+                                   util:wait_for_table_to_disappear(X, Tab)
                                end || Tab <- Tabs ],
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}

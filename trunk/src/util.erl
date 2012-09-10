@@ -65,7 +65,7 @@
          supervisor_terminate_childs/1,
          wait_for/1, wait_for/2,
          wait_for_process_to_die/1,
-         wait_for_table_to_disappear/1,
+         wait_for_table_to_disappear/2,
          ets_tables_of/1]).
 
 -export([repeat/3, repeat/4, parallel_run/5]).
@@ -154,7 +154,7 @@ supervisor_terminate_childs(SupPid) ->
               Tables = ets_tables_of(Pid),
               _ = supervisor:terminate_child(SupPid, Id),
               wait_for_process_to_die(Pid),
-              _ = [ wait_for_table_to_disappear(Tab) || Tab <- Tables ],
+              _ = [ wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
               supervisor:delete_child(SupPid, Id)
           end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
                   Pid =/= undefined ],
@@ -182,9 +182,15 @@ wait_for_process_to_die(Name) when is_atom(Name) ->
 wait_for_process_to_die(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 
--spec wait_for_table_to_disappear(tid() | atom()) -> ok.
-wait_for_table_to_disappear(Table) ->
-    wait_for(fun() -> ets:info(Table) =:= undefined end).
+-spec wait_for_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
+wait_for_table_to_disappear(Pid, Table) ->
+    wait_for(fun() ->
+                     case ets:info(Table, owner) of
+                         undefined -> true;
+                         Pid -> false;
+                         _ -> true
+                     end
+             end).
 
 -spec ets_tables_of(pid()) -> list().
 ets_tables_of(Pid) ->
