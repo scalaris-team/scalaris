@@ -248,7 +248,7 @@ apply_args(Module, Func, Args, ResultType, TypeInfos) ->
                      tester_parse_state:state(), integer(), test_options()) -> ok.
 run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
     Master = self(),
-    _Pids = [spawn(
+    _Pids = [spawn_link(
                fun() ->
                        Name = list_to_atom("run_test:" ++ integer_to_list(Thread)),
                        catch(erlang:register(Name, self())),
