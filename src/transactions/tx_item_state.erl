@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 
 %% Operations on tx_item_state
--export([new/1, new/3, new/6]).
+-export([new/1, new/3, new/5]).
 -export([get_txid/1]).
 -export([get_maj_for_prepared/1, get_maj_for_abort/1]).
 -export([get_itemid/1, set_itemid/2]).
@@ -83,14 +83,15 @@ new(ItemId) ->
 new(ItemId, TxId, TLogEntry) ->
     ReplDeg = config:read(replication_factor),
     new(ItemId, TxId, TLogEntry, quorum:majority_for_accept(ReplDeg),
-        quorum:majority_for_deny(ReplDeg), unknown).
+        quorum:majority_for_deny(ReplDeg)).
 
 %% pre: if paxos IDs are given, their order must match the order of the created RTLogEntries!
 -spec new(tx_item_id(), tx_state:tx_id(), tx_tlog:tlog_entry(),
           Maj_for_prepared::non_neg_integer(),
-          Maj_for_abort::non_neg_integer(), PaxosIds::[paxos_id()] | unknown)
+          Maj_for_abort::non_neg_integer())
          -> tx_item_state().
-new(ItemId, TxId, TLogEntry, Maj_for_prepared, Maj_for_abort, PaxosIds0) ->
+new({?tx_item_id, TLogUid, ItemNr} = ItemId, TxId, TLogEntry,
+    Maj_for_prepared, Maj_for_abort) ->
     %% expand TransLogEntry to replicated translog entries
     RTLogEntries =
         case tx_tlog:get_entry_operation(TLogEntry) of
@@ -100,17 +101,10 @@ new(ItemId, TxId, TLogEntry, Maj_for_prepared, Maj_for_abort, PaxosIds0) ->
                 rdht_tx_write:validate_prefilter(TLogEntry)
         end,
     PaxIDsRTLogsTPs =
-        case PaxosIds0 of
-            unknown ->
-                {?tx_item_id, TLogUid, ItemNr} = ItemId,
-                util:map_with_nr(
-                  fun(RTLogEntry, NrX) ->
-                          {{?paxos_id, TLogUid, ItemNr, NrX}, RTLogEntry, unknown}
-                  end, RTLogEntries, 0);
-            PaxosIds ->
-                TPs = [ unknown || _ <- PaxosIds ],
-                lists:zip3(PaxosIds, RTLogEntries, TPs)
-        end,
+        util:map_with_nr(
+          fun(RTLogEntry, NrX) ->
+                  {{?paxos_id, TLogUid, ItemNr, NrX}, RTLogEntry, unknown}
+          end, RTLogEntries, 0),
     {ItemId, ?tx_item_state, TxId, TLogEntry,
      Maj_for_prepared, Maj_for_abort,
      false, 0, 0, PaxIDsRTLogsTPs,
