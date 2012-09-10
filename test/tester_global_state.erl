@@ -27,10 +27,11 @@
 
 -export([register_type_checker/3,
          unregister_type_checker/1,
-         get_type_checker/1,
-         register_value_creator/4,
+         get_type_checker/1]).
+-export([register_value_creator/4,
          unregister_value_creator/1,
          get_value_creator/1]).
+-export([set_last_call/4, get_last_call/1, reset_last_call/1]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -58,6 +59,15 @@ unregister_value_creator(Type) ->
 
 get_value_creator(Type) ->
     lookup({value_creator, Type}).
+
+set_last_call(Thread, Module, Function, Args) ->
+    insert({last_call, Thread}, {Module, Function, Args}).
+
+reset_last_call(Thread) ->
+    delete({last_call, Thread}).
+
+get_last_call(Thread) ->
+    lookup({last_call, Thread}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

@@ -130,6 +130,12 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
             case (catch config:read(no_print_ring_data)) of
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
+            end,
+            case tester_global_state:get_last_call() of
+                failed -> ok;
+                {Module, Function, Args} ->
+                    ct:pal("Last call by tester:~n~.0p:~.0p(~.0p)",
+                           [Module, Function, Args])
             end;
         _ -> ok
     end,
