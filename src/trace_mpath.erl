@@ -143,7 +143,15 @@ get_trace(TraceId) ->
               normalize_pidinfo(Source),
               normalize_pidinfo(Dest), convert_msg(Msg)};
          {log_info, Time, TraceId, Pid, Msg} ->
-             {log_info, Time, TraceId, normalize_pidinfo(Pid), convert_msg(Msg)}
+             case Msg of
+                 {gc_on_done, Tag} ->
+                     {log_info, Time, TraceId,
+                      normalize_pidinfo(Pid),
+                      {gc_on_done, util:extint2atom(Tag)}};
+                 _ ->
+                     {log_info, Time, TraceId,
+                      normalize_pidinfo(Pid), convert_msg(Msg)}
+             end
      end || Event <- LogRaw].
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
@@ -326,18 +334,34 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                           element(2, X) =< element(2, Y)
                    ],
             SendTime = element(2, X),
+            SendMsg = element(6, X),
             RecvEvent =
                 case Recv of
                     [] -> setelement(2, X, SendTime + 10);
                     _ -> hd(Recv)
                 end,
             RecvTime = element(2, RecvEvent),
-            SendTag = term_to_latex_string(element(1, element(6, X))),
+            SendTag = term_to_latex_string(element(1, SendMsg)),
             RecvTag = term_to_latex_string(element(1, element(6, RecvEvent))),
             Color = case element(7, X) of
                         local -> "green!30!black";
                         global -> "red!50!black"
                     end,
+            MsgSizeBytes = erlang:external_size(SendMsg),
+            MsgSize =
+                case math:log(MsgSizeBytes)/math:log(2) of
+                    L when L < 10.0 ->
+                        term_to_latex_string(MsgSizeBytes) ++ "B";
+                    L when L < 20.0 ->
+                        term_to_latex_string(MsgSizeBytes div 1024) ++ "KB";
+                    L when L < 30.0 ->
+                        term_to_latex_string(
+                          MsgSizeBytes div 1024 div 1024) ++ "MB";
+                    L when L < 40.0 ->
+                        term_to_latex_string(
+                          MsgSizeBytes div 1024 div 1024 div 1024) ++ "GB"
+                end,
+
             case SrcNum of
                 SrcNum when (SrcNum < DestNum) ->
                     MsgTag =
@@ -347,11 +371,13 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         end,
                     io:format(File,
                               "\\draw[->, color=~s] (~pcm, -~p)"
-                              " to node[anchor=west,sloped,rotate=90,align=left]"
-                              "{\\tiny ~s} (~pcm, -~p);~n",
+                              " to node[inner sep=1pt, anchor=west,sloped,rotate=90,align=left]"
+                              "{\\tiny ~s} (~pcm, -~p)"
+                              "node [anchor=north, inner sep=1pt] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecvTime/ScaleX, DestNum/2]);
+                               RecvTime/ScaleX, DestNum/2,
+                               MsgSize]);
                 SrcNum when (SrcNum > DestNum) ->
                     MsgTag =
                         case SendTag =:= RecvTag of
@@ -360,11 +386,13 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         end,
                     io:format(File,
                               "\\draw[->, color=~s] (~pcm, -~p)"
-                              " to node[anchor=west,sloped,rotate=-90, align=left]"
-                              "{\\tiny ~s} (~pcm, -~p);~n",
+                              " to node[inner sep=1pt, anchor=west,sloped,rotate=-90, align=left]"
+                              "{\\tiny ~s} (~pcm, -~p)"
+                              "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
-                               RecvTime/ScaleX, DestNum/2]);
+                               RecvTime/ScaleX, DestNum/2,
+                               MsgSize]);
                 SrcNum when (SrcNum =:= DestNum) ->
                     MsgTag =
                         case SendTag =:= RecvTag of
@@ -374,16 +402,43 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                     io:format(File,
                               "\\draw[->, color=~s] (~pcm, -~p)"
                               " .. controls +(~pcm,-0.3) .."
-                              " node[anchor=west,sloped,rotate=-90, align=left]"
-                              "{\\tiny{~s}} (~pcm, -~p);~n",
+                              " node[inner sep=1pt,anchor=west,sloped,rotate=-90, align=left]"
+                              "{\\tiny{~s}} (~pcm, -~p)"
+                              "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, element(2, X)/ScaleX, SrcNum/2,
                                (RecvTime - element(2, X))/ScaleX/2,
                                MsgTag,
-                               RecvTime/ScaleX, DestNum/2])
+                               RecvTime/ScaleX, DestNum/2,
+                               MsgSize])
             end,
+            NewDrawTrace =
+                case Recv of
+                    [] -> DrawTrace;
+                    _ -> lists:delete(hd(Recv), DrawTrace)
+                end,
             case Recv of
                 [] -> DrawTrace;
-                _ -> lists:delete(hd(Recv), DrawTrace)
+                _ ->
+                    %% draw process busy until gc_on_done log_info event
+                    DoneEvents = [ Y || Y <- NewDrawTrace,
+                                        log_info =:= element(1, Y),
+                                        element(2, Y) >= RecvTime,
+                                        element(4, Y) =:= element(5, hd(Recv)),
+                                        element(1, element(5, Y)) =:= gc_on_done
+                                ],
+                    case DoneEvents of
+                        [] -> NewDrawTrace;
+                        _ ->
+                            DoneTime = element(2, hd(DoneEvents)),
+                            io:format(File,
+                                      "\\draw[semithick] (~pcm, -~p)"
+                                      " -- "
+                                      " (~pcm, -~p) node[inner sep=1pt, anchor=south] {\\tiny ~p};~n",
+                                      [RecvTime/ScaleX, DestNum/2,
+                                       DoneTime/ScaleX, DestNum/2,
+                                       DoneTime - RecvTime]),
+                            lists:delete(hd(DoneEvents), NewDrawTrace)
+                    end
             end;
         log_recv ->
             %% found a receive without a send?
@@ -397,7 +452,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                               fun(Y) -> element(4, X) =/= Y end, Nodes)),
             EventTime = element(2, X),
             io:format(
-              File, "\\draw [color=blue] (~pcm, -~p) ++(0, 0.1cm) node[rotate=60, anchor=west] {\\tiny ~s}-- ++(0, -0.2cm);~n",
+              File, "\\draw [color=blue] (~pcm, -~p) ++(0, 0.1cm) node[rotate=60, anchor=west, inner sep=1pt] {\\tiny ~s}-- ++(0, -0.2cm);~n",
               [EventTime/ScaleX, SrcNum/2, term_to_latex_string(element(1, element(5, X)))]),
             %% not yet implemented
             DrawTrace
@@ -410,8 +465,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) ->
-                      gc_mpath_msg().
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> ok.
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     Now = os:timestamp(),
     MsgMapFun = passed_state_msg_map_fun(PState),
@@ -427,7 +481,7 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
               LoggerPid,
               {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal})
     end,
-    epidemic_reply_msg(PState, FromPid, ToPid, Msg).
+    ok.
 
 -spec log_info(anypid(), comm:message()) -> ok.
 log_info(FromPid, Info) ->
