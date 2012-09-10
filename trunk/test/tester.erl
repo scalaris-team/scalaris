@@ -58,7 +58,7 @@ test_log(Module, Func, Arity, Iterations) ->
     EmptyParseState = tester_parse_state:new_parse_state(),
     ParseState = tester_parse_state:find_fun_info(Module, Func, Arity, EmptyParseState),
     io:format(""),
-    _ = run(Module, Func, Arity, Iterations, ParseState, []),
+    _ = run(Module, Func, Arity, Iterations, ParseState, [], 1),
     ok.
 
 % @doc options are white_list and seed
@@ -94,9 +94,10 @@ repeat(F, Repetitions) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec run/6 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
-                tester_parse_state:state(), test_options()) -> any().
-run(Module, Func, Arity, Iterations, ParseState, Options) ->
+-spec run/7 :: (module(), atom(), non_neg_integer(), non_neg_integer(),
+                tester_parse_state:state(), test_options(),
+                Thread::non_neg_integer()) -> any().
+run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
     FeederFun = list_to_atom(atom_to_list(Func) ++ "_feeder"),
     case proplists:get_bool(with_feeder, Options) of
         true ->
@@ -110,7 +111,7 @@ run(Module, Func, Arity, Iterations, ParseState, Options) ->
                                                                        Func, Arity},
                                                                       ParseState),
                     run_helper(Module, Func, Arity, Iterations, FunType,
-                               FeederFunType, ParseState, Options);
+                               FeederFunType, ParseState, Options, Thread);
                 none ->
                    {fail, no_result, no_result_type, feeder_fun_type_not_found,
                     tester_parse_state,
@@ -126,22 +127,24 @@ run(Module, Func, Arity, Iterations, ParseState, Options) ->
             {value, FunType} = tester_parse_state:lookup_type({'fun', Module,
                                                                Func, Arity},
                                                               ParseState),
-            run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, ParseState, Options)
+            run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType,
+                       ParseState, Options, Thread)
     end.
 
--spec run_helper/8 :: (Module::module(), Fun::atom(), Arity::non_neg_integer(),
+-spec run_helper/9 :: (Module::module(), Fun::atom(), Arity::non_neg_integer(),
                        Iterations::non_neg_integer(),
                        FunType | {union_fun, [FunType,...]},
                        FeederFunType | {union_fun, [FeederFunType,...]},
-                       tester_parse_state:state(), test_options()) -> any()
+                       tester_parse_state:state(), test_options(),
+                       Thread::non_neg_integer()) -> any()
         when is_subtype(FunType, {'fun', type_spec(), type_spec()}).
-run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options) ->
+run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options, _Thread) ->
     ok;
-run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options) ->
-    case run_test_ttt(Module, Func, FunType, FeederFunType, TypeInfos, Options) of
+run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options, Thread) ->
+    case run_test_ttt(Module, Func, FunType, FeederFunType, TypeInfos, Options, Thread) of
         ok ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, FeederFunType,
-                       TypeInfos, Options);
+                       TypeInfos, Options, Thread);
         Error ->
             Error
     end.
@@ -159,7 +162,7 @@ get_arg_and_result_type({union_fun, FunTypes} = _FunType,
 run_test_ttt(Module, Func,
              {union_fun, FunTypes} = FunType,
              {union_fun, _FeederFunTypes} = FeederFunType,
-             TypeInfos, Options) ->
+             TypeInfos, Options, Thread) ->
     {ArgType, ResultType} = get_arg_and_result_type(FunType, FeederFunType, Options),
     Size = 30,
     Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
@@ -189,13 +192,13 @@ run_test_ttt(Module, Func,
                              util:get_linetrace()};
                         _ ->
                             apply_args(Module, Func, tuple_to_list(FeededArgs),
-                                       {union, FunResultTypes}, TypeInfos)
+                                       {union, FunResultTypes}, TypeInfos, Thread)
                     end;
                 FeederError ->
                     FeederError
             end;
         false ->
-            apply_args(Module, Func, Args, ResultType, TypeInfos)
+            apply_args(Module, Func, Args, ResultType, TypeInfos, Thread)
     end.
 
 % @doc called before the actual test to convert the input values. Can
@@ -222,9 +225,10 @@ apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
              Reason, erlang:get_stacktrace(), util:get_linetrace()}
     end.
 
-apply_args(Module, Func, Args, ResultType, TypeInfos) ->
+apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
 %%     ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
     try
+        tester_global_state:set_last_call(Thread, Module, Func, Args),
         Result = erlang:apply(Module, Func, Args),
 %%         ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
         case tester_type_checker:check(Result, ResultType, TypeInfos) of
@@ -255,7 +259,8 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                        Result = run(Module, Func, Arity,
                                     Iterations div Threads, ParseState, Options,
                                     Thread),
-                       Master ! {result, Result}
+                       Master ! {result, Result},
+                       tester_global_state:reset_last_call(Thread)
                end) || Thread <- lists:seq(1, Threads)],
     Results = [receive {result, Result} -> Result end || _ <- lists:seq(1, Threads)],
     %ct:pal("~w~n", [Results]),
