@@ -532,6 +532,7 @@ on_gc_msg({'$gen_component', trace_mpath, PState, From, To, Msg}, State) ->
     trace_mpath:start(PState),
     NewState = on(Msg, State),
     trace_mpath:stop(),
+    trace_mpath:log_info(PState, To, {gc_on_done, element(1, Msg)}),
     NewState;
 on_gc_msg({'$gen_component', kill}, State) ->
     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
