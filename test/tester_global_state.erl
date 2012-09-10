@@ -67,26 +67,33 @@ get_value_creator(Type) ->
 
 -spec lookup(any()) -> failed | any().
 lookup(Key) ->
-    check_whether_table_exists(),
-    case ets:lookup(?MODULE, Key) of
-        [{Key, Value}] -> Value;
-        [] -> failed
+    case check_whether_table_exists(false) of
+        true -> case ets:lookup(?MODULE, Key) of
+                    [{Key, Value}] -> Value;
+                    [] -> failed
+                end;
+        false -> failed
     end.
 
 insert(Key, Value) ->
-    check_whether_table_exists(),
+    check_whether_table_exists(true),
     ets:insert(?MODULE, {Key, Value}).
 
 delete(Key) ->
-    check_whether_table_exists(),
-    ets:delete(?MODULE, Key).
-
-check_whether_table_exists() ->
-    case ets:info(?MODULE) of
-        undefined -> create_table();
-        _ -> ok
+    case check_whether_table_exists(false) of
+        true -> ets:delete(?MODULE, Key);
+        false -> ok
     end.
 
+-spec check_whether_table_exists(Create::boolean()) -> boolean().
+check_whether_table_exists(Create) ->
+    case ets:info(?MODULE) of
+        undefined when Create -> create_table();
+        undefined -> false;
+        _ -> true
+    end.
+
+-spec create_table() -> true.
 create_table() ->
     P = self(),
     spawn(
@@ -106,8 +113,4 @@ create_table() ->
               P ! go,
               util:sleep_for_ever()
       end),
-    receive
-        go ->
-            ok
-    end,
-    ok.
+    receive go -> true end.
