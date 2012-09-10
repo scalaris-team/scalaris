@@ -48,8 +48,8 @@
 -export_type([paxos_id/0]).
 -endif.
 
--opaque paxos_id() :: {?paxos_id, uid:global_uid(), non_neg_integer(), non_neg_integer()}.
--type tx_item_id() :: {?tx_item_id, uid:global_uid(), non_neg_integer()}.
+-type tx_item_id() :: {?tx_item_id, TLogUid::uid:global_uid(), ItemId::non_neg_integer()}.
+-opaque paxos_id() :: {?paxos_id, TLogUid::uid:global_uid(), ItemId::non_neg_integer(), PaxosId::non_neg_integer()}.
 -type tx_item_state() ::
  {
    TxItemId::tx_item_id(), %%  1 id of the item
