@@ -268,7 +268,7 @@ tester_type_check_tx(_Config) ->
         [ {rdht_tx,
            [ {decode_value, 1} ], %% not every binary is an erlterm
            [ {collect_replies,2}, %% recv msgs
-             {receive_answer,0}, %% recv msgs
+             {receive_answer,1}, %% recv msgs
              {do_reqs_on_tlog,3}, %% req keys maybe not in tlog
              {do_reqs_on_tlog_iter,4}, %% req keys maybe not in tlog
              {commit, 1} %% should work, but hangs
@@ -300,7 +300,7 @@ tester_type_check_tx(_Config) ->
            ], []},
           {tx_item_state,
            [ {new, 3}, %% TODO: not a list error
-             {new, 6} %% cannot create same length lists for zip
+             {new, 5} %% TODO invalid result type
            ], []},
           {tx_op_beh,[], []},
           {tx_state, [], []},
