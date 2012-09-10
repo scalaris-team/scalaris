@@ -27,7 +27,8 @@
 
 %% for type_check_SUITE
 -export([binomial_coeff_feeder/2,
-         factorial_feeder/1]).
+         factorial_feeder/1,
+         zeros_feeder/1]).
 
 -type(vector() :: [number(),...]).
 -type(centroid() :: vector()).
@@ -119,6 +120,9 @@ condExchange(Min, I, J, Dist, _, _) when Min =< Dist ->
 
 condExchange(_, _, _, Dist, I, J) ->
     {Dist, I, J}.
+
+-spec zeros_feeder(0..10000) -> {0..10000}.
+zeros_feeder(N) -> {N}.
 
 %% @doc Create a list with N zeros.
 -spec zeros(N::0) -> [];

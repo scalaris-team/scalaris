@@ -151,7 +151,8 @@ tester_type_check_math(_Config) ->
              {vecAdd, 2}, %% needs same length lists
              {vecSub, 2}, %% needs same length lists
              {euclideanDistance, 2}, %% needs same length lists
-             {u, 1} %% needs non zero number in list
+             {u, 1}, %% needs non zero number in list
+             {zeros, 1} %% slow for large integers, tested via feeder
            ],
            [ {closestPointsForJ, 7}, %% needs same length lists and funs
              {aggloClusteringHelper, 6}, %% spec suspicious (-1 for lists:nth())
