@@ -248,11 +248,15 @@ apply_args(Module, Func, Args, ResultType, TypeInfos) ->
                      tester_parse_state:state(), integer(), test_options()) -> ok.
 run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
     Master = self(),
-    _Pids = [spawn(fun () ->
-                           Result = run(Module, Func, Arity,
-                                        Iterations div Threads, ParseState, Options),
-                           Master ! {result, Result}
-                   end) || _ <- lists:seq(1, Threads)],
+    _Pids = [spawn(
+               fun() ->
+                       Name = list_to_atom("run_test:" ++ integer_to_list(Thread)),
+                       catch(erlang:register(Name, self())),
+                       Result = run(Module, Func, Arity,
+                                    Iterations div Threads, ParseState, Options,
+                                    Thread),
+                       Master ! {result, Result}
+               end) || Thread <- lists:seq(1, Threads)],
     Results = [receive {result, Result} -> Result end || _ <- lists:seq(1, Threads)],
     %ct:pal("~w~n", [Results]),
     _ = [fun (Result) ->
