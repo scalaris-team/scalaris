@@ -506,17 +506,8 @@ commit(TLog) ->
                       );
                     ?SCALARIS_RECV(
                        {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
-                         begin
-                             {fail, abort, FailedKeys} %% commit / abort;
-                         end
-                       );
-                    ?SCALARIS_RECV(
-                       {tx_timeout, ClientsId}, %% ->
-                       begin
-                         log:log(error, "No result for commit received!"),
-                         {fail, timeout}
-                       end
-                      )
+                         {fail, abort, FailedKeys} %% commit / abort;
+                       )
                 end
     end.
 
@@ -525,11 +516,6 @@ receive_answer(ReqId) ->
     receive
         ?SCALARIS_RECV(
            {tx_tm_rtm_commit_reply, _, _}, %%->
-           %% probably an outdated commit reply: drop it.
-             receive_answer(ReqId)
-          );
-        ?SCALARIS_RECV(
-           {tx_timeout, _}, %% ->
            %% probably an outdated commit reply: drop it.
              receive_answer(ReqId)
           );
@@ -543,7 +529,6 @@ receive_answer(ReqId) ->
 receive_old_answers() ->
     receive
         ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
-        ?SCALARIS_RECV({tx_timeout, _}, receive_old_answers());
         ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
     after 0 -> ok
     end.
