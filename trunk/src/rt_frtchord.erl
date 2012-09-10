@@ -133,8 +133,7 @@ init_stabilize(Neighbors, RT) ->
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
         true -> remove_and_ping_entries(Neighbors, RT) ;
         _Else -> % source node changed, replace the complete table
-            EmptyRT = init(Neighbors),
-            remove_and_ping_entries(Neighbors, EmptyRT)
+            init(Neighbors)
     end
     .
 
