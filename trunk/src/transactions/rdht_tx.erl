@@ -206,18 +206,12 @@ initiate_rdht_ops(ReqList) ->
     %% better round robin.
     [ begin
           NewReqId = uid:get_global_uid(), % local id not sufficient
-          OpModule = case req_get_op(Entry) of
-                         read -> rdht_tx_read;
-                         write -> rdht_tx_write;
-                         test_and_set -> rdht_tx_read;
-                         add_del_on_list -> rdht_tx_read;
-                         add_on_nr -> rdht_tx_read
-                     end,
-          case OpModule of
-              rdht_tx_read ->
-                  rdht_tx_read:work_phase(self(), NewReqId, Entry);
-              rdht_tx_write ->
-                  rdht_tx_write:work_phase(self(), NewReqId, Entry)
+          case req_get_op(Entry) of
+              write           -> rdht_tx_write:work_phase(self(), NewReqId, Entry);
+              read            -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
+              test_and_set    -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
+              add_del_on_list -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
+              add_on_nr       -> rdht_tx_read:work_phase(self(), NewReqId, Entry)
           end,
           NewReqId
       end || Entry <- ReqList ].
@@ -250,7 +244,11 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                  Acc) ->
     TKey = tx_tlog:get_entry_key(TEntry),
     RTKey = tx_tlog:get_entry_key(RTEntry),
-    if TKey =:= RTKey ->
+    if TKey < RTKey ->
+           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
+       TKey > RTKey ->
+           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc]);
+       true -> % TKey =:= RTKey ->
            %% key was in TLog, new entry is newer and contains value
            %% for read?
            case tx_tlog:get_entry_operation(TEntry) of
@@ -258,23 +256,19 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                    %% check versions: if mismatch -> change status to abort
                    NewTLogEntry =
                        case tx_tlog:get_entry_version(TEntry)
-                                =/= tx_tlog:get_entry_version(RTEntry) of
+                                =:= tx_tlog:get_entry_version(RTEntry) of
                            true ->
-                               tx_tlog:set_entry_status(RTEntry, {fail, abort});
-                           false ->
                                Val = tx_tlog:get_entry_value(RTEntry),
-                               tx_tlog:set_entry_value(TEntry, Val)
+                               tx_tlog:set_entry_value(TEntry, Val);
+                           false ->
+                               tx_tlog:set_entry_status(RTEntry, {fail, abort})
                        end,
                    merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
                _ ->
                    log:log(warn,
                            "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
                    merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
-           end;
-       TKey < RTKey ->
-           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
-       true ->
-           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc])
+           end
     end;
 merge_tlogs_iter([], [], Acc)                 -> lists:reverse(Acc);
 merge_tlogs_iter([], [_|_] = SortedRTLog, []) -> SortedRTLog;
@@ -290,10 +284,9 @@ do_reqs_on_tlog(TLog, ReqList, EnDecode) ->
 
 %% @doc Helper to perform all operations on the TLog and generate list
 %%      of results.
+%%      TODO: sort the req list similar to the tlog list and parse through both at the same time!
 -spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], results(), EnDecode::boolean()) ->
                                   {tx_tlog:tlog(), results()}.
-do_reqs_on_tlog_iter(TLog, [], Acc, _EnDecode) ->
-    {tlog_cleanup(TLog), lists:reverse(Acc)};
 do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
     Key = req_get_key(Req),
     Entry = tx_tlog:find_entry_by_key(TLog, Key),
@@ -308,7 +301,9 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
             {test_and_set, Key, Old, New} -> tlog_test_and_set(Entry, Key, Old, New, EnDecode)
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
-    do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc], EnDecode).
+    do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc], EnDecode);
+do_reqs_on_tlog_iter(TLog, [], Acc, _EnDecode) ->
+    {tlog_cleanup(TLog), lists:reverse(Acc)}.
 
 -spec tlog_cleanup(tx_tlog:tlog()) -> tx_tlog:tlog().
 tlog_cleanup(TLog) ->
