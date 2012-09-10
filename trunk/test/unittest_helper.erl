@@ -396,13 +396,17 @@ get_all_children(Supervisor) ->
     lists:flatten([WorkerChilds | [get_all_children(S) || S <- SupChilds]]).
 
 -type process_info() ::
-    {pid(), InitCall::mfa(), CurFun::mfa(), Info::term | failed | no_further_infos}.
+    {pid(), InitCall::mfa(), CurFun::mfa(), Info::term() | failed | no_further_infos}.
 
 -spec get_processes() -> [process_info()].
 get_processes() ->
     [begin
          InitCall = element(2, lists:keyfind(initial_call, 1, Data)),
          CurFun = element(2, lists:keyfind(current_function, 1, Data)),
+         RegName = case lists:keyfind(registered_name, 1, Data) of
+                       false -> not_registered;
+                       RegNameTpl -> element(2, RegNameTpl)
+                   end,
          Info =
              case {InitCall, CurFun} of
                  {{gen_component, _, _}, {gen_component, _, _}} ->
@@ -421,10 +425,10 @@ get_processes() ->
                      end;
                  _ -> no_further_infos
              end,
-         {X, InitCall, CurFun, Info}
+         {X, InitCall, CurFun, {RegName, Info}}
      end
      || X <- processes(),
-        Data <- [process_info(X, [current_function, initial_call])],
+        Data <- [process_info(X, [current_function, initial_call, registered_name])],
         Data =/= undefined].
 
 -spec kill_new_processes(OldProcesses::[process_info()]) -> ok.
@@ -446,8 +450,13 @@ kill_new_processes(OldProcesses, Options) ->
 %%                   ct:pal("killing ~.0p~n", [Proc]),
                   Tabs = util:ets_tables_of(X),
                   try erlang:exit(X, kill) of
-                      true -> util:wait_for_process_to_die(X),
-                              _ = [ util:wait_for_table_to_disappear(Tab) || Tab <- Tabs ],
+                      true ->
+                          util:wait_for_process_to_die(X),
+                          _ = [begin
+%%                                    ct:pal("waiting for table ~.0p to disappear~n~p",
+%%                                           [Tab, ets:info(Tab)]),
+                                   util:wait_for_table_to_disappear(Tab)
+                               end || Tab <- Tabs ],
                               {ok, Proc}
                   catch _:_ -> {fail, Proc}
                   end
