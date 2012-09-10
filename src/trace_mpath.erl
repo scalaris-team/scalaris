@@ -155,8 +155,9 @@ get_trace(TraceId) ->
      end || Event <- LogRaw].
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
-convert_msg(Msg) when is_tuple(Msg) ->
-    setelement(1, Msg, util:extint2atom(element(1, Msg))).
+convert_msg(Msg) when is_tuple(Msg) andalso size(Msg) >= 1 ->
+    setelement(1, Msg, util:extint2atom(element(1, Msg)));
+convert_msg(Msg) -> Msg.
 
 -spec get_trace_raw(trace_id()) -> trace().
 get_trace_raw(TraceId) ->
@@ -351,15 +352,15 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
             MsgSize =
                 case math:log(MsgSizeBytes)/math:log(2) of
                     L when L < 10.0 ->
-                        term_to_latex_string(MsgSizeBytes) ++ "B";
+                        term_to_latex_string(MsgSizeBytes) ++ "\\,B";
                     L when L < 20.0 ->
-                        term_to_latex_string(MsgSizeBytes div 1024) ++ "KB";
+                        term_to_latex_string(MsgSizeBytes div 1024) ++ "\\,KB";
                     L when L < 30.0 ->
                         term_to_latex_string(
-                          MsgSizeBytes div 1024 div 1024) ++ "MB";
+                          MsgSizeBytes div 1024 div 1024) ++ "\\,MB";
                     L when L < 40.0 ->
                         term_to_latex_string(
-                          MsgSizeBytes div 1024 div 1024 div 1024) ++ "GB"
+                          MsgSizeBytes div 1024 div 1024 div 1024) ++ "\\,GB"
                 end,
 
             case SrcNum of
@@ -371,8 +372,8 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         end,
                     io:format(File,
                               "\\draw[->, color=~s] (~pcm, -~p)"
-                              " to node[inner sep=1pt, anchor=west,sloped,rotate=90,align=left]"
-                              "{\\tiny ~s} (~pcm, -~p)"
+                              " to node[inner sep=1pt, anchor=west,sloped,rotate=90,align=left] "
+                              "{\\tiny ~s} (~pcm, -~p) "
                               "node [anchor=north, inner sep=1pt] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
@@ -386,8 +387,8 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         end,
                     io:format(File,
                               "\\draw[->, color=~s] (~pcm, -~p)"
-                              " to node[inner sep=1pt, anchor=west,sloped,rotate=-90, align=left]"
-                              "{\\tiny ~s} (~pcm, -~p)"
+                              " to node[inner sep=1pt, anchor=west,sloped,rotate=-90, align=left] "
+                              "{\\tiny ~s} (~pcm, -~p) "
                               "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
@@ -403,7 +404,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                               "\\draw[->, color=~s] (~pcm, -~p)"
                               " .. controls +(~pcm,-0.3) .."
                               " node[inner sep=1pt,anchor=west,sloped,rotate=-90, align=left]"
-                              "{\\tiny{~s}} (~pcm, -~p)"
+                              "{\\tiny ~s} (~pcm, -~p) "
                               "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, element(2, X)/ScaleX, SrcNum/2,
                                (RecvTime - element(2, X))/ScaleX/2,
