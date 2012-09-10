@@ -132,9 +132,9 @@ upd_tlog_via_rdht(TLog, ReqList) ->
 
     %% perform RDHT operations to collect missing TLog entries
     %% rdht requests for independent keys are processed in parallel.
-    ReqListWithReqIds = initiate_rdht_ops(ReqListonRDHT),
+    ReqIds = initiate_rdht_ops(ReqListonRDHT),
 
-    RTLog = collect_replies(tx_tlog:empty(), ReqListWithReqIds),
+    RTLog = collect_replies(tx_tlog:empty(), ReqIds),
 
     %% merge TLogs (insert fail, abort, when version mismatch
     %% in reads for same key is detected)
@@ -199,7 +199,7 @@ first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
     end.
 
 %% @doc Trigger operations for the DHT.
--spec initiate_rdht_ops([request_on_key()]) -> [{req_id(), request_on_key()}].
+-spec initiate_rdht_ops([request_on_key()]) -> [req_id()].
 initiate_rdht_ops(ReqList) ->
     ?TRACE("rdht_tx:initiate_rdht_ops(~p)~n", [ReqList]),
     %% @todo should choose a dht_node in the local VM at random or even
@@ -219,26 +219,21 @@ initiate_rdht_ops(ReqList) ->
               rdht_tx_write ->
                   rdht_tx_write:work_phase(self(), NewReqId, Entry)
           end,
-          {NewReqId, Entry}
+          NewReqId
       end || Entry <- ReqList ].
 
 %% @doc Collect replies from the quorum DHT operations.
--spec collect_replies(tx_tlog:tlog(), [{req_id(), request_on_key()}]) -> tx_tlog:tlog().
-collect_replies(TLog, [_|_] = ReqIdsReqList) ->
-    ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsReqList]),
-    % TODO: receive only matching replies?!
-    % (as a result we would not need to parse through the reqlist over and over again!)
-    {_, ReqId, RdhtTlogEntry} = receive_answer(),
-    case lists:keytake(ReqId, 1, ReqIdsReqList) of
-        {value, _ReqIdReq, NewReqIdsReqList} ->
-            %% add TLog entry, as it is guaranteed a necessary entry
-            NewTLog = [RdhtTlogEntry | TLog],
-            collect_replies(NewTLog, NewReqIdsReqList);
-        false ->
-            %% Drop outdated result...
-            collect_replies(TLog, ReqIdsReqList)
-    end;
-collect_replies(TLog, []) -> tx_tlog:sort_by_key(TLog).
+-spec collect_replies(tx_tlog:tlog(), [req_id()]) -> tx_tlog:tlog().
+collect_replies(TLog, [ReqId | RestReqIds] = _ReqIdsList) ->
+    ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, _ReqIdsList]),
+    % receive only matching replies
+    RdhtTlogEntry = receive_answer(ReqId),
+    NewTLog = [RdhtTlogEntry | TLog],
+    collect_replies(NewTLog, RestReqIds);
+collect_replies(TLog, []) ->
+    %% Drop outdated results...
+    receive_old_answers(),
+    tx_tlog:sort_by_key(TLog).
 
 %% @doc Merge TLog entries, if same key. Check for version mismatch,
 %%      take over values.
@@ -530,23 +525,32 @@ commit(TLog) ->
                 end
     end.
 
--spec receive_answer() -> {tx_tlog:tx_op(), req_id(), tx_tlog:tlog_entry()}.
-receive_answer() ->
+-spec receive_answer(ReqId::req_id()) -> tx_tlog:tlog_entry().
+receive_answer(ReqId) ->
     receive
         ?SCALARIS_RECV(
            {tx_tm_rtm_commit_reply, _, _}, %%->
            %% probably an outdated commit reply: drop it.
-             receive_answer()
+             receive_answer(ReqId)
           );
         ?SCALARIS_RECV(
            {tx_timeout, _}, %% ->
            %% probably an outdated commit reply: drop it.
-             receive_answer()
+             receive_answer(ReqId)
           );
         ?SCALARIS_RECV(
-           {_Op, _RdhtId, _RdhtTlog} = Msg, %% ->
-             Msg
+           {_Op, ReqId, RdhtTlog}, %% ->
+             RdhtTlog
           )
+    end.
+
+-spec receive_old_answers() -> ok.
+receive_old_answers() ->
+    receive
+        ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
+        ?SCALARIS_RECV({tx_timeout, _}, receive_old_answers());
+        ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
+    after 0 -> ok
     end.
 
 -spec req_get_op(api_tx:request_on_key())
