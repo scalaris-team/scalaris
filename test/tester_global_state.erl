@@ -108,6 +108,7 @@ create_table() ->
     P = self(),
     spawn(
       fun() ->
+              catch(erlang:register(?MODULE, self())),
               _ = try ets:new(?MODULE, [set, public, named_table])
                   catch
                       % is there a race-condition?
