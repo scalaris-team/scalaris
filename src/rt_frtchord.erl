@@ -74,15 +74,6 @@ maximum_entries() -> 10.
 %% Key Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% userdevguide-begin rt_frtchord:empty
-%% @doc Creates an "empty" routing table.
--spec empty(nodelist:neighborhood()) -> rt().
-empty(Neighbors) ->
-    EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
-    remove_and_ping_entries(Neighbors, EmptyRT)
-    .
-%% userdevguide-end rt_frtchord:empty
-
 % @doc Initialize the routing table. This function is allowed to send messages.
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) -> 
@@ -90,7 +81,10 @@ init(Neighbors) ->
     Msg = {send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
     comm:send_local(self(), {trigger_random_lookup}),
-    empty(Neighbors).
+    % create an initial RT consisting of the neighbors
+    EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
+    remove_and_ping_entries(Neighbors, EmptyRT)
+    .
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key()) -> key().
