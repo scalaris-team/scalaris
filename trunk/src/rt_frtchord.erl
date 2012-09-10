@@ -180,8 +180,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
     case nodelist:node(OldNeighbors) =:= nodelist:node(NewNeighbors) of
         true -> % source node didn't change
             % update the sticky nodes: delete old nodes and add new nodes
-            NewRT = remove_and_ping_entries(NewNeighbors, OldRT),
-            {ok, NewRT}
+            {ok, remove_and_ping_entries(NewNeighbors, OldRT)}
             ;
         _Else -> % source node changed, rebuild the complete table
             {trigger_rebuild, OldRT} % XXX this triggers init_stabilize
@@ -196,6 +195,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 filter_dead_node(RT, DeadPid) -> 
     % find the node id of DeadPid and delete it from the RT
     [Node] = [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid],
+    delete_fd(node:pidX(Node)),
     entry_delete(node:id(Node), RT)
     .
 %% userdevguide-end rt_frtchord:filter_dead_node
@@ -326,30 +326,25 @@ handle_custom_message({get_rt_reply, RT}, State) ->
     LocalRT = rt_loop:get_rt(State),
     NewRT = case LocalRT =/= RT of
         true ->
-            % Merge the smaller table into the bigger one
             % - add each entry from the other RT if it doesn't already exist
-            % - entries to be added have to be normal entries
-            {From, To} = case get_size(RT) < get_size(LocalRT) of
-                true -> {RT, LocalRT};
-                false -> {LocalRT, RT}
-            end,
+            % - entries to be added have to be normal entries as RM invokes adding sticky
+            % nodes
             util:gb_trees_foldl(
                 fun(Key, Entry, Acc) ->
                         %% TODO send an async message to check if entry is valid; if it
                         %isn't, delete it later
-                        %% TODO if an entry exist, we might have to update the fingers
                         case entry_exists(Key, Acc) of
                             true -> Acc;
-                            false -> 
-                                add_normal_entry(rt_entry_node(Entry), Acc)
+                            false -> add_normal_entry(rt_entry_node(Entry), Acc)
                         end
                 end,
-                To, get_rt_tree(From)
+                LocalRT, get_rt_tree(RT)
             )
             ;
 
         false -> LocalRT
     end,
+    update_fd(LocalRT, NewRT),
     rt_loop:set_rt(State, NewRT)
     ;
 
@@ -377,11 +372,15 @@ handle_custom_message({rt_get_node, From}, State) ->
 
 handle_custom_message({rt_get_node_response, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
-    NewRT = add_normal_entry(NewNode, OldRT),
-    check(OldRT, NewRT, rt_loop:get_neighb(State), true),
+    NewRT = case rt_lookup_node(node:id(NewNode), OldRT) of
+        none -> RT = add_normal_entry(NewNode, OldRT),
+                check(OldRT, RT, rt_loop:get_neighb(State), true),
+                RT;
+        _Else ->  OldRT
+    end,
+
     rt_loop:set_rt(State, NewRT)
     ;
-
 
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
@@ -416,13 +415,30 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
             end,
             % update failure detector:
             case ReportToFD of
-                true -> NewPids = to_pid_list(NewRT),
-                        OldPids = to_pid_list(OldRT),
-                        fd:update_subscriptions(OldPids, NewPids);
-                _ -> ok
+                true -> update_fd(OldRT, NewRT);
+                _Else -> ok
             end
     end
     .
+
+
+%% @doc Set up a set of subscriptions from a routing table
+-spec add_fd(RT :: rt())  -> ok.
+add_fd(#rt_t{} = RT) ->
+    NewPids = to_pid_list(RT),
+    fd:subscribe(NewPids).
+
+%% @doc Update subscriptions
+-spec update_fd(OldRT :: rt(), NewRT :: rt()) -> ok.
+update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
+    OldPids = to_pid_list(OldRT),
+    NewPids = to_pid_list(NewRT),
+    fd:update_subscriptions(OldPids, NewPids).
+
+%% @doc Delete a subscription
+%-spec delete_fd(EntryPid :: pid()) -> ok.
+delete_fd(EntryPid) -> fd:unsubscribe(EntryPid).
+
 %% userdevguide-end rt_frtchord:check
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -526,12 +542,13 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 % @doc Filter one element from a set of nodes. Do it in a way that filters such a node
 % that the resulting routing table is the best one under all _possible_ routing tables.
 -spec entry_filtering(rt(),[rt_entry()]) -> rt().
-entry_filtering(RT, []) -> RT;
-entry_filtering(RT, AllowedNodes) ->
+entry_filtering(RT, []) -> RT; % only sticky entries and the source node given; nothing to do
+entry_filtering(RT, [_|_] = AllowedNodes) ->
     % XXX ensure that the allowed nodes are actually contained in the routing table
     false = lists:any(fun(none) -> true; (_) -> false end,
             [rt_lookup_node(entry_nodeid(N), RT) || N
                 <- AllowedNodes]),
+
     Spacings = [
         begin PredNode = predecessor_node(RT,Node),
               {Node, spacing(Node, RT) + spacing(PredNode, RT)}
@@ -543,16 +560,23 @@ entry_filtering(RT, AllowedNodes) ->
                 -> SpacingA =< SpacingB
             end, Spacings)
     ),
-    entry_delete(entry_nodeid(FilterEntry), RT)
+    NewRT = entry_delete(entry_nodeid(FilterEntry), RT),
+
+    %% XXX Assertion
+    OldSourceNode = get_source_node(RT),
+    OldSourceNode = get_source_node(NewRT),
+
+    NewRT
     .
 
 % @doc Delete an entry from the routing table
 -spec entry_delete(EntryKey :: key(), RT :: rt()) -> RefinedRT :: rt().
 entry_delete(EntryKey, RT) ->
     Tree = gb_trees:delete(EntryKey, get_rt_tree(RT)),
+    Node = rt_get_node(EntryKey, RT),
 
     % update affected routing table entries (adjacent fingers)
-    {PredId, SuccId} = adjacent_fingers(rt_get_node(EntryKey, RT)),
+    {PredId, SuccId} = adjacent_fingers(Node),
     Pred = rt_get_node(PredId, RT),
     Succ = rt_get_node(SuccId, RT),
 
@@ -567,7 +591,8 @@ entry_delete(EntryKey, RT) ->
                 gb_trees:enter(SuccId, NewSucc, Tree))
     end,
 
-    RT#rt_t{nodes=UpdatedTree}.
+    RT#rt_t{nodes=UpdatedTree}
+    .
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
@@ -641,11 +666,7 @@ entry_learning(Entry, Type, RT) ->
                             )
                         )
                 end,
-            NewRT = case Type of
-                source -> set_source_node(entry_nodeid(NewNode), RT);
-                _else  -> RT
-            end,
-            rt_set_nodes(NewRT, Nodes);
+            rt_set_nodes(RT, Nodes);
         _else -> RT
     end
     .
@@ -657,12 +678,24 @@ entry_learning_and_filtering(Entry, Type, RT) ->
 
     SizeOfRT = get_size(IntermediateRT),
     MaxEntries = maximum_entries(),
-    if SizeOfRT >= MaxEntries ->
-            AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(RT)),
+    case SizeOfRT >= MaxEntries of
+        true ->
+            AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(IntermediateRT)),
                 not is_sticky(N) and not is_source(N)],
-            entry_filtering(IntermediateRT, AllowedNodes);
-       true -> IntermediateRT
-    end.
+            NewRT = entry_filtering(IntermediateRT, AllowedNodes),
+            %% only delete the subscription if the added node was not filtered;
+            %otherwise, there isn't a subscription yet
+            case rt_lookup_node(node:id(Entry), NewRT) of
+                none -> % the newly added node was filtered; do nothing
+                    ok;
+                _Else ->
+                    update_fd(RT, NewRT)
+            end,
+            NewRT
+            ;
+        false -> IntermediateRT
+    end
+    .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RT and RT entry record accessors
@@ -702,20 +735,33 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 %-spec add_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) -> rt().
 -spec add_entry(node:node_type(),'normal' | 'source' | 'sticky',rt()) -> rt().
 add_entry(Node, Type, RT) ->
-    entry_learning_and_filtering(Node, Type, RT).
+    NewRT = entry_learning_and_filtering(Node, Type, RT),
+    update_fd(RT, NewRT),
+    NewRT
+    .
 
 % @doc Add a sticky entry to the routing table
 -spec add_sticky_entry(Entry :: node:node_type(), rt()) -> rt().
-add_sticky_entry(Entry, RT) -> add_entry(Entry, sticky, RT).
+add_sticky_entry(Entry, RT) ->
+   add_entry(Entry, sticky, RT)
+   .
 
 % @doc Add the source entry to the routing table
-% TODO unit test that only one source entry is allowed
 -spec add_source_entry(Entry :: node:node_type(), rt()) -> rt().
-add_source_entry(Entry, RT) -> add_entry(Entry, source, RT).
+add_source_entry(Entry, #rt_t{source=undefined} = RT) ->
+    IntermediateRT = set_source_node(node:id(Entry), RT),
+    % only learn; the RT must be empty, so there is no filtering needed afterwards
+    NewRT = entry_learning(Entry, source, IntermediateRT),
+    %% TODO is this needed? Maybe we don't need a subscription.
+    add_fd(NewRT),
+    NewRT
+    .
 
 % @doc Add a normal entry to the routing table
 -spec add_normal_entry(Entry :: node:node_type(), rt()) -> rt().
-add_normal_entry(Entry, RT) -> add_entry(Entry, normal, RT).
+add_normal_entry(Entry, RT) ->
+    add_entry(Entry, normal, RT)
+    .
 
 % @doc Get the inner node:node_type() of a rt_entry
 -spec rt_entry_node(N :: rt_entry()) -> node:node_type().
