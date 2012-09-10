@@ -742,13 +742,10 @@ rtm_update(RTMs, Delay, TriggerMsg) ->
 init_RTMs(TxState, ItemStates) ->
     ?TRACE("tx_tm_rtm:init_RTMs~n", []),
     ItemStatesForRTM =
-        [ begin
-              PaxIDs_RTLogs_TPs = tx_item_state:get_paxosids_rtlogs_tps(ItemState),
-              PaxosIDs = [PaxosId || {PaxosId, _, _} <- PaxIDs_RTLogs_TPs],
-              {tx_item_state:get_itemid(ItemState),
-               tx_item_state:get_maj_for_prepared(ItemState),
-               tx_item_state:get_maj_for_abort(ItemState), PaxosIDs}
-          end || ItemState <- ItemStates],
+        [ {tx_item_state:get_itemid(ItemState),
+           tx_item_state:get_maj_for_prepared(ItemState),
+           tx_item_state:get_maj_for_abort(ItemState)}
+        || ItemState <- ItemStates],
     RTMs = tx_state:get_rtms(TxState),
     send_to_rtms(
       RTMs, fun(X) -> {?tx_tm_rtm_init_RTM, TxState, ItemStatesForRTM, get_nth(X)}
@@ -887,13 +884,12 @@ trigger_delete_if_done(TxState, State) ->
                         [{tx_tlog:tlog_entry(), tx_item_state:tx_item_id()}],
                         [{EntryId::tx_item_state:tx_item_id(),
                           Maj_for_prepared::non_neg_integer(),
-                          Maj_for_abort::non_neg_integer(),
-                          PaxosIds::[tx_item_state:paxos_id()] | unknown}],
+                          Maj_for_abort::non_neg_integer()}],
                          State::state(), Learners::[comm:mypid()], LAcceptor::pid())
         -> HoldBackQ::[comm:message()].
 merge_item_states(_Tid, [], [], _State, _Learners, _LAcceptor) -> [];
 merge_item_states(Tid, [{TLogEntry, EntryId} | RestLocal],
-                  [{EntryId, Maj_for_prepared, Maj_for_abort, PaxosIds} | RestNew],
+                  [{EntryId, Maj_for_prepared, Maj_for_abort} | RestNew],
                   State, Learners, LAcceptor) ->
     {LocalItemStatus, LocalItem} = get_item_entry(EntryId, State),
     {TmpItem, TmpItemHoldBackQ} =
@@ -901,13 +897,13 @@ merge_item_states(Tid, [{TLogEntry, EntryId} | RestLocal],
             new -> %% nothing known locally
                 {tx_item_state:new(
                   EntryId, Tid, TLogEntry, Maj_for_prepared,
-                  Maj_for_abort, PaxosIds), []};
+                  Maj_for_abort), []};
             uninitialized ->
                 %% take over hold back from existing entry
                 IHoldBQ = tx_item_state:get_hold_back(LocalItem),
                 Entry = tx_item_state:new(
                           EntryId, Tid, TLogEntry, Maj_for_prepared,
-                          Maj_for_abort, PaxosIds),
+                          Maj_for_abort),
                 {Entry, IHoldBQ};
             ok ->
                 log:log(error, "Duplicate init_RTM for an item", []),
