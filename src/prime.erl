@@ -31,7 +31,7 @@
 -export([prime_cache/0]).
 
 % feeder for tester
--export([get_feeder/1]).
+-export([get_nearest_feeder/1, get_feeder/1]).
 -export([tester_create_prime_list/1, tester_create_rev_prime_list/1,
          tester_is_prime_list/1]).
 
@@ -43,6 +43,9 @@
 -define(PrimeCache, 5003).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_nearest_feeder(1..5250) -> {1..5250}.
+get_nearest_feeder(N) -> {N}.
 
 % @doc returns first prime larger than N
 -spec get_nearest(pos_integer()) -> prime().

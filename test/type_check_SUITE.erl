@@ -161,7 +161,8 @@ tester_type_check_math(_Config) ->
            ]},
           %% {math_pos, [], []}, %% needs valid pos fields
           {prime,
-           [ {get, 1}  %% too slow for large integers, tested via feeder
+           [ {get, 1},  %% too slow for large integers, tested via feeder
+             {get_nearest, 1}  %% too slow for large integers, tested via feeder
            ],
            [ {find_bigger_prime, 3}, %% too slow for large integers
              {find_primes, 3} %% special precond; tested via feeder
