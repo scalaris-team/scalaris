@@ -78,13 +78,11 @@ sum_test(N) ->
     R = random_bias:binomial(N, P),
     Vals = get_binom_values(R, []),
     Sum = lists:sum(Vals),
-    N2 = lists:foldl(fun(V, Acc) ->
-                             Acc + erlang:round(V * N)
-                     end, 0, Vals),
-    ?assert(1 - Sum =< 0.00001) andalso
-        ?assert_w_note(N2 >= 0.99*N, io_lib:format("N2=~p - N=~p", [N2, N])).
+    N2 = lists:foldl(fun(V, Acc) -> Acc + (V * N) end, 0, Vals),
+    ?assert_w_note(1 - Sum =< 0.00001, io_lib:format("Sum=~p", [Sum])) andalso
+        ?assert_w_note(N2 >= 0.99*N, io_lib:format("N2=~p - N=~p - 0.99*N=~p", [N2, N, 0.99*N])).
 
-tester_sum_test(_) ->
+tester_sum_test(_) ->    
     tester:test(?MODULE, sum_test, 1, 12, [{threads, 4}]).
 
 -spec prop_value_count(pos_integer()) -> boolean().
