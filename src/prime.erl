@@ -78,9 +78,8 @@ is_prime_p(V, Primes) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_feeder(1..2000) -> {pos_integer()}.
-get_feeder(N) ->
-    {N}.
+-spec get_feeder(1..5250) -> {1..5250}.
+get_feeder(N) -> {N}.
     
 % @doc returns all primes less than or equal to N
 -spec get(pos_integer()) -> prime_list().
