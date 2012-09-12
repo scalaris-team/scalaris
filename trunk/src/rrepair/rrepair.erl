@@ -269,12 +269,12 @@ on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
                                                 open_sessions = Sessions } = State) ->
     ?TRACE("WEB DEBUG INFO", []),
     KeyValueList =
-        [{"Recon Method:", get_recon_method()},
-         {"Bloom Module:", ?REP_BLOOM},
-         {"Sync Round:", Round},
-         {"Open Recon Jobs:", OpenRecon},
-         {"Open Resolve Jobs:", OpenResol},
-         {"Open Sessions:", length(Sessions)}
+        [{"Recon Method:",      webhelpers:safe_html_string("~p", [get_recon_method()])},
+         {"Bloom Module:",      webhelpers:safe_html_string("~p", [?REP_BLOOM])},
+         {"Sync Round:",        webhelpers:safe_html_string("~p", [Round])},
+         {"Open Recon Jobs:",   webhelpers:safe_html_string("~p", [OpenRecon])},
+         {"Open Resolve Jobs:", webhelpers:safe_html_string("~p", [OpenResol])},
+         {"Open Sessions:",     webhelpers:safe_html_string("~p", [length(Sessions)])}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
