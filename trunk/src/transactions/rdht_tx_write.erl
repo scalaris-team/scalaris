@@ -108,17 +108,15 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     %% perform op
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
     DBVers = db_entry:get_version(DBEntry),
-    NewEntry =
-        case DBVers =< RTLogVers of
-            true ->
-                T2DBEntry = db_entry:set_value(
-                              DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
-                T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
-                db_entry:reset_locks(T3DBEntry);
-            false ->
-                DBEntry %% outdated commit
-        end,
-    ?DB:set_entry(DB, NewEntry).
+    if DBVers =< RTLogVers ->
+           T2DBEntry = db_entry:set_value(
+                         DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
+           T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
+           NewEntry = db_entry:reset_locks(T3DBEntry),
+           ?DB:set_entry(DB, NewEntry);
+       true ->
+           DB %% outdated commit
+    end.
 
 -spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
 abort(DB, RTLogEntry, OwnProposalWas) ->
