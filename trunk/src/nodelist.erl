@@ -103,29 +103,29 @@ new_neighborhood(Node, Neighbor) ->
 -spec new_neighborhood(Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()) -> neighborhood().
 new_neighborhood(Pred, Node, Succ) ->
     case node:same_process(Pred, Node) of
-        true ->
-            % the node should always be the first to get a new ID!
-            % if not, something went wrong
-            throw_if_newer(Pred, Node),
-            new_neighborhood(Node, Succ);
         false ->
             case node:same_process(Succ, Node) of
-                true ->
-                    throw_if_newer(Succ, Node),
-                    new_neighborhood(Node, Pred);
                 false ->
                     case node:same_process(Pred, Succ) of
-                        true ->
-                            NewerNode = node:newer(Pred, Succ),
-                            new_neighborhood(Node, NewerNode);
                         false ->
                             % distinct nodes -> determine order:
                             case succ_ord_node(Pred, Succ, Node) of
                                 true  -> add_intervals([Succ], Node, [Pred]);
                                 false -> add_intervals([Pred], Node, [Succ])
-                            end
-                    end
-            end
+                            end;
+                        true ->
+                            NewerNode = node:newer(Pred, Succ),
+                            new_neighborhood(Node, NewerNode)
+                    end;
+                true ->
+                    throw_if_newer(Succ, Node),
+                    new_neighborhood(Node, Pred)
+            end;
+        true ->
+            % the node should always be the first to get a new ID!
+            % if not, something went wrong
+            throw_if_newer(Pred, Node),
+            new_neighborhood(Node, Succ)
     end.
 
 %% @doc Creates a new neighborhood structure with the given elements.
@@ -159,28 +159,27 @@ trunc({Preds, Node, Succs, NodeIntv, SuccIntv}, PredsLength, SuccsLength) when (
 
 %% @doc Truncates the given neighborhood's predecessor list to the given size.
 -spec trunc_preds(neighborhood(), PredsLength::pos_integer()) -> neighborhood().
-trunc_preds({Preds, Node, Succs, NodeIntv, SuccIntv}, PredsLength) when (PredsLength > 0) ->
-    {lists:sublist(Preds, PredsLength), Node, Succs, NodeIntv, SuccIntv}.
+trunc_preds(Neighborhood, PredsLength) when (PredsLength > 0) ->
+    Preds = preds(Neighborhood),
+    setelement(1, Neighborhood, lists:sublist(Preds, PredsLength)).
 
 %% @doc Truncates the given neighborhood's successor list to the given size.
 -spec trunc_succs(neighborhood(), SuccsLength::pos_integer()) -> neighborhood().
-trunc_succs({Preds, Node, Succs, NodeIntv, SuccIntv}, SuccsLength) when (SuccsLength > 0) ->
-    {Preds, Node, lists:sublist(Succs, SuccsLength), NodeIntv, SuccIntv}.
+trunc_succs(Neighborhood, SuccsLength) when (SuccsLength > 0) ->
+    Succs = succs(Neighborhood),
+    setelement(3, Neighborhood, lists:sublist(Succs, SuccsLength)).
 
 %% @doc Returns the neighborhood's node.
 -spec node(neighborhood()) -> node:node_type().
-node({_Preds, Node, _Succs, _NodeIntv, _SuccIntv}) ->
-    Node.
+node(Neighborhood) -> element(2, Neighborhood).
 
 %% @doc Returns the ID of the neighborhood's node (provided for convenience).
 -spec nodeid(neighborhood()) -> ?RT:key().
-nodeid({_Preds, Node, _Succs, _NodeIntv, _SuccIntv}) ->
-    node:id(Node).
+nodeid(Neighborhood) -> node:id(?MODULE:node(Neighborhood)).
 
 %% @doc Returns the node's range.
 -spec node_range(neighborhood()) -> intervals:interval().
-node_range({_Preds, _Node, _Succs, NodeIntv, _SuccIntv}) ->
-    NodeIntv.
+node_range(Neighborhood) -> element(4, Neighborhood).
 
 %% @doc Updates the base node of the neighborhood if its ID is still between
 %%      the ID of the predecessor and successor. Otherwise throws an exception.
@@ -201,42 +200,35 @@ update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs, _NodeIntv, _SuccIntv
 
 %% @doc Returns the neighborhood's predecessor list.
 -spec preds(neighborhood()) -> non_empty_snodelist().
-preds({Preds, _Node, _Succs, _NodeIntv, _SuccIntv}) ->
-    Preds.
+preds(Neighborhood) -> element(1, Neighborhood).
 
 %% @doc Returns a neighborhood's or a node lists's predecessor (may be the node
 %%      itself).
 -spec pred(neighborhood()) -> node:node_type().
-pred({[Pred | _], _Node, _Succs, _NodeIntv, _SuccIntv}) ->
-    Pred.
+pred(Neighborhood) -> hd(preds(Neighborhood)).
 
 %% @doc Returns whether the neighborhood contains a real predecessor (one not
 %%      equal to the own node) or not (provided for convenience).
 -spec has_real_pred(neighborhood()) -> boolean().
-has_real_pred({[Pred | _], Node, _Succs, _NodeIntv, _SuccIntv}) ->
-    Pred =/= Node.
+has_real_pred(Neighborhood) -> pred(Neighborhood) =/= ?MODULE:node(Neighborhood).
 
 %% @doc Returns the neighborhood's successor list.
 -spec succs(neighborhood()) -> non_empty_snodelist().
-succs({_Preds, _Node, Succs, _NodeIntv, _SuccIntv}) ->
-    Succs.
+succs(Neighborhood) -> element(3, Neighborhood).
 
 %% @doc Returns the neighborhood's or a node lists's successor (may be the node
 %%      itself).
 -spec succ(neighborhood()) -> node:node_type().
-succ({_Preds, _Node, [Succ | _], _NodeIntv, _SuccIntv}) ->
-    Succ.
+succ(Neighborhood) -> hd(succs(Neighborhood)).
 
 %% @doc Returns the successor's range.
 -spec succ_range(neighborhood()) -> intervals:interval().
-succ_range({_Preds, _Node, _Succs, _NodeIntv, SuccIntv}) ->
-    SuccIntv.
+succ_range(Neighborhood) -> element(5, Neighborhood).
 
 %% @doc Returns whether the neighborhood contains a real predecessor (one not
 %%      equal to the own node) or not (provided for convenience).
 -spec has_real_succ(neighborhood()) -> boolean().
-has_real_succ({_Preds, Node, [Succ | _], _NodeIntv, _SuccIntv}) ->
-    Succ =/= Node.
+has_real_succ(Neighborhood) -> succ(Neighborhood) =/= ?MODULE:node(Neighborhood).
 
 %% @doc Splits the given (unsorted) node list into sorted lists with nodes that
 %%      have smaller, equal and larger IDs than the given node. The NodeList may
@@ -252,19 +244,23 @@ lsplit_nodelist(NodeList, Node) ->
 %%      than the given node.
 -spec lusplit_nodelist(NodeList::[node:node_type()], Node::node:node_type()) -> {Smaller::snodelist(), Equal::snodelist(), Larger::snodelist()}.
 lusplit_nodelist(NodeList, Node) ->
-    {Smaller, LargerOrEqual} =
-        lists:partition(
+    NodeId = node:id(Node),
+    {Smaller, Equal, Larger} =
+        util:lists_partition3(
           fun(N) ->
                   case node:same_process(N, Node) of
-                      true -> throw_if_newer(N, Node), false;
-                      _    -> node:id(N) < node:id(Node)
+                      true -> throw_if_newer(N, Node), 2;
+                      _    -> NId = node:id(N),
+                              if NId < NodeId -> 1;
+                                 NId > NodeId -> 3;
+                                 true -> 2
+                              end
                   end
           end, NodeList),
 
     SmallerSorted = lists:usort(fun succ_ord_node/2, Smaller),
-    {EqualSorted, LargerSorted} =
-        lists:splitwith(fun(N) -> node:id(N) =:= node:id(Node) end,
-                        lists:usort(fun succ_ord_node/2, LargerOrEqual)),
+    EqualSorted = lists:usort(fun succ_ord_node/2, Equal),
+    LargerSorted = lists:usort(fun succ_ord_node/2, Larger),
     {SmallerSorted, EqualSorted, LargerSorted}.
 
 %% @doc Creates a sorted nodelist starting at the given node and going clockwise
@@ -291,16 +287,18 @@ mk_neighborhood(NodeList, Node) ->
     {SmallerSorted, EqualSorted, LargerSorted} =
         lsplit_nodelist(NodeList, Node),
 
-    case (LargerSorted =:= []) andalso (SmallerSorted =:= []) of
-        true ->
-            Preds = lists:reverse(EqualSorted),
-            Succs = EqualSorted;
-        _ ->
-            Neighbors = lists:append(LargerSorted, SmallerSorted),
-            Preds = lists:reverse(Neighbors),
-            Succs = Neighbors
+    if (LargerSorted =:= []) andalso (SmallerSorted =:= []) ->
+           Preds = lists:reverse(EqualSorted),
+           Succs = EqualSorted;
+       true ->
+           Neighbors = lists:append(LargerSorted, SmallerSorted),
+           Preds = lists:reverse(Neighbors),
+           Succs = Neighbors
     end,
     ensure_lists_not_empty(Preds, Node, Succs).
+
+-type filter_fun() :: fun((node:node_type()) -> boolean()).
+-type eval_fun() :: fun((node:node_type()) -> any()).
 
 %% @doc Removes the given node (or node with the given Pid) from a node list
 %%      (provided for convenience - see lfilter/2).
@@ -318,7 +316,8 @@ remove(NodeOrPid, Neighborhood) ->
 %% @doc Removes the given node (or node with the given Pid) from a node list
 %%      and executes EvalFun for any such occurrence (provided for convenience
 %%      - see filter/3).
--spec lremove(NodeOrPid::node:node_type() | comm:mypid() | pid(), snodelist(), EvalFun::fun((node:node_type()) -> any())) -> snodelist().
+-spec lremove(NodeOrPid::node:node_type() | comm:mypid() | pid(), snodelist(),
+              EvalFun::eval_fun()) -> snodelist().
 lremove(NodeOrPid, NodeList, EvalFun) ->
     lfilter(NodeList, fun(N) -> not node:same_process(NodeOrPid, N) end, EvalFun).
 
@@ -326,18 +325,19 @@ lremove(NodeOrPid, NodeList, EvalFun) ->
 %%      and executes EvalFun for any such occurrence (provided for convenience,
 %%      see filter/3).
 %%      Note: A neighborhood's base node is never removed!
--spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood(), EvalFun::fun((node:node_type()) -> any())) -> neighborhood().
+-spec remove(NodeOrPid::node:node_type() | comm:mypid() | pid(), neighborhood(),
+             EvalFun::eval_fun()) -> neighborhood().
 remove(NodeOrPid, Neighborhood, EvalFun) ->
     filter(Neighborhood, fun(N) -> not node:same_process(NodeOrPid, N) end, EvalFun).
 
 %% @doc Keeps any node for which FilterFun returns true in a node list.
--spec lfilter(snodelist(), FilterFun::fun((node:node_type()) -> boolean())) -> snodelist().
+-spec lfilter(snodelist(), FilterFun::filter_fun()) -> snodelist().
 lfilter(NodeList, FilterFun) ->
     [N || N <- NodeList, FilterFun(N)].
 
 %% @doc Keeps any node for which FilterFun returns true in a neighborhood.
 %%      Note: A neighborhood's base node is never removed!
--spec filter(neighborhood(), FilterFun::fun((node:node_type()) -> boolean())) -> neighborhood().
+-spec filter(neighborhood(), FilterFun::filter_fun()) -> neighborhood().
 filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun) ->
     NewPreds = lfilter(Preds, FilterFun),
     NewSuccs = lfilter(Succs, FilterFun),
@@ -345,16 +345,25 @@ filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun) ->
 
 %% @doc Keeps any node for which FilterFun returns true in a node list and
 %%      executes EvalFun for any other node.
--spec lfilter(snodelist(), FilterFun::fun((node:node_type()) -> boolean()), EvalFun::fun((node:node_type()) -> any())) -> snodelist().
+-spec lfilter(snodelist(), FilterFun::filter_fun(), EvalFun::eval_fun()) -> snodelist().
 lfilter(NodeList, FilterFun, EvalFun) ->
-    {Satisfying, NonSatisfying} = lists:partition(FilterFun, NodeList),
-    _ = lists:map(EvalFun, NonSatisfying),
-    Satisfying.
+    lfilter(NodeList, FilterFun, EvalFun, []).
+
+-spec lfilter(snodelist(), FilterFun::filter_fun(), EvalFun::eval_fun(), snodelist()) -> snodelist().
+lfilter([N | Rest], FilterFun, EvalFun, Res) ->
+    case FilterFun(N) of
+        true -> lfilter(Rest, FilterFun, EvalFun, [N | Res]);
+        _    -> EvalFun(N),
+                lfilter(Rest, FilterFun, EvalFun, Res)
+    end;
+lfilter([], _FilterFun, _EvalFun, Res) ->
+    lists:reverse(Res).
 
 %% @doc Keeps any node for which FilterFun returns true in a neighborhood
 %%      and executes EvalFun for any other node.
 %%      Note: A neighborhood's base node is never removed!
--spec filter(neighborhood(), FilterFun::fun((node:node_type()) -> boolean()), EvalFun::fun((node:node_type()) -> any())) -> neighborhood().
+-spec filter(neighborhood(), FilterFun::filter_fun(),
+             EvalFun::eval_fun()) -> neighborhood().
 filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, EvalFun) ->
     NewPreds = lfilter(Preds, FilterFun, EvalFun),
     NewSuccs = lfilter(Succs, FilterFun, EvalFun),
@@ -362,8 +371,9 @@ filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, EvalFun) ->
 
 %% @doc Keeps any node for which FilterFun returns true in a node list but
 %%      produces a node list with at least MinLength elements by adding enough
-%%      unmatching nodes in the order of the list.
--spec lfilter_min_length(snodelist(), FilterFun::fun((node:node_type()) -> boolean()), MinLength::non_neg_integer()) -> snodelist().
+%%      unmatching nodes. Preserves the order of the list.
+-spec lfilter_min_length(snodelist(), FilterFun::filter_fun(), MinLength::non_neg_integer())
+        -> snodelist().
 lfilter_min_length(NodeList, FilterFun, MinLength) ->
     % first count the number of nodes that match the FilterFun
     SatisfyingCount = lists:foldl(fun(N, Count) ->
@@ -407,7 +417,7 @@ lfilter_min_length(NodeList, FilterFun, MinLength) ->
 %%      MinPredsLength and MinSuccsLength respectively, the whole list will be
 %%      used.
 %%      Note: A neighborhood's base node is never removed!
--spec filter_min_length(neighborhood(), FilterFun::fun((node:node_type()) -> boolean()), MinPredsLength::non_neg_integer(), MinSuccsLength::non_neg_integer()) -> neighborhood().
+-spec filter_min_length(neighborhood(), FilterFun::filter_fun(), MinPredsLength::non_neg_integer(), MinSuccsLength::non_neg_integer()) -> neighborhood().
 filter_min_length({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, MinPredsLength, MinSuccsLength) ->
     NewPreds = lfilter_min_length(Preds, FilterFun, MinPredsLength),
     NewSuccs = lfilter_min_length(Succs, FilterFun, MinSuccsLength),
@@ -418,8 +428,8 @@ filter_min_length({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, MinPred
 -spec lremove_head_if_eq(NodeList::snodelist(), Node::node:node_type()) -> snodelist().
 lremove_head_if_eq([H | T] = NodeList, Node) ->
     case node:same_process(H, Node) of
-        true  -> T;
-        false -> NodeList
+        false -> NodeList;
+        true  -> T
     end;
 lremove_head_if_eq([] = NodeList, _Node) ->
     NodeList.
@@ -458,8 +468,8 @@ lget_last_and_remove([], _NodeToRemove, [Last | _] = ResultList) ->
 -spec ladd_head_if_noteq(NewHead::node:node_type(), NodeList::snodelist(), Node::node:node_type()) -> snodelist().
 ladd_head_if_noteq(NewHead, NodeList, Node) ->
     case node:same_process(NewHead, Node) of
-        true  -> NodeList;
-        false -> [NewHead | NodeList]
+        false -> [NewHead | NodeList];
+        true  -> NodeList
     end.
 
 %% @doc Rebases a sorted node list (as returned by to_list/1, for example) to
@@ -475,27 +485,27 @@ lrebase_list([NewFirstNode | T], NewFirstNode) ->
     lremove(NewFirstNode, T); % just to be sure, remove NewFirstNode from the Tail
 lrebase_list([First | T], NewFirstNode) ->
     {LastNode, TFilt} = lget_last_and_remove(T, NewFirstNode, []),
-    case LastNode =/= null of
-        true ->
-            NodeListInterval = node:mk_interval_between_nodes(First, LastNode),
-            NewPredsInterval = node:mk_interval_between_nodes(First, NewFirstNode),
-            case intervals:in(node:id(NewFirstNode), NodeListInterval) of
-                false ->
-                    ladd_head_if_noteq(First, TFilt, NewFirstNode);
-                true->
-                    {L1T, L2} = lists:splitwith(fun(N) -> intervals:in(node:id(N), NewPredsInterval) end, TFilt),
-                    L1 = ladd_head_if_noteq(First, L1T, NewFirstNode),
-                    lists:append(L2, L1)
-            end;
-        false ->
-            ladd_head_if_noteq(First, [], NewFirstNode)
+    if LastNode =/= null ->
+           NodeListInterval = node:mk_interval_between_nodes(First, LastNode),
+           case intervals:in(node:id(NewFirstNode), NodeListInterval) of
+               false ->
+                   ladd_head_if_noteq(First, TFilt, NewFirstNode);
+               true->
+                   NewPredsInterval = node:mk_interval_between_nodes(First, NewFirstNode),
+                   {L1T, L2} = lists:splitwith(fun(N) -> intervals:in(node:id(N), NewPredsInterval) end, TFilt),
+                   L1 = ladd_head_if_noteq(First, L1T, NewFirstNode),
+                   lists:append(L2, L1)
+           end;
+       true ->
+           ladd_head_if_noteq(First, [], NewFirstNode)
     end.
 
 %% @doc Merges two lists of nodes into a neighborhood structure with the given
 %%      node. Predecessor and successor lists are truncated to the given sizes,
 %%      node IDs are updated with the most up-to-date ID from any list.
 %%      Neither Node1View nor Node2View should contain BaseNode!
--spec lmerge_helper(Node1View::snodelist(), Node2View::snodelist(), BaseNode::node:node_type(), PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
+-spec lmerge_helper(Node1View::snodelist(), Node2View::snodelist(), BaseNode::node:node_type(),
+                    PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
 lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
     {Node1ViewUpd, Node2ViewUpd} = lupdate_ids(Node1View, Node2View),
     % due to updated IDs, the lists might not be sorted anymore...
@@ -510,7 +520,8 @@ lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
 
 %% @doc Merges nodes of Neighbors2 into Neighbors1 and truncates the predecessor
 %%      and successor lists to the given sizes. 
--spec merge(Neighbors1::neighborhood(), Neighbors2::neighborhood(), PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
+-spec merge(Neighbors1::neighborhood(), Neighbors2::neighborhood(), PredsLength::pos_integer(),
+            SuccsLength::pos_integer()) -> neighborhood().
 merge(Neighbors1, Neighbors2, PredsLength, SuccsLength) ->
     % note: similar to mk_neighborhood/4
     Node1 = ?MODULE:node(Neighbors1),
@@ -524,13 +535,10 @@ merge(Neighbors1, Neighbors2, PredsLength, SuccsLength) ->
 %%      Note: nodes which have only been present in the predecessor (successor)
 %%      list may now also appear in the successor (predecessor) list if a list
 %%      has been too small.
--spec add_node(Neighbors::neighborhood(), NodeToAdd::node:node_type(), PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
+-spec add_node(Neighbors::neighborhood(), NodeToAdd::node:node_type(), PredsLength::pos_integer(),
+               SuccsLength::pos_integer()) -> neighborhood().
 add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength, SuccsLength) ->
     case node:same_process(BaseNode, NodeToAdd) of
-        true ->
-            throw_if_newer(NodeToAdd, BaseNode),
-            % eventually
-            mk_neighborhood(lists:append(Preds, Succs), BaseNode, PredsLength, SuccsLength);
         false ->
             CleanPreds = lremove_head_if_eq(Preds, BaseNode),
             CleanSuccs = lremove_head_if_eq(Succs, BaseNode),
@@ -541,13 +549,18 @@ add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength,
                                 end
                         end,
             % create a view of all know (and updated) nodes:
-            ViewUpd = lists:append([NodeToAdd | lists:map(UpdateFun, CleanPreds)], lists:map(UpdateFun, CleanSuccs)),
+            ViewUpd = lists:append([NodeToAdd | lists:map(UpdateFun, CleanPreds)],
+                                   lists:map(UpdateFun, CleanSuccs)),
             % sort the list again
             SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
             SuccsUpdSorted = lists:usort(SuccOrd, ViewUpd),
             PredsUpdSorted = lists:reverse(SuccsUpdSorted),
             
-            trunc(new(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength)
+            trunc(new(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength);
+        true ->
+            throw_if_newer(NodeToAdd, BaseNode),
+            % eventually
+            mk_neighborhood(lists:append(Preds, Succs), BaseNode, PredsLength, SuccsLength)
     end.
 
 %% @doc Adds nodes from the given node list to the given neighborhood structure
@@ -555,7 +568,8 @@ add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength,
 %%      Note: nodes which have only been present in the predecessor (successor)
 %%      list may now also appear in the successor (predecessor) list if a list
 %%      has been too small.
--spec add_nodes(Neighbors::neighborhood(), NodeList::[node:node_type()], PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
+-spec add_nodes(Neighbors::neighborhood(), NodeList::[node:node_type()],
+                PredsLength::pos_integer(), SuccsLength::pos_integer()) -> neighborhood().
 add_nodes(Neighbors, [NodeToAdd], PredsLength, SuccsLength) ->
     add_node(Neighbors, NodeToAdd, PredsLength, SuccsLength);
 add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
@@ -565,11 +579,10 @@ add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
     {SmallerSorted, EqualSorted, LargerSorted} =
         lsplit_nodelist(NodeList, Node),
 
-    OtherView = case (LargerSorted =:= []) andalso (SmallerSorted =:= []) of
-                    true ->
-                        [N || N <- EqualSorted, not node:same_process(N, Node)];
-                    false ->
-                        lists:append(LargerSorted, SmallerSorted)
+    OtherView = if (LargerSorted =:= []) andalso (SmallerSorted =:= []) ->
+                       [N || N <- EqualSorted, not node:same_process(N, Node)];
+                   true ->
+                       lists:append(LargerSorted, SmallerSorted)
                 end,
     lmerge_helper(NeighborsView, OtherView, Node, PredsLength, SuccsLength);
 add_nodes(Neighbors, [], PredsLength, SuccsLength) ->
@@ -662,7 +675,8 @@ ets_insert_newer_node(Table, Node) ->
 %% @doc Removes any node with outdated ID information from the list as well as
 %%      any outdated node that shares the same process as Node and any invalid
 %%      node.
--spec lremove_outdated(NodeList::[node:node_type()], Node::node:node_type() | null) -> [node:node_type()].
+-spec lremove_outdated(NodeList::[node:node_type()], Node::node:node_type() | null)
+        -> [node:node_type()].
 lremove_outdated(NodeList, Node) ->
     Tab = ets:new(nodelist_helper_lremove_outdated, [set, private]),
     % make a unique table of updated pids:
@@ -690,7 +704,8 @@ lremove_outdated(NodeList) ->
 %%      as the input lists and may now contain duplicates (we could not decide
 %%      which to remove here!). Note that due to the updated IDs the order might
 %%      not be correct, i.e. according to some ordering function, anymore!
--spec lupdate_ids(L1::[node:node_type()], L2::[node:node_type()]) -> {L1Upd::[node:node_type()], L2Upd::[node:node_type()]}.
+-spec lupdate_ids(L1::[node:node_type()], L2::[node:node_type()])
+        -> {L1Upd::[node:node_type()], L2Upd::[node:node_type()]}.
 lupdate_ids(L1, L2) ->
     L1L2Tab = ets:new(nodelist_helper_lupdate_ids, [set, private]),
     % make a unique table of updated pids:
@@ -714,48 +729,41 @@ less_than_id(NId, Id, MyId) ->
                               succ_ord_id(NId, Id, MyId)).
 
 %% @doc Look-up largest node in the NodeList that has an ID smaller than Id.
-%%      NodeList must be sorted with the largest key first (reverse order of
-%%      a neighborhood's successor list).
+%%      NodeList must be sorted with the largest key first (order of a
+%%      neighborhood's predecessor list).
 %%      Note: this implementation does not use intervals because comparing keys
 %%      with succ_ord is (slightly) faster. Also this is faster than a
 %%      lists:fold*/3.
--spec best_node_maxfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
+-spec best_node_maxfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(),
+                         LastFound::node:node_type()) -> Result::node:node_type().
 best_node_maxfirst(MyId, Id, [H | T], LastFound) ->
     % note: succ_ord_id = less than or equal
     HId = node:id(H),
-    LTId = less_than_id(HId, Id, MyId),
-    case LTId andalso succ_ord_id(node:id(LastFound), HId, Id) of
-        true        -> H;
-        _ when LTId -> best_node_maxfirst2(Id, T, LastFound);
-        _           -> best_node_maxfirst(MyId, Id, T, LastFound)
+    case less_than_id(HId, Id, MyId) of
+        false -> best_node_maxfirst(MyId, Id, T, LastFound);
+        _     -> case succ_ord_id(node:id(LastFound), HId, Id) of
+                     true -> H;
+                     _    -> LastFound
+                 end
     end;
 best_node_maxfirst(_MyId, _Id, [], LastFound) -> LastFound.
-%% @doc Helper for best_node_maxfirst/4 which assumes that all nodes in
-%%      NodeList are in a valid range, i.e. between MyId and the target Id.
--spec best_node_maxfirst2(Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_maxfirst2(Id, [H | T], LastFound) ->
-    % note: succ_ord_id = less than or equal
-    case succ_ord_id(node:id(LastFound), node:id(H), Id) of
-        true        -> H;
-        _           -> best_node_maxfirst2(Id, T, LastFound)
-    end;
-best_node_maxfirst2(_Id, [], LastFound) -> LastFound.
 
 %% @doc Similar to best_node_maxfirst/4 but with a NodeList that must be sorted
-%%      with the smallest key first (reverse order of a neighborhood's
-%%      predecessor list).
--spec best_node_minfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(), LastFound::node:node_type()) -> Result::node:node_type().
-best_node_minfirst(MyId, Id, [H | T], LastFound) ->
-    % note: succ_ord_id = less than or equal
-    HId = node:id(H),
-    LTId = less_than_id(HId, Id, MyId),
-    case LTId andalso
-             succ_ord_id(node:id(LastFound), HId, Id) of
-        true        -> best_node_minfirst(MyId, Id, T, H);
-        _ when LTId -> best_node_minfirst(MyId, Id, T, LastFound);
-        _           -> LastFound
+%%      with the smallest key first (order of a neighborhood's successor list).
+-spec best_node_minfirst(MyId::?RT:key(), Id::?RT:key(), NodeList::snodelist(),
+                         LastFound1::node:node_type(), LastFound2::node:node_type())
+        -> Result::node:node_type().
+best_node_minfirst(MyId, Id, [H | T], LastFound1, LastFound2) ->
+    case less_than_id(node:id(H), Id, MyId) of
+        true -> best_node_minfirst(MyId, Id, T, H, LastFound2);
+        _    -> best_node_minfirst(MyId, Id, [], LastFound1, LastFound2)
     end;
-best_node_minfirst(_MyId, _Id, [], LastFound) -> LastFound.
+best_node_minfirst(_MyId, Id, [], LastFound1, LastFound2) ->
+    % note: succ_ord_id = less than or equal
+    case succ_ord_id(node:id(LastFound1), node:id(LastFound2), Id) of
+        true -> LastFound2;
+        _    -> LastFound1
+    end.
 
 %% @doc Returns the node among all know neighbors (including the base node)
 %%      with the largest id smaller than Id.
@@ -775,7 +783,8 @@ largest_smaller_than({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, Id) ->
 %% @doc Returns the node among all know neighbors (including the base node)
 %%      with the largest id smaller than Id given that a previous search found
 %%      LastFound as its Node with the largest id smaller than id.
--spec largest_smaller_than(Neighbors::neighborhood(), Id::?RT:key(), LastFound::node:node_type()) -> node:node_type().
+-spec largest_smaller_than(Neighbors::neighborhood(), Id::?RT:key(),
+                           LastFound::node:node_type()) -> node:node_type().
 largest_smaller_than({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, Id, LastFound) ->
     largest_smaller_than(Preds, BaseNode, Succs, Id, LastFound).
 
@@ -785,5 +794,5 @@ largest_smaller_than({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, Id, LastFou
                            LastFound::node:node_type()) -> node:node_type().
 largest_smaller_than(Preds, BaseNode, Succs, Id, LastFound) ->
     MyId = node:id(BaseNode),
-    BestSucc = best_node_maxfirst(MyId, Id, lists:reverse([BaseNode | Succs]), LastFound),
-    _Best = best_node_minfirst(MyId, Id, lists:reverse(Preds), BestSucc).
+    BestSucc = best_node_minfirst(MyId, Id, [BaseNode | Succs], LastFound, LastFound),
+    _Best = best_node_maxfirst(MyId, Id, Preds, BestSucc).
