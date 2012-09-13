@@ -196,8 +196,7 @@ tester_type_check_node(_Config) ->
           [ {get, 2}], %% throws 'not_available' on empty nodelist
           [ {get_list, 2}]}, %% throws 'not_available'
          {nodelist,
-          [ {throw_if_newer, 2}, %% throws
-            {lremove, 3}, %% cannot create funs
+          [ {lremove, 3}, %% cannot create funs
             {lfilter_min_length, 3}, %% cannot create funs
             {filter_min_length, 4}, %% cannot create funs
             {lfilter, 2}, %% cannot create funs
@@ -205,10 +204,11 @@ tester_type_check_node(_Config) ->
             {filter, 2}, %% cannot create funs
             {filter, 3}, %% cannot create funs
             {update_node, 2}, %% needs node in certain interval
-            {ets_insert_newer_node,2}, %% cannot create tid()
             {remove, 3} %% cannot create funs
           ],
-          [ {lfilter, 4} %% cannot create funs
+          [ {ets_insert_newer_node,2}, %% cannot create tid()
+            {throw_if_newer, 2}, %% throws
+            {lfilter, 4} %% cannot create funs
           ]}
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
