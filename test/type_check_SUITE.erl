@@ -207,7 +207,8 @@ tester_type_check_node(_Config) ->
             {ets_insert_newer_node,2}, %% cannot create tid()
             {remove, 3} %% cannot create funs
           ],
-          [ ]}
+          [ {lfilter, 4} %% cannot create funs
+          ]}
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
