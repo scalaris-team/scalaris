@@ -92,14 +92,13 @@ validate(DB, RTLogEntry) ->
         (tx_tlog:get_entry_version(RTLogEntry)
          >= db_entry:get_version(DBEntry)),
     Lockable = (false =:= db_entry:get_writelock(DBEntry)),
-    case (VersionOK andalso Lockable) of
-        true ->
-            %% set locks on entry
-            NewEntry = db_entry:inc_readlock(DBEntry),
-            NewDB = ?DB:set_entry(DB, NewEntry),
-            {NewDB, ?prepared};
-        false ->
-            {DB, ?abort}
+    if VersionOK andalso Lockable ->
+           %% set locks on entry
+           NewEntry = db_entry:inc_readlock(DBEntry),
+           NewDB = ?DB:set_entry(DB, NewEntry),
+           {NewDB, ?prepared};
+       true ->
+           {DB, ?abort}
     end.
 
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
@@ -112,11 +111,10 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
             DBVers = db_entry:get_version(DBEntry),
-            case RTLogVers of
-                DBVers ->
-                    NewEntry = db_entry:dec_readlock(DBEntry),
-                    ?DB:set_entry(DB, NewEntry);
-                _ -> DB %% a write has already deleted this lock
+            if RTLogVers =:= DBVers ->
+                   NewEntry = db_entry:dec_readlock(DBEntry),
+                   ?DB:set_entry(DB, NewEntry);
+               true -> DB %% a write has already deleted this lock
             end;
         ?abort ->
             %% we could compare DB with RTLogEntry and update if outdated
