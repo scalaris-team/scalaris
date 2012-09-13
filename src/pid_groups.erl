@@ -218,9 +218,10 @@ find_a(PidName) ->
                 failed ->
                     %% search others
                     case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
-                        [[Pid] | _] ->
+                        [[Pid] | _] = Pids ->
                             %% fill process local cache
-                            erlang:put(CachedName, Pid),
+                            erlang:put(CachedName,
+                                       ring_new(lists:flatten(Pids))),
                             Pid;
                         [] ->
                             io:format("***No pid registered for ~p~n",
@@ -231,14 +232,34 @@ find_a(PidName) ->
                     erlang:put(CachedName, Pid),
                     Pid
             end;
-        Pid ->
+        Pid when is_pid(Pid) ->
             %% clean process local cache if entry is outdated
             case erlang:is_process_alive(Pid) of
-                true -> Pid;
+                true ->
+                    Pid;
+                false -> erlang:erase(CachedName),
+                         find_a(PidName)
+            end;
+        Pids ->
+            %% clean process local cache if entry is outdated
+            {Pid, NewPids} = ring_get(Pids),
+            case erlang:is_process_alive(Pid) of
+                true ->
+                    erlang:put(CachedName, NewPids),
+                    Pid;
                 false -> erlang:erase(CachedName),
                          find_a(PidName)
             end
     end.
+
+-spec ring_get({list(), list()}) -> {any(), {list(), list()}}.
+ring_get({[E], []} = Q) -> {E, Q};
+ring_get({[], [ E | R ]}) -> {E, {R, [E]}};
+ring_get({[ E | R ], L}) -> {E, {R, [E|L]}};
+ring_get({[], []}) -> {'$dead_code', {[], []}}.
+
+-spec ring_new(list()) -> {list(), list()}.
+ring_new(L) -> {L, []}.
 
 -spec find_all(pidname()) -> [pid()].
 find_all(PidName) ->
