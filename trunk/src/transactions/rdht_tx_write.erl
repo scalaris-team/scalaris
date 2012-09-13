@@ -164,7 +164,7 @@ on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->
 
 %% reply triggered by rdht_tx_write:work_phase/3
 on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
-    {Id, ClientPid, WriteValue} = pdb:get(Id, TableName),
+    {Id, ClientPid, WriteValue} = pdb:take(Id, TableName),
     NewTLogEntry = update_tlog_entry(TLogEntry, WriteValue),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
