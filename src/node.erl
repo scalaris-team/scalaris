@@ -112,11 +112,10 @@ is_newer(#node{pid=PID, id=Id1, id_version=IdVersion1},
 %%      responsible for if his predecessor has PredKey, i.e. (PredKey, MyKey]
 -spec mk_interval_between_ids(PredKey::?RT:key(), MyKey::?RT:key())
                              -> intervals:interval().
+mk_interval_between_ids(Key, Key) ->
+    intervals:all();
 mk_interval_between_ids(PredKey, MyKey) ->
-    case PredKey of
-        MyKey -> intervals:all();
-        _     -> intervals:new('(', PredKey, MyKey, ']')
-    end.
+    intervals:new('(', PredKey, MyKey, ']').
 
 %% @doc Creates an interval that covers all keys a node is responsible for given
 %%      his predecessor, i.e. (node:id(PredKey), node:id(MyKey)]
