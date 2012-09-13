@@ -31,7 +31,7 @@
 -export([prime_cache/0]).
 
 % feeder for tester
--export([get_nearest_feeder/1, get_feeder/1]).
+-export([is_prime_feeder/1, get_nearest_feeder/1, get_feeder/1]).
 -export([tester_create_prime_list/1, tester_create_rev_prime_list/1,
          tester_is_prime_list/1]).
 
@@ -68,6 +68,9 @@ find_bigger_prime(I, N, Primes) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec is_prime_feeder(1..5250) -> {1..5250}.
+is_prime_feeder(N) -> {N}.
 
 -spec is_prime(pos_integer()) -> boolean().
 is_prime(V) when V =< ?PrimeCache ->
