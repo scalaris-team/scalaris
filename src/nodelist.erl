@@ -20,8 +20,6 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--compile([export_all]).
-
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
          mk_neighborhood/2, mk_neighborhood/4,
