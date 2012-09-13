@@ -104,15 +104,12 @@ get_numreplied(State) ->
                 non_neg_integer(), non_neg_integer()) -> read_state().
 add_reply(State, Val, Vers, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
-    {_OldVal, OldVers} = OldResult = get_result(State),
-    NewResult = case Vers > OldVers of
-                    true -> {Val, Vers};
-                    false -> OldResult
-                end,
-    TmpState = set_result(State, NewResult),
-    NewState = case Vers >= 0 of
-                   true -> inc_numok(TmpState);
-                   false -> inc_numfailed(TmpState)
+    {_OldVal, OldVers} = get_result(State),
+    TmpState = if Vers > OldVers -> set_result(State, {Val, Vers});
+                  true           -> State
+               end,
+    NewState = if Vers >= 0 -> inc_numok(TmpState);
+                  true      -> inc_numfailed(TmpState)
                end,
     update_decided(NewState, MajOk, MajDeny).
 
@@ -122,21 +119,22 @@ update_decided(State, MajOk, MajDeny) ->
     ?TRACE("rdht_tx_read_state:update_decided state maj ~p ~p ~p~n",
            [State, MajOk, MajDeny]),
     {_, Vers} = get_result(State),
-    case Vers =/= -1 of
-        true ->
-            OK = get_numok(State) >= MajOk,
-            Abort = get_numfailed(State) >= MajDeny,
-            if OK -> %% andalso (not Abort) ->
-                    set_decided(State, ?value);
-               (not OK) andalso Abort ->
-                    set_decided(State, {fail, not_found});
-               true -> State
-            end;
-        false ->
-            case get_numreplied(State) of
-                4 -> set_decided(State, {fail, not_found}); % all replied with -1
-                _ -> State
-            end
+    if Vers =/= -1 ->
+           OK = get_numok(State) >= MajOk,
+           if OK -> %% OK andalso (not Abort) ->
+                  set_decided(State, ?value);
+              true ->
+                  Abort = get_numfailed(State) >= MajDeny,
+                  if Abort -> %% (not OK) andalso Abort
+                         set_decided(State, {fail, not_found});
+                     true -> State
+                  end
+           end;
+       true ->
+           case get_numreplied(State) of
+               4 -> set_decided(State, {fail, not_found}); % all replied with -1
+               _ -> State
+           end
     end.
 
 -spec is_newly_decided(read_state()) -> boolean().
