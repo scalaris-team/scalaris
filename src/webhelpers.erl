@@ -206,10 +206,34 @@ get_and_cache_ring() ->
                     undefined -> statistics:get_ring_details_neighbors(1); % get neighbors only
                     _         -> statistics:get_ring_details()
                 end,
+            % mapping node_id -> index
+            util:map_with_nr(
+              fun(RingE, NrX) ->
+                      case RingE of
+                          {ok, NodeDetailsX} ->
+                              NodeX = node_details:get(NodeDetailsX, node),
+                              erlang:put({web_scalaris_ring_idx, node:id(NodeX)}, NrX),
+                              erlang:put(web_scalaris_ring_size, NrX),
+                              ok;
+                          _ -> ok
+                      end
+              end, Ring, 1),
             erlang:put(web_scalaris_ring, Ring);
         Ring -> ok
     end,
     Ring.
+
+-spec get_indexed_id_by_node(Node::node:node_type()) -> non_neg_integer() | undefined.
+get_indexed_id_by_node(Node) ->
+    get_indexed_id_by_id(node:id(Node)).
+
+-spec get_indexed_id_by_id(NodeId::?RT:key()) -> non_neg_integer() | undefined.
+get_indexed_id_by_id(NodeId) ->
+    erlang:get({web_scalaris_ring_idx, NodeId}).
+
+-spec get_ring_size() -> non_neg_integer() | undefined.
+get_ring_size() ->
+    erlang:get(web_scalaris_ring_size).
 
 -spec flush_ring_cache() -> ok.
 flush_ring_cache() ->
@@ -221,14 +245,18 @@ flush_ring_cache() ->
 extract_ring_info([]) ->
     [];
 extract_ring_info([RingE]) ->
-    Me_tmp = node:id(node_details:get(RingE, node)),
-    Pred_tmp = node:id(node_details:get(RingE, pred)),
-    Label = node_details:get(RingE, hostname) ++ " (" ++
+    MyId = node:id(node_details:get(RingE, node)),
+    PredId = node:id(node_details:get(RingE, pred)),
+    MyIndexStr = case get_indexed_id_by_id(MyId) of
+                     undefined -> "";
+                     MyIndex -> integer_to_list(MyIndex) ++ ": "
+                 end,
+    Label = MyIndexStr ++ node_details:get(RingE, hostname) ++ " (" ++
                 integer_to_list(node_details:get(RingE, load)) ++ ")",
-    case Me_tmp =:= Pred_tmp of
+    case MyId =:= PredId of
         true -> [{Label, "100.00", true}];
         _ ->
-            Diff = ?RT:get_range(Pred_tmp, Me_tmp) * 100 / ?RT:n(),
+            Diff = ?RT:get_range(PredId, MyId) * 100 / ?RT:n(),
             Me_val = io_lib:format("~f", [Diff]),
             Unknown_val = io_lib:format("~f", [100 - Diff]),
             [{Label, Me_val, true}, {"unknown", Unknown_val, false}]
@@ -249,17 +277,21 @@ extract_ring_info([RingE1, RingE2 | Rest], First, Acc) ->
 -spec extract_ring_info2(RingE1::node_details:node_details(), RingE2::node_details:node_details())
         -> [{Label::string(), Value::string(), Known::boolean()}].
 extract_ring_info2(RingE1, RingE2) ->
-    E1_Me_tmp = node:id(node_details:get(RingE1, node)),
-    E1_Pred_tmp = node:id(node_details:get(RingE1, pred)),
-    E2_Pred_tmp = node:id(node_details:get(RingE2, pred)),
-    E1_Diff = ?RT:get_range(E1_Pred_tmp, E1_Me_tmp) * 100 / ?RT:n(),
-    E1_Label = node_details:get(RingE1, hostname) ++ " (" ++
+    E1_MyId = node:id(node_details:get(RingE1, node)),
+    E1_PredId = node:id(node_details:get(RingE1, pred)),
+    E2_PredId = node:id(node_details:get(RingE2, pred)),
+    E1_Diff = ?RT:get_range(E1_PredId, E1_MyId) * 100 / ?RT:n(),
+    E1_MyIndexStr = case get_indexed_id_by_id(E1_MyId) of
+                        undefined -> "";
+                        E1_MyIndex -> integer_to_list(E1_MyIndex) ++ ": "
+                    end,
+    E1_Label = E1_MyIndexStr ++ node_details:get(RingE1, hostname) ++ " (" ++
                    integer_to_list(node_details:get(RingE1, load)) ++ ")",
     E1_Me_val = io_lib:format("~f", [E1_Diff]),
-    case E1_Me_tmp =:= E2_Pred_tmp of
+    case E1_MyId =:= E2_PredId of
         true -> [{E1_Label, E1_Me_val, true}];
         _ -> % add an "unknown" slice as there is another (but unknown) node:
-            Diff2 = ?RT:get_range(E1_Me_tmp, E2_Pred_tmp) * 100 / ?RT:n(),
+            Diff2 = ?RT:get_range(E1_MyId, E2_PredId) * 100 / ?RT:n(),
             Unknown_val = io_lib:format("~f", [Diff2]),
             [{E1_Label, E1_Me_val, true}, {"unknown", Unknown_val, false}]
     end.
@@ -370,12 +402,22 @@ renderRing({ok, Details}) ->
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
     Load = node_details:get(Details, load),
+    MyIndexStr = case get_indexed_id_by_node(Node) of
+                     undefined -> dead_node();
+                     MyIndex -> MyIndex
+                 end,
+    NodeListFun = fun(NodeX) ->
+                          case get_indexed_id_by_node(NodeX) of
+                              undefined -> node:id(NodeX);
+                              X         -> "<b>" ++ integer_to_list(X) ++ "</b>"
+                          end
+                  end,
     {tr, [], 
       [
        {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
-       {td, [], io_lib:format("~.100p", [[node:id(N) || N <- PredList]])},
-       {td, [], io_lib:format("~p", [node:id(Node)])},
-       {td, [], io_lib:format("~.100p", [[node:id(N) || N <- SuccList]])},
+       {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- PredList]])},
+       {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
+       {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
        {td, [], io_lib:format("~p", [RTSize])},
        {td, [], io_lib:format("~p", [Load])}
       ]};
@@ -393,14 +435,7 @@ renderRing({failed, Pid}) ->
 -spec getIndexedRingRendered() -> html_type().
 getIndexedRingRendered() ->
     RealRing = get_and_cache_ring(),
-    % table with mapping node_id -> index
-    _ = ets:new(webhelpers_indexed_ring, [ordered_set, private, named_table]),
-    _ = [begin
-             Size = ets:info(webhelpers_indexed_ring, size),
-             ets:insert(webhelpers_indexed_ring,
-                        {node:id(node_details:get(NodeDetails, node)), Size})
-         end || {ok, NodeDetails} <- RealRing],
-    RingSize = ets:info(webhelpers_indexed_ring, size),
+    RingSize = get_ring_size(),
     EHtml =
         if
         RingSize =:= 0 ->
@@ -434,7 +469,7 @@ getIndexedRingRendered() ->
                  [
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds Offset"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node Index"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs Offsets"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
@@ -446,11 +481,10 @@ getIndexedRingRendered() ->
              ]
             }
     end,
-    ets:delete(webhelpers_indexed_ring),
     EHtml.
 
 %% @doc Renders an indexed ring into ehtml.
-%%      Precond: existing webhelpers_indexed_ring ets table with
+%%      Precond: existing Ring from get_and_cache_ring/0 with
 %%      node_id -> index mapping.
 -spec renderIndexedRing(Node::statistics:ring_element()) -> html_type().
 renderIndexedRing({ok, Details}) ->
@@ -460,10 +494,14 @@ renderIndexedRing({ok, Details}) ->
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
     Load = node_details:get(Details, load),
-    MyIndex = get_indexed_id(Node),
+    MyIndex = get_indexed_id_by_node(Node),
     PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, MyIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, MyIndex) end, SuccList),
     [FirstSuccIndex|_] = SuccIndices,
+    MyIndexStr = case MyIndex of
+                     undefined -> dead_node();
+                     X -> X
+                 end,
     {tr, [],
       [
        {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
@@ -473,7 +511,7 @@ renderIndexedRing({ok, Details}) ->
            false ->
                {td, [], io_lib:format("<span style=\"color:red\">~p</span>", [PredIndex])}
        end,
-       {td, [], io_lib:format("~p: ~p", [MyIndex, node:id(Node)])},
+       {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
        case is_list(FirstSuccIndex) orelse FirstSuccIndex =/= 1 of
            true -> {td, [], io_lib:format("<span style=\"color:red\">~p</span>", [SuccIndices])};
            false -> {td, [], io_lib:format("~p", [SuccIndices])}
@@ -747,33 +785,24 @@ dead_node() ->
 -spec get_indexed_pred_id(Node::node:node_type(),
                           MyIndex::non_neg_integer() | string()) -> integer() | string().
 get_indexed_pred_id(Node, MyIndex) ->
-    NodeIndex = get_indexed_id(Node),
-    RingSize = ets:info(webhelpers_indexed_ring, size),
-    case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
-        true -> dead_node();
-        _    ->
-            case NodeIndex =:= MyIndex of
-                true -> 0;
-                _    ->
-                    ((NodeIndex - MyIndex + RingSize) rem RingSize) - RingSize
-            end
+    NodeIndex = get_indexed_id_by_node(Node),
+    RingSize = get_ring_size(),
+    if NodeIndex =:= undefined orelse MyIndex =:= undefined -> dead_node();
+       true ->
+           case NodeIndex =:= MyIndex of
+               true -> 0;
+               _    ->
+                   ((NodeIndex - MyIndex + RingSize) rem RingSize) - RingSize
+           end
     end.
 
 -spec get_indexed_succ_id(Node::node:node_type(),
                           MyIndex::non_neg_integer() | string()) -> integer() | string().
 get_indexed_succ_id(Node, MyIndex) ->
-    NodeIndex = get_indexed_id(Node),
-    RingSize = ets:info(webhelpers_indexed_ring, size),
-    case NodeIndex =:= dead_node() orelse MyIndex =:= dead_node() of
-        true -> dead_node();
-        _    -> (NodeIndex - MyIndex + RingSize) rem RingSize
-    end.
-
--spec get_indexed_id(Node::node:node_type()) -> non_neg_integer() | string().
-get_indexed_id(Node) ->
-    case ets:lookup(webhelpers_indexed_ring, node:id(Node)) of
-        [] -> dead_node();
-        [{_, Index}] -> Index
+    NodeIndex = get_indexed_id_by_node(Node),
+    RingSize = get_ring_size(),
+    if NodeIndex =:= undefined orelse MyIndex =:= undefined -> dead_node();
+       true -> (NodeIndex - MyIndex + RingSize) rem RingSize
     end.
 
 -spec get_flag(Hostname::node_details:hostname()) -> html_type().
