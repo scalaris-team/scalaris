@@ -27,7 +27,7 @@
 -export_type([tableid/0]).
 -endif.
 
--export([new/2, get/2, set/2, delete/2, tab2list/1]).
+-export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
 
 -ifdef(PDB_ERL).
@@ -89,6 +89,18 @@ delete(Key, _TableName) ->
 delete(Key, TableName) ->
     ets:delete(TableName, Key),
     ok.
+-endif.
+
+-spec take(term(), tableid()) -> term() | undefined.
+-ifdef(PDB_ERL).
+take(Key, _TableName) ->
+    erlang:erase(Key).
+-endif.
+-ifdef(PDB_ETS).
+take(Key, TableName) ->
+    Old = get(Key, TableName)
+    ets:delete(TableName, Key),
+    Old.
 -endif.
 
 -spec tab2list(tableid()) -> [term()].
