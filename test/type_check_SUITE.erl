@@ -400,6 +400,7 @@ tester_type_check_util(_Config) ->
              {for_to_fold, 5}, %% cannot create funs
              {gb_trees_foldl, 3}, %% cannot create funs
              {lists_keystore2, 5}, %% key id may not be larger than the tuple size in the list
+             {lists_partition3, 2}, %% cannot create funs; tested via feeder
              {log, 2}, %% floats become to large and raise badarith
              {log2, 1}, %% floats become to large and raise badarith
              {logged_exec, 1}, %% not execute random strings
@@ -436,6 +437,7 @@ tester_type_check_util(_Config) ->
            ],
            [ {dump_extract_from_list,2}, %% wrong spec
              {dumpXNoSort,2}, %% needs fun
+             {lists_partition3, 5}, %% cannot create funs; tested via feeder
              {shuffle_helper,4}, %% badarg error? why?
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
              {'=:<_lists', 2}, %% need equal length lists
