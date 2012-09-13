@@ -11,7 +11,8 @@ function plot_ring(ring, colors) {
      formatter: function(label, series) {
       return '<div style="font-size:8pt;text-align:center;padding:2px;color:white;">'+label+'</div>';
      },
-     background: { opacity: 0.5, color: '#000000' }
+     background: { opacity: 0.5, color: '#000000' },
+     threshold: 0.03
     }
    }
   },
