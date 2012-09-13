@@ -40,6 +40,7 @@
          map_with_nr/3,
          par_map/2, par_map/3,
          lists_split/2, lists_keystore2/5,
+         lists_partition3/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -78,6 +79,7 @@
 -export([readable_utc_time_feeder/1]).
 -export([map_with_nr_feeder/3]).
 -export([par_map_feeder/2, par_map_feeder/3]).
+-export([lists_partition3_feeder/1]).
 
 -export([sets_map/2]).
 
@@ -1072,6 +1074,30 @@ lists_keystore2(Key, NC, [H | T], NS, NewValue) ->
     [H | lists_keystore2(Key, NC, T, NS, NewValue)];
 lists_keystore2(_Key, _N, [], _NS, _NewValue) ->
     [].
+
+-spec lists_partition3_feeder([integer()])
+        -> {fun((integer()) -> 1..3), [integer()]}.
+lists_partition3_feeder(List) ->
+    {fun(I) -> (I rem 3) + 1 end, List}.
+
+-spec lists_partition3(Pred::fun((Elem :: T) -> 1..3), List::[T])
+    -> {Pred1::[T], Pred2::[T], Pred3::[T]}.
+lists_partition3(Pred, L) ->
+    lists_partition3(Pred, L, [], [], []).
+
+-spec lists_partition3_feeder([integer()], [integer()], [integer()], [integer()])
+        -> {fun((integer()) -> 1..3), [integer()], [integer()], [integer()], [integer()]}.
+lists_partition3_feeder(List, As, Bs, Cs) ->
+    {fun(I) -> (I rem 3) + 1 end, List, As, Bs, Cs}.
+
+lists_partition3(Pred, [H | T], As, Bs, Cs) ->
+    case Pred(H) of
+        1 -> lists_partition3(Pred, T, [H | As], Bs, Cs);
+        2 -> lists_partition3(Pred, T, As, [H | Bs], Cs);
+        3 -> lists_partition3(Pred, T, As, Bs, [H | Cs])
+    end;
+lists_partition3(Pred, [], As, Bs, Cs) when is_function(Pred, 1) ->
+    {lists:reverse(As), lists:reverse(Bs), lists:reverse(Cs)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
