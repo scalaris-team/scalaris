@@ -247,7 +247,7 @@ prop_store_to_dot(L, R, ToAdd) ->
     Tree = build_tree(I, ToAdd, uniform),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
     ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p
-            Saved to ..\MerkleTree.png", [ToAdd, Inner, Leafs]),
+            Saved to ../MerkleTree.png", [ToAdd, Inner, Leafs]),
     merkle_tree:store_graph(Tree, "MerkleTree"),
     true.
 
