@@ -137,7 +137,7 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 
 %% @doc Gets the key that splits the interval (Begin, End] so that the first
 %%      interval will be (Num/Denom) * range(Begin, End). In the special case of
-%%      Begin==End, the whole key range is split in halves.
+%%      Begin==End, the whole key range is split.
 %%      Beware: SplitFactor must be in [0, 1]; the final key will be rounded
 %%      down and may thus be Begin.
 -spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
