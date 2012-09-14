@@ -41,10 +41,11 @@
 
 % last prime in prime_cache/0
 -define(PrimeCache, 5003).
+-define(TESTER_MAX_PRIME, 5250).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_nearest_feeder(1..5250) -> {1..5250}.
+-spec get_nearest_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
 get_nearest_feeder(N) -> {N}.
 
 % @doc returns first prime larger than N
@@ -69,7 +70,7 @@ find_bigger_prime(I, N, Primes) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec is_prime_feeder(1..5250) -> {1..5250}.
+-spec is_prime_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
 is_prime_feeder(N) -> {N}.
 
 -spec is_prime(pos_integer()) -> boolean().
@@ -84,7 +85,7 @@ is_prime_p(V, Primes) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_feeder(1..5250) -> {1..5250}.
+-spec get_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
 get_feeder(N) -> {N}.
     
 % @doc returns all primes less than or equal to N
@@ -94,8 +95,8 @@ get(N) when N =< ?PrimeCache ->
 get(N) ->
     find_primes(?PrimeCache, N, lists:reverse(prime_cache())).
 
--spec find_primes_feeder(0 | 2, pos_integer(), rev_prime_list())
-        -> {pos_integer(), pos_integer(), rev_prime_list()}.
+-spec find_primes_feeder(0 | 2, 1..?TESTER_MAX_PRIME, rev_prime_list())
+        -> {pos_integer(), 1..?TESTER_MAX_PRIME, rev_prime_list()}.
 find_primes_feeder(_Add, N, [] = Primes) ->
     {2, N, Primes};
 find_primes_feeder(Add, N, [H|_] = Primes) ->
