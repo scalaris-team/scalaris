@@ -113,8 +113,6 @@ lookup(Node, Art) ->
     is_subtype(Node,   merkle_tree:mt_node()),
     is_subtype(CF,     non_neg_integer()),        %correction factor
     is_subtype(Result, boolean()).
-lookup_cf([], _Art) ->
-    true;
 lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
     BF = ?IIF(merkle_tree:is_leaf(Node), LBF, IBF),
@@ -135,7 +133,9 @@ lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
                                L),
                         lookup_cf(NL, Art)
                 end                        
-    end.
+    end;
+lookup_cf([], _Art) ->
+    true.
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper

@@ -80,11 +80,11 @@ add_list_(Bloom, Items) ->
                }.
 
 % faster than lists:foldl
-p_add_list(_Hfs, _BFSize, Acc, []) -> 
-    Acc;
 p_add_list(Hfs, BFSize, Acc, [Item | Items]) ->
     Pos = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
-    p_add_list(Hfs, BFSize, set_Bits(Acc, Pos), Items).    
+    p_add_list(Hfs, BFSize, set_Bits(Acc, Pos), Items);
+p_add_list(_Hfs, _BFSize, Acc, []) -> 
+    Acc.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -163,8 +163,6 @@ get_property(Bloom, Property) ->
 
 % @doc Sets all filter-bits at given positions to 1
 -spec set_Bits(binary(), [integer()]) -> binary().
-set_Bits(Filter, []) -> 
-    Filter;
 set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
     <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,    
@@ -173,7 +171,9 @@ set_Bits(Filter, [Pos | Positions]) ->
                     OldByte -> Filter;
                     _ -> <<PreBin/binary, NewByte:8, PostBin/binary>>
                 end,
-    set_Bits(NewBinary, Positions).
+    set_Bits(NewBinary, Positions);
+set_Bits(Filter, []) -> 
+    Filter.
 
 % ->V2 -> 1/3 slower than V1
 %% set_Bits(Filter, [Pos | Positions]) ->
@@ -186,8 +186,6 @@ set_Bits(Filter, [Pos | Positions]) ->
 
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [integer()]) -> boolean().
-check_Bits(_, []) -> 
-    true;
 % V1
 %% check_Bits(Filter, [Pos | Positions]) -> 
 %%     PreBytes = Pos div 8,
@@ -195,7 +193,7 @@ check_Bits(_, []) ->
 %%     case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
 %%         true -> check_Bits(Filter, Positions);
 %%         false -> false
-%%     end.
+%%     end;
 
 % V 2 - 12 % faster than V1
 check_Bits(Filter, [Pos | Positions]) ->
@@ -203,7 +201,10 @@ check_Bits(Filter, [Pos | Positions]) ->
     case C of
         1 -> check_Bits(Filter, Positions);
         0 -> false
-    end.
+    end;
+
+check_Bits(_, []) -> 
+    true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helper functions
@@ -215,7 +216,7 @@ ln(X) ->
 
 % @doc Increases Val until Val rem Div == 0.
 -spec resize(integer(), integer()) -> integer().
-resize(Val, Div) when Val rem Div == 0 -> 
+resize(Val, Div) when (Val rem Div) =:= 0 -> 
     Val;
-resize(Val, Div) when Val rem Div /= 0 -> 
+resize(Val, Div) -> 
     resize(Val + 1, Div).

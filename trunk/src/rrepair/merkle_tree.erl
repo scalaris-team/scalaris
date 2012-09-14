@@ -124,7 +124,7 @@ new(I, KeyList, ConfParams) ->
     InitNode = {nil, 1, [], I, []},
     Config = build_config(ConfParams),
     Root = p_bulk_build(InitNode, Config, KeyList),
-    {merkle_tree, Config, gen_hash_node(Root, Config)}.
+    {merkle_tree, Config, gen_hash_node(Root, Config#mt_config.inner_hf)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -280,8 +280,6 @@ p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
     NCount = lists:foldl(fun(N, Acc) -> Acc + node_size(N) end, 0, ChildNodes),
     {nil, C + NCount, [], I, ChildNodes}.
 
-build_childs([], _, Acc) ->
-    Acc;
 build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     BucketSize = Config#mt_config.bucket_size,
     KeepBucket = Config#mt_config.keep_bucket,
@@ -295,24 +293,25 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                           end,                    
                    {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
            end,
-    build_childs(T, Config, [Node | Acc]).
+    build_childs(T, Config, [Node | Acc]);
+build_childs([], _, Acc) ->
+    Acc.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec gen_hash(merkle_tree()) -> merkle_tree().
 gen_hash({merkle_tree, Config, Root}) ->
-    {merkle_tree, Config, gen_hash_node(Root, Config)}.
+    {merkle_tree, Config, gen_hash_node(Root, Config#mt_config.inner_hf)}.
 
--spec gen_hash_node(Node, Config) -> Node when
+-spec gen_hash_node(Node, InnerHf) -> Node when
       is_subtype(Node,   mt_node()),
-      is_subtype(Config, mt_config()).
-gen_hash_node({_, _Count, _Bucket, _I, []} = N, _Config) ->
-    N;
-gen_hash_node({_, Count, [], I, List}, Config) ->    
-    NewChilds = [gen_hash_node(X, Config) || X <- List],
-    InnerHf = Config#mt_config.inner_hf,
+      is_subtype(InnerHf, inner_hash_fun()).
+gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf) ->    
+    NewChilds = [gen_hash_node(X, InnerHf) || X <- List],
     Hash = InnerHf([get_hash(C) || C <- NewChilds]),
-    {Hash, Count, [], I, NewChilds}.
+    {Hash, Count, [], I, NewChilds};
+gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf) ->
+    N.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -323,22 +322,22 @@ size(Node) -> node_size(Node).
 
 -spec node_size(mt_node()) -> non_neg_integer().
 node_size({_, _, _, _, []}) -> 1;
-node_size({_, C, _, _, _}) -> C.
+node_size({_, C, _, _, [_|_]}) -> C.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns a tuple with number of inner nodes and leaf nodes.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
-    size_detail_node([Root], {0, 0}).
+    size_detail_node([Root], 0, 0).
 
--spec size_detail_node([mt_node()], mt_size()) -> mt_size().
-size_detail_node([], Result) -> 
-    Result;
-size_detail_node([{_, _, _, _, []} | R], {Inner, Leafs}) ->
-    size_detail_node(R, {Inner, Leafs+1});
-size_detail_node([{_, _, _, _, Childs} | R], {Inner, Leafs}) ->
-    size_detail_node(Childs ++ R, {Inner+1, Leafs}).
+-spec size_detail_node([mt_node()], InnerNodes::non_neg_integer(), Leafs::non_neg_integer()) -> mt_size().
+size_detail_node([{_, _, _, _, [_|_] = Childs} | R], Inner, Leafs) ->
+    size_detail_node(Childs ++ R, Inner + 1, Leafs);
+size_detail_node([{_, _, _, _, []} | R], Inner, Leafs) ->
+    size_detail_node(R, Inner, Leafs + 1);
+size_detail_node([], InnerNodes, Leafs) -> 
+    {InnerNodes, Leafs}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -352,10 +351,10 @@ iterator({merkle_tree, _, Root}) -> [Root].
 -spec iterator_node(Node, Iter) -> Iter when
       is_subtype(Node,  mt_node()),
       is_subtype(Iter, mt_iter()).
-iterator_node({_, _, _, _, []}, Iter1) ->
-    Iter1;
 iterator_node({_, _, _, _, [_|_] = Childs}, Iter1) ->
-    lists:append(Childs, Iter1).
+    lists:append(Childs, Iter1);
+iterator_node({_, _, _, _, []}, Iter1) ->
+    Iter1.
 
 -spec next(Iter) -> none | {Node, Iter} when
       is_subtype(Iter, mt_iter()),
@@ -443,8 +442,6 @@ build_config(ParamList) ->
 
 % @doc inserts key into its matching interval
 %      precondition: key fits into one of the given intervals
-p_key_in_I(_Key, _Left, []) ->
-    erlang:error(precondition_violated);
 p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     CheckKey = case rr_recon:decodeBlob(Key) of
                    {K, _} -> K;
@@ -453,7 +450,9 @@ p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
     case intervals:in(CheckKey, Interval) of
         true -> lists:append([Left, [{Interval, C + 1, [Key | L]}], Right]);
         false -> p_key_in_I(Key, lists:append(Left, [P]), Right)
-    end.
+    end;
+p_key_in_I(_Key, _Left, []) ->
+    erlang:error(precondition_violated).
 
 -spec keys_to_intervals([Key], [I]) -> [{I, Count, [Key]}] when
     is_subtype(Key,   term()),
