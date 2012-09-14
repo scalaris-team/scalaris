@@ -134,6 +134,9 @@ childs(Options) ->
     YAWS =
         util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
 
+    Top =
+        util:sup_worker_desc(top, top, start_link,
+                             [ServiceGroup]),
 
     ServicePaxosGroup = util:sup_supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
@@ -144,6 +147,7 @@ childs(Options) ->
                     Logger,
                     ClientsDelayer,
                     ClientsMonitor,
+                    Top,
                     Monitor,
                     Service,
                     CommStats,
