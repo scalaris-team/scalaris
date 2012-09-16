@@ -47,13 +47,16 @@ start_link(Group) ->
 
 -spec init([]) -> state().
 init([]) ->
-    Candidates = [ {X, process_info(X, [initial_call])}
-                   || X <- processes()],
-    Leaders = [ {Pid, process_info(Pid, [registered_name])}
-                 || {Pid, [{initial_call, Call}]} <- Candidates,
-                    Call =:= {group, server, 3}],
-    [Leader] = [ Pid ||  {Pid, [{registered_name, []}]} <- Leaders],
-    erlang:group_leader(Leader, self()),
+    try
+        Candidates = [ {X, process_info(X, [initial_call])}
+                       || X <- processes()],
+        Leaders = [ {Pid, process_info(Pid, [registered_name])}
+                    || {Pid, [{initial_call, Call}]} <- Candidates,
+                       Call =:= {group, server, 3}],
+        [Leader] = [ Pid ||  {Pid, [{registered_name, []}]} <- Leaders],
+        erlang:group_leader(Leader, self())
+    catch _:_ -> ok
+    end,
     {pdb:new(?MODULE, [set, protected]), false, false,
      os:timestamp(), 0, _SortBy = 3, self()}.
 
