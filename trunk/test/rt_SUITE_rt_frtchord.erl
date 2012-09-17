@@ -63,5 +63,5 @@ check_split_key(Begin, End, SplitKey, SplitFraction) ->
                       [(FullRange * erlang:element(1, SplitFraction)) div erlang:element(2, SplitFraction), SplitKey])).
 
 additional_tests(_Config) ->
-    ok
+    tester:test(rt_frtchord, get_random_key_from_generator, 3, 2000, [{threads, 2}])
     .

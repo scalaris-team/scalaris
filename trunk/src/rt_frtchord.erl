@@ -25,7 +25,9 @@
 -include("scalaris.hrl").
 
 % exports for unit tests
--export([check_rt_integrity/1]).
+-export([check_rt_integrity/1
+        , get_random_key_from_generator/3
+    ]).
 
 %% userdevguide-begin rt_frtchord:types
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
@@ -68,7 +70,7 @@
 
 % @doc Maximum number of entries in a routing table
 -spec maximum_entries() -> non_neg_integer().
-maximum_entries() -> 10.
+maximum_entries() -> 128.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
@@ -85,7 +87,7 @@ init(Neighbors) ->
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
     % create an initial RT consisting of the neighbors
     EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
-    remove_and_ping_entries(Neighbors, EmptyRT)
+    update_entries(Neighbors, EmptyRT)
     .
 
 %% @doc Hashes the key to the identifier space.
@@ -123,12 +125,11 @@ get_random_node_id() ->
 %% - if node id changed, just renew the complete table and maybe tell known nodes
 %%  that something changed (async and optimistic -> if they don't care, we don't care)
 %% - if pred/succ changed, update sticky entries
-%% TODO: what is the difference to update?
 -spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) -> 
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
-        true -> remove_and_ping_entries(Neighbors, RT) ;
-        _Else -> % source node changed, replace the complete table
+        true -> update_entries(Neighbors, RT) ;
+        false -> % source node changed, replace the complete table
             init(Neighbors)
     end
     .
@@ -152,24 +153,25 @@ get_node_neighbors(Neighborhood) ->
         nodelist:succs(Neighborhood))
     .
 
-%% @doc Remove and ping entries
-%% This function removes sticky nodes from the RT which aren't in the neighborhood
-%% anymore. Additionally, it pings all entries to make sure that the IDs of the entries
-%% haven't changed.
--spec remove_and_ping_entries(NewNeighbors :: nodelist:neighborhood(),
+%% @doc Update sticky entries
+%% This function converts sticky nodes from the RT which aren't in the neighborhood
+%% anymore to normal nodes. Afterwards it adds new nodes from the neighborhood.
+-spec update_entries(NewNeighbors :: nodelist:neighborhood(),
                               RT :: rt()) -> rt().
-remove_and_ping_entries(NewNeighbors, RT) ->
+update_entries(NewNeighbors, RT) ->
     OldStickyNodes = sets:from_list(lists:map(fun rt_entry_node/1,
             get_sticky_entries(RT))),
     NewStickyNodes = get_node_neighbors(NewNeighbors),
-    DeadStickyNodes = sets:subtract(OldStickyNodes, NewStickyNodes),
-    DeadStickyNodesIds = util:sets_map(fun node:id/1, DeadStickyNodes),
-    ToBeAddedNodes = sets:subtract(NewStickyNodes, OldStickyNodes),
-    % filter dead nodes and add sticky nodes
-    FilteredRT = lists:foldl(fun entry_delete/2, RT, DeadStickyNodesIds),
-    NewRT = sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes),
-    %% TODO ping entries
-    NewRT.
+
+    ConvertNodes = sets:subtract(OldStickyNodes, NewStickyNodes),
+    ConvertNodesIds = util:sets_map(fun node:id/1, ConvertNodes),
+
+    ToBeAddedNodes = sets:subtract(NewStickyNodes, ConvertNodes),
+
+    % convert former neighboring nodes to normal nodes and add sticky nodes
+    FilteredRT = lists:foldl(fun sticky_entry_to_normal_node/2, RT, ConvertNodesIds),
+    sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes)
+    .
 
 %% userdevguide-begin rt_frtchord:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
@@ -182,10 +184,10 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
     case nodelist:node(OldNeighbors) =:= nodelist:node(NewNeighbors) of
         true -> % source node didn't change
             % update the sticky nodes: delete old nodes and add new nodes
-            {ok, remove_and_ping_entries(NewNeighbors, OldRT)}
+            {ok, update_entries(NewNeighbors, OldRT)}
             ;
         _Else -> % source node changed, rebuild the complete table
-            {trigger_rebuild, OldRT} % XXX this triggers init_stabilize
+            {trigger_rebuild, OldRT}
     end
     .
 %% userdevguide-end rt_frtchord:update
@@ -196,9 +198,13 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 -spec filter_dead_node(rt(), comm:mypid()) -> rt().
 filter_dead_node(RT, DeadPid) -> 
     % find the node id of DeadPid and delete it from the RT
-    [Node] = [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid],
-    delete_fd(node:pidX(Node)),
-    entry_delete(node:id(Node), RT)
+    case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
+        [Node] ->
+            delete_fd(node:pidX(Node)),
+            entry_delete(node:id(Node), RT);
+        [] ->
+            RT
+    end
     .
 %% userdevguide-end rt_frtchord:filter_dead_node
 
@@ -287,10 +293,7 @@ check_config() ->
         end.
 
 %% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
-% TODO unit test that the generator doesn't generate keys from outside ?MINUS_INFINITY
-% to ?PLUS_INFINITY
-%% TODO
-%I floor the key for now; the key generator should return ints, but returns
+%% TODO I floor the key for now; the key generator should return ints, but returns
 %float. It is currently unclear if this is a bug in the original paper by Nagao and
 %Shudo. Using erlang:trunc/1 should be enough for flooring, as X >= 0
 % TODO using the remainder might destroy the CDF. why can X > 2^128?
@@ -331,8 +334,6 @@ handle_custom_message({get_rt_reply, RT}, State) ->
             % nodes
             util:gb_trees_foldl(
                 fun(Key, Entry, Acc) ->
-                        %% TODO send an async message to check if entry is valid; if it
-                        %isn't, delete it later
                         case entry_exists(Key, Acc) of
                             true -> Acc;
                             false -> add_normal_entry(rt_entry_node(Entry), Acc)
@@ -424,7 +425,6 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
     end
     .
 
-
 %% @doc Set up a set of subscriptions from a routing table
 -spec add_fd(RT :: rt())  -> ok.
 add_fd(#rt_t{} = RT) ->
@@ -485,7 +485,6 @@ next_hop(State, Id) ->
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up ?RT:next_hop/2. For this, it is
 %%  only a gb_tree with keys being node ids and values being of type node:node_type().
-%% TODO is it ok to ignore the neighbors?
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(InternalRT, _Neighbors) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
@@ -525,7 +524,7 @@ internal_to_list(#rt_t{} = RT) ->
     .
 
 % @doc Helper to do the actual work of converting a list of node:node_type() records
-% to a sorted list
+% to list beginning with the source node and wrapping around at 0
 -spec sorted_nodelist(nodelist:snodelist(), SourceNode::key()) -> nodelist:snodelist().
 sorted_nodelist(ListOfNodes, SourceNode) ->
     % sort
@@ -533,7 +532,6 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
         ListOfNodes),
     % rearrange elements: all until the source node must be attached at the end
     {Front, Tail} = lists:splitwith(fun(N) -> node:id(N) =< SourceNode end, Sorted),
-    % TODO inefficient -> reimplement with foldl (combine with splitwith)
     Tail ++ Front
     .
 %% userdevguide-end rt_frtchord:to_list
@@ -544,14 +542,17 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 
 % @doc Filter one element from a set of nodes. Do it in a way that filters such a node
 % that the resulting routing table is the best one under all _possible_ routing tables.
+
+-spec entry_filtering(rt()) -> rt().
+entry_filtering(#rt_t{} = RT) ->
+    AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(RT)),
+        not is_sticky(N) and not is_source(N)],
+    entry_filtering(RT, AllowedNodes)
+    .
+
 -spec entry_filtering(rt(),[#rt_entry{type :: 'normal'}]) -> rt().
 entry_filtering(RT, []) -> RT; % only sticky entries and the source node given; nothing to do
 entry_filtering(RT, [_|_] = AllowedNodes) ->
-    % XXX ensure that the allowed nodes are actually contained in the routing table
-    false = lists:any(fun(none) -> true; (_) -> false end,
-            [rt_lookup_node(entry_nodeid(N), RT) || N
-                <- AllowedNodes]),
-
     Spacings = [
         begin PredNode = predecessor_node(RT,Node),
               {Node, spacing(Node, RT) + spacing(PredNode, RT)}
@@ -563,13 +564,7 @@ entry_filtering(RT, [_|_] = AllowedNodes) ->
                 -> SpacingA =< SpacingB
             end, Spacings)
     ),
-    NewRT = entry_delete(entry_nodeid(FilterEntry), RT),
-
-    %% XXX Assertion
-    OldSourceNode = get_source_node(RT),
-    OldSourceNode = get_source_node(NewRT),
-
-    NewRT
+    entry_delete(entry_nodeid(FilterEntry), RT)
     .
 
 % @doc Delete an entry from the routing table
@@ -593,7 +588,15 @@ entry_delete(EntryKey, RT) ->
             gb_trees:enter(PredId, NewPred,
                 gb_trees:enter(SuccId, NewSucc, Tree))
     end,
+    RT#rt_t{nodes=UpdatedTree}
+    .
 
+% @doc Convert a sticky entry to a normal node
+-spec sticky_entry_to_normal_node(EntryKey::key(), RT::rt()) -> rt().
+sticky_entry_to_normal_node(EntryKey, RT) ->
+    Node = #rt_entry{type=sticky} = rt_get_node(EntryKey, RT),
+    NewNode = Node#rt_entry{type=normal},
+    UpdatedTree = gb_trees:enter(EntryKey, NewNode, get_rt_tree(RT)),
     RT#rt_t{nodes=UpdatedTree}
     .
 
@@ -653,10 +656,38 @@ get_adjacent_fingers_from(PredId, Pred, Node, Type, RT) ->
 % once.
 -spec entry_learning(Entry :: node:node_type(), Type :: entry_type(), RT :: rt()) -> RefinedRT :: rt().
 entry_learning(Entry, Type, RT) -> 
-    % only add the entry if it doesn't exist yet
-    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) of
-        none ->
-            Ns = {NewPred, NewNode, NewSucc} = create_entry(Entry, Type, RT),
+    % only add the entry if it doesn't exist yet or if it is a sticky node. If its a
+    % stickynode, RM told us about a new neighbour -> if the neighbour was already added
+    % as a normal node, convert it to a sticky node now.
+    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) =:= none orelse Type =:= sticky of
+        true ->
+            % change the type to 'sticky' if the node is between the neighbors of the source
+            % node
+            AdaptedType = case Type of
+                sticky -> Type;
+                source -> Type;
+                normal ->
+                    {Pred, Succ} = adjacent_fingers(get_source_node(RT)),
+                    ShouldBeAStickyNode = case Pred =/= Succ of
+                        true ->
+                            case Pred =< Succ of
+                                true ->
+                                    Interval = intervals:new('[', Pred, Succ, ']'),
+                                    intervals:in(node:id(Entry), Interval);
+                                false ->
+                                    Interval = intervals:new('[', Pred, 0, ']'),
+                                    Interval2 = intervals:new('[', 0, Succ, ']'),
+                                    intervals:in(node:id(Entry), Interval) orelse
+                                        intervals:in(node:id(Entry), Interval2)
+                            end
+                    end,
+                    case ShouldBeAStickyNode of
+                        true -> sticky;
+                        false -> Type
+                    end
+            end,
+
+            Ns = {NewPred, NewNode, NewSucc} = create_entry(Entry, AdaptedType, RT),
             % if the nodes are all the same, we entered the first node and thus only enter
             % a single node to the tree
             Nodes = case Ns of
@@ -670,7 +701,7 @@ entry_learning(Entry, Type, RT) ->
                         )
                 end,
             rt_set_nodes(RT, Nodes);
-        _else -> RT
+        false -> RT
     end
     .
 
@@ -683,14 +714,11 @@ entry_learning_and_filtering(Entry, Type, RT) ->
     MaxEntries = maximum_entries(),
     case SizeOfRT >= MaxEntries of
         true ->
-            AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(IntermediateRT)),
-                not is_sticky(N) and not is_source(N)],
-            NewRT = entry_filtering(IntermediateRT, AllowedNodes),
+            NewRT = entry_filtering(IntermediateRT),
             %% only delete the subscription if not the newly added node was filtered;
             %otherwise, there isn't a subscription yet
             case rt_lookup_node(node:id(Entry), NewRT) of
-                none -> % the newly added node was filtered; do nothing
-                    ok;
+                none -> ok;
                 _Else ->
                     update_fd(RT, NewRT)
             end,
@@ -755,7 +783,6 @@ add_source_entry(Entry, #rt_t{source=undefined} = RT) ->
     IntermediateRT = set_source_node(node:id(Entry), RT),
     % only learn; the RT must be empty, so there is no filtering needed afterwards
     NewRT = entry_learning(Entry, source, IntermediateRT),
-    %% TODO is this needed? Maybe we don't need a subscription.
     add_fd(NewRT),
     NewRT
     .
