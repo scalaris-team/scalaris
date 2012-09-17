@@ -77,10 +77,12 @@ maximum_entries() -> 10.
 % @doc Initialize the routing table. This function is allowed to send messages.
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) -> 
+    % trigger a random lookup after initializing the table
+    comm:send_local(self(), {trigger_random_lookup}),
+
     % ask the successor node for its routing table
     Msg = {send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
-    comm:send_local(self(), {trigger_random_lookup}),
     % create an initial RT consisting of the neighbors
     EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
     remove_and_ping_entries(Neighbors, EmptyRT)
@@ -284,8 +286,6 @@ check_config() ->
             _ -> false
         end.
 
-
-
 %% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
 % TODO unit test that the generator doesn't generate keys from outside ?MINUS_INFINITY
 % to ?PLUS_INFINITY
@@ -357,20 +357,23 @@ handle_custom_message({trigger_random_lookup}, State) ->
     SourceNodeId = entry_nodeid(SourceNode),
     {PredId, SuccId} = adjacent_fingers(SourceNode),
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
-    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
-                                        {rt_get_node, comm:this()}}),
+
+    % schedule the next random lookup
     Interval = config:read(active_learning_lookup_interval),
     msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
+
+    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
+                                        {rt_get_node, comm:this()}}),
     State
     ;
 
 handle_custom_message({rt_get_node, From}, State) ->
     MyNode = nodelist:node(rt_loop:get_neighb(State)),
-    comm:send(From, {rt_get_node_response, MyNode}),
+    comm:send(From, {rt_learn_node, MyNode}),
     State
     ;
 
-handle_custom_message({rt_get_node_response, NewNode}, State) ->
+handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
     NewRT = case rt_lookup_node(node:id(NewNode), OldRT) of
         none -> RT = add_normal_entry(NewNode, OldRT),
@@ -541,7 +544,7 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 
 % @doc Filter one element from a set of nodes. Do it in a way that filters such a node
 % that the resulting routing table is the best one under all _possible_ routing tables.
--spec entry_filtering(rt(),[rt_entry()]) -> rt().
+-spec entry_filtering(rt(),[#rt_entry{type :: 'normal'}]) -> rt().
 entry_filtering(RT, []) -> RT; % only sticky entries and the source node given; nothing to do
 entry_filtering(RT, [_|_] = AllowedNodes) ->
     % XXX ensure that the allowed nodes are actually contained in the routing table
@@ -683,7 +686,7 @@ entry_learning_and_filtering(Entry, Type, RT) ->
             AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(IntermediateRT)),
                 not is_sticky(N) and not is_source(N)],
             NewRT = entry_filtering(IntermediateRT, AllowedNodes),
-            %% only delete the subscription if the added node was not filtered;
+            %% only delete the subscription if not the newly added node was filtered;
             %otherwise, there isn't a subscription yet
             case rt_lookup_node(node:id(Entry), NewRT) of
                 none -> % the newly added node was filtered; do nothing
