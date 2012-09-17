@@ -31,12 +31,7 @@
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
     Neighbors = dht_node_state:get(State, neighbors),
-    % wrap messages with prob. 50%
-    WrappedMsg = case ?RT =:= rt_frtchord andalso Hops =:= 0 andalso random:uniform(2) =:= 1 of
-        false -> Msg;
-        true  -> {'$wrapped', comm:this(), Msg}
-    end,
-
+    WrappedMsg = ?RT:wrap_message(Msg),
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> % found node -> terminate
             P = node:pidX(nodelist:succ(Neighbors)),
@@ -58,14 +53,7 @@ lookup_fin(State, Key, Hops, Msg) ->
                 true ->
                     comm:send_local(dht_node_state:get(State, monitor_proc),
                                     {lookup_hops, Hops}),
-                    Unwrap = case Msg of
-                        _Else when element(1, Msg) =/= '$wrapped' -> Msg;
-                        {'$wrapped', Pid, UnwrappedMessage} ->
-                            comm:send(Pid, {send_to_group_member, routing_table,
-                                    {rt_learn_node, dht_node_state:get(State, node)}
-                                }),
-                            UnwrappedMessage
-                    end,
+                    Unwrap = ?RT:unwrap_message(Msg, State),
                     gen_component:post_op(State, Unwrap);
                 false ->
                     % it is possible that we received the message due to a

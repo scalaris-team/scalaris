@@ -368,3 +368,15 @@ to_list(State) ->
     Neighbors = dht_node_state:get(State, neighbors),
     nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
                          nodelist:node(Neighbors)).
+
+%% userdevguide-begin rt_chord:wrap_message
+%% @doc Wrap lookup messages. This is a noop in Chord.
+-spec wrap_message(Msg::comm:message()) -> comm:message().
+wrap_message(Msg) -> Msg.
+%% userdevguide-end rt_chord:wrap_message
+
+%% userdevguide-begin rt_chord:unwrap_message
+%% @doc Unwrap lookup messages. This is a noop in Chord.
+-spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
+unwrap_message(Msg, _State) -> Msg.
+%% userdevguide-end rt_chord:unwrap_message
