@@ -904,9 +904,9 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
 %% sending routing table.
--spec wrap_message(Msg::comm:message()) -> comm:message().
-wrap_message(Msg) when element(1, Msg) =:= lookup -> {'$wrapped', comm:this(), Msg};
-wrap_message(Msg) -> Msg.
+-spec wrap_message(Msg::comm:message(), Hops::non_neg_integer()) -> comm:message().
+wrap_message(Msg, 0) -> {'$wrapped', comm:this(), Msg};
+wrap_message(Msg, _) -> Msg.
 %% userdevguide-end rt_frtchord:wrap_message
 
 %% userdevguide-begin rt_frtchord:unwrap_message
@@ -919,7 +919,5 @@ unwrap_message({'$wrapped', Pid, UnwrappedMessage}, State) ->
             {rt_learn_node, dht_node_state:get(State, node)}
         }),
     UnwrappedMessage
-    ;
-unwrap_message(Msg, _State) -> Msg
     .
 %% userdevguide-end rt_frtchord:unwrap_message
