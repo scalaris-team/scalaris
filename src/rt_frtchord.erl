@@ -872,3 +872,27 @@ check_rt_integrity(#rt_t{} = RT) ->
                 end end || {P, C, S} <- lists:zip3(Preds, Currents, Succs)],
     lists:all(fun(X) -> X end, Checks)
     .
+
+%% userdevguide-begin rt_frtchord:wrap_message
+%% @doc Wrap lookup messages.
+%% For node learning in lookups, a lookup message is wrapped with the global Pid of the
+%% sending routing table.
+-spec wrap_message(Msg::comm:message()) -> comm:message().
+wrap_message(Msg) when element(1, Msg) =:= lookup -> {'$wrapped', comm:this(), Msg};
+wrap_message(Msg) -> Msg.
+%% userdevguide-end rt_frtchord:wrap_message
+
+%% userdevguide-begin rt_frtchord:unwrap_message
+%% @doc Unwrap lookup messages.
+%% The Pid is retrieved and the Pid of the current node is sent to the retrieved Pid
+-spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
+unwrap_message({'$wrapped', Pid, UnwrappedMessage}, State) ->
+    comm:send(Pid,
+        {send_to_group_member, routing_table,
+            {rt_learn_node, dht_node_state:get(State, node)}
+        }),
+    UnwrappedMessage
+    ;
+unwrap_message(Msg, _State) -> Msg
+    .
+%% userdevguide-end rt_frtchord:unwrap_message

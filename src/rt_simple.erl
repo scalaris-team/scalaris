@@ -248,3 +248,15 @@ export_rt_to_dht_node(RT, _Neighbors) -> RT.
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) -> [dht_node_state:get(State, succ)].
 %% userdevguide-end rt_simple:to_list
+
+%% userdevguide-begin rt_simple:wrap_message
+%% @doc Wrap lookup messages. This is a noop in rt_simple.
+-spec wrap_message(Msg::comm:message()) -> comm:message().
+wrap_message(Msg) -> Msg.
+%% userdevguide-end rt_simple:wrap_message
+
+%% userdevguide-begin rt_simple:unwrap_message
+%% @doc Unwrap lookup messages. This is a noop in rt_simple.
+-spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
+unwrap_message(Msg, _State) -> Msg.
+%% userdevguide-end rt_simple:unwrap_message

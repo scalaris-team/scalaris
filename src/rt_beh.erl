@@ -65,6 +65,9 @@
             NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 
 -callback check_config() -> boolean().
+-callback wrap_message(Msg::comm:message()) -> comm:message().
+-callback unwrap_message(Msg::comm:message(), State::dht_node_state:state()) ->
+    comm:message().
 
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
@@ -102,7 +105,10 @@ behaviour_info(callbacks) ->
      {handle_custom_message, 2},
      % common methods
      {check, 4}, {check, 5},
-     {check_config, 0}
+     {check_config, 0},
+     % wrap and unwrap lookup messages
+     {wrap_message,1},
+     {unwrap_message,2}
     ];
 behaviour_info(_Other) ->
     undefined.

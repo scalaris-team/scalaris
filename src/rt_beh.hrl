@@ -37,7 +37,10 @@
          handle_custom_message/2,
          check/4, check/5,
          check_config/0,
-         client_key_to_binary/1]).
+         client_key_to_binary/1,
+         wrap_message/1,
+         unwrap_message/2
+     ]).
 
 -spec client_key_to_binary(Key::client_key()) -> binary().
 client_key_to_binary(Key) ->
