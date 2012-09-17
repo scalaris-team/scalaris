@@ -31,7 +31,7 @@
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
     Neighbors = dht_node_state:get(State, neighbors),
-    WrappedMsg = ?RT:wrap_message(Msg),
+    WrappedMsg = ?RT:wrap_message(Msg, Hops),
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
         true -> % found node -> terminate
             P = node:pidX(nodelist:succ(Neighbors)),
