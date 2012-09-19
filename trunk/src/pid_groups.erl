@@ -220,6 +220,11 @@ find_a(PidName) ->
                     case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
                         [[Pid] | _] = Pids ->
                             %% fill process local cache
+
+                            %% This should only happen for client
+                            %% processes not registered in a pid_group (failed)
+                            %% io:format("Ring is created to find a ~p in ~p ~p~n",
+                            %% [PidName, self(), pid_groups:group_and_name_of(self())]),
                             erlang:put(CachedName,
                                        ring_new(lists:flatten(Pids))),
                             Pid;
@@ -253,10 +258,10 @@ find_a(PidName) ->
     end.
 
 -spec ring_get({list(), list()}) -> {any(), {list(), list()}}.
-ring_get({[E], []} = Q) -> {E, Q};
+ring_get({[E], []} = Q)   -> {E, Q};
 ring_get({[], [ E | R ]}) -> {E, {R, [E]}};
-ring_get({[ E | R ], L}) -> {E, {R, [E|L]}};
-ring_get({[], []}) -> {'$dead_code', {[], []}}.
+ring_get({[ E | R ], L})  -> {E, {R, [E|L]}};
+ring_get({[], []})        -> {'$dead_code', {[], []}}.
 
 -spec ring_new(list()) -> {list(), list()}.
 ring_new(L) -> {L, []}.
