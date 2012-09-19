@@ -30,20 +30,19 @@
 -export([top/0]).
 
 -type state() :: { pdb:tableid(),
-                   boolean(), %% monitoring is on
-                   boolean(), %% output is on
+                   false | all | pid, %% sampling: no, all or a single pid
+                   false | all | pid, %% output: no, all, or a single pid
                    erlang_timestamp(), %% last output
                    non_neg_integer(), %% # of measures
                    non_neg_integer(), %% sort by
                    no_exclude | pid()
                  }.
 
-
 -spec start_link(list()) -> {ok, pid()}.
 start_link(Group) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                              [{erlang_register, ?MODULE},
-                             {pid_groups_join_as, Group, ?MODULE}]).
+                              {pid_groups_join_as, Group, ?MODULE}]).
 
 -spec init([]) -> state().
 init([]) ->
@@ -58,28 +57,28 @@ init([]) ->
     catch _:_ -> ok
     end,
     {pdb:new(?MODULE, [set, protected]), false, false,
-     os:timestamp(), 0, _SortBy = 3, self()}.
+     os:timestamp(), 0, _SortBy = 4, self()}.
 
 -spec top() -> ok.
 top() ->
     io:format("~p~n", [io:rows(standard_io)]),
     Pid = pid_groups:find_a(?MODULE),
-    comm:send_local(Pid, {mon_on}),
-    comm:send_local(Pid, {output_on}),
-    comm:send_local(Pid, {start_mon}),
-    top_interactive(Pid),
-    comm:send_local(Pid, {output_off}),
-    comm:send_local(Pid, {stop_mon}).
+    comm:send_local(Pid, {enable_sampling, all}),
+    comm:send_local(Pid, {sample_all}),
+    comm:send_local(Pid, {enable_output, all}),
+    comm:send_local(Pid, {output_all}),
+    top_interactive(Pid).
 
 top_interactive(Pid) ->
-    {ok, [Char]} = io:fread(">", "~c"),
+    {ok, [Char]} = io:fread("> ", "~c"),
     Quit =
         case Char of
             "q" -> quit;
             "e" ->
                 comm:send_local(Pid, {output_off}),
                 Expr = io:parse_erl_exprs('expr>'),
-                comm:send_local(Pid, {output_on}),
+                comm:send_local(Pid, {enable_output, all}),
+                comm:send_local(Pid, {output_all}),
                 case element(1, Expr) of
                     ok ->
                         spawn(fun() -> erl_eval:exprs(element(2, Expr), erl_eval:new_bindings()) end),
@@ -91,40 +90,115 @@ top_interactive(Pid) ->
             "c" -> comm:send_local(Pid, {sort_by, cpuusage});
             "m" -> comm:send_local(Pid, {sort_by, memory});
             "t" -> comm:send_local(Pid, {toggle_exclude_self});
+            "i" -> top_inspect_pid(Pid);
             "g" -> [garbage_collect(X) || X <- processes()];
             _ -> ok
     end,
     case Quit of
-        quit -> ok;
+        quit ->
+            comm:send_local(Pid, {output_off}),
+            comm:send_local(Pid, {stop_sampling});
         _ -> top_interactive(Pid)
+    end.
+
+top_inspect_pid(Pid) ->
+    %% Read pid and start inspect mode
+    comm:send_local(Pid, {output_off}),
+    comm:send_local(Pid, {stop_sampling}),
+    InspectPid = pid_prompt(),
+    comm:send_local(Pid, {enable_sampling, pid}),
+    comm:send_local(Pid, {sample_pid, InspectPid}),
+    comm:send_local(Pid, {enable_output, pid}),
+    comm:send_local(Pid, {output_pid, InspectPid}),
+    top_inspect_pid_interactive(Pid, InspectPid),
+    comm:send_local(Pid, {enable_sampling, all}),
+    comm:send_local(Pid, {sample_all}),
+    comm:send_local(Pid, {enable_output, all}),
+    comm:send_local(Pid, {output_all}).
+
+pid_prompt() ->
+    {ok, [InspectPidString]} = io:fread("pid or name > ", "~s"),
+    try list_to_pid(InspectPidString)
+    catch _:_ ->
+            try
+                InspectPidAtom = list_to_atom(InspectPidString),
+                case whereis(InspectPidAtom) of
+                    undefined ->
+                        case pid_groups:find_all(InspectPidAtom) of
+                            [Pid] -> Pid;
+                            Pids ->
+                                io:format("Which of the ~ps do you mean?~n",
+                                          [InspectPidAtom]),
+                                lists:foldl(
+                                  fun(X, Acc) ->
+                                          io:format(
+                                            " ~p: ~p ~p~n",
+                                            [Acc, X,
+                                             pid_groups:group_and_name_of(X)]),
+                                          1 + Acc end, 1, Pids),
+                                {ok, [Nth]} = io:fread("num > ", "~d"),
+                                lists:nth(Nth, Pids)
+                        end;
+                    Pid -> Pid
+                end
+            catch _:_ ->
+                    io:format("No such pid found. Please retry.~n"),
+                    pid_prompt()
+            end
+    end.
+
+top_inspect_pid_interactive(TopPid, Pid) ->
+    {ok, [Char]} = io:fread(">", "~c"),
+    Quit =
+        case Char of
+            "q" -> quit;
+            "e" ->
+                comm:send_local(TopPid, {output_off}),
+                Expr = io:parse_erl_exprs('expr>'),
+                comm:send_local(TopPid, {enable_output, pid}),
+                comm:send_local(TopPid, {output_pid, Pid}),
+                case element(1, Expr) of
+                    ok ->
+                        spawn(fun() -> erl_eval:exprs(element(2, Expr), erl_eval:new_bindings()) end),
+                          ok;
+                    _ -> ok
+                end;
+            "c" -> comm:send_local(TopPid, {sort_by, cpuusage});
+            "g" -> [garbage_collect(X) || X <- processes()];
+            _ -> ok
+        end,
+    case Quit of
+        quit ->
+            comm:send_local(TopPid, {output_off}),
+            comm:send_local(TopPid, {stop_sampling}),
+            ok;
+        _ -> top_inspect_pid_interactive(TopPid, Pid)
     end.
 
 usage() ->
     io:format(
       "~n"
-      " (q)uit, (e)val expr, (g)arb-coll."
+      " (q)uit, (e)val expr, (g)arb-coll. (i)nspect a pid"
       %% ", exclude (t)op itself" %% undocumented feature for top development
       "~n sort by: (c)pu usage (m)emory (p)ids (w)aiting messages~n").
 
+usage_inspect() ->
+    io:format(
+      "~n"
+      " (q)uit, (e)val expr, (g)arb-coll."
+      %% ", exclude (t)op itself" %% undocumented feature for top development
+      "~n sort by: (c)pu usage~n").
+
 -spec on(comm:message(), state()) -> state().
-on({mon_on}, State) ->
-    set_monitoring(State, true);
 
-on({output_on}, State) ->
-    comm:send_local(self(), {output_data}),
-    set_output(State, true);
+on({enable_sampling, Val}, State) -> set_sampling(State, Val);
+on({enable_output, Val}, State)   -> set_output(State, Val);
+on({sort_by, Type}, State)        -> set_sort_by(State, Type);
+on({toggle_exclude_self}, State)  -> toggle_exclude_self(State);
+on({output_off}, State)           -> set_output(State, false);
 
-on({output_off}, State) ->
-    comm:send_local(self(), {output_data}),
-    set_output(State, false);
-
-on({sort_by, Type}, State) ->
-    set_sort_by(State, Type);
-
-on({toggle_exclude_self}, State) ->
-    toggle_exclude_self(State);
-
-on({start_mon}, State) when element(2, State) ->
+%% gather information on all local pids for periodic statistical output
+on({sample_all}, State) when all =:= element(2, State) ->
     T = [ catch({X, erlang:process_info(X, [message_queue_len, status])})
           || X <- erlang:processes(), X =/= exclude_self(State) ],
 
@@ -141,14 +215,59 @@ on({start_mon}, State) when element(2, State) ->
                   pdb:set(V1, TableName)
           end
       end || {P, NewVals} <- T, is_pid(P), undefined =/= NewVals],
-    comm:send_local_after(1, self(), {start_mon}),
+    comm:send_local_after(1, self(), {sample_all}),
     inc_counter(State);
-on({start_mon}, State) -> State;
 
-on({output_data}, State) when element(3, State) ->
+on({sample_all}, State) -> State;
+
+%% gather information on a single pid for periodic statistical output
+on({sample_pid, Pid}, State) when pid =:= element(2, State) ->
     TableName = table(State),
-    %%Now = os:timestamp(),
-    %%Delay = timer:now_diff(Now, timestamp(State)) / 1000000,
+    NewVals = try_process_info(
+                Pid,
+                [message_queue_len, status, current_function, backtrace]),
+    TakeVals = case process_info_get(NewVals, status, dead_pid) of
+                   running -> true;
+                   runnable -> true;
+                   _ -> false
+               end,
+    case TakeVals of
+        true ->
+            P = {Pid, process_info_get(NewVals, current_function, dead)},
+            Entry = pdb:get(P, TableName),
+            case Entry of
+                undefined ->
+                    V1 = pdbe_new(P, NewVals),
+                    pdb:set(V1, TableName);
+                _ ->
+                    %% io:format("X:~p Y:~p~n", [X, Y]),
+                    V1 = pdbe_add_vals(Entry, NewVals),
+                    pdb:set(V1, TableName)
+            end;
+        false ->
+            P = {Pid, not_running},
+            Entry = pdb:get(P, TableName),
+            TVals = lists:keyreplace(status, 1,
+                                     NewVals, {status, runnable}),
+            case Entry of
+                undefined ->
+                    V1 = pdbe_new(P, TVals),
+                    pdb:set(V1, TableName);
+                _ ->
+                    %% io:format("X:~p Y:~p~n", [X, Y]),
+                    V1 = pdbe_add_vals(Entry, TVals),
+                    pdb:set(V1, TableName)
+            end
+    end,
+    %%comm:send_local_after(1, self(), {sample_pid, Pid}),
+    comm:send_local(self(), {sample_pid, Pid}),
+    inc_counter(State);
+on({sample_pid, _Pid}, State) -> State;
+
+on({output_all}, State) when all =:= element(3, State) ->
+    TableName = table(State),
+    Now = os:timestamp(),
+    Delay = timer:now_diff(Now, timestamp(State)) / 1000000,
     Count = counter(State),
     ProcsMem = erlang:memory(processes),
     ProcsMemUsed = erlang:memory(processes_used),
@@ -157,16 +276,14 @@ on({output_data}, State) when element(3, State) ->
                      Pid = element(1, X),
                      pdb:delete(Pid, TableName),
                      %% plot data is:
-                     Status = try element(2, process_info(Pid, status))
-                              catch _:_ -> dead_pid
-                              end,
+                     Infos = try_process_info(Pid, [status, memory, stack_size]),
+                     Status = process_info_get(Infos, status, dead_pid),
                      {vals_pid(X),
                       Status,
                       vals_mqlen(X)/Count,
                       vals_cpu_usage(X, Count),
-                      try element(2, process_info(Pid, memory))
-                      catch _Level2:_Reason2 -> 0
-                      end}
+                      process_info_get(Infos, memory, 0),
+                      process_info_get(Infos, stack_size, 0)}
                  end || X <- R1, is_tuple(X), is_pid(element(1, X)) ],
     SortedPlotData = lists:keysort(sort_by(State), PlotData),
     L = length(SortedPlotData),
@@ -204,69 +321,152 @@ on({output_data}, State) when element(3, State) ->
                                       _ -> Acc
                                   end end, 0, PlotData)
               ]),
-    io:format("Mem: ~s procs, ~s atom, ~s binary, ~s ets~n",
-             [readable_mem(ProcsMem),
-              readable_mem(erlang:memory(atom)),
-              readable_mem(erlang:memory(binary)),
-              readable_mem(erlang:memory(ets))
-             ]),
-    io:format("FPS: ~4B",
-             [counter(State)]),
-    io:format("~n~11s ~1s ~1s ~-20s ~9s ~6s ~6s ~5s~n",
-              [ "PID", "T", "S", "NAME", "W-Msg", "%CPU", "%MEM", "MEM" ]),
+    {{_, IOIn}, {_, IOOut}} = erlang:statistics(io),
+    %% {GCNum, GCFreed, _} = erlang:statistics(garbage_collection),
+    %% io:format("Context Switches: ~p Garb.Coll: ~p ~s~n",
+    %%           [element(1, erlang:statistics(context_switches)),
+    %%            GCNum, readable_mem(GCFreed)]),
+
+    io:format("IO: ~s/~s in/out Mem: ~s procs, ~s atom, ~s binary, ~s ets~n",
+              [readable_mem(IOIn), readable_mem(IOOut),
+               readable_mem(ProcsMem),
+               readable_mem(erlang:memory(atom)),
+               readable_mem(erlang:memory(binary)),
+               readable_mem(erlang:memory(ets))
+              ]),
+    io:format("FPS: ~.1f~n", [Count / Delay]),
+    WordSize = erlang:system_info(wordsize),
+    io:format("~11s ~1s ~1s ~-20s ~9s ~6s ~6s ~5s ~5s~n",
+              [ "PID", "T", "S", "NAME", "W-Msg", "%CPU", "%MEM", "MEM", "STACK" ]),
     _ = [ begin
-          InitialCall = try element(2, process_info(Pid, initial_call))
-                        catch _Level2:_Reason2 -> dead_pid
-                        end,
-          Name = case pid_groups:group_and_name_of(Pid) of
-                     failed ->
-                         try element(2, process_info(Pid, registered_name))
-                         catch _Level:_Reason -> InitialCall
-                         end;
-                     N -> element(2, N)
-                 end,
           Type = case catch(gen_component:is_gen_component(Pid)) of
                      true -> "G";
                      _ -> "E"
                  end,
-          Status = case Status1 of
-                       exiting -> "E";
-                       garbage_collecting -> "G";
-                       waiting -> "W";
-                       runnable -> "I";
-                       suspended -> "S";
-                       running -> "R";
-                       dead_pid -> "D"
-                   end,
-          NameString = case is_list(Name) of
-                           false -> io_lib:write(Name);
-                           true -> Name
-                       end,
-          io:format("~11w ~1s ~1s ~-20s ~9.2f ~6.2f ~6.2f ~5s~n",
-                    [Pid, Type, Status,
-                     NameString, MQLen, CPUUsage,
+          io:format("~11w ~1s ~1s ~-20s ~9.2f ~6.2f ~6.2f ~5s ~5s~n",
+                    [Pid, Type, readable_status(Status),
+                     readable_pid_name(Pid), MQLen, CPUUsage,
                      MemUsage / ProcsMemUsed * 100,
-                     readable_mem(MemUsage)])
+                     readable_mem(MemUsage),
+                     readable_mem(WordSize * StackSize)])
       end
-      || {Pid, Status1, MQLen, CPUUsage, MemUsage} <- lists:reverse(PlotThese)],
+      || {Pid, Status, MQLen, CPUUsage, MemUsage, StackSize} <- lists:reverse(PlotThese)],
     usage(),
-    msg_delay:send_local(2, self(), {output_data}),
+    msg_delay:send_local(2, self(), {output_all}),
     S1 = set_counter(State, 0),
     set_timestamp(S1, os:timestamp());
 
-on({output_data}, State) -> State;
+on({output_all}, State) -> State;
 
-on({stop_mon}, State) ->
+on({output_pid, Pid}, State) when pid =:= element(3, State) ->
+    TableName = table(State),
+    Now = os:timestamp(),
+    Delay = timer:now_diff(Now, timestamp(State)) / 1000000,
+    Count = counter(State),
+    Infos = try_process_info(
+              Pid, [dictionary, registered_name, memory, total_heap_size,
+                    stack_size, status, message_queue_len, current_function]),
+    PD = process_info_get(Infos, dictionary, 0),
+    R1 = pdb:tab2list(TableName),
+    PlotData = [ begin
+                     pdb:delete(PidAndCFun, TableName),
+                     %% plot data is:
+                     {PidAndCFun,
+                      no_status,
+                      no_mqlen,
+                      vals_cpu_usage(X, Count),
+                      no_mem}
+                 end || {PidAndCFun, _MQLen, _Status} = X <- R1
+                        %% is_pid(element(1, element(1,X)))
+               ],
+    SortedPlotData = lists:keysort(sort_by(State), PlotData),
+    L = length(SortedPlotData),
+    {ok, Lines} = io:rows(), %% terminal rows
+    SkipLines = 11,
+    {_, PlotThese} =
+        lists:split(erlang:max(0, L - (Lines - SkipLines)), SortedPlotData),
+
+    Time = element(2, calendar:local_time()),
+    WallClock = element(1, erlang:statistics(wall_clock)) div 60000,
+    io:format("top - ~2..0B:~2..0B:~2..0B up ~B days, ~B:~2..0B~n",
+              [element(1, Time), element(2, Time), element(3, Time),
+               WallClock div (60*24),
+               WallClock rem (60*24) div 60,
+               (WallClock rem (60*60)) rem 60
+              ]),
+    IdlePlotDataEntry = lists:keyfind({Pid, not_running}, 1, PlotData),
+    Idle = element(4, IdlePlotDataEntry),
+    io:format("Pid: ~p, ~6.2f% run, ~6.2f% idle~n",
+              [ Pid, 100.0 - Idle, Idle ]),
+    io:format("Name: ~p",
+              [process_info_get(Infos, registered_name, [])]),
+    case gen_component:is_gen_component(Pid) of
+        true -> io:format(" ~p", [readable_grp_and_pid_name(Pid)]);
+        false -> ok
+    end,
+    io:format("~n"),
+    MemUsage = process_info_get(Infos, memory, 0),
+    HeapSize = process_info_get(Infos, total_heap_size, 0),
+    StackSize = process_info_get(Infos, stack_size, 0),
+    PDSize = case PD of
+                 0 -> 0;
+                 _ -> erlang:external_size(PD)
+             end,
+    WordSize = erlang:system_info(wordsize),
+    io:format("Mem: ~s total, ~s heap, ~s stack, ~s dictionary (~p entries)~n",
+              [readable_mem(MemUsage),
+               readable_mem((HeapSize - StackSize) * WordSize),
+               readable_mem(StackSize * WordSize),
+               readable_mem(PDSize), length(PD)
+              ]),
+
+    io:format("Status: ~s MQLen: ~p Current Function: ~p~n",
+              [readable_status(
+                 process_info_get(Infos, status, dead_pid)),
+               process_info_get(Infos, message_queueu_len, 0),
+               process_info_get(Infos, current_function, none)
+              ]),
+    io:format("FPS: ~.1f~n", [Count / Delay]),
+
+    io:format("~11s ~-35s ~6s~n",
+              [ "PID", "FUNCTION", "%TIME"]),
+    _ = [ begin
+              CFun = element(2, PlotPid),
+              CFunString =
+                  case is_tuple(CFun) of
+                      true ->
+                          io_lib:write(element(1, CFun))
+                              ++ ":" ++ io_lib:write(element(2, CFun))
+                              ++ "/" ++ io_lib:write(element(3, CFun));
+                      false -> io_lib:write(CFun)
+                  end,
+              io:format("~11w ~-35s ~6.2f~n",
+                        [element(1, PlotPid), CFunString, CPUUsage ])
+          end
+          || {PlotPid, _Status, _MQLen, CPUUsage, _MemUsage}
+                 <- lists:reverse(PlotThese)],
+    util:for_to(1, Lines - SkipLines - length(PlotThese),
+                fun(_) -> io:format("~n") end),
+    usage_inspect(),
+    msg_delay:send_local(2, self(), {output_pid, Pid}),
+    S1 = set_counter(State, 0),
+    set_timestamp(S1, os:timestamp());
+
+on({output_pid, _Pid}, State) -> State;
+
+on({stop_sampling}, State) ->
     TableName = table(State),
     R1 = pdb:tab2list(TableName),
-    _ = [ pdb:delete(element(1, X), TableName) || {_,_} = X <- R1 ],
-    set_monitoring(State, false).
+    _ = [ pdb:delete(element(1, X), TableName)
+          || {_,_,_} = X <- R1, is_pid(element(1, X)) ],
+    S1 = set_counter(State, 0),
+    set_sampling(S1, false).
 
 
 table(State) -> element(1, State).
-set_monitoring(State, Val) -> setelement(2, State, Val).
+set_sampling(State, Val) -> setelement(2, State, Val).
 set_output(State, Val) -> setelement(3, State, Val).
-%% timestamp(State) -> element(4, State).
+timestamp(State) -> element(4, State).
 set_timestamp(State, Val) -> setelement(4, State, Val).
 counter(State) -> element(5, State).
 inc_counter(State) -> setelement(5, State, 1 + element(5, State)).
@@ -287,8 +487,6 @@ toggle_exclude_self(State) ->
         Self -> setelement(7, State, no_exclude);
         _ -> setelement(7, State, self())
     end.
-
-
 
 vals_pid(Entry) -> element(1, Entry).
 vals_mqlen(Entry) -> element(2, Entry).
@@ -325,25 +523,38 @@ vals_add_status(Entry, Val) ->
 
 pdbe_new(Pid, Vals) ->
     Entry = {Pid,
-             element(2, lists:keyfind(message_queue_len, 1, Vals)),
+             process_info_get(Vals, message_queue_len, 0),
              {_E = 0,_G = 0, _W = 0, _I = 0, _S = 0, _R= 0, _D = 0} %% status
             },
-    vals_add_status(Entry, element(2, lists:keyfind(status, 1, Vals))).
+    vals_add_status(Entry, process_info_get(Vals, status, dead_pid)).
 
 
 pdbe_add_vals(Entry, Vals) ->
-    MQLen = element(2, lists:keyfind(message_queue_len, 1, Vals)),
+    MQLen = process_info_get(Vals, message_queue_len, 0),
     V1 = case MQLen > 1 of
              false -> Entry;
              true -> vals_add_mqlen(Entry, MQLen)
          end,
-    Status = element(2, lists:keyfind(status, 1, Vals)),
+    Status = process_info_get(Vals, status, dead_pid),
     _V2 = vals_add_status(V1, Status).
 
+readable_status(Status) ->
+    case Status of
+        exiting -> "E";
+        garbage_collecting -> "G";
+        waiting -> "W";
+        runnable -> "R";
+        suspended -> "S";
+        running -> "R";
+        dead_pid -> "D"
+    end.
+
+readable_mem(0) -> "0B";
 readable_mem(Mem) ->
     case math:log(Mem)/math:log(2) of
         L when L < 10.0 ->
-            "B";
+            lists:flatten(io_lib:format("~p", [Mem]))
+            ++ "B";
         L when L < 20.0 ->
             lists:flatten(io_lib:format("~p", [Mem div 1024]))
             ++ "KB";
@@ -355,4 +566,46 @@ readable_mem(Mem) ->
               io_lib:format(
                 "~p", [Mem div 1024 div 1024 div 1024]))
             ++ "GB"
+    end.
+
+readable_pid_name(Pid) ->
+    Name = case pid_groups:group_and_name_of(Pid) of
+               failed ->
+                   try element(2, process_info(Pid, registered_name))
+                   catch _Level:_Reason ->
+                           try_process_info(Pid, initial_call, dead_pid)
+                   end;
+               N -> element(2, N)
+           end,
+    case is_list(Name) of
+        false -> io_lib:write(Name);
+        true -> Name
+    end.
+
+readable_grp_and_pid_name(Pid) ->
+    case pid_groups:group_and_name_of(Pid) of
+        failed ->
+            try element(2, process_info(Pid, registered_name))
+            catch _Level:_Reason ->
+                    try_process_info(Pid, initial_call, dead_pid)
+            end;
+        N -> N
+    end.
+
+try_process_info(Pid, Types) ->
+    try erlang:process_info(Pid, Types)
+    catch _:_ -> []
+    end.
+
+try_process_info(Pid, Type, DefaultVal) ->
+    try element(2, erlang:process_info(Pid, Type))
+    catch _:_ -> DefaultVal
+    end.
+
+process_info_get(undefined, _Type, DefaultVal) ->
+    DefaultVal;
+process_info_get(PropList, Type, DefaultVal) ->
+    case lists:keyfind(Type, 1, PropList) of
+        false -> DefaultVal;
+        X -> element(2, X)
     end.
