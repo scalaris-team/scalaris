@@ -21,7 +21,7 @@
 %% @end
 %% @version $Id$
 -module(gen_component).
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 
@@ -89,9 +89,6 @@
 -type gc_state() ::
         { module(),
           handler(),
-          user_state(),       %% users state
-          Options :: list(),
-          Slowest :: float(),
           [bp()],             %% registered breakpoints
           boolean(),          %% bp active?
           [bp_msg()],         %% queued bp messages
@@ -102,14 +99,13 @@
 %% define macros for the tuple positions to use them also in guards.
 -define(MOD,         1).
 -define(HAND,        2).
--define(USTATE,      3).
--define(OPTS,        4).
--define(SLOWEST,     5).
--define(BPS,         6).
--define(BP_ACTIVE,   7).
--define(BP_QUEUE,    8).
--define(BP_STEPPED,  9).
--define(BP_STEPPER,  10).
+%-define(OPTS,        3).
+%-define(SLOWEST,     4).
+-define(BPS,         3).
+-define(BP_ACTIVE,   4).
+-define(BP_QUEUE,    5).
+-define(BP_STEPPED,  6).
+-define(BP_STEPPER,  7).
 
 %% userdevguide-begin gen_component:behaviour
 -ifdef(have_callback_support).
@@ -323,9 +319,9 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
             true -> ok;
             false -> Supervisor ! {started, self()}
         end,
-    State =
+    {NewUState, GCState} =
         try
-            T1State = gc_new(Module, DefaultHandler, Options),
+            T1State = gc_new(Module, DefaultHandler),
             Handler = case Module:init(Args) of
                           {'$gen_component', Config, UState} ->
                               {on_handler, NewHandler} =
@@ -334,8 +330,7 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                           UState ->
                               DefaultHandler
                       end,
-            T2State = gc_set_ustate(T1State, UState),
-            gc_set_hand(T2State, Handler)
+            {UState, gc_set_hand(T1State, Handler)}
         catch
             % If init throws up, send 'started' to the supervisor but exit.
             % The supervisor will try to restart the process as it is watching
@@ -351,27 +346,24 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
             end
         end,
     ?INITIALIZED(Module),
-    loop(State).
+    loop(NewUState, GCState).
 
-
--spec loop(gc_state()) -> no_return() | ok.
-loop(State) ->
+-spec loop(user_state(), gc_state()) -> no_return() | ok.
+loop(UState, GCState) ->
     ?CALLING_RECEIVE(Module),
-    NewState =
-        receive Msg ->
-                try on(Msg, State)
-                catch Level:Reason ->
-                        Stacktrace = erlang:get_stacktrace(),
-                        log:log(error,
-                                "Error: exception ~p:~p in loop of ~.0p~n ",
-                                [Level, Reason, State]),
-                        on_exception(Msg, Level, Reason, Stacktrace, State)
-                end
-        end,
-    case NewState of
-        ok -> ok;
-        _ -> loop(NewState)
+    receive Msg ->
+%%            try
+                on(Msg, UState, GCState)
+            %% catch Level:Reason ->
+            %%         Stacktrace = erlang:get_stacktrace(),
+            %%         log:log(error,
+            %%                 "Error: exception ~p:~p in loop of ~.0p~n ",
+            %%                 [Level, Reason, {UState, GCState}]),
+            %%         on_exception(Msg, Level, Reason, Stacktrace,
+            %%                      UState, GCState)
+            %% end
     end.
+
 
 %%%%%%%%%%%%%%%%%%%%
 %% Attention!:
@@ -382,15 +374,17 @@ loop(State) ->
 %%   not in a breakpoint. A selective receive of breakpoint messages,
 %%   provides further bp instructions when needed inside a bp.
 %%%%%%%%%%%%%%%%%%%%
--spec on(comm:message(), gc_state()) -> gc_state() | ok.
-on(GCMsg, State) when is_tuple(GCMsg)
-                      andalso '$gen_component' =:= element(1, GCMsg) ->
-    on_gc_msg(GCMsg, State);
-on({ping, Pid}, State) ->
+-spec on(comm:message(), user_state(), gc_state())
+        -> ok.
+on(GCMsg, UState, GCState)
+  when is_tuple(GCMsg)
+       andalso '$gen_component' =:= element(1, GCMsg) ->
+    on_gc_msg(GCMsg, UState, GCState);
+on({ping, Pid}, UState, GCState) ->
     %% handle failure detector messages
     comm:send(Pid, {pong}, [{channel, prio}]),
-    State;
-on({send_to_group_member, Processname, Msg}, State) ->
+    loop(UState, GCState);
+on({send_to_group_member, Processname, Msg}, UState, GCState) ->
     %% forward a message to group member by its process name
     %% initiated via comm:send/3 with group_member
     Pid = pid_groups:get_my(Processname),
@@ -398,12 +392,11 @@ on({send_to_group_member, Processname, Msg}, State) ->
         failed -> ok;
         _      -> comm:send_local(Pid, Msg)
     end,
-    State;
-on(Msg, State) ->
-    T1State = on_bp(Msg, State),
-    Module  = gc_mod(T1State),
-    Handler = gc_hand(T1State),
-    UState = gc_ustate(T1State),
+    loop(UState, GCState);
+on(Msg, UState, GCState) ->
+    T1GCState = on_bp(Msg, UState, GCState),
+    Module  = gc_mod(T1GCState),
+    Handler = gc_hand(T1GCState),
     T2State =
         try Handler(Msg, UState)
         catch Level:Reason ->
@@ -417,11 +410,12 @@ on(Msg, State) ->
                           erlang:element(3, T) =:= [Msg, UState] andalso
                           Reason =:= function_clause andalso
                           Level =:= error ->
-                        {'$gc_unknown_event',
-                         on_unknown_event(Msg, T1State)};
+                        on_unknown_event(Msg, UState, T1GCState),
+                        {'$gc_unknown_event'};
                     _ ->
-                        {'$gc_exception',
-                         on_exception(Msg, Level, Reason, Stacktrace, T1State)}
+                        on_exception(Msg, Level, Reason, Stacktrace,
+                                     UState, T1GCState),
+                        {'$gc_exception'}
                 end
         end,
     case T2State of
@@ -430,18 +424,16 @@ on(Msg, State) ->
                     [self(), Module, Handler]),
             ok;
         {'$gen_component', [{post_op, Msg1}], NewUState} ->
-            T3State = gc_set_ustate(T1State, NewUState),
-            on_post_op(Msg1, T3State);
+            on_post_op(Msg1, NewUState, T1GCState);
         {'$gen_component', Commands, NewUState} ->
             %% This is not counted as a bp_step
-            T3State = gc_set_ustate(T1State, NewUState),
             case lists:keyfind(on_handler, 1, Commands) of
                 {on_handler, NewHandler} ->
-                    gc_set_hand(T3State, NewHandler);
+                    loop(NewUState, gc_set_hand(T1GCState, NewHandler));
                 false ->
                     case lists:keyfind(post_op, 1, Commands) of
                         {post_op, Msg1} ->
-                            on_post_op(Msg1, T3State);
+                            on_post_op(Msg1, NewUState, T1GCState);
                         false ->
                             %% let's fail since the Config list was either
                             %% empty or contained an invalid entry
@@ -450,25 +442,138 @@ on(Msg, State) ->
                             erlang:throw('unknown gen_component command')
                     end
             end;
-        {'$gc_unknown_event', NewState} -> NewState;
-        {'$gc_exception', NewState} ->     NewState;
+        {'$gc_unknown_event'} -> loop(UState, T1GCState);
+        {'$gc_exception'} ->     loop(UState, T1GCState);
         unknown_event ->
             %% drop T2State, as it contains the error message
-            TmpState = on_unknown_event(Msg, T1State),
-            bp_step_done(Msg, TmpState);
+            on_unknown_event(Msg, UState, T1GCState),
+            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
+                false -> loop(UState, T1GCState);
+                true -> loop(UState, bp_step_done(Msg, T1GCState))
+            end;
         NewUState ->
-            bp_step_done(Msg, gc_set_ustate(T1State, NewUState))
+            case element(?BP_ACTIVE, T1GCState) andalso gc_bpstepped(T1GCState) of
+                false -> loop(NewUState, T1GCState);
+                true -> loop(NewUState, bp_step_done(Msg, T1GCState))
+            end
     end.
 
--spec on_unknown_event(comm:message(), gc_state()) -> gc_state().
-on_unknown_event({web_debug_info, Requestor}, State) ->
+-spec on_traced_msg(comm:message(), user_state(), gc_state())
+                   -> ok.
+on_traced_msg(GCMsg, UState, GCState)
+  when is_tuple(GCMsg)
+       andalso '$gen_component' =:= element(1, GCMsg) ->
+    on_gc_msg(GCMsg, UState, GCState);
+on_traced_msg({ping, Pid}, UState, GCState) ->
+    %% handle failure detector messages
+    comm:send(Pid, {pong}, [{channel, prio}]),
+    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+    trace_mpath:stop(),
+    loop(UState, GCState);
+on_traced_msg({send_to_group_member, Processname, Msg}, UState, GCState) ->
+    %% forward a message to group member by its process name
+    %% initiated via comm:send/3 with group_member
+    Pid = pid_groups:get_my(Processname),
+    case Pid of
+        failed -> ok;
+        _      -> comm:send_local(Pid, Msg)
+    end,
+    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+    trace_mpath:stop(),
+    loop(UState, GCState);
+on_traced_msg(Msg, UState, GCState) ->
+    T1GCState = on_bp(Msg, UState, GCState),
+    Module  = gc_mod(T1GCState),
+    Handler = gc_hand(T1GCState),
+    T2State =
+        try Handler(Msg, UState)
+        catch Level:Reason ->
+                Stacktrace = erlang:get_stacktrace(),
+                case Stacktrace of
+                    %% erlang < R15 : {Module, Handler, [Msg, State]}
+                    %% erlang >= R15: {Module, Handler, [Msg, State], _}
+                    [T | _] when
+                          erlang:element(1, T) =:= Module andalso
+                          %% erlang:element(2, T) =:= Handler andalso
+                          erlang:element(3, T) =:= [Msg, UState] andalso
+                          Reason =:= function_clause andalso
+                          Level =:= error ->
+                        on_unknown_event(Msg, UState, T1GCState),
+                        {'$gc_unknown_event'};
+                    _ ->
+                        on_exception(Msg, Level, Reason, Stacktrace,
+                                     UState, T1GCState),
+                        {'$gc_exception'}
+                end
+        end,
+    case T2State of
+        kill ->
+            log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
+                    [self(), Module, Handler]),
+            ok;
+        {'$gen_component', [{post_op, Msg1}], NewUState} ->
+            on_post_op(Msg1, NewUState, T1GCState);
+        {'$gen_component', Commands, NewUState} ->
+            %% This is not counted as a bp_step
+            case lists:keyfind(on_handler, 1, Commands) of
+                {on_handler, NewHandler} ->
+                    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+                    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+                    trace_mpath:stop(),
+                    loop(NewUState, gc_set_hand(T1GCState, NewHandler));
+                false ->
+                    case lists:keyfind(post_op, 1, Commands) of
+                        {post_op, Msg1} ->
+                            on_post_op(Msg1, NewUState, T1GCState);
+                        false ->
+                            %% let's fail since the Config list was either
+                            %% empty or contained an invalid entry
+                            log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
+                                    [Commands]),
+                            erlang:throw('unknown gen_component command')
+                    end
+            end;
+        {'$gc_unknown_event'} ->
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
+            loop(UState, T1GCState);
+        {'$gc_exception'} ->
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
+            loop(UState, T1GCState);
+        unknown_event ->
+            %% drop T2State, as it contains the error message
+            on_unknown_event(Msg, UState, T1GCState),
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
+            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
+                false -> loop(UState, T1GCState);
+                true -> loop(UState, bp_step_done(Msg, T1GCState))
+            end;
+        NewUState ->
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
+            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
+                false -> loop(NewUState, T1GCState);
+                true -> loop(NewUState, bp_step_done(Msg, T1GCState))
+            end
+    end.
+
+-spec on_unknown_event(comm:message(), user_state(), gc_state())
+                      -> ok.
+on_unknown_event({web_debug_info, Requestor}, UState, GCState) ->
     comm:send_local(Requestor, {web_debug_info_reply,
                                 [{"generic info from gen_component:", ""},
-                                 {"module", webhelpers:safe_html_string("~.0p", [gc_mod(State)])},
-                                 {"handler", webhelpers:safe_html_string("~.0p", [gc_hand(State)])},
-                                 {"state", webhelpers:safe_html_string("~.0p", [gc_ustate(State)])}]}),
-    State;
-on_unknown_event(UnknownMessage, State) ->
+                                 {"module", webhelpers:safe_html_string("~.0p", [gc_mod(GCState)])},
+                                 {"handler", webhelpers:safe_html_string("~.0p", [gc_hand(GCState)])},
+                                 {"state", webhelpers:safe_html_string("~.0p", [UState])}]});
+on_unknown_event(UnknownMessage, UState, GCState) ->
     log:log(error,
             "~n** Unknown message:~n ~.0p~n"
             "** Module:~n ~.0p~n"
@@ -476,13 +581,13 @@ on_unknown_event(UnknownMessage, State) ->
             "** Pid:~n ~p ~.0p~n"
             "** State:~n ~.0p~n",
             [UnknownMessage,
-             gc_mod(State),
-             gc_hand(State),
+             gc_mod(GCState),
+             gc_hand(GCState),
              self(), catch pid_groups:group_and_name_of(self()),
-             State]),
-    State.
+             {UState, GCState}]),
+    ok.
 
-on_exception(Msg, Level, Reason, Stacktrace, State) ->
+on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
     log:log(error,
             "~n** Exception:~n ~.0p:~.0p~n"
             "** Current message:~n ~.0p~n"
@@ -494,17 +599,18 @@ on_exception(Msg, Level, Reason, Stacktrace, State) ->
             "** Stacktrace:~n ~.0p~n",
             [Level, Reason,
              Msg,
-             gc_mod(State),
-             gc_hand(State),
+             gc_mod(GCState),
+             gc_hand(GCState),
              self(), catch pid_groups:group_and_name_of(self()),
              erlang:get(test_server_loc),
-             State,
+             {UState, GCState},
              Stacktrace]),
-    State.
+    ok.
 
--spec on_post_op(comm:message(), gc_state()) -> gc_state().
-on_post_op(Msg, State) ->
-    case gc_bpactive(State) of
+-spec on_post_op(comm:message(), user_state(), gc_state())
+                -> ok.
+on_post_op(Msg, UState, GCState) ->
+    case gc_bpactive(GCState) of
         true ->
             ?TRACE_BP_STEPS("~n"
                             "*** Trigger post-op...~n"
@@ -512,96 +618,103 @@ on_post_op(Msg, State) ->
                             "    Handler: ~p:~p/2~n"
                             "    Message: ~.0p~n",
                             [self(), catch pid_groups:group_and_name_of(self()),
-                             gc_mod(State), gc_hand(State), Msg]),
+                             gc_mod(GCState), gc_hand(GCState), Msg]),
             self() ! {'$gen_component', bp, breakpoint, step,
-                      gc_bpstepper(State)},
+                      gc_bpstepper(GCState)},
             ok;
         false -> ok
     end,
     case erlang:get(trace_mpath) of
-        undefined ->
-            ok;
-        Logger ->
-            trace_mpath:log_info(Logger, self(), Msg)
-    end,
-    on(Msg, State).
+        undefined -> on(Msg, UState, GCState);
+        Logger    -> trace_mpath:log_info(Logger, self(), Msg),
+                     on_traced_msg(Msg, UState, GCState)
+    end.
 
--spec on_gc_msg(gc_msg(), gc_state()) -> gc_state() | ok.
-on_gc_msg({'$gen_component', trace_mpath, PState, From, To, Msg}, State) ->
+-spec on_gc_msg(gc_msg(), user_state(), gc_state()) -> ok.
+on_gc_msg({'$gen_component', trace_mpath, PState, From, To, Msg}, UState, GCState) ->
     trace_mpath:log_recv(PState, From, To, Msg),
+    erlang:put('$gen_component_trace_mpath_msg_tag', element(1, Msg)),
     trace_mpath:start(PState),
-    NewState = on(Msg, State),
-    trace_mpath:stop(),
-    trace_mpath:log_info(PState, To, {gc_on_done, element(1, Msg)}),
-    NewState;
-on_gc_msg({'$gen_component', kill}, State) ->
+    on_traced_msg(Msg, UState, GCState);
+on_gc_msg({'$gen_component', kill}, _UState, GCState) ->
     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
-            [self(), gc_mod(State), gc_hand(State)]),
+            [self(), gc_mod(GCState), gc_hand(GCState)]),
     ok;
-on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid}, State) ->
+on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid}, UState, GCState) ->
     Pid ! {'$gen_component', bp, msg_in_bp_waiting_response, false},
-    State;
-on_gc_msg({'$gen_component', sleep, Time}, State) ->
+    loop(UState, GCState);
+on_gc_msg({'$gen_component', sleep, Time}, UState, GCState) ->
     timer:sleep(Time),
-    State;
-on_gc_msg({'$gen_component', get_state, Pid}, State) ->
+    loop(UState, GCState);
+on_gc_msg({'$gen_component', get_state, Pid}, UState, GCState) ->
     comm:send_local(
-      Pid, {'$gen_component', get_state_response, gc_ustate(State)}),
-    State;
-on_gc_msg({'$gen_component', get_component_state, Pid}, State) ->
+      Pid, {'$gen_component', get_state_response, UState}),
+    loop(UState, GCState);
+on_gc_msg({'$gen_component', get_component_state, Pid}, UState, GCState) ->
     comm:send_local(
       Pid, {'$gen_component', get_component_state_response,
-            {gc_mod(State), gc_hand(State), State}}),
-    State;
-on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName} = Msg, State) ->
-    case gc_bpqueue(State) of
-        [] -> gc_bp_set_cond(State, Cond, BPName);
-        _ -> gc_bp_hold_back(State, Msg)
-    end;
-on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName} = Msg, State) ->
-    case gc_bpqueue(State) of
-        [] -> gc_bp_set(State, MsgTag, BPName);
-        _ -> gc_bp_hold_back(State, Msg)
-    end;
-on_gc_msg({'$gen_component', bp, bp_del, BPName} = Msg, State) ->
-    case gc_bpqueue(State) of
-        [] -> gc_bp_del(State, BPName);
-        _ -> gc_bp_hold_back(State, Msg)
-    end;
-on_gc_msg({'$gen_component', bp, barrier} = Msg, State) ->
-    gc_bp_hold_back(State, Msg);
-on_gc_msg({'$gen_component', bp, breakpoint, step, _Stepper} = Msg, State) ->
-    gc_bp_hold_back(State, Msg);
-on_gc_msg({'$gen_component', bp, breakpoint, cont} = Msg, State) ->
-    gc_bp_hold_back(State, Msg).
+            {gc_mod(GCState), gc_hand(GCState), GCState}}),
+    loop(UState, GCState);
+on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName} = Msg, UState, GCState) ->
+    NewGCState =
+        case gc_bpqueue(GCState) of
+            [] -> gc_bp_set_cond(GCState, Cond, BPName);
+            _ -> gc_bp_hold_back(GCState, Msg)
+        end,
+    loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName} = Msg, UState, GCState) ->
+    NewGCState =
+        case gc_bpqueue(GCState) of
+            [] -> gc_bp_set(GCState, MsgTag, BPName);
+            _ -> gc_bp_hold_back(GCState, Msg)
+        end,
+    loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, bp_del, BPName} = Msg, UState, GCState) ->
+    NewGCState =
+        case gc_bpqueue(GCState) of
+            [] -> gc_bp_del(GCState, BPName);
+            _ -> gc_bp_hold_back(GCState, Msg)
+        end,
+    loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, barrier} = Msg, UState, GCState) ->
+    NewGCState = gc_bp_hold_back(GCState, Msg),
+    loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, breakpoint, step, _Stepper} = Msg,
+          UState, GCState) ->
+    NewGCState = gc_bp_hold_back(GCState, Msg),
+    loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, breakpoint, cont} = Msg,
+          UState, GCState) ->
+    NewGCState = gc_bp_hold_back(GCState, Msg),
+    loop(UState, NewGCState).
 
 
--spec on_bp(comm:message(), gc_state()) -> gc_state().
-on_bp(_Msg, State)
-  when (false =:= element(?BP_ACTIVE, State))
-       andalso ([] =:= element(?BPS, State)) ->
-    State;
-on_bp(Msg, State) ->
-    BPActive = bp_active(Msg, State),
-    wait_for_bp_leave(Msg, State, BPActive).
+-spec on_bp(comm:message(), user_state(), gc_state()) -> gc_state().
+on_bp(_Msg, _UState, GCState)
+  when (false =:= element(?BP_ACTIVE, GCState))
+       andalso ([] =:= element(?BPS, GCState)) ->
+   GCState;
+on_bp(Msg, UState, GCState) ->
+    BPActive = bp_active(Msg, UState, GCState),
+    wait_for_bp_leave(Msg, GCState, BPActive).
 
--spec bp_active(comm:message(), gc_state()) -> boolean().
-bp_active(_Msg, State)
-  when (false =:= element(?BP_ACTIVE, State))
-       andalso ([] =:= element(?BPS, State))->
+-spec bp_active(comm:message(), user_state(), gc_state()) -> boolean().
+bp_active(_Msg, _UState, GCState)
+  when (false =:= element(?BP_ACTIVE, GCState))
+       andalso ([] =:= element(?BPS, GCState))->
     false;
-bp_active(Msg, State) ->
-    gc_bpactive(State)
+bp_active(Msg, UState, GCState) ->
+    gc_bpactive(GCState)
         orelse
         begin
-            [ ThisBP | RemainingBPs ] = gc_bps(State),
+            [ ThisBP | RemainingBPs ] = gc_bps(GCState),
             Decision = case ThisBP of
                            {bp, ThisTag, _BPName} ->
                                ThisTag =:= comm:get_msg_tag(Msg);
                            {bp_cond, Cond, _BPName} when is_function(Cond) ->
-                               Cond(Msg, gc_ustate(State));
+                               Cond(Msg, UState);
                            {bp_cond, {Module, Fun, Params}, _BPName} ->
-                               apply(Module, Fun, [Msg, gc_ustate(State), Params])
+                               apply(Module, Fun, [Msg, UState, Params])
                        end,
             case Decision of
                 true ->
@@ -611,7 +724,7 @@ bp_active(Msg, State) ->
             end
         end
         orelse
-        bp_active(Msg, gc_set_bps(State, RemainingBPs)).
+        bp_active(Msg, UState, gc_set_bps(GCState, RemainingBPs)).
 
 -spec wait_for_bp_leave(comm:message(), gc_state(), boolean()) -> gc_state().
 wait_for_bp_leave(_Msg, State, _BP_Active = false) -> State;
@@ -711,23 +824,23 @@ on_bp_req_in_bp(Msg, State,
 
 %% @doc release the bp_step function when we executed a bp_step
 -spec bp_step_done(comm:message(), gc_state()) -> gc_state().
+bp_step_done(_, State)
+  when not element(?BP_ACTIVE, State)
+       orelse not element(?BP_STEPPED, State) ->
+    State;
 bp_step_done(Msg, State) ->
-    case gc_bpactive(State) andalso gc_bpstepped(State) of
-        true ->
-            ?TRACE_BP_STEPS("step done ~.0p~n", [Msg]),
-            comm:send_local(gc_bpstepper(State),
-                            {'$gen_component', bp, breakpoint, step_done,
-                             self(), gc_mod(State), gc_hand(State), Msg}),
-            T1State = gc_set_bpstepper(State, unknown),
-            gc_set_bpstepped(T1State, false);
-        _ -> State
-    end.
+    ?TRACE_BP_STEPS("step done ~.0p~n", [Msg]),
+    comm:send_local(gc_bpstepper(State),
+                    {'$gen_component', bp, breakpoint, step_done,
+                     self(), gc_mod(State), gc_hand(State), Msg}),
+    T1State = gc_set_bpstepper(State, unknown),
+    gc_set_bpstepped(T1State, false).
 
--spec gc_new(module(), handler(), list()) -> gc_state().
-gc_new(Module, Handler, Options) ->
+
+-spec gc_new(module(), handler()) -> gc_state().
+gc_new(Module, Handler) ->
     {Module, Handler,
-     no_user_state_yet,
-     Options, _Slowest = 0.0,
+%     Options, _Slowest = 0.0,
      _BPs = [], _BPActive = false,
      _BPHoldbackQueue = [], _BPStepped = false,
      _BPStepperPid = unknown
@@ -750,18 +863,13 @@ gc_bpqueue(State) ->            element(?BP_QUEUE, State).
 -spec gc_set_bpqueue(gc_state(), [bp_msg()]) -> gc_state().
 gc_set_bpqueue(State, Val) ->   setelement(?BP_QUEUE, State, Val).
 -spec gc_bpstepped(gc_state()) -> boolean().
-gc_bpstepped(State) ->          element(?BP_STEPPED, State).
+gc_bpstepped(State) -> element(?BP_STEPPED, State).
 -spec gc_set_bpstepped(gc_state(), boolean()) -> gc_state().
 gc_set_bpstepped(State, Val) -> setelement(?BP_STEPPED, State, Val).
 -spec gc_bpstepper(gc_state()) -> pid() | 'unknown'.
 gc_bpstepper(State) ->          element(?BP_STEPPER, State).
 -spec gc_set_bpstepper(gc_state(), pid() | 'unknown') -> gc_state().
 gc_set_bpstepper(State, Val) -> setelement(?BP_STEPPER, State, Val).
-%% users state
--spec gc_ustate(gc_state()) -> user_state().
-gc_ustate(State) ->             element(?USTATE, State).
--spec gc_set_ustate(gc_state(), user_state()) -> gc_state().
-gc_set_ustate(State, Val) ->    setelement(?USTATE, State, Val).
 
 -spec gc_bp_hold_back(gc_state(), bp_msg()) -> gc_state().
 gc_bp_hold_back(State, Msg) ->
