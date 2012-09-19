@@ -46,6 +46,9 @@ supspec(_) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([]) ->
     CommLayerGroup = "comm_layer",
+    Delayer =
+        util:sup_worker_desc(comm_layer_msg_delay, msg_delay, start_link,
+                             [CommLayerGroup]),
     CommServer =
         util:sup_worker_desc(comm_server, comm_server, start_link,
                              [CommLayerGroup]),
@@ -55,6 +58,7 @@ childs([]) ->
     CommLogger =
         util:sup_worker_desc(comm_logger, comm_logger, start_link),
     [
+     Delayer,
      CommServer,
      CommLogger,
      CommAcceptor

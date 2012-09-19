@@ -108,6 +108,9 @@ childs(Options) ->
     ClientsDelayer =
         util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
+    BasicServicesDelayer =
+        util:sup_worker_desc(basic_services_msg_delay, msg_delay, start_link,
+                             [ServiceGroup]),
     ClientsMonitor =
         util:sup_worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
     DHTNodeJoinAt = case util:app_get_env(join_at, random) of
@@ -146,6 +149,7 @@ childs(Options) ->
                     Config,
                     Logger,
                     ClientsDelayer,
+                    BasicServicesDelayer,
                     ClientsMonitor,
                     Top,
                     Monitor,
