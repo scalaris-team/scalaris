@@ -397,28 +397,7 @@ on(Msg, UState, GCState) ->
     T1GCState = on_bp(Msg, UState, GCState),
     Module  = gc_mod(T1GCState),
     Handler = gc_hand(T1GCState),
-    T2State =
-        try Handler(Msg, UState)
-        catch Level:Reason ->
-                Stacktrace = erlang:get_stacktrace(),
-                case Stacktrace of
-                    %% erlang < R15 : {Module, Handler, [Msg, State]}
-                    %% erlang >= R15: {Module, Handler, [Msg, State], _}
-                    [T | _] when
-                          erlang:element(1, T) =:= Module andalso
-                          %% erlang:element(2, T) =:= Handler andalso
-                          erlang:element(3, T) =:= [Msg, UState] andalso
-                          Reason =:= function_clause andalso
-                          Level =:= error ->
-                        on_unknown_event(Msg, UState, T1GCState),
-                        {'$gc_unknown_event'};
-                    _ ->
-                        on_exception(Msg, Level, Reason, Stacktrace,
-                                     UState, T1GCState),
-                        {'$gc_exception'}
-                end
-        end,
-    case T2State of
+    try Handler(Msg, UState) of
         kill ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                     [self(), Module, Handler]),
@@ -442,8 +421,6 @@ on(Msg, UState, GCState) ->
                             erlang:throw('unknown gen_component command')
                     end
             end;
-        {'$gc_unknown_event'} -> loop(UState, T1GCState);
-        {'$gc_exception'} ->     loop(UState, T1GCState);
         unknown_event ->
             %% drop T2State, as it contains the error message
             on_unknown_event(Msg, UState, T1GCState),
@@ -452,10 +429,28 @@ on(Msg, UState, GCState) ->
                 true -> loop(UState, bp_step_done(Msg, T1GCState))
             end;
         NewUState ->
-            case element(?BP_ACTIVE, T1GCState) andalso gc_bpstepped(T1GCState) of
+            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
                 false -> loop(NewUState, T1GCState);
                 true -> loop(NewUState, bp_step_done(Msg, T1GCState))
             end
+    catch Level:Reason ->
+              Stacktrace = erlang:get_stacktrace(),
+              case Stacktrace of
+                  %% erlang < R15 : {Module, Handler, [Msg, State]}
+                  %% erlang >= R15: {Module, Handler, [Msg, State], _}
+                  [T | _] when
+                    erlang:element(1, T) =:= Module andalso
+                        %% erlang:element(2, T) =:= Handler andalso
+                        erlang:element(3, T) =:= [Msg, UState] andalso
+                        Reason =:= function_clause andalso
+                        Level =:= error ->
+                      on_unknown_event(Msg, UState, T1GCState),
+                      loop(UState, T1GCState);
+                  _ ->
+                      on_exception(Msg, Level, Reason, Stacktrace,
+                                   UState, T1GCState),
+                      loop(UState, T1GCState)
+              end
     end.
 
 -spec on_traced_msg(comm:message(), user_state(), gc_state())
@@ -487,28 +482,7 @@ on_traced_msg(Msg, UState, GCState) ->
     T1GCState = on_bp(Msg, UState, GCState),
     Module  = gc_mod(T1GCState),
     Handler = gc_hand(T1GCState),
-    T2State =
-        try Handler(Msg, UState)
-        catch Level:Reason ->
-                Stacktrace = erlang:get_stacktrace(),
-                case Stacktrace of
-                    %% erlang < R15 : {Module, Handler, [Msg, State]}
-                    %% erlang >= R15: {Module, Handler, [Msg, State], _}
-                    [T | _] when
-                          erlang:element(1, T) =:= Module andalso
-                          %% erlang:element(2, T) =:= Handler andalso
-                          erlang:element(3, T) =:= [Msg, UState] andalso
-                          Reason =:= function_clause andalso
-                          Level =:= error ->
-                        on_unknown_event(Msg, UState, T1GCState),
-                        {'$gc_unknown_event'};
-                    _ ->
-                        on_exception(Msg, Level, Reason, Stacktrace,
-                                     UState, T1GCState),
-                        {'$gc_exception'}
-                end
-        end,
-    case T2State of
+    try Handler(Msg, UState) of
         kill ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                     [self(), Module, Handler]),
@@ -535,16 +509,6 @@ on_traced_msg(Msg, UState, GCState) ->
                             erlang:throw('unknown gen_component command')
                     end
             end;
-        {'$gc_unknown_event'} ->
-            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
-            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-            trace_mpath:stop(),
-            loop(UState, T1GCState);
-        {'$gc_exception'} ->
-            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
-            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-            trace_mpath:stop(),
-            loop(UState, T1GCState);
         unknown_event ->
             %% drop T2State, as it contains the error message
             on_unknown_event(Msg, UState, T1GCState),
@@ -563,6 +527,30 @@ on_traced_msg(Msg, UState, GCState) ->
                 false -> loop(NewUState, T1GCState);
                 true -> loop(NewUState, bp_step_done(Msg, T1GCState))
             end
+    catch Level:Reason ->
+              Stacktrace = erlang:get_stacktrace(),
+              case Stacktrace of
+                  %% erlang < R15 : {Module, Handler, [Msg, State]}
+                  %% erlang >= R15: {Module, Handler, [Msg, State], _}
+                  [T | _] when
+                    erlang:element(1, T) =:= Module andalso
+                        %% erlang:element(2, T) =:= Handler andalso
+                        erlang:element(3, T) =:= [Msg, UState] andalso
+                        Reason =:= function_clause andalso
+                        Level =:= error ->
+                      on_unknown_event(Msg, UState, T1GCState),
+                      MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+                      trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+                      trace_mpath:stop(),
+                      loop(UState, T1GCState);
+                  _ ->
+                      on_exception(Msg, Level, Reason, Stacktrace,
+                                   UState, T1GCState),
+                      MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+                      trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+                      trace_mpath:stop(),
+                      loop(UState, T1GCState)
+              end
     end.
 
 -spec on_unknown_event(comm:message(), user_state(), gc_state())
