@@ -42,11 +42,11 @@ init() ->
 %%            It runs inside the dht_node to get access to the ?DB
 %%
 
--spec on_init_TP({tx_state:tx_id(),
+-spec on_init_TP({tx_tm_rtm:tx_id(),
                   [comm:mypid()], [comm:mypid()], comm:mypid(),
                   tx_tlog:tlog_entry(),
-                  tx_item_state:tx_item_id(),
-                  tx_item_state:paxos_id()},
+                  tx_tm_rtm:tx_item_id(),
+                  tx_tm_rtm:paxos_id()},
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 %% PreCond: check for DB responsibility must still be valid (ref. lookup_fin handling)
@@ -91,10 +91,10 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = Params, DHT_Node_S
 %%     end
     .
 
--spec on_do_commit_abort({tx_item_state:paxos_id(),
+-spec on_do_commit_abort({tx_tm_rtm:paxos_id(),
                           tx_tlog:tlog_entry(),
                           comm:mypid(),
-                          tx_item_state:tx_item_id()},
+                          tx_tm_rtm:tx_item_id()},
                          ?commit | ?abort, dht_node_state:state())
                         -> dht_node_state:state().
 on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_State) ->
@@ -131,7 +131,7 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, DHT_Node_St
             DHT_Node_State
     end.
 
--spec on_do_commit_abort_fwd(comm:mypid(), tx_item_state:tx_item_id(),
+-spec on_do_commit_abort_fwd(comm:mypid(), tx_tm_rtm:tx_item_id(),
                              tx_tlog:tlog_entry(),
                              ?commit | ?abort, ?prepared | ?abort,
                              dht_node_state:state())

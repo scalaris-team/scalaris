@@ -35,6 +35,8 @@
 -export([on/2, init/1]).
 -export([check_config/0]).
 
+-include("learner_state.hrl").
+
 -type state() :: atom(). % table name
 
 -spec msg_decide(comm:mypid(), any(), any(), any()) -> ok.
@@ -80,23 +82,23 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
    ETSTableName = State) ->
     ?TRACE("learner:initialize for paxos id: ~p~n", [PaxosID]),
     case pdb:get(PaxosID, ETSTableName) of
-        undefined -> pdb:set(learner_state:new(PaxosID, Majority,
-                                               ProcessToInform, ClientCookie),
+        undefined -> pdb:set(state_new(PaxosID, Majority,
+                                       ProcessToInform, ClientCookie),
                             ETSTableName);
         StateForID ->
             %% set Majority and ProcessInfo and check whether finished already
-            case Majority =:= learner_state:get_majority(StateForID)
-                andalso ProcessToInform =:= learner_state:get_process_to_inform(StateForID)
+            case Majority =:= state_get_majority(StateForID)
+                andalso ProcessToInform =:= state_get_process_to_inform(StateForID)
             of
                 true ->
                     log:log(error,
                             "duplicate learner initialize for id ~p",
                             [PaxosID]);
                 false ->
-                    TmpState = learner_state:set_majority(StateForID, Majority),
-                    Tmp2State = learner_state:set_process_to_inform(TmpState, ProcessToInform),
-                    NewState = learner_state:set_client_cookie(Tmp2State, ClientCookie),
-                    case (Majority =< learner_state:get_accepted_count(NewState)) of
+                    TmpState = state_set_majority(StateForID, Majority),
+                    Tmp2State = state_set_process_to_inform(TmpState, ProcessToInform),
+                    NewState = state_set_client_cookie(Tmp2State, ClientCookie),
+                    case (Majority =< state_get_accepted_count(NewState)) of
                         true -> decide(PaxosID, NewState);
                         false -> ok
                     end,
@@ -113,10 +115,10 @@ on({?acceptor_accept, PaxosID, Round, Value}, ETSTableName = State) ->
                       msg_delay:send_local(
                         config:read(learner_noinit_timeout) div 1000, self(),
                         {learner_deleteid_if_still_no_client, PaxosID}),
-                      learner_state:new(PaxosID, 128, none, no_cookie);
+                      state_new(PaxosID, 128, none, no_cookie);
                   StateForID -> StateForID
               end,
-    case learner_state:add_accepted_msg(MyState, Round, Value) of
+    case state_add_accepted_msg(MyState, Round, Value) of
         {majority_accepted, NewState} ->
             decide(PaxosID, NewState),
             pdb:set(NewState, ETSTableName);
@@ -133,7 +135,7 @@ on({learner_deleteid_if_still_no_client, PaxosID}, ETSTableName = State) ->
     case pdb:get(PaxosID, ETSTableName) of
         undefined -> ok;
         StateForId ->
-            case learner_state:get_process_to_inform(StateForId) of
+            case state_get_process_to_inform(StateForId) of
                 none ->
                     %% io:format("Deleting unhosted learner id~n"),
                     pdb:delete(PaxosID, ETSTableName);
@@ -147,11 +149,11 @@ on(_, _State) ->
 
 decide(PaxosID, State) ->
     ?TRACE("learner:decide for paxosid '~p' in round '~p' and value '~p'~n",
-           [PaxosID, learner_state:get_round(State), learner_state:get_value(State)]),
-    case learner_state:get_process_to_inform(State) of
+           [PaxosID, state_get_round(State), state_get_value(State)]),
+    case state_get_process_to_inform(State) of
         none -> ok; % will be informed later when learner is initialized
-        Pid -> msg_decide(Pid, learner_state:get_client_cookie(State),
-                          PaxosID, learner_state:get_value(State))
+        Pid -> msg_decide(Pid, state_get_client_cookie(State),
+                          PaxosID, state_get_value(State))
     end.
 
 %% @doc Checks whether config parameters exist and are valid.
@@ -160,4 +162,3 @@ check_config() ->
     config:cfg_is_integer(learner_noinit_timeout) and
     config:cfg_is_greater_than_equal(learner_noinit_timeout, 1000) and
     config:cfg_is_greater_than(learner_noinit_timeout, tx_timeout).
-
