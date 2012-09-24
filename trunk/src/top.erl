@@ -28,6 +28,7 @@
 -export([on/2, init/1]).
 
 -export([top/0]).
+-export([trace_fwd/2]).
 
 -type state() :: { pdb:tableid(),
                    false | all | pid, %% sampling: no, all or a single pid
@@ -106,11 +107,12 @@ top_inspect_pid(Pid) ->
     comm:send_local(Pid, {output_off}),
     comm:send_local(Pid, {stop_sampling}),
     InspectPid = pid_prompt(),
-    comm:send_local(Pid, {enable_sampling, pid}),
+    comm:send_local(Pid, {enable_sampling, InspectPid}),
     comm:send_local(Pid, {sample_pid, InspectPid}),
     comm:send_local(Pid, {enable_output, pid}),
     comm:send_local(Pid, {output_pid, InspectPid}),
     top_inspect_pid_interactive(Pid, InspectPid),
+    comm:send_local(Pid, {stop_sampling}),
     comm:send_local(Pid, {enable_sampling, all}),
     comm:send_local(Pid, {sample_all}),
     comm:send_local(Pid, {enable_output, all}),
@@ -126,7 +128,9 @@ pid_prompt() ->
                     undefined ->
                         case pid_groups:find_all(InspectPidAtom) of
                             [Pid] -> Pid;
+                            [] -> throw({no_pid, no_pid});
                             Pids ->
+                                SPids = lists:sort(Pids),
                                 io:format("Which of the ~ps do you mean?~n",
                                           [InspectPidAtom]),
                                 lists:foldl(
@@ -135,9 +139,9 @@ pid_prompt() ->
                                             " ~p: ~p ~p~n",
                                             [Acc, X,
                                              pid_groups:group_and_name_of(X)]),
-                                          1 + Acc end, 1, Pids),
+                                          1 + Acc end, 1, SPids),
                                 {ok, [Nth]} = io:fread("num > ", "~d"),
-                                lists:nth(Nth, Pids)
+                                lists:nth(Nth, SPids)
                         end;
                     Pid -> Pid
                 end
@@ -148,10 +152,20 @@ pid_prompt() ->
     end.
 
 top_inspect_pid_interactive(TopPid, Pid) ->
-    {ok, [Char]} = io:fread(">", "~c"),
+    {ok, [Char]} = io:fread("> ", "~c"),
     Quit =
         case Char of
             "q" -> quit;
+            "d" -> %% show dictionary
+                comm:send_local(TopPid, {output_off}),
+                comm:send_local(TopPid, {stop_sampling}),
+                print_process_dictionary(Pid),
+                io:get_chars("Hit return to continue> ", 1),
+                comm:send_local(TopPid, {enable_sampling, Pid}),
+                comm:send_local(TopPid, {sample_pid, Pid}),
+                comm:send_local(TopPid, {enable_output, pid}),
+                comm:send_local(TopPid, {output_pid, Pid}),
+                ok;
             "e" ->
                 comm:send_local(TopPid, {output_off}),
                 Expr = io:parse_erl_exprs('expr>'),
@@ -185,13 +199,43 @@ usage() ->
 usage_inspect() ->
     io:format(
       "~n"
-      " (q)uit, (e)val expr, (g)arb-coll."
+      " (q)uit, (e)val expr, (g)arb-coll. (d)ictionary"
       %% ", exclude (t)op itself" %% undocumented feature for top development
       "~n sort by: (c)pu usage~n").
 
+print_process_dictionary(Pid) ->
+    Infos = try_process_info(
+              Pid, [dictionary, registered_name]),
+
+    io:format("Pid: ~p~n", [ Pid ]),
+    io:format("Name: ~p",
+              [process_info_get(Infos, registered_name, [])]),
+    case gen_component:is_gen_component(Pid) of
+        true -> io:format(" ~p", [readable_grp_and_pid_name(Pid)]);
+        false -> ok
+    end,
+    io:format("~n"),
+    io:format("Process Dictionary:~n"),
+    io:format("~20s ~-60s~n", ["Key", "Value"]),
+    [ io:format("~20s ~-60s~n",
+                [ lists:flatten(io_lib:format("~1210.0p", [element(1, X)])),
+                  lists:flatten(io_lib:format("~111610.0p", [element(2, X)]))])
+      || X <- process_info_get(Infos, dictionary, [])].
+
+
 -spec on(comm:message(), state()) -> state().
 
-on({enable_sampling, Val}, State) -> set_sampling(State, Val);
+on({enable_sampling, Val}, State) ->
+    case is_pid(Val) of
+        true ->
+            dbg:stop_clear(),
+            dbg:tracer(process, {fun top:trace_fwd/2, self()}),
+            dbg:tpl('_', []),
+            dbg:p(Val, [c, return_to]);
+        false -> ok
+    end,
+    set_sampling(State, Val);
+
 on({enable_output, Val}, State)   -> set_output(State, Val);
 on({sort_by, Type}, State)        -> set_sort_by(State, Type);
 on({toggle_exclude_self}, State)  -> toggle_exclude_self(State);
@@ -221,19 +265,22 @@ on({sample_all}, State) when all =:= element(2, State) ->
 on({sample_all}, State) -> State;
 
 %% gather information on a single pid for periodic statistical output
-on({sample_pid, Pid}, State) when pid =:= element(2, State) ->
+on({sample_pid, Pid}, State) when is_pid(element(2, State)) ->
     TableName = table(State),
     NewVals = try_process_info(
                 Pid,
-                [message_queue_len, status, current_function, backtrace]),
+                [message_queue_len, status]),
     TakeVals = case process_info_get(NewVals, status, dead_pid) of
                    running -> true;
                    runnable -> true;
                    _ -> false
                end,
+    %% comm:send_local_after(1, self(), {sample_pid, Pid}),
+    comm:send_local(self(), {sample_pid, Pid}),
     case TakeVals of
         true ->
-            P = {Pid, process_info_get(NewVals, current_function, dead)},
+            %P = {Pid, process_info_get(NewVals, current_function, dead)},
+            P = {Pid, erlang:get(current_function)},
             Entry = pdb:get(P, TableName),
             case Entry of
                 undefined ->
@@ -254,15 +301,17 @@ on({sample_pid, Pid}, State) when pid =:= element(2, State) ->
                     V1 = pdbe_new(P, TVals),
                     pdb:set(V1, TableName);
                 _ ->
-                    %% io:format("X:~p Y:~p~n", [X, Y]),
                     V1 = pdbe_add_vals(Entry, TVals),
                     pdb:set(V1, TableName)
             end
     end,
-    %%comm:send_local_after(1, self(), {sample_pid, Pid}),
-    comm:send_local(self(), {sample_pid, Pid}),
     inc_counter(State);
+
 on({sample_pid, _Pid}, State) -> State;
+
+on({trace, _Pid, Fun}, State) ->
+    erlang:put(current_function, Fun),
+    State;
 
 on({output_all}, State) when all =:= element(3, State) ->
     TableName = table(State),
@@ -353,7 +402,7 @@ on({output_all}, State) when all =:= element(3, State) ->
       || {Pid, Status, MQLen, CPUUsage, MemUsage, StackSize} <- lists:reverse(PlotThese)],
     usage(),
     msg_delay:send_local(2, self(), {output_all}),
-    S1 = set_counter(State, 0),
+    S1 = set_counter(State, 1),
     set_timestamp(S1, os:timestamp());
 
 on({output_all}, State) -> State;
@@ -366,7 +415,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
     Infos = try_process_info(
               Pid, [dictionary, registered_name, memory, total_heap_size,
                     stack_size, status, message_queue_len, current_function]),
-    PD = process_info_get(Infos, dictionary, 0),
+    PD = process_info_get(Infos, dictionary, []),
     R1 = pdb:tab2list(TableName),
     PlotData = [ begin
                      pdb:delete(PidAndCFun, TableName),
@@ -376,8 +425,8 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
                       no_mqlen,
                       vals_cpu_usage(X, Count),
                       no_mem}
-                 end || {PidAndCFun, _MQLen, _Status} = X <- R1
-                        %% is_pid(element(1, element(1,X)))
+                 end || {PidAndCFun, MQLen, Status} = X <- R1,
+                        is_tuple(Status), is_number(MQLen)
                ],
     SortedPlotData = lists:keysort(sort_by(State), PlotData),
     L = length(SortedPlotData),
@@ -395,7 +444,10 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
                (WallClock rem (60*60)) rem 60
               ]),
     IdlePlotDataEntry = lists:keyfind({Pid, not_running}, 1, PlotData),
-    Idle = element(4, IdlePlotDataEntry),
+    Idle = case IdlePlotDataEntry of
+        false -> 0.0;
+        _ -> element(4, IdlePlotDataEntry)
+    end,
     io:format("Pid: ~p, ~6.2f% run, ~6.2f% idle~n",
               [ Pid, 100.0 - Idle, Idle ]),
     io:format("Name: ~p",
@@ -408,10 +460,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
     MemUsage = process_info_get(Infos, memory, 0),
     HeapSize = process_info_get(Infos, total_heap_size, 0),
     StackSize = process_info_get(Infos, stack_size, 0),
-    PDSize = case PD of
-                 0 -> 0;
-                 _ -> erlang:external_size(PD)
-             end,
+    PDSize = erlang:external_size(PD),
     WordSize = erlang:system_info(wordsize),
     io:format("Mem: ~s total, ~s heap, ~s stack, ~s dictionary (~p entries)~n",
               [readable_mem(MemUsage),
@@ -424,12 +473,12 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
               [readable_status(
                  process_info_get(Infos, status, dead_pid)),
                process_info_get(Infos, message_queueu_len, 0),
-               process_info_get(Infos, current_function, none)
+               erlang:get(current_function)
               ]),
     io:format("FPS: ~.1f~n", [Count / Delay]),
 
     io:format("~11s ~-35s ~6s~n",
-              [ "PID", "FUNCTION", "%TIME"]),
+              [ "PID", "FUNCTION", "%RTIME"]),
     _ = [ begin
               CFun = element(2, PlotPid),
               CFunString =
@@ -440,15 +489,22 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
                               ++ "/" ++ io_lib:write(element(3, CFun));
                       false -> io_lib:write(CFun)
                   end,
+              FunRTime = if 0.004 > (100.0 - Idle) ->
+                                 case L > 1 of
+                                     true -> 100.0 / (L-1);
+                                     false -> 100.0
+                                 end;
+                            true -> CPUUsage * 100.0 / (100.0 - Idle)
+                         end,
               io:format("~11w ~-35s ~6.2f~n",
-                        [element(1, PlotPid), CFunString, CPUUsage ])
+                        [element(1, PlotPid), CFunString, FunRTime ])
           end
           || {PlotPid, _Status, _MQLen, CPUUsage, _MemUsage}
-                 <- lists:reverse(PlotThese)],
+                 <- lists:reverse(PlotThese), not_running =/= element(2, PlotPid)],
     util:for_to(1, Lines - SkipLines - length(PlotThese),
                 fun(_) -> io:format("~n") end),
     usage_inspect(),
-    msg_delay:send_local(2, self(), {output_pid, Pid}),
+    msg_delay:send_local(4, self(), {output_pid, Pid}),
     S1 = set_counter(State, 0),
     set_timestamp(S1, os:timestamp());
 
@@ -460,6 +516,7 @@ on({stop_sampling}, State) ->
     _ = [ pdb:delete(element(1, X), TableName)
           || {_,_,_} = X <- R1, is_pid(element(1, X)) ],
     S1 = set_counter(State, 0),
+    dbg:stop_clear(),
     set_sampling(S1, false).
 
 
@@ -495,7 +552,10 @@ vals_cpu_usage(Entry, Count) ->
     Status = element(3, Entry),
     Runs = element(6, Status),
     Runnable = element(4, Status),
-    (Runs + Runnable) / Count * 100.
+    case Count of
+        0 -> 0;
+        _ -> (Runs + Runnable) / Count * 100
+    end.
 
 vals_add_mqlen(Entry, Amount) ->
     setelement(2, Entry, Amount + element(2, Entry)).
@@ -519,7 +579,6 @@ vals_add_status(Entry, Val) ->
                 setelement(7, OldStatus, 1 + element(7, OldStatus))
         end,
     setelement(3, Entry, NewStatus).
-
 
 pdbe_new(Pid, Vals) ->
     Entry = {Pid,
@@ -609,3 +668,12 @@ process_info_get(PropList, Type, DefaultVal) ->
         false -> DefaultVal;
         X -> element(2, X)
     end.
+
+-spec trace_fwd({trace, pid(), call | return_to, mfa()}, pid()) -> pid().
+trace_fwd({trace, Pid, call, {Mod, Fun, Params}}, TopPid) ->
+    TopPid ! {trace, Pid, {Mod, Fun, length(Params)}},
+    TopPid;
+trace_fwd({trace, Pid, return_to, {Mod, Fun, Arity}}, TopPid) ->
+    TopPid ! {trace, Pid, {Mod, Fun, Arity}},
+    TopPid.
+
