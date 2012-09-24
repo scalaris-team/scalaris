@@ -99,7 +99,7 @@ on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
 %% periodic trigger
 on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
     ?TRACE("msg_delay:on(~.0p, ~.0p)~n", [Trigger, State]),
-    case pdb:get(Counter, TimeTable) of
+    _ = case pdb:take(Counter, TimeTable) of
         undefined -> ok;
         {_, MsgQueue} ->
             _ = [ case Msg of
@@ -109,8 +109,7 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
                           comm:send_local(Dest, OrigMsg),
                           erlang:put(trace_mpath, Restore);
                       _ -> comm:send_local(Dest, Msg)
-                  end || {Dest, Msg} <- MsgQueue ],
-            pdb:delete(Counter, TimeTable)
+                  end || {Dest, Msg} <- MsgQueue ]
     end,
     ETrigger =
         case erlang:get(trace_mpath) of
