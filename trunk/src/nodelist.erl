@@ -20,6 +20,9 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
+                   node_range/1, succ_range/1]}).
+
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
          mk_neighborhood/2, mk_neighborhood/4,
