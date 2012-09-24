@@ -334,9 +334,18 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         Connection connection = getConnection(request);
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime)); // should forward to another page
+            showEmptyPage(request, response, connection, new WikiPageBean(serviceUser, startTime)); // should forward to another page
             return; // return just in case
         }
+        
+        for (WikiEventHandler handler: eventHandlers) {
+            if (!handler.checkAccess(serviceUser, request, connection)) {
+                // access not allowed
+                showEmptyPage(request, response, connection, new WikiPageBean(serviceUser, startTime));
+                return;
+            }
+        }
+        
         try {
             if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
                 showImportPage(request, response, connection); // should forward to another page
@@ -347,14 +356,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             // show empty page for testing purposes if a parameter called "test" exists:
             if (request.getParameter("test") != null) {
-                showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime));
+                showEmptyPage(request, response, connection, new WikiPageBean(
+                        serviceUser, startTime));
                 return;
             }
             
             // if the "search" parameter exists, show the search
             String req_search = request.getParameter("search");
             if (req_search != null) {
-                handleSearch(request, response, null, req_search, connection, new WikiPageListBean(serviceUser, startTime));
+                handleSearch(request, response, null, req_search, connection,
+                        new WikiPageListBean(serviceUser, startTime));
                 return;
             }
 
@@ -369,9 +380,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             if (!MyWikiModel.isValidTitle(req_title)) {
                 handleViewPageBadTitle(request, response, connection, new WikiPageBean(serviceUser, startTime));
             } else if (req_title.startsWith("Special:")) {
-                handleViewSpecialPage(request, response, req_title, req_search, "Special:".length(), connection, startTime);
+                handleViewSpecialPage(request, response, req_title, req_search, "Special:".length(), connection, startTime, serviceUser);
             } else if (req_title.startsWith(namespace.getSpecial() + ":")) {
-                handleViewSpecialPage(request, response, req_title, req_search, namespace.getSpecial().length() + 1, connection, startTime);
+                handleViewSpecialPage(request, response, req_title, req_search, namespace.getSpecial().length() + 1, connection, startTime, serviceUser);
             } else if (req_action == null || req_action.equals("view")) {
                 handleViewPage(request, response, req_title, connection, new WikiPageBean(serviceUser, startTime));
             } else if (req_action.equals("history")) {
@@ -416,9 +427,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     protected void handleViewSpecialPage(HttpServletRequest request,
             HttpServletResponse response, String title, String req_search,
-            int prefixLength, Connection connection, long startTime)
+            int prefixLength, Connection connection, long startTime,
+            final String serviceUser)
             throws IOException, ServletException {
-        final String serviceUser = getParam(request, "service_user");
         final String plainTitle = title.substring(prefixLength);
         // a "/" which separates the special page title from its parameters
         final String plainTitleToSlash = plainTitle.split("/")[0];
@@ -666,9 +677,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         Connection connection = getConnection(request);
         final String serviceUser = getParam(request, "service_user");
         if (connection == null) {
-            showEmptyPage(request, response, new WikiPageBean(serviceUser, startTime)); // should forward to another page
+            showEmptyPage(request, response, connection, new WikiPageBean(
+                    serviceUser, startTime)); // should forward to another page
             return; // return just in case
         }
+        
+        for (WikiEventHandler handler: eventHandlers) {
+            if (!handler.checkAccess(serviceUser, request, connection)) {
+                // access not allowed
+                showEmptyPage(request, response, connection, new WikiPageBean(
+                        serviceUser, startTime));
+                return;
+            }
+        }
+        
         try {
             if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
                 showImportPage(request, response, connection); // should forward to another page
@@ -679,7 +701,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
 
             String req_title = request.getParameter("title");
             if (!MyWikiModel.isValidTitle(req_title)) {
-                handleViewPageBadTitle(request, response, connection, new WikiPageBean(serviceUser, startTime));
+                handleViewPageBadTitle(request, response, connection,
+                        new WikiPageBean(serviceUser, startTime));
             } else {
                 handleEditPageSubmitted(request, response,
                         request.getParameter("title"), connection,
@@ -689,7 +712,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             // if the request has not been forwarded, print a general error
             response.setContentType("text/html");
             PrintWriter out = response.getWriter();
-            out.write("An unknown error occured, please contact your administrator. A server restart may be required.");
+            out.write("An unknown error occured, please contact your administrator. "
+                    + "A server restart may be required.");
             out.close();
         } finally {
             releaseConnection(request, connection);
@@ -721,27 +745,35 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
         final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
+        String redirectUrl;
         if (result.success) {
             ArrayList<Long> times = new ArrayList<Long>();
             for (List<Long> time : result.stats.values()) {
                 times.addAll(time);
             }
-            StringBuilder redirectUrl = new StringBuilder(256);
-            redirectUrl.append("?title=");
-            redirectUrl.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
-            redirectUrl.append("&random_times=" + StringUtils.join(times, "%2C"));
-            redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
-            redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
-            response.sendRedirect("http://" + Options.getInstance().SERVERNAME
+            StringBuilder redirectUrl0 = new StringBuilder(256);
+            redirectUrl0.append("?title=");
+            redirectUrl0.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
+            redirectUrl0.append("&random_times=" + StringUtils.join(times, "%2C"));
+            redirectUrl0.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
+            redirectUrl0.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
+            redirectUrl = "http://" + Options.getInstance().SERVERNAME
                     + Options.getInstance().SERVERPATH
-                    + response.encodeRedirectURL(redirectUrl.toString())
-                    + serviceUser);
+                    + response.encodeRedirectURL(redirectUrl0.toString())
+                    + serviceUser;
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
+            return;
         } else {
-            response.sendRedirect(response.encodeRedirectURL("?title=Main Page&notice=error: can not view random page: <pre>" + result.message + "</pre>" + serviceUser));
+            redirectUrl = response.encodeRedirectURL("?title=Main Page"
+                    + "&notice=error: can not view random page: <pre>"
+                    + result.message + "</pre>" + serviceUser);
         }
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onViewRandomPage(page, result, connection);
+        }
+        response.sendRedirect(redirectUrl);
     }
 
     /**
@@ -775,7 +807,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         } else if (result.page_not_existing) {
             handleViewPageNotExisting(request, response, title, connection, page);
@@ -795,14 +827,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 page.setEditRestricted(true);
             }
 
-            // forward the request and the bean to the jsp:
-            request.setAttribute("pageBean", page);
-            RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
-            dispatcher.forward(request, response);
+            forwardToPageJsp(request, response, connection, page);
         } else {
             setParam_error(request, "ERROR: revision unavailable");
             addToParam_notice(request, "error: unknown error getting page " + title + ":" + req_oldid + ": <pre>" + result.message + "</pre>");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
         }
     }
     
@@ -991,7 +1020,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             renderRevision(title, result.revision, render, request, connection, page);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         } else {
 //            addToParam_notice(request, "error: unknown error getting page " + notExistingTitle + ": <pre>" + result.message + "</pre>");
@@ -1006,6 +1035,31 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
+        forwardToPageJsp(request, response, connection, page);
+    }
+
+    /**
+     * Forwards a request to the <tt>page.jsp</tt> with the given page bean.
+     * 
+     * @param request
+     *            the request of the current operation
+     * @param response
+     *            the response of the current operation
+     * @param connection
+     *            connection to the database
+     * @param page
+     *            the bean for the page
+     * 
+     * @throws ServletException
+     * @throws IOException
+     */
+    protected void forwardToPageJsp(HttpServletRequest request,
+            HttpServletResponse response, Connection connection,
+            WikiPageBean page) throws ServletException, IOException {
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onPageView(page, connection);
+        }
+        
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
@@ -1044,7 +1098,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             renderRevision(title, result.revision, render, request, connection, page);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         } else {
 //            addToParam_notice(request, "error: unknown error getting page " + badTitleTitle + ": <pre>" + result.message + "</pre>");
@@ -1060,10 +1114,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        // forward the request and the bean to the jsp:
-        request.setAttribute("pageBean", page);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
-        dispatcher.forward(request, response);
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onPageView(page, connection);
+        }
+
+        forwardToPageJsp(request, response, connection, page);
     }
 
     /**
@@ -1092,7 +1147,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         } else if (result.not_existing) {
             handleViewPageNotExisting(request, response, title, connection, page);
@@ -1113,6 +1168,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
+
+            for (WikiEventHandler handler: eventHandlers) {
+                handler.onPageHistory(page, connection);
+            }
             
             // forward the request and the bean to the jsp:
             request.setAttribute("pageBean", page);
@@ -1122,7 +1181,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         } else {
             setParam_error(request, "ERROR: revision list unavailable");
             addToParam_notice(request, "error: unknown error getting revision list for page " + title + ": <pre>" + result.message + "</pre>");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
         }
     }
 
@@ -1186,6 +1245,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
+
+            for (WikiEventHandler handler: eventHandlers) {
+                handler.onSpecialPage(page, connection);
+            }
             
             // forward the request and the bean to the jsp:
             request.setAttribute("pageBean", page);
@@ -1199,7 +1262,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 setParam_error(request, "ERROR: page list unavailable");
                 addToParam_notice(request, "error: unknown error getting page list for " + page.getTitle() + ": <pre>" + result.message + "</pre>");
             }
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         }
         page.setError(getParam_error(request));
@@ -1500,6 +1563,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            the request of the current operation
      * @param response
      *            the response of the current operation
+     * @param connection
+     *            connection to the database
      * @param page
      *            the bean for the page
      * 
@@ -1507,13 +1572,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @throws ServletException 
      */
     private void showEmptyPage(HttpServletRequest request,
-            HttpServletResponse response, WikiPageBeanBase page)
-            throws ServletException, IOException {
+            HttpServletResponse response, Connection connection,
+            WikiPageBeanBase page) throws ServletException, IOException {
         page.setNotice(getParam_notice(request));
         page.setError(getParam_error(request));
-        request.setAttribute("pageBean", new WikiPageBean(page));
-        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
-        dispatcher.forward(request, response);
+        forwardToPageJsp(request, response, connection, new WikiPageBean(page));
     }
     
     /**
@@ -1558,7 +1621,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         } else if (result.rev_not_existing) {
             result = getRevision(connection, title, namespace);
@@ -1574,7 +1637,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             // DB corrupt
             setParam_error(request, "ERROR: revision unavailable");
             addToParam_notice(request, "error: unknown error getting current revision of page \"" + title + "\": <pre>" + result.message + "</pre>");
-            showEmptyPage(request, response, page);
+            showEmptyPage(request, response, connection, page);
             return;
         }
         if (result.success) {
@@ -1593,6 +1656,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setTitle(title);
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
+
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onPageEditStart(page, connection);
+        }
 
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
@@ -1661,7 +1728,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setSaveAttempts(retries + 1);
             for (WikiEventHandler handler: eventHandlers) {
-                handler.onPageSaved(result);
+                handler.onPageSaved(page, result, connection);
             }
             if (result.success) {
                 // successfully saved -> show page with a notice of the successful operation
@@ -1721,6 +1788,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onPageEditPreview(page, connection);
+        }
+
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
         RequestDispatcher dispatcher = request.getRequestDispatcher("pageEdit.jsp");
@@ -1742,24 +1813,26 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @throws UnsupportedEncodingException 
      * @throws ServletException 
      */
-    private void showImage(HttpServletRequest request,
-            HttpServletResponse response, String image)
+    private void showImage(final HttpServletRequest request,
+            final HttpServletResponse response, final String image)
             throws UnsupportedEncodingException, IOException, ServletException {
         // we need to fix the image title first, e.g. a prefix with the desired size may exist
-        image = MATCH_WIKI_IMAGE_PX.matcher(image).replaceFirst("");
-        String realImageUrl = getWikiImageUrl(image);
-        if (realImageUrl != null) {
-            response.sendRedirect(realImageUrl);
-        } else {
+        final String imageNoSize = MATCH_WIKI_IMAGE_PX.matcher(image).replaceFirst("");
+        String realImageUrl = getWikiImageUrl(imageNoSize);
+        if (realImageUrl == null) {
             // bliki may have created ".svg.png" from an original ".svg" image:
-            String new_image = MATCH_WIKI_IMAGE_SVG_PNG.matcher(image).replaceFirst(".svg");
-            if (!image.equals(new_image)
-                    && (realImageUrl = getWikiImageUrl(new_image)) != null) {
-                response.sendRedirect(realImageUrl);
-            } else {
-                response.sendRedirect(response.encodeRedirectURL("images/image.png"));
+            String new_image = MATCH_WIKI_IMAGE_SVG_PNG.matcher(imageNoSize).replaceFirst(".svg");
+            realImageUrl = getWikiImageUrl(new_image);
+            if (imageNoSize.equals(new_image) || realImageUrl == null) {
+                realImageUrl = response.encodeRedirectURL("images/image.png");
             }
         }
+
+        for (WikiEventHandler handler: eventHandlers) {
+            handler.onImageRedirect(image, realImageUrl);
+        }
+        
+        response.sendRedirect(realImageUrl);
     }
 
     /**
