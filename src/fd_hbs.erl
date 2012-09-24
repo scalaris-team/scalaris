@@ -25,6 +25,20 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [state_get_rem_hbs/1, state_set_rem_hbs/2,
+                   state_get_rem_pids/1, state_set_rem_pids/2,
+                   state_get_last_pong/1, state_set_last_pong/2,
+                   state_get_crashed_after/1, state_set_crashed_after/2,
+                   state_get_table/1,
+                   state_get_monitors/1, state_set_monitors/2
+                  ]}).
+
+-compile({inline, [rempid_get_rempid/1,
+                   rempid_refcount/1,
+                   rempid_get_last_modified/1, rempid_set_last_modified/2,
+                   rempid_get_pending_demonitor/1, rempid_set_pending_demonitor/2
+                  ]}).
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
 %-define(TRACEPONG(X,Y), io:format(X,Y)).
@@ -498,10 +512,10 @@ rempid_inc(Entry) ->
 rempid_dec(Entry) ->
     TmpEntry = setelement(2, Entry, element(2, Entry) - 1),
     rempid_set_last_modified(TmpEntry, {0,0,0}).
--spec rempid_set_last_modified(rempid(), util:time()) -> rempid().
-rempid_set_last_modified(Entry, Time) -> setelement(3, Entry, Time).
 -spec rempid_get_last_modified(rempid()) -> util:time().
 rempid_get_last_modified(Entry) -> element(3, Entry).
+-spec rempid_set_last_modified(rempid(), util:time()) -> rempid().
+rempid_set_last_modified(Entry, Time) -> setelement(3, Entry, Time).
 -spec rempid_get_pending_demonitor(rempid()) -> boolean().
 rempid_get_pending_demonitor(Entry) -> element(4, Entry).
 -spec rempid_set_pending_demonitor(rempid(), boolean()) -> rempid().

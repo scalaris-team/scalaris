@@ -22,6 +22,8 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [req_get_op/1, req_get_key/1]}).
+
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 
@@ -114,14 +116,14 @@ tlog_and_results_to_abort(TLog, ReqList) ->
                                             req_get_key(Req),
                                             {fail, abort})
                                   end end, TLog, ReqList),
-    {NewTLog, [ case element(1, X) of
+    {NewTLog, [ case req_get_op(Req) of
                     read -> {fail, not_found};
                     write -> {ok};
                     add_del_on_list -> {ok};
                     add_on_nr -> {ok};
                     test_and_set -> {ok};
                     commit -> {fail, abort, []}
-                end || X <- ReqList ]}.
+                end || Req <- ReqList ]}.
 
 %% @doc Send requests to the DHT, gather replies and merge TLogs.
 -spec upd_tlog_via_rdht(tx_tlog:tlog(), [request_on_key()]) -> tx_tlog:tlog().

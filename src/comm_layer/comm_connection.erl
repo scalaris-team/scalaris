@@ -30,6 +30,18 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
+-compile({inline, [dest_ip/1, dest_port/1, local_listen_port/1, channel/1,
+                   socket/1, set_socket/2,
+                   started/1,
+                   s_msg_count/1, inc_s_msg_count/1,
+                   r_msg_count/1, inc_r_msg_count/1,
+                   msg_queue/1, set_msg_queue/2,
+                   msg_queue_len/1, set_msg_queue_len/2,
+                   desired_bundle_size/1, set_desired_bundle_size/2,
+                   msgs_since_bundle_start/1, inc_msgs_since_bundle_start/1,
+                   set_msgs_since_bundle_start/2,
+                   last_stat_report/1, set_last_stat_report/2]}).
+
 -include("scalaris.hrl").
 
 -export([start_link/6, init/1, on/2]).
@@ -429,8 +441,7 @@ msg_queue_len(State)           -> element(10, State).
 set_msg_queue_len(State, Val)  -> setelement(10, State, Val).
 desired_bundle_size(State)     -> element(11, State).
 set_desired_bundle_size(State, Val) -> setelement(11, State, Val).
-msgs_since_bundle_start(State) ->
-    element(12, State).
+msgs_since_bundle_start(State) -> element(12, State).
 inc_msgs_since_bundle_start(State) ->
     setelement(12, State, msgs_since_bundle_start(State) + 1).
 set_msgs_since_bundle_start(State, Val) ->
