@@ -207,17 +207,17 @@ get_and_cache_ring() ->
                     _         -> statistics:get_ring_details()
                 end,
             % mapping node_id -> index
-            util:map_with_nr(
-              fun(RingE, NrX) ->
-                      case RingE of
-                          {ok, NodeDetailsX} ->
-                              NodeX = node_details:get(NodeDetailsX, node),
-                              erlang:put({web_scalaris_ring_idx, node:id(NodeX)}, NrX),
-                              erlang:put(web_scalaris_ring_size, NrX),
-                              ok;
-                          _ -> ok
-                      end
-              end, Ring, 1),
+            _ = util:map_with_nr(
+                  fun(RingE, NrX) ->
+                          case RingE of
+                              {ok, NodeDetailsX} ->
+                                  NodeX = node_details:get(NodeDetailsX, node),
+                                  erlang:put({web_scalaris_ring_idx, node:id(NodeX)}, NrX),
+                                  erlang:put(web_scalaris_ring_size, NrX),
+                                  ok;
+                              _ -> ok
+                          end
+                  end, Ring, 1),
             erlang:put(web_scalaris_ring, Ring);
         Ring -> ok
     end,
