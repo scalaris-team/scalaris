@@ -185,14 +185,14 @@ set_tp_for_paxosid(State, TP, PaxosId) ->
 add_learner_decide(State, {learner_decide, _ItemId, _PaxosID, Value} = Msg) ->
     case ok =/= get_status(State) of
         true -> %% new | uninitialized
-            TmpState = tx_item_state:hold_back(Msg, State),
-            NewState = tx_item_state:set_status(TmpState, uninitialized),
+            TmpState = hold_back(Msg, State),
+            NewState = set_status(TmpState, uninitialized),
             {hold_back, NewState};
         false -> %% ok
             TmpState =
                 case Value of
-                    ?prepared -> tx_item_state:inc_numprepared(State);
-                    ?abort ->    tx_item_state:inc_numabort(State)
+                    ?prepared -> inc_numprepared(State);
+                    ?abort ->    inc_numabort(State)
                 end,
             case newly_decided(TmpState) of
                 false -> {state_updated, TmpState};
