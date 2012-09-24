@@ -40,7 +40,10 @@
 -export([start_link/2]).
 -export([on/2, init/1]).
 
+-include("proposer_state.hrl").
+
 -type state() :: atom(). % TableName
+
 %%% public function to start a new paxos instance gets as parameters:
 %%%   PaxosID: has to be unique in the system, user has to care about this
 %%%   Acceptors: a list of paxos_acceptor processes, that are used
@@ -121,8 +124,8 @@ on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
     ?TRACE("proposer:initialize for paxos id: ~p round ~p~n", [PaxosID,InitialRound]),
     case pdb:get(PaxosID, ETSTableName) of
         undefined ->
-            pdb:set(proposer_state:new(PaxosID, ReplyTo, Acceptors, Proposal,
-                                       Majority, MaxProposers, InitialRound),
+            pdb:set(state_new(PaxosID, ReplyTo, Acceptors, Proposal,
+                              Majority, MaxProposers, InitialRound),
                     ETSTableName);
         _ ->
             log:log(error, "Duplicate proposer:initialize for paxos id ~p"
@@ -136,12 +139,12 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
     case pdb:get(PaxosID, ETSTableName) of
         undefined -> State;
         StateForID ->
-            TmpState = proposer_state:reset_state(StateForID),
-            NewState = proposer_state:inc_round(TmpState),
+            TmpState = state_reset_state(StateForID),
+            NewState = state_inc_round(TmpState),
             pdb:set(NewState, ETSTableName),
             gen_component:post_op(State,
                                   {proposer_trigger, PaxosID,
-                                   proposer_state:get_round(NewState)})
+                                   state_get_round(NewState)})
     end;
 
 %% trigger for given round is needed for initial round without auto-increment
@@ -152,9 +155,9 @@ on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
     case pdb:get(PaxosID, ETSTableName) of
         undefined -> ok;
         StateForID ->
-            Acceptors = proposer_state:get_acceptors(StateForID),
-            ReplyTo = proposer_state:get_replyto(StateForID),
-            Proposal = proposer_state:get_proposal(StateForID),
+            Acceptors = state_get_acceptors(StateForID),
+            ReplyTo = state_get_replyto(StateForID),
+            Proposal = state_get_proposal(StateForID),
             _ = case Round of
                 0 -> [msg_accept(X, ReplyTo,
                                  PaxosID, Round,
@@ -163,9 +166,9 @@ on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
                 _ -> [msg_prepare(X, ReplyTo, PaxosID, Round)
                       || X <- Acceptors]
             end,
-            case Round > proposer_state:get_round(StateForID) of
+            case Round > state_get_round(StateForID) of
                 true ->
-                    pdb:set(proposer_state:set_round(StateForID, Round),
+                    pdb:set(state_set_round(StateForID, Round),
                             ETSTableName);
                 false -> ok
             end
@@ -180,7 +183,7 @@ on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
             %% -> Proposers don't get messages, they not requested.
             ok;
         StateForID ->
-            case proposer_state:add_ack_msg(StateForID, Round, Value, RLast) of
+            case state_add_ack_msg(StateForID, Round, Value, RLast) of
                 {ok, NewState} ->
                     %% ?TRACE("NEW State: ~p~n", [NewState]),
                     pdb:set(NewState, ETSTableName);
@@ -188,9 +191,9 @@ on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
                     %%   multicast accept(Round, Latest_value) to Acceptors
                     %% ?TRACE("NEW State: ~p majority accepted~n", [NewState]),
                     pdb:set(NewState, ETSTableName),
-                    Acceptors = proposer_state:get_acceptors(NewState),
-                    ReplyTo = proposer_state:get_replyto(NewState),
-                    LatestVal = proposer_state:get_latest_value(NewState),
+                    Acceptors = state_get_acceptors(NewState),
+                    ReplyTo = state_get_replyto(NewState),
+                    LatestVal = state_get_latest_value(NewState),
                     [msg_accept(X, ReplyTo, PaxosID, Round, LatestVal)
                      || X <- Acceptors]
             end
@@ -220,16 +223,16 @@ start_new_higher_round(PaxosID, Round, ETSTableName) ->
     case pdb:get(PaxosID, ETSTableName) of
         undefined -> ok;
         StateForID ->
-            MyRound = proposer_state:get_round(StateForID),
+            MyRound = state_get_round(StateForID),
             %% check whether outdated nack message? (we get them from each acceptor)
             case MyRound < Round of
                 true ->
-                    MaxProposers = proposer_state:get_max_proposers(StateForID),
+                    MaxProposers = state_get_max_proposers(StateForID),
                     Factor = (Round - MyRound) div MaxProposers + 1,
                     NextRound = MyRound + Factor * MaxProposers,
                     %% let other prop. more time (NextRound ms) to achieve consensus
-                    TmpState = proposer_state:reset_state(StateForID),
-                    pdb:set(proposer_state:set_round(TmpState, NextRound), ETSTableName),
+                    TmpState = state_reset_state(StateForID),
+                    pdb:set(state_set_round(TmpState, NextRound), ETSTableName),
                     NewMsg = {proposer_trigger, PaxosID, NextRound},
 %%                     comm:send_local_after(NextRound, self(),
 %%                                              {proposer_trigger, PaxosID,

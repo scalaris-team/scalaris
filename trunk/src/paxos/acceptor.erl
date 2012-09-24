@@ -38,6 +38,8 @@
 -export([on/2, init/1]).
 -export([check_config/0]).
 
+-include("acceptor_state.hrl").
+
 %% Messages to expect from this module
 -spec msg_ack(comm:mypid(), any(), non_neg_integer(), any(), non_neg_integer())
              -> ok.
@@ -109,12 +111,12 @@ init([]) ->
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
     {_, StateForID} = get_entry(PaxosID, ETSTableName),
-    case acceptor_state:get_learners(StateForID) of
+    case state_get_learners(StateForID) of
         Learners -> log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
         _ ->
-            NewState = acceptor_state:set_learners(StateForID, Learners),
+            NewState = state_set_learners(StateForID, Learners),
             set_entry(NewState, ETSTableName),
-            case acceptor_state:accepted(NewState) of
+            case state_accepted(NewState) of
                 true  -> inform_learners(PaxosID, NewState);
                 false -> ok
             end
@@ -131,12 +133,12 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
                  {acceptor_delete_if_no_learner, PaxosID});
         _ -> ok
     end,
-    case acceptor_state:add_prepare_msg(StateForID, InRound) of
+    case state_add_prepare_msg(StateForID, InRound) of
         {ok, NewState} ->
             set_entry(NewState, ETSTableName),
             msg_ack(Proposer, PaxosID, InRound,
-                    acceptor_state:get_value(NewState),
-                    acceptor_state:get_raccepted(NewState));
+                    state_get_value(NewState),
+                    state_get_raccepted(NewState));
         {dropped, NewerRound} -> msg_nack(Proposer, PaxosID, NewerRound)
     end,
     State;
@@ -149,7 +151,7 @@ on({?proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = St
                          {acceptor_delete_if_no_learner, PaxosID});
         _ -> ok
     end,
-    _ = case acceptor_state:add_accept_msg(StateForID, InRound, InProposal) of
+    _ = case state_add_accept_msg(StateForID, InRound, InProposal) of
         {ok, NewState} ->
             set_entry(NewState, ETSTableName),
             inform_learners(PaxosID, NewState);
@@ -167,11 +169,11 @@ on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
     {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
     case ErrCode of
         new -> ok; %% already deleted
-        _ -> case acceptor_state:get_learners(StateForID) of
+        _ -> case state_get_learners(StateForID) of
                  [] ->
                      %% io:format("Deleting unhosted acceptor id~n"),
                      pdb:delete(PaxosID, ETSTableName);
-                 _ -> ok %% learners are registered
+                 [_|_] -> ok %% learners are registered
              end
     end,
     State;
@@ -182,19 +184,19 @@ on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
     case ErrCode of
         new -> ok; %% do not support adding learners without prior initialize
         ok ->
-            case acceptor_state:accepted(StateForID) of
+            case state_accepted(StateForID) of
                 true -> inform_learner(Learner,  PaxosID, StateForID);
                 false -> ok
             end,
-            NewLearners = [Learner | acceptor_state:get_learners(StateForID)],
-            NStateForID = acceptor_state:set_learners(StateForID, NewLearners),
+            NewLearners = [Learner | state_get_learners(StateForID)],
+            NStateForID = state_set_learners(StateForID, NewLearners),
             set_entry(NStateForID, ETSTableName)
     end,
     State.
 
 get_entry(Id, TableName) ->
     case pdb:get(Id, TableName) of
-        undefined -> {new, acceptor_state:new(Id)};
+        undefined -> {new, state_new(Id)};
         Entry -> {ok, Entry}
     end.
 
@@ -203,14 +205,14 @@ set_entry(NewEntry, TableName) ->
 
 inform_learners(PaxosID, State) ->
     ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p Decision ~p~n",
-           [PaxosID, acceptor_state:get_learners(State), acceptor_state:get_value(State)]),
+           [PaxosID, state_get_learners(State), state_get_value(State)]),
     [ inform_learner(X, PaxosID, State)
-      || X <- acceptor_state:get_learners(State) ].
+      || X <- state_get_learners(State) ].
 
 inform_learner(Learner, PaxosID, StateForID) ->
     msg_accepted(Learner, PaxosID,
-                 acceptor_state:get_raccepted(StateForID),
-                 acceptor_state:get_value(StateForID)).
+                 state_get_raccepted(StateForID),
+                 state_get_value(StateForID)).
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().

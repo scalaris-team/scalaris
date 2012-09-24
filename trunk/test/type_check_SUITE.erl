@@ -236,7 +236,6 @@ tester_type_check_paxos(_Config) ->
              {inform_learners,2}, %% sends msgs
              {inform_learner,3} %% sends msgs
            ]},
-          {acceptor_state, [], []},
           {learner,
            [ {on, 2}, %% spec for messages not tight enough
              {start_link,2}, %% tries to spawn processes
@@ -246,7 +245,6 @@ tester_type_check_paxos(_Config) ->
            [ {msg_decide,4}, %% sends msg.
              {decide, 2} %% no spec & uses msg_decide
            ]},
-          {learner_state, [], []},
           {proposer,
            [ {msg_accept, 5}, %% tries to send messages
              {on, 2}, %% spec for messages not tight enough
@@ -257,8 +255,7 @@ tester_type_check_paxos(_Config) ->
              {trigger, 2} %% tries to send messages
            ],
            [ {msg_prepare,4}, %% tries to send messages
-             {start_new_higher_round,3}]}, %% tries to send messages
-          {proposer_state, [], []}
+             {start_new_higher_round,3}]} %% tries to send messages
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
@@ -292,7 +289,6 @@ tester_type_check_tx(_Config) ->
              %% use feeder to avoid unknown as key
              {make_tlog_entry, 1}
            ]},
-          {rdht_tx_read_state,[], []},
           {rdht_tx_write,
            [ {abort, 3},
              {commit, 3},
@@ -301,12 +297,7 @@ tester_type_check_tx(_Config) ->
              {validate, 2},
              {work_phase, 3}
            ], []},
-          {tx_item_state,
-           [ {new, 3}, %% TODO: not a list error
-             {new, 5} %% TODO invalid result type
-           ], []},
           {tx_op_beh,[], []},
-          {tx_state, [], []},
           {tx_tlog,
            [ {new_entry, 5}, %% split tlog types for client and rt:keys
              {set_entry_key, 2} %% split tlog types for client and rt:keys
@@ -330,7 +321,9 @@ tester_type_check_tx(_Config) ->
              {send_to_rtms, 2}, %% tries to send
              {state_subscribe, 2}, %% tries to create pids / envelopes
              {state_unsubscribe, 2}, %% tries to create pids / envelopes
-             {merge_item_states, 6} %% needs specially-crafted lists
+             {merge_item_states, 6}, %% needs specially-crafted lists
+             {tx_item_new, 3}, %% TODO: not a list error
+             {tx_item_new, 5} %% TODO invalid result type
            ]}
           %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
           %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},

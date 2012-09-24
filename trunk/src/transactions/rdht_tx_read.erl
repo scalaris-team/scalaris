@@ -38,6 +38,8 @@
 -export([start_link/1]).
 -export([check_config/0]).
 
+-include("rdht_tx_read_state.hrl").
+
 %% reply messages a client should expect (when calling asynch work_phase/3)
 -spec msg_reply(rdht_tx:req_id() | rdht_tx_write:req_id(),
                 tx_tlog:tlog_entry()) -> comm:message().
@@ -163,14 +165,14 @@ on({?get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    TmpEntry = rdht_tx_read_state:add_reply(Entry, Val, Vers, MajOk, MajDeny),
-    _ = case rdht_tx_read_state:get_client(TmpEntry) of
+    TmpEntry = state_add_reply(Entry, Val, Vers, MajOk, MajDeny),
+    _ = case state_get_client(TmpEntry) of
             unknown ->
                 %% when we get a client, we will inform it
                 pdb:set(TmpEntry, Table);
             Client ->
                 NewEntry =
-                    case rdht_tx_read_state:is_newly_decided(TmpEntry) of
+                    case state_is_newly_decided(TmpEntry) of
                         true  -> inform_client(Client, TmpEntry);
                         false -> TmpEntry
                     end,
@@ -182,9 +184,9 @@ on({?get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
 on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(client_is)~n", [self()]),
     Entry = get_entry(Id, Table),
-    Tmp1Entry = rdht_tx_read_state:set_client(Entry, Pid),
-    TmpEntry = rdht_tx_read_state:set_key(Tmp1Entry, Key),
-    _ = case rdht_tx_read_state:is_newly_decided(TmpEntry) of
+    Tmp1Entry = state_set_client(Entry, Pid),
+    TmpEntry = state_set_key(Tmp1Entry, Key),
+    _ = case state_is_newly_decided(TmpEntry) of
             true ->
                 Tmp2Entry = inform_client(Pid, TmpEntry),
                 set_or_delete_if_all_replied(Tmp2Entry, Reps, Table);
@@ -204,60 +206,60 @@ on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
 %    end,
     State.
 
--spec get_entry(rdht_tx:req_id(), atom()) -> rdht_tx_read_state:read_state().
+-spec get_entry(rdht_tx:req_id(), atom()) -> read_state().
 get_entry(Id, Table) ->
     case pdb:get(Id, Table) of
         undefined ->
 %%            msg_delay:send_local(config:read(transaction_lookup_timeout) div 1000,
 %%                                 self(), {timeout_id, Id}),
-            rdht_tx_read_state:new(Id);
+            state_new(Id);
         Any -> Any
     end.
 
-% -spec timeout_inform(rdht_tx_read_state:read_state()) -> ok.
+% -spec timeout_inform(read_state()) -> ok.
 % %% inform client on timeout if Id exists and client is not informed yet
 % timeout_inform(Entry) ->
-%     case {rdht_tx_read_state:is_client_informed(Entry),
-%           rdht_tx_read_state:get_client(Entry)} of
+%     case {state_is_client_informed(Entry),
+%           state_get_client(Entry)} of
 %         {_, unknown} -> ok;
 %         {false, Client} ->
-%             TmpEntry = rdht_tx_read_state:set_decided(Entry, {fail, timeout}),
+%             TmpEntry = state_set_decided(Entry, {fail, timeout}),
 %             inform_client(Client, TmpEntry);
 %         _ -> ok
 %     end.
 
--spec inform_client(pid(), rdht_tx_read_state:read_state()) ->
-                           rdht_tx_read_state:read_state().
+-spec inform_client(pid(), read_state()) ->
+                           read_state().
 inform_client(Client, Entry) ->
-    Id = rdht_tx_read_state:get_id(Entry),
+    Id = state_get_id(Entry),
     Msg = msg_reply(Id, make_tlog_entry(Entry)),
     comm:send_local(Client, Msg),
-    rdht_tx_read_state:set_client_informed(Entry).
+    state_set_client_informed(Entry).
 
 %% -spec make_tlog_entry_feeder(
-%%         {rdht_tx_read_state:read_state(), ?RT:key()})
-%%                             -> {rdht_tx_read_state:read_state()}.
+%%         {read_state(), ?RT:key()})
+%%                             -> {read_state()}.
 %% make_tlog_entry_feeder({State, Key}) ->
 %%     %% when make_tlog_entry is called, the key of the state is never
 %%     %% 'unknown'
-%%     {rdht_tx_read_state:set_key(State, Key)}.
+%%     {state_set_key(State, Key)}.
 
--spec make_tlog_entry(rdht_tx_read_state:read_state()) ->
+-spec make_tlog_entry(read_state()) ->
                                 tx_tlog:tlog_entry().
 make_tlog_entry(Entry) ->
-    {Val, Vers} = rdht_tx_read_state:get_result(Entry),
-    Key = rdht_tx_read_state:get_key(Entry),
-    Status = rdht_tx_read_state:get_decided(Entry),
+    {Val, Vers} = state_get_result(Entry),
+    Key = state_get_key(Entry),
+    Status = state_get_decided(Entry),
     tx_tlog:new_entry(?read, Key, Vers, Status, Val).
 
--spec set_or_delete_if_all_replied(rdht_tx_read_state:read_state(),
+-spec set_or_delete_if_all_replied(read_state(),
                                    pos_integer(), atom()) -> ok.
 set_or_delete_if_all_replied(Entry, Reps, Table) ->
     ?TRACE("rdht_tx_read:delete_if_all_replied Reps: ~p =?= ~p, ClientInformed: ~p Client: ~p~n",
-              [Reps, rdht_tx_read_state:get_numreplied(Entry), rdht_tx_read_state:is_client_informed(Entry), rdht_tx_read_state:get_client(Entry)]),
-    case (Reps =:= rdht_tx_read_state:get_numreplied(Entry))
-        andalso (rdht_tx_read_state:is_client_informed(Entry)) of
-        true  -> pdb:delete(rdht_tx_read_state:get_id(Entry), Table);
+              [Reps, state_get_numreplied(Entry), state_is_client_informed(Entry), state_get_client(Entry)]),
+    case (Reps =:= state_get_numreplied(Entry))
+        andalso (state_is_client_informed(Entry)) of
+        true  -> pdb:delete(state_get_id(Entry), Table);
         false -> pdb:set(Entry, Table)
     end.
 
