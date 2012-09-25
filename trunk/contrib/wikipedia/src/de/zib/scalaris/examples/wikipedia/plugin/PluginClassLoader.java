@@ -203,6 +203,7 @@ public class PluginClassLoader extends ClassLoader {
                         }
                     }
                 }
+                jarFile.close();
             }
         }
     }
@@ -222,14 +223,15 @@ public class PluginClassLoader extends ClassLoader {
         cp.append(System.getProperty("java.class.path" ));
         
         for (ClassLoader cl: new ClassLoader[] {this.getClass().getClassLoader(), getSystemClassLoader()}) {
-            if (cl instanceof URLClassLoader) {
+            if (cl != null && cl instanceof URLClassLoader) {
+                // note: we don't create new class loaders here!
+                @SuppressWarnings("resource")
                 URLClassLoader clu = (URLClassLoader) cl;
                 for (URL url: clu.getURLs()) {
                     cp.append(File.pathSeparatorChar);
                     cp.append(url.getPath());
                 }
             }
-
         }
         for (File jarFile: addJars) {
             cp.append(File.pathSeparatorChar);
