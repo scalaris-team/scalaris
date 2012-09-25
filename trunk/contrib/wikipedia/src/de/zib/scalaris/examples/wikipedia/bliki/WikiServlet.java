@@ -1115,10 +1115,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        for (WikiEventHandler handler: eventHandlers) {
-            handler.onPageView(page, connection);
-        }
-
         forwardToPageJsp(request, response, connection, page);
     }
 
