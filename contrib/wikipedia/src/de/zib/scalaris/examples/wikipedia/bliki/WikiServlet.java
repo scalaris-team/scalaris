@@ -767,7 +767,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             showEmptyPage(request, response, connection, page);
             return;
         } else {
-            redirectUrl = response.encodeRedirectURL("?title=Main Page"
+            redirectUrl = response.encodeRedirectURL("?title=" + MAIN_PAGE
                     + "&notice=error: can not view random page: <pre>"
                     + result.message + "</pre>" + serviceUser);
         }
