@@ -1063,12 +1063,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected void forwardToPageJsp(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
             WikiPageBean page) throws ServletException, IOException {
-        for (WikiEventHandler handler: eventHandlers) {
-            handler.onPageView(page, connection);
-        }
-        
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
+        request.setAttribute("servlet", this);
         RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
         dispatcher.forward(request, response);
     }
@@ -1171,13 +1168,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
-
-            for (WikiEventHandler handler: eventHandlers) {
-                handler.onPageHistory(page, connection);
-            }
             
             // forward the request and the bean to the jsp:
             request.setAttribute("pageBean", page);
+            request.setAttribute("servlet", this);
             RequestDispatcher dispatcher = request
                     .getRequestDispatcher("pageHistory.jsp");
             dispatcher.forward(request, response);
@@ -1248,13 +1242,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
-
-            for (WikiEventHandler handler: eventHandlers) {
-                handler.onSpecialPage(page, connection);
-            }
             
             // forward the request and the bean to the jsp:
             request.setAttribute("pageBean", page);
+            request.setAttribute("servlet", this);
             RequestDispatcher dispatcher = request
                     .getRequestDispatcher("pageSpecial_pagelist.jsp");
             dispatcher.forward(request, response);
@@ -1662,12 +1653,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        for (WikiEventHandler handler: eventHandlers) {
-            handler.onPageEditStart(page, connection);
-        }
-
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
+        request.setAttribute("servlet", this);
         RequestDispatcher dispatcher = request.getRequestDispatcher("pageEdit.jsp");
         dispatcher.forward(request, response);
     }
@@ -1793,12 +1781,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        for (WikiEventHandler handler: eventHandlers) {
-            handler.onPageEditPreview(page, connection);
-        }
-
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
+        request.setAttribute("servlet", this);
         RequestDispatcher dispatcher = request.getRequestDispatcher("pageEdit.jsp");
         dispatcher.forward(request, response);
     }
@@ -2087,18 +2072,21 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
     }
     
-    /**
-     * Adds a user request to the user request log if enabled by setting
-     * {@link Options#LOG_USER_REQS} to a value larger than <tt>0</tt>.
-     * 
-     * @param timestamp
-     *            milliseconds since midnight, January 1, 1970
-     * @param serviceUser
-     *            service user name (may be null)
-     * @param servertime
-     *            time spend in the web server
-     */
-    public static void storeUserReq(long timestamp, String serviceUser, long servertime) {
+    @Override
+    public void storeUserReq(WikiPageBeanBase page, long servertime) {
+        long timestamp = page.getStartTime();
+        String serviceUser = page.getServiceUser();
+        if (!eventHandlers.isEmpty()) {
+            Connection connection = getConnection(null);
+            for (WikiEventHandler handler: eventHandlers) {
+                try {
+                    handler.onPageView(page, connection);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            releaseConnection(null, connection);
+        }
         if (userReqLogs != null && userReqLogs.length > 0) {
             int timestamp_s = (int) (timestamp / 1000);
             // build log entry:

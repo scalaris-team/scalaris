@@ -77,4 +77,20 @@ public interface WikiServletContext {
      *            the event handler to add
      */
     public abstract void registerEventHandler(WikiEventHandler handler);
+    
+    /**
+     * Called at the end of each <tt>jsp</tt> for storing user requests.
+     * 
+     * Adds a user request to the user request log if enabled by setting
+     * {@link Options#LOG_USER_REQS} to a value larger than <tt>0</tt>. Also
+     * calls {@link WikiEventHandler#onPageView(WikiPageBeanBase, Object)} for
+     * each registered event handler no matter what
+     * {@link Options#LOG_USER_REQS} is set.
+     * 
+     * @param page
+     *            some info on the shown page
+     * @param servertime
+     *            time spend in the web server
+     */
+    public abstract void storeUserReq(WikiPageBeanBase page, long servertime);
 }
