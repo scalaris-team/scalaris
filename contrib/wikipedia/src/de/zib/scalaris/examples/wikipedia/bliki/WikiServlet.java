@@ -348,7 +348,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         try {
             if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
-                showImportPage(request, response, connection); // should forward to another page
+                showImportPage(request, response, connection, new WikiPageBean(serviceUser, startTime)); // should forward to another page
                 return; // return just in case
             }
             request.setCharacterEncoding("UTF-8");
@@ -693,7 +693,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         try {
             if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
-                showImportPage(request, response, connection); // should forward to another page
+                showImportPage(request, response, connection, new WikiPageBean(
+                        serviceUser, startTime)); // should forward to another page
                 return; // return just in case
             }
             request.setCharacterEncoding("UTF-8");
@@ -1586,13 +1587,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            the request of the current operation
      * @param response
      *            the response of the current operation
+     * @param page
+     *            the bean for the page
      * 
      * @throws IOException 
      * @throws ServletException 
      */
     protected synchronized void showImportPage(HttpServletRequest request,
-            HttpServletResponse response, Connection connection)
-            throws ServletException, IOException {
+            HttpServletResponse response, Connection connection,
+            WikiPageBean page) throws ServletException, IOException {
     }
 
     /**

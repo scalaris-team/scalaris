@@ -215,9 +215,8 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
      */
     @Override
     protected synchronized void showImportPage(HttpServletRequest request,
-            HttpServletResponse response, Connection connection)
-            throws ServletException, IOException {
-        WikiPageBean page = new WikiPageBean();
+            HttpServletResponse response, Connection connection,
+            WikiPageBean page) throws ServletException, IOException {
         page.setNotAvailable(true);
         request.setAttribute("pageBean", page);
         
@@ -242,6 +241,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                 content.append("<h2>Please select a wiki dump to import</h2>\n");
                 
                 content.append("<form method=\"get\" action=\"wiki\">\n");
+                content.append("<input type=\"hidden\" value=\"" + page.getServiceUser() + "\" name=\"service_user\"/>");
                 content.append("<p>\n");
                 content.append("  <select name=\"import\" size=\"10\" style=\"width:500px;\">\n");
                 for (String dump: availableDumps) {
@@ -273,14 +273,14 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     }
                     importHandler.setMsgOut(ps);
                     this.new ImportThread(importHandler, fileName, ps).start();
-                    response.setHeader("Refresh", "2; url = wiki?import=" + currentImport + "#refresh");
+                    response.setHeader("Refresh", "2; url = wiki?import=" + currentImport + "&service_user=" + page.getServiceUser() + "#refresh");
                     content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
                     content.append("<pre>");
                     content.append("starting import...\n");
                     content.append("</pre>");
-                    content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "#refresh\">refresh</a></p>");
+                    content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "&service_user=" + page.getServiceUser() + "#refresh\">refresh</a></p>");
                     if (importHandler.hasStopSupport()) {
-                        content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
+                        content.append("<p><a href=\"wiki?stop_import=" + currentImport + "&service_user=" + page.getServiceUser() + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
                     }
                 } catch (Exception e) {
                     setParam_error(request, "ERROR: import failed");
@@ -298,7 +298,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                 importHandler.stopParsing();
                 content.append("<p>Current log file:</p>\n");
             } else {
-                response.setHeader("Refresh", IMPORT_REDIRECT_EVERY + "; url = wiki?import=" + currentImport + "#refresh");
+                response.setHeader("Refresh", IMPORT_REDIRECT_EVERY + "; url = wiki?import=" + currentImport + "&service_user=" + page.getServiceUser() + "#refresh");
                 content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
             }
             content.append("<pre>");
@@ -309,12 +309,12 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             }
             content.append("</pre>");
             if (!stopImport) {
-                content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "#refresh\">refresh</a></p>");
+                content.append("<p><a name=\"refresh\" href=\"wiki?import=" + currentImport + "&service_user=" + page.getServiceUser() + "#refresh\">refresh</a></p>");
                 if (importHandler.hasStopSupport()) {
-                    content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
+                    content.append("<p><a href=\"wiki?stop_import=" + currentImport + "&service_user=" + page.getServiceUser() + "\">stop</a> (WARNING: pages may be incomplete due to missing templates)</p>");
                 }
             } else {
-                content.append("<p>Import has been stopped by the user. Return to <a href=\"wiki?title=" + MAIN_PAGE + "\">" + MAIN_PAGE + "</a>.</p>");
+                content.append("<p>Import has been stopped by the user. Return to <a href=\"wiki?title=" + MAIN_PAGE + "&service_user=" + page.getServiceUser() + "\">" + MAIN_PAGE + "</a>.</p>");
             }
         } else if (!currentImport.isEmpty() && importHandler == null) {
             content.append("<h2>Import of \"" + currentImport + "\" finished</h2>\n");
@@ -333,10 +333,10 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     importLog.close();
                     WikiServletScalaris.this.currentImport = "";
                 }
-                response.setHeader("Refresh", "1; url = wiki");
-                content.append("<p>If not re-directed automatically: Return to <a href=\"wiki?title=" + MAIN_PAGE + "\">" + MAIN_PAGE + "</a></p>\n");
+                response.setHeader("Refresh", "1; url = wiki?title=" + MAIN_PAGE + "&service_user=" + page.getServiceUser() + "");
+                content.append("<p>If not re-directed automatically: Return to <a href=\"wiki?title=" + MAIN_PAGE + "&service_user=" + page.getServiceUser() + "\">" + MAIN_PAGE + "</a></p>\n");
             } else {
-                content.append("<p><a href=\"wiki?stop_import=" + currentImport + "\">clear log and return to Main Page</a></p>");
+                content.append("<p><a href=\"wiki?stop_import=" + currentImport + "&service_user=" + page.getServiceUser() + "\">clear log and return to Main Page</a></p>");
             }
         }
 
