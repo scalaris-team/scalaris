@@ -31,6 +31,11 @@ BuildRequires:  scalaris-java >= 0.4.1+svn3348
 %else
 %define with_tomcat6 0
 %endif
+%if 0%{?fedora_version} >= 16
+%define with_tomcat7 1
+%else
+%define with_tomcat7 0
+%endif
 %endif
 
 ##########################################################################################
@@ -39,21 +44,27 @@ BuildRequires:  scalaris-java >= 0.4.1+svn3348
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 %define with_tomcat5 1
 %define with_tomcat6 0
+%define with_tomcat7 0
 %endif
 
 ###########################################################################################
 # SuSE, openSUSE
 ###########################################################################################
 %if 0%{?suse_version}
-%if 0%{?suse_version} >= 1110 
+%if 0%{?suse_version} >= 1110
 %define with_tomcat5 0
 %else
 %define with_tomcat5 1
 %endif
-%if 0%{?sles_version} == 10
+%if 0%{?sles_version} == 10 || 0%{?suse_version} >= 1220
 %define with_tomcat6 0
 %else
 %define with_tomcat6 1
+%endif
+%if 0%{?suse_version} >= 1220
+%define with_tomcat7 1
+%else
+%define with_tomcat7 0
 %endif
 %endif
 
@@ -87,6 +98,19 @@ This web application demonstrates the use of Scalaris as a data-store back-end f
 Wikipedia-like application.
 %endif
 
+%if 0%{?with_tomcat7}
+%package -n scalaris-examples-wiki-tomcat7
+Summary:    Wikipedia on Scalaris example using tomcat7
+Group:      Productivity/Networking/Web/Servers
+Requires:   tomcat >= 7.0.0
+Requires:   scalaris-java >= 0.4.1+svn3348
+BuildArch:  noarch
+
+%description -n scalaris-examples-wiki-tomcat7
+This web application demonstrates the use of Scalaris as a data-store back-end for a
+Wikipedia-like application.
+%endif
+
 %prep
 %setup -q -n %{name}-%{version}
 
@@ -111,6 +135,10 @@ cp -r scalaris-wiki %{buildroot}/usr/share/tomcat5/webapps/scalaris-wiki
 mkdir -p %{buildroot}/usr/share/tomcat6/webapps
 cp -r scalaris-wiki %{buildroot}/usr/share/tomcat6/webapps/scalaris-wiki
 %endif
+%if 0%{?with_tomcat7}
+mkdir -p %{buildroot}/usr/share/tomcat/webapps
+cp -r scalaris-wiki %{buildroot}/usr/share/tomcat/webapps/scalaris-wiki
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -129,6 +157,14 @@ rm -rf $RPM_BUILD_ROOT
 %dir /usr/share/tomcat6
 %dir /usr/share/tomcat6/webapps
 /usr/share/tomcat6/webapps/scalaris-wiki
+%endif
+
+%if 0%{?with_tomcat7}
+%files -n scalaris-examples-wiki-tomcat7
+%defattr(-,root,root)
+%dir /usr/share/tomcat
+%dir /usr/share/tomcat/webapps
+/usr/share/tomcat/webapps/scalaris-wiki
 %endif
 
 %changelog
