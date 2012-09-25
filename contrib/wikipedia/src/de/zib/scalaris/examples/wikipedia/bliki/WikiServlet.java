@@ -2070,16 +2070,18 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected void updateExistingPages() {
         if (initialized) {
             Connection connection = getConnection(null);
-            try {
-                ValueResult<List<NormalisedTitle>> result = getPageList(connection);
-                if (result.success) {
-                    List<NormalisedTitle> pages = result.value;
-                    pages.addAll(specialPages);
-                    BloomFilter<NormalisedTitle> filter = MyWikiModel.createBloomFilter(pages);
-                    existingPages = filter;
+            if (connection != null) {
+                try {
+                    ValueResult<List<NormalisedTitle>> result = getPageList(connection);
+                    if (result.success) {
+                        List<NormalisedTitle> pages = result.value;
+                        pages.addAll(specialPages);
+                        BloomFilter<NormalisedTitle> filter = MyWikiModel.createBloomFilter(pages);
+                        existingPages = filter;
+                    }
+                } finally {
+                    releaseConnection(null, connection);
                 }
-            } finally {
-                releaseConnection(null, connection);
             }
         }
     }
