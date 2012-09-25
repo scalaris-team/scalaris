@@ -161,8 +161,13 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     /**
      * Sets up the connection to the Scalaris erlang node once on the server.
      * 
+     * In case of errors, the <tt>error</tt> and <tt>notice</tt> attributes of
+     * the <tt>request</tt> object are set appropriately if not <tt>null</tt>.
+     * 
      * @param request
-     *            request to the servlet or <tt>null</tt> if there is none
+     *            the request to the servlet
+     * 
+     * @return a valid connection of <tt>null</tt> if an error occurred
      */
     @Override
     protected Connection getConnection(HttpServletRequest request) {
