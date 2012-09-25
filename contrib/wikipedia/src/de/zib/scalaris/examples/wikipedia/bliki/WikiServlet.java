@@ -295,8 +295,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * Sets up the connection to the DB server.
      * 
+     * In case of errors, the <tt>error</tt> and <tt>notice</tt> attributes of
+     * the <tt>request</tt> object are set appropriately if not <tt>null</tt>.
+     * 
      * @param request
      *            the request to the servlet
+     * 
+     * @return a valid connection of <tt>null</tt> if an error occurred
      */
     abstract protected Connection getConnection(HttpServletRequest request);
 
