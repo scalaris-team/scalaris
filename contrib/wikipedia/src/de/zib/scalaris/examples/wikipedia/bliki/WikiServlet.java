@@ -747,6 +747,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewRandomPage(HttpServletRequest request,
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws IOException, ServletException {
+        page.setTitle(title);
         ValueResult<NormalisedTitle> result = getRandomArticle(connection, new Random());
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
