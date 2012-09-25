@@ -23,7 +23,6 @@ import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageBean;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageBeanBase;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageEditBean;
-import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiServlet;
 
 /**
@@ -40,7 +39,7 @@ public interface WikiEventHandler {
      * the wiki.
      * 
      * Note that if the operation was not successful,
-     * {@link #onPageEditPreview(WikiPageEditBean, Object)} will also be called!
+     * {@link #onPageView(WikiPageBeanBase, Object)} will also be called!
      * 
      * @param page
      *            some info on the edited page
@@ -53,31 +52,9 @@ public interface WikiEventHandler {
             Connection connection);
 
     /**
-     * Will be called on an edit preview (textbox + rendered wiki text). Note
-     * that after an unsuccessful save operation, an edit preview is shown, too!
-     * 
-     * @param page
-     *            some info on the edited page
-     * @param connection
-     *            connection to the data store
-     * 
-     * @see #onPageSaved(WikiPageEditBean, SavePageResult, Object)
-     */
-    public <Connection> void onPageEditPreview(WikiPageEditBean page, Connection connection);
-
-    /**
-     * Will be called if an edit was started (textbox without page preview).
-     * 
-     * @param page
-     *            some info on the edited page
-     * @param connection
-     *            connection to the data store
-     */
-    public <Connection> void onPageEditStart(WikiPageEditBean page, Connection connection);
-
-    /**
-     * Will be called for a normal page view. This also includes empty pages,
-     * NoArticleText, BadTitle, unsuccessful data connections etc.
+     * Will be called for a page view. This also includes empty pages,
+     * NoArticleText, BadTitle, unsuccessful data connections, page edit/preview
+     * pages, special pages, page history pages etc.
      * 
      * @param page
      *            some info on the shown page
@@ -85,26 +62,6 @@ public interface WikiEventHandler {
      *            connection to the data store (may be <tt>null</tt>!)
      */
     public <Connection> void onPageView(WikiPageBeanBase page, Connection connection);
-
-    /**
-     * Will be called when a special page is shown.
-     * 
-     * @param page
-     *            some info on the shown page
-     * @param connection
-     *            connection to the data store
-     */
-    public <Connection> void onSpecialPage(WikiPageListBean page, Connection connection);
-
-    /**
-     * Will be called when a page history is shown.
-     * 
-     * @param page
-     *            some info on the shown page
-     * @param connection
-     *            connection to the data store
-     */
-    public <Connection> void onPageHistory(WikiPageBean page, Connection connection);
 
     /**
      * Will be called during a request for an image.

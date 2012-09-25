@@ -6,6 +6,7 @@
  import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,org.apache.commons.lang.StringUtils,org.apache.commons.lang.StringEscapeUtils"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageBean" scope="request" />
+<jsp:useBean id="servlet" type="de.zib.scalaris.examples.wikipedia.WikiServletContext" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
@@ -426,6 +427,6 @@ server: <%= renderTime %>
                 </pre></div>
         </div>
         <!-- /footer -->
-<% WikiServlet.storeUserReq(pageBean.getStartTime(), pageBean.getServiceUser(), renderTime); %>
+<% servlet.storeUserReq(pageBean, renderTime); %>
 </body>
 </html>
