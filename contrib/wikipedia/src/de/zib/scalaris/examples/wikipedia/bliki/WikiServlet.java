@@ -166,7 +166,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         init2(config);
         
         loadSiteInfo();
-        loadPlugins();
+        loadPlugins(config);
         startExistingPagesUpdate();
         existingPages.addAll(specialPages);
         if (Options.getInstance().LOG_USER_REQS > 0) {
@@ -220,10 +220,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * Load all plugins from the plugin directory
      * <tt>&lt;ServletContextDir&gt;/WEB-INF/plugins</tt>.
      * 
+     * @param config
+     *            servlet config
+     * 
      * @return <tt>true</tt> on success, <tt>false</tt> otherwise
      */
     @SuppressWarnings("unchecked")
-    protected synchronized boolean loadPlugins() {
+    protected synchronized boolean loadPlugins(ServletConfig config) {
         final String pluginDir = getServletContext().getRealPath("/WEB-INF/plugins");
         try {
             PluginClassLoader pcl = new PluginClassLoader(pluginDir, new Class[] {WikiPlugin.class});
@@ -233,7 +236,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     WikiPlugin plugin;
                     try {
                         plugin = ((Class<WikiPlugin>) clazz).newInstance();
-                        plugin.init(this);
+                        plugin.init(this, config);
                     } catch (Exception e) {
                         System.err.println("failed to load plugin " + clazz.getCanonicalName());
                         e.printStackTrace();
