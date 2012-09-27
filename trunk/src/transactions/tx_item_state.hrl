@@ -20,6 +20,7 @@
 
 -compile({inline, [tx_item_get_itemid/1, %tx_item_set_itemid/2,
                    tx_item_get_txid/1,
+                   tx_item_get_tlog/1,
                    tx_item_get_maj_for_prepared/1,
                    tx_item_get_maj_for_abort/1,
                    tx_item_get_decided/1, tx_item_set_decided/2,
@@ -100,6 +101,8 @@ tx_item_get_itemid(State) ->         element(1, State).
 %% tx_item_set_itemid(State, Val) ->    setelement(1, State, Val).
 -spec tx_item_get_txid(tx_item_state()) -> tx_id() | undefined_tx_id.
 tx_item_get_txid(State) ->           element(3, State).
+-spec tx_item_get_tlog(tx_item_state()) -> tx_tlog:tlog_entry() | empty_tlog_entry.
+tx_item_get_tlog(State) ->           element(4, State).
 -spec tx_item_get_maj_for_prepared(tx_item_state()) -> non_neg_integer().
 tx_item_get_maj_for_prepared(State) -> element(5, State).
 -spec tx_item_get_maj_for_abort(tx_item_state()) -> non_neg_integer().

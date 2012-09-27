@@ -234,24 +234,22 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     GLLearner = state_get_gllearner(State),
     TLogUid = uid:get_global_uid(),
     NewTid = {?tx_id, TLogUid},
-    TLogTxItemIds = util:map_with_nr(
-                      fun(TLogEntry, NrX) ->
-                              {TLogEntry, {?tx_item_id, TLogUid, NrX}}
-                      end, TransLog, 0),
-    ItemStates =
-        [ begin
-              TItemState = tx_item_new(ItemId, NewTid, TLogEntry),
-              ItemState = tx_item_set_status(TItemState, ok),
-              %% initialize local learner
-              _ = [ learner:start_paxosid(GLLearner, element(1, X),
-                                          Maj, comm:this(), ItemId)
-                      || X <- tx_item_get_paxosids_rtlogs_tps(ItemState) ],
-              ItemState
-          end || {TLogEntry, ItemId} <- TLogTxItemIds ],
+    ItemStates = 
+        util:map_with_nr(
+          fun(TLogEntry, NrX) ->
+                  ItemId = {?tx_item_id, TLogUid, NrX},
+                  TItemState = tx_item_new(ItemId, NewTid, TLogEntry),
+                  ItemState = tx_item_set_status(TItemState, ok),
+                  %% initialize local learner
+                  _ = [ learner:start_paxosid(GLLearner, element(1, X),
+                                              Maj, comm:this(), ItemId)
+                          || X <- tx_item_get_paxosids_rtlogs_tps(ItemState) ],
+                  ItemState
+          end, TransLog, 0),
 
     RTMs = state_get_RTMs(State),
     TmpTxState = tx_state_new(NewTid, Client, ClientsID, comm:this(), RTMs,
-                              TLogTxItemIds, [GLLearner]),
+                              ItemStates, [GLLearner]),
     TxState = tx_state_set_status(TmpTxState, ok),
 
     init_TPs(TxState, ItemStates),
@@ -390,7 +388,7 @@ on({?tx_tm_rtm_delete, TxId, Decision} = Msg, State) ->
             TableName = state_get_tablename(State),
             %% delete locally
             _ = [ pdb:delete(ItemId, TableName)
-              || {_, ItemId} <- tx_state_get_tlog_txitemids(TxState)],
+              || ItemId <- tx_state_get_txitemids(TxState)],
             pdb:delete(TxId, TableName),
             state_dec_opentxnum(NewState)
             %% @TODO failure cases are not handled yet. If some
@@ -469,7 +467,7 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
     Learners = tx_state_get_learners(TxState),
     LAcceptor = state_get_lacceptor(NewState),
     NewItemsHoldBackQ = lists:flatten(
-                          merge_item_states(Tid, tx_state_get_tlog_txitemids(NewEntry),
+                          merge_item_states(Tid, tx_state_get_txitemids(NewEntry),
                                             ItemStates, NewState, Learners, LAcceptor)),
 
     %% process hold back messages for tx_state
@@ -560,7 +558,6 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
-            TxItemIDs = [ TxItemId || {_, TxItemId} <- tx_state_get_tlog_txitemids(TxState)],
             GLLearner = state_get_gllearner(State),
             Proposer = comm:make_global(get_my(Role, proposer)),
             [ begin
@@ -587,7 +584,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                           ct:pal("Already decided~n"),
                           ok
                   end
-              end || ItemId <- TxItemIDs ]
+              end || ItemId <- tx_state_get_txitemids(TxState) ]
             end
         end,
     State;
@@ -750,7 +747,8 @@ init_RTMs(TxState, ItemStates) ->
     ItemStatesForRTM =
         [ {tx_item_get_itemid(ItemState),
            tx_item_get_maj_for_prepared(ItemState),
-           tx_item_get_maj_for_abort(ItemState)}
+           tx_item_get_maj_for_abort(ItemState),
+           tx_item_get_tlog(ItemState)}
         || ItemState <- ItemStates],
     RTMs = tx_state_get_rtms(TxState),
     send_to_rtms(
@@ -779,7 +777,7 @@ init_TPs(TxState, ItemStates) ->
                 api_dht_raw:unreliable_lookup(Key, Msg1)
             end
             || {PaxId, RTLog, _TP} <- tx_item_get_paxosids_rtlogs_tps(ItemState) ]
-              %%      end || {_TLogEntry, ItemId} <- tx_state_get_tlog_txitemids(TxState) ],
+              %%      end || ItemId <- tx_state_get_txitemids(TxState) ],
       end || ItemState <- ItemStates ],
     ok.
 
@@ -810,7 +808,7 @@ get_paxos_ids(State, TxState) ->
             {ok, ItemState} = get_item_entry(ItemId, State),
             [ PaxId || {PaxId, _RTLog, _TP}
                            <- tx_item_get_paxosids_rtlogs_tps(ItemState) ]
-        end || {_TLogEntry, ItemId} <- tx_state_get_tlog_txitemids(TxState) ]).
+        end || ItemId <- tx_state_get_txitemids(TxState) ]).
 
 -spec inform_client(tx_state(), state(), ?commit | ?abort) -> ok.
 inform_client(TxState, State, Result) ->
@@ -834,7 +832,7 @@ inform_tps(TxState, State, Result) ->
     %% inform TPs
     Informed =
         lists:foldl(
-          fun({_TLogEntry, ItemId}, Sum) ->
+          fun(ItemId, Sum) ->
                   {ok, ItemState} = get_item_entry(ItemId, State),
                   Sum + length(
                     [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
@@ -843,7 +841,7 @@ inform_tps(TxState, State, Result) ->
                         || {PaxId, RTLogEntry, TP}
                                <- tx_item_get_paxosids_rtlogs_tps(ItemState),
                            comm:is_valid(TP) ])
-          end, 0, tx_state_get_tlog_txitemids(TxState)),
+          end, 0, tx_state_get_txitemids(TxState)),
     tx_state_set_numinformed(TxState, Informed).
 
 -spec inform_rtms(tx_id(), tx_state(), ?commit | ?abort) -> ok.
@@ -882,7 +880,7 @@ trigger_delete_if_done(TxState, State) ->
     end, ok.
 
 %% @doc Merges the item states transferred in a ?tx_tm_rtm_init_RTM message
-%%      into the locally known state, initiates nex paxos processes and
+%%      into the locally known state, initiates new paxos processes and
 %%      returns the holdback (message) queue. 
 -spec merge_item_states(Tid::tx_id(),
                         [{tx_tlog:tlog_entry(), tx_item_id()}],
@@ -892,8 +890,8 @@ trigger_delete_if_done(TxState, State) ->
                          State::state(), Learners::[comm:mypid()], LAcceptor::pid())
         -> HoldBackQ::[comm:message()].
 merge_item_states(_Tid, [], [], _State, _Learners, _LAcceptor) -> [];
-merge_item_states(Tid, [{TLogEntry, EntryId} | RestLocal],
-                  [{EntryId, Maj_for_prepared, Maj_for_abort} | RestNew],
+merge_item_states(Tid, [EntryId | RestLocal],
+                  [{EntryId, Maj_for_prepared, Maj_for_abort, TLogEntry} | RestNew],
                   State, Learners, LAcceptor) ->
     {LocalItemStatus, LocalItem} = get_item_entry(EntryId, State),
     {TmpItem, TmpItemHoldBackQ} =
@@ -946,7 +944,7 @@ merge_item_states(Tid, [{TLogEntry, EntryId} | RestLocal],
 %%               ValidTPs = [ Y || Y <- TPs, unknown =/= Y],
 %%               length(ValidTPs) >= tx_item_get_maj_for_prepared(ItemState)
 %%           end
-%%           || {_, X} <- tx_state_get_tlog_txitemids(TxState)],
+%%           || X <- tx_state_get_txitemids(TxState)],
 %%     lists:foldl(fun(X, Acc) -> Acc andalso X end, true, BoolV).
 
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
@@ -1057,15 +1055,11 @@ get_failed_keys(TxState, State) ->
     case NumAbort of
         0 -> [];
         _ ->
-            TLogTxItemIds = tx_state_get_tlog_txitemids(TxState),
-            TLog_TxItems =
-                [ begin
-                      {_, TxItem} = get_item_entry(TxItemId, State),
-                      {TLogEntr, TxItem}
-                  end
-                  || {TLogEntr, TxItemId} <- TLogTxItemIds ],
-            [ tx_tlog:get_entry_key(TLogEntr)
-              || {TLogEntr, TxItem} <- TLog_TxItems,
+            TxItems =
+                [ element(2, get_item_entry(TxItemId, State))
+                  || TxItemId <- tx_state_get_txitemids(TxState) ],
+            [ tx_tlog:get_entry_key(tx_item_get_tlog(TxItem))
+              || TxItem <- TxItems,
                  ?abort =:= tx_item_get_decided(TxItem)]
     end,
     case length(Result) of
