@@ -24,7 +24,7 @@
                    tx_state_get_clientsid/1, %tx_state_set_clientsid/2,
                    tx_state_get_tm/1, %tx_state_set_tm/2,
                    tx_state_get_rtms/1, %tx_state_set_rtms/2,
-                   tx_state_get_tlog_txitemids/1, %tx_state_set_tlog_txitemids/2,
+                   tx_state_get_txitemids/1, %tx_state_set_txitemids/2,
                    tx_state_get_learners/1,
                    tx_state_is_decided/1, tx_state_set_decided/2,
                    tx_state_get_numids/1,
@@ -47,8 +47,7 @@
          any(),                    %% ClientsId,
          comm:mypid() | unknown,   %% TM
          rtms(), %% [{Key, RTM, Nth, Acceptor}]
-         [{tx_tlog:tlog_entry(),
-           tx_item_id()}], %% _tlogtxitemids = [{TLogEntry, TxItemId}],
+         [tx_item_id()], %% _txitemids = [TxItemId],
          [comm:mypid()],           %% Learners,
          ?undecided | false | ?abort | ?commit, %% Status decided?
          non_neg_integer(),        %% NumIds,
@@ -74,17 +73,18 @@
 -spec tx_state_new(tx_id(), comm:mypid() | unknown,
                    comm:mypid() | unknown, comm:mypid() | unknown,
                    tx_tm_rtm:rtms(),
-                   [{tx_tlog:tlog_entry(), tx_tm_rtm:tx_item_id()}],
+                   [tx_item_state()],
                    [comm:mypid()]) -> tx_state().
-tx_state_new(Tid, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners) ->
-    {Tid, ?tx_state, Client, ClientsID, TM, RTMs, TLogTxItemIds, Learners,
-     ?undecided, length(TLogTxItemIds),
+tx_state_new(Tid, Client, ClientsID, TM, RTMs, ItemStates, Learners) ->
+    {Tid, ?tx_state, Client, ClientsID, TM, RTMs,
+     [tx_item_get_itemid(ItemState) || ItemState <- ItemStates],
+     Learners, ?undecided, length(ItemStates),
      _Prepared = 0, _Aborts = 0, _Informed = 0, _CommitsAcked = 0,
      _TpsRegistered = 0, _Status = uninitialized, _HoldBackQueue = []}.
 
 -spec tx_state_new(tx_id()) -> tx_state().
 tx_state_new(Tid) ->
-    tx_state_new(Tid, unknown, unknown, unknown, _RTMs = [], _TLogTxItemIds = [], []).
+    tx_state_new(Tid, unknown, unknown, unknown, _RTMs = [], _ItemStates = [], []).
 
 -spec tx_state_get_tid(tx_state()) -> tx_id().
 tx_state_get_tid(State) ->                 element(1, State).
@@ -108,13 +108,10 @@ tx_state_get_tm(State) ->                  element(5, State).
 tx_state_get_rtms(State) ->                element(6, State).
 %% -spec tx_state_set_rtms(tx_state(), tx_tm_rtm:rtms()) -> tx_state().
 %% tx_state_set_rtms(State, Val) ->           setelement(6, State, Val).
--spec tx_state_get_tlog_txitemids(tx_state()) -> [{tx_tlog:tlog_entry(),
-                                                   tx_tm_rtm:tx_item_id()}].
-tx_state_get_tlog_txitemids(State) ->      element(7, State).
-%% -spec tx_state_set_tlog_txitemids(tx_state(),
-%%                                   [{tx_tlog:tlog_entry(),
-%%                                     tx_tm_rtm:tx_item_id()}]) -> tx_state().
-%% tx_state_set_tlog_txitemids(State, Val) -> setelement(7, State, Val).
+-spec tx_state_get_txitemids(tx_state()) -> [tx_tm_rtm:tx_item_id()].
+tx_state_get_txitemids(State) ->      element(7, State).
+%% -spec tx_state_set_txitemids(tx_state(), [tx_tm_rtm:tx_item_id()]) -> tx_state().
+%% tx_state_set_txitemids(State, Val) -> setelement(7, State, Val).
 -spec tx_state_get_learners(tx_state()) -> [comm:mypid()].
 tx_state_get_learners(State) ->            element(8, State).
 -spec tx_state_is_decided(tx_state()) -> ?undecided | false | ?abort | ?commit.
