@@ -30,6 +30,8 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.codec.binary.Base64;
 import org.junit.Test;
 
+import com.ericsson.otp.erlang.OtpErlangObject;
+
 import de.zib.scalaris.TransactionSingleOp.RequestList;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
 import de.zib.scalaris.operations.ReadOp;
@@ -214,8 +216,8 @@ public class TransactionSingleOpTest {
         final TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
-            for (int i = 0; i < testData.length; ++i) {
-                conn.write(testTime + key, testData[i]);
+            for (final String element : testData) {
+                conn.write(testTime + key, element);
             }
 
             // now try to read the data:
@@ -812,9 +814,9 @@ public class TransactionSingleOpTest {
                     assertEquals(testData[i], actual);
                 } else {
                     try {
-                        results.processReadAt(i);
+                        final OtpErlangObject result = results.processReadAt(i).value();
                         // a not found exception must be thrown
-                        assertTrue(false);
+                        assertTrue("Expected a NotFoundException, got: " + result.toString(), false);
                     } catch (final NotFoundException e) {
                     }
                 }

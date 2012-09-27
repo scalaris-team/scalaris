@@ -340,9 +340,9 @@ class TestTransactionSingleOp(unittest.TestCase):
                 self.assertEqual(_TEST_DATA[i], actual)
             else:
                 try:
-                    conn.process_result_read(results[i])
+                    result = conn.process_result_read(results[i])
                     # a not found exception must be thrown
-                    self.fail('expected a NotFoundError')
+                    self.fail('expected a NotFoundError, got: ' + str(result))
                 except scalaris.NotFoundError:
                     pass
 
