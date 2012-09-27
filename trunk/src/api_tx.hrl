@@ -161,7 +161,7 @@ test_and_set(Key, OldValue, NewValue) ->
         _ -> Res2
     end.
 
--spec commit_req(request()) -> result().
+-spec commit_req(request_on_key()) -> result().
 commit_req(Request) ->
     case Request of
         {read, Key} -> read(Key);
@@ -172,6 +172,8 @@ commit_req(Request) ->
         _ -> {fail, abort, []}
     end.
 
--spec req_list_commit_each([request()]) -> [result()].
+%% @doc Perform several requests in parallel and commit each.
+%%      The execution order of multiple requests on the same key is undefined!
+-spec req_list_commit_each([request_on_key()]) -> [result()].
 req_list_commit_each(ReqList) ->
     util:par_map(fun commit_req/1, ReqList, 50).
