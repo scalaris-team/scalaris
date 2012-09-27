@@ -791,9 +791,9 @@ public class TransactionSingleOpTest {
             final RequestList writeRequests = new RequestList();
             for (int i = 0; i < testData.length; ++i) {
                 if ((i % 2) == 0) {
-                    firstWriteRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
+                    firstWriteRequests.addOp(new WriteOp(testTime + key + i, "first_" + testData[i]));
                 }
-                writeRequests.addOp(new WriteOp(testTime + key + i, testData[i]));
+                writeRequests.addOp(new WriteOp(testTime + key + i, "second_" + testData[i]));
                 readRequests.addOp(new ReadOp(testTime + key + i));
             }
 
@@ -803,15 +803,13 @@ public class TransactionSingleOpTest {
                 results.processWriteAt(i);
             }
 
-            final RequestList requests = new RequestList(readRequests).addAll(writeRequests);
-            results = conn.req_list(requests);
-            assertEquals(requests.size(), results.size());
-
+            results = conn.req_list(readRequests);
+            assertEquals(readRequests.size(), results.size());
             // now evaluate the read results:
             for (int i = 0; i < readRequests.size(); ++i) {
                 if ((i % 2) == 0) {
                     final String actual = results.processReadAt(i).stringValue();
-                    assertEquals(testData[i], actual);
+                    assertEquals("first_" + testData[i], actual);
                 } else {
                     try {
                         final OtpErlangObject result = results.processReadAt(i).value();
@@ -822,10 +820,12 @@ public class TransactionSingleOpTest {
                 }
             }
 
+            results = conn.req_list(writeRequests);
+            assertEquals(writeRequests.size(), results.size());
+
             // now evaluate the write results:
             for (int i = 0; i < writeRequests.size(); ++i) {
-                final int pos = readRequests.size() + i;
-                results.processWriteAt(pos);
+                results.processWriteAt(i);
             }
 
             // once again test reads - now all reads should be successful
@@ -835,7 +835,7 @@ public class TransactionSingleOpTest {
             // now evaluate the read results:
             for (int i = 0; i < readRequests.size(); ++i) {
                 final String actual = results.processReadAt(i).stringValue();
-                assertEquals(testData[i], actual);
+                assertEquals("second_" + testData[i], actual);
             }
         } finally {
             conn.closeConnection();

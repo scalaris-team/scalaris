@@ -768,6 +768,8 @@ class TransactionSingleOp(object):
     def req_list(self, reqlist):
         """
         Issues multiple parallel requests to scalaris; each will be committed.
+        NOTE: The execution order of multiple requests on the same key is
+        undefined!
         Request lists can be created using new_req_list().
         The returned list has the following form:
         [{'status': 'ok'} or {'status': 'ok', 'value': xxx} or

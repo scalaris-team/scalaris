@@ -320,8 +320,8 @@ class TestTransactionSingleOp(unittest.TestCase):
         writeRequests = conn.new_req_list()
         for i in xrange(0, len(_TEST_DATA)):
             if (i % 2) == 0:
-                firstWriteRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
-            writeRequests.add_write(str(self._testTime) + key + str(i), _TEST_DATA[i])
+                firstWriteRequests.add_write(str(self._testTime) + key + str(i), "first_" + _TEST_DATA[i])
+            writeRequests.add_write(str(self._testTime) + key + str(i), "second_" + _TEST_DATA[i])
             readRequests.add_read(str(self._testTime) + key + str(i))
         
         results = conn.req_list(firstWriteRequests)
@@ -329,15 +329,13 @@ class TestTransactionSingleOp(unittest.TestCase):
         for i in xrange(0, firstWriteRequests.size()):
             conn.process_result_write(results[i])
 
-        requests = conn.new_req_list(readRequests).extend(writeRequests)
-        results = conn.req_list(requests)
-        self.assertEqual(requests.size(), len(results))
-
+        results = conn.req_list(readRequests)
+        self.assertEqual(readRequests.size(), len(results))
         # now evaluate the read results:
         for i in xrange(0, readRequests.size()):
             if (i % 2) == 0:
                 actual = conn.process_result_read(results[i])
-                self.assertEqual(_TEST_DATA[i], actual)
+                self.assertEqual("first_" + _TEST_DATA[i], actual)
             else:
                 try:
                     result = conn.process_result_read(results[i])
@@ -346,10 +344,11 @@ class TestTransactionSingleOp(unittest.TestCase):
                 except scalaris.NotFoundError:
                     pass
 
+        results = conn.req_list(writeRequests)
+        self.assertEqual(writeRequests.size(), len(results))
         # now evaluate the write results:
         for i in xrange(0, writeRequests.size()):
-            pos = readRequests.size() + i
-            conn.process_result_write(results[pos])
+            conn.process_result_write(results[i])
 
         # once again test reads - now all reads should be successful
         results = conn.req_list(readRequests)
@@ -358,7 +357,7 @@ class TestTransactionSingleOp(unittest.TestCase):
         # now evaluate the read results:
         for i in xrange(0, readRequests.size()):
             actual = conn.process_result_read(results[i])
-            self.assertEqual(_TEST_DATA[i], actual)
+            self.assertEqual("second_" + _TEST_DATA[i], actual)
         
         conn.close_connection();
 

@@ -338,8 +338,11 @@ public class TransactionSingleOp extends
     }
 
     /**
-     * Executes all requests in <code>req</code> and commits each one of them
-     * in a single transaction.
+     * Executes all requests in <code>req</code> and commits each one of them in
+     * a single transaction.
+     *
+     * NOTE: The execution order of multiple requests on the same key is
+     * undefined!
      *
      * @param req
      *            the requests to issue

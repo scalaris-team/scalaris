@@ -354,9 +354,9 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     writeRequests = conn.new_req_list()
     (0..($_TEST_DATA.length - 1)).each do |i|
       if (i % 2) == 0
-        firstWriteRequests.add_write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
+        firstWriteRequests.add_write(@testTime.to_s + key + i.to_s, "first_" + $_TEST_DATA[i])
       end
-      writeRequests.add_write(@testTime.to_s + key + i.to_s, $_TEST_DATA[i])
+      writeRequests.add_write(@testTime.to_s + key + i.to_s, "second_" + $_TEST_DATA[i])
       readRequests.add_read(@testTime.to_s + key + i.to_s)
     end
     
@@ -366,15 +366,13 @@ class TestTransactionSingleOp < Test::Unit::TestCase
       conn.process_result_write(results[i])
     end
 
-    requests = conn.new_req_list(readRequests).concat(writeRequests)
-    results = conn.req_list(requests)
-    assert_equal(requests.size(), results.length)
-
+    results = conn.req_list(readRequests)
+    assert_equal(readRequests.size(), results.length)
     # now evaluate the read results:
     (0..(readRequests.size() - 1)).step(2) do |i|
       if (i % 2) == 0
         actual = conn.process_result_read(results[i])
-        assert_equal($_TEST_DATA[i], actual)
+        assert_equal("first_" + $_TEST_DATA[i], actual)
       else
         begin
           conn.process_result_read(results[i])
@@ -384,11 +382,12 @@ class TestTransactionSingleOp < Test::Unit::TestCase
         end
       end
     end
-    
+
+    results = conn.req_list(writeRequests)
+    assert_equal(writeRequests.size(), results.length)
     # now evaluate the write results:
     (0..(writeRequests.size() - 1)).step(2) do |i|
-      pos = readRequests.size() + i
-      conn.process_result_write(results[pos])
+      conn.process_result_write(results[i])
     end
 
     # once again test reads - now all reads should be successful
@@ -398,7 +397,7 @@ class TestTransactionSingleOp < Test::Unit::TestCase
     # now evaluate the read results:
     (0..(readRequests.size() - 1)).step(2) do |i|
       actual = conn.process_result_read(results[i])
-      assert_equal($_TEST_DATA[i], actual)
+      assert_equal("second_" + $_TEST_DATA[i], actual)
     end
     
     conn.close_connection();
