@@ -107,23 +107,29 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
 -spec tlog_and_results_to_abort(tx_tlog:tlog(), [api_tx:request()]) ->
                                        {tx_tlog:tlog(), results()}.
 tlog_and_results_to_abort(TLog, ReqList) ->
-    NewTLog = lists:foldl(fun(Req, AccTLog) ->
-                                  case Req of
-                                      {commit} -> AccTLog;
-                                      _ ->
-                                          tx_tlog:add_or_update_status_by_key(
-                                            AccTLog,
-                                            req_get_key(Req),
-                                            {fail, abort})
-                                  end end, TLog, ReqList),
-    {NewTLog, [ case req_get_op(Req) of
-                    read -> {fail, not_found};
-                    write -> {ok};
-                    add_del_on_list -> {ok};
-                    add_on_nr -> {ok};
-                    test_and_set -> {ok};
-                    commit -> {fail, abort, []}
-                end || Req <- ReqList ]}.
+    tlog_and_results_to_abort_iter(TLog, ReqList, []).
+
+-spec tlog_and_results_to_abort_iter(tx_tlog:tlog(), [api_tx:request()], results())
+        -> {tx_tlog:tlog(), results()}.
+tlog_and_results_to_abort_iter(TLog, [], AccRes) ->
+    {TLog, lists:reverse(AccRes)};
+tlog_and_results_to_abort_iter(TLog, [Req | ReqListT], AccRes) ->
+    case Req of
+        {commit} ->
+            Res = {fail, abort, []},
+            tlog_and_results_to_abort_iter(TLog, ReqListT, [Res | AccRes]);
+        _ ->
+            Res = case req_get_op(Req) of
+                      read -> {fail, not_found};
+                      write -> {ok};
+                      add_del_on_list -> {ok};
+                      add_on_nr -> {ok};
+                      test_and_set -> {ok}
+                  end,
+            NewTLog = tx_tlog:add_or_update_status_by_key(
+                        TLog, req_get_key(Req), {fail, abort}),
+            tlog_and_results_to_abort_iter(NewTLog, ReqListT, [Res | AccRes])
+    end.
 
 %% @doc Send requests to the DHT, gather replies and merge TLogs.
 -spec upd_tlog_via_rdht(tx_tlog:tlog(), [request_on_key()]) -> tx_tlog:tlog().
