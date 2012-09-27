@@ -90,6 +90,18 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             end;
         {builtin_type, module} ->
             inner_check(Value, atom, CheckStack, ParseState);
+        {builtin_type, dict} ->
+            % there is no is_dict/1, so try some functions on the dict to check
+            try
+                _ = dict:size(Value),
+                _ = dict:find('$non_existing_key', Value),
+                _ = dict:store('$non_existing_key', '$value', Value),
+                check_list(dict:to_list(Value), % [{Key, Value}]
+                           {list, {tuple, [{typedef, tester, test_any},
+                                           {typedef, tester, test_any}]}},
+                           CheckStack, ParseState)
+            catch _:_ -> {false, [{Value, dict_functions_thrown} | CheckStack]}
+            end;
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_float/1, no_float);
