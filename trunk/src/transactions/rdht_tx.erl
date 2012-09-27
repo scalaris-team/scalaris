@@ -30,6 +30,7 @@
 -export([req_list/3]).
 -export([check_config/0]).
 -export([encode_value/1, decode_value/1]).
+-export([req_needs_rdht_op_on_ex_tlog_read_entry/1, req_get_key/1, req_get_op/1]).
 
 %% export to silence dialyzer
 -export([decode_result/1]).
@@ -38,7 +39,7 @@
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0]).
+-export_type([req_id/0, request_on_key/0]).
 -endif.
 
 -type req_id() :: uid:global_uid().
@@ -136,7 +137,7 @@ tlog_and_results_to_abort_iter(TLog, [Req | ReqListT], AccRes) ->
 upd_tlog_via_rdht(TLog, ReqList) ->
     %% what to get from rdht? (also check old TLog)
     USReqList = lists:ukeysort(2, ReqList),
-    ReqListonRDHT = first_req_per_key_not_in_tlog(TLog, USReqList),
+    ReqListonRDHT = tx_tlog:first_req_per_key_not_in_tlog(TLog, USReqList),
 
     %% perform RDHT operations to collect missing TLog entries
     %% rdht requests for independent keys are processed in parallel.
@@ -146,64 +147,19 @@ upd_tlog_via_rdht(TLog, ReqList) ->
 
     %% merge TLogs (insert fail, abort, when version mismatch
     %% in reads for same key is detected)
-    _MTLog = merge_tlogs(TLog, RTLog).
+    _MTLog = tx_tlog:merge(TLog, RTLog).
 
-%% @doc Requests, that need information from the DHT.
--spec first_req_per_key_not_in_tlog(tx_tlog:tlog(), [request_on_key()]) ->
-                                           [request_on_key()].
-first_req_per_key_not_in_tlog(SortedTLog, USortedReqList) ->
-    %% PRE: no {commit} requests in SortedReqList
-    %% POST: returns requests in reverse order, but thats sufficient.
-    first_req_per_key_not_in_tlog_iter(SortedTLog, USortedReqList, []).
-
-%% @doc Helper to acquire requests, that need information from the DHT.
--spec first_req_per_key_not_in_tlog_iter(tx_tlog:tlog(),
-                                         [request_on_key()],
-                                         [request_on_key()]) ->
-                                                [request_on_key()].
-first_req_per_key_not_in_tlog_iter(_, [], Acc) -> Acc;
-first_req_per_key_not_in_tlog_iter([], USortedReqList, Acc) ->
-    USortedReqList ++ Acc;
-first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
-                                   [Req | RTail] = USReqList,
-                                   Acc) ->
-    TKey = tx_tlog:get_entry_key(TEntry),
-    case TKey =:= req_get_key(Req) of
-        true ->
-            %% key is in TLog, rdht op not necessary
-            case tx_tlog:get_entry_operation(TEntry) of
-                ?write ->
-                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
-                _ ->
-                    case req_get_op(Req) of
-                        %% when operation needs the value (read) and
-                        %% TLog is optimized, we need the op anyway to
-                        %% calculate the result entry.
-                        read ->
-                            first_req_per_key_not_in_tlog_iter
-                              (USTLog, RTail, [Req | Acc]);
-                        test_and_set ->
-                            first_req_per_key_not_in_tlog_iter
-                              (USTLog, RTail, [Req | Acc]);
-                        add_on_nr ->
-                            first_req_per_key_not_in_tlog_iter
-                              (USTLog, RTail, [Req | Acc]);
-                        add_del_on_list ->
-                            first_req_per_key_not_in_tlog_iter
-                              (USTLog, RTail, [Req | Acc]);
-                        %%first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
-                        _ ->
-                            first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
-                    end
-            end;
-        false ->
-            case TKey < req_get_key(Req) of
-                true ->
-                    %% jump to next Tlog entry
-                    first_req_per_key_not_in_tlog_iter(TTail, USReqList, Acc);
-                false ->
-                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, [Req | Acc])
-            end
+-spec req_needs_rdht_op_on_ex_tlog_read_entry(Req::request_on_key()) -> boolean().
+req_needs_rdht_op_on_ex_tlog_read_entry(Req) ->
+    case req_get_op(Req) of
+        %% if operation needs the value (read) and
+        %% TLog is optimized, we need the op anyway to
+        %% calculate the result entry.
+        read -> true;
+        test_and_set -> true;
+        add_on_nr -> true;
+        add_del_on_list -> true;
+        _ -> false
     end.
 
 %% @doc Trigger operations for the DHT.
@@ -230,59 +186,12 @@ collect_replies(TLog, [ReqId | RestReqIds] = _ReqIdsList) ->
     ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, _ReqIdsList]),
     % receive only matching replies
     RdhtTlogEntry = receive_answer(ReqId),
-    NewTLog = [RdhtTlogEntry | TLog],
+    NewTLog = tx_tlog:add_entry(TLog, RdhtTlogEntry),
     collect_replies(NewTLog, RestReqIds);
 collect_replies(TLog, []) ->
     %% Drop outdated results...
     receive_old_answers(),
     tx_tlog:sort_by_key(TLog).
-
-%% @doc Merge TLog entries, if same key. Check for version mismatch,
-%%      take over values.
-%%      SortedTlog is old TLog
-%%      SortedRTlog is TLog received from newer RDHT operations
--spec merge_tlogs(tx_tlog:tlog(), tx_tlog:tlog()) -> tx_tlog:tlog().
-merge_tlogs(SortedTLog, SortedRTLog) ->
-    merge_tlogs_iter(SortedTLog, SortedRTLog, []).
-
--spec merge_tlogs_iter(tx_tlog:tlog(), tx_tlog:tlog(), tx_tlog:tlog()) ->
-                              tx_tlog:tlog().
-merge_tlogs_iter([TEntry | TTail] = SortedTLog,
-                 [RTEntry | RTTail] = SortedRTLog,
-                 Acc) ->
-    TKey = tx_tlog:get_entry_key(TEntry),
-    RTKey = tx_tlog:get_entry_key(RTEntry),
-    if TKey < RTKey ->
-           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
-       TKey > RTKey ->
-           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc]);
-       true -> % TKey =:= RTKey ->
-           %% key was in TLog, new entry is newer and contains value
-           %% for read?
-           case tx_tlog:get_entry_operation(TEntry) of
-               ?read ->
-                   %% check versions: if mismatch -> change status to abort
-                   NewTLogEntry =
-                       case tx_tlog:get_entry_version(TEntry)
-                                =:= tx_tlog:get_entry_version(RTEntry) of
-                           true ->
-                               Val = tx_tlog:get_entry_value(RTEntry),
-                               tx_tlog:set_entry_value(TEntry, Val);
-                           false ->
-                               tx_tlog:set_entry_status(RTEntry, {fail, abort})
-                       end,
-                   merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
-               _ ->
-                   log:log(warn,
-                           "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
-                   merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
-           end
-    end;
-merge_tlogs_iter([], [], Acc)                 -> lists:reverse(Acc);
-merge_tlogs_iter([], [_|_] = SortedRTLog, []) -> SortedRTLog;
-merge_tlogs_iter([], [_|_] = SortedRTLog, [_|_] = Acc) -> lists:reverse(Acc) ++ SortedRTLog;
-merge_tlogs_iter([_|_] = SortedTLog, [], [])  -> SortedTLog;
-merge_tlogs_iter([_|_] = SortedTLog, [], [_|_] = Acc)  -> lists:reverse(Acc) ++ SortedTLog.
 
 %% @doc Perform all operations on the TLog and generate list of results.
 -spec do_reqs_on_tlog(tx_tlog:tlog(), [request_on_key()], EnDecode::boolean()) ->
@@ -311,14 +220,7 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
     do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc], EnDecode);
 do_reqs_on_tlog_iter(TLog, [], Acc, _EnDecode) ->
-    {tlog_cleanup(TLog), lists:reverse(Acc)}.
-
--spec tlog_cleanup(tx_tlog:tlog()) -> tx_tlog:tlog().
-tlog_cleanup(TLog) ->
-    [ case tx_tlog:get_entry_operation(TLogEntry) of
-          ?read -> tx_tlog:set_entry_value(TLogEntry, '$empty');
-          ?write -> TLogEntry
-      end || TLogEntry <- TLog ].
+    {tx_tlog:cleanup(TLog), lists:reverse(Acc)}.
 
 %% @doc Get a result entry for a read from the given TLog entry.
 -spec tlog_read(tx_tlog:tlog_entry(), client_key(), EnDecode::boolean()) ->
