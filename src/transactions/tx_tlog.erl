@@ -19,6 +19,15 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [new_entry/5,
+                   get_entry_operation/1, set_entry_operation/2,
+                   get_entry_key/1,       set_entry_key/2,
+                   get_entry_status/1,    set_entry_status/2,
+                   get_entry_value/1,     set_entry_value/2,
+                   drop_value/1,
+                   get_entry_version/1
+                  ]}).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
@@ -31,6 +40,7 @@
 -export([find_entry_by_key/2]).
 -export([is_sane_for_commit/1]).
 -export([get_insane_keys/1]).
+-export([merge/2, first_req_per_key_not_in_tlog/2, cleanup/1]).
 
 %% Operations on entries of TLogs
 -export([new_entry/5]).
@@ -60,6 +70,7 @@
             tx_status(),              %% status
             any()                     %% value
           }.
+%% -opaque tlog() :: [tlog_entry()]. % creates a false warning in add_or_update_status_by_key/3
 -type tlog() :: [tlog_entry()].
 
 % @doc create an empty list
@@ -109,6 +120,104 @@ get_insane_keys(TLog) ->
                             false -> [get_entry_key(X) | Acc]
                         end
                 end, [], TLog).
+
+%% @doc Merge TLog entries from sorted translogs (see sort_by_key/1), if same
+%%      key. Check for version mismatch, take over values.
+%%      Duplicate keys are only allowedif the old TLog only read the value!
+%%      SortedTlog is old TLog
+%%      SortedRTlog is TLog received from newer RDHT operations
+-spec merge(tlog(), tlog()) -> tlog().
+merge(TLog1, TLog2) ->
+    merge_tlogs_iter(TLog1, TLog2, []).
+
+-spec merge_tlogs_iter([tlog_entry()], [tlog_entry()], [tlog_entry()]) -> [tlog_entry()].
+merge_tlogs_iter([TEntry | TTail] = SortedTLog,
+                 [RTEntry | RTTail] = SortedRTLog,
+                 Acc) ->
+    TKey = get_entry_key(TEntry),
+    RTKey = get_entry_key(RTEntry),
+    if TKey < RTKey ->
+           merge_tlogs_iter(TTail, SortedRTLog, [TEntry | Acc]);
+       TKey > RTKey ->
+           merge_tlogs_iter(SortedTLog, RTTail, [RTEntry | Acc]);
+       true -> % TKey =:= RTKey ->
+           %% key was in TLog, new entry is newer and contains value
+           %% for read?
+           case get_entry_operation(TEntry) of
+               ?read ->
+                   %% check versions: if mismatch -> change status to abort
+                   TVersion = get_entry_version(TEntry),
+                   RTVersion = get_entry_version(RTEntry),
+                   NewTLogEntry =
+                       if TVersion =:= RTVersion ->
+                              Val = get_entry_value(RTEntry),
+                              set_entry_value(TEntry, Val);
+                          true ->
+                              set_entry_status(RTEntry, {fail, abort})
+                       end,
+                   merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
+               _ ->
+                   log:log(warn,
+                           "Duplicate key in TLog merge should not happen ~p ~p", [TEntry, RTEntry]),
+                   merge_tlogs_iter(TTail, RTTail, [ RTEntry | Acc])
+           end
+    end;
+merge_tlogs_iter([], [], Acc)                 -> lists:reverse(Acc);
+merge_tlogs_iter([], [_|_] = SortedRTLog, []) -> SortedRTLog;
+merge_tlogs_iter([], [_|_] = SortedRTLog, [_|_] = Acc) -> lists:reverse(Acc) ++ SortedRTLog;
+merge_tlogs_iter([_|_] = SortedTLog, [], [])  -> SortedTLog;
+merge_tlogs_iter([_|_] = SortedTLog, [], [_|_] = Acc)  -> lists:reverse(Acc) ++ SortedTLog.
+
+%% @doc Filters a request list with unique keys so that only operations reside
+%%      that need data from the DHT which is not yet present in the TLog.
+%%      Note: uses functions from rdht_tx to cope with requests.
+-spec first_req_per_key_not_in_tlog(tlog(), [rdht_tx:request_on_key()])
+        -> [rdht_tx:request_on_key()].
+first_req_per_key_not_in_tlog(SortedTLog, USortedReqList) ->
+    %% PRE: no {commit} requests in SortedReqList
+    %% POST: returns requests in reverse order, but thats sufficient.
+    first_req_per_key_not_in_tlog_iter(SortedTLog, USortedReqList, []).
+
+%% @doc Helper to acquire requests, that need information from the DHT.
+-spec first_req_per_key_not_in_tlog_iter(
+        [tlog_entry()], [rdht_tx:request_on_key()], [rdht_tx:request_on_key()])
+        -> [rdht_tx:request_on_key()].
+first_req_per_key_not_in_tlog_iter(_, [], Acc) -> Acc;
+first_req_per_key_not_in_tlog_iter([], USortedReqList, Acc) ->
+    USortedReqList ++ Acc;
+first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
+                                   [Req | RTail] = USReqList,
+                                   Acc) ->
+    TKey = get_entry_key(TEntry),
+    ReqKey = rdht_tx:req_get_key(Req),
+    if TKey =:= ReqKey ->
+            %% key is in TLog, rdht op not necessary
+            case get_entry_operation(TEntry) of
+                ?write ->
+                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
+                _ ->
+                    NeedsOp = rdht_tx:req_needs_rdht_op_on_ex_tlog_read_entry(Req),
+                    if NeedsOp ->
+                           first_req_per_key_not_in_tlog_iter
+                             (USTLog, RTail, [Req | Acc]);
+                       true ->
+                           first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
+                    end
+            end;
+       TKey < ReqKey ->
+           %% jump to next Tlog entry
+           first_req_per_key_not_in_tlog_iter(TTail, USReqList, Acc);
+       true -> % TKey > ReqKey
+           first_req_per_key_not_in_tlog_iter(USTLog, RTail, [Req | Acc])
+    end.
+
+%% @doc Strips the tlog from read values (sets those values to '$empty').
+-spec cleanup(tlog()) -> tlog().
+cleanup(TLog) ->
+    [ case get_entry_operation(TLogEntry) of
+          ?read -> set_entry_value(TLogEntry, '$empty');
+          ?write -> TLogEntry
+      end || TLogEntry <- TLog ].
 
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(),
