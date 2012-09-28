@@ -61,7 +61,9 @@
                 <div id="siteSub">From <%= pageBean.getWikiNamespace().getMeta() %></div>
                 <!-- /tagline -->
                 <!-- subtitle -->
-                <div id="contentSub"><a href="wiki?title=Special:Log&amp;page=<%= safePageTitle %><%= andServiceUser %>" title="Special:Log">View logs for this page</a></div>
+                <div id="contentSub">
+                <!-- <a href="wiki?title=Special:Log&amp;page=<%= safePageTitle %><%= andServiceUser %>" title="Special:Log">View logs for this page</a> -->
+                </div>
                 <!-- /subtitle -->
                 <!-- jumpto -->
                 <div id="jump-to-nav">
