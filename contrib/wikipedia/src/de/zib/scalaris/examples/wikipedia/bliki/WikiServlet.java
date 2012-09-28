@@ -766,7 +766,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             redirectUrl0.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
             redirectUrl0.append("&random_times=" + StringUtils.join(times, "%2C"));
             redirectUrl0.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
-            redirectUrl0.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
             redirectUrl = "http://" + Options.getInstance().SERVERNAME
                     + Options.getInstance().SERVERPATH
                     + response.encodeRedirectURL(redirectUrl0.toString())
@@ -783,7 +782,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         for (WikiEventHandler handler: eventHandlers) {
             handler.onViewRandomPage(page, result, connection);
         }
-        response.sendRedirect(redirectUrl);
+        response.sendRedirect(redirectUrl + "&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
     }
 
     /**
