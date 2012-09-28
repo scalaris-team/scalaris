@@ -173,7 +173,7 @@ public class MyWikiModel extends WikiModel {
     protected static final Pattern MATCH_WIKI_FORBIDDEN_TITLE_CHARS =
             Pattern.compile("^.*?([\\p{Cc}\\p{Cn}\\p{Co}#<>\\[\\]|{}\\n\\r]).*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
-    protected static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^#REDIRECT[^\\[]?\\[\\[:?([^\\]]*)\\]\\]$", Pattern.CASE_INSENSITIVE);
+    protected static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^\\s*#REDIRECT[ ]?\\[\\[:?([^\\]]*)\\]\\].*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!

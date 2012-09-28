@@ -127,6 +127,10 @@ public class MyScalarisWikiModel extends MyWikiModel {
                         if (redirText != null && !redirText.isEmpty()) {
                             text = redirText;
                         }
+                    } else {
+                        // we must disarm the redirect here!
+                        System.err.println("Couldn't parse the redirect title from: " + text);
+                        text = null;
                     }
                 }
             } else {
