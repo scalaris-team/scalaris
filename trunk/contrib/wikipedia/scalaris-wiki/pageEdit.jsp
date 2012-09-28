@@ -69,7 +69,6 @@
           <% if (pageBean.isEditRestricted()) { %>
                 for <a href="wiki?title=<%= safePageTitle %><%= andServiceUser %>" title="<%= safePageTitle %>">${ pageBean.title }</a>
           <% } %>
-                
                 </div>
                 <!-- /subtitle -->
                 <!-- jumpto -->

@@ -47,7 +47,6 @@ public class WikiPageBeanBase {
     private String wikiLang = "en";
     private String wikiLangDir = "ltr";
     private MyNamespace wikiNamespace = new MyNamespace();
-    protected String redirectedTo = "";
     private boolean isEditRestricted = false;
     protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
     private long startTime;
@@ -109,7 +108,6 @@ public class WikiPageBeanBase {
         wikiLang = other.wikiLang;
         wikiLangDir = other.wikiLangDir;
         wikiNamespace = other.wikiNamespace;
-        redirectedTo = other.redirectedTo;
         isEditRestricted = other.isEditRestricted;
         stats = new LinkedMultiHashMap<String, Long>(other.stats);
         startTime = other.startTime;

@@ -61,12 +61,7 @@
                 <!-- /tagline -->
                 <!-- subtitle -->
                 <div id="contentSub">
-<% if (!pageBean.getRedirectedTo().isEmpty()) {
-    final String redirectTitle = pageBean.getRedirectedTo();
-    final String safeRedirectTitle = StringEscapeUtils.escapeHtml(redirectTitle);
-%>
-                (Redirected to <a href="wiki?title=<%=safeRedirectTitle%><%= andServiceUser %>" title="<%=safeRedirectTitle%>"><%=redirectTitle%></a> - showing contents of redirected page)
-<% } %>
+                ${ pageBean.contentSub }
                 </div>
                 <!-- /subtitle -->
                 <!-- jumpto -->

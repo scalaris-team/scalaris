@@ -49,6 +49,8 @@ public class WikiPageBean extends WikiPageBeanBase {
     private Collection<String> subCategories = new LinkedList<String>();
     private Collection<String> categoryPages = new LinkedList<String>();
     
+    private String contentSub = "";
+
     /**
      * Creates an empty page bean.
      */
@@ -169,18 +171,18 @@ public class WikiPageBean extends WikiPageBeanBase {
     public void setCategoryPages(Collection<String> categoryPages) {
         this.categoryPages = categoryPages;
     }
-
+    
     /**
-     * @return the redirectedFrom
+     * @return the contentSub
      */
-    public String getRedirectedTo() {
-        return redirectedTo;
+    public String getContentSub() {
+        return contentSub;
     }
 
     /**
-     * @param redirectedTo the redirectedFrom to set
+     * @param contentSub the contentSub to set
      */
-    public void setRedirectedTo(String redirectedTo) {
-        this.redirectedTo = redirectedTo;
+    public void setContentSub(String contentSub) {
+        this.contentSub = contentSub;
     }
 }
