@@ -63,6 +63,7 @@ public class Result {
         this.involvedKeys = involvedKeys;
         this.message = message;
         this.connect_failed = connectFailed;
+        assert(!connect_failed || !success);
     }
 
     /**

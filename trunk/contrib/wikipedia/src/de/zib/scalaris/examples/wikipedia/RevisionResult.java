@@ -25,11 +25,13 @@ public class RevisionResult extends Result {
      */
     public Page page = null;
     /**
-     * Whether the pages exists or not.
+     * whether the page exists or not (if <tt>true</tt>, {@link Result#success}
+     * must also be <tt>true</tt>).
      */
     public boolean page_not_existing = false;
     /**
-     * Whether the requested revision exists or not.
+     * Whether the requested revision exists or not (if <tt>true</tt>,
+     * {@link Result#success} must also be <tt>true</tt>).
      */
     public boolean rev_not_existing = false;
     
@@ -96,9 +98,11 @@ public class RevisionResult extends Result {
      * @param revision
      *            revision on success
      * @param page_not_existing
-     *            whether the pages exists or not
+     *            whether the page exists or not (if <tt>true</tt>,
+     *            {@link Result#success} must also be <tt>true</tt>)
      * @param rev_not_existing
-     *            whether the requested revision exists or not
+     *            whether the requested revision exists or not (if <tt>true</tt>,
+     *            {@link Result#success} must also be <tt>true</tt>)
      */
     public RevisionResult(boolean success, List<InvolvedKey> involvedKeys,
             String message, boolean connectFailed, NormalisedTitle normalisedTitle, Page page,
@@ -110,6 +114,8 @@ public class RevisionResult extends Result {
         this.revision = revision;
         this.page_not_existing = page_not_existing;
         this.rev_not_existing = rev_not_existing;
+        assert(!rev_not_existing || !success);
+        assert(!page_not_existing || !success);
     }
     
     /**
@@ -130,9 +136,11 @@ public class RevisionResult extends Result {
      * @param revision
      *            revision on success
      * @param page_not_existing
-     *            whether the pages exists or not
+     *            whether the page exists or not (if <tt>true</tt>,
+     *            {@link Result#success} must also be <tt>true</tt>)
      * @param rev_not_existing
-     *            whether the requested revision exists or not
+     *            whether the requested revision exists or not (if <tt>true</tt>,
+     *            {@link Result#success} must also be <tt>true</tt>)
      * @param name
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
@@ -148,6 +156,8 @@ public class RevisionResult extends Result {
         this.revision = revision;
         this.page_not_existing = page_not_existing;
         this.rev_not_existing = rev_not_existing;
+        assert(!rev_not_existing || !success);
+        assert(!page_not_existing || !success);
         addStat(name, time);
     }
 }
