@@ -830,7 +830,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         
         if (result.success) {
-            renderRevision(result.page.getTitle(), result.revision, render, request, connection, page);
+            final boolean noRedirect = getParam(request, "redirect").equals("no");
+            renderRevision(result.page.getTitle(), result.revision, render,
+                    request, connection, page, noRedirect);
             
             if (!result.page.checkEditAllowed("")) {
                 page.setEditRestricted(true);
@@ -861,10 +863,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @param page
      *            the bean for the page (the rendered content will be added to
      *            this object)
+     * @param noRedirect
+     *            if <tt>true</tt>, a redirect will be shown as such, otherwise
+     *            the content of the redirected page will be show
      */
     private void renderRevision(String title, Revision revision,
             int renderer, HttpServletRequest request, Connection connection,
-            WikiPageBean page) {
+            WikiPageBean page, boolean noRedirect) {
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
@@ -918,13 +923,28 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     addToParam_notice(request, "error getting category pages: " + catPagesResult.message);
                 }
             }
+            page.setTitle(title);
+            page.setVersion(revision.getId());
             String redirectedPageName = wikiModel.getRedirectLink();
             if (redirectedPageName != null) {
-                page.setRedirectedTo(redirectedPageName);
-                // add the content from the page directed to:
-                wikiModel.tearDown();
-                wikiModel.setUp();
-                mainText = wikiModel.renderPageWithCache(wikiModel.getRedirectContent(redirectedPageName));
+                if (noRedirect) {
+                    page.setContentSub("Redirect page");
+                    mainText = wikiModel.renderRedirectPage(redirectedPageName);
+                    // extract the date:
+                    page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
+                } else {
+                    final String safeTitle = StringEscapeUtils.escapeHtml(title);
+                    final String redirectUrl = wikiModel.getWikiBaseURL().replace("${title}", title);
+                    page.setContentSub("(Redirected from <a href=\"" + redirectUrl + "&redirect=no\" title=\"" + safeTitle + "\">" + title + "</a>)");
+                    // add the content from the page directed to:
+                    wikiModel.tearDown();
+                    wikiModel.setUp();
+                    mainText = wikiModel.renderPageWithCache(wikiModel.getRedirectContent(redirectedPageName));
+                    page.setTitle(redirectedPageName);
+                    // TODO: extract the version and date from the redirected page:
+                    page.setVersion(-1);
+//                    page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
+                }
             }
             page.setPage(mainText);
             page.setCategories(wikiModel.getCategories().keySet());
@@ -952,6 +972,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     + StringEscapeUtils.escapeHtml(revision.getTimestamp()) + "</pre></p>" +
                     "<p>Request Parameters:<pre>"
                     + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
+            page.setTitle(title);
+            page.setVersion(revision.getId());
+            // extract the date:
+            page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
         }
 
         page.setNotice(getParam_notice(request));
@@ -987,13 +1011,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
         }
         page.setError(getParam_error(request));
-        page.setTitle(title);
-        page.setVersion(revision.getId());
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
-
-        // extract the date:
-        page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
     }
     
     /**
@@ -1026,7 +1045,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         
         if (result.success) {
-            renderRevision(title, result.revision, render, request, connection, page);
+            renderRevision(title, result.revision, render, request, connection, page, false);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, connection, page);
@@ -1101,7 +1120,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         
         if (result.success) {
-            renderRevision(title, result.revision, render, request, connection, page);
+            renderRevision(title, result.revision, render, request, connection, page, false);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, connection, page);
@@ -1746,6 +1765,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 }
                 redirectUrl.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
                 redirectUrl.append("&server_time=" + (System.currentTimeMillis() - page.getStartTime()));
+                if (result.newPage.isRedirect()) {
+                    redirectUrl.append("&redirect=no");
+                }
                 final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
                 response.sendRedirect("http://"
                         + Options.getInstance().SERVERNAME

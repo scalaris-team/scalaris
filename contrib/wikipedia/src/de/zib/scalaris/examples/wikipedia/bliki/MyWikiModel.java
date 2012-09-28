@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringEscapeUtils;
+
 import com.skjegstad.utils.BloomFilter;
 
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
@@ -406,6 +408,24 @@ public class MyWikiModel extends WikiModel {
 //            return "<b>ERROR: redirect to " + getRedirectLink() + " failed </b>";
         }
         return "&#35;redirect [[" + pageName0 + "]]";
+    }
+    
+    /**
+     * Renders the "redirect to" content in case no auto-redirection is used.
+     * 
+     * @param pageTitle
+     *            the title of the page being redirected to
+     * 
+     * @return HTML redirect note
+     */
+    public String renderRedirectPage(String pageTitle) {
+        final String redirectUrl = getWikiBaseURL().replace("${title}", pageTitle);
+        final String safeRedirectTitle = StringEscapeUtils.escapeHtml(pageTitle);
+        return "<div class=\"redirectMsg\">"
+                + "<img src=\"skins/redirectltr.png\" alt=\"#REDIRECT\" />"
+                + "<span class=\"redirectText\">"
+                + "<a href=\"" + redirectUrl + "\" title=\"" + safeRedirectTitle + "\">" + pageTitle + "</a>"
+                + "</span></div>";
     }
     
     /**
