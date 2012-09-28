@@ -1312,7 +1312,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         specialPages.put("Page tools", curSpecialPages);
 
         StringBuilder content = new StringBuilder();
-        final String serviceUser = "&amp;service_user=" + page.getServiceUser();
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
         for (Entry<String, Map<String, String>> specialPagesInGroup: specialPages.entrySet()) {
             String groupName = specialPagesInGroup.getKey();
             int i = 0;
@@ -1327,7 +1327,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             int pagesInFirst = specialPagesInGroup.getValue().size() / 2 + specialPagesInGroup.getValue().size() % 2;
             for (; i < pagesInFirst; ++i) {
                 Entry<String, String> pageInFirst = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + "\" title=\"" + pageInFirst.getKey() + serviceUser + "\">" + pageInFirst.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInFirst.getKey() + serviceUser + "\" title=\"" + pageInFirst.getKey() + "\">" + pageInFirst.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
@@ -1336,7 +1336,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             content.append("    <ul>\n");
             while(it.hasNext()) {
                 Entry<String, String> pageInSecond = it.next();
-                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + "\" title=\"" + pageInSecond.getKey() + serviceUser + "\">" + pageInSecond.getValue() + "</a></li>\n");
+                content.append("<li><a href=\"wiki?title=" + pageInSecond.getKey() + serviceUser + "\" title=\"" + pageInSecond.getKey() + "\">" + pageInSecond.getValue() + "</a></li>\n");
             }
             content.append("    </ul>\n");
             content.append("   </td>\n");
@@ -2031,7 +2031,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     @Override
     public String getLinkbaseurl(WikiPageBeanBase page) {
-        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + page.getServiceUser();
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
         return Options.getInstance().SERVERPATH + "?title=${title}" + serviceUser;
     }
 
@@ -2040,7 +2040,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     @Override
     public String getImagebaseurl(WikiPageBeanBase page) {
-        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + page.getServiceUser();
+        final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
         return Options.getInstance().SERVERPATH + "?get_image=${image}" + serviceUser;
     }
 
