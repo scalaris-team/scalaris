@@ -390,27 +390,6 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Gets the contents of the newest revision of the page redirected to.
-     * 
-     * @param pageName0
-     *            the name of the page redirected to (unnormalised)
-     * 
-     * @return the contents of the newest revision of that page or a placeholder
-     *         string for the redirect
-     */
-    public String getRedirectContent(String pageName0) {
-        String redirText = retrievePage(pageName0, null, false);
-        if (redirText != null) {
-            // make PAGENAME in the redirected content work as expected
-            setPageName(pageName0);
-            return redirText;
-        } else {
-//            return "<b>ERROR: redirect to " + getRedirectLink() + " failed </b>";
-        }
-        return "&#35;redirect [[" + pageName0 + "]]";
-    }
-    
-    /**
      * Renders the "redirect to" content in case no auto-redirection is used.
      * 
      * @param pageTitle

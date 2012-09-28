@@ -831,8 +831,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         if (result.success) {
             final boolean noRedirect = getParam(request, "redirect").equals("no");
-            renderRevision(result.page.getTitle(), result.revision, render,
-                    request, connection, page, noRedirect);
+            renderRevision(result.page.getTitle(), result, render, request,
+                    connection, page, noRedirect,
+                    getWikiModel(connection, page), true);
             
             if (!result.page.checkEditAllowed("")) {
                 page.setEditRestricted(true);
@@ -852,8 +853,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * 
      * @param title
      *            the title of the article to render
-     * @param revision
-     *            the revision to render
+     * @param result
+     *            the revision to render (must be successful and contain a
+     *            revision)
      * @param renderer
      *            the renderer to use (0=plain text, 1=Bliki)
      * @param request
@@ -866,17 +868,22 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * @param noRedirect
      *            if <tt>true</tt>, a redirect will be shown as such, otherwise
      *            the content of the redirected page will be show
+     * @param wikiModel
+     *            the wiki model to use
+     * @param topLevel
+     *            if this function is called from inside
+     *            {@link #renderRevision()}, this will be <tt>false</tt>,
+     *            otherwise always use <tt>true</tt>
      */
-    private void renderRevision(String title, Revision revision,
+    private void renderRevision(String title, RevisionResult result,
             int renderer, HttpServletRequest request, Connection connection,
-            WikiPageBean page, boolean noRedirect) {
+            WikiPageBean page, boolean noRedirect, MyWikiModel wikiModel, boolean topLevel) {
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
-        MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
         if (renderer > 0) {
-            String mainText = wikiModel.renderPageWithCache(revision.unpackedText());
+            String mainText = wikiModel.renderPageWithCache(result.revision.unpackedText());
             NormalisedTitle titleN = NormalisedTitle.fromUnnormalised(title, namespace);
             if (titleN.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
                 ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, titleN);
@@ -924,14 +931,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 }
             }
             page.setTitle(title);
-            page.setVersion(revision.getId());
+            page.setVersion(result.revision.getId());
             String redirectedPageName = wikiModel.getRedirectLink();
             if (redirectedPageName != null) {
                 if (noRedirect) {
-                    page.setContentSub("Redirect page");
+                    if (topLevel) {
+                        page.setContentSub("Redirect page");
+                    }
                     mainText = wikiModel.renderRedirectPage(redirectedPageName);
-                    // extract the date:
-                    page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
+                    page.setDate(Revision.stringToCalendar(result.revision.getTimestamp()));
                 } else {
                     final String safeTitle = StringEscapeUtils.escapeHtml(title);
                     final String redirectUrl = wikiModel.getWikiBaseURL().replace("${title}", title);
@@ -939,11 +947,21 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     // add the content from the page directed to:
                     wikiModel.tearDown();
                     wikiModel.setUp();
-                    mainText = wikiModel.renderPageWithCache(wikiModel.getRedirectContent(redirectedPageName));
-                    page.setTitle(redirectedPageName);
-                    // TODO: extract the version and date from the redirected page:
-                    page.setVersion(-1);
-//                    page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
+                    
+                    RevisionResult redirectResult = getRevision(connection,
+                            redirectedPageName, namespace);
+                    page.addStats(redirectResult.stats);
+                    page.getInvolvedKeys().addAll(redirectResult.involvedKeys);
+                    if (redirectResult.success) {
+                        renderRevision(redirectedPageName, redirectResult,
+                                renderer, request, connection, page, true,
+                                wikiModel, false);
+                        return;
+                    } else {
+                        // non-existing/non-successful page is like redirect=no
+                        mainText = wikiModel.renderRedirectPage(redirectedPageName);
+                        page.setDate(Revision.stringToCalendar(result.revision.getTimestamp()));
+                    }
                 }
             }
             page.setPage(mainText);
@@ -965,17 +983,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 sb.append(request.getHeader(element) + "\n");
             }
             page.setPage("<p>WikiText:<pre>"
-                    + StringEscapeUtils.escapeHtml(revision.unpackedText()) + "</pre></p>" +
+                    + StringEscapeUtils.escapeHtml(result.revision.unpackedText()) + "</pre></p>" +
                     "<p>Version:<pre>"
-                    + StringEscapeUtils.escapeHtml(String.valueOf(revision.getId())) + "</pre></p>" +
+                    + StringEscapeUtils.escapeHtml(String.valueOf(result.revision.getId())) + "</pre></p>" +
                     "<p>Last change:<pre>"
-                    + StringEscapeUtils.escapeHtml(revision.getTimestamp()) + "</pre></p>" +
+                    + StringEscapeUtils.escapeHtml(result.revision.getTimestamp()) + "</pre></p>" +
                     "<p>Request Parameters:<pre>"
                     + StringEscapeUtils.escapeHtml(sb.toString()) + "</pre></p>");
             page.setTitle(title);
-            page.setVersion(revision.getId());
-            // extract the date:
-            page.setDate(Revision.stringToCalendar(revision.getTimestamp()));
+            page.setVersion(result.revision.getId());
+            page.setDate(Revision.stringToCalendar(result.revision.getTimestamp()));
         }
 
         page.setNotice(getParam_notice(request));
@@ -1045,7 +1062,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         
         if (result.success) {
-            renderRevision(title, result.revision, render, request, connection, page, false);
+            renderRevision(title, result, render, request, connection, page,
+                    false, getWikiModel(connection, page), true);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, connection, page);
@@ -1120,7 +1138,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         
         if (result.success) {
-            renderRevision(title, result.revision, render, request, connection, page, false);
+            renderRevision(title, result, render, request, connection, page,
+                    false, getWikiModel(connection, page), true);
         } else if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, connection, page);
