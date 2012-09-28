@@ -303,11 +303,6 @@ public class MyWikiModel extends WikiModel {
             return processedMagicWord;
         }
         
-        if (getRedirectLink() != null) {
-            // requesting a page from a redirect?
-            return getRedirectContent(getRedirectLink());
-        }
-        
         if (!isValidTitle(createFullPageName(namespace, articleName))) {
             return null;
         }
