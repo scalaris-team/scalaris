@@ -439,7 +439,7 @@ update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
     fd:update_subscriptions(OldPids, NewPids).
 
 %% @doc Delete a subscription
--spec delete_fd(EntryPid :: pid()) -> ok.
+-spec delete_fd(EntryPid :: comm:mypid()) -> ok.
 delete_fd(EntryPid) -> fd:unsubscribe(EntryPid).
 
 %% userdevguide-end rt_frtchord:check
