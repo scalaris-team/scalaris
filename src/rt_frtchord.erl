@@ -306,7 +306,7 @@ get_random_key_from_generator(SourceNodeId, PredId, SuccId) ->
                     get_range(SourceNodeId, SuccId),
                     Rand
                 ),
-    erlang:trunc(X) rem 16#100000000000000000000000000000000
+    erlang:trunc(X) rem n()
     .
 
 %% userdevguide-begin rt_frtchord:handle_custom_message
@@ -509,8 +509,9 @@ export_rt_to_dht_node(InternalRT, _Neighbors) ->
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) -> % match external RT
     RT = dht_node_state:get(State, rt),
-    SourceNode = dht_node_state:get(State, node_id),
-    sorted_nodelist(gb_trees:values(RT), SourceNode)
+    Neighbors = dht_node_state:get(State, neighbors),
+    nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
+        nodelist:node(Neighbors))
     .
 
 %% @doc Converts the internal representation of the routing table to a list
