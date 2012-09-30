@@ -26,6 +26,7 @@
 
 % exports for unit tests
 -export([check_rt_integrity/1
+        , check_well_connectedness/1
         , get_random_key_from_generator/3
     ]).
 
@@ -199,11 +200,8 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 filter_dead_node(RT, DeadPid) -> 
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
-        [Node] ->
-            delete_fd(node:pidX(Node)),
-            entry_delete(node:id(Node), RT);
-        [] ->
-            RT
+        [Node] -> entry_delete(node:id(Node), RT);
+        [] -> RT
     end
     .
 %% userdevguide-end rt_frtchord:filter_dead_node
@@ -414,8 +412,9 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
             Pid = pid_groups:get_my(dht_node),
             case Pid of
                 failed -> ok;
-                _E     -> RTExt = export_rt_to_dht_node(NewRT, NewNeighbors),
-                          comm:send_local(Pid, {rt_update, RTExt})
+                _E     ->
+                    RTExt = export_rt_to_dht_node(NewRT, NewNeighbors),
+                    comm:send_local(Pid, {rt_update, RTExt})
             end,
             % update failure detector:
             case ReportToFD of
@@ -433,13 +432,14 @@ add_fd(#rt_t{} = RT) ->
 
 %% @doc Update subscriptions
 -spec update_fd(OldRT :: rt(), NewRT :: rt()) -> ok.
+update_fd(OldRT, OldRT) -> ok;
 update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
     OldPids = to_pid_list(OldRT),
     NewPids = to_pid_list(NewRT),
     fd:update_subscriptions(OldPids, NewPids).
 
 %% @doc Delete a subscription
-%-spec delete_fd(EntryPid :: pid()) -> ok.
+-spec delete_fd(EntryPid :: pid()) -> ok.
 delete_fd(EntryPid) -> fd:unsubscribe(EntryPid).
 
 %% userdevguide-end rt_frtchord:check
@@ -564,7 +564,9 @@ entry_filtering(RT, [_|_] = AllowedNodes) ->
                 -> SpacingA =< SpacingB
             end, Spacings)
     ),
-    entry_delete(entry_nodeid(FilterEntry), RT)
+    FilteredNode = rt_entry_node(FilterEntry),
+    delete_fd(node:pidX(FilteredNode)),
+    entry_delete(node:id(FilteredNode), RT)
     .
 
 % @doc Delete an entry from the routing table
@@ -588,6 +590,11 @@ entry_delete(EntryKey, RT) ->
             gb_trees:enter(PredId, NewPred,
                 gb_trees:enter(SuccId, NewSucc, Tree))
     end,
+    % Note: We don't update the subscription here, as it is unclear at this point wether
+    % the node died and the FD informed us on that or if the node is alive and was
+    % filtered due to a full routing table. If the node died, the FD
+    % already removed the subscription.
+
     RT#rt_t{nodes=UpdatedTree}
     .
 
@@ -620,35 +627,37 @@ create_entry(Node, Type, RT) ->
             {NewEntry, NewEntry, NewEntry}
             ;
         nil -> % largest finger
-            {PredId, Pred} = gb_trees:largest(Tree),
-            get_adjacent_fingers_from(PredId, Pred, Node, Type, RT)
+            {_PredId, Pred} = gb_trees:largest(Tree),
+            get_adjacent_fingers_from(Pred, Node, Type, RT)
             ;
-        {value, PredId, Pred} ->
-            get_adjacent_fingers_from(PredId, Pred, Node, Type, RT)
+        {value, _PredId, Pred} ->
+            get_adjacent_fingers_from(Pred, Node, Type, RT)
     end
     .
 
 % Get the tuple of adjacent finger ids with Node being in the middle:
 % {Predecessor, Node, Successor}
-get_adjacent_fingers_from(PredId, Pred, Node, Type, RT) ->
+-spec get_adjacent_fingers_from(Pred::rt_entry(), Node::node:node_type(),
+    Type::entry_type(), RT::rt()) -> {rt_entry(), rt_entry(), rt_entry()}.
+get_adjacent_fingers_from(Pred, Node, Type, RT) ->
+    PredId = entry_nodeid(Pred),
     Succ = successor_node(RT, Pred),
     SuccId = entry_nodeid(Succ),
     NodeId = node:id(Node),
-    % construct the node
     NewEntry = #rt_entry{
         node=Node,
         type=Type,
-        adjacent_fingers={PredId, entry_nodeid(Succ)}
+        adjacent_fingers={PredId, SuccId}
     },
     case PredId =:= SuccId of
-        false -> {set_adjacent_succ(Pred, NodeId),
+        false ->
+            {set_adjacent_succ(Pred, NodeId),
                 NewEntry,
                 set_adjacent_pred(Succ, NodeId)
             };
-        true -> {set_adjacent_fingers(Pred, NodeId, NodeId),
-                NewEntry,
-                set_adjacent_fingers(Succ, NodeId, NodeId)
-            }
+        true ->
+            AdjacentNode = set_adjacent_fingers(Pred, NodeId, NodeId),
+            {AdjacentNode, NewEntry, AdjacentNode}
     end
     .
 
@@ -659,7 +668,7 @@ entry_learning(Entry, Type, RT) ->
     % only add the entry if it doesn't exist yet or if it is a sticky node. If its a
     % stickynode, RM told us about a new neighbour -> if the neighbour was already added
     % as a normal node, convert it to a sticky node now.
-    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) =:= none orelse Type =:= sticky of
+    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) =:= none of
         true ->
             % change the type to 'sticky' if the node is between the neighbors of the source
             % node
@@ -688,20 +697,37 @@ entry_learning(Entry, Type, RT) ->
             end,
 
             Ns = {NewPred, NewNode, NewSucc} = create_entry(Entry, AdaptedType, RT),
-            % if the nodes are all the same, we entered the first node and thus only enter
+            % - if the nodes are all the same, we entered the first node and thus only enter
             % a single node to the tree
+            % - if pred and succ are the same, we enter the second node: add that node and
+            % an updated pred
+            % - else, add the new node and update succ and pred
             Nodes = case Ns of
-                {NewNode, NewNode, NewSucc} ->
-                    gb_trees:enter(entry_nodeid(NewSucc), NewSucc, get_rt_tree(RT));
-                    _Else ->
-                        gb_trees:enter(entry_nodeid(NewSucc), NewSucc,
-                            gb_trees:enter(entry_nodeid(NewNode), NewNode,
-                                gb_trees:enter(entry_nodeid(NewPred), NewPred, get_rt_tree(RT))
-                            )
+                {NewNode, NewNode, NewNode} ->
+                    gb_trees:enter(entry_nodeid(NewNode), NewNode, get_rt_tree(RT));
+                {NewPred, NewNode, NewPred} ->
+                    gb_trees:enter(entry_nodeid(NewNode), NewNode,
+                            gb_trees:enter(entry_nodeid(NewPred), NewPred,
+                                get_rt_tree(RT)));
+                _Else ->
+                    gb_trees:enter(entry_nodeid(NewSucc), NewSucc,
+                        gb_trees:enter(entry_nodeid(NewNode), NewNode,
+                            gb_trees:enter(entry_nodeid(NewPred), NewPred, get_rt_tree(RT))
                         )
-                end,
+                    )
+            end,
             rt_set_nodes(RT, Nodes);
-        false -> RT
+        false ->
+            case Type of
+                sticky -> % update entry
+                    StickyEntry = rt_get_node(node:id(Entry), RT),
+                    Nodes = gb_trees:enter(node:id(Entry),
+                        StickyEntry#rt_entry{type=sticky},
+                        get_rt_tree(RT)),
+                    rt_set_nodes(RT, Nodes)
+                    ;
+                _ -> RT
+            end
     end
     .
 
@@ -735,7 +761,13 @@ entry_learning_and_filtering(Entry, Type, RT) ->
 % @doc Get the source node of a routing table
 -spec get_source_node(RT :: rt()) -> rt_entry().
 get_source_node(#rt_t{source=undefined}) -> erlang:error("routing table source unknown");
-get_source_node(#rt_t{source=NodeId, nodes=Nodes}) -> gb_trees:get(NodeId, Nodes).
+get_source_node(#rt_t{source=NodeId, nodes=Nodes}) ->
+    case Nodes =:= gb_trees:empty() of
+            false ->
+                gb_trees:get(NodeId, Nodes);
+            true  ->
+                exit(rt_broken_tree_empty)
+    end.
 
 % @doc Set the source node of a routing table
 -spec set_source_node(SourceId :: key(), RT :: rt()) -> rt().
@@ -921,3 +953,39 @@ unwrap_message({'$wrapped', Pid, UnwrappedMessage}, State) ->
     UnwrappedMessage
     .
 %% userdevguide-end rt_frtchord:unwrap_message
+
+% @doc Check that the adjacent fingers of a RT are building a ring
+-spec check_well_connectedness(RT::rt()) -> boolean().
+check_well_connectedness(RT) ->
+    Nodes = [N || {_, N} <- gb_trees:to_list(get_rt_tree(RT))],
+    NodeIds = lists:sort([Id || {Id, _} <- gb_trees:to_list(get_rt_tree(RT))]),
+    % traverse the adjacent fingers of the nodes and add each visited node to a list
+    % NOTE: each node should only be visited once
+    InitVisitedNodes = ordsets:from_list([{N, false} || N <- Nodes]),
+    %% check forward adjacent fingers
+    Visit = fun(Visit, Current, Visited, Direction) ->
+            case ordsets:is_element({Current, false}, Visited) of
+                true -> % node wasn't visited
+                    AccVisited = ordsets:add_element({Current, true},
+                        ordsets:del_element({Current, false}, Visited)),
+                    Next = case Direction of
+                        succ -> rt_get_node(adjacent_succ(Current), RT);
+                        pred -> rt_get_node(adjacent_pred(Current), RT)
+                    end,
+                    Visit(Visit, Next, AccVisited, Direction);
+                false ->
+                    Filtered = ordsets:filter(fun({_, true}) -> true; (_) -> false end,
+                        Visited),
+                    lists:sort([entry_nodeid(N) || {N, true} <- ordsets:to_list(Filtered)])
+            end
+    end,
+    Succs = Visit(Visit, get_source_node(RT), InitVisitedNodes, succ),
+    Preds = Visit(Visit, get_source_node(RT), InitVisitedNodes, pred),
+    try
+        NodeIds = Succs,
+        NodeIds = Preds,
+        true
+    catch
+        _:_ -> false
+    end
+    .
