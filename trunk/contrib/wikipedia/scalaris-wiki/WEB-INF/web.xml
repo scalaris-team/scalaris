@@ -81,6 +81,12 @@ example:
 -->
             <param-value>ALL:APPEND_INCREMENT</param-value>
         </init-param>
+<!--
+        <init-param>
+            <param-name>4CaaSt.accounting</param-name>
+            <param-value>URL</param-value>
+        </init-param>
+-->
     </servlet>
     <servlet-mapping>
         <servlet-name>WikiServletScalaris</servlet-name>
