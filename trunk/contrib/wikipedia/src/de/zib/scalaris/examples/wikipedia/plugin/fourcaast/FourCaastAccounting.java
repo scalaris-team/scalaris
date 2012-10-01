@@ -158,4 +158,29 @@ public class FourCaastAccounting implements WikiEventHandler {
 
     }
 
+    @Override
+    public String getName() {
+        return "4CaaSt accounting";
+    }
+    
+    @Override
+    public String getURL() {
+        return "https://code.google.com/p/scalaris/";
+    }
+
+    @Override
+    public String getVersion() {
+        return "0.1";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Registers page-view events with an accounting server.";
+    }
+
+    @Override
+    public String getAuthor() {
+        return "Nico Kruber";
+    }
+
 }

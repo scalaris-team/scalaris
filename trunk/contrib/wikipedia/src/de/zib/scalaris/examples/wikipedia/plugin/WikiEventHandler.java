@@ -104,4 +104,39 @@ public interface WikiEventHandler {
      */
     public <Connection> boolean checkAccess(String serviceUser, HttpServletRequest request,
             Connection connection);
+
+    /**
+     * Gets a descriptive name of this event handler.
+     * 
+     * @return a (HTML) string
+     */
+    public String getName();
+
+    /**
+     * Gets a URL where to get the plugin from or get more information about it.
+     * 
+     * @return a URL
+     */
+    public String getURL();
+
+    /**
+     * Gets a descriptive version number of this event handler.
+     * 
+     * @return a (HTML) string
+     */
+    public String getVersion();
+
+    /**
+     * Gets a brief description of what this event handler is doing.
+     * 
+     * @return a (HTML) string
+     */
+    public String getDescription();
+
+    /**
+     * Gets the name of the author(s) of this event handler.
+     * 
+     * @return a (HTML) string
+     */
+    public String getAuthor();
 }
