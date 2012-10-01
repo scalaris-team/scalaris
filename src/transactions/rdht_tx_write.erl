@@ -143,7 +143,10 @@ commit(DB, RTLogEntry, _OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
     TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
     NewDB = case (TLogSnapNo < OwnSnapNo) of
         true ->
-            ?DB:set_snapshot_entry(DB, NewEntry);
+            case ?DB:snapshot_is_running(DB) of
+                true -> ?DB:set_snapshot_entry(DB, NewEntry);
+                _ -> DB
+            end;
         _ -> 
             DB
     end,
