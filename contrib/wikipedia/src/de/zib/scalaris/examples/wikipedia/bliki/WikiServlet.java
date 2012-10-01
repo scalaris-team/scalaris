@@ -1582,6 +1582,31 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         content.append(" </tbody>\n");
         content.append("</table>\n");
         
+        content.append("<h2 id=\"mw-version-ext\"> <span class=\"mw-headline\" id=\"Installed_extensions\">Installed extensions</span></h2>\n");
+        content.append("<table class=\"wikitable\" id=\"sv-ext\">\n");
+        content.append(" <tbody>\n");
+        content.append("  <tr>\n");
+        content.append("   <th colspan=\"4\" id=\"sv-credits-specialpage\">Event handlers</th>\n");
+        content.append("  </tr>\n");
+        if (eventHandlers.isEmpty()) {
+            content.append("  <tr>\n");
+            content.append("   <td>-</td>\n");
+            content.append("   <td>-</td>\n");
+            content.append("   <td>-</td>\n");
+            content.append("   <td>-</td>\n");
+            content.append("  </tr>\n");
+        }
+        for (WikiEventHandler eventHandler : eventHandlers) {
+            content.append("  <tr>\n");
+            content.append("   <td><em><a class=\"external text\" href=\"" + eventHandler.getURL() + "\">" + eventHandler.getName() + "</a> (Version " + eventHandler.getVersion() + ")</em></td>\n");
+            content.append("   <td><code title=\" " + eventHandler.getClass().getCanonicalName() + "\">" + eventHandler.getClass().getSimpleName() + "</code></td>\n");
+            content.append("   <td>" + eventHandler.getDescription() + "</td>\n");
+            content.append("   <td>" + eventHandler.getAuthor() + "</td>\n");
+            content.append("  </tr>\n");
+        }
+        content.append(" </tbody>\n");
+        content.append("</table>\n");
+        
         page.setPage(content.toString());
         // abuse #handleViewSpecialPageList here:
         ValueResult<List<NormalisedTitle>> result = new ValueResult<List<NormalisedTitle>>(
