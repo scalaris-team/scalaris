@@ -46,6 +46,7 @@
 -ifdef(with_export_type_support).
 -export_type([rtms/0]).
 -export_type([tx_item_id/0, paxos_id/0]).
+-export_type([tx_id/0]).
 -endif.
 
 -type tx_id() :: {?tx_id, uid:global_uid()}.
@@ -874,6 +875,9 @@ trigger_delete_if_done(TxState, State) ->
             of
                 true ->
                     TxId = tx_state_get_tid(TxState),
+                    %% wait a bit for slow minority of answers to arrive
+                    %%msg_delay:send_local(1, self(),
+                    %%                     {?tx_tm_rtm_delete, TxId, Decision});
                     comm:send_local(self(), {?tx_tm_rtm_delete, TxId, Decision});
                 false -> ok
             end
