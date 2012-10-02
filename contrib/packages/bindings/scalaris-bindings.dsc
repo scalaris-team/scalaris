@@ -1,6 +1,6 @@
 Format: 1.0
 Source: scalaris-bindings
-Version: 0.4.1+svn-1
+Version: 0.5.0+svn-1
 Maintainer: Nico Kruber <kruber@zib.de>
 Architecture: all
 Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, default-jdk, pkg-config, ruby, ruby1.8, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
