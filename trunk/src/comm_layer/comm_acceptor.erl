@@ -107,7 +107,7 @@ server(LS) ->
 open_listen_port({From, To}, IP) ->
     open_listen_port(lists:seq(From, To), IP);
 open_listen_port([Port | Rest], IP) ->
-    case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}, {backlog, 128000}]
+    case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}, {backlog, 128}]
                         ++ comm_server:tcp_options(main)) of
         {ok, Socket} ->
             log:log(info,"[ CC ] listening on ~p:~p", [IP, Port]),
