@@ -1,0 +1,15 @@
+== QUICKSTART ==
+
+1) run 'ant download' to get a wikipedia dump of the simple wiktionary (or download a dump yourself)
+2) start at least one Scalaris node, e.g. by running '../../bin/scalarisctl -f -s -d start' (for a deamonized first node)
+3) import the dump using either of the two following options:
+3a) run 'ant import-xml' and follow the instructions to import data into Scalaris
+3b) run 'ant prepare' to create a prepared dump file for faster dump loads and then use 'ant import-db' with the created DB to import data into Scalaris
+4) run 'ant run' and follow the instructions to get a webserver up and running
+
+== Creating a scalaris-wiki.war with pre-defined config ==
+
+1) place your desired scalaris.properties in simplewiki/WEB-INF/
+2) run 'ant dist'
+
+Note: Properties inside simplewiki/WEB-INF/scalaris.properties overwrite config parameters provided during 'ant run'!

@@ -1,0 +1,144 @@
+\chapter{Setting up \scalaris{}}
+\label{chapter.runscalaris}
+\svnrev{r1810}
+
+\section{Runtime Configuration}
+
+\scalaris{} reads two configuration files from the working directory:
+\code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
+(optional). The former defines default settings and is included in the
+release. The latter can be created by the user to alter settings.  A
+sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
+\scalaris{} distributed over several nodes, each node requires a
+\code{bin/scalaris.local.cfg}:
+
+\codefile{scalaris.local.cfg}{../bin/scalaris.local.cfg.example}
+
+A \scalaris{} deployment can have a management server and several nodes. The
+management-server is optional and provides a global view on all nodes of a
+\scalaris{} deployment which contact this server, i.e. have its address
+specified in the \code{mgmt_server} configuration setting.
+
+In this example, the \code{mgmt_server}'s location is defined as
+an IP address plus a TCP port and its Erlang-internal process name.
+If the deployment should not use a management server, replace the setting with
+an invalid address, e.g. \code{'null'}.
+
+\subsection{Logging}
+\label{sec:logging}
+
+\scalaris{} uses the log4erl library (see \code{contrib/log4erl}) for
+logging status information and error messages. The log level can be
+configured in \code{bin/scalaris.cfg} for both the stdout and file logger.
+The default value is {\tt warn}; only warnings, errors and severe problems are
+logged.
+
+\begin{lstlisting}[language=erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, warn}.
+{log_level_file, warn}.
+\end{lstlisting}
+
+In some cases, it might be necessary to get more complete logging
+information, e.g. for debugging. In Chapter~\sieheref{chapter.join},
+we are explaining the startup process of \scalaris{} nodes in more
+detail, here the {\tt info} level provides more detailed information.
+
+\begin{lstlisting}[language=erlang]
+%% @doc Loglevel: debug < info < warn < error < fatal < none
+{log_level, info}.
+{log_level_file, info}.
+\end{lstlisting}
+
+
+\section{Running \scalaris{}}
+
+As mentioned above, \scalaris{} consists of:
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\item management servers and
+\item regular nodes
+\end{itemize}
+
+The management server will maintain a list of nodes participating in the
+system. A regular node is either the first node in a system or joins an
+existing system deployment.
+
+\subsection{Running on a local machine}
+\label{sec.boot}
+
+Open at least two shells. In the first, inside the \scalaris{} directory,
+start the first node (\code{firstnode.bat} on Windows):
+\begin{lstlisting}[language=sh]
+%> ./bin/firstnode.sh
+\end{lstlisting}
+
+This will start a new \scalaris{} deployment with a single node, including a
+management server. On success \url{http://localhost:8000} should point to
+the management interface page of the management server. The main page will
+show you the number of nodes currently in the system.
+A first \scalaris{} node should have started and the number should
+show 1 node. The main page will also allow you to store and retrieve
+key-value pairs but should not be used by applications to access
+\scalaris{}. See Section~\sieheref{chapter.systemuse.apis} for application APIs.
+
+In a second shell, you can now start a second \scalaris{} node. This
+will be a `regular node':
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh
+\end{lstlisting}
+
+The second node will read the configuration file and use this information to
+contact a number of known nodes (set by the \code{known_hosts} configuration
+setting) and join the ring. It will also register itself with the management
+server.
+The number of nodes on the web page should have increased to two by now.
+
+Optionally, a third and fourth node can be started on the same
+machine. In a third shell:
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh 2
+\end{lstlisting}
+
+In a fourth shell:
+\begin{lstlisting}[language=sh]
+%> ./bin/joining_node.sh 3
+\end{lstlisting}
+
+This will add two further nodes to the deployment. The
+\code{./bin/joining_node.sh} script accepts a number as its parameter which
+will be added to the started node's name, i.e. \code{1} will lead to a node
+named \code{node1}.
+The web pages at \url{http://localhost:8000} should show the additional nodes.
+
+\subsection{Running distributed}
+
+\scalaris{} can be installed on other machines in the same way as
+described in Section~\sieheref{sec:install}. In the default configuration,
+nodes will look for the management server on \code{127.0.0.1} on port 14195. You
+should create a \code{scalaris.local.cfg} pointing to the node running
+the management server. You should also add a list of known nodes.
+
+\codesnippet{scalaris.local.cfg}{local_cfg:distributed}{../bin/scalaris.local.cfg.example}
+
+If you are starting the management server using \code{firstnode.sh}, it will
+listen on port 14195 and you have to change the port and the IP address in the
+configuration file. Otherwise the other nodes will not find the management
+server. Calling \code{./bin/joining_node.sh} on a remote machine will start the
+node and automatically contact the configured management server.
+
+%\subsection{Running on PlanetLab}
+
+%\subsection{Replication Degree}
+
+%\subsection{Routing Scheme}
+
+\section{Custom startup using \texorpdfstring{\code{scalarisctl}}{scalarisctl}}
+
+On linux you can also use the \code{scalarisctl} script to start a
+management server and `regular' nodes directly.
+\begin{lstlisting}[language=sh]
+%> ./bin/scalarisctl -h
+\end{lstlisting}
+\lstinputlisting[language={}]{scalarisctl-h.out}

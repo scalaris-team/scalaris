@@ -1,0 +1,8 @@
+<erl module=jsonrpc_api_dht_raw_mod>
+-compile(export_all).
+-include("yaws_handler.hrl").
+
+forward_to_handler(Operation, Params) ->
+  api_json_dht_raw:handler(Operation, Params).
+
+</erl>
