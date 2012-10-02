@@ -3,8 +3,8 @@
 SCALARIS_VERSION="0.5.0"
 date=`date +"%Y%m%d"`
 name="scalaris-examples-wiki" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
-package_url="http://scalaris.googlecode.com/svn/trunk/contrib/packages/examples-wiki"
+url="http://scalaris.googlecode.com/svn/branches/0.5/contrib/wikipedia"
+package_url="http://scalaris.googlecode.com/svn/branches/0.5/contrib/packages/examples-wiki"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
