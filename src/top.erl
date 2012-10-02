@@ -160,7 +160,7 @@ top_inspect_pid_interactive(TopPid, Pid) ->
                 comm:send_local(TopPid, {output_off}),
                 comm:send_local(TopPid, {stop_sampling}),
                 print_process_dictionary(Pid),
-                io:get_chars("Hit return to continue> ", 1),
+                _ = io:get_chars("Hit return to continue> ", 1),
                 comm:send_local(TopPid, {enable_sampling, Pid}),
                 comm:send_local(TopPid, {sample_pid, Pid}),
                 comm:send_local(TopPid, {enable_output, pid}),
@@ -217,11 +217,13 @@ print_process_dictionary(Pid) ->
     io:format("~n"),
     io:format("Process Dictionary:~n"),
     io:format("~20s ~-60s~n", ["Key", "Value"]),
-    [ io:format("~20s ~-60s~n",
-                [ lists:flatten(io_lib:format("~1210.0p", [element(1, X)])),
-                  lists:flatten(io_lib:format("~111610.0p", [element(2, X)]))])
-      || X <- process_info_get(Infos, dictionary, [])].
-
+    _ = [ io:format("~20s ~-60s~n",
+                    [ lists:flatten(io_lib:format("~1210.0p",
+                                                  [element(1, X)])),
+                      lists:flatten(io_lib:format("~111610.0p",
+                                                  [element(2, X)]))])
+          || X <- process_info_get(Infos, dictionary, [])],
+    ok.
 
 -spec on(comm:message(), state()) -> state().
 
@@ -230,7 +232,7 @@ on({enable_sampling, Val}, State) ->
         true ->
             dbg:stop_clear(),
             dbg:tracer(process, {fun top:trace_fwd/2, self()}),
-            dbg:tpl('_', []),
+            _ = dbg:tpl('_', []),
             dbg:p(Val, [c, return_to]);
         false -> ok
     end,
