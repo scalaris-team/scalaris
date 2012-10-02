@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
          dump/1,
          set_rt/2,
          set_rm/2,
+         set_prbr/2,
          set_db/2,
          details/1, details/2,
          % node responsibilities:
@@ -68,7 +69,8 @@
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
                 bulkowner_reply_timer   = null :: null | reference(),
                 bulkowner_reply_ids     = []   :: [uid:global_uid()],
-                monitor_proc            = ?required(state, monitor_proc) :: pid()
+                monitor_proc            = ?required(state, monitor_proc) :: pid(),
+                prbr_state = ?required(state, prbr_state) :: prbr:state()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -81,7 +83,8 @@ new(RT, RMState, DB) ->
            db = DB,
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
-           monitor_proc = pid_groups:get_my(dht_node_monitor)
+           monitor_proc = pid_groups:get_my(dht_node_monitor),
+           prbr_state = prbr:init([])
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -137,11 +140,12 @@ new(RT, RMState, DB) ->
          (state(), slide_succ) -> slide_op:slide_op() | null;
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
-         (state(), monitor_proc) -> pid().
+         (state(), monitor_proc) -> pid();
+         (state(), prbr_state) -> prbr:state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, monitor_proc=MonitorProc}, Key) ->
+           db_range=DBRange, monitor_proc=MonitorProc, prbr_state=PRBRState}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -175,7 +179,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node         -> nodelist:node(rm_loop:get_neighbors(RMState));
         node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         join_time    -> JoinTime;
-        load         -> ?DB:get_load(DB)
+        load         -> ?DB:get_load(DB);
+        prbr_state   -> PRBRState
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
@@ -235,6 +240,9 @@ set_rt(State, RT) -> State#state{rt = RT}.
 
 -spec set_rm(State::state(), NewRMState::rm_loop:state()) -> state().
 set_rm(State, RMState) -> State#state{rm_state = RMState}.
+
+-spec set_prbr(State::state(), NewRBRState::prbr:state()) -> state().
+set_prbr(State, PRBRState) -> State#state{prbr_state = PRBRState}.
 
 -spec set_slide(state(), pred | succ, slide_op:slide_op() | null) -> state().
 set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};

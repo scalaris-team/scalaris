@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(dht_node).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 -behaviour(gen_component).
@@ -188,6 +188,11 @@ on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
 %    dht_node_lookup:lookup_aux_failed(State, Target, Message);
 on({send_error, Target, {?lookup_fin, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_fin_failed(State, Target, Message);
+
+%% messages handled as a prbr
+on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
+    NewRBRState = prbr:on(X, dht_node_state:get(State, prbr_state)),
+    dht_node_state:set_prbr(State, NewRBRState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
