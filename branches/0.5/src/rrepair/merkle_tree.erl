@@ -430,7 +430,7 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
 % S = 1.. has to be smaller than log_v(N)
 -spec get_opt_bucket_size(N::pos_integer(), V::pos_integer(), S::pos_integer()) -> pos_integer().
 get_opt_bucket_size(N, V, S) ->
-    Height = util:ceil(util:log(N, V)) - S,
+    Height = erlang:max(util:ceil(util:log(N, V)) - S, 1),
     util:ceil(N / math:pow(V, Height)). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
