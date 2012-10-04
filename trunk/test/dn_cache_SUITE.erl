@@ -70,7 +70,9 @@ dn_detection(Config) ->
     Config.
 
 fake_node() ->
-    unittest_helper:start_subprocess(fun() -> pid_groups:join_as("dn_cache_group", node) end, fun fake_process/0).
+    element(1, unittest_helper:start_subprocess(
+              fun() -> pid_groups:join_as("dn_cache_group", node) end,
+              fun fake_process/0)).
 
 fake_process() ->
     receive
