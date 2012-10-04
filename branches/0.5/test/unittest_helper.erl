@@ -154,7 +154,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
         undefined -> ok;
         _         -> ct:fail("Trying to create a new ring although there is already one.")
     end,
-    {Pid, _StartRes} =
+    {Pid, StartRes} =
         start_process(
           fun() ->
                   ct:pal("Trying to build Scalaris with ids~n"),
@@ -168,6 +168,12 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                   [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]) |
                        [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
           end),
+    FailedNodes = [X || X = {error, _ } <- StartRes],
+    case FailedNodes of
+        [] -> ok;
+        [_|_] -> stop_ring(Pid),
+                 ?ct_fail("adding nodes failed: ~.0p", [FailedNodes])
+    end,
 %%     timer:sleep(1000),
     % need to call IdsFun again (may require config process or others
     % -> can not call it before starting the scalaris process)
@@ -199,7 +205,7 @@ make_ring(Size, Options) ->
         undefined -> ok;
         _         -> ct:fail("Trying to create a new ring although there is already one.")
     end,
-    {Pid, _StartRes} =
+    {Pid, StartRes} =
         start_process(
           fun() ->
                   ct:pal("unittest_helper:make_ring size ~p", [Size]),
@@ -213,6 +219,12 @@ make_ring(Size, Options) ->
                   {RestSuc, RestFailed} = admin:add_nodes(Size - 1),
                   [First | RestSuc ++ RestFailed]
           end),
+    FailedNodes = [X || X = {error, _ } <- StartRes],
+    case FailedNodes of
+        [] -> ok;
+        [_|_] -> stop_ring(Pid),
+                 ?ct_fail("adding nodes failed: ~.0p", [FailedNodes])
+    end,
     true = erlang:is_process_alive(Pid),
 %%     timer:sleep(1000),
     check_ring_size(Size),
