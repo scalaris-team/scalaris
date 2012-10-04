@@ -314,7 +314,7 @@ get_failure_rep_group(Key, FType, FDest) ->
     end.
 
 % @doc Resolves failure type mixed.
--spec get_failure_type(failure_type()) -> regen | mixed.
+-spec get_failure_type(failure_type()) -> regen | update.
 get_failure_type(mixed) ->
     case randoms:rand_uniform(1, 3) of
         1 -> update;
