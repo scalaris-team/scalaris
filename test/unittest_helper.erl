@@ -154,20 +154,20 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
         undefined -> ok;
         _         -> ct:fail("Trying to create a new ring although there is already one.")
     end,
-    Pid = start_process(
-            fun() ->
-                    ct:pal("Trying to build Scalaris with ids~n"),
-                    erlang:register(ct_test_ring, self()),
-                    randoms:start(),
-                    {ok, _GroupsPid} = pid_groups:start_link(),
-                    NewOptions = prepare_config(Options),
-                    {ok, _} = sup_scalaris:start_link(NewOptions),
-                    mgmt_server:connect(),
-                    Ids = IdsFun(), % config may be needed
-                    _ = admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]),
-                    _ = [admin:add_node_at_id(Id) || Id <- tl(Ids)],
-                    ok
-            end),
+    {Pid, _StartRes} =
+        start_process(
+          fun() ->
+                  ct:pal("Trying to build Scalaris with ids~n"),
+                  erlang:register(ct_test_ring, self()),
+                  randoms:start(),
+                  {ok, _GroupsPid} = pid_groups:start_link(),
+                  NewOptions = prepare_config(Options),
+                  {ok, _} = sup_scalaris:start_link(NewOptions),
+                  mgmt_server:connect(),
+                  Ids = IdsFun(), % config may be needed
+                  [admin:add_node([{first}, {{dht_node, id}, hd(Ids)}]) |
+                       [admin:add_node_at_id(Id) || Id <- tl(Ids)]]
+          end),
 %%     timer:sleep(1000),
     % need to call IdsFun again (may require config process or others
     % -> can not call it before starting the scalaris process)
@@ -199,19 +199,20 @@ make_ring(Size, Options) ->
         undefined -> ok;
         _         -> ct:fail("Trying to create a new ring although there is already one.")
     end,
-    Pid = start_process(
-            fun() ->
-                    ct:pal("unittest_helper:make_ring size ~p", [Size]),
-                    erlang:register(ct_test_ring, self()),
-                    randoms:start(),
-                    {ok, _GroupsPid} = pid_groups:start_link(),
-                    NewOptions = prepare_config(Options),
-                    {ok, _} = sup_scalaris:start_link(NewOptions),
-                    mgmt_server:connect(),
-                    _ = admin:add_node([{first}]),
-                    _ = admin:add_nodes(Size - 1),
-                    ok
-            end),
+    {Pid, _StartRes} =
+        start_process(
+          fun() ->
+                  ct:pal("unittest_helper:make_ring size ~p", [Size]),
+                  erlang:register(ct_test_ring, self()),
+                  randoms:start(),
+                  {ok, _GroupsPid} = pid_groups:start_link(),
+                  NewOptions = prepare_config(Options),
+                  {ok, _} = sup_scalaris:start_link(NewOptions),
+                  mgmt_server:connect(),
+                  First = admin:add_node([{first}]),
+                  {RestSuc, RestFailed} = admin:add_nodes(Size - 1),
+                  [First | RestSuc ++ RestFailed]
+          end),
     true = erlang:is_process_alive(Pid),
 %%     timer:sleep(1000),
     check_ring_size(Size),
@@ -323,23 +324,24 @@ check_ring_size_fully_joined(Size) ->
                           end).
 
 %% @doc Starts a process which executes the given function and then waits forever.
--spec start_process(StartFun::fun(() -> any())) -> pid().
+-spec start_process(StartFun::fun(() -> StartRes)) -> {pid(), StartRes}.
 start_process(StartFun) ->
     start_process(StartFun, fun() -> receive {done} -> ok end end).
 
--spec start_process(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
+-spec start_process(StartFun::fun(() -> StartRes), RunFun::fun(() -> any())) -> {pid(), StartRes}.
 start_process(StartFun, RunFun) ->
     start_process(StartFun, RunFun, false, spawn).
 
--spec start_process(StartFun::fun(() -> any()), RunFun::fun(() -> any()),
-                    TrapExit::boolean(), Spawn::spawn | spawn_link) -> pid().
+-spec start_process(StartFun::fun(() -> StartRes), RunFun::fun(() -> any()),
+                    TrapExit::boolean(), Spawn::spawn | spawn_link)
+        -> {pid(), StartRes}.
 start_process(StartFun, RunFun, TrapExit, Spawn) ->
     process_flag(trap_exit, TrapExit),
     Owner = self(),
     Node = erlang:Spawn(
              fun() ->
-                     try _ = StartFun(),
-                         Owner ! {started, self()}
+                     try Res = StartFun(),
+                         Owner ! {started, self(), Res}
                      catch Level:Reason ->
                                Owner ! {killed},
                                erlang:Level(Reason)
@@ -347,17 +349,17 @@ start_process(StartFun, RunFun, TrapExit, Spawn) ->
                      RunFun()
              end),
     receive
-        {started, Node} -> Node;
+        {started, Node, Res} -> {Node, Res};
         {killed} -> ?ct_fail("start_process(~.0p, ~.0p, ~.0p, ~.0p) failed",
                              [StartFun, RunFun, TrapExit, Spawn])
     end.
 
 %% @doc Starts a sub-process which executes the given function and then waits forever.
--spec start_subprocess(StartFun::fun(() -> any())) -> pid().
+-spec start_subprocess(StartFun::fun(() -> StartRes)) -> {pid(), StartRes}.
 start_subprocess(StartFun) ->
     start_subprocess(StartFun, fun() -> receive {done} -> ok end end).
 
--spec start_subprocess(StartFun::fun(() -> any()), RunFun::fun(() -> any())) -> pid().
+-spec start_subprocess(StartFun::fun(() -> StartRes), RunFun::fun(() -> any())) -> {pid(), StartRes}.
 start_subprocess(StartFun, RunFun) ->
     start_process(StartFun, RunFun, true, spawn_link).
 
@@ -367,24 +369,25 @@ start_subprocess(StartFun, RunFun) ->
                           StartCommServer::boolean()) -> CTConfig when is_subtype(CTConfig, list()).
 start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
     ok = unittest_helper:fix_cwd(),
-    Pid = unittest_helper:start_process(
-            fun() ->
-                    {ok, _GroupsPid} = pid_groups:start_link(),
-                    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
-                    ConfigOptions2 = unittest_helper:prepare_config(
-                                       [{config, [{log_path, PrivDir} | ConfigOptions]}]),
-                    {ok, _ConfigPid} = config:start_link(ConfigOptions2),
-                    {ok, _LogPid} = log:start_link(),
-                    case StartCommServer of
-                        true ->
-                            {ok, _CommPid} = sup:sup_start(
-                                               {local, no_name},
-                                               sup_comm_layer, []),
-                            Port = unittest_helper:get_scalaris_port(),
-                            comm_server:set_local_address({127,0,0,1}, Port);
-                        false -> ok
-                    end
-            end),
+    {Pid, _} =
+        start_process(
+          fun() ->
+                  {ok, _GroupsPid} = pid_groups:start_link(),
+                  {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
+                  ConfigOptions2 = unittest_helper:prepare_config(
+                                     [{config, [{log_path, PrivDir} | ConfigOptions]}]),
+                  {ok, _ConfigPid} = config:start_link(ConfigOptions2),
+                  {ok, _LogPid} = log:start_link(),
+                  case StartCommServer of
+                      true ->
+                          {ok, _CommPid} = sup:sup_start(
+                                             {local, no_name},
+                                             sup_comm_layer, []),
+                          Port = unittest_helper:get_scalaris_port(),
+                          comm_server:set_local_address({127,0,0,1}, Port);
+                      false -> ok
+                  end
+          end),
     [{wrapper_pid, Pid} | CTConfig].
 
 %% @doc Stops the processes started by start_minimal_procs/3 given the

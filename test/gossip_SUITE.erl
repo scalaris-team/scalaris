@@ -136,9 +136,9 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
                       {expect_no_message_done} -> ?expect_no_message(), ok
                   end
         end,
-    Cyclon = unittest_helper:start_subprocess(
-               fun() -> pid_groups:join_as("gossip_group", cyclon) end,
-               fun() -> CyclonRunFun(CyclonRunFun) end),
+    Cyclon = element(1, unittest_helper:start_subprocess(
+                       fun() -> pid_groups:join_as("gossip_group", cyclon) end,
+                       fun() -> CyclonRunFun(CyclonRunFun) end)),
     
     MyRange = node:mk_interval_between_ids(PredId, NodeId),
     
@@ -832,5 +832,5 @@ get_ptrigger_delay(Delay) ->
 
 -spec fake_node(RegisterGroup::pid_groups:groupname(), RegisterName::pid_groups:pidname()) -> pid().
 fake_node(RegisterGroup, RegisterName) ->
-    unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as(RegisterGroup, RegisterName) end).
+    element(1, unittest_helper:start_subprocess(
+              fun() -> pid_groups:join_as(RegisterGroup, RegisterName) end)).

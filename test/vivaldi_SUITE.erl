@@ -167,5 +167,5 @@ get_ptrigger_delay(Delay) ->
     trigger:init('trigger_periodic', fun () -> Delay end, 'vivaldi_trigger').
 
 fake_dht_node() ->
-    unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("vivaldi_SUITE_group", dht_node) end).
+    element(1, unittest_helper:start_subprocess(
+              fun() -> pid_groups:join_as("vivaldi_SUITE_group", dht_node) end)).
