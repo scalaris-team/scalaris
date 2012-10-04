@@ -32,6 +32,7 @@
          is_empty/1, is_leaf/1, is_merkle_tree/1, 
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1, get_bucket_size/1, get_branch_factor/1,
+         get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
 
 % exports for tests
@@ -422,6 +423,15 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
                erlang:atom_to_list(RBr)]),
     NNNFreeId.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Calculates min bucket size to remove S tree levels.
+% Formula: N / (v^(log_v(N) - S))
+% S = 1.. has to be smaller than log_v(N)
+-spec get_opt_bucket_size(N::pos_integer(), V::pos_integer(), S::pos_integer()) -> pos_integer().
+get_opt_bucket_size(N, V, S) ->
+    Height = util:ceil(util:log(N, V)) - S,
+    util:ceil(N / math:pow(V, Height)). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions
@@ -469,9 +479,10 @@ get_XOR_fun() ->
 
 get_small_sha() ->
     (fun(B) ->
+             DestSize = 2,
              Sha = crypto:sha(B),
-             Start = erlang:byte_size(Sha) - 2,
-             <<_:Start/binary, SmallSha:2/binary>> = Sha,
+             Start = erlang:byte_size(Sha) - DestSize,
+             <<_:Start/binary, SmallSha:DestSize/binary>> = Sha,
              SmallSha
      end).
 
