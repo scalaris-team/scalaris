@@ -145,6 +145,8 @@ make_ring_with_ids(Ids, Options) when is_list(Ids) ->
 make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     % note: do not call IdsFun before the initial setup
     %       (it might use config or another process)
+    % allow at most 10s for the whole ring to come up
+    TimeTrap = test_server:timetrap(10000),
     _ = fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
@@ -175,6 +177,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     check_ring_size(Size),
     ct:pal("Scalaris booted with ~p node(s)...~n", [Size]),
     ?TRACE_RING_DATA(),
+    test_server:timetrap_cancel(TimeTrap),
     Pid.
 
 %% @doc Creates a ring with Size random IDs.
@@ -187,6 +190,8 @@ make_ring(Size) ->
 %%      a {config, [{Key, Value},...]} option.
 -spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
 make_ring(Size, Options) ->
+    % allow at most 1s for each node to come up
+    TimeTrap = test_server:timetrap(Size * 1000),
     _ = fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
@@ -213,6 +218,7 @@ make_ring(Size, Options) ->
     check_ring_size(Size),
     ct:pal("unittest_helper:make_ring size ~p done.", [Size]),
     ?TRACE_RING_DATA(),
+    test_server:timetrap_cancel(TimeTrap),
     Pid.
 
 %% @doc Stops a ring previously started with make_ring/1 or make_ring_with_ids/1.
