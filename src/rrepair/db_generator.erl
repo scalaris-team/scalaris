@@ -307,15 +307,14 @@ get_rep_group(Key) ->
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
     EKey = get_error_key(Key, FDest),
-    EType = get_failure_type(FType),
     RGrp = [get_synthetic_entry(X, new) || X <- RepKeys, X =/= EKey],
-    if EType =:= update andalso EKey =/= null ->
-           {[get_synthetic_entry(EKey, old) | RGrp], 1};
-       true -> {RGrp, 0}
+    case get_failure_type(FType) of
+        update -> {[get_synthetic_entry(EKey, old) | RGrp], 1};
+        regen -> {RGrp, 0}
     end.
 
 % @doc Resolves failure type mixed.
--spec get_failure_type(failure_type()) -> failure_type().
+-spec get_failure_type(failure_type()) -> regen | mixed.
 get_failure_type(mixed) ->
     case randoms:rand_uniform(1, 3) of
         1 -> update;
