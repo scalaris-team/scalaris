@@ -42,7 +42,8 @@ SCALARISCLIENT=${exec_prefix}/bin/scalaris
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
 # for best performance, especially on Erlang > R14B04:
-ERL_SCHED_FLAGS=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
+ERL_SCHED_FLAGS_R15=${ERL_SCHED_FLAGS-"+sbt db +swt low +sbwt short"}
+ERL_SCHED_FLAGS_R14=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
 
 # default values (commandline options change these parameters)
 NODE_NAME=node1
@@ -245,10 +246,13 @@ checkinstallation() {
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo "$CHECKCONFIGMSG"
-        echo "WARNING: could not start erlang with $ERL_SCHED_FLAGS."
-        echo " These parameters are needed for erlang >= R15 to achieve a performance comparable with R14B04."
+        echo "WARNING: could not start erlang with the given $ERL_SCHED_FLAGS."
+        echo " Defaults will be used when running Scalaris."
         echo " Use the ERL_SCHED_FLAGS environment variable to override the scheduler flags."
         echo " You may need to include the +sct flag to set the CPU topology manually."
+        echo " Proposed values for optimal performance (will be used if not overridden):"
+        echo "  R15+: $ERL_SCHED_FLAGS_R15"
+        echo "  R14 : $ERL_SCHED_FLAGS_R14"
         echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
     fi
 
@@ -267,10 +271,18 @@ scalarisstart(){
         echo "We were trying to run: erl -noinput -name $NODE_NAME -eval 'halt(0).'"
         exit 1
     fi
-    $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
+    $ERL $ERL_SCHED_FLAGS_R15 -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
     FAILED=$?
     if [ $FAILED -eq 0 ]; then
-        erl_flags="$ERL_SCHED_FLAGS $erl_flags"
+        erl_flags="$ERL_SCHED_FLAGS_R15 $erl_flags"
+    else
+        if [ "$ERL_SCHED_FLAGS_R15" != "$ERL_SCHED_FLAGS_R14" ]; then
+            $ERL $ERL_SCHED_FLAGS_R14 -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
+            FAILED=$?
+            if [ $FAILED -eq 0 ]; then
+                erl_flags="$ERL_SCHED_FLAGS_R14 $erl_flags"
+            fi
+        fi
     fi
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -eq 0 ]; then
         BACKGROUND="-detached"
