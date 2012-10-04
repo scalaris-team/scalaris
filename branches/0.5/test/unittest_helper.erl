@@ -53,6 +53,7 @@
 -endif.
 
 -include("scalaris.hrl").
+-include("unittest.hrl").
 
 -type kv_opts() :: [{Key::atom(), Value::term()}].
 
@@ -337,13 +338,19 @@ start_process(StartFun, RunFun, TrapExit, Spawn) ->
     Owner = self(),
     Node = erlang:Spawn(
              fun() ->
-                     try StartFun()
-                     catch Level:Reason -> erlang:Level(Reason)
-                     after Owner ! {started, self()}
+                     try _ = StartFun(),
+                         Owner ! {started, self()}
+                     catch Level:Reason ->
+                               Owner ! {killed},
+                               erlang:Level(Reason)
                      end,
                      RunFun()
              end),
-    receive {started, Node} -> Node end.
+    receive
+        {started, Node} -> Node;
+        {killed} -> ?ct_fail("start_process(~.0p, ~.0p, ~.0p, ~.0p) failed",
+                             [StartFun, RunFun, TrapExit, Spawn])
+    end.
 
 %% @doc Starts a sub-process which executes the given function and then waits forever.
 -spec start_subprocess(StartFun::fun(() -> any())) -> pid().
@@ -608,8 +615,6 @@ get_ring_data() ->
 print_ring_data() ->
     DataAll = get_ring_data(),
     ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
-
--include("unittest.hrl").
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(), ExpectedStr::string()) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr) ->
