@@ -23,11 +23,13 @@
 -author('schintke@onscale.de').
 -vsn('$Id: pdb.erl 3617 2012-08-27 13:25:33Z kruber@zib.de $ ').
 
+-behaviour(pdb_beh).
+
 -ifdef(with_export_type_support).
 -export_type([tableid/0]).
 -endif.
 
--export([new/2, get/2, set/2, delete/2, tab2list/1]).
+-export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
 
 -type tableid() :: ets:tid() | atom().
@@ -59,6 +61,12 @@ set(NewTuple, TableName) ->
 delete(Key, TableName) ->
     ets:delete(TableName, Key),
     TableName.
+
+-spec take(term(), tableid()) -> term() | undefined.
+take(Key, TableName) ->
+    Old = get(Key, TableName),
+    ets:delete(TableName, Key),
+    Old.
 
 -spec tab2list(tableid()) -> [term()].
 tab2list(TableName) ->
