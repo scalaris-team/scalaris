@@ -198,8 +198,8 @@ additional_tests(Config) ->
 %% helpers
 
 fake_dht_node(Suffix) ->
-    unittest_helper:start_subprocess(
-      fun() -> pid_groups:join_as("rt_SUITE" ++ Suffix, dht_node) end).
+    element(1, unittest_helper:start_subprocess(
+              fun() -> pid_groups:join_as("rt_SUITE" ++ Suffix, dht_node) end)).
 
 -spec call_helper_fun(Fun::atom(), Args::list()) -> term().
 call_helper_fun(Fun, Args) ->
