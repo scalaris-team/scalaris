@@ -1,3 +1,87 @@
+Scalaris 0.5.0 (codename "Saperda scalaris")
+============================================
+
+Packaging:
+
+- new init.d script to start Scalaris
+- added chef scripts to deploy Scalaris nodes
+- improved Windows start scripts (support for R15B01 and R15B02, don't close
+  command prompt window immediately after shutdown if double-clicked)
+- more flexible scalarisctl (arbitrary parameter order, allow setting cookie,
+  ports and number of nodes in VM via parameters, allow using screen for
+  daemonised sessions, allow graceful leave via "gstop" command, new "status"
+  command)
+- support for new linux distributions (Fedora 17, Ubuntu 12.04, openSUSE 12.2)
+
+API:
+
+- allow Scalaris monitoring via JMX through the Java API
+- added an executor-service to the Java-API (de.zib.scalaris.executor.*)
+- added a node discovery daemon to the Java-API
+- allow compressed communication between the Java-API and Erlang for increased
+  performance, especially if the two are on separate nodes
+- added VM management support to the JSON- and Python-API
+- added transaction log filtering to the Java-API, i.e. only sent the needed
+  parts of the tlog back to Erlang and re-combine the result
+- fixed api_tx:req_list_commit_each/1 not running requests in parallel
+  -> do not assure any order of requests, even if on same key!
+
+Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/):
+
+- allow different partitioned data models for better performance and
+  scalability
+- allow logging of user requests
+- added support for checking whether another article exists (approximate)
+  -> show link colours based on this check
+- added check for bad page titles
+- allow SERVERNAME and SERVERPATH in config for setups with load balancers
+- reduced memory footprint of Wiki data in Scalaris
+- support for newer wiki xml dumps
+- added support for using a MediaWiki-like SQLite-DB backend for e.g.
+  filtering
+- improved overall performance
+- several rendering fixes
+
+Business Logic:
+
+- added (experimental) support for replica repair (disabled by default)
+  (thanks to Maik Lange)
+- added monitoring of memory statistics (also available via web interface)
+- better error reporting in the failure detector
+- reduced message overhead by UIDs and message/tuple tags
+- reduced overall message size of transactions:
+  * do not include the (uncompressed) value in messages of the read phase of
+    write operations
+  * do not include the value in init_TP messages
+- allow VM-flag "first" to be set via config file
+- gather overall connection statistics in comm_stats (also available via web
+  interface)
+- reduced erroneous failure messages on node shutdown
+- integrated comm_layer into comm_server
+- better scalability in pid_groups (find processes round-robin in find_a/1)
+- several changes to improve overall performance and/or CPU time at the nodes
+
+Tests:
+
+- support for more types in the runtime type-checker
+- verify several API functions via runtime type-checker (also test private
+  functions if possible!)
+
+Tools:
+
+- distributed protocol visualisation via trace_mpath (text-based or latex-file
+  for graphical presentation)
+- better profiling via top for Erlang processes
+- better debugging, e.g. via ASCII supervisor-tree rendering in verbose mode
+
+Bugs:
+
+- fixed memory leaks in read and write operations
+- fixed memory leaks in tx_tm_rtm
+- prevent potential endless loops in tx_tm_rtm
+- fixed inform RTMs sometimes informing the wrong RTMs
+- fixed numerous other bugs
+
 Scalaris 0.4.1
 ============================================
 
@@ -39,7 +123,7 @@ Business Logic:
   returned to user after read requests)
 - eliminated timeouts in data hand-over protocol (relies on fd now)
 - added a DB subscribe mechanism, e.g. to become informed when locks
-    are freed
+  are freed
 - fixed a strong consistency issue in the tx protocol
 - gather some run-time statistics and expose them via the APIs and the
   web debug interface
