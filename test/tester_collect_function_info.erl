@@ -23,7 +23,7 @@
 -module(tester_collect_function_info).
 
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -export([collect_fun_info/4]).
 
@@ -127,114 +127,123 @@ parse_chunk({eof, _Line}, _Module, ParseState) ->
 
 -spec parse_type/3 :: (any(), module(), tester_parse_state:state()) ->
     {type_spec() , tester_parse_state:state()}.
-parse_type({union_fun, FunSpecs}, Module, ParseState) ->
+-ifdef(tid_not_builtin).
+parse_type(T, M, ParseState) -> parse_type_(T, M, ParseState).
+-else.
+parse_type({type, _Line, tid, []}, _Module, ParseState) ->
+    {tid, ParseState};
+parse_type(T, M, ParseState) ->
+    parse_type_(T, M, ParseState).
+-endif.
+
+-spec parse_type_/3 :: (any(), module(), tester_parse_state:state()) ->
+    {type_spec() , tester_parse_state:state()}.
+parse_type_({union_fun, FunSpecs}, Module, ParseState) ->
     {FunSpecs2, PS2} = lists:foldl(fun (FunType, {List, PS}) ->
                         {ParsedFunType, PS1 } = parse_type(FunType, Module, PS),
                         {[ParsedFunType | List], PS1}
                 end, {[], ParseState}, FunSpecs),
     {{union_fun, FunSpecs2}, PS2};
-parse_type({type, _Line, 'fun', [Arg, Result]}, Module, ParseState) ->
+parse_type_({type, _Line, 'fun', [Arg, Result]}, Module, ParseState) ->
     {ArgType, ParseState2} = parse_type(Arg, Module, ParseState),
     {ResultType, ParseState3} = parse_type(Result, Module, ParseState2),
     {{'fun', ArgType, ResultType}, ParseState3};
-parse_type({type, _Line, product, Types}, Module, ParseState) ->
+parse_type_({type, _Line, product, Types}, Module, ParseState) ->
     {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
     {{product, TypeList}, ParseState2};
-parse_type({type, _Line, tuple, any}, _Module, ParseState) ->
+parse_type_({type, _Line, tuple, any}, _Module, ParseState) ->
     {{tuple, {typedef, tester, test_any}}, ParseState};
-parse_type({type, _Line, tuple, Types}, Module, ParseState) ->
+parse_type_({type, _Line, tuple, Types}, Module, ParseState) ->
     {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
     {{tuple, TypeList}, ParseState2};
-parse_type({type, _Line, list, [Type]}, Module, ParseState) ->
+parse_type_({type, _Line, list, [Type]}, Module, ParseState) ->
     {ListType, ParseState2} = parse_type(Type, Module, ParseState),
     {{list, ListType}, ParseState2};
-parse_type({type, _Line, nonempty_list, [Type]}, Module, ParseState) ->
+parse_type_({type, _Line, nonempty_list, [Type]}, Module, ParseState) ->
     {ListType, ParseState2} = parse_type(Type, Module, ParseState),
     {{nonempty_list, ListType}, ParseState2};
-parse_type({type, _Line, list, []}, _Module, ParseState) ->
+parse_type_({type, _Line, list, []}, _Module, ParseState) ->
     {{list, {typedef, tester, test_any}}, ParseState};
-parse_type({type, _Line, range, [Begin, End]}, Module, ParseState) ->
+parse_type_({type, _Line, range, [Begin, End]}, Module, ParseState) ->
     {BeginType, ParseState2} = parse_type(Begin, Module, ParseState),
     {EndType, ParseState3} = parse_type(End, Module, ParseState2),
     {{range, BeginType, EndType}, ParseState3};
-parse_type({type, _Line, union, Types}, Module, ParseState) ->
+parse_type_({type, _Line, union, Types}, Module, ParseState) ->
     {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
     {{union, TypeList}, ParseState2};
-parse_type({type, _Line, integer, []}, _Module, ParseState) ->
+parse_type_({type, _Line, integer, []}, _Module, ParseState) ->
     {integer, ParseState};
-parse_type({type, _Line, pos_integer, []}, _Module, ParseState) ->
+parse_type_({type, _Line, pos_integer, []}, _Module, ParseState) ->
     {pos_integer, ParseState};
-parse_type({type, _Line, non_neg_integer, []}, _Module, ParseState) ->
+parse_type_({type, _Line, non_neg_integer, []}, _Module, ParseState) ->
     {non_neg_integer, ParseState};
-parse_type({type, _Line, byte, []}, _Module, ParseState) ->
+parse_type_({type, _Line, byte, []}, _Module, ParseState) ->
     {{range, {integer, 0}, {integer, 255}}, ParseState};
-parse_type({type, _Line, bool, []}, _Module, ParseState) ->
+parse_type_({type, _Line, bool, []}, _Module, ParseState) ->
     {bool, ParseState};
-parse_type({type, _Line, char, []}, _Module, ParseState) ->
+parse_type_({type, _Line, char, []}, _Module, ParseState) ->
     {{range, {integer, 0}, {integer, 16#10ffff}}, ParseState};
-parse_type({type, _Line, string, []}, _Module, ParseState) ->
+parse_type_({type, _Line, string, []}, _Module, ParseState) ->
     {{list, {range, {integer, 0}, {integer, 16#10ffff}}}, ParseState};
-parse_type({type, _Line, nonempty_string, []}, _Module, ParseState) ->
+parse_type_({type, _Line, nonempty_string, []}, _Module, ParseState) ->
     {nonempty_string, ParseState};
-parse_type({type, _Line, number, []}, _Module, ParseState) ->
+parse_type_({type, _Line, number, []}, _Module, ParseState) ->
     {{union, [integer, float]}, ParseState};
-parse_type({type, _Line, boolean, []}, _Module, ParseState) ->
+parse_type_({type, _Line, boolean, []}, _Module, ParseState) ->
     {bool, ParseState};
-parse_type({type, _Line, any, []}, _Module, ParseState) ->
+parse_type_({type, _Line, any, []}, _Module, ParseState) ->
     {{typedef, tester, test_any}, ParseState};
-parse_type({type, _Line, atom, []}, _Module, ParseState) ->
+parse_type_({type, _Line, atom, []}, _Module, ParseState) ->
     {atom, ParseState};
-parse_type({type, _Line, arity, []}, _Module, ParseState) ->
+parse_type_({type, _Line, arity, []}, _Module, ParseState) ->
     {arity, ParseState};
-parse_type({type, _Line, binary, []}, _Module, ParseState) ->
+parse_type_({type, _Line, binary, []}, _Module, ParseState) ->
     {binary, ParseState};
-parse_type({type, _Line, pid, []}, _Module, ParseState) ->
+parse_type_({type, _Line, pid, []}, _Module, ParseState) ->
     {pid, ParseState};
-parse_type({type, _Line, tid, []}, _Module, ParseState) ->
-    {tid, ParseState};
-parse_type({type, _Line, port, []}, _Module, ParseState) ->
+parse_type_({type, _Line, port, []}, _Module, ParseState) ->
     {port, ParseState};
-parse_type({type, _Line, float, []}, _Module, ParseState) ->
+parse_type_({type, _Line, float, []}, _Module, ParseState) ->
     {float, ParseState};
-parse_type({type, _Line, iolist, []}, _Module, ParseState) ->
+parse_type_({type, _Line, iolist, []}, _Module, ParseState) ->
     {iolist, ParseState};
-parse_type({type, _Line, nil, []}, _Module, ParseState) ->
+parse_type_({type, _Line, nil, []}, _Module, ParseState) ->
     {nil, ParseState};
-parse_type({type, _Line, node, []}, _Module, ParseState) ->
+parse_type_({type, _Line, node, []}, _Module, ParseState) ->
     {node, ParseState};
-parse_type({type, _Line, none, []}, _Module, ParseState) ->
+parse_type_({type, _Line, none, []}, _Module, ParseState) ->
     {none, ParseState};
-parse_type({type, _Line, no_return, []}, _Module, ParseState) ->
+parse_type_({type, _Line, no_return, []}, _Module, ParseState) ->
     {none, ParseState};
-parse_type({type, _Line, reference, []}, _Module, ParseState) ->
+parse_type_({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
-parse_type({type, _Line, term, []}, _Module, ParseState) ->
+parse_type_({type, _Line, term, []}, _Module, ParseState) ->
     {{typedef, tester, test_any}, ParseState};
-parse_type({ann_type, _Line, [{var, _Line2, _Varname}, Type]}, Module, ParseState) ->
+parse_type_({ann_type, _Line, [{var, _Line2, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
-parse_type({atom, _Line, Atom}, _Module, ParseState) ->
+parse_type_({atom, _Line, Atom}, _Module, ParseState) ->
     {{atom, Atom}, ParseState};
-parse_type({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
+parse_type_({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
     {{integer, -Value}, ParseState};
-parse_type({integer, _Line, Value}, _Module, ParseState) ->
+parse_type_({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
-parse_type({type, _Line, array, []}, _Module, ParseState) ->
+parse_type_({type, _Line, array, []}, _Module, ParseState) ->
     {{builtin_type, array}, ParseState};
-parse_type({type, _Line, dict, []}, _Module, ParseState) ->
+parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
     {{builtin_type, dict}, ParseState};
-parse_type({type, _Line, gb_set, []}, _Module, ParseState) ->
+parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
     {{builtin_type, gb_set}, ParseState};
-parse_type({type, _Line, gb_tree, []}, _Module, ParseState) ->
+parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
     {{builtin_type, gb_tree}, ParseState};
-parse_type({type, _Line, set, []}, _Module, ParseState) ->
+parse_type_({type, _Line, set, []}, _Module, ParseState) ->
     {{builtin_type, set}, ParseState};
-parse_type({type, _Line, module, []}, _Module, ParseState) ->
+parse_type_({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
-parse_type({type, _Line, iodata, []}, _Module, ParseState) ->
+parse_type_({type, _Line, iodata, []}, _Module, ParseState) ->
     {{builtin_type, iodata}, ParseState};
-parse_type({type, _Line, mfa, []}, _Module, ParseState) ->
+parse_type_({type, _Line, mfa, []}, _Module, ParseState) ->
     {{tuple, [atom, atom, {range, {integer, 0}, {integer, 255}}]}, ParseState};
-parse_type({remote_type, _Line, [{atom, _Line2, TypeModule},
+parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
                                  {atom, _line3, TypeName}, []]},
            _Module, ParseState) ->
     case tester_parse_state:is_known_type(TypeModule, TypeName, ParseState) of
@@ -245,35 +254,35 @@ parse_type({remote_type, _Line, [{atom, _Line2, TypeModule},
              tester_parse_state:add_unknown_type(TypeModule, TypeName, ParseState)}
     end;
 % why is this here? function() is no official type
-parse_type({type, _Line, 'function', []}, _Module, ParseState) ->
+parse_type_({type, _Line, 'function', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
-parse_type({type, _Line, 'fun', []}, _Module, ParseState) ->
+parse_type_({type, _Line, 'fun', []}, _Module, ParseState) ->
     {{'function'}, ParseState};
-parse_type({type, _Line, record, [{atom, _Line2, TypeName}]}, Module, ParseState) ->
+parse_type_({type, _Line, record, [{atom, _Line2, TypeName}]}, Module, ParseState) ->
     {{record, Module, TypeName}, ParseState};
-parse_type({type, _Line, record, [{atom, _Line2, TypeName} | Fields]}, Module,
+parse_type_({type, _Line, record, [{atom, _Line2, TypeName} | Fields]}, Module,
            ParseState) ->
     {RecordType, ParseState2} = parse_type_list(Fields, Module, ParseState),
     {{record, Module, TypeName, RecordType}, ParseState2};
-parse_type({typed_record_field, {record_field, _Line,
+parse_type_({typed_record_field, {record_field, _Line,
                                  {atom, _Line2, FieldName}}, Field}, Module,
            ParseState) ->
     {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
     {{typed_record_field, FieldName, FieldType}, ParseState2};
-parse_type({typed_record_field, {record_field, _Line,
+parse_type_({typed_record_field, {record_field, _Line,
                                  {atom, _Line2, FieldName}, _Default}, Field},
            Module, ParseState) ->
     {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
     {{typed_record_field, FieldName, FieldType}, ParseState2};
-parse_type({type, _, field_type, [{atom, _, FieldName}, Field]}, Module, ParseState) ->
+parse_type_({type, _, field_type, [{atom, _, FieldName}, Field]}, Module, ParseState) ->
     {FieldType, ParseState2} = parse_type(Field, Module, ParseState),
     {{field_type, FieldName, FieldType}, ParseState2};
-parse_type({record_field, _Line, {atom, _Line2, FieldName}}, _Module, ParseState) ->
+parse_type_({record_field, _Line, {atom, _Line2, FieldName}}, _Module, ParseState) ->
     {{untyped_record_field, FieldName}, ParseState};
-parse_type({record_field, _Line, {atom, _Line2, FieldName}, _Default}, _Module,
+parse_type_({record_field, _Line, {atom, _Line2, FieldName}, _Default}, _Module,
            ParseState) ->
     {{untyped_record_field, FieldName}, ParseState};
-parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
+parse_type_(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
     case hd(TypeSpecs) of
         {typed_record_field, _, _} ->
             {RecordType, ParseState2} = parse_type_list(TypeSpecs,
@@ -291,11 +300,11 @@ parse_type(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
             ct:pal("potentially unknown type2: ~p~n", [TypeSpecs]),
             unknown
     end;
-parse_type({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
+parse_type_({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
     {{tuple, {typedef, tester, test_any}}, ParseState};
-parse_type({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
+parse_type_({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
     {{constraint, nyi}, ParseState};
-parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState) ->
+parse_type_({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState) ->
     {InternalFunType, ParseState2} = parse_type(FunType, Module, ParseState),
     Foldl = fun (Constraint, {PartialConstraintList, ParseState2a}) ->
                     {InternalConstraint, ParseState2c} = parse_type(Constraint,
@@ -305,17 +314,17 @@ parse_type({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState
             end,
     {Constraints, ParseState3} = lists:foldl(Foldl, {[], ParseState2}, ConstraintList),
     {{bounded_fun, InternalFunType, Constraints}, ParseState3};
-parse_type({paren_type, _Line, [InnerType]}, Module, ParseState) ->
+parse_type_({paren_type, _Line, [InnerType]}, Module, ParseState) ->
     parse_type(InnerType, Module, ParseState);
-parse_type({type, _Line, identifier, L}, _Module, ParseState) when is_list(L) ->
+parse_type_({type, _Line, identifier, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, identifier}, ParseState};
-parse_type({type, _Line, timeout, L}, _Module, ParseState) when is_list(L) ->
+parse_type_({type, _Line, timeout, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, timeout}, ParseState};
-parse_type({type, _Line, bitstring, L}, _Module, ParseState) when is_list(L) ->
+parse_type_({type, _Line, bitstring, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, bitstring}, ParseState};
-parse_type({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_list(L) ->
+parse_type_({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, maybe_improper_list}, ParseState};
-parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
+parse_type_({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
         true ->
@@ -324,7 +333,7 @@ parse_type({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
             {{typedef, Module, TypeName},
              tester_parse_state:add_unknown_type(Module, TypeName, ParseState)}
     end;
-parse_type(TypeSpec, Module, ParseState) ->
+parse_type_(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     {unkown, ParseState}.
 
