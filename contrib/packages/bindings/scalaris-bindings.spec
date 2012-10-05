@@ -61,6 +61,9 @@ BuildRequires:  pkg-config
 %define with_python 1
 %define with_python_doc_html 1
 %define with_python_doc_pdf 1
+%if 0%{?suse_version} > 1220
+%define with_python_doc_pdf 0
+%endif
 %if 0%{?suse_version} >= 1130 
 %else
 # py_requires is no longer needed since 11.3
