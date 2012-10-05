@@ -27,7 +27,7 @@ if [ ${result} -eq 0 ]; then
   echo " ${revision}"
   # not safe in other languages than English:
   # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-  pkg_version="${SCALARIS_VERSION}${revision}"
+  pkg_version="${SCALARIS_VERSION}"
 fi
 
 if [ ${result} -eq 0 ]; then
