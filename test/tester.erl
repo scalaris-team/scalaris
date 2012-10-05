@@ -349,7 +349,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
           Res1 = case lists:member(FA, FunsToTestNormally) of
                      true ->
                          ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
-                         test(Module, Fun, Arity, Count);
+                         test(Module, Fun, Arity, Count, [{threads, 2}]);
                      false -> skipped
                  end,
 
@@ -362,7 +362,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
               true ->
                   ct:pal("Testing with feeder ~p:~p/~p~n",
                          [Module, Fun, Arity]),
-                  [Res1 , test(Module, Fun, Arity, Count, [with_feeder])];
+                  [Res1 , test(Module, Fun, Arity, Count, [{threads, 2}, with_feeder])];
               false -> Res1
           end
       end
