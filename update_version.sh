@@ -18,7 +18,7 @@ VERSION=`cat VERSION`
 echo "Setting Scalaris version to ${VERSION}..."
 sed -e "s/-define(SCALARIS_VERSION, \".*\")\\./-define(SCALARIS_VERSION, \"${VERSION}\")./g" \
     -i include/scalaris.hrl
-sed -e "s/AC_INIT(scalaris, .*, schuett@zib.de)/AC_INIT(scalaris, ${VERSION}, schuett@zib.de)/g" \
+sed -e "s/AC_INIT(scalaris, .*, scalaris@googlegroups.com)/AC_INIT(scalaris, ${VERSION}, scalaris@googlegroups.com)/g" \
     -i configure.ac
 sed -e "s/public static final String version = \".*\";/public static final String version = \"${VERSION}\";/g" \
     -i contrib/wikipedia/src/de/zib/scalaris/examples/wikipedia/bliki/WikiServlet.java
