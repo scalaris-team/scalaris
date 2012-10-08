@@ -138,6 +138,7 @@ public class MyScalarisWikiModel extends MyWikiModel {
                     }
                 }
             } else {
+                // NOTE: must return null for non-existing pages in order for #ifexist to work correctly!
                 // System.err.println(getRevResult.message);
                 // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
             }
