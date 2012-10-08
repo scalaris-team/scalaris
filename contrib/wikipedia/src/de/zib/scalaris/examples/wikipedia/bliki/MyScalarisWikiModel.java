@@ -118,15 +118,22 @@ public class MyScalarisWikiModel extends MyWikiModel {
             addInvolvedKeys(getRevResult.involvedKeys);
             if (getRevResult.success) {
                 text = getRevResult.revision.unpackedText();
-                if (followRedirect && getRevResult.page.isRedirect()) {
+                if (getRevResult.page.isRedirect()) {
                     final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
                     if (matcher.matches()) {
-                        // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
                         String[] redirFullName = splitNsTitle(matcher.group(1));
-                        String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
-                        if (redirText != null && !redirText.isEmpty()) {
-                            text = redirText;
+                        if (followRedirect) {
+                            // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
+                            String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
+                            if (redirText != null && !redirText.isEmpty() ) {
+                                text = redirText;
+                            } else {
+                                text = "<ol><li>REDIRECT [["
+                                        + createFullPageName(redirFullName[0],
+                                                redirFullName[1]) + "]]</li></ol>";
+                            }
                         } else {
+                            // we must disarm the redirect here!
                             text = "<ol><li>REDIRECT [["
                                     + createFullPageName(redirFullName[0],
                                             redirFullName[1]) + "]]</li></ol>";
