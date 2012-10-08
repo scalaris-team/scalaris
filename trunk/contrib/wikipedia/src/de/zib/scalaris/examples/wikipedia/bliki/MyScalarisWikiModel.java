@@ -126,6 +126,10 @@ public class MyScalarisWikiModel extends MyWikiModel {
                         String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
                         if (redirText != null && !redirText.isEmpty()) {
                             text = redirText;
+                        } else {
+                            text = "<ol><li>REDIRECT [["
+                                    + createFullPageName(redirFullName[0],
+                                            redirFullName[1]) + "]]</li></ol>";
                         }
                     } else {
                         // we must disarm the redirect here!
