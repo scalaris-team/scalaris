@@ -335,8 +335,8 @@ AS_IF([test "$file_sendfile" = true -a \
       [HAVE_YAWS_SENDFILE=false; AC_MSG_NOTICE(found file:sendfile/5)])
 
 AS_IF([test "$HAVE_YAWS_SENDFILE" = true],
-      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is available for yaws])],
-      [HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is not available for yaws])])
+      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is not available for yaws])],
+      [HAVE_YAWS_SENDFILE=""; HAVE_YAWS_SENDFILE_DIALYZER=""; AC_MSG_NOTICE([file:send_file/5 is available for yaws])])
 
 ###########################################################
 #
