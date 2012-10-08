@@ -61,7 +61,7 @@ done
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
 DIRNAME=`dirname $ABSPATH`
 # is this a svn checkout or an (rpm/deb/manual) installation?
-if [ "$DIRNAME" != "@bindir@" ]; then
+if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" ]; then
   no_config=true
 fi
 
