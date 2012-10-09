@@ -37,7 +37,10 @@ JAVADIR=@datarootdir@/java
 # /var/log/scalaris
 LOGDIR=@localstatedir@/log/scalaris
 # /usr/bin/scalaris
-SCALARISCLIENT=${exec_prefix}/bin/scalaris
+SCALARISCLIENT_JAVA=${exec_prefix}/bin/scalaris
+SCALARISCLIENT_PYTHON=${exec_prefix}/bin/scalaris-python
+SCALARISCLIENT_PYTHON3=${exec_prefix}/bin/scalaris-python3
+SCALARISCLIENT_RUBY=${exec_prefix}/bin/scalaris-ruby
 
 TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
 
@@ -112,7 +115,10 @@ fix_paths() {
         # scalaris/log
         LOGDIR=$SCALARISDIR/log
         # /usr/bin/scalaris
-        SCALARISCLIENT="$SCALARISDIR/java-api/scalaris --noconfig"
+        SCALARISCLIENT_JAVA="$SCALARISDIR/java-api/scalaris --noconfig"
+        SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris_client.py"
+        SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris_client.py"
+        SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris_client.rb"
     fi
 }
 
@@ -140,6 +146,7 @@ get_cookie() {
 }
 
 checkinstallation() {
+    echo "Running basic tests..."
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -201,16 +208,18 @@ checkinstallation() {
         exit 1
     fi
 
-    $SCALARISCLIENT -h > /dev/null 2>/dev/null
+    $SCALARISCLIENT_JAVA -h > /dev/null 2>/dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        HAS_JAVACLIENT=0
         echo -n "INFO: could not find Scalaris' Java-API files. "
         echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
         echo "  'make java' will build the Java-API"
-        echo "We were trying to run: $SCALARISCLIENT -h"
+        echo "We were trying to run: $SCALARISCLIENT_JAVA -h"
     else
+        HAS_JAVACLIENT=1
         HOSTNAME=`hostname -f`
-        JAVAHOST=`$SCALARISCLIENT -lh`
+        JAVAHOST=`$SCALARISCLIENT_JAVA -lh`
         if [ "$HOSTNAME" != "$JAVAHOST" ]; then
             echo "WARNING: the hostnames reported by 'hostname -f' and Java do not match. You won't be"
             echo " able to connect to Scalaris using the Java-API through scalaris.jar. Also, the"
@@ -226,7 +235,7 @@ checkinstallation() {
             echo " the DNS."
             echo "system: hostname -f"
             echo "     -> $HOSTNAME"
-            echo "java:   $SCALARISCLIENT -lh"
+            echo "java:   $SCALARISCLIENT_JAVA -lh"
             echo "     -> $JAVAHOST"
         fi
     fi
@@ -255,6 +264,202 @@ checkinstallation() {
         echo "  R14 : $ERL_SCHED_FLAGS_R14"
         echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
     fi
+
+    echo "Running Scalaris run-time tests..."
+    # test runtime
+    if [ -z "$yaws_port" ]; then
+        echo "  NOTE: yaws port not specified."
+        echo "        Python, Python3, Ruby API tests may fail if the port is different in"
+        echo "        one of the config files."
+    else
+        export SCALARIS_JSON_URL="http://localhost:$yaws_port" # for single operations
+        export SCALARIS_JSON_URLS="http://localhost:$yaws_port" # for benchmarks
+    fi
+    export SCALARIS_JAPI_NODE="$NODE_NAME"
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start &> /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
+        echo "  we were trying to run: $0 -f -s -m -d start"
+        # try to stop anyway (it could have been a false alarm):
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null &> /dev/null
+        exit 1
+    fi
+    sleep 3s # let Scalaris settle
+    # bench parameters:
+    BENCH_NR_OPS=10
+    BENCH_TPN=1 # threads per node
+    BENCH_TESTS=all
+
+    # testing Java:
+    echo -n "  Java-API ... "
+    if [ "$HAS_JAVACLIENT" -eq 1 ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        JAVA_OUTPUT=`echo -e "> $SCALARISCLIENT_JAVA -r ${KEY}"`
+        JAVAREAD1_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
+        echo "$JAVAREAD1_OUTPUT" | grep "failed with not found" &> /dev/null
+        JAVAREAD1_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD1_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -w ${KEY} 1"`
+        JAVAWRITE1_OUTPUT=`$SCALARISCLIENT_JAVA -w ${KEY} 1 2>&1`
+        JAVAWRITE1_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAWRITE1_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -r ${KEY}"`
+        JAVAREAD2_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
+        JAVAREAD2_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD2_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        JAVABENCH_OUTPUT=`$SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        JAVABENCH_FAILED=$?
+        echo "$JAVABENCH_OUTPUT" | grep "failed" &> /dev/null && JAVABENCH_FAILED=1
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVABENCH_OUTPUT"`
+
+        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
+            JAVA_FAILED=1
+            JAVA_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+        else
+            JAVA_FAILED=0
+            JAVA_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+        fi
+    else
+        JAVA_FAILED=0
+        JAVA_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    fi
+    echo -e "$JAVA_RESULT"
+    if [ "$verbose" -eq 1 -o "$JAVA_FAILED" -ne 0 ]; then
+        echo "$JAVA_OUTPUT"
+    fi
+
+    # testing Python:
+    echo -n "  Python-API ... "
+    if [ -f "$SCALARISCLIENT_PYTHON" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        PYTHON_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON -r ${KEY}"`
+        PYTHONREAD1_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
+        echo "$PYTHONREAD1_OUTPUT" | grep "failed with not_found" &> /dev/null
+        PYTHONREAD1_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD1_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -w ${KEY} 1"`
+        PYTHONWRITE1_OUTPUT=`$SCALARISCLIENT_PYTHON -w ${KEY} 1 2>&1`
+        PYTHONWRITE1_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONWRITE1_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -r ${KEY}"`
+        PYTHONREAD2_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
+        PYTHONREAD2_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD2_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        PYTHONBENCH_OUTPUT=`$SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        PYTHONBENCH_FAILED=$?
+        echo "$PYTHONBENCH_OUTPUT" | grep "failed" &> /dev/null && PYTHONBENCH_FAILED=1
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONBENCH_OUTPUT"`
+
+        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
+            PYTHON_FAILED=1
+            PYTHON_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+        else
+            PYTHON_FAILED=0
+            PYTHON_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+        fi
+    else
+        PYTHON_FAILED=0
+        PYTHON_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    fi
+    echo -e "$PYTHON_RESULT"
+    if [ "$verbose" -eq 1 -o "$PYTHON_FAILED" -ne 0 ]; then
+        echo "$PYTHON_OUTPUT"
+    fi
+
+    # testing Python3:
+    echo -n "  Python3-API ... "
+    if [ -f "$SCALARISCLIENT_PYTHON3" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        PYTHON3_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
+        PYTHON3READ1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
+        echo "$PYTHON3READ1_OUTPUT" | grep "failed with not_found" &> /dev/null
+        PYTHON3READ1_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ1_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -w ${KEY} 1"`
+        PYTHON3WRITE1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -w ${KEY} 1 2>&1`
+        PYTHON3WRITE1_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3WRITE1_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
+        PYTHON3READ2_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
+        PYTHON3READ2_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ2_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        PYTHON3BENCH_OUTPUT=`$SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        PYTHON3BENCH_FAILED=$?
+        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" &> /dev/null && PYTHON3BENCH_FAILED=1
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3BENCH_OUTPUT"`
+
+        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
+            PYTHON3_FAILED=1
+            PYTHON3_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+        else
+            PYTHON3_FAILED=0
+            PYTHON3_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+        fi
+    else
+        PYTHON3_FAILED=0
+        PYTHON3_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    fi
+    echo -e "$PYTHON3_RESULT"
+    if [ "$verbose" -eq 1 -o "$PYTHON3_FAILED" -ne 0 ]; then
+        echo "$PYTHON3_OUTPUT"
+    fi
+
+    # testing Ruby:
+    echo -n "  Ruby-API ... "
+    if [ -f "$SCALARISCLIENT_RUBY" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
+        RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+        echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" &> /dev/null
+        RUBYREAD1_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD1_OUTPUT"`
+
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -w ${KEY},1"`
+        RUBYWRITE1_OUTPUT=`$SCALARISCLIENT_RUBY -w ${KEY},1 2>&1`
+        RUBYWRITE1_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYWRITE1_OUTPUT"`
+
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -r ${KEY}"`
+        RUBYREAD2_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+        RUBYREAD2_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD2_OUTPUT"`
+
+        # note: we don't have a minibench for ruby...
+
+        if [ $RUBYREAD1_FAILED -ne 0 -o $RUBYWRITE1_FAILED -ne 0 -o $RUBYREAD2_FAILED -ne 0 ]; then
+            RUBY_FAILED=1
+            RUBY_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+        else
+            RUBY_FAILED=0
+            RUBY_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+        fi
+    else
+        RUBY_FAILED=0
+        RUBY_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    fi
+    echo -e "$RUBY_RESULT"
+    if [ "$verbose" -eq 1 -o "$RUBY_FAILED" -ne 0 ]; then
+        echo "$RUBY_OUTPUT"
+    fi
+
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null
 
     exit 0
 }
