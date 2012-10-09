@@ -738,7 +738,7 @@ def _printResults(columns, rows, results, operations, parallel_runs):
             elif (value == -1):
                 print '\tfailed', 
             else:
-                print '\t' + str(value), 
+                print '\t' + str(int(value)),
         print ''
     
     i = 1
