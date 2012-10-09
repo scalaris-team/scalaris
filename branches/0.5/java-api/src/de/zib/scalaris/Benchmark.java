@@ -1194,6 +1194,7 @@ public class Benchmark {
             InvocationTargetException, NoSuchMethodException {
         final String key = benchTime + name;
         final long[] results = new long[testRuns];
+        Arrays.fill(results, -1);
 
         for (int i = 0; i < testRuns; ++i) {
             final BenchRunnable<T> worker[] = new BenchRunnable[parallelRuns];
