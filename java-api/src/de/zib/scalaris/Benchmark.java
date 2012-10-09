@@ -1142,14 +1142,16 @@ public class Benchmark {
             final int operations, final int parallelRuns) {
         for (int test = 0; test < (results.length * results[0].length); ++test) {
             try {
+                final int i = test % results.length;
+                final int j = test / results.length;
                 if (benchmarks.contains(test + firstBenchId)) {
-                    final int i = test % results.length;
-                    final int j = test / results.length;
                     results[i][j] = runBench(operations,
                             getRandom(BENCH_DATA_SIZE, testTypes[j]),
                             testGroup + "_" + testTypesStr[j] + "_" + (i + 1),
                             testBench[i], parallelRuns);
                     TimeUnit.SECONDS.sleep(1);
+                } else {
+                    results[i][j] = -2;
                 }
             } catch (final Exception e) {
                  e.printStackTrace();
@@ -1253,8 +1255,10 @@ public class Benchmark {
                     + firstColumn.substring(0,
                             firstColumn.length() - rows[i].length() - 1));
             for (int j = 0; j < columns.length; j++) {
-                if (results[i][j] == -1) {
+                if (results[i][j] == -2) {
                     System.out.print("\tn/a");
+                } else if (results[i][j] == -1) {
+                    System.out.print("\tfailed");
                 } else {
                     System.out.print("\t" + results[i][j]);
                 }
