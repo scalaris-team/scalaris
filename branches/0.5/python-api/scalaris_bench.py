@@ -680,14 +680,16 @@ def _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
     """
     for test in xrange(len(results) * len(results.itervalues().next())):
         try:
+            i = test % len(results);
+            j = test // len(results);
             if (test + first_bench_id) in benchmarks:
-                i = test % len(results);
-                j = test // len(results);
                 results[rows[i]][columns[j]] = _runBench(operations,
                         _getRandom(_BENCH_DATA_SIZE, test_types[j]),
                         test_group + "_" + test_types_str[j] + "_" + str(i + 1),
                         test_bench[i], parallel_runs)
                 time.sleep(1)
+            else:
+                results[rows[i]][columns[j]] = -2
         except Exception: # do not catch SystemExit
             _printException()
     
@@ -731,8 +733,10 @@ def _printResults(columns, rows, results, operations, parallel_runs):
         print row + ''.join([' ']*(colLen - len(row))),
         for column in columns:
             value = results[row][column]
-            if (value == -1):
+            if (value == -2):
                 print '\tn/a', 
+            elif (value == -1):
+                print '\tfailed', 
             else:
                 print '\t' + str(value), 
         print ''
