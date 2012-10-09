@@ -12,6 +12,7 @@ Packaging:
   daemonised sessions, allow graceful leave via "gstop" command, new "status"
   command)
 - support for new linux distributions (Fedora 17, Ubuntu 12.04, openSUSE 12.2)
+- let scalarisctl checkinstallation also perform runtime tests for the APIs
 
 API:
 
