@@ -539,11 +539,11 @@ public class Benchmark {
             Transaction.ResultList results;
             reqs = new Transaction.RequestList();
             // read old values into the transaction
-            for (int i = 0; i < keys.length; ++i) {
+            for (final String key : keys) {
                 if (value instanceof OtpErlangObject) {
-                    reqs.addOp(new ReadOp(new OtpErlangString(keys[i])));
+                    reqs.addOp(new ReadOp(new OtpErlangString(key)));
                 } else {
-                    reqs.addOp(new ReadOp(keys[i]));
+                    reqs.addOp(new ReadOp(key));
                 }
             }
             reqs.addCommit();
@@ -558,12 +558,12 @@ public class Benchmark {
 
             // write new values...
             reqs = new Transaction.RequestList();
-            for (int i = 0; i < keys.length; ++i) {
+            for (final String key : keys) {
                 final T value = valueWrite[j % valueWrite.length];
                 if (value instanceof OtpErlangObject) {
-                    reqs.addOp(new WriteOp(new OtpErlangString(keys[i]), (OtpErlangObject) value));
+                    reqs.addOp(new WriteOp(new OtpErlangString(key), (OtpErlangObject) value));
                 } else {
-                    reqs.addOp(new WriteOp(keys[i], value));
+                    reqs.addOp(new WriteOp(key, value));
                 }
             }
             reqs.addCommit();
@@ -921,7 +921,7 @@ public class Benchmark {
         abstract protected void operation(int j) throws Exception;
 
         @Override
-        public void run() {
+        final public void run() {
             Thread.currentThread().setName("BenchRunnable-" + key);
             for (int retry = 0; (retry < 3) && !stop; ++retry) {
                 try {
