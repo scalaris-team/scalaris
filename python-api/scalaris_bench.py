@@ -137,7 +137,7 @@ class BenchRunnable(Thread):
         self._value = value
         self._operations = operations
         
-        self._stop = False
+        self._shouldStop = False
         self._timeAtStart = 0
         self._speed = -1
 
@@ -187,7 +187,7 @@ class BenchRunnable(Thread):
     def run(self):
         threading.currentThread().name = "BenchRunnable-" + self._key
         retry = 0
-        while (retry < 3) and (not self._stop):
+        while (retry < 3) and (not self._shouldStop):
             try:
                 self.pre_init()
                 for j in xrange(self._operations):
@@ -207,8 +207,8 @@ class BenchRunnable(Thread):
     def getSpeed(self):
         return self._speed
 
-    def stop(self):
-        self._stop = True
+    def shouldStop(self):
+        self._shouldStop = True
 
 class BenchRunnable2(BenchRunnable):
     def __init__(self, key, value, operations):
@@ -631,7 +631,7 @@ def _integrateResults(results, i, worker, failed):
     try:
         for bench_thread in worker:
             if failed >= 3:
-                bench_thread.stop()
+                bench_thread.shouldStop()
                 try:
                     while(bench_thread.isAlive()): # non-blocking join so we are able to receive CTRL-C
                         bench_thread.join(1)
@@ -653,7 +653,7 @@ def _integrateResults(results, i, worker, failed):
     except KeyboardInterrupt:
         print 'CTRL-C received, aborting...'
         for bench_thread in worker:
-            bench_thread.stop()
+            bench_thread.shouldStop()
         sys.exit(1)
     
 def _getAvgSpeed(results):
