@@ -97,8 +97,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
 
 %pre
-getent group %{scalaris_group} >/dev/null || groupadd --system %{scalaris_group}
-getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd --system -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
+# note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
+getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
+getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
 exit 0
 
 %post
