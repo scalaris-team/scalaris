@@ -4504,7 +4504,10 @@ echo "detected OS is: '$DRIVER_OS'"
 
 mkdir -p ~/.yaws 2> /dev/null
 
-ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris"
+cp python-api/scalaris.in python3-api/
+sed -i -e "s|python-api|python3-api|g" -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" python3-api/scalaris.in
+
+ac_config_files="$ac_config_files Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris python-api/scalaris python3-api/scalaris ruby-api/scalaris"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5217,6 +5220,9 @@ do
     "java-api/scalaris") CONFIG_FILES="$CONFIG_FILES java-api/scalaris" ;;
     "java-api/scalaris-java.conf") CONFIG_FILES="$CONFIG_FILES java-api/scalaris-java.conf" ;;
     "contrib/init.d/scalaris") CONFIG_FILES="$CONFIG_FILES contrib/init.d/scalaris" ;;
+    "python-api/scalaris") CONFIG_FILES="$CONFIG_FILES python-api/scalaris" ;;
+    "python3-api/scalaris") CONFIG_FILES="$CONFIG_FILES python3-api/scalaris" ;;
+    "ruby-api/scalaris") CONFIG_FILES="$CONFIG_FILES ruby-api/scalaris" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -5669,5 +5675,8 @@ fi
 
 chmod u+x bin/scalarisctl
 chmod u+x java-api/scalaris
+chmod u+x python-api/scalaris
+chmod u+x python3-api/scalaris
+chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
 

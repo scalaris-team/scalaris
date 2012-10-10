@@ -473,10 +473,16 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris])
+cp python-api/scalaris.in python3-api/
+sed -i -e "s|python-api|python3-api|g" -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" python3-api/scalaris.in
+
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl
 chmod u+x java-api/scalaris
+chmod u+x python-api/scalaris
+chmod u+x python3-api/scalaris
+chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
 
