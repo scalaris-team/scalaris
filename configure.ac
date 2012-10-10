@@ -473,6 +473,7 @@ AC_SUBST(DRIVER_OS)
 
 mkdir -p ~/.yaws 2> /dev/null
 
+mkdir -p python3-api
 cp python-api/scalaris.in python3-api/
 sed -i -e "s|python-api|python3-api|g" -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" python3-api/scalaris.in
 
