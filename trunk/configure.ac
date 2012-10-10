@@ -294,37 +294,14 @@ AC_RUN_IFELSE(
 # check for file:send_file/5 for yaws
 #
 ###########################################################
+# split erlang ets version:
 set `echo $erlang_cv_erts_ver | sed 's/\./ /g'`
 ERTS_MAJOR=$1
 ERTS_MINOR=$2
 ERTS_MAINT=${3:-0}
 
 HAVE_YAWS_SENDFILE=false
-
-case "$host_os" in
-        *linux*)
-           HAVE_YAWS_SENDFILE=true
-           ;;
-        *solaris*)
-           ;;
-        *bsd*)
-           case "$host_os" in
-                freebsd*)
-                    HAVE_YAWS_SENDFILE=true
-                    ;;
-                bsdi*)
-                    ;;
-           esac
-           ;;
-         *darwin*)
-           AC_LANG(C)
-           AC_CHECK_LIB([c],[sendfile],[HAVE_YAWS_SENDFILE=true])
-           ;;
-         *cygwin*)
-           ;;
-        *)
-           ;;
-esac
+HAVE_ERL_SENDFILE=false
 
 file_sendfile=`"${ERL}" -noshell -eval 'io:format("~p~n",[[erlang:function_exported(file, sendfile, 5)]]), erlang:halt().' | tail -1`
 
@@ -332,11 +309,14 @@ AS_IF([test "$file_sendfile" = true -a \
            '(' $ERTS_MAJOR -gt 5 -o \
            '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -gt 9 ')' -o \
            '(' $ERTS_MAJOR -eq 5 -a $ERTS_MINOR -eq 9 -a $ERTS_MAINT -ge 1 ')' ')'],
-      [HAVE_YAWS_SENDFILE=false; AC_MSG_NOTICE(found file:sendfile/5)])
+      [HAVE_ERL_SENDFILE=true; AC_MSG_NOTICE(found file:sendfile/5)])
 
-AS_IF([test "$HAVE_YAWS_SENDFILE" = true],
-      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; AC_MSG_NOTICE([file:send_file/5 is not available for yaws])],
-      [HAVE_YAWS_SENDFILE=""; HAVE_YAWS_SENDFILE_DIALYZER=""; AC_MSG_NOTICE([file:send_file/5 is available for yaws])])
+AS_IF([test "$HAVE_ERL_SENDFILE" = true],
+      [HAVE_YAWS_SENDFILE=""; HAVE_YAWS_SENDFILE_DIALYZER=""; AC_MSG_NOTICE([file:sendfile/5 is available for yaws])])
+AS_IF([test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = true],
+      [HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; AC_MSG_NOTICE([using yaws_sendfile for yaws])])
+AS_IF([test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = false],
+      [HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"; AC_MSG_NOTICE([no send_file suitable for yaws, using fallback])])
 
 ###########################################################
 #
