@@ -678,7 +678,8 @@ def _runBenchAndPrintResults(benchmarks, results, columns, rows, test_types,
     """
     Runs the given benchmarks and prints a results table.
     """
-    for test in xrange(len(results) * len(results.itervalues().next())):
+    # assume non-empty results dict:
+    for test in xrange(len(results) * len(results[list(results.keys())[0]])):
         try:
             i = test % len(results);
             j = test // len(results);
