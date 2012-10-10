@@ -275,13 +275,15 @@ checkinstallation() {
         export SCALARIS_JSON_URL="http://localhost:$yaws_port" # for single operations
         export SCALARIS_JSON_URLS="http://localhost:$yaws_port" # for benchmarks
     fi
+    if [ -n "$port" ]; then
+        export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]"
+    fi
     export SCALARIS_JAPI_NODE="$NODE_NAME"
-    SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]" $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start &> /dev/null
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
-        echo "  we were trying to run:"
-        echo "  SCALARIS_ADDITIONAL_PARAMETERS=\"-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]\" $0 -f -s -m -d start"
+        echo "  we were trying to run: $0 -f -s -m -d start"
         # try to stop anyway (it could have been a false alarm):
         $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null &> /dev/null
         exit 1
