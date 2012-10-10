@@ -237,6 +237,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/scalaris-ruby
 %{rb_sitelib}/scalaris.rb
+%{rb_sitelib}/scalaris_client.rb
 
 %if 0%{?with_python}
 %files -n python-scalaris

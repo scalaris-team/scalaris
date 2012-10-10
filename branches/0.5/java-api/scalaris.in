@@ -189,16 +189,21 @@ if [ ! -x "$JAVACMD" ] ; then
   exit 1
 fi
 
+# include our Scalaris jar files (we know where they are and do not need to
+# rely on tools like build-classpath which may include the wrong library,
+# i.e. not the installed one)
+if [ -z "$LOCALCLASSPATH" ] ; then
+  LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar
+else
+  LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar:$LOCALCLASSPATH
+fi
+
 # Build local classpath manually in non-rpm mode or
 # use the Jpackage helper in rpm mode with basic and default jars
-# specified in the scalaris-java.conf configuration. Because the launcher
-# is used, libraries linked in SCALARIS_JAVA_HOME/lib will also be included, but this
-# is discouraged as it is not java-version safe. A user should
+# specified in the scalaris-java.conf configuration. A user should
 # request optional jars and their dependencies via the OPT_JAR_LIST
 # variable
 if $rpm_mode && [ -x "@BUILDCLASSPATH@" ] ; then
-  LOCALCLASSPATH="$(@BUILDCLASSPATH@ scalaris)"
-
   # If the user requested to try to add some other jars to the classpath
   if [ -n "$OPT_JAR_LIST" ] ; then
     _OPTCLASSPATH="$(@BUILDCLASSPATH@ $OPT_JAR_LIST 2> /dev/null)"
@@ -234,13 +239,6 @@ if $rpm_mode && [ -x "@BUILDCLASSPATH@" ] ; then
 
     # remove class path from launcher -cp option
     CLASSPATH=""
-  fi
-else
-  # not using rpm_mode or no build-classpath tool
-  if [ -z "$LOCALCLASSPATH" ] ; then
-      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar
-  else
-      LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar:$LOCALCLASSPATH
   fi
 fi
 
