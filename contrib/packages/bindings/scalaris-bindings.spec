@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  ruby >= 1.8.7
+BuildRequires:  ruby >= 1.8
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -21,7 +21,7 @@ BuildRequires:  ruby >= 1.8.7
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 BuildRequires:  pkgconfig
-BuildRequires:  ruby(abi) >= 1.8.7
+BuildRequires:  ruby(abi) >= 1.8
 %if 0%{?fedora_version} >= 12 || 0%{?centos_version} >= 600
 %define with_python 1
 %define with_python_doc_html 1
@@ -82,7 +82,7 @@ BuildRequires:  pkg-config
 BuildRequires:  python3-2to3
 %endif
 %if 0%{?suse_version} >= 1130 
-BuildRequires:  ruby(abi) >= 1.8.7
+BuildRequires:  ruby(abi) >= 1.8
 %endif
 %endif
 
@@ -128,9 +128,9 @@ Java Bindings and command line client for scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
 %if 0%{?mandriva_version} || 0%{?mdkversion}
-Requires:   ruby >= 1.8.7
+Requires:   ruby >= 1.8
 %else
-Requires:   ruby(abi) >= 1.8.7
+Requires:   ruby(abi) >= 1.8
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
