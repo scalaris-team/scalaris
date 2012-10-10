@@ -22,7 +22,7 @@ BuildRequires:  ruby >= 1.8
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
 BuildRequires:  pkgconfig
 BuildRequires:  ruby(abi) >= 1.8
-%if 0%{?fedora_version} >= 12
+%if 0%{?fedora_version} >= 12 || 0%{?centos_version} >= 600
 %define with_python 1
 %define with_python_doc_html 1
 %define with_python_doc_pdf 0
