@@ -622,20 +622,23 @@ install-erlang: compile
 install-ruby:
 	install -d $(RUBYSITELIBDIR)
 	install -m 644 -t $(RUBYSITELIBDIR) ruby-api/scalaris.rb
+	install -m 755 -t $(RUBYSITELIBDIR) ruby-api/scalaris_client.rb
 	install -d $(BINDIR)
-	install -m 755 ruby-api/scalaris_client.rb $(BINDIR)/scalaris-ruby
+	install -m 755 ruby-api/scalaris $(BINDIR)/scalaris-ruby
 
 install-python: python
 	install -d $(PYTHONSITELIBDIR)
 	install -m 644 -p -t $(PYTHONSITELIBDIR) python-api/scalaris.py*
 	install -m 644 -p -t $(PYTHONSITELIBDIR) python-api/scalaris_bench.py*
+	install -m 755 -p -t $(PYTHONSITELIBDIR) python-api/scalaris_client.py*
 	install -d $(BINDIR)
-	install -m 755 -p python-api/scalaris_client.py $(BINDIR)/scalaris-python
+	install -m 755 -p python-api/scalaris $(BINDIR)/scalaris-python
 
 install-python3: python3
 	install -d $(PYTHON3SITELIBDIR)
 	install -m 644 -p -t $(PYTHON3SITELIBDIR) python3-api/scalaris.py*
 	install -m 644 -p -t $(PYTHON3SITELIBDIR) python3-api/scalaris_bench.py*
+	install -m 755 -p -t $(PYTHON3SITELIBDIR) python3-api/scalaris_client.py*
 	if [ -d python3-api/__pycache__ ]; then \
 	  install -d $(PYTHON3SITELIBDIR)/__pycache__ ; \
 	  install -m 644 -p -t $(PYTHON3SITELIBDIR)/__pycache__ \
@@ -644,7 +647,7 @@ install-python3: python3
 	           python3-api/__pycache__/scalaris_bench.*.py*; \
 	fi
 	install -d $(BINDIR)
-	install -m 755 -p python3-api/scalaris_client.py $(BINDIR)/scalaris-python3
+	install -m 755 -p python3-api/scalaris $(BINDIR)/scalaris-python3
 
 install-one:
 	install -d $(INITDIR)
