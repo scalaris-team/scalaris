@@ -462,6 +462,11 @@ checkinstallation() {
 
     $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null
 
+    if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
+         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
+        exit 1
+    fi
+
     exit 0
 }
 
