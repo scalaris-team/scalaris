@@ -1,6 +1,0 @@
-NAME	      = "ScalarisWiki4Contrail"
-TYPE          = CDROM
-PATH          = /home/bzcschut/Scalaris-Wiki-LiveCD.iso
-PUBLIC        = YES
-DEV_PREFIX    = sd
-DESCRIPTION   = "Scalaris-Wiki (Contrail Edition)"

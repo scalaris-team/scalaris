@@ -1,3 +1,0 @@
-deb http://archive.cloudera.com/debian lenny-cdh3 contrib
-deb-src http://archive.cloudera.com/debian lenny-cdh3 contrib
-
