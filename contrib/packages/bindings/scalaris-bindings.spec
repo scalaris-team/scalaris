@@ -261,5 +261,3 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
-* Thu Apr 14 2011 Nico Kruber <kruber@zib.de>
-- Initial package

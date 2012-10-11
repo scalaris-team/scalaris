@@ -43,7 +43,8 @@ if [ ${result} -eq 0 ]; then
   sourcefolder=${folder}/contrib/packages/main
   sed -e "s/%define pkg_version .*/%define pkg_version ${pkg_version}/g" \
       < ${sourcefolder}/scalaris.spec              > ./scalaris.spec && \
-  cp  ${sourcefolder}/scalaris-rpmlintrc             ./scalaris-rpmlintrc
+  cp  ${sourcefolder}/scalaris-rpmlintrc             ./scalaris-rpmlintrc && \
+  cp  ${sourcefolder}/scalaris.changes               ./scalaris.changes
   result=$?
 fi
 
@@ -54,7 +55,8 @@ if [ ${result} -eq 0 ]; then
       -e "s/scalaris\\.orig\\.tar\\.gz/scalaris-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris\\.diff\\.tar\\.gz/scalaris-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris.dsc               > ./scalaris.dsc && \
-  sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
+  sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
+      -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
       < ${sourcefolder}/debian.changelog           > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                 ./debian.control && \
   cp  ${sourcefolder}/debian.rules                   ./debian.rules && \
