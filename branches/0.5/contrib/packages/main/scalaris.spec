@@ -173,7 +173,3 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
 
 %changelog
-* Thu Mar 19 2009 Nico Kruber <nico.laus.2001@gmx.de>
-- minor changes to the spec file improving support for snapshot rpms
-* Thu Dec 11 2008 Thorsten Schuett <schuett@zib.de> - 0.0.1-1
-- Initial build.
