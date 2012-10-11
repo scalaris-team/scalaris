@@ -23,7 +23,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.5.0+svn").
+-define(SCALARIS_VERSION, "0.5.0").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
@@ -41,9 +41,6 @@
 %%Simple routingtable
 %-define(RT, rt_simple).
 %% userdevguide-end scalaris:rt
-
-%%Flexible routingtable
-%-define(RT, rt_frtchord).
 
 %% userdevguide-begin scalaris:db
 %%Standard database backend

@@ -1,6 +1,6 @@
 Format: 1.0
 Source: conpaas-scalarix
-Version: 0.5.0+svn-1
+Version: 0.5.0-1
 Binary: conpaas-scalarix
 Maintainer: Thorsten Schuett <schuett@zib.de>
 Architecture: all

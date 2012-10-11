@@ -1,9 +1,9 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.5.0+svn"
+SCALARIS_VERSION="0.5.0"
 date=`date +"%Y%m%d"`
 name="conpaas-scalarix" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+url="http://scalaris.googlecode.com/svn/branches/0.5/"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
@@ -27,7 +27,7 @@ if [ ${result} -eq 0 ]; then
   echo " ${revision}"
   # not safe in other languages than English:
   # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-  pkg_version="${SCALARIS_VERSION}${revision}"
+  pkg_version="${SCALARIS_VERSION}"
 fi
 
 if [ ${result} -eq 0 ]; then

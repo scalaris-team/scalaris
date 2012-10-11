@@ -13,17 +13,15 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@zib.de>
+%% @author Florian Schintke <schintke@onscale.de>
 %% @doc DB for a process internal state (lika a gen_component).
 %% This abstraction allows for easy switching between
 %% erlang:put/get/erase and ets:insert/lookup/delete
 %% @end
 %% @version $Id$
 -module(pdb).
--author('schintke@zib.de').
--vsn('$Id$ ').
-
--behaviour(pdb_beh).
+-author('schintke@onscale.de').
+-vsn('$Id$').
 
 -ifdef(with_export_type_support).
 -export_type([tableid/0]).
@@ -32,31 +30,85 @@
 -export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
 
+-ifdef(PDB_ERL).
 -type tableid() :: atom() | nonempty_string().
-
+-endif.
+-ifdef(PDB_ETS).
+-type tableid() :: tid() | atom().
+-endif.
 -spec new(TableName::atom() | nonempty_string(),
           [set | ordered_set | bag | duplicate_bag |
            public | protected | private |
            named_table | {keypos, integer()} |
            {heir, pid(), term()} | {heir,none} |
            {write_concurrency, boolean()}]) -> tableid().
-new(TableName, _Params) -> TableName.
+-ifdef(PDB_ERL).
+new(TableName, _Params) ->
+    TableName.
+-endif.
+-ifdef(PDB_ETS).
+new([_|_] = TableName, Params) ->
+    new(util:list_to_atom(TableName), Params);
+new(TableName, Params) when is_atom(TableName) ->
+    ets:new(TableName, Params).
+-endif.
 
 -spec get(term(), tableid()) -> tuple() | undefined.
-get(Key, _TableName) -> erlang:get(Key).
+-ifdef(PDB_ERL).
+get(Key, _TableName) ->
+    erlang:get(Key).
+-endif.
+-ifdef(PDB_ETS).
+get(Key, TableName) ->
+    case ets:lookup(TableName, Key) of
+        [] -> undefined;
+        [Entry] -> Entry
+    end.
+-endif.
 
 -spec set(tuple(), tableid()) -> ok.
+-ifdef(PDB_ERL).
 set({}, _TableName) -> ok; %% empty_tuple is forbidden as key
 set(NewTuple, _TableName) ->
     erlang:put(element(1, NewTuple), NewTuple),
     ok.
+-endif.
+-ifdef(PDB_ETS).
+set(NewTuple, TableName) ->
+    ets:insert(TableName, NewTuple),
+    ok.
+-endif.
 
 -spec delete(term(), tableid()) -> ok.
-delete(Key, _TableName) -> erlang:erase(Key), ok.
+-ifdef(PDB_ERL).
+delete(Key, _TableName) ->
+    erlang:erase(Key),
+    ok.
+-endif.
+-ifdef(PDB_ETS).
+delete(Key, TableName) ->
+    ets:delete(TableName, Key),
+    ok.
+-endif.
 
 -spec take(term(), tableid()) -> term() | undefined.
-take(Key, _TableName) -> erlang:erase(Key).
+-ifdef(PDB_ERL).
+take(Key, _TableName) ->
+    erlang:erase(Key).
+-endif.
+-ifdef(PDB_ETS).
+take(Key, TableName) ->
+    Old = get(Key, TableName)
+    ets:delete(TableName, Key),
+    Old.
+-endif.
 
 -spec tab2list(tableid()) -> [term()].
-tab2list(_TableName) -> [ X || {_,X} <- erlang:get()].
-
+-ifdef(PDB_ERL).
+tab2list(_TableName) ->
+    [ X || {_,X} <- erlang:get()].
+-endif.
+-ifdef(PDB_ETS).
+tab2list(TableName) ->
+  ets:tab2list(TableName).
+-endif.
