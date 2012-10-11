@@ -30,13 +30,13 @@ sed -e "s/%define pkg_version .*/%define pkg_version ${VERSION}/g" \
     -i contrib/packages/*/*.spec
 sed -e "s/Version: .*-.*/Version: ${VERSION}-1/g" \
     -i contrib/packages/*/*.dsc
-sed -e "s/(.*-.*)/(${VERSION}-1)/g" \
+sed -e "0,/(.*-.*)/s//(${VERSION}-1)/" \
     -i contrib/packages/*/debian.changelog
 if [[ "$VERSION" == *svn* ]]; then
   RELEASE="unstable"
 else
   RELEASE="stable"
 fi
-sed -e "s/u*n*stable;/${RELEASE};/g" \
+sed -e "0,/u*n*stable;/s//${RELEASE};/" \
     -i contrib/packages/*/debian.changelog
 echo "done"
