@@ -1,11 +1,7 @@
-scalaris (0.5.0+svn-1) unstable; urgency=low
+-------------------------------------------------------------------
+Thu Oct 11 10:30:00 UTC 2012 - kruber@zib.de
 
-  * svn snapshot from trunk
-
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
-
-scalaris (0.5.0-1) stable; urgency=low
-
+- Scalaris 0.5.0 (codename "Saperda scalaris")
   * Packaging:
     - new init.d script to start Scalaris
     - added chef scripts to deploy Scalaris nodes
@@ -84,10 +80,10 @@ scalaris (0.5.0-1) stable; urgency=low
     - fixed inform RTMs sometimes informing the wrong RTMs
     - fixed numerous other bugs
 
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+-------------------------------------------------------------------
+Thu Mar 22 09:51:00 UTC 2012 - kruber@zib.de
 
-scalaris (0.4.1-1) stable; urgency=low
-
+- Scalaris 0.4.1
   * Packaging:
     - new official ConPaaS packages (http://www.conpaas.eu/)
     - install rubygem dependencies in Debian postinstall scripts for Ruby API
@@ -100,10 +96,10 @@ scalaris (0.4.1-1) stable; urgency=low
     - forward additional parameters of the start scripts to new syntax of
       scalarisctl
 
- -- Nico Kruber <kruber@zib.de>  Thu, 22 Mar 2012 10:51:00 +0100
+-------------------------------------------------------------------
+Wed Jan 24 23:48:00 UTC 2012 - kruber@zib.de
 
-scalaris (0.4.0-1) stable; urgency=low
-
+- Scalaris 0.4.0 (codename "Pomacea scalaris")
   * API:
     - new functions for incremental data change:
       test_and_set: check for a provided old value before setting a new one
@@ -145,10 +141,10 @@ scalaris (0.4.0-1) stable; urgency=low
   * Bugs:
     - fixed numerous bugs
 
- -- Nico Kruber <kruber@zib.de>  Wed, 25 Jan 2012 00:48:00 +0100
+-------------------------------------------------------------------
+Fri Jul 15 15:01:00 UTC 2011 - kruber@zib.de
 
-scalaris (0.3.0-1) stable; urgency=low
-
+- Scalaris 0.3.0 (codename "Rhinechis Scalaris")
   * API
     - new API with interoperable bindings to Java, Python, Ruby, and JSON
     - support for several data types, including strings, integers, JSON
@@ -196,5 +192,3 @@ scalaris (0.3.0-1) stable; urgency=low
     - extended, but - as always - by far not enough...
   * Bugs
     - fixed countless bugs
-
- -- Nico Kruber <kruber@zib.de>  Fri, 15 Jul 2011 17:01:00 +0200

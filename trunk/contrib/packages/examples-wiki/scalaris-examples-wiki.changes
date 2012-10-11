@@ -1,10 +1,7 @@
-scalaris-examples-wiki (0.5.0+svn-1) unstable; urgency=low
+-------------------------------------------------------------------
+Thu Oct 11 10:30:00 UTC 2012 - kruber@zib.de
 
-  * svn snapshot from trunk
-
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
-
-scalaris-examples-wiki (0.5.0-1) stable; urgency=low
+- Scalaris 0.5.0 (codename "Saperda scalaris")
   * Demonstrator "Wiki on Scalaris"
     (supported by 4CaaSt http://www.4caast.eu/):
     - allow different partitioned data models for better performance and
@@ -24,16 +21,16 @@ scalaris-examples-wiki (0.5.0-1) stable; urgency=low
   * Bugs:
     - fixed numerous bugs
 
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+-------------------------------------------------------------------
+Thu Mar 22 09:51:00 UTC 2012 - kruber@zib.de
 
-scalaris-examples-wiki (0.4.1-1) stable; urgency=low
-
+- Scalaris 0.4.1
   * no changes recorded
 
- -- Nico Kruber <kruber@zib.de>  Thu, 22 Mar 2012 10:51:00 +0100
+-------------------------------------------------------------------
+Wed Jan 24 23:48:00 UTC 2012 - kruber@zib.de
 
-scalaris-examples-wiki (0.4.0-1) stable; urgency=low
-
+- Scalaris 0.4.0 (codename "Pomacea scalaris")
   * Demonstrator "Wiki on Scalaris"
     (supported by 4CaaSt http://www.4caast.eu/):
     - improved performance of page edits
@@ -42,11 +39,9 @@ scalaris-examples-wiki (0.4.0-1) stable; urgency=low
   * Bugs:
     - fixed numerous bugs
 
- -- Nico Kruber <kruber@zib.de>  Wed, 25 Jan 2012 00:48:00 +0100
+-------------------------------------------------------------------
+Fri Jul 15 15:01:00 UTC 2011 - kruber@zib.de
 
-scalaris-examples-wiki (0.3.0-1) stable; urgency=low
-
+- Scalaris 0.3.0 (codename "Rhinechis Scalaris")
   * Demonstrator
     - added Wikipedia-hosting using Scalaris as demonstrator application
-
- -- Nico Kruber <kruber@zib.de>  Fri, 15 Jul 2011 17:01:00 +0200

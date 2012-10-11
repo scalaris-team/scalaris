@@ -43,7 +43,8 @@ if [ ${result} -eq 0 ]; then
   echo "extracting .spec file ..."
   sourcefolder=${folder}/contrib/packages/bindings
   sed -e "s/%define pkg_version .*/%define pkg_version ${pkg_version}/g" \
-      < ${sourcefolder}/scalaris-bindings.spec     > ./scalaris-bindings.spec
+      < ${sourcefolder}/scalaris-bindings.spec     > ./scalaris-bindings.spec && \
+  cp  ${sourcefolder}/scalaris-bindings.changes      ./scalaris-bindings.changes
   result=$?
 fi
 
@@ -54,7 +55,8 @@ if [ ${result} -eq 0 ]; then
       -e "s/scalaris-bindings\\.orig\\.tar\\.gz/scalaris-bindings-${pkg_version}\\.orig\\.tar\\.gz/g" \
       -e "s/scalaris-bindings\\.diff\\.tar\\.gz/scalaris-bindings-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris-bindings.dsc          > ./scalaris-bindings.dsc && \
-  sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
+  sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
+      -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
       < ${sourcefolder}/debian.changelog               > ./debian.changelog && \
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
