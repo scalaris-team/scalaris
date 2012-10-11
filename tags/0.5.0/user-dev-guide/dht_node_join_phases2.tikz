@@ -1,0 +1,49 @@
+% TODO: extend this picture and provide all paths between phases
+\begin{tikzpicture}
+ [rounded corners,
+  pre/.style={<-,shorten <=1pt,>=stealth,semithick},
+  post/.style={->,shorten >=1pt,>=stealth,semithick},
+  timeout/.style={draw=black!50, dashed},
+  phase/.style={rectangle,fill=codebackground,drop shadow},
+  bend angle=60]
+ \node[phase] (phase1)                         {init};
+ \node[phase] (phase2)  [right=3.5 of phase1]  {phase2};
+ \node[phase] (phase2b) [below=3 of phase2]    {phase2b};
+ \node[phase] (phase3)  [right=3.5 of phase2]  {phase3};
+ \node[phase] (phase4)  [right=3.5 of phase3]  {phase4};
+
+
+ \path[->] (phase2)
+             edge [pre]  node[auto, swap] {\code{get_known_nodes()}} (phase1)
+             edge [post] node[auto, anchor=east, text width=4.5cm]
+                          {
+                           \code{get_number_of_samples()}\\
+                           \footnotesize{\textcolor{red}{\code{skip_psv_lb} not set,}}\\
+                           \footnotesize{\textcolor{red}{non-empty ContactNodes}}\\
+                          } (phase2b)
+             edge [post] node[auto, anchor=south, pos=0.6, text width=4cm]
+                          {
+                           \code{lookup_new_ids2()}\\
+                           ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+                           ~~\scriptsize{$\hookrightarrow$\code{lookup()}}\\
+                          }
+                         node[auto, swap, anchor=north, pos=0.64, text width=4cm]
+                          {
+                           \footnotesize{\textcolor{red}{\code{skip_psv_lb} set,}}\\
+                           \footnotesize{\textcolor{red}{non-empty ContactNodes}}\\
+                          } (phase3)
+           (phase2b)
+             edge [post, bend left=-35]
+                         node[auto, swap, pos=0.7, anchor=north west, text width=3cm]
+                          {
+                           \code{lookup_new_ids2()}\\
+                           ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+                           ~~\scriptsize{$\hookrightarrow$\code{lookup()}}\\
+                          } (phase3)
+           (phase3)
+             edge [post] node[auto, anchor=south, pos=0.45, text width=3cm]
+                          {
+                           \code{contact_best_candidate()}\\
+                           ~\footnotesize{$\hookrightarrow$\code{send_join_request()}}\\
+                          } (phase4);
+\end{tikzpicture}

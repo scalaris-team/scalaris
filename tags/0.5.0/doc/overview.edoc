@@ -1,0 +1,10 @@
+@copyright 2007-2011 Zuse Institute Berlin
+@version $Id$
+@title Scalaris
+
+@doc
+== Introduction ==
+
+Scalaris is a distributed key-value store with support for
+transactions.
+
