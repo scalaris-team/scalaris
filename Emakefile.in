@@ -1,5 +1,5 @@
 % behaviors first - otherwise there are compile warnings
-{["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/lb_psv_beh.erl", "src/transactions/tx_op_beh.erl", "src/rrepair/bloom_beh.erl", "src/rrepair/hfs_beh.erl"],
+{["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/lb_psv_beh.erl", "src/transactions/tx_op_beh.erl", "src/rrepair/bloom_beh.erl", "src/rrepair/hfs_beh.erl", "src/pdb_beh.erl"],
  [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record,
   {outdir, "ebin"},
   {i, "include"},
