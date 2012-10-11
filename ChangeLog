@@ -1,5 +1,5 @@
-Scalaris 0.5.0 (codename "Saperda scalaris")
-============================================
+Scalaris 0.5.0 (codename "Saperda scalaris") - October 11, 2012
+===============================================================
 
 Packaging:
 
@@ -83,8 +83,8 @@ Bugs:
 - fixed inform RTMs sometimes informing the wrong RTMs
 - fixed numerous other bugs
 
-Scalaris 0.4.1
-============================================
+Scalaris 0.4.1 - March 22, 2012
+===============================
 
 Packaging:
 
@@ -98,8 +98,8 @@ Bugs:
 - better tx cleanup (should fix rare occurance of duplicate client inform)
 - forward additional parameters of the start scripts to new syntax of scalarisctl
 
-Scalaris 0.4.0 (codename "Pomacea scalaris")
-============================================
+Scalaris 0.4.0 (codename "Pomacea scalaris") - January 25, 2012
+===============================================================
 
 API:
 
@@ -155,8 +155,8 @@ Bugs:
 - fixed numerous bugs
 
 
-Scalaris 0.3.0 (codename "Rhinechis Scalaris")
-==============================================
+Scalaris 0.3.0 (codename "Rhinechis Scalaris") - July 15, 2011
+==============================================================
 
 API:
 
