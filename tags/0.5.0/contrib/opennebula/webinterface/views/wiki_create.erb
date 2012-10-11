@@ -1,0 +1,20 @@
+<html>
+<head>
+<link rel="stylesheet" text="text/css" href="/contrail.css">
+<title>Wiki Instance</title>
+</head>
+<body>
+
+<h2>Wiki Create Result</h>
+<p>
+Valid: <%= @valid %><br>
+Id: <%= @id %><br>
+Node: <%= @node %><br>
+Error:<%= @error %><br>
+Parameters:<%= @params %><br>
+</p>
+
+<a href="/wiki/<%= @id %>">Back to instance <%= @id %></a>
+
+</body>
+</html>

@@ -1,0 +1,34 @@
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.4/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.4/ http://www.mediawiki.org/xml/export-0.4.xsd" version="0.4" xml:lang="es">
+  <siteinfo>
+    <sitename>Wikipedia</sitename>
+    <base>http://es.wikipedia.org/wiki/Wikipedia:Portada</base>
+    <generator>MediaWiki 1.16alpha-wmf</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="-2">Media</namespace>
+      <namespace key="-1">Especial</namespace>
+      <namespace key="0" />
+      <namespace key="1">Discusión</namespace>
+      <namespace key="2">Usuario</namespace>
+      <namespace key="3">Usuario Discusión</namespace>
+      <namespace key="4">Wikipedia</namespace>
+      <namespace key="5">Wikipedia Discusión</namespace>
+      <namespace key="6">Archivo</namespace>
+      <namespace key="7">Archivo Discusión</namespace>
+      <namespace key="8">MediaWiki</namespace>
+      <namespace key="9">MediaWiki Discusión</namespace>
+      <namespace key="10">Plantilla</namespace>
+      <namespace key="11">Plantilla Discusión</namespace>
+      <namespace key="12">Ayuda</namespace>
+      <namespace key="13">Ayuda Discusión</namespace>
+      <namespace key="14">Categoría</namespace>
+      <namespace key="15">Categoría Discusión</namespace>
+      <namespace key="100">Portal</namespace>
+      <namespace key="101">Portal Discusión</namespace>
+      <namespace key="102">Wikiproyecto</namespace>
+      <namespace key="103">Wikiproyecto Discusión</namespace>
+      <namespace key="104">Anexo</namespace>
+      <namespace key="105">Anexo Discusión</namespace>
+    </namespaces>
+  </siteinfo>
+</mediawiki>
