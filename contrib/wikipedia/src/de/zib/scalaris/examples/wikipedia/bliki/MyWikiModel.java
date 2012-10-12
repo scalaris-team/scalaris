@@ -272,47 +272,16 @@ public class MyWikiModel extends WikiModel {
     @Override
     public String getRawWikiContent(String namespace, String articleName,
             Map<String, String> templateParameters) {
-        // Remove article from templates and add it by our conditions (see below).
-        // (was added by AbstractWikiModel#substituteTemplateCall)
-        templates.remove(articleName);
-        /* AbstractWikiModel#substituteTemplateCall sets the template
-         * namespace even for texts like "{{MediaWiki:Noarticletext NS Other}}"
-         * or "{{:Main Page/Introduction}}" which transcludes the page but does
-         * not need "Template:" prepended 
-         */
-        String processedMagicWord = null;
-        int index = articleName.indexOf(':');
-        if (index > 0) {
-            final String maybeNs = articleName.substring(0, index);
-            final String maybeName = articleName.substring(index + 1).trim();
-            if (isTemplateNamespace(namespace)) {
-                // if it is a magic word, the first part is the word itself, the second its parameters
-                processedMagicWord = getMagicWord(articleName, maybeNs, maybeName);
+        if (isTemplateNamespace(namespace)) {
+            String processedMagicWord = null;
+            processedMagicWord = processMagicWord(articleName);
+            if (processedMagicWord != null) {
+                return processedMagicWord;
             }
-            // set the corrected namespace and article name (if it is a namespace!)
-            if (getNamespace().getNumberByName(maybeNs) != null) {
-                namespace = maybeNs;
-                articleName = maybeName;
-            }
-        } else {
-            if (isTemplateNamespace(namespace)) {
-                // if it is a magic word, there are no parameters
-                processedMagicWord = getMagicWord(articleName, articleName, "");
-            }
-        }
-
-        if (processedMagicWord != null) {
-            return processedMagicWord;
         }
         
         if (!isValidTitle(createFullPageName(namespace, articleName))) {
             return null;
-        }
-        
-        if (isTemplateNamespace(namespace)) {
-            addTemplate(articleName);
-        } else {
-            addInclude(createFullPageName(namespace, articleName));
         }
 
         // (ugly) fix for template parameter replacement if no parameters given,
@@ -342,7 +311,16 @@ public class MyWikiModel extends WikiModel {
      * @return the contents of the magic word or <tt>null</tt> if the template
      *         is no magic word
      */
-    private String getMagicWord(String templateName, String magicWord, String parameter) {
+    private String processMagicWord(String templateName) {
+        int index = templateName.indexOf(':');
+        String magicWord = templateName;
+        String parameter = "";
+        if (index > 0) {
+            // if it is a magic word, the first part is the word itself, the second its parameters
+            magicWord = templateName.substring(0, index);
+            parameter = templateName.substring(index + 1).trim();
+        }
+        
         if (isMagicWord(magicWord)) {
             // cache values for magic words:
             if (magicWordCache.containsKey(templateName)) {
@@ -362,7 +340,7 @@ public class MyWikiModel extends WikiModel {
      * {@link MyMagicWord#isMagicWord(String)}.
      * 
      * @param name
-     *            the template name
+     *            the template name (without the template namespace)
      * 
      * @return whether the template is a magic word or not
      */
