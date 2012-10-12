@@ -17,8 +17,8 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.wiki.filter.MagicWord;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.Options;
 
@@ -29,7 +29,7 @@ import de.zib.scalaris.examples.wikipedia.Options;
  */
 public class MyMagicWord extends MagicWord {
 
-    private static List<String> MY_MAGIC_WORDS = new ArrayList<String>();
+    private static Set<String> MY_MAGIC_WORDS = new HashSet<String>(100);
 
     // private HashMap parameterValues = new HashMap();
 
@@ -164,7 +164,7 @@ public class MyMagicWord extends MagicWord {
                 name.equals(MAGIC_ARTICLE_PAGE_NAME) || name.equals(MAGIC_ARTICLE_PAGE_NAME_E)) {
             String pagename = getPageName(parameter, model);
             String[] split = model.splitNsTitle(pagename);
-            String subjectSpace = model.getNamespace().getSubjectspace(split[0]);
+            String subjectSpace = model.getNamespace().getContentspace(split[0]);
             if (subjectSpace == null || subjectSpace.isEmpty()) {
                 subjectSpace = "";
             } else {
@@ -206,7 +206,7 @@ public class MyMagicWord extends MagicWord {
                 name.equals(MAGIC_ARTICLE_SPACE) || name.equals(MAGIC_ARTICLE_SPACE_E)) {
             String pagename = getPageName(parameter, model);
             String talkNamespace = model.getNamespace(pagename);
-            String subjectspace = model.getNamespace().getSubjectspace(talkNamespace);
+            String subjectspace = model.getNamespace().getContentspace(talkNamespace);
             if (subjectspace == null) {
                 return "";
             } else {

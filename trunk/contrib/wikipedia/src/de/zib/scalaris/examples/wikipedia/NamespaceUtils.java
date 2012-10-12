@@ -8,14 +8,6 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  * @author Nico Kruber, kruber@zib.de
  */
 public interface NamespaceUtils {
-    /**
-     * Gets the subject/content namespace for a given namespace.
-     * 
-     * @param talkNamespace the namespace, potentially a talkspace
-     * 
-     * @return the subject/content namespace or <tt>null</tt>
-     */
-    public abstract String getSubjectspace(String talkNamespace);
 
     /**
      * Gets the siteinfo object used for this namespace.
