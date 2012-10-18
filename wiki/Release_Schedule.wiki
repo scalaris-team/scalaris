@@ -1,15 +1,5 @@
 #summary Features for releases.
 
-= 0.3.0 Rhinechis Scalaris (planned) =
+= Scalaris > 0.5.0 (planned) =
 
-  * tx_tm_rtm handle more failure scenarios (done in r1793)
   * update user-dev-guide
-  * clarify cs_api_v2 (return types) (done) issue 64
-  * switch Java API to new cs_api_v2 (done)
-  * switch web-interface to cs_api_v2 (done)
-  * update JSON API (done)
-  * make APIs interoperable (Erlang, Java, JSON) for some datatypes (done) issue 43
-  * remove transstore, cs_api_v1 (done)
-  * graceful join/leave protocol with data handover (done)
-  * passive load balancing (done)
-  * update client examples (ruby, java) (done)
