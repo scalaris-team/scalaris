@@ -441,15 +441,6 @@ AC_SUBST(ENABLEONEINSTALL)
 
 ###########################################################
 #
-# check for screen
-#
-###########################################################
-
-AC_CHECK_PROG([screen], [screen], ["found"], ["not_found"])
-AC_SUBST(ac_cv_prog_screen)
-
-###########################################################
-#
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
