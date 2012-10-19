@@ -7,12 +7,12 @@ pkgdesc="Bindings and clients for Scalaris."
 arch=('i686' 'x86_64')
 url="http://code.google.com/p/scalaris/"
 license=('Apache')
-depends=('java-environment>=1.6.0' 'python2>=2.6' 'python>=3.0' 'glibc')
-makedepends=('apache-ant' 'erlang>=R13B01')
+depends=('java-environment>=1.6.0' 'python2>=2.6' 'python>=3.0')
+makedepends=('apache-ant' 'glib2' 'erlang>=R13B01')
 optdepends=('java-environment: Java API and client'
             'python2: Python2 API and client'
             'python: Python3 API and client')
-backup=('etc/scalaris/initd.conf' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
+backup=('etc/scalaris/scalaris-java.conf' 'etc/scalaris/scalaris.properties')
 source=($pkgname-$pkgver.tar.gz)
 md5sums=('f188e12f4cf893022a87a1b29971aa81')
 
