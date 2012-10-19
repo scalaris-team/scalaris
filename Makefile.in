@@ -19,6 +19,8 @@ ERL_LIB_DIR = @ERLANG_LIB_DIR@
 SVN = svn
 CD = cd
 MAKE = make
+PYTHON2="@PYTHON2@"
+PYTHON3="@PYTHON3@"
 VERSION=@PACKAGE_VERSION@
 OTP_ERLANG_VERSION=1.5.6-custom
 COMMONS_CLI_VERSION=1.2
@@ -57,7 +59,7 @@ RUNDIR=$(DESTDIR)@localstatedir@/run
 # /usr/lib/ruby/site_ruby/1.8
 RUBYSITELIBDIR=$(DESTDIR)@RUBYSITELIBDIR@
 # /usr/lib/python2.7/site-packages
-PYTHONSITELIBDIR=$(DESTDIR)@PYTHONSITELIBDIR@
+PYTHON2SITELIBDIR=$(DESTDIR)@PYTHON2SITELIBDIR@
 # /usr/lib/python3.1/site-packages
 PYTHON3SITELIBDIR=$(DESTDIR)@PYTHON3SITELIBDIR@
 
@@ -190,8 +192,8 @@ java-%:
 python: python-compile
 
 python-compile:
-	python -mcompileall python-api
-	python -O -mcompileall python-api
+	$(PYTHON2) -mcompileall python-api
+	$(PYTHON2) -O -mcompileall python-api
 
 python-clean:
 	rm -f python-api/*.py
@@ -256,11 +258,11 @@ python3-convert: python3-clean
 	fi
 	cp python-api/*.py python3-api/
 	cd python3-api && 2to3 -f all -f buffer -w -n . >/dev/null
-	sed -i -e "s|#!/usr/bin/python|#!/usr/bin/python3|g" python3-api/*.py
+	sed -i -e "1s|#!.*|#!$(PYTHON3)|g" python3-api/*.py
 
 python3-compile: python3-convert
-	python3 -mcompileall python3-api
-	python3 -O -mcompileall python3-api
+	$(PYTHON3) -mcompileall python3-api
+	$(PYTHON3) -O -mcompileall python3-api
 
 python3-clean:
 	if [ -d python3-api ]; then \
@@ -627,10 +629,10 @@ install-ruby:
 	install -m 755 ruby-api/scalaris $(BINDIR)/scalaris-ruby
 
 install-python: python
-	install -d $(PYTHONSITELIBDIR)
-	install -m 644 -p -t $(PYTHONSITELIBDIR) python-api/scalaris.py*
-	install -m 644 -p -t $(PYTHONSITELIBDIR) python-api/scalaris_bench.py*
-	install -m 755 -p -t $(PYTHONSITELIBDIR) python-api/scalaris_client.py*
+	install -d $(PYTHON2SITELIBDIR)
+	install -m 644 -p -t $(PYTHON2SITELIBDIR) python-api/scalaris.py*
+	install -m 644 -p -t $(PYTHON2SITELIBDIR) python-api/scalaris_bench.py*
+	install -m 755 -p -t $(PYTHON2SITELIBDIR) python-api/scalaris_client.py*
 	install -d $(BINDIR)
 	install -m 755 -p python-api/scalaris $(BINDIR)/scalaris-python
 
@@ -678,4 +680,4 @@ install-one:
 
 install: install-erlang
 
-install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHONINSTALL@ @ENABLEPYTHON3INSTALL@ @ENABLEONEINSTALL@
+install-all: install-erlang install-java install-docs @ENABLERUBYINSTALL@ @ENABLEPYTHON2INSTALL@ @ENABLEPYTHON3INSTALL@ @ENABLEONEINSTALL@

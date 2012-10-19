@@ -186,9 +186,6 @@ Python3 bindings and Python3 command line client for scalaris
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
     --docdir=%{_docdir}/scalaris \
-%if 0%{?with_python3}
-    --with-python3-sitelibdir=%{python3_sitelib} \
-%endif
     --with-ruby-sitelibdir=%{rb_sitelib}
 make java
 make java-doc
