@@ -67,6 +67,16 @@ if [ ${result} -eq 0 ]; then
   result=$?
 fi
 
+if [ ${result} -eq 0 ]; then
+  echo "extracting ArchLinux package files ..."
+  sourcefolder=${folder}/contrib/packages/bindings
+  tarmd5sum=`md5sum ${targzfile} | cut -d' ' -f 1` && \
+  sed -e "s/pkgver=.*/pkgver=${pkg_version}/g" \
+      -e "s/md5sums=('.*')/md5sums=('${tarmd5sum}')/g" \
+      < ${sourcefolder}/PKGBUILD                   > ./PKGBUILD
+  result=$?
+fi
+
 if [ ${result} -eq 0 -a ${deletefolder} -eq 1 ]; then
   echo "removing ${folder} ..."
   rm -rf ${folder}

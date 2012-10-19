@@ -1,0 +1,40 @@
+# Maintainer: Nico Kruber <kruber at zib dot de>
+
+pkgname=scalaris-bindings
+pkgver=0.5.0+svn
+pkgrel=1
+pkgdesc="Bindings and clients for Scalaris."
+arch=('i686' 'x86_64')
+url="http://code.google.com/p/scalaris/"
+license=('Apache')
+depends=('java-environment>=1.6.0' 'python2>=2.6' 'python>=3.0' 'glibc')
+makedepends=('apache-ant' 'erlang>=R13B01')
+optdepends=('java-environment: Java API and client'
+            'python2: Python2 API and client'
+            'python: Python3 API and client')
+backup=('etc/scalaris/initd.conf' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
+source=($pkgname-$pkgver.tar.gz)
+md5sums=('f188e12f4cf893022a87a1b29971aa81')
+
+build() {
+  # set JAVA_HOME for ant:
+  source /etc/profile.d/jdk.sh
+  cd "$srcdir/$pkgname-$pkgver"
+  ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var
+  make java
+  make java-doc
+  make python
+  make python3
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  make install-java DESTDIR="$pkgdir/"
+  make install-java-doc DESTDIR="$pkgdir/"
+  make install-ruby DESTDIR="$pkgdir/"
+  make install-python DESTDIR="$pkgdir/"
+  make install-python3 DESTDIR="$pkgdir/"
+  
+  # put the LICENSE file to the licenses
+  install -D -m644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
