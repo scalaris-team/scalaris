@@ -40,3 +40,5 @@ fi
 sed -e "0,/u*n*stable;/s//${RELEASE};/" \
     -i contrib/packages/*/debian.changelog
 echo "done"
+sed -e "s/pkgver=.*/pkgver=${VERSION}/g" \
+    -i contrib/packages/*/PKGBUILD
