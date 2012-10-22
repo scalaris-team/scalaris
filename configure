@@ -588,8 +588,10 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
 ENABLEONEINSTALL
+ENABLEPYTHON3INSTALL
 PYTHON3SITELIBDIR
 PYTHON3
+ENABLEPYTHON2INSTALL
 PYTHON2SITELIBDIR
 PYTHON2
 RUBYSITELIBDIR
@@ -4244,6 +4246,7 @@ $as_echo "$PYTHON2SITELIBDIR" >&6; }
        sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py
 fi
 
+
 PYTHON3SITELIBDIR=
 ENABLEPYTHON3INSTALL=
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python 3.x" >&5
@@ -4293,6 +4296,7 @@ $as_echo_n "checking for python 3.x sitelibdir... " >&6; }
 $as_echo "$PYTHON3SITELIBDIR" >&6; }
        ENABLEPYTHON3INSTALL="install-python3"
 fi
+
 
 ###########################################################
 #
