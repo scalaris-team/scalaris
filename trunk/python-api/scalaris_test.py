@@ -16,7 +16,7 @@
 from scalaris import TransactionSingleOp, Transaction, PubSub, ReplicatedDHT, ScalarisVM,\
     JSONConnection
 import scalaris
-import time, threading, json
+import time, threading, json, socket
 from datetime import datetime
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from random import shuffle
@@ -1071,6 +1071,7 @@ class TestPubSub(unittest.TestCase):
         server_thread.setDaemon(True)
         server_thread.start()
         #print "Server loop running in thread:", server_thread.getName()
+        server.waitForStart()
     
         return server
     
@@ -1078,6 +1079,37 @@ class TestPubSub(unittest.TestCase):
         def __init__(self, server_address):
             HTTPServer.__init__(self, server_address, TestPubSub.SubscriptionHandler)
             self.notifications = {}
+        
+        def checkPortOccupied(self):
+            """Checks if the chosen port is in use."""
+            if (self.server_port == 0):
+                return False
+            
+            # try to connect to the http server's socket to test whether it is up
+            for (family, socktype, proto, _canonname, _sockaddr) in \
+                socket.getaddrinfo(self.server_name, self.server_port, 0, socket.SOCK_STREAM):
+                s = None
+                try:
+                    s = socket.socket(family, socktype, proto)
+                    s.settimeout(1.0)
+                    s.connect((self.server_name, self.server_port))
+                    s.close()
+                    return True
+                except:
+                    if s:
+                        s.close()
+            return False
+        
+        def waitForStart(self):
+            # wait until port is occupied:
+            for _i in xrange(10): # 1s timeout in socket connect + 0.1 here => 11s total timeout 
+                if self.checkPortOccupied():
+                    return
+                else:
+                    time.sleep(.1)
+            
+            msg = "Port %s not bound on %s" % (repr(self.server_port), repr(self.server_name))
+            raise IOError(msg)
     
     class SubscriptionHandler(BaseHTTPRequestHandler):
         def do_POST(self):
