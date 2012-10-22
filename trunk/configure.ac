@@ -408,6 +408,7 @@ AS_IF([test "$PYTHON2" != ""],
        AC_MSG_RESULT([$PYTHON2SITELIBDIR])
        ENABLEPYTHON2INSTALL="install-python"
        sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py])
+AC_SUBST(ENABLEPYTHON2INSTALL)
 
 PYTHON3SITELIBDIR=
 ENABLEPYTHON3INSTALL=
@@ -424,6 +425,7 @@ AS_IF([test "$PYTHON3" != ""],
       [AC_MSG_CHECKING([for python 3.x sitelibdir])
        AC_MSG_RESULT([$PYTHON3SITELIBDIR])
        ENABLEPYTHON3INSTALL="install-python3"])
+AC_SUBST(ENABLEPYTHON3INSTALL)
 
 ###########################################################
 #
