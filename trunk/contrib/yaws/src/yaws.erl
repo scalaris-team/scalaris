@@ -536,18 +536,18 @@ stringdate_to_datetime([_D1, _D2, _D3, $\,, $ |Tail]) ->
     stringdate_to_datetime1(Tail).
 
 stringdate_to_datetime1([A, B, $\s |T]) ->
-    stringdate_to_datetime2(T, list_to_integer([A,B]));
+    stringdate_to_datetime2(T, erlang:list_to_integer([A,B]));
 stringdate_to_datetime1([A, $\s |T]) ->
-    stringdate_to_datetime2(T, list_to_integer([A])).
+    stringdate_to_datetime2(T, erlang:list_to_integer([A])).
 
 stringdate_to_datetime2([M1, M2, M3, $\s , Y1, Y2, Y3, Y4, $\s,
                          H1, H2, $:, Min1, Min2,$:,
                          S1, S2,$\s ,$G, $M, $T|_], Day) ->
-    {{list_to_integer([Y1,Y2,Y3,Y4]),
+    {{erlang:list_to_integer([Y1,Y2,Y3,Y4]),
       month_str_to_int([M1, M2, M3]), Day},
-     {list_to_integer([H1, H2]),
-      list_to_integer([Min1, Min2]),
-      list_to_integer([S1, S2])}}.
+     {erlang:list_to_integer([H1, H2]),
+      erlang:list_to_integer([Min1, Min2]),
+      erlang:list_to_integer([S1, S2])}}.
 
 
 %% used by If-Modified-Since header code
@@ -1534,7 +1534,7 @@ accumulate_header({"Content-Length", Len}) ->
         I when is_integer(I) ->
             accumulate_header({content_length, I});
         L when is_list(L) ->
-            accumulate_header({content_length, list_to_integer(L)})
+            accumulate_header({content_length, erlang:list_to_integer(L)})
     end;
 
 accumulate_header({transfer_encoding, What}) ->
@@ -2201,7 +2201,7 @@ get_chunk_header(Fd, SSL) ->
                    end,
             ?Debug("Get chunk num from line ~p~n",[Line]),
             {N, Exts} = split_at(Line, $;),
-            {list_to_integer(strip_spaces(N),16), strip_spaces(Exts)};
+            {erlang:list_to_integer(strip_spaces(N),16), strip_spaces(Exts)};
         {error, _Rsn} ->
             exit(normal)
     end.
@@ -2307,7 +2307,7 @@ integer_to_ip(_, _) ->
     throw({error, einval}).
 
 netmask_to_integer(Type, NetMask) ->
-    case catch list_to_integer(NetMask) of
+    case catch erlang:list_to_integer(NetMask) of
         I when is_integer(I) ->
             case Type of
                 ipv4 -> (1 bsl ?MAXBITS_IPV4) - (1 bsl (?MAXBITS_IPV4 - I));
