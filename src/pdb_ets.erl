@@ -52,15 +52,15 @@ get(Key, TableName) ->
         [Entry] -> Entry
     end.
 
--spec set(tuple(), tableid()) -> tableid().
+-spec set(tuple(), tableid()) -> ok.
 set(NewTuple, TableName) ->
     ets:insert(TableName, NewTuple),
-    TableName.
+    ok.
 
--spec delete(term(), tableid()) -> tableid().
+-spec delete(term(), tableid()) -> ok.
 delete(Key, TableName) ->
     ets:delete(TableName, Key),
-    TableName.
+    ok.
 
 -spec take(term(), tableid()) -> term() | undefined.
 take(Key, TableName) ->
