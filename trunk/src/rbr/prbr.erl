@@ -157,8 +157,8 @@ get_entry(Id, TableName) ->
 
 -spec set_entry(entry(), state()) -> state().
 set_entry(NewEntry, TableName) ->
-    ?PDB:set(NewEntry, TableName).
-
+    ?PDB:set(NewEntry, TableName),
+    TableName.
 
 %% operations for abstract data type entry()
 
