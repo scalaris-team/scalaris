@@ -8,7 +8,9 @@ arch=('i686' 'x86_64')
 url="http://code.google.com/p/scalaris/"
 license=('Apache')
 depends=('openssl' 'erlang>=R13B01')
-optdepends=('tokyocabinet: storage on disk')
+makedepends=('screen')
+optdepends=('tokyocabinet: storage on disk'
+            'screen: scalaris daemon with screen')
 backup=('etc/scalaris/initd.conf' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
 source=($pkgname-$pkgver.tar.gz)
 md5sums=('f188e12f4cf893022a87a1b29971aa81')
