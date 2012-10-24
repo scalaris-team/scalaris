@@ -32,17 +32,16 @@
 -export([qread/2, qread/3]).
 -export([qwrite/6]).
 
--export([start_link/1]).
+-export([start_link/2]).
 -export([init/1, on/2]).
 
 -type state() :: { ?PDB:tableid(),
+                   dht_node_state:db_selector(),
                    non_neg_integer() %% period this process is in
                  }.
 
 %% TODO: add support for *consistent* quorum by counting the number of
 %% same round number replies
-%% TODO: add support for a db_selector to operate on (separate DBs for
-%% leases, tx_ids, keys / replicas, ...
 
 -type entry() :: {any(), %% ReqId
                   non_neg_integer(), %% period of last retriggering / starting
@@ -55,6 +54,7 @@
                   prbr:r_with_id(), %% highest seen round in replies
                   any(), %% value of highest seen round in replies
                   any() %% filter or tuple of filters
+%%% Attention: There is a case that checks the size of this tuple below!!
                  }.
 
 -type check_next_step() :: fun((term(), term()) -> term()).
@@ -105,22 +105,23 @@ qwrite(Client, Key, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
     Pid = pid_groups:find_a(?MODULE),
     comm:send_local(Pid, {qwrite, Client,
-                          {ReadFilter, ContentCheck, WriteFilter},
-                          Key, Value, _RetriggerAfter = 1}),
+                          Key, {ReadFilter, ContentCheck, WriteFilter},
+                          Value, _RetriggerAfter = 1}),
     %% the process will reply to the client directly
     ok.
 
 %% @doc spawns a rbrcseq, called by the scalaris supervisor process
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
+-spec start_link(pid_groups:groupname(), dht_node_state:db_selector())
+                -> {ok, pid()}.
+start_link(DHTNodeGroup, DBSelector) ->
     gen_component:start_link(
-      ?MODULE, fun ?MODULE:on/2, [],
+      ?MODULE, fun ?MODULE:on/2, DBSelector,
       [{pid_groups_join_as, DHTNodeGroup, rbrcseq}]).
 
--spec init(Options::[tuple()]) -> state().
-init(_Options) ->
+-spec init(dht_node_state:db_selector()) -> state().
+init(DBSelector) ->
     msg_delay:send_local(1, self(), {next_period, 1}),
-    {?PDB:new(?MODULE, [set, protected]), 0}.
+    {?PDB:new(?MODULE, [set, protected]), DBSelector, 0}.
 
 -spec on(comm:message(), state()) -> state().
 %% ; ({qread, any(), client_key(), fun ((any()) -> any())},
@@ -147,9 +148,10 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     %% to get the entry from the pdb
     MyId = {my_id(), ReqId},
     Dest = pid_groups:find_a(dht_node),
+    DB = db_selector(State),
     _ = [ comm:send_local(Dest,
                           {?lookup_aux, X, 0,
-                           {prbr, read, This, X, MyId, ReadFilter}})
+                           {prbr, read, DB, This, X, MyId, ReadFilter}})
       || X <- api_rdht:get_replica_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
@@ -184,7 +186,7 @@ on({qread_collect, {read_reply, MyRwithId, Val, AckRound}}, State) ->
     end,
     State;
 
-on({qwrite, Client, Filters, Key, Value, RetriggerAfter}, State) ->
+on({qwrite, Client, Key, Filters, Value, RetriggerAfter}, State) ->
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
 
@@ -210,9 +212,10 @@ on({qwrite_read_done, ReqId, {qread_done, _ReadId, Round, ReadValue}},
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
             Dest = pid_groups:find_a(dht_node),
+            DB = db_selector(State),
             [ comm:send_local(Dest,
                               {?lookup_aux, X, 0,
-                               {prbr, write, This, X, Round,
+                               {prbr, write, DB, This, X, Round,
                                 WriteValue,
                                 PassedToUpdate,
                                 WriteFilter}})
@@ -243,7 +246,8 @@ on({qwrite_collect, ReqId, {write_reply, _Key, Round}}, State) ->
     State;
 
 on({qwrite_collect, ReqId, {write_deny, _Key, NewerRound}}, State) ->
-    Entry = get_entry(ReqId, tablename(State)),
+    TableName = tablename(State),
+    Entry = get_entry(ReqId, TableName),
     _ = case Entry of
         undefined ->
             %% drop replies for unknown requests, as they must be
@@ -254,14 +258,11 @@ on({qwrite_collect, ReqId, {write_deny, _Key, NewerRound}}, State) ->
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
-                    inform_client(qwrite_deny, NewEntry),
-                    ?PDB:delete(entry_reqid(Entry), tablename(State))
+                    %% retry
+                    retrigger(NewEntry, TableName)%%,
+%%                    ?PDB:delete(entry_reqid(Entry), tablename(State))
             end
     end,
-
-    inform_client(qwrite_done, Entry),
-    ?PDB:delete(ReqId, tablename(State)),
-
     %% decide somehow whether a fast paxos or a normal paxos is necessary
     %% if full paxos: perform qread(self(), Key, ContentReadFilter)
 
@@ -303,7 +304,7 @@ on({next_period, NewPeriod}, State) ->
 
     set_period(State, NewPeriod).
 
--spec retrigger(entry(), ?PDB:tableid()) -> ?PDB:tableid().
+-spec retrigger(entry(), ?PDB:tableid()) -> ok.
 retrigger(Entry, TableName) ->
     RetriggerDelay = (entry_retrigger(Entry) - entry_period(Entry)) + 1,
     case erlang:size(Entry) of
@@ -316,7 +317,7 @@ retrigger(Entry, TableName) ->
         11 -> %% read request
             comm:send_local(self(),
                             {qread, entry_client(Entry),
-                             entry_key(Entry), entry_filters(Entry),
+                              entry_key(Entry), entry_filters(Entry),
                              RetriggerDelay})
         end,
     ?PDB:delete(element(1, Entry), TableName).
@@ -438,7 +439,9 @@ my_id() ->
 
 -spec tablename(state()) -> ?PDB:tableid().
 tablename(State) -> element(1, State).
+-spec db_selector(state()) -> dht_node_state:db_selector().
+db_selector(State) -> element(2, State).
 -spec period(state()) -> non_neg_integer().
-period(State) -> element(2, State).
+period(State) -> element(3, State).
 -spec set_period(state(), non_neg_integer()) -> state().
-set_period(State, Val) -> setelement(2, State, Val).
+set_period(State, Val) -> setelement(3, State, Val).

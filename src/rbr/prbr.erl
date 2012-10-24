@@ -26,7 +26,6 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
-%%-define(PDB, pdb).
 -define(PDB, pdb_ets).
 
 %%% the prbr has to be embedded into a gen_component using it.
@@ -62,9 +61,11 @@
 -type state() :: ?PDB:tableid().
 
 -type message() ::
-        {prbr, read, Proposer :: comm:mypid(), client_key(), InRound,
+        {prbr, read, DB :: dht_node_state:db_selector(),
+         Proposer :: comm:mypid(), client_key(), InRound,
          read_filter()}
-      | {prbr, write, Proposer :: comm:mypid(), client_key(), InRound,
+      | {prbr, write, DB :: dht_node_state:db_selector(),
+         Proposer :: comm:mypid(), client_key(), InRound,
          Value :: term(), PassedToUpdate :: term(), write_filter()}.
 
 %% r_with_id() has to be unique for this key system wide
@@ -119,13 +120,13 @@ noop_read_filter(X) -> X.
 init([]) -> ?PDB:new(?MODULE, [set, protected]).
 
 -spec on(message(), state()) -> state().
-on({prbr, read, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, read, _DB, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
     %% assign a valid next read round number
     TheRound = next_read_round(KeyEntry, ProposerUID),
-    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
+%%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
     msg_read_reply(Proposer, TheRound,
                    ReadFilter(entry_val(KeyEntry)),
                    entry_r_write(KeyEntry)),
@@ -134,7 +135,7 @@ on({prbr, read, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
-on({prbr, write, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, write, _DB, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
     _ = case writable(KeyEntry, InRound) of
@@ -144,6 +145,7 @@ on({prbr, write, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, Ta
                                      PassedToUpdate, Value),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
+                ct:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Key, NewerRound)
         end,
     TableName.

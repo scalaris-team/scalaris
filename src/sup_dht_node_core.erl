@@ -61,8 +61,9 @@ childs([DHTNodeGroup, Options]) ->
     DHTNodeModule = config:read(dht_node),
     DHTNode = util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
-    RBRcseq = util:sup_worker_desc(rbrcseq, rbrcseq,
-                                   start_link, [DHTNodeGroup]),
+    %% rbrcseq process working on the kv DB
+    KV_RBRcseq = util:sup_worker_desc(rbrcseq, rbrcseq,
+                                      start_link, [DHTNodeGroup, kv]),
     DHTNodeMonitor = util:sup_worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
                        [DHTNodeGroup, Options]),
@@ -71,7 +72,7 @@ childs([DHTNodeGroup, Options]) ->
                                  [DHTNodeGroup]),
     [
      PaxosProcesses,
-     RBRcseq,
+     KV_RBRcseq,
      DHTNodeMonitor,
      DHTNode,
      TX

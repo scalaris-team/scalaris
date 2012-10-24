@@ -17,7 +17,7 @@
 %% @version $Id$
 -module(dht_node_state).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -25,34 +25,36 @@
 -export([new/3,
          get/2,
          dump/1,
-         set_rt/2,
-         set_rm/2,
-         set_prbr/2,
-         set_db/2,
-         details/1, details/2,
-         % node responsibilities:
-         has_left/1,
-         is_responsible/2,
-         is_db_responsible/2,
-         % transactions:
-         set_tx_tp_db/2,
-         % node moves:
-         get_slide/2, set_slide/3,
-         add_db_range/3, rm_db_range/2,
-         % bulk owner:
-         add_bulkowner_reply_msg/5,
-         take_bulkowner_reply_msgs/1,
-         get_bulkowner_reply_timer/1,
-         set_bulkowner_reply_timer/2]).
+         set_rt/2, set_rm/2, set_db/2,
+         details/1, details/2]).
+%% node responsibility:
+-export([has_left/1,
+        is_responsible/2,
+        is_db_responsible/2]).
+%% transactions:
+-export([set_tx_tp_db/2]).
+%% node moves:
+-export([get_slide/2, set_slide/3,
+        add_db_range/3, rm_db_range/2]).
+%% bulk owner:
+-export([add_bulkowner_reply_msg/5,
+        take_bulkowner_reply_msgs/1,
+        get_bulkowner_reply_timer/1,
+        set_bulkowner_reply_timer/2]).
+%% prbr DBs and states:
+-export([get_prbr_state/2]).
+-export([set_prbr_state/3]).
 
 -ifdef(with_export_type_support).
--export_type([state/0, name/0]).
+-export_type([state/0, name/0, db_selector/0]).
 -endif.
 
--type name() :: rt | rt_size | neighbors | succlist | succ | succ_id | succ_pid |
-                predlist | pred | pred_id | pred_pid | node | node_id | my_range |
-                succ_range | join_time | trans_log | db | tx_tp_db | proposer |
-                load | slide_pred | slide_succ | msg_fwd | rm_state | monitor_proc.
+-type db_selector() :: kv. %%| tx_id | leases_1 | leases_2 | leases_3 | leases_4.
+-type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
+              | succ_pid | predlist | pred | pred_id | pred_pid | node
+              | node_id | my_range | db_range | succ_range | join_time
+              | db | tx_tp_db | proposer | load | slide_pred | slide_succ
+              | msg_fwd | rm_state | monitor_proc | prbr_state.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -70,7 +72,7 @@
                 bulkowner_reply_timer   = null :: null | reference(),
                 bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
-                prbr_state = ?required(state, prbr_state) :: prbr:state()
+                prbr_kv_db = ?required(state, prbr_state) :: prbr:state()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -84,7 +86,7 @@ new(RT, RMState, DB) ->
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
-           prbr_state = prbr:init([])
+           prbr_kv_db = prbr:init([])
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -105,7 +107,6 @@ new(RT, RMState, DB) ->
 %%        <li>my_range = the range of the own node,</li>
 %%        <li>succ_range = the range of the successor,</li>
 %%        <li>join_time = the time the node was created, i.e. joined the system,</li>
-%%        <li>trans_log = transaction log,</li>
 %%        <li>db = DB storing the items,</li>
 %%        <li>tx_tp_db = transaction participant DB,</li>
 %%        <li>proposer = paxos proposer PID,</li>
@@ -141,11 +142,11 @@ new(RT, RMState, DB) ->
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
          (state(), monitor_proc) -> pid();
-         (state(), prbr_state) -> prbr:state().
+         (state(), prbr_kv_db) -> prbr:state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, monitor_proc=MonitorProc, prbr_state=PRBRState}, Key) ->
+           db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -180,7 +181,29 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         join_time    -> JoinTime;
         load         -> ?DB:get_load(DB);
-        prbr_state   -> PRBRState
+        prbr_kv_db   -> PRBRState
+    end.
+
+-spec get_prbr_state(state(), db_selector()) -> prbr:state().
+get_prbr_state(State, WhichDB) ->
+    case WhichDB of
+        kv -> get(State, prbr_kv_db)
+        %% tx_id -> get(State, tx_id);
+        %% leases_1 -> get(State, leases_1);
+        %% leases_2 -> get(State, leases_2);
+        %% leases_3 -> get(State, leases_3);
+        %% leases_4 -> get(State, leases_4)
+    end.
+
+-spec set_prbr_state(state(), db_selector(), prbr:state()) -> state().
+set_prbr_state(State, WhichDB, Value) ->
+    case WhichDB of
+        kv -> State#state{prbr_kv_db = Value}
+        %% tx_id ->    State#state{tx_id = Value};
+        %% leases_1 -> State#state{leases_1 = Value};
+        %% leases_2 -> State#state{leases_2 = Value};
+        %% leases_3 -> State#state{leases_3 = Value};
+        %% leases_4 -> State#state{leases_ = Value}
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
@@ -240,9 +263,6 @@ set_rt(State, RT) -> State#state{rt = RT}.
 
 -spec set_rm(State::state(), NewRMState::rm_loop:state()) -> state().
 set_rm(State, RMState) -> State#state{rm_state = RMState}.
-
--spec set_prbr(State::state(), NewRBRState::prbr:state()) -> state().
-set_prbr(State, PRBRState) -> State#state{prbr_state = PRBRState}.
 
 -spec set_slide(state(), pred | succ, slide_op:slide_op() | null) -> state().
 set_slide(State, pred, SlidePred) -> State#state{slide_pred=SlidePred};
