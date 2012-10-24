@@ -54,7 +54,12 @@
 read(Key) ->
     rbrcseq:qread(self(), Key, fun kv_on_cseq:rf_val/1),
     receive
-        ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value}, {ok, Value} )
+        ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
+                       case Value of
+                           no_value_yet -> {fail, not_found};
+                           _ -> {ok, Value}
+                           end
+                      )
     end.
 
 -spec write(client_key(), client_value()) -> api_tx:write_result().
@@ -63,7 +68,8 @@ write(Key, Value) ->
                    fun kv_on_cseq:is_valid_next_req/2,
                    fun kv_on_cseq:wf_set_vers_val/3, Value),
     receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} )
+        ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
+%%        ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value}, {fail, timeout} )
     end.
 
 %% inc(...)

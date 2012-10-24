@@ -191,8 +191,13 @@ on({send_error, Target, {?lookup_fin, _, _, _} = Message, _Reason}, State) ->
 
 %% messages handled as a prbr
 on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
-    NewRBRState = prbr:on(X, dht_node_state:get(State, prbr_state)),
-    dht_node_state:set_prbr(State, NewRBRState);
+    %% as prbr has several use cases (may operate on different DBs) in
+    %% the dht_node, the addressed use case is given in the third
+    %% element by convention.
+    DBKind = element(3, X),
+    PRBRState = dht_node_state:get_prbr_state(State, DBKind),
+    NewRBRState = prbr:on(X, PRBRState),
+    dht_node_state:set_prbr_state(State, DBKind, NewRBRState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
