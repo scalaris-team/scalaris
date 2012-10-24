@@ -19,7 +19,7 @@ require 'json'
 require 'optparse'
 require 'pp'
 begin
-  require "#{File.dirname(__FILE__)}/scalaris"
+  require "#{File.expand_path(File.dirname(__FILE__))}/scalaris"
 rescue LoadError => e
   raise unless e.message =~ /scalaris/
   require "scalaris"
