@@ -29,10 +29,10 @@
 -include("client_types.hrl").
 
 %% api:
--export([qread/2, qread/3]).
--export([qwrite/6]).
+-export([qread/3, qread/4]).
+-export([qwrite/7]).
 
--export([start_link/2]).
+-export([start_link/3]).
 -export([init/1, on/2]).
 
 -type state() :: { ?PDB:tableid(),
@@ -63,16 +63,16 @@
 -export_type([check_next_step/0]).
 -endif.
 
--spec qread(comm:erl_local_pid(), client_key()) -> ok.
-qread(Client, Key) ->
-    qread(Client, Key, fun prbr:noop_read_filter/1).
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), client_key()) -> ok.
+qread(CSeqPidName, Client, Key) ->
+    qread(CSeqPidName, Client, Key, fun prbr:noop_read_filter/1).
 
 %% user definable functions for read:
 %% ContentReadFilter(custom_data() | no_value_yet) -> any().
 
--spec qread(comm:erl_local_pid(), any(), prbr:read_filter()) -> ok.
-qread(Client, Key, ReadFilter) ->
-    Pid = pid_groups:find_a(?MODULE),
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), prbr:read_filter()) -> ok.
+qread(CSeqPidName, Client, Key, ReadFilter) ->
+    Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qread, Client, Key, ReadFilter, _RetriggerAfter = 1})
     %% the process will reply to the client directly
     .
@@ -84,7 +84,8 @@ qread(Client, Key, ReadFilter) ->
 %% info_passed_from_read_to_write() must be used to update older
 %% versions, so in all replicas the same data is written
 %% ContentWriteFilter(custom_data(), info_passed_from_read_to_write(), Value()) -> custom_data()
--spec qwrite(comm:erl_local_pid(),
+-spec qwrite(pid_groups:pidname(),
+             comm:erl_local_pid(),
              client_key(),
              fun ((any()) -> any()),
              fun ((any(), any()) -> any()),
@@ -101,9 +102,9 @@ qread(Client, Key, ReadFilter) ->
 %%              fun ((PassedInfo, WriteValue) -> CustomData),
 %%              %%module(),
              client_value()) -> ok.
-qwrite(Client, Key, ReadFilter, ContentCheck,
+qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
        WriteFilter, Value) ->
-    Pid = pid_groups:find_a(?MODULE),
+    Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite, Client,
                           Key, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 1}),
@@ -111,12 +112,12 @@ qwrite(Client, Key, ReadFilter, ContentCheck,
     ok.
 
 %% @doc spawns a rbrcseq, called by the scalaris supervisor process
--spec start_link(pid_groups:groupname(), dht_node_state:db_selector())
+-spec start_link(pid_groups:groupname(), pid_groups:pidname(), dht_node_state:db_selector())
                 -> {ok, pid()}.
-start_link(DHTNodeGroup, DBSelector) ->
+start_link(DHTNodeGroup, Name, DBSelector) ->
     gen_component:start_link(
       ?MODULE, fun ?MODULE:on/2, DBSelector,
-      [{pid_groups_join_as, DHTNodeGroup, rbrcseq}]).
+      [{pid_groups_join_as, DHTNodeGroup, Name}]).
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->

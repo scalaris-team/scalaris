@@ -62,8 +62,12 @@ childs([DHTNodeGroup, Options]) ->
     DHTNode = util:sup_worker_desc(dht_node, DHTNodeModule, start_link,
                                    [DHTNodeGroup, Options]),
     %% rbrcseq process working on the kv DB
-    KV_RBRcseq = util:sup_worker_desc(rbrcseq, rbrcseq,
-                                      start_link, [DHTNodeGroup, kv]),
+    KV_RBRcseq = util:sup_worker_desc(
+                   rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsName = kv_rbrcseq,
+                    _DBSelector = kv]),
     DHTNodeMonitor = util:sup_worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
                        [DHTNodeGroup, Options]),
