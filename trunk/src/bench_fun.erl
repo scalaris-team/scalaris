@@ -106,11 +106,6 @@ increment_iter(Key, Iterations, Aborts) ->
         {fail, abort, [Key]}     ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_iter(Key, Iterations, Aborts + 1);
-        {fail, timeout}   ->
-            %% overloaded system?
-            timer:sleep(randoms:rand_uniform(1, 100 * (Aborts + 1)
-                                                   * (Aborts +1))),
-            increment_iter(Key, Iterations, Aborts + 1);
         {fail, not_found} ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_iter(Key, Iterations, Aborts + 1);
@@ -131,11 +126,6 @@ increment_with_histo_iter(H, Key, Iterations, Aborts) ->
         {fail, abort, [Key]}     ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
-        {fail, timeout}   ->
-            %% overloaded system?
-            timer:sleep(randoms:rand_uniform(1, 100 * (Aborts + 1)
-                                                   * (Aborts +1))),
-            increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         {fail, not_found} ->
             timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
@@ -152,8 +142,8 @@ read_iter(_Key, 0, Aborts) ->
     Aborts;
 read_iter(Key, Iterations, Aborts) ->
     case api_tx:read(Key) of
-        {fail, _Reason} -> read_iter(Key, Iterations, Aborts + 1);
-        {ok, _Value}    -> read_iter(Key, Iterations - 1, Aborts)
+        {ok, _Value}    -> read_iter(Key, Iterations - 1, Aborts);
+        {fail, _Reason} -> read_iter(Key, Iterations, Aborts + 1)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,9 +192,5 @@ get_and_init_key(Key, Count, TriedKeys) ->
             io:format("geT_and_init_key 1 failed, retrying in ~p ms~n",
                       [SleepTime]),
             timer:sleep(SleepTime),
-            get_and_init_key(Key, Count - 1, TriedKeys);
-        {fail, timeout} ->
-            io:format("geT_and_init_key 2 timeout, retrying~n", []),
-            timer:sleep(TriedKeys * randoms:rand_uniform(1, 2000 * 11-Count)),
             get_and_init_key(Key, Count - 1, TriedKeys)
     end.
