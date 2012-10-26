@@ -270,7 +270,4 @@ check_config() ->
     config:cfg_is_integer(quorum_factor) and
     config:cfg_is_greater_than(quorum_factor, 0) and
     config:cfg_is_integer(replication_factor) and
-    config:cfg_is_greater_than(replication_factor, 0) and
-
-    config:cfg_is_integer(transaction_lookup_timeout) and
-    config:cfg_is_greater_than_equal(transaction_lookup_timeout, 1000).
+    config:cfg_is_greater_than(replication_factor, 0).
