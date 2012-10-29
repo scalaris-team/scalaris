@@ -14,7 +14,7 @@
 #    limitations under the License.
 
 begin
-  require "#{File.dirname(__FILE__)}/scalaris"
+  require "#{File.expand_path(File.dirname(__FILE__))}/scalaris"
 rescue LoadError => e
   raise unless e.message =~ /scalaris/
   require "scalaris"
@@ -216,7 +216,7 @@ failed += read_write_list(basekey, sc, mode)
 failed += read_write_map(basekey, sc, mode)
 puts ''
 
-if (failed > 0):
+if (failed > 0)
   puts failed.to_s + ' number of ' + mode.to_s + 's failed.'
   puts ''
   exit 1
