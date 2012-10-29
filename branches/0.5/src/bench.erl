@@ -222,8 +222,7 @@ init_key(_Key, 0) ->
 init_key(Key, Count) ->
     case api_tx:write(Key, 0) of
         {ok}                 -> Key;
-        {fail, abort, [Key]} -> init_key(Key, Count - 1);
-        {fail, timeout}      -> init_key(Key, Count - 1)
+        {fail, abort, [Key]} -> init_key(Key, Count - 1)
     end.
 
 collect(0, L, _Print)     -> L;

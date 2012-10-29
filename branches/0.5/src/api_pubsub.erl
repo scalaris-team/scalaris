@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,9 +38,7 @@ subscribe(Topic, URL) ->
             {ok, URLs} ->
                 api_tx:req_list(TLog, [{write, Topic, [URL | URLs]}, {commit}]);
             {fail, not_found} ->
-                api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}]);
-            {fail, timeout} ->
-                {TLog, [nothing, {fail, timeout}]}
+                api_tx:req_list(TLog, [{write, Topic, [URL]}, {commit}])
         end,
     CommitRes.
 
