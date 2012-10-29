@@ -32,14 +32,24 @@
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0]).
 
+-record(state_active,{
+        centroids = [] :: dc_centroids:centroids()
+        , local_epoch = 0 :: non_neg_integer()
+        , reset_trigger_state :: trigger:state()
+        , cluster_trigger_state :: trigger:state()
+        , radius :: float()
+}).
+
+-record(state_inactive,{
+        queued_messages :: msg_queue:msg_queue()
+        , reset_trigger_state :: trigger:state()
+        , cluster_trigger_state :: trigger:state()
+        , radius :: float()
+}).
+
 % state of the clustering loop
--type(state_active() :: {Centroids::dc_centroids:centroids(),
-                         LocalEpoch::non_neg_integer(),
-                         ResetTriggerState::trigger:state(),
-                         ClusterTriggerState::trigger:state()}).
--type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
-                           ResetTriggerState::trigger:state(),
-                           ClusterTriggerState::trigger:state()}).
+-type(state_active() :: #state_active{}).
+-type(state_inactive() :: #state_inactive{}).
 %% -type(state() :: state_active() | state_inactive()).
 
 % accepted messages of an initialized dc_clustering process
@@ -50,7 +60,9 @@
     {cy_cache, [node:node_type()]} |
     {clustering_shuffle, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
     {clustering_shuffle_reply, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
-    {query_clustering, comm:mypid()}).
+    {query_clustering, comm:mypid()} |
+    {query_epoch, comm:mypid()}
+).
 
 %% @doc Sends an initialization message to the node's dc_clustering process.
 -spec activate() -> ok | ignore.
@@ -97,7 +109,18 @@ start_link(DHTNodeGroup) ->
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    {inactive, msg_queue:new(), ResetTriggerState, ClusterTriggerState}.
+    Radius = case config:read(dc_clustering_radius) of
+        failed -> exit(dc_clustering_radius_not_set);
+        R when R > 0 -> R;
+        _Else -> exit(dc_clustering_radius_invalid)
+    end,
+    #state_inactive{
+        queued_messages = msg_queue:new()
+        , reset_trigger_state = ResetTriggerState
+        , cluster_trigger_state = ClusterTriggerState
+        , radius=Radius
+    }
+    .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -106,30 +129,40 @@ init({ResetTrigger, ClusterTrigger}) ->
 %% @doc Message handler during start up phase (will change to on_active/2 when a
 %%      'activate_clustering' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                ({activate_clustering}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
-on_inactive({activate_clustering},
-            {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
+                ({activate_clustering}, state_inactive())
+            -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
+on_inactive({activate_clustering}, #state_inactive{
+                                    queued_messages=QueuedMessages
+                                    ,reset_trigger_state=ResetTriggerState
+                                    ,cluster_trigger_state=ClusterTriggerState
+                                    ,radius=R
+                                }) ->
     log:log(info, "[ Clustering ~.0p ] activating...~n", [comm:this()]),
     ResetTriggerState2 = trigger:now(ResetTriggerState),
     ClusterTriggerState2 = trigger:now(ClusterTriggerState),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({dc_centroids:empty_centroids_list(), 0, ResetTriggerState2, ClusterTriggerState2},
-                                 fun ?MODULE:on_active/2);
+    StateActive = #state_active{
+        centroids = dc_centroids:empty_centroids_list()
+        , reset_trigger_state = ResetTriggerState2
+        , cluster_trigger_state = ClusterTriggerState2
+        , radius=R
+    },
+    gen_component:change_handler(StateActive, fun ?MODULE:on_active/2)
+    ;
 
-on_inactive(Msg = {query_clustering, _Pid},
-            {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
-    {inactive, msg_queue:add(QueuedMessages, Msg), ResetTriggerState, ClusterTriggerState};
+on_inactive(Msg = {query_clustering, _Pid}, #state_inactive{queued_messages=QueuedMessages} = State) ->
+    State#state_inactive{queued_messages=msg_queue:add(QueuedMessages, Msg)}
+    ;
 
-on_inactive({query_epoch, _Pid} = Msg, 
-            {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
-    {inactive, msg_queue:add(QueuedMessages, Msg), ResetTriggerState, ClusterTriggerState};
+on_inactive({query_epoch, _Pid} = Msg, #state_inactive{queued_messages=Q} = State) ->
+    State#state_inactive{queued_messages=msg_queue:add(Q, Msg)}
+    ;
 
-on_inactive({web_debug_info, Requestor},
-            {inactive, QueuedMessages, _ResetTriggerState, _ClusterTriggerState} = State) ->
+on_inactive({web_debug_info, Requestor}, #state_inactive{queued_messages=Q} = State) ->
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
-                  || Message <- lists:sublist(QueuedMessages, 50)],
-    MessageList = case length(QueuedMessages) > 50 of
+                  || Message <- lists:sublist(Q, 50)],
+    MessageList = case length(Q) > 50 of
                       true -> lists:append(MessageListTmp, [{"...", ""}]);
                       _    -> MessageListTmp
                   end,
@@ -143,11 +176,20 @@ on_inactive(_Msg, State) ->
 %% @doc Message handler when the module is fully initialized.
 -spec on_active(Message::message(), State::state_active()) -> state_active();
          ({deactivate_clustering}, state_active()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
-on_active({deactivate_clustering},
-          {_Centroids, ResetTriggerState, ClusterTriggerState}) ->
+on_active({deactivate_clustering}
+          , #state_active{
+                          reset_trigger_state=ResetTriggerState
+                          , cluster_trigger_state=ClusterTriggerState
+                          , radius=R
+                      }) ->
     log:log(info, "[ Clustering ~.0p ] deactivating...~n", [comm:this()]),
-    gen_component:change_handler({inactive, msg_queue:new(), ResetTriggerState, ClusterTriggerState},
-                                 fun ?MODULE:on_inactive/2);
+    StateInactive = #state_inactive{
+        queued_messages = msg_queue:new()
+        , reset_trigger_state = ResetTriggerState
+        , cluster_trigger_state = ClusterTriggerState
+        , radius=R
+    },
+    gen_component:change_handler(StateInactive, fun ?MODULE:on_inactive/2);
 
 % ignore activate_clustering messages in active state
 % note: remove this if the clustering process is to be deactivated on leave (see
@@ -157,36 +199,39 @@ on_active({deactivate_clustering},
 on_active({activate_clustering}, State) ->
     State;
     
-on_active({start_clustering_shuffle},
-          {Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
+on_active({start_clustering_shuffle}, #state_active{cluster_trigger_state = C} = State) ->
     % start new clustering shuffle -> gossip communication
-    %io:format("~p~n", [State]),
-    NewClusterTriggerState = trigger:next(ClusterTriggerState),
+    NewClusterTriggerState = trigger:next(C),
     cyclon:get_subset_rand(1),
-    {Centroids, Epoch, ResetTriggerState, NewClusterTriggerState};
+    State#state_active{cluster_trigger_state=NewClusterTriggerState}
+    ;
 
 % ask vivaldi for network coordinate
-on_active({reset_clustering},
-          {Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
+on_active({reset_clustering}
+          , #state_active{reset_trigger_state = ResetTriggerState} = State) ->
     NewResetTriggerState = trigger:next(ResetTriggerState),
     vivaldi:get_coordinate(),
-    {Centroids, Epoch, NewResetTriggerState, ClusterTriggerState};
+    State#state_active{reset_trigger_state=NewResetTriggerState}
+    ;
 
 % reset the local state and start a new epoche
-on_active({vivaldi_get_coordinate_response, Coordinate, _Confidence},
-          {_Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
-          NewEpoch = Epoch + 1,
-    {[dc_centroids:new(Coordinate, 1.0)], NewEpoch,ResetTriggerState, ClusterTriggerState};
+on_active({vivaldi_get_coordinate_response, Coordinate, _Confidence}
+           , #state_active{local_epoch=Epoch} = State) ->
+    State#state_active{
+        local_epoch=Epoch + 1
+        , centroids=[dc_centroids:new(Coordinate, 1.0)]
+    }
+    ;
 
 on_active({cy_cache, []}, State)  ->
     % ignore empty cache from cyclon
     State;
 
 % got random node from cyclon
-on_active({cy_cache, [Node] = _Cache},
-          {Centroids, Epoch, _ResetTriggerState, _ClusterTriggerState} = State) ->
+on_active({cy_cache, [Node] = _Cache}
+          , #state_active{centroids=C, local_epoch=E} = State) ->
     %io:format("~p~n",[_Cache]),
-    comm:send(node:pidX(Node), {clustering_shuffle, comm:this(), Centroids, Epoch},
+    comm:send(node:pidX(Node), {clustering_shuffle, comm:this(), C, E},
               [{group_member, dc_clustering}]),
     State;
 
@@ -204,14 +249,13 @@ on_active({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteEpoch},
     ;
 
 % return my clusters
-on_active({query_clustering, Pid}, {Centroids, _Epoch, _ResetTriggerState, _ClusterTriggerState} = State) ->
-    comm:send(Pid, {query_clustering_response, Centroids}),
+on_active({query_clustering, Pid}, #state_active{centroids=C} = State) ->
+    comm:send(Pid, {query_clustering_response, C}),
     State
     ;
 
-on_active({query_epoch, Pid},
-    {_Centroids, Epoch,_ResetTriggerState, _ClusterTriggerState} = State) ->
-    comm:send(Pid, {query_epoch_response, Epoch}),
+on_active({query_epoch, Pid}, #state_active{local_epoch=E} = State) ->
+    comm:send(Pid, {query_epoch_response, E}),
     State
     .
 
@@ -219,23 +263,14 @@ on_active({query_epoch, Pid},
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec cluster(centroids:centroids(), centroids:centroids()) -> centroids:centroids().
-cluster([], RemoteCentroids) -> RemoteCentroids;
-cluster(Centroids, RemoteCentroids) ->
-    % TODO extract Radius into state
-    Radius = case config:read(dc_clustering_radius) of
-        failed -> exit(dc_clustering_radius_not_set);
-        R when R > 0 -> R;
-        _Else -> exit(dc_clustering_radius_invalid)
-    end,
-
-    %% TODO avoid ++
+-spec cluster(centroids:centroids(), centroids:centroids(), float()) -> centroids:centroids().
+cluster([], RemoteCentroids, _Radius) -> RemoteCentroids;
+cluster(Centroids, RemoteCentroids, Radius) ->
     NewCentroids = mathlib:aggloClustering(Centroids ++ RemoteCentroids, Radius),
     NormalizedCentroids = lists:map(fun (Centroid) ->
                 dc_centroids:set_relative_size(Centroid,
                     0.5 * dc_centroids:get_relative_size(Centroid))
                 end, NewCentroids),
-    % XXX fails: 1 = lists:foldr(fun(S, Acc) -> Acc + S end, 0, NormalizedSizes),
     NormalizedCentroids.
 
 %% @doc Gets the clustering reset interval set in scalaris.cfg.
@@ -251,9 +286,14 @@ get_clustering_interval() ->
 
 -spec handle_shuffle(state_active(),
         {RemoteNode :: comm:mypid() | ignore, RemoteEpoch :: non_neg_integer(),
-         RemoteCentroids :: dc_centroids:centroids()})
-     -> state_active().
-    handle_shuffle({Centroids, Epoch, ResetTriggerState, ClusterTriggerState}, {RemoteNode, RemoteEpoch, RemoteCentroids}) ->
+         RemoteCentroids :: dc_centroids:centroids()}) -> state_active().
+handle_shuffle(#state_active{
+        centroids=Centroids
+        , local_epoch=Epoch
+        , reset_trigger_state=ResetTriggerState
+        , cluster_trigger_state=ClusterTriggerState
+        , radius=Radius
+    } = State, {RemoteNode, RemoteEpoch, RemoteCentroids}) ->
     % Check the epoch to swallow old messages and delete old state:
     %
     % - if the local epoch is less than the remote epoch, we didn't see a certain wave yet and
@@ -282,15 +322,20 @@ get_clustering_interval() ->
                 ignore -> ok;
                 R -> comm:send(R, {clustering_shuffle_reply, comm:this(), Centroids, Epoch})
             end,
-            {Epoch, cluster(Centroids, RemoteCentroids)}
+            {Epoch, cluster(Centroids, RemoteCentroids, Radius)}
     end,
     case NewEpoch of % reset needed?
-        Epoch -> {NewCentroids, Epoch, ResetTriggerState, ClusterTriggerState};
+        Epoch -> State#state_active{centroids=NewCentroids};
         _Else ->
             NewResetTriggerState = trigger:next(ResetTriggerState),
             NewClusterTriggerState = trigger:next(ClusterTriggerState),
             % Note: NewEpoch - 1 because we will increment it in the handler for the
             % vivaldi reply
-            {NewCentroids, NewEpoch - 1, NewResetTriggerState, NewClusterTriggerState}
+            State#state_active{
+                centroids=NewCentroids
+                , local_epoch=NewEpoch - 1
+                , reset_trigger_state=NewResetTriggerState
+                , cluster_trigger_state=NewClusterTriggerState
+            }
     end
     .
