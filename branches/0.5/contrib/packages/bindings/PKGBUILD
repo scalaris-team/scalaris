@@ -31,7 +31,6 @@ package() {
   cd "$srcdir/$pkgname-$pkgver"
   make install-java DESTDIR="$pkgdir/"
   make install-java-doc DESTDIR="$pkgdir/"
-  make install-ruby DESTDIR="$pkgdir/"
   make install-python DESTDIR="$pkgdir/"
   make install-python3 DESTDIR="$pkgdir/"
   
