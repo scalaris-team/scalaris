@@ -30,7 +30,9 @@ all() ->
      repeat_p, repeat_p_collect, repeat_p_accumulate,
      tester_minus_all, tester_minus_all_sort,
      tester_minus_first, tester_minus_first_sort,
-     tester_par_map2, tester_par_map3].
+     tester_par_map2, tester_par_map3,
+     lists_remove_at_indices
+ ].
 
 suite() ->
     [
@@ -245,3 +247,13 @@ prop_par_map3(List, MaxThreads) ->
 
 tester_par_map3(_Config) ->
     tester:test(?MODULE, prop_par_map3, 2, 5000, [{threads, 2}]).
+
+lists_remove_at_indices(_Config) ->
+    ?equals(util:lists_remove_at_indices([0,1,2,3,4,5], [0,2,4]), [1,3,5]),
+
+    % both lists should be non-empty and all indices in the second list should point to
+    % existing elements in the first list
+    ?expect_exception(util:lists_remove_at_indices([1], []), error, function_clause),
+    ?expect_exception(util:lists_remove_at_indices([], [0]), error, function_clause),
+    ?expect_exception(util:lists_remove_at_indices([0,1,2,3], [5]), error, function_clause),
+    ok.
