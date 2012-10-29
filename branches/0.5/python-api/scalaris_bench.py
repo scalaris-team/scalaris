@@ -88,7 +88,7 @@ def minibench(operations, threads_per_node, benchmarks):
     sys.stdout.flush()
     test_types = ['int']
     test_types_str = ['I']
-    columns = ['Transaction.read(string) + Transaction.write(string, int)']
+    columns = ['Transaction.add_add_on_nr(string, int)']
     test_bench = [TransIncrementBench1, TransIncrementBench2, TransIncrementBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
     test_group = 'transbench_inc';
@@ -115,7 +115,7 @@ def minibench(operations, threads_per_node, benchmarks):
     sys.stdout.flush()
     test_types = ['string']
     test_types_str = ['S']
-    columns = ['Transaction.read(string) + Transaction.write(string, int)']
+    columns = ['Transaction.add_add_del_on_list(string, [string], [])']
     test_bench = [TransAppendToListBench1, TransAppendToListBench2, TransAppendToListBench3]
     rows = ['separate connection', 're-use connection', 're-use object']
     test_group = 'transbench_append';
