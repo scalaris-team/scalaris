@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@
 
 % state of the clustering loop
 -type(state_active() :: {Centroids::dc_centroids:centroids(),
+                         LocalEpoch::non_neg_integer(),
                          ResetTriggerState::trigger:state(),
                          ClusterTriggerState::trigger:state()}).
 -type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue(),
@@ -47,8 +48,8 @@
     {reset_clustering} |
     {vivaldi_get_coordinate_response, vivaldi:network_coordinate(), vivaldi:error()} |
     {cy_cache, [node:node_type()]} |
-    {clustering_shuffle, comm:mypid(), dc_centroids:centroids()} |
-    {clustering_shuffle_reply, comm:mypid(), dc_centroids:centroids()} |
+    {clustering_shuffle, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
+    {clustering_shuffle_reply, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
     {query_clustering, comm:mypid()}).
 
 %% @doc Sends an initialization message to the node's dc_clustering process.
@@ -112,7 +113,7 @@ on_inactive({activate_clustering},
     ResetTriggerState2 = trigger:now(ResetTriggerState),
     ClusterTriggerState2 = trigger:now(ClusterTriggerState),
     msg_queue:send(QueuedMessages),
-    gen_component:change_handler({dc_centroids:empty_centroids_list(), ResetTriggerState2, ClusterTriggerState2},
+    gen_component:change_handler({dc_centroids:empty_centroids_list(), 0, ResetTriggerState2, ClusterTriggerState2},
                                  fun ?MODULE:on_active/2);
 
 on_inactive(Msg = {query_clustering, _Pid},
@@ -153,24 +154,25 @@ on_active({activate_clustering}, State) ->
     State;
     
 on_active({start_clustering_shuffle},
-          {Centroids, ResetTriggerState, ClusterTriggerState}) ->
-    % start new clustering shuffle
+          {Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
+    % start new clustering shuffle -> gossip communication
     %io:format("~p~n", [State]),
     NewClusterTriggerState = trigger:next(ClusterTriggerState),
     cyclon:get_subset_rand(1),
-    {Centroids, ResetTriggerState, NewClusterTriggerState};
+    {Centroids, Epoch, ResetTriggerState, NewClusterTriggerState};
 
 % ask vivaldi for network coordinate
 on_active({reset_clustering},
-          {Centroids, ResetTriggerState, ClusterTriggerState}) ->
+          {Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
     NewResetTriggerState = trigger:next(ResetTriggerState),
     vivaldi:get_coordinate(),
-    {Centroids, NewResetTriggerState, ClusterTriggerState};
+    {Centroids, Epoch, NewResetTriggerState, ClusterTriggerState};
 
-% reset the local state
+% reset the local state and start a new epoche
 on_active({vivaldi_get_coordinate_response, Coordinate, _Confidence},
-          {_Centroids, ResetTriggerState, ClusterTriggerState}) ->
-    {[dc_centroids:new(Coordinate, 1.0)], ResetTriggerState, ClusterTriggerState};
+          {_Centroids, Epoch, ResetTriggerState, ClusterTriggerState}) ->
+          NewEpoch = Epoch + 1,
+    {[dc_centroids:new(Coordinate, 1.0)], NewEpoch,ResetTriggerState, ClusterTriggerState};
 
 on_active({cy_cache, []}, State)  ->
     % ignore empty cache from cyclon
@@ -178,33 +180,27 @@ on_active({cy_cache, []}, State)  ->
 
 % got random node from cyclon
 on_active({cy_cache, [Node] = _Cache},
-          {Centroids, _ResetTriggerState, _ClusterTriggerState} = State) ->
+          {Centroids, Epoch, _ResetTriggerState, _ClusterTriggerState} = State) ->
     %io:format("~p~n",[_Cache]),
-    comm:send(node:pidX(Node),
-              {clustering_shuffle, comm:this(), Centroids},
+    comm:send(node:pidX(Node), {clustering_shuffle, comm:this(), Centroids, Epoch},
               [{group_member, dc_clustering}]),
     State;
 
 % have been asked to shuffle
-on_active({clustering_shuffle, RemoteNode, RemoteCentroids},
-          {Centroids, ResetTriggerState, ClusterTriggerState}) ->
+on_active({clustering_shuffle, RemoteNode, RemoteCentroids, RemoteEpoch}, State) ->
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    comm:send(RemoteNode, {clustering_shuffle_reply,
-                           comm:this(),
-                           Centroids}),
-    NewCentroids = cluster(Centroids, RemoteCentroids),
-    {NewCentroids, ResetTriggerState, ClusterTriggerState};
+    handle_shuffle(State, {RemoteNode, RemoteEpoch, RemoteCentroids})
+    ;
 
 % got shuffle response
-on_active({clustering_shuffle_reply, _RemoteNode, RemoteCentroids},
-          {Centroids, ResetTriggerState, ClusterTriggerState}) ->
+on_active({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteEpoch}, State) ->
     %io:format("{shuffle_reply, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
     %vivaldi_latency:measure_latency(RemoteNode, RemoteCoordinate, RemoteConfidence),
-    NewCentroids = cluster(Centroids, RemoteCentroids),
-    {NewCentroids, ResetTriggerState, ClusterTriggerState};
+    handle_shuffle(State, {ignore, RemoteEpoch, RemoteCentroids})
+    ;
 
 % return my clusters
-on_active({query_clustering, Pid}, {Centroids, _ResetTriggerState, _ClusterTriggerState} = State) ->
+on_active({query_clustering, Pid}, {Centroids, _Epoch, _ResetTriggerState, _ClusterTriggerState} = State) ->
     comm:send(Pid, {query_clustering_response, Centroids}),
     State.
 
@@ -214,6 +210,7 @@ on_active({query_clustering, Pid}, {Centroids, _ResetTriggerState, _ClusterTrigg
 
 -spec cluster(centroids:centroids(), centroids:centroids()) -> centroids:centroids().
 cluster(Centroids, RemoteCentroids) ->
+    % TODO extract Radius into state
     Radius = case config:read(dc_clustering_radius) of
         failed -> exit(dc_clustering_radius_not_set);
         R when R > 0 -> R;
@@ -222,7 +219,10 @@ cluster(Centroids, RemoteCentroids) ->
 
     %% TODO avoid ++
     NewCentroids = mathlib:aggloClustering(Centroids ++ RemoteCentroids, Radius),
-    NormalizedCentroids = lists:map(fun ({C, S}) -> {C, 0.5 * S} end, NewCentroids),
+    NormalizedCentroids = lists:map(fun (Centroid) ->
+                dc_centroids:set_relative_size(Centroid,
+                    0.5 * dc_centroids:get_relative_size(Centroid))
+                end, NewCentroids),
     % XXX fails: 1 = lists:foldr(fun(S, Acc) -> Acc + S end, 0, NormalizedSizes),
     NormalizedCentroids.
 
@@ -236,3 +236,49 @@ get_clustering_reset_interval() ->
 -spec get_clustering_interval() -> pos_integer().
 get_clustering_interval() ->
     config:read(dc_clustering_interval).
+
+-spec handle_shuffle(state_active(),
+        {RemoteNode :: comm:mypid() | ignore, RemoteEpoch :: non_neg_integer(),
+         RemoteCentroids :: dc_centroids:centroids()})
+     -> state_active().
+    handle_shuffle({Centroids, Epoch, ResetTriggerState, ClusterTriggerState}, {RemoteNode, RemoteEpoch, RemoteCentroids}) ->
+    % Check the epoch to swallow old messages and delete old state:
+    %
+    % - if the local epoch is less than the remote epoch, we didn't see a certain wave yet and
+    % have to reset the local cluster state.
+    % - if the local epoch is bigger than the remote epoch, we ignore the information we
+    % received and only send our information, as the remote node is behind the last wave
+    % we saw.
+
+    % With this, we purge "zombie centroids" (stale centroids far away from any real
+    % clusters) over time: clusters can not survive a wave if they seized to exist during
+    % the cut.
+
+    {NewEpoch, NewCentroids} =
+    if Epoch < RemoteEpoch -> % reset and merge remote information
+            vivaldi:get_coordinate(),
+            {RemoteEpoch, []}
+            ;
+        Epoch > RemoteEpoch -> % ignore remote information, keep talking
+            case RemoteNode of
+                ignore -> ok;
+                R -> comm:send(R, {clustering_shuffle_reply, comm:this(), Centroids, Epoch})
+            end,
+            {Epoch, Centroids};
+        true -> % Epoch == RemoteEpoch
+            case RemoteNode of
+                ignore -> ok;
+                R -> comm:send(R, {clustering_shuffle_reply, comm:this(), Centroids, Epoch})
+            end,
+            {Epoch, cluster(Centroids, RemoteCentroids)}
+    end,
+    case NewEpoch of % reset needed?
+        Epoch -> {NewCentroids, Epoch, ResetTriggerState, ClusterTriggerState};
+        _Else ->
+            NewResetTriggerState = trigger:next(ResetTriggerState),
+            NewClusterTriggerState = trigger:next(ClusterTriggerState),
+            % Note: NewEpoch - 1 because we will increment it in the handler for the
+            % vivaldi reply
+            {NewCentroids, NewEpoch - 1, NewResetTriggerState, NewClusterTriggerState}
+    end
+    .
