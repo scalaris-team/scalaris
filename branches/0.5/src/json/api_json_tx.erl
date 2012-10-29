@@ -179,8 +179,6 @@ json_to_reqlist({array, TmpReqList}, AllowCommit) ->
           % note: struct properties sorted alphabetically
           {"add_del_on_list", {struct, [{"add", {array, ToAdd}}, {"del", {array, ToRemove}}, {"key", Key}]}} ->
               {add_del_on_list, Key, ToAdd, ToRemove};
-          {"add_del_on_list", {struct, [{"add", ToAdd}, {"del", ToRemove}, {"key", Key}]}} ->
-              {add_del_on_list, Key, ToAdd, ToRemove};
           {"add_on_nr", {struct, [{Key, ToAdd}]}} ->
               {add_on_nr, Key, ToAdd};
           {"test_and_set", {struct, [{"key", Key}, {"new", New}, {"old", Old}]}} ->
