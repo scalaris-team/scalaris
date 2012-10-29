@@ -13,6 +13,7 @@
 %   limitations under the License.
 
 %% @author Marie Hoffmann <ozymandiaz147@googlemail.com>
+%% TODO change from camel case to prefix_infix_postfix()
 %% @doc Math utility functions.
 %% @version $Id$
 -module(mathlib).
@@ -21,7 +22,7 @@
 
 -export([closestPoints/1, euclideanDistance/1, euclideanDistance/2, u/1,
          vecAdd/2, vecSub/2, vecMult/2, vecWeightedAvg/4, zeros/1, median/1,
-        aggloClustering/3]).
+        aggloClustering/2]).
 
 -export([factorial/1, binomial_coeff/2]).
 
@@ -31,7 +32,8 @@
          zeros_feeder/1]).
 
 -type(vector() :: [number(),...]).
--type(centroid() :: vector()).
+-type(centroid() :: {vivaldi:network_coordinate(), float()}).
+-type(centroids() :: [centroid()]).
 
 %% @doc Median of an unsorted non-empty list of numbers, i.e. a vector.
 -spec median(vector()) -> number().
@@ -81,14 +83,14 @@ u(V) ->
     vecMult(V, 1 / euclideanDistance(V)).
 
 %% @doc Find indices of closest centroids.
--spec closestPoints(Centroids::[centroid()])
+-spec closestPoints(Centroids::centroids())
         -> {Min::number(), I::pos_integer(), J::pos_integer()} | {-1, -1, -1}.
-closestPoints([C1, C2 |_] = L) ->
+closestPoints([{C1,_S1}, {C2,_S2} |_] = L) ->
     closestPointsForI(L, 0, 1, euclideanDistance(C1, C2), 0, 1);
 closestPoints(_) ->
     {-1, -1, -1}.
 
--spec closestPointsForI(Centroids::[centroid()], I::non_neg_integer(), J::non_neg_integer(),
+-spec closestPointsForI(Centroids::centroids(), I::non_neg_integer(), J::non_neg_integer(),
                         Min::number(), MinI::non_neg_integer(), MinJ::non_neg_integer())
         -> {DistMin::number(), IMin::pos_integer(), JMin::pos_integer()}.
 closestPointsForI([First | Rest], I, J, Min, MinI, MinJ) ->
@@ -99,15 +101,15 @@ closestPointsForI([First | Rest], I, J, Min, MinI, MinJ) ->
 closestPointsForI([], _, _, Min, I, J) ->
     {Min, I, J}.
 
--spec closestPointsForJ(First::centroid(), Rest::[centroid()],
+-spec closestPointsForJ(First::centroid(), Rest::centroids(),
                         I::non_neg_integer(), J::non_neg_integer(),
                         Min::number(), MinI::non_neg_integer(), MinJ::non_neg_integer())
         -> {DistMin::number(), IMin::non_neg_integer(), JMin::non_neg_integer()}.
-closestPointsForJ(First, [Centroid | Rest], I, J, Min, MinI, MinJ) ->
+closestPointsForJ(F = {First, _SF}, [{Centroid, _ST} | Rest], I, J, Min, MinI, MinJ) ->
     Dist = euclideanDistance(First, Centroid),
     {Min1, MinI1, MinJ1} = condExchange(Min, MinI, MinJ, Dist, I, J),
     J1 = J + 1,
-    closestPointsForJ(First, Rest, I, J1, Min1, MinI1, MinJ1);
+    closestPointsForJ(F, Rest, I, J1, Min1, MinI1, MinJ1);
 closestPointsForJ(_, [], _, _, Min, MinI, MinJ) ->
     {Min, MinI, MinJ}.
 
@@ -130,33 +132,28 @@ zeros_feeder(N) -> {N}.
 zeros(N) -> lists:duplicate(N, 0).
 
 %% @doc Get closest centroids and merge them if their distance is within Radius.
--spec aggloClustering(Centroids::[centroid()], Sizes::vector(),
-                      Radius::number()) -> {[centroid()], vector()}.
-aggloClustering(Centroids, Sizes, Radius) when Radius >= 0 ->
+-spec aggloClustering(Centroids::centroids(), Radius::number()) -> centroids().
+aggloClustering(Centroids, Radius) when Radius >= 0 ->
     {Min, I, J} = closestPoints(Centroids),
-    aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J).
+    aggloClusteringHelper(Centroids, Radius, Min, I, J).
 
 -spec aggloClusteringHelper
-        (Centroids::[centroid(),...], Sizes::vector(), Radius::number(),
-         Min::number(), I::pos_integer(), J::pos_integer()) -> {[centroid()], vector()};
-        (Centroids::[centroid()], Sizes::vector(), Radius::number(),
-         Min::-1, I::-1, J::-1) -> {[centroid()], vector()}.
+        (Centroids::[centroid(),...], Radius::number(),
+            Min::number(), I::pos_integer(), J::pos_integer()) -> centroids();
+        (Centroids::centroids(), Radius::number(),
+            Min::-1, I::-1, J::-1) -> centroids().
 % Note: closestPoints/1 creates Min, I, J and only returns {-1, -1, -1} if
 % Centroids contains less than two elements. This is not the case in the first
 % pattern and we can thus assume these values are pos_integer().
-aggloClusteringHelper([_,_|_] = Centroids, [_,_|_] = Sizes, Radius, Min, I, J) when Min =< Radius ->
-    C1 = lists:nth(I+1, Centroids),
-    C2 = lists:nth(J+1, Centroids),
-    S1 = lists:nth(I+1, Sizes),
-    S2 = lists:nth(J+1, Sizes),
-    Centroids1 = [vecWeightedAvg(C1, C2, S1, S2) |
+aggloClusteringHelper([{_C1,_S1},{_C2,_S2}|_] = Centroids, Radius, Min, I, J) when Min =< Radius ->
+    {C1, S1} = lists:nth(I+1, Centroids),
+    {C2, S2} = lists:nth(J+1, Centroids),
+    Centroids1 = [{vecWeightedAvg(C1, C2, S1, S2), S1+S2} |
         util:lists_remove_at_indices(Centroids, [I, J])],
     {Min1, I1, J1} = closestPoints(Centroids1),
-    aggloClusteringHelper(Centroids1, [S1 + S2 |
-            util:lists_remove_at_indices(Sizes, [I, J])],
-                          Radius, Min1, I1, J1);
-aggloClusteringHelper(Centroids, Sizes, _Radius, _Min, _I, _J) ->
-    {Centroids, Sizes}.
+    aggloClusteringHelper(Centroids1, Radius, Min1, I1, J1);
+aggloClusteringHelper(Centroids, _Radius, _Min, _I, _J) ->
+    Centroids.
 
 % @doc Calculates the binomial coefficient of n over k for n >= k.
 %      see http://rosettacode.org/wiki/Evaluate_binomial_coefficients#Erlang
