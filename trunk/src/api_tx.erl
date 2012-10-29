@@ -16,7 +16,8 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc API for transactional access to replicated DHT items.
 %% For single request/single item operations, we provide read/1,
-%% write/2, and test_and_set/3 functions that directly commit.
+%% write/2, test_and_set/3, add_on_nr/2 and add_del_on_list/3
+%% functions that directly commit.
 %%
 %% For compound transactions a transaction log has to be passed
 %% through all operations and finally has to be committed. This is
