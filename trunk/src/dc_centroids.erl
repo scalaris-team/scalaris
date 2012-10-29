@@ -29,6 +29,9 @@
         , get_coordinate/1
         , get_relative_size/1
         , get_coordinate_and_relative_size/1
+
+        %% setters
+        , set_relative_size/2
     ]).
 
 -type(coordinate() :: vivaldi:network_coordinate()).
@@ -65,6 +68,11 @@ get_relative_size(#centroid{relative_size=RelativeSize}) -> RelativeSize.
             -> {coordinate(), relative_size()}.
 get_coordinate_and_relative_size(#centroid{coordinate=Coordinate, relative_size=RelativeSize}) ->
     {Coordinate, RelativeSize}.
+
+% @doc Set the relative size of a centroid
+-spec set_relative_size(Centroid :: centroid(), relative_size()) -> centroid().
+set_relative_size(#centroid{coordinate=Coordinate}, RelativeSize) ->
+    #centroid{coordinate=Coordinate, relative_size=RelativeSize}.
 
 %% @doc Helper to return an empty list of centroids.
 -spec empty_centroids_list() -> centroids().
