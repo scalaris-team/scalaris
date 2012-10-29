@@ -47,6 +47,9 @@ out(Arg) ->
         <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
       </div>
       <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
+      </div>
+      <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
       </div>
 "}
