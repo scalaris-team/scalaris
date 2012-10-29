@@ -220,6 +220,7 @@ on_active({query_epoch, Pid},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec cluster(centroids:centroids(), centroids:centroids()) -> centroids:centroids().
+cluster([], RemoteCentroids) -> RemoteCentroids;
 cluster(Centroids, RemoteCentroids) ->
     % TODO extract Radius into state
     Radius = case config:read(dc_clustering_radius) of
