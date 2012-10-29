@@ -83,13 +83,13 @@ u(V) ->
 %% @doc Find indices of closest centroids.
 -spec closestPoints(Centroids::[centroid()])
         -> {Min::number(), I::pos_integer(), J::pos_integer()} | {-1, -1, -1}.
-closestPoints([C1, C2 | Rest]) ->
-    closestPointsForI([C1, C2 | Rest], 1, 2, euclideanDistance(C1, C2), 1, 2);
+closestPoints([C1, C2 |_] = L) ->
+    closestPointsForI(L, 0, 1, euclideanDistance(C1, C2), 0, 1);
 closestPoints(_) ->
     {-1, -1, -1}.
 
--spec closestPointsForI(Centroids::[centroid()], I::pos_integer(), J::pos_integer(),
-                        Min::number(), MinI::pos_integer(), MinJ::pos_integer())
+-spec closestPointsForI(Centroids::[centroid()], I::non_neg_integer(), J::non_neg_integer(),
+                        Min::number(), MinI::non_neg_integer(), MinJ::non_neg_integer())
         -> {DistMin::number(), IMin::pos_integer(), JMin::pos_integer()}.
 closestPointsForI([First | Rest], I, J, Min, MinI, MinJ) ->
     {Min1, MinI1, MinJ1} = closestPointsForJ(First, Rest, I, J, Min, MinI, MinJ),
@@ -100,9 +100,9 @@ closestPointsForI([], _, _, Min, I, J) ->
     {Min, I, J}.
 
 -spec closestPointsForJ(First::centroid(), Rest::[centroid()],
-                        I::pos_integer(), J::pos_integer(),
-                        Min::number(), MinI::pos_integer(), MinJ::pos_integer())
-        -> {DistMin::number(), IMin::pos_integer(), JMin::pos_integer()}.
+                        I::non_neg_integer(), J::non_neg_integer(),
+                        Min::number(), MinI::non_neg_integer(), MinJ::non_neg_integer())
+        -> {DistMin::number(), IMin::non_neg_integer(), JMin::non_neg_integer()}.
 closestPointsForJ(First, [Centroid | Rest], I, J, Min, MinI, MinJ) ->
     Dist = euclideanDistance(First, Centroid),
     {Min1, MinI1, MinJ1} = condExchange(Min, MinI, MinJ, Dist, I, J),
@@ -112,8 +112,8 @@ closestPointsForJ(_, [], _, _, Min, MinI, MinJ) ->
     {Min, MinI, MinJ}.
 
 %% @doc Update smallest distance and its indices.
--spec condExchange(Min::number(), MinI::pos_integer(), MinJ::pos_integer(),
-                   Dist::number(), DistI::pos_integer(), DistJ::pos_integer())
+-spec condExchange(Min::number(), MinI::non_neg_integer(), MinJ::non_neg_integer(),
+                   Dist::number(), DistI::non_neg_integer(), DistJ::non_neg_integer())
         -> {DistMin::number(), IMin::integer(), JMin::integer()}.
 condExchange(Min, I, J, Dist, _, _) when Min =< Dist ->
     {Min, I, J};
@@ -132,7 +132,7 @@ zeros(N) -> lists:duplicate(N, 0).
 %% @doc Get closest centroids and merge them if their distance is within Radius.
 -spec aggloClustering(Centroids::[centroid()], Sizes::vector(),
                       Radius::number()) -> {[centroid()], vector()}.
-aggloClustering(Centroids, Sizes, Radius) ->
+aggloClustering(Centroids, Sizes, Radius) when Radius >= 0 ->
     {Min, I, J} = closestPoints(Centroids),
     aggloClusteringHelper(Centroids, Sizes, Radius, Min, I, J).
 
@@ -145,13 +145,15 @@ aggloClustering(Centroids, Sizes, Radius) ->
 % Centroids contains less than two elements. This is not the case in the first
 % pattern and we can thus assume these values are pos_integer().
 aggloClusteringHelper([_,_|_] = Centroids, [_,_|_] = Sizes, Radius, Min, I, J) when Min =< Radius ->
-    C1 = lists:nth(I, Centroids),
-    C2 = lists:nth(J, Centroids),
-    S1 = lists:nth(I, Sizes),
-    S2 = lists:nth(J, Sizes),
-    Centroids1 = [vecWeightedAvg(C1, C2, S1, S2) | tools:rmvTwo(Centroids, I, J)],
+    C1 = lists:nth(I+1, Centroids),
+    C2 = lists:nth(J+1, Centroids),
+    S1 = lists:nth(I+1, Sizes),
+    S2 = lists:nth(J+1, Sizes),
+    Centroids1 = [vecWeightedAvg(C1, C2, S1, S2) |
+        util:lists_remove_at_indices(Centroids, [I, J])],
     {Min1, I1, J1} = closestPoints(Centroids1),
-    aggloClusteringHelper(Centroids1, [S1 + S2 | tools:rmvTwo(Sizes, I, J)],
+    aggloClusteringHelper(Centroids1, [S1 + S2 |
+            util:lists_remove_at_indices(Sizes, [I, J])],
                           Radius, Min1, I1, J1);
 aggloClusteringHelper(Centroids, Sizes, _Radius, _Min, _I, _J) ->
     {Centroids, Sizes}.
