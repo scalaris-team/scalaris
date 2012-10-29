@@ -176,12 +176,28 @@ json_to_reqlist({array, TmpReqList}, AllowCommit) ->
               {read, Key};
           {"write", {struct, [{Key, Val}]}} ->
               {write, Key, json_to_value(Val)};
-          % note: struct properties sorted alphabetically
-          {"add_del_on_list", {struct, [{"add", {array, ToAdd}}, {"del", {array, ToRemove}}, {"key", Key}]}} ->
+          % note: struct properties may be arbitrarily sorted (common sorting: alphabetically)
+          {"add_del_on_list", {struct, PropList}} ->
+              case PropList of
+                  [{"add", {array, ToAdd}}, {"del", {array, ToRemove}}, {"key", Key}] -> ok;
+                  [{"add", {array, ToAdd}}, {"key", Key}, {"del", {array, ToRemove}}] -> ok;
+                  [{"del", {array, ToRemove}}, {"add", {array, ToAdd}}, {"key", Key}] -> ok;
+                  [{"del", {array, ToRemove}}, {"key", Key}, {"add", {array, ToAdd}}] -> ok;
+                  [{"key", Key}, {"add", {array, ToAdd}}, {"del", {array, ToRemove}}] -> ok;
+                  [{"key", Key}, {"del", {array, ToRemove}}, {"add", {array, ToAdd}}] -> ok
+              end,
               {add_del_on_list, Key, ToAdd, ToRemove};
           {"add_on_nr", {struct, [{Key, ToAdd}]}} ->
               {add_on_nr, Key, ToAdd};
-          {"test_and_set", {struct, [{"key", Key}, {"new", New}, {"old", Old}]}} ->
+          {"test_and_set", {struct, PropList}} ->
+              case PropList of
+                  [{"key", Key}, {"new", New}, {"old", Old}] -> ok;
+                  [{"key", Key}, {"old", Old}, {"new", New}] -> ok;
+                  [{"new", New}, {"key", Key}, {"old", Old}] -> ok;
+                  [{"new", New}, {"old", Old}, {"key", Key}] -> ok;
+                  [{"old", Old}, {"new", New}, {"key", Key}] -> ok;
+                  [{"old", Old}, {"key", Key}, {"new", New}] -> ok
+              end,
               {test_and_set, Key, Old, New};
           {"commit", _} when AllowCommit ->
               {commit}
