@@ -2,7 +2,7 @@ Source: conpaas-scalarix
 Section: database
 Priority: optional
 Maintainer: Thorsten Schütt <schuett@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), erlang-common-test (>= 13.b.1), pkg-config, ruby, ruby1.8
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), pkg-config, ruby, ruby1.8
 Homepage: http://code.google.com/p/scalaris
 
 Package: conpaas-scalarix-one-manager
