@@ -85,7 +85,10 @@ out(Arg) ->
     </button>
     <input type="text" name="updateInterval" id="updateInterval" />
 </div>
-<div id="numClusters"></div>
+<div id="stats">
+    <ul>
+    </ul>
+</div>
 <div id="graph"></div>
 <div id="histogram"></div>
 
