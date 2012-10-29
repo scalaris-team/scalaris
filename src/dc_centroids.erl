@@ -32,6 +32,9 @@
 
         %% setters
         , set_relative_size/2
+
+        %% helpers
+        , distance/2
     ]).
 
 -type(coordinate() :: vivaldi:network_coordinate()).
@@ -77,3 +80,10 @@ set_relative_size(#centroid{coordinate=Coordinate}, RelativeSize) ->
 %% @doc Helper to return an empty list of centroids.
 -spec empty_centroids_list() -> centroids().
 empty_centroids_list() -> [].
+
+%% @doc Get the distance between two centroids
+-spec distance(U :: centroid(), V :: centroid()) -> float().
+distance(U,V) ->
+    mathlib:euclideanDistance(get_coordinate(U), get_coordinate(V))
+    .
+
