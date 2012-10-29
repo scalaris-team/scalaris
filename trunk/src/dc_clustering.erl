@@ -219,7 +219,12 @@ on_active({query_clustering, Pid}, {Centroids, Sizes, _ResetTriggerState, _Clust
 
 -spec cluster(centroids(), sizes(), centroids(), sizes()) -> {centroids(), sizes()}.
 cluster(Centroids, Sizes, RemoteCentroids, RemoteSizes) ->
-    Radius = config:read(dc_clustering_radius),
+    Radius = case config:read(dc_clustering_radius) of
+        failed -> exit(dc_clustering_radius_not_set);
+        R when R > 0 -> R;
+        _Else -> exit(dc_clustering_radius_invalid)
+    end,
+
     {NewCentroids, NewSizes} = mathlib:aggloClustering(Centroids ++ RemoteCentroids,
                                                        Sizes ++ RemoteSizes, Radius),
     NormalizedSizes = lists:map(fun (S) -> 0.5 * S end, NewSizes),
