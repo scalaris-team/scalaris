@@ -156,7 +156,7 @@ public class Benchmark {
         testTypes = new Class[] {null};
         testTypesStr = new String[] {"null"};
         columns = new String[] {
-                "Transaction.read(String).intValue() + Transaction.write(String, Integer)" };
+                "Transaction.addOnNr(String, Integer)" };
         testBench = new Class[] {TransIncrementBench1.class, TransIncrementBench2.class, TransIncrementBench3.class};
         rows = new String[] {
                 "separate connection",
@@ -192,7 +192,7 @@ public class Benchmark {
         testTypes = new Class[] {String.class};
         testTypesStr = new String[] {"S"};
         columns = new String[] {
-                "Transaction.read(String).intValue() + Transaction.write(String, Integer)" };
+                "Transaction.addDelOnList(String, StringList, [])" };
         testBench = new Class[] {TransAppendToListBench1.class, TransAppendToListBench2.class, TransAppendToListBench3.class};
         rows = new String[] {
                 "separate connection",
