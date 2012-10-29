@@ -345,3 +345,21 @@ br.br_class {
 ul {
   list-style-type: square;
 }
+
+circle.node {
+    fill: #39c;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+
+#graph {
+}

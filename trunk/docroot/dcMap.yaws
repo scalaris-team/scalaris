@@ -1,0 +1,63 @@
+<erl>
+out(_A) ->
+    {[{[FirstX,FirstY],_}|_] = Nodes, Centroids} = webhelpers:dc_get_clusters(),
+
+    {NodesDomain, UnflatNodesJSON} = lists:foldl(
+        fun({[X,Y], NodeName}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
+                {
+                    {
+                        [erlang:min(MinX, X), erlang:max(MaxX,X)],
+                        [erlang:min(MinY, Y), erlang:max(MaxY,Y)]
+                    },
+                    [io_lib:format("{\"coords\":[~p,~p], \"color\":\"~s\"}",[X,Y,
+                                color(NodeName)])|Acc]
+                }
+    end, {{[FirstX,FirstX],[FirstY,FirstY]},[]}, Nodes),
+
+    NodesJSON = "[" ++ string:join(UnflatNodesJSON, ",") ++ "]",
+
+    {CentroidsDomain, UnflatClusters} = lists:foldl(
+        fun({[X,Y], CentroidSize}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
+                {
+                    {
+                        [erlang:min(MinX, X), erlang:max(MaxX,X)],
+                        [erlang:min(MinY, Y), erlang:max(MaxY,Y)]
+                    },
+                    [io_lib:format("{\"coords\":[~p,~p],\"size\":~p}",[X,Y,CentroidSize])|Acc]
+                }
+    end, {{[FirstX,FirstX],[FirstY,FirstY]},[]}, Centroids),
+
+    ClustersJSON = "[" ++ string:join(UnflatClusters, ",") ++ "]",
+
+    Domain = [
+        [
+            lists:min(element(1,NodesDomain) ++ element(1, CentroidsDomain)),
+            lists:max(element(1,NodesDomain) ++ element(1, CentroidsDomain))
+        ],
+        [
+            lists:min(element(2,NodesDomain) ++ element(2, CentroidsDomain)),
+            lists:max(element(2,NodesDomain) ++ element(2, CentroidsDomain))
+        ]
+    ],
+
+    %% this is actually json, but we\"ll trick yaws. YAWS doesn\"t know json as a return
+    % atom here.
+    {html, io_lib:format("{
+        \"domain\":~p,
+        \"nodes\":~s,
+        \"clusters\":~s
+    }",[Domain, NodesJSON, ClustersJSON])}
+.
+
+color(Pid) ->
+    Hi = 255,
+    Lo = 0,
+    S1 = webhelpers:pid_to_integer(Pid),
+    _ = random:seed(S1,S1,S1),
+    C1 = random:uniform(Hi-Lo)+Lo-1,
+    C2 = random:uniform(Hi-Lo)+Lo-1,
+    C3 = random:uniform(Hi-Lo)+Lo-1,
+    io_lib:format("rgb(~p,~p,~p)",[C1,C2,C3])
+    .
+
+</erl>
