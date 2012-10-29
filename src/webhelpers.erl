@@ -201,7 +201,7 @@ pid_to_integer(Pid) ->
 
 %%%--------------------------DC Clustering------------------------------
 -spec getDCClustersAndNodes() -> {[vivaldi:network_coordinate()],
-        [dc_centroids:centroids()]}.
+        dc_centroids:centroids(), non_neg_integer(), float()}.
 getDCClustersAndNodes() ->
     mgmt_server:node_list(),
     Nodes =
