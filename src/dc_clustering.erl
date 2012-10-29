@@ -61,7 +61,8 @@
     {clustering_shuffle, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
     {clustering_shuffle_reply, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
     {query_clustering, comm:mypid()} |
-    {query_epoch, comm:mypid()}
+    {query_epoch, comm:mypid()} |
+    {query_my, atom(), comm:mypid()}
 ).
 
 %% @doc Sends an initialization message to the node's dc_clustering process.
@@ -254,8 +255,14 @@ on_active({query_clustering, Pid}, #state_active{centroids=C} = State) ->
     State
     ;
 
-on_active({query_epoch, Pid}, #state_active{local_epoch=E} = State) ->
-    comm:send(Pid, {query_epoch_response, E}),
+on_active({query_my, Atom, Pid}, State) ->
+    case Atom of
+        local_epoch -> Msg = State#state_active.local_epoch
+            , comm:send(Pid, {query_my_response, local_epoch, Msg})
+            ;
+        radius -> Msg = State#state_active.radius
+            , comm:send(Pid, {query_my_response, radius, Msg})
+    end,
     State
     .
 
