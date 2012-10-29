@@ -363,3 +363,13 @@ circle.node {
 
 #graph {
 }
+
+#stats ul {
+    display:inline;
+    list-style-type:none;
+}
+
+#stats ul li {
+    float:left;
+    list-style-position:inside;
+}

@@ -42,8 +42,9 @@ var clustering = {
         var circleradius = this.circleradius;
 
         // statistics
-        var stats = d3.select("#numClusters")
-            .selectAll("p")
+        var stats = d3.select("#stats")
+            .select("ul")
+            .selectAll("li")
                 .data([
                         ["Clusters", data.clusters.length]
                         , ["Mean relative cluster size", data.clusters.reduce(function(acc,b) {
@@ -53,11 +54,12 @@ var clustering = {
                             return b.size > 0 ? acc : acc + 1;
                         }, 0)]
                         , ["Current epoch", data.epoch]
+                        , ["Cluster radius", data.cluster_radius]
                         ])
                     .text(function(d) { return d.join(": "); });
 
         stats.enter()
-            .append("p")
+            .append("li")
             .text(function(d) { return d.join(": "); });
 
         stats.exit().remove() ;
@@ -120,6 +122,22 @@ var clustering = {
             .attr("fill", "none")
             .attr("stroke", "black")
             .attr("style","node")
+            ;
+
+        // draw a circle around the cluster with the radius being the cluster radius
+        scale = Math.min(borderx, bordery) == borderx ? xscale : yscale;
+        this.canvas.append("g")
+            .selectAll("ellipse")
+            .data(data.clusters)
+            .enter()
+            .append("ellipse")
+            .attr("cx", function(d){ return xscale(d.coords[0]); })
+            .attr("cy", function(d){ return yscale(d.coords[1]); })
+            .attr("rx", xscale(data.cluster_radius))
+            .attr("ry", yscale(data.cluster_radius))
+            .attr("fill","none")
+            .attr("stroke", "black")
+            .attr("stroke-dasharray", "2,2")
             ;
 
         // axis
@@ -222,7 +240,7 @@ function toggleUpdate() {
         .text(clustering.updateEnabled ? "Disable automatic update" : "Enable automatic update")
         ;
     if(clustering.updateEnabled) {
-        clustering.updateMap.bind(this)()
+        updateVisualization();
     } else {
         stopTimer();
     }
