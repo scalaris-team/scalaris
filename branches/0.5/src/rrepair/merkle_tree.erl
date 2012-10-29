@@ -52,7 +52,7 @@
 -export_type([mt_iter/0, mt_config_params/0]).
 -endif.
 
--type mt_node_key()     :: binary() | nil.
+-type mt_node_key()     :: binary().
 -type mt_interval()     :: intervals:interval(). 
 -type mt_bucket()       :: [].
 -type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
@@ -63,14 +63,15 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         leaf_hf        = get_small_sha()   :: hash_fun(),      %hash function for leaf signature creation
+         signature_size = 2                 :: pos_integer(),   %node signature size in byte
+         leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled          
          }).
 -type mt_config() :: #mt_config{}.
 -type mt_config_params() :: [{atom(), term()}] | [].    %only key value pairs of mt_config allowed
 
--type mt_node() :: { Hash        :: mt_node_key(),       %hash of childs/containing items 
+-type mt_node() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items 
                      Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
@@ -287,10 +288,9 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     Node = case Count > BucketSize of
                true -> p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
                false -> 
-                   LeafHf = Config#mt_config.leaf_hf,
                    Hash = case Count > 0 of
-                              true -> LeafHf(erlang:term_to_binary(Bucket));
-                              _ -> LeafHf(term_to_binary(0))
+                              true -> run_leaf_hf(Config, erlang:term_to_binary(Bucket));
+                              _ -> run_leaf_hf(Config, term_to_binary(0))
                           end,                    
                    {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
            end,
@@ -428,7 +428,9 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
 % Calculates min bucket size to remove S tree levels.
 % Formula: N / (v^(log_v(N) - S))
 % S = 1.. has to be smaller than log_v(N)
--spec get_opt_bucket_size(N::pos_integer(), V::pos_integer(), S::pos_integer()) -> pos_integer().
+-spec get_opt_bucket_size(N::non_neg_integer(), V::non_neg_integer(), S::pos_integer()) -> pos_integer().
+get_opt_bucket_size(N, 0, S) -> 1;
+get_opt_bucket_size(0, V, S) -> 1;
 get_opt_bucket_size(N, V, S) ->
     Height = erlang:max(util:ceil(util:log(N, V)) - S, 1),
     util:ceil(N / math:pow(V, Height)). 
@@ -447,6 +449,20 @@ build_config(ParamList) ->
                         end
                 end, 
                 #mt_config{}, ParamList).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec run_leaf_hf(mt_config(), binary()) -> mt_node_key(). 
+run_leaf_hf(#mt_config{ leaf_hf = Hf, signature_size = SigSize }, X) ->
+    Hash = Hf(X),
+    Size = erlang:byte_size(Hash),
+    case Size > SigSize of
+        true -> 
+            Start = Size - SigSize,
+            <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
+            SmallHash;
+        false -> Hash
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -476,13 +492,4 @@ keys_to_intervals(KList, IList) ->
 
 get_XOR_fun() ->
     (fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end).
-
-get_small_sha() ->
-    (fun(B) ->
-             DestSize = 2,
-             Sha = crypto:sha(B),
-             Start = erlang:byte_size(Sha) - DestSize,
-             <<_:Start/binary, SmallSha:DestSize/binary>> = Sha,
-             SmallSha
-     end).
 
