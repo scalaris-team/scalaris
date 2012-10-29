@@ -48,10 +48,11 @@ var clustering = {
                         ["Clusters", data.clusters.length]
                         , ["Mean relative cluster size", data.clusters.reduce(function(acc,b) {
                             return acc + b.size;
-                      }, 0) / data.clusters.length]
+                        }, 0) / data.clusters.length]
                         , ["Zombie of size 0", data.clusters.reduce(function(acc, b) {
                             return b.size > 0 ? acc : acc + 1;
                         }, 0)]
+                        , ["Current epoch", data.epoch]
                         ])
                     .text(function(d) { return d.join(": "); });
 

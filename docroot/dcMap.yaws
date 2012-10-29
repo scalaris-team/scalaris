@@ -1,6 +1,6 @@
 <erl>
 out(_A) ->
-    {[{_,[FirstX, FirstY]}|_]=Nodes, Centroids} = webhelpers:getDCClustersAndNodes(),
+    {[{_,[FirstX, FirstY]}|_]=Nodes, Centroids, Epoch} = webhelpers:getDCClustersAndNodes(),
 
     {NodesDomain, UnflatNodesJSON} = lists:foldl(
         fun({NodeName, [X,Y]}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
@@ -47,8 +47,9 @@ out(_A) ->
     {html, io_lib:format("{
         \"domain\":~p,
         \"nodes\":~s,
-        \"clusters\":~s
-    }",[Domain, NodesJSON, ClustersJSON])}
+        \"clusters\":~s,
+        \"epoch\":~p
+    }",[Domain, NodesJSON, ClustersJSON, Epoch])}
 .
 
 color(Pid) ->
