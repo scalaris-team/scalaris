@@ -120,6 +120,10 @@ on_inactive(Msg = {query_clustering, _Pid},
             {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
     {inactive, msg_queue:add(QueuedMessages, Msg), ResetTriggerState, ClusterTriggerState};
 
+on_inactive({query_epoch, _Pid} = Msg, 
+            {inactive, QueuedMessages, ResetTriggerState, ClusterTriggerState}) ->
+    {inactive, msg_queue:add(QueuedMessages, Msg), ResetTriggerState, ClusterTriggerState};
+
 on_inactive({web_debug_info, Requestor},
             {inactive, QueuedMessages, _ResetTriggerState, _ClusterTriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
@@ -202,7 +206,14 @@ on_active({clustering_shuffle_reply, _RemoteNode, RemoteCentroids, RemoteEpoch},
 % return my clusters
 on_active({query_clustering, Pid}, {Centroids, _Epoch, _ResetTriggerState, _ClusterTriggerState} = State) ->
     comm:send(Pid, {query_clustering_response, Centroids}),
-    State.
+    State
+    ;
+
+on_active({query_epoch, Pid},
+    {_Centroids, Epoch,_ResetTriggerState, _ClusterTriggerState} = State) ->
+    comm:send(Pid, {query_epoch_response, Epoch}),
+    State
+    .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers

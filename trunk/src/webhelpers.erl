@@ -213,6 +213,8 @@ getDCClustersAndNodes() ->
     end,
     This = comm:this(),
     comm:send(hd(Nodes), {query_clustering, This}, [{group_member, dc_clustering}]),
+    comm:send(hd(Nodes), {query_epoch, This}, [{group_member, dc_clustering}]),
+
     _ = [erlang:spawn(
             fun() ->
                     SourcePid = comm:reply_as(This, 1, {'_', Pid}),
@@ -223,9 +225,13 @@ getDCClustersAndNodes() ->
         {query_clustering_response, Cs} -> Cs
     end,
 
+    Epoch = receive
+        {query_epoch_response, E} -> E
+    end,
+
     CC_list = get_vivaldi(Nodes, [], 0),
 
-    {lists:zip(Nodes, CC_list), Centroids}
+    {lists:zip(Nodes, CC_list), Centroids, Epoch}
     .
 
 
