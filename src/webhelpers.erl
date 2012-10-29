@@ -25,10 +25,13 @@
 
 -export([getRingChart/0, getRingRendered/0, getIndexedRingRendered/0,
          get_and_cache_ring/0, flush_ring_cache/0,
+         getDCClustersAndNodes/0,
          getGossipRendered/0, getVivaldiMap/0,
          getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1,
-         safe_html_string/1, safe_html_string/2]).
+         safe_html_string/1, safe_html_string/2,
+         pid_to_integer/1
+     ]).
 
 -opaque attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
@@ -194,6 +197,38 @@ pid_to_integer(Pid) ->
     {A,B,C,D} = comm:get_ip(Pid),
     I = comm:get_port(Pid),
     A+B+C+D+I.
+
+
+%%%--------------------------DC Clustering------------------------------
+-spec getDCClustersAndNodes() -> {[vivaldi:network_coordinate()],
+        [dc_centroids:centroids()]}.
+getDCClustersAndNodes() ->
+    mgmt_server:node_list(),
+    Nodes =
+    receive
+        {get_list_response, X} -> X
+    after 2000 ->
+            log:log(error,"[ WH ] Timeout getting node list from mgmt server"),
+            throw('mgmt_server_timeout')
+    end,
+    This = comm:this(),
+    comm:send(hd(Nodes), {query_clustering, This}, [{group_member, dc_clustering}]),
+    _ = [erlang:spawn(
+            fun() ->
+                    SourcePid = comm:reply_as(This, 1, {'_', Pid}),
+                    comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
+            end) || Pid <- Nodes],
+
+    Centroids = receive
+        {query_clustering_response, Cs} -> Cs
+    end,
+
+    CC_list = get_vivaldi(Nodes, [], 0),
+
+    {lists:zip(Nodes, CC_list), Centroids}
+    .
+
+
 
 %%%-----------------------------Ring----------------------------------
 
