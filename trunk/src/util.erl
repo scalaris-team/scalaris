@@ -41,6 +41,7 @@
          par_map/2, par_map/3,
          lists_split/2, lists_keystore2/5,
          lists_partition3/2,
+         lists_remove_at_indices/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -1098,6 +1099,23 @@ lists_partition3(Pred, [H | T], As, Bs, Cs) ->
     end;
 lists_partition3(Pred, [], As, Bs, Cs) when is_function(Pred, 1) ->
     {lists:reverse(As), lists:reverse(Bs), lists:reverse(Cs)}.
+
+-spec lists_remove_at_indices([any(),...], [non_neg_integer(),...]) -> [any()].
+lists_remove_at_indices([_|_] = List, [_|_] = Indices) -> lists_remove_at_indices(List, [], Indices, 0).
+
+% PRED: Indices list should be non-empty
+-spec lists_remove_at_indices([any()], [any()], [non_neg_integer()], non_neg_integer()) -> [any()].
+lists_remove_at_indices(List, AccList, [], _CurrentIndex) ->
+    lists:reverse(lists_prepend_reversed(List, AccList));
+lists_remove_at_indices([_|ListTail], AccList, [CurrentIndex|IndexTail], CurrentIndex) ->
+    lists_remove_at_indices(ListTail, AccList, IndexTail, CurrentIndex + 1);
+lists_remove_at_indices([X|L], AccList, Indices, CurrentIndex) ->
+    lists_remove_at_indices(L, [X | AccList], Indices, CurrentIndex + 1).
+
+% prepend a list in reversed order to another list
+-spec lists_prepend_reversed([any()], [any()]) -> [any()].
+lists_prepend_reversed(L, To) -> lists:foldl(fun(El, Acc) -> [El | Acc] end, To, L).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
