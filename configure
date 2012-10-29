@@ -4231,6 +4231,7 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_path_PYTHON2" >&5
 $as_echo "$ac_cv_path_PYTHON2" >&6; }
+PYTHON2=$ac_cv_path_PYTHON2
 
 
 
@@ -4281,6 +4282,7 @@ fi
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_path_PYTHON3" >&5
 $as_echo "$ac_cv_path_PYTHON3" >&6; }
+PYTHON3=$ac_cv_path_PYTHON3
 
 
 

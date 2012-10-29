@@ -400,7 +400,7 @@ AC_CACHE_CHECK([for python 2.x >= 2.6], [ac_cv_path_PYTHON2],
       PYTHON2SITELIBDIR=`$ac_path_PYTHON2 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null` && \
       ac_cv_path_PYTHON2=$ac_path_PYTHON2 ac_path_PYTHON2_found=:]],
     [AC_MSG_RESULT([not found])])])
-AC_SUBST(PYTHON2)
+AC_SUBST([PYTHON2], [$ac_cv_path_PYTHON2])
 AC_SUBST(PYTHON2SITELIBDIR)
 
 AS_IF([test "$PYTHON2" != ""],
@@ -417,7 +417,7 @@ AC_CACHE_CHECK([for python 3.x], [ac_cv_path_PYTHON3],
       PYTHON3SITELIBDIR=`$ac_path_PYTHON3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null` && \
       ac_cv_path_PYTHON3=$ac_path_PYTHON3 ac_path_PYTHON3_found=:]],
     [AC_MSG_RESULT([not found])])])
-AC_SUBST(PYTHON3)
+AC_SUBST([PYTHON3], [$ac_cv_path_PYTHON3])
 AC_SUBST(PYTHON3SITELIBDIR)
 
 AS_IF([test "$PYTHON3" != ""],
