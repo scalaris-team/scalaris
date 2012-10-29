@@ -151,6 +151,7 @@ tester_type_check_math(_Config) ->
              {vecAdd, 2}, %% needs same length lists
              {vecSub, 2}, %% needs same length lists
              {euclideanDistance, 2}, %% needs same length lists
+             {nearestCentroid, 2}, %% needs proper centroids
              {u, 1}, %% needs non zero number in list
              {zeros, 1} %% slow for large integers, tested via feeder
            ],
