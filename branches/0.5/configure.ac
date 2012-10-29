@@ -389,36 +389,41 @@ AC_SUBST(RUBYSITELIBDIR)
 
 ###########################################################
 #
-# check python
+# check python, python3
 #
 ###########################################################
-PYTHONSITELIBDIR=
-ENABLEPYTHONINSTALL=
-AM_PATH_PYTHON(,, [:])
-AS_IF([test "$PYTHON" != ":"],
-      [PYTHONSITELIBDIR=$am_cv_python_pythondir
-       ENABLEPYTHONINSTALL="install-python"])
-AC_SUBST(ENABLEPYTHONINSTALL)
-AC_SUBST(PYTHONSITELIBDIR)
+PYTHON2SITELIBDIR=
+ENABLEPYTHON2INSTALL=
+AC_CACHE_CHECK([for python 2.x >= 2.6], [ac_cv_path_PYTHON2],
+  [AC_PATH_PROGS_FEATURE_CHECK([PYTHON2], [python python2],
+    [[$ac_path_PYTHON2 -V 2>&1 | grep "^Python 2.[6789]" > /dev/null && \
+      PYTHON2SITELIBDIR=`$ac_path_PYTHON2 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null` && \
+      ac_cv_path_PYTHON2=$ac_path_PYTHON2 ac_path_PYTHON2_found=:]],
+    [AC_MSG_RESULT([not found])])])
+AC_SUBST(PYTHON2)
+AC_SUBST(PYTHON2SITELIBDIR)
 
-###########################################################
-#
-# check python3
-#
-###########################################################
+AS_IF([test "$PYTHON2" != ""],
+      [AC_MSG_CHECKING([for python 2.x sitelibdir])
+       AC_MSG_RESULT([$PYTHON2SITELIBDIR])
+       ENABLEPYTHON2INSTALL="install-python"
+       sed -i -e "1s|#!.*|#!$PYTHON2|g" python-api/*.py])
 
-ENABLEPYTHON3INSTALL=
 PYTHON3SITELIBDIR=
-AC_ARG_WITH([python3-sitelibdir],
-            [AS_HELP_STRING([--with-python3-sitelibdir=SITELIBDIR],
-            [where to install python3 libraries])],
-            [if test -n "$withval"; then
-               PYTHON3SITELIBDIR="$withval"
-               ENABLEPYTHON3INSTALL="install-python3"
-             fi],
-            [])
-AC_SUBST(ENABLEPYTHON3INSTALL)
+ENABLEPYTHON3INSTALL=
+AC_CACHE_CHECK([for python 3.x], [ac_cv_path_PYTHON3],
+  [AC_PATH_PROGS_FEATURE_CHECK([PYTHON3], [python3 python],
+    [[$ac_path_PYTHON3 -V 2>&1 | grep "^Python 3." > /dev/null && \
+      PYTHON3SITELIBDIR=`$ac_path_PYTHON3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null` && \
+      ac_cv_path_PYTHON3=$ac_path_PYTHON3 ac_path_PYTHON3_found=:]],
+    [AC_MSG_RESULT([not found])])])
+AC_SUBST(PYTHON3)
 AC_SUBST(PYTHON3SITELIBDIR)
+
+AS_IF([test "$PYTHON3" != ""],
+      [AC_MSG_CHECKING([for python 3.x sitelibdir])
+       AC_MSG_RESULT([$PYTHON3SITELIBDIR])
+       ENABLEPYTHON3INSTALL="install-python3"])
 
 ###########################################################
 #
@@ -466,7 +471,9 @@ mkdir -p ~/.yaws 2> /dev/null
 
 mkdir -p python3-api
 cp python-api/scalaris.in python3-api/
-sed -i -e "s|python-api|python3-api|g" -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" python3-api/scalaris.in
+sed -i -e "s|python-api|python3-api|g" \
+       -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
+       -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
 AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT

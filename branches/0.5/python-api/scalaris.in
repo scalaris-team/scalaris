@@ -19,7 +19,8 @@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 SCALARISDIR=@libdir@/scalaris
-SCALARISCLIENT_PYTHON="@PYTHONSITELIBDIR@/scalaris_client.py"
+PYTHON2="@PYTHON2@"
+SCALARISCLIENT_PYTHON2="@PYTHON2SITELIBDIR@/scalaris_client.py"
 
 for arg in "$@"; do
   args="$args \"$arg\""
@@ -31,7 +32,7 @@ DIRNAME=`dirname $ABSPATH`
 # is this a svn checkout or an (rpm/deb/manual) installation?
 if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" ]; then
   # local mode, i.e. uninstalled
-  SCALARISCLIENT_PYTHON="`dirname $DIRNAME`/python-api/scalaris_client.py"
+  SCALARISCLIENT_PYTHON2="`dirname $DIRNAME`/python-api/scalaris_client.py"
 fi
 
-eval $SCALARISCLIENT_PYTHON $args
+eval $PYTHON2 $SCALARISCLIENT_PYTHON2 $args
