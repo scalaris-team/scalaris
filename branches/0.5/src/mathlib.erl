@@ -163,7 +163,7 @@ binomial_coeff(_, 0) -> 1;
 binomial_coeff(N, K) when N >= K ->
   choose(N, K, 1, 1).
 
--spec binomial_coeff_feeder(non_neg_integer(), non_neg_integer()) ->
+-spec binomial_coeff_feeder(0..100, 0..100) ->
                                    {non_neg_integer(), non_neg_integer()}.
 binomial_coeff_feeder(X, Y) ->
     {erlang:max(X, Y), erlang:min(X, Y)}.
