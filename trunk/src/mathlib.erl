@@ -107,31 +107,26 @@ nearestCentroid(U, [X|Centroids]) ->
     .
 
 %% @doc Find indices of closest centroids.
--spec closestPoints(Centroids::dc_centroids:centroids())
-        -> {Min::number(), I::dc_centroids:centroid(), J::dc_centroids:centroid()} | {-1, nil, nil}.
-closestPoints(Centroids) ->
+-spec closestPoints(dc_centroids:centroids())
+    -> {dc_centroids:centroid(), dc_centroids:centroid()} | none.
+closestPoints([]) -> none;
+closestPoints([_]) -> none;
+closestPoints([First, Second|_] = Centroids) ->
+    FirstDist = dc_centroids:distance(First, Second),
     lists:foldl(
         fun
-            (Centroid, start) ->
-                CentroidMin = nearestCentroid(Centroid, Centroids),
-                CoordC = dc_centroids:get_coordinate(Centroid),
-                CoordMin = dc_centroids:get_coordinate(CentroidMin), 
-                Dist = euclideanDistance(CoordC, CoordMin),
-                {Dist, Centroid, CentroidMin}
-            ;
-
             (Centroid, {CurrentMinDist, _, _} = Acc) ->
                 % get the centroid with minimum distance to Centroid. If this is less than
                 % the distance of the centroids in Acc, exchange
-                CentroidMin = nearestCentroid(Centroid, Centroids),
-                CoordC = dc_centroids:get_coordinate(Centroid),
-                CoordMin = dc_centroids:get_coordinate(CentroidMin), 
-                Dist = euclideanDistance(CoordC, CoordMin),
-                case Dist < CurrentMinDist of
-                    true -> {Dist, Centroid, CentroidMin};
-                    false -> Acc
+                case nearestCentroid(Centroid, Centroids) of
+                    none -> Acc;
+                    {Dist, CentroidMin} ->
+                        case Dist < CurrentMinDist of
+                            true -> {Dist, Centroid, CentroidMin};
+                            false -> Acc
+                        end
                 end
-    end, start, Centroids)
+    end, {FirstDist, First, Second}, Centroids)
 .
 
 -spec zeros_feeder(0..10000) -> {0..10000}.
@@ -145,26 +140,16 @@ zeros(N) -> lists:duplicate(N, 0).
 %% @doc Get closest centroids and merge them if their distance is within Radius.
 -spec aggloClustering(Centroids::dc_centroids:centroids(), Radius::number()) -> dc_centroids:centroids().
 aggloClustering(Centroids, Radius) when Radius >= 0 ->
-    {Min, I, J} = closestPoints(Centroids),
-    NewCentroids = aggloClusteringHelper(Centroids, Radius, Min, I, J),
-    %% assert that MinAfterClustering is bigger than Radius when we are finished with
-    %clustering
-    {MinAfterClustering,A,B} = closestPoints(Centroids),
-    case Radius =< MinAfterClustering orelse length(NewCentroids) =:= 1 orelse A =:= B of
-        true -> NewCentroids;
-        false -> 
-            io:format("Not finished: Wanted:~p, Got: ~p~nCentroids:~n~p~n, Centroids:~p and ~p",
-                [Radius, MinAfterClustering, NewCentroids, A, B]),
-            NewCentroids,
-            exit(not_really_finished)
+    case closestPoints(Centroids) of
+        none -> Centroids;
+        {Min, I, J} -> aggloClusteringHelper(Centroids, Radius, Min, I, J)
     end
     .
 
 -spec aggloClusteringHelper
         (Centroids::[dc_centroids:centroid(),...], Radius::number(),
-            Min::number(), I::pos_integer(), J::pos_integer()) -> dc_centroids:centroids();
-        (Centroids::dc_centroids:centroids(), Radius::number(),
-            Min::-1, I::-1, J::-1) -> dc_centroids:centroids().
+         Min::number(), I::dc_centroids:centroid(), J::dc_centroids:centroid()) ->
+         dc_centroids:centroids().
 % Note: closestPoints/1 creates Min, I, J and only returns {-1, -1, -1} if
 % Centroids contains less than two elements. This is not the case in the first
 % pattern and we can thus assume these values are pos_integer().
@@ -175,9 +160,13 @@ aggloClusteringHelper(Centroids, Radius, Min, I, J) when Min =< Radius ->
     NewCoordinate = vecWeightedAvg(C1, C2, S1, S2),
     NewCentroid = dc_centroids:new(NewCoordinate, S1+S2),
 
-    NewCentroids = [NewCentroid | util:lists_remove_at_indices(Centroids, [I, J])],
-    {Min1, I1, J1} = closestPoints(NewCentroids),
-    aggloClusteringHelper(NewCentroids, Radius, Min1, I1, J1);
+    NewCentroids = [NewCentroid | lists:subtract(Centroids, [I,J])],
+    case closestPoints(NewCentroids) of
+        none -> NewCentroids;
+        {Min1, I1, J1} ->
+            aggloClusteringHelper(NewCentroids, Radius, Min1, I1, J1)
+    end
+    ;
 aggloClusteringHelper(Centroids, _Radius, _Min, _I, _J) ->
     Centroids.
 
