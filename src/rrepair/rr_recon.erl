@@ -566,8 +566,12 @@ build_recon_struct(bloom, {I, DBItems}) ->
 build_recon_struct(merkle_tree, {I, DBItems}) ->
     merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()}, 
                                  {bucket_size, get_merkle_bucket_size()}]);
-build_recon_struct(art, Chunk) ->
-    art:new(build_recon_struct(merkle_tree, Chunk), get_art_config()).
+build_recon_struct(art, {I, DBItems}) ->
+    Branch = get_merkle_branch_factor(),
+    BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
+    Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch}, 
+                                        {bucket_size, BucketSize}]),
+    art:new(Tree, get_art_config()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
