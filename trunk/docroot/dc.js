@@ -65,17 +65,6 @@ var clustering = {
         stats.exit().remove() ;
 
         // construct the scales
-        var domainx = data.domain[0],
-            domainy = data.domain[1];
-
-        var borderx = (domainx[1] - domainx[0]) * 0.2,
-            bordery = (domainy[1] - domainy[0]) * 0.2;
-
-        var xdomain = [domainx[0] - borderx,
-            domainx[1] + borderx],
-            ydomain = [domainy[0] - bordery,
-            domainy[1] + bordery];
-
         var xscale = d3.scale.linear()
             .domain(data.domain[0])
             .range([0,w])
@@ -124,21 +113,31 @@ var clustering = {
             .attr("style","node")
             ;
 
-        // draw a circle around the cluster with the radius being the cluster radius
-        scale = Math.min(borderx, bordery) == borderx ? xscale : yscale;
-        this.canvas.append("g")
-            .selectAll("ellipse")
-            .data(data.clusters)
-            .enter()
-            .append("ellipse")
-            .attr("cx", function(d){ return xscale(d.coords[0]); })
-            .attr("cy", function(d){ return yscale(d.coords[1]); })
-            .attr("rx", xscale(data.cluster_radius))
-            .attr("ry", yscale(data.cluster_radius))
-            .attr("fill","none")
-            .attr("stroke", "black")
-            .attr("stroke-dasharray", "2,2")
-            ;
+        {
+            // Draw lines to indicate where the cluster borders are
+            this.canvas.append("g")
+                .selectAll("line")
+                    .data(data.clusters)
+                .enter().append("line")
+                    .attr("x1", function(d){ return xscale(d.coords[0] - data.cluster_radius); })
+                    .attr("y1", function(d){ return yscale(d.coords[1] - data.cluster_radius); })
+                    .attr("x2", function(d){ return xscale(d.coords[0] + data.cluster_radius); })
+                    .attr("y2", function(d){ return yscale(d.coords[1] + data.cluster_radius); })
+                    .attr("r", this.circleradius)
+                    .attr("stroke", "yellow")
+                ;
+            this.canvas.append("g")
+                .selectAll("line")
+                    .data(data.clusters)
+                .enter().append("line")
+                    .attr("x1", function(d){ return xscale(d.coords[0] - data.cluster_radius); })
+                    .attr("y1", function(d){ return yscale(d.coords[1] + data.cluster_radius); })
+                    .attr("x2", function(d){ return xscale(d.coords[0] + data.cluster_radius); })
+                    .attr("y2", function(d){ return yscale(d.coords[1] - data.cluster_radius); })
+                    .attr("r", this.circleradius)
+                    .attr("stroke", "yellow")
+                ;
+        }
 
         // axis
         var xaxis = d3.svg.axis()
@@ -170,55 +169,12 @@ var clustering = {
 
 };
 
-var histogram = {
-    createHistogram: function (data) {
-        var w = 300,
-            h = 500;
-        var histogram = d3.layout.histogram()
-            (data.clusters.map(function (c) { return c.size; }));
-
-        var x = d3.scale.ordinal()
-            .domain(histogram.map(function(d) { return d.x; }))
-            .rangeRoundBands([0, w]);
-
-        var y = d3.scale.linear()
-            .domain([0, d3.max(histogram, function(d) { return d.y; })])
-            .range([0, h]);
-
-        d3.select("#histogram > svg").remove();
-
-        var vis = d3.select("#histogram").append("svg")
-                .attr("id", "histogram")
-                .attr("width", w)
-                .attr("height", h),
-            g = vis 
-                .append("svg:g")
-                .attr("transform", "translate(1,0.5)")
-            ;
-
-        g.selectAll("rect")
-            .data(histogram)
-            .enter().append("svg:rect")
-            .attr("transform", function(d) {
-                return "translate(" + x(d.x) + "," + (h - y(d.y)) + ")"; })
-            .attr("width", x.rangeBand())
-            .attr("y", function(d) { return y(d.y); })
-            .attr("height", 0)
-            .transition()
-            .duration(750)
-            .attr("y", 0)
-            .attr("height", function(d) { return y(d.y); })
-            ;
-    }
-}
-
 function updateVisualization() {
     clustering.redoCanvas();
 
-    var updater = (function(this_clustering, this_histogram, data) {
+    var updater = (function(this_clustering, data) {
         clustering.createMap.bind(this_clustering)(data);
-        //histogram.createHistogram.bind(this_histogram)(data);
-    }).bind(this, clustering, histogram);
+    }).bind(this, clustering);
     d3.json("dcMap.yaws", updater);
 
     if (clustering.updateEnabled) {
