@@ -39,7 +39,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.catalina.Context;
+import org.apache.catalina.Lifecycle;
+import org.apache.catalina.LifecycleEvent;
 import org.apache.catalina.LifecycleException;
+import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.startup.Tomcat;
 import org.eclipse.jetty.util.ajax.JSON;
@@ -641,6 +644,17 @@ public class PubSubTest {
         }
     }
 
+    private static class TomcatWaitForStartListener implements LifecycleListener{
+        boolean started = false;
+
+        public void lifecycleEvent(final LifecycleEvent lifecycleEvent) {
+            if (lifecycleEvent.getType().equals(Lifecycle.START_EVENT)) {
+                started = true;
+            }
+        }
+
+    }
+
     /**
      * Creates a new subscription server and tries to start it at {@link #startPort}.
      */
@@ -666,9 +680,18 @@ public class PubSubTest {
         }
 //        ((RealmBase) tomcat.getServer().getRealm()).setRealmPath("/realm" + tomcat.getConnector().getPort());
         do {
+            final TomcatWaitForStartListener listener = new TomcatWaitForStartListener();
+            tomcat.getServer().addLifecycleListener(listener);
             try {
                 tomcat.start();
-                return new Server(tomcat, servlets);
+                for (int i = 0; i < 100; ++i) { // wait 10s in total
+                    if (listener.started) {
+                        return new Server(tomcat, servlets);
+                    }
+                    Thread.sleep(100);
+                }
+                assertTrue("Timeout starting server", false);
+                return null; // just in case
             } catch (final LifecycleException e) {
                 // e.printStackTrace();
             }
