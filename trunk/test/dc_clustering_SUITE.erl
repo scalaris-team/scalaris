@@ -100,7 +100,6 @@ single_node(_) ->
     .
 
 two_nodes(_) ->
-    %% get the node which forms the ring
     Clustering = pid_groups:find_a(dc_clustering),
     Group = pid_groups:group_of(Clustering),
     Vivaldi = pid_groups:pid_of(Group, vivaldi),
@@ -108,5 +107,7 @@ two_nodes(_) ->
     {_Coordinate, Centroids} = get_vivaldi_and_centroids(Vivaldi, Clustering),
     ?assert(length(Centroids) > 0),
     ?assert(length(Centroids) < 3),
+    ?equals(1.0, lists:foldl(fun(C, Acc) -> dc_centroids:get_relative_size(C) + Acc end,
+            0, Centroids)),
     ok
     .
