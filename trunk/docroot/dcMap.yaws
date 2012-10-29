@@ -1,9 +1,9 @@
 <erl>
 out(_A) ->
-    {[{[FirstX,FirstY],_}|_] = Nodes, Centroids} = webhelpers:dc_get_clusters(),
+    {[{_,[FirstX, FirstY]}|_]=Nodes, Centroids} = webhelpers:getDCClustersAndNodes(),
 
     {NodesDomain, UnflatNodesJSON} = lists:foldl(
-        fun({[X,Y], NodeName}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
+        fun({NodeName, [X,Y]}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
                 {
                     {
                         [erlang:min(MinX, X), erlang:max(MaxX,X)],
@@ -17,7 +17,9 @@ out(_A) ->
     NodesJSON = "[" ++ string:join(UnflatNodesJSON, ",") ++ "]",
 
     {CentroidsDomain, UnflatClusters} = lists:foldl(
-        fun({[X,Y], CentroidSize}, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
+        fun(Centroid, {{[MinX, MaxX], [MinY,MaxY]}, Acc}) ->
+                {[X,Y], CentroidSize} =
+                    dc_centroids:get_coordinate_and_relative_size(Centroid),
                 {
                     {
                         [erlang:min(MinX, X), erlang:max(MaxX,X)],

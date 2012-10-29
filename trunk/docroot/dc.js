@@ -198,7 +198,7 @@ function updateVisualization() {
 
     var updater = (function(this_clustering, this_histogram, data) {
         clustering.createMap.bind(this_clustering)(data);
-        histogram.createHistogram.bind(this_histogram)(data);
+        //histogram.createHistogram.bind(this_histogram)(data);
     }).bind(this, clustering, histogram);
     d3.json("dcMap.yaws", updater);
 
