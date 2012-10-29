@@ -42,16 +42,24 @@ init_per_suite(Config) ->
     Config2.
 
 init_per_testcase(Testcase, Config) ->
+    % dc_clustering must be activated
+    EnableClustering = {dc_clustering_enable, true},
     case Testcase of
         single_node ->
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(1, [{config, [
+                            {log_path, PrivDir}
+                            , EnableClustering
+                        ]}]),
             timer:sleep(500);
         two_nodes ->
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(2, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(2, [{config, [
+                            {log_path, PrivDir}
+                            , EnableClustering
+                        ]}]),
             timer:sleep(500);
         _Else -> ok
     end,
@@ -89,11 +97,7 @@ single_node(_) ->
     Group = pid_groups:group_of(Clustering),
     Vivaldi = pid_groups:pid_of(Group, vivaldi),
 
-    % ask for the vivaldi coordinate and centroid of the node
-    comm:send_local(Vivaldi, {get_coordinate, comm:this()}),
-    comm:send_local(Clustering, {query_clustering, comm:this()}),
-
-    {Coordinate, [{Center, Size}]} = get_vivaldi_and_centroids(Vivaldi, Clustering),
+    {Coordinate, [{centroid, Center, Size}]} = get_vivaldi_and_centroids(Vivaldi, Clustering),
     ?equals(Coordinate, Center),
     ?equals(1.0, Size),
     ok
