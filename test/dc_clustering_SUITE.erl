@@ -42,8 +42,9 @@ init_per_suite(Config) ->
     Config2.
 
 init_per_testcase(Testcase, Config) ->
-    % dc_clustering must be activated
+    % dc_clustering must be activated and a radius must exist
     EnableClustering = {dc_clustering_enable, true},
+    ClusterRadius = {dc_clustering_radius, 1000},
     case Testcase of
         single_node ->
             unittest_helper:stop_ring(),
@@ -51,6 +52,7 @@ init_per_testcase(Testcase, Config) ->
             unittest_helper:make_ring(1, [{config, [
                             {log_path, PrivDir}
                             , EnableClustering
+                            , ClusterRadius
                         ]}]),
             timer:sleep(500);
         two_nodes ->
@@ -59,6 +61,7 @@ init_per_testcase(Testcase, Config) ->
             unittest_helper:make_ring(2, [{config, [
                             {log_path, PrivDir}
                             , EnableClustering
+                            , ClusterRadius
                         ]}]),
             timer:sleep(500);
         _Else -> ok
