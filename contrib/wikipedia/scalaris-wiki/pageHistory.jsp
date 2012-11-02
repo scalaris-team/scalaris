@@ -2,7 +2,7 @@
 <%@page import="de.zib.scalaris.examples.wikipedia.bliki.WikiServlet"%>
 <%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.data.Revision,de.zib.scalaris.examples.wikipedia.data.ShortRevision,org.apache.commons.lang.StringEscapeUtils,java.util.Map,java.util.List"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,de.zib.scalaris.examples.wikipedia.data.Revision,de.zib.scalaris.examples.wikipedia.data.ShortRevision,org.apache.commons.lang.StringEscapeUtils,java.util.Map,java.util.List,java.net.URLEncoder"%>
 <% String req_render = request.getParameter("render"); %>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageBean" scope="request" />
 <jsp:useBean id="servlet" type="de.zib.scalaris.examples.wikipedia.WikiServletContext" scope="request" />
@@ -10,7 +10,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<% final String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle()); %>
+<% final String safePageTitle = StringEscapeUtils.escapeHtml(URLEncoder.encode(pageBean.getTitle(), "UTF-8")); %>
 <% final String andServiceUser = pageBean.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + pageBean.getServiceUser(); %>
 <title>Revision history of "${ pageBean.title }" - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
