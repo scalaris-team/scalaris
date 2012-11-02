@@ -161,7 +161,7 @@ ${ pageBean.preview }
 				If you did not write this yourself, it must be available under terms consistent with the <a href="wiki?title=Terms of Use<%= andServiceUser %>" rel="nofollow">Terms of Use</a>, and you agree to follow any relevant licensing requirements.
 				</p></div>
 				<div class="mw-editTools"></div>
-				<% if (!pageBean.getTemplates().isEmpty()) { %>
+				<% if (! (pageBean.getTemplates().isEmpty() && pageBean.getIncludes().isEmpty())) { %>
 				<div class='templatesUsed'>
 				<div class="mw-templatesUsedExplanation">
 				<p>Templates used on this page:</p>
