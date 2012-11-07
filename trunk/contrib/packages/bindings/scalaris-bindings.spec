@@ -220,7 +220,7 @@ make install-python3 DESTDIR=$RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files -n scalaris-java
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %{_javadir}/scalaris
 %dir %{_sysconfdir}/scalaris
 %config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
@@ -231,14 +231,14 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_docdir}/scalaris/java-api
 
 %files -n ruby-scalaris
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %{_bindir}/scalaris-ruby
 %{rb_sitelib}/scalaris.rb
 %{rb_sitelib}/scalaris_client.rb
 
 %if 0%{?with_python}
 %files -n python-scalaris
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %{_bindir}/scalaris-python
 %{python_sitelib}/*
 %if 0%{?with_python_doc_html} || 0%{?with_python_doc_pdf}
@@ -248,7 +248,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_python3}
 %files -n python3-scalaris
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %{_bindir}/scalaris-python3
 %if 0%{?suse_version}
 %dir %{python3_sitelib}

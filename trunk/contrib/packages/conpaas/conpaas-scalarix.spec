@@ -154,7 +154,7 @@ make install-one DESTDIR=$RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files -n conpaas-scalarix-one-manager
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir %{_sysconfdir}/scalaris
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
@@ -177,7 +177,7 @@ rm -rf $RPM_BUILD_ROOT
 ## remove ts_*.rb !!!
 
 %files -n conpaas-scalarix-one-frontend
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
 %dir %{_prefix}/lib/scalaris/contrib/opennebula
@@ -191,7 +191,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris/contrib/opennebula/fe_views
 
 %files -n conpaas-scalarix-one-client
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir %{_prefix}/lib/scalaris
 %dir %{_prefix}/lib/scalaris/contrib
 %dir %{_prefix}/lib/scalaris/contrib/opennebula

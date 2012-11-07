@@ -61,8 +61,6 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
   cp  ${sourcefolder}/debian.scalaris-java.conffiles     ./debian.scalaris-java.conffiles && \
-  cp  ${sourcefolder}/debian.scalaris-java.postrm        ./debian.scalaris-java.postrm && \
-  cp  ${sourcefolder}/debian.scalaris-java.postinst      ./debian.scalaris-java.postinst && \
   cp  ${sourcefolder}/debian.scalaris-ruby1.8.postinst   ./debian.scalaris-ruby1.8.postinst
   result=$?
 fi
