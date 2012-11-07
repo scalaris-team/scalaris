@@ -1,6 +1,6 @@
 % behaviors first - otherwise there are compile warnings
 {["src/gen_component.erl", "src/trigger_beh.erl", "src/db_beh.erl", "src/rm_beh.erl", "src/rt_beh.erl", "src/lb_psv_beh.erl", "src/transactions/tx_op_beh.erl", "src/rrepair/bloom_beh.erl", "src/rrepair/hfs_beh.erl", "src/pdb_beh.erl"],
- [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record,
+ [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record, inline_list_funcs,
   {outdir, "ebin"},
   {i, "include"},
   {i, "contrib/yaws/include"},
@@ -10,7 +10,7 @@
  ]}.
 % now the source and all of its sub-directories:
 {["src/*", "src/cp/*", "src/comm_layer/*", "src/paxos/*", "src/pubsub/*", "src/simulation/*", "src/transactions/*", "src/rbr/*", "src/rrepair/*", "src/json/*"],
- [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record,
+ [debug_info, warn_unused_import, warn_missing_spec, warn_exported_vars, warn_untyped_record, inline_list_funcs,
   {outdir, "ebin"},
   {i, "ebin"},
   {i, "include"},
@@ -21,7 +21,7 @@
  ]}.
 % unit tests:
 {"test/*",
- [debug_info,
+ [debug_info, inline_list_funcs,
   {outdir, "test"},
   {i, "include"}
   @EMAKEFILEDEFINES@
@@ -29,11 +29,12 @@
 % contributing libraries:
 {"contrib/log4erl/src/*",
  [debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,
-  {outdir, "contrib/log4erl/ebin/"},
+  inline_list_funcs, {outdir, "contrib/log4erl/ebin/"},
   {i, "contrib/log4erl/include"}
  ]}.
 {"contrib/yaws/src/*",
  [debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,
+   inline_list_funcs,
   {outdir, "contrib/yaws/ebin/"},
   {i, "contrib/yaws/include"}
   @HAVE_YAWS_SENDFILE@
