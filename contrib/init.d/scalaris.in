@@ -89,12 +89,14 @@ gstop() {
             # not running anymore
             result=0
         fi
-    fi
-    if [ $result -eq 0 ]; then
-        rm -f $PID_DS
-        echo "success"
+        if [ $result -eq 0 ]; then
+            rm -f $PID_DS
+            echo "success"
+        else
+            echo "failed"
+        fi
     else
-        echo "failed"
+        echo "Scalaris node \"${SCALARIS_NODE}\" is not running"
     fi
 
     return $result
@@ -106,12 +108,14 @@ stop() {
         echo -n "Killing Scalaris node \"${SCALARIS_NODE}\"... "
         killproc -p $PID_DS screen
         result=$?
-    fi
-    if [ $result -eq 0 ]; then
-        rm -f $PID_DS
-        echo "success"
+        if [ $result -eq 0 ]; then
+            rm -f $PID_DS
+            echo "success"
+        else
+            echo "failed"
+        fi
     else
-        echo "failed"
+        echo "Scalaris node \"${SCALARIS_NODE}\" is not running"
     fi
 
     return $result
