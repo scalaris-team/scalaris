@@ -26,8 +26,6 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--include_lib("eunit/include/eunit.hrl").
-
 all() -> [
         distance
     ].
@@ -37,8 +35,12 @@ suite() ->
         {timetrap, {seconds, 30}}
     ].
 
-init_per_suite(Config) -> Config.
-end_per_suite(Config) -> Config.
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
 
 % Test dc_centroids:distance/2
 %
