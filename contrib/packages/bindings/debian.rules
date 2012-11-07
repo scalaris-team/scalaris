@@ -5,9 +5,6 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-# This is the debhelper compatibility version to use.
-export DH_COMPAT=4
-
 RUBY_SITELIB:=$(shell ruby1.8 -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')
 PYTHON_SITELIB:=$(shell python -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON-NOT-FOUND)
 PYTHON3_SITELIB:=$(shell python3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON3-NOT-FOUND)
@@ -57,7 +54,7 @@ BUILD_DIR_PYTHON3:=$(CURDIR)/debian/python3-scalaris
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_prep
 	dh_installdirs
 
 	# Add here commands to install the package into debian/gentoo.
