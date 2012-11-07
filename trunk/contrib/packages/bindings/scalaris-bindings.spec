@@ -5,7 +5,7 @@ Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
-License:        ASL 2.0
+License:        Apache-2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
