@@ -56,7 +56,8 @@ if [ ${result} -eq 0 ]; then
   sourcefolder=${package_folder}
   sed -e "s/%define pkg_version .*/%define pkg_version ${pkg_version}/g" \
       < ${sourcefolder}/scalaris-examples-wiki.spec  > ./scalaris-examples-wiki.spec && \
-  cp  ${sourcefolder}/scalaris-examples-wiki.changes   ./scalaris-examples-wiki.changes
+  cp  ${sourcefolder}/scalaris-examples-wiki.changes   ./scalaris-examples-wiki.changes && \
+  cp  ${sourcefolder}/scalaris-examples-wiki-rpmlintrc ./scalaris-examples-wiki-rpmlintrc
   result=$?
 fi
 

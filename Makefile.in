@@ -36,6 +36,8 @@ datarootdir = @datarootdir@
 
 # /bin
 BINDIR = $(DESTDIR)@bindir@
+# /sbin
+SBINDIR = $(DESTDIR)@sbindir@
 # /etc/scalaris/
 ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
 # /etc/init.d/
@@ -572,6 +574,7 @@ install-erlang: compile
 	install -d $(INITDIR)
 	install -m 744 -t $(INITDIR) \
 	           contrib/init.d/scalaris
+	ln -s $(INITDIR)/scalaris $(SBINDIR)/rcscalaris
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \
