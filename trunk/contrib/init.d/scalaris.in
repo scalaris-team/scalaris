@@ -96,7 +96,7 @@ gstop() {
             echo "failed"
         fi
     else
-        echo "Scalaris node \"${SCALARIS_NODE}\" is not running"
+        echo "Scalaris node \"${SCALARIS_NODE}\" has not been running"
     fi
 
     return $result
@@ -115,7 +115,7 @@ stop() {
             echo "failed"
         fi
     else
-        echo "Scalaris node \"${SCALARIS_NODE}\" is not running"
+        echo "Scalaris node \"${SCALARIS_NODE}\" has not been running"
     fi
 
     return $result
