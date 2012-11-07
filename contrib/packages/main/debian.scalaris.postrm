@@ -2,7 +2,6 @@
 set -e
 
 if [ "$1" = "purge" ]; then
-  rm -f /etc/scalaris/scalaris.cfg
   echo "Removing Scalaris RC-links"
   update-rc.d -f scalaris remove > /dev/null
 fi
