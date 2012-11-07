@@ -36,6 +36,7 @@ public class MyMagicWord extends MagicWord {
         // statistics
         MY_MAGIC_WORDS.add(MAGIC_CURRENT_VERSION);
         // page values
+        MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
         MY_MAGIC_WORDS.add(MAGIC_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME_E);
@@ -101,7 +102,6 @@ public class MyMagicWord extends MagicWord {
         
         // check whether numbers should be printed in raw format and
         // remove this tag from the parameter string:
-        @SuppressWarnings("unused")
         boolean rawNumber = false;
         if (parameter.equals("R")) {
             parameter = "";
@@ -219,6 +219,17 @@ public class MyMagicWord extends MagicWord {
             return MagicWord.processMagicWord(MAGIC_FULL_PAGE_NAME, parameter, model);
         } else if (name.equals(MAGIC_TALK_PAGE_NAME_E)) {
             return MagicWord.processMagicWord(MAGIC_TALK_PAGE_NAME, parameter, model);
+
+        /*
+         * Technical metadata / Latest revision to current page
+         */
+        } else if (name.equals(MAGIC_PAGE_SIZE)) {
+            final String revText = model.retrievePage(parameter, null, false);
+            int size = 0;
+            if (revText != null) {
+                size = revText.getBytes().length;
+            }
+            return model.formatStatisticNumber(rawNumber, size);
         }
         
         return name;
