@@ -25,8 +25,6 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--include_lib("eunit/include/eunit.hrl").
-
 all() -> [
         single_node
         , two_nodes
@@ -38,8 +36,7 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    Config2.
+    unittest_helper:init_per_suite(Config).
 
 init_per_testcase(Testcase, Config) ->
     % dc_clustering must be activated and a radius must exist
@@ -72,7 +69,7 @@ init_per_testcase(Testcase, Config) ->
 
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
-    Config.
+    ok.
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node
 get_vivaldi_and_centroids(Vivaldi, Clustering) ->
