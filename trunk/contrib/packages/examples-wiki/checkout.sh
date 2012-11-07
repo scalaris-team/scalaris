@@ -70,13 +70,14 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
       -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
-      < ${sourcefolder}/debian.changelog           > ./debian.changelog && \
+      < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
+  cp  ${sourcefolder}/debian.compat                   ./debian.compat && \
   cp  ${sourcefolder}/debian.control                  ./debian.control && \
   cp  ${sourcefolder}/debian.rules                    ./debian.rules && \
   cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat5.conffiles \
-                                                     ./debian.scalaris-examples-wiki-tomcat5.conffiles && \
+                                                      ./debian.scalaris-examples-wiki-tomcat5.conffiles && \
   cp  ${sourcefolder}/debian.scalaris-examples-wiki-tomcat6.conffiles \
-                                                     ./debian.scalaris-examples-wiki-tomcat6.conffiles
+                                                      ./debian.scalaris-examples-wiki-tomcat6.conffiles
 
   result=$?
 fi

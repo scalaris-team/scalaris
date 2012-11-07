@@ -58,10 +58,10 @@ if [ ${result} -eq 0 ]; then
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
       -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
       < ${sourcefolder}/debian.changelog           > ./debian.changelog && \
+  cp  ${sourcefolder}/debian.compat                  ./debian.compat && \
   cp  ${sourcefolder}/debian.control                 ./debian.control && \
   cp  ${sourcefolder}/debian.rules                   ./debian.rules && \
   cp  ${sourcefolder}/debian.scalaris.install        ./debian.scalaris.install && \
-  cp  ${sourcefolder}/debian.scalaris.conffiles      ./debian.scalaris.conffiles && \
   cp  ${sourcefolder}/debian.scalaris.prerm          ./debian.scalaris.prerm && \
   cp  ${sourcefolder}/debian.scalaris.postrm         ./debian.scalaris.postrm && \
   cp  ${sourcefolder}/debian.scalaris.postinst       ./debian.scalaris.postinst && \

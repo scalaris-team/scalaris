@@ -55,6 +55,7 @@ if [ ${result} -eq 0 ]; then
       < ${sourcefolder}/conpaas-scalarix.dsc           > ./conpaas-scalarix.dsc && \
   sed -e "s/(.*-.*)/(${pkg_version}-1)/g" \
       < ${sourcefolder}/debian.changelog               > ./debian.changelog && \
+  cp  ${sourcefolder}/debian.compat                      ./debian.compat && \
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
   cp  ${sourcefolder}/debian.conpaas-scalarix-one-client.install    ./debian.conpaas-scalarix-one-client.install && \
