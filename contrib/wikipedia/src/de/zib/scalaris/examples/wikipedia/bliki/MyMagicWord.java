@@ -18,7 +18,6 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 import info.bliki.wiki.filter.MagicWord;
 
 import java.util.HashSet;
-import java.util.Set;
 
 import de.zib.scalaris.examples.wikipedia.Options;
 
@@ -29,7 +28,7 @@ import de.zib.scalaris.examples.wikipedia.Options;
  */
 public class MyMagicWord extends MagicWord {
 
-    private static Set<String> MY_MAGIC_WORDS = new HashSet<String>(100);
+    private static HashSet<String> MY_MAGIC_WORDS = new HashSet<String>(100);
 
     // private HashMap parameterValues = new HashMap();
 
