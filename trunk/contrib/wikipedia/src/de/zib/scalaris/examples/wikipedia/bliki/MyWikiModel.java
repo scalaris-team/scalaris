@@ -45,6 +45,7 @@ import com.skjegstad.utils.BloomFilter;
 
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
+import de.zib.scalaris.examples.wikipedia.RevisionResult;
 
 /**
  * Wiki model fixing some bugs of {@link WikiModel} and adding some
@@ -406,7 +407,7 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Retrieves the contents of the given page (override in sub-classes!).
+     * Retrieves the contents of the given page.
      * 
      * @param namespace
      *            the namespace of the page
@@ -417,6 +418,7 @@ public class MyWikiModel extends WikiModel {
      *            otherwise
      * 
      * @return <tt>null</tt>
+     * @see #retrievePage(String, String, Map, boolean)
      */
     final protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters) {
@@ -424,7 +426,7 @@ public class MyWikiModel extends WikiModel {
     }
 
     /**
-     * Retrieves the contents of the given page (override in sub-classes!).
+     * Retrieves the contents of the given page.
      * 
      * @param pageName0
      *            the unnormalised name of the page
@@ -436,6 +438,7 @@ public class MyWikiModel extends WikiModel {
      *            should be followed)
      * 
      * @return the page's contents or <tt>null</tt> if no connection exists
+     * @see #retrievePage(String, String, Map, boolean)
      */
     final protected String retrievePage(String pageName0,
             Map<String, String> templateParameters, boolean followRedirect) {
@@ -444,7 +447,14 @@ public class MyWikiModel extends WikiModel {
     }
 
     /**
-     * Retrieves the contents of the given page (override in sub-classes!).
+     * Retrieves the contents of the given page.
+     * 
+     * If {@link #hasDBConnection()} is <tt>true</tt>, uses
+     * {@link #getRevFromDB(NormalisedTitle)} to get the content from the DB. If
+     * <tt>followRedirect</tt> is set, resolves redirects by including the
+     * redirected content instead.
+     * 
+     * Caches retrieved pages in {@link #pageCache}.
      * 
      * @param namespace
      *            the namespace of the page
@@ -461,7 +471,68 @@ public class MyWikiModel extends WikiModel {
      */
     protected String retrievePage(String namespace, String articleName,
             Map<String, String> templateParameters, boolean followRedirect) {
+
+        if (articleName.isEmpty()) {
+            return null;
+        }
+        
+        // normalise page name:
+        NormalisedTitle pageName = normalisePageTitle(namespace, articleName);
+        if (pageCache.containsKey(pageName)) {
+            return pageCache.get(pageName);
+        } else if (hasDBConnection()) {
+            String text = null;
+            // System.out.println("retrievePage(" + namespace + ", " + articleName + ")");
+            RevisionResult getRevResult = getRevFromDB(pageName);
+            addStats(getRevResult.stats);
+            addInvolvedKeys(getRevResult.involvedKeys);
+            if (getRevResult.success) {
+                text = getRevResult.revision.unpackedText();
+                if (getRevResult.page.isRedirect()) {
+                    final Matcher matcher = MATCH_WIKI_REDIRECT.matcher(text);
+                    if (matcher.matches()) {
+                        String[] redirFullName = splitNsTitle(matcher.group(1));
+                        if (followRedirect) {
+                            // see https://secure.wikimedia.org/wikipedia/en/wiki/Help:Redirect#Transclusion
+                            String redirText = retrievePage(redirFullName[0], redirFullName[1], templateParameters, false);
+                            if (redirText != null && !redirText.isEmpty()) {
+                                text = redirText;
+                            } else {
+                                text = "<ol><li>REDIRECT [["
+                                        + createFullPageName(redirFullName[0],
+                                                redirFullName[1]) + "]]</li></ol>";
+                            }
+                        } else {
+                            // we must disarm the redirect here!
+                            text = "<ol><li>REDIRECT [["
+                                    + createFullPageName(redirFullName[0],
+                                            redirFullName[1]) + "]]</li></ol>";
+                        }
+                    } else {
+                        // we must disarm the redirect here!
+                        System.err.println("Couldn't parse the redirect title from: " + text);
+                        text = null;
+                    }
+                }
+            } else {
+                // NOTE: must return null for non-existing pages in order for #ifexist to work correctly!
+                // System.err.println(getRevResult.message);
+                // text = "<b>ERROR: template " + pageName + " not available: " + getRevResult.message + "</b>";
+            }
+            pageCache.put(pageName, text);
+            return text;
+        }
         return null;
+    }
+    
+    protected boolean hasDBConnection() {
+        return false;
+    }
+    
+    protected RevisionResult getRevFromDB(NormalisedTitle title) {
+        return new RevisionResult(false, new ArrayList<InvolvedKey>(),
+                "no DB connection", true, title, null, null, false,
+                false, title.toString(), 0l);
     }
 
     /* (non-Javadoc)
