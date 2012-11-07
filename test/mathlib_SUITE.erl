@@ -26,8 +26,6 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--include_lib("eunit/include/eunit.hrl").
-
 all() -> [
         euclidian_distance
         , nearest_centroid
@@ -40,10 +38,12 @@ suite() ->
         {timetrap, {seconds, 30}}
     ].
 
-init_per_suite(Config) -> 
-    unittest_helper:init_per_suite(Config),
-    Config.
-end_per_suite(Config) -> Config.
+init_per_suite(Config) ->
+    unittest_helper:init_per_suite(Config).
+
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
 
 %% helper functions
 -spec in(X::any(), List::[any()]) -> boolean().
@@ -188,7 +188,7 @@ closest_points(_Config) ->
 % - XXX What should it do if elements/coordinates are duplicated?
 agglomerative_clustering(_Config) ->
     % crash when radius < 0
-    ?assertError(function_clause, mathlib:aggloClustering([], -1)),
+    ?expect_exception(mathlib:aggloClustering([], -1), error, function_clause),
 
     % empty centroid list
     ?equals(mathlib:aggloClustering([], 0), []),
