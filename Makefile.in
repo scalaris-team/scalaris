@@ -575,7 +575,7 @@ install-erlang: compile
 	install -m 744 -t $(INITDIR) \
 	           contrib/init.d/scalaris
 	install -d $(SBINDIR)
-	ln -s @sysconfdir@/init.d $(SBINDIR)/rcscalaris
+	ln -sf @sysconfdir@/init.d $(SBINDIR)/rcscalaris
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \
