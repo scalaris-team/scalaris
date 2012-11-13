@@ -57,7 +57,7 @@
     {report_single, Process::atom(), Key::key(),
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
     {check_timeslots} |
-    {get_rrds, [{Process::atom(), Key::key()},...], SourcePid::comm:mypid()} |
+    {get_rrds, [table_index(),...], SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
