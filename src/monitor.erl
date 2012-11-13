@@ -38,7 +38,10 @@
 % reporting to the monitor for manually-maintained rrd records
 -export([check_report/4]).
 
--export([get_rrds/2]).
+-export([get_rrds/2
+         , get_rrd_keys/0
+         , get_rrd_keys/1
+        ]).
 
 -ifdef(with_export_type_support).
 -export_type([key/0]).
@@ -234,6 +237,11 @@ on({get_rrds, TableIndexes, SourcePid}, {Table, ApiTxReqList} = State) ->
     comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 
+on({get_rrd_keys, SourcePid}, {Table, _} = State) ->
+    Keys = get_all_keys(Table),
+    comm:send_local(SourcePid, {get_rrd_keys, Keys}),
+    State;
+
 on({web_debug_info, Requestor}, {Table, _ApiTxReqList} = State) ->
     Keys = get_all_keys(Table),
     GroupedLast5 = [begin
@@ -339,3 +347,26 @@ get_timeslots_to_keep() ->
 -spec get_check_timeslots_interval() -> 10000.
 get_check_timeslots_interval() ->
     10 * 1000. % every 10s
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Convenience API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Get the available RRD keys
+-spec get_rrd_keys() -> [table_index()].
+get_rrd_keys() ->
+    Monitor = case pid_groups:get_my(monitor) of
+        failed -> pid_groups:find_a(monitor);
+        M -> M
+    end,
+    get_rrd_keys(Monitor).
+
+-spec get_rrd_keys(comm:erl_local_pid()) -> [table_index()].
+get_rrd_keys(MonitorPid) ->
+    comm:send_local(MonitorPid, {get_rrd_keys, self()}),
+    receive
+        {get_rrd_keys, Keys} -> Keys
+    after 2000 ->
+            timeout
+    end
+    .
