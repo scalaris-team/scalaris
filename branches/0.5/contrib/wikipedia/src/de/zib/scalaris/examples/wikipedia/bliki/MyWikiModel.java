@@ -16,8 +16,10 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.htmlcleaner.TagNode;
+import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.filter.ITextConverter;
+import info.bliki.wiki.model.AbstractWikiModel;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.namespaces.Namespace;
@@ -316,7 +318,9 @@ public class MyWikiModel extends WikiModel {
         int index = templateName.indexOf(':');
         String magicWord = templateName;
         String parameter = "";
+        boolean hasParameter = false;
         if (index > 0) {
+            hasParameter = true;
             // if it is a magic word, the first part is the word itself, the second its parameters
             magicWord = templateName.substring(0, index);
             parameter = templateName.substring(index + 1).trim();
@@ -327,7 +331,7 @@ public class MyWikiModel extends WikiModel {
             if (magicWordCache.containsKey(templateName)) {
                 return magicWordCache.get(templateName);
             } else {
-                String value = retrieveMagicWord(templateName, magicWord, parameter);
+                String value = retrieveMagicWord(templateName, magicWord, parameter, hasParameter);
                 magicWordCache.put(templateName, value);
                 return value;
             }
@@ -359,13 +363,16 @@ public class MyWikiModel extends WikiModel {
      * @param magicWord
      *            the magic word alone
      * @param parameter
-     *            the parameters of the magic word
+     *            the parameters of the magic word name
+     * @param hasParameter
+     *            whether a parameter was given or not (cannot distinguish from
+     *            <tt>parameter</tt> value alone)
      * 
      * @return the contents of the magic word
      */
     protected String retrieveMagicWord(String templateName, String magicWord,
-            String parameter) {
-        return MyMagicWord.processMagicWord(templateName, parameter, this);
+            String parameter, boolean hasParameter) {
+        return MyMagicWord.processMagicWord(templateName, parameter, this, hasParameter);
     }
     
     /**
@@ -585,19 +592,6 @@ public class MyWikiModel extends WikiModel {
      * 
      * @param fullTitle
      *            the (full) title including a namespace (if present)
-     * 
-     * @return a 2-element array with the namespace (index 0) and the page title
-     *         (index 1)
-     */
-    public String[] splitNsTitle(String fullTitle) {
-        return splitNsTitle(fullTitle, getNamespace());
-    }
-
-    /**
-     * Splits the given full title into its namespace and page title components.
-     * 
-     * @param fullTitle
-     *            the (full) title including a namespace (if present)
      * @param nsObject
      *            the namespace for determining how to split the title
      * 
@@ -622,17 +616,7 @@ public class MyWikiModel extends WikiModel {
      *         (index 1)
      */
     private static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject, boolean onlyValidNs) {
-        int colonIndex = fullTitle.indexOf(':');
-        if (colonIndex != (-1)) {
-            String maybeNs = normaliseName(fullTitle.substring(0, colonIndex));
-            if (!onlyValidNs || nsObject.getNumberByName(maybeNs) != null) {
-                // this is a real namespace
-                return new String[] { maybeNs,
-                        normaliseName(fullTitle.substring(colonIndex + 1)) };
-            }
-            // else: page belongs to the main namespace and only contains a colon
-        }
-        return new String[] {"", normaliseName(fullTitle)};
+        return AbstractWikiModel.splitNsTitle(fullTitle, nsObject, onlyValidNs, true, ' ');
     }
 
     /**
@@ -825,31 +809,7 @@ public class MyWikiModel extends WikiModel {
      * @return a normalised string
      */
     public static String normaliseName(final String value) {
-        StringBuilder sb = new StringBuilder(value.length());
-        boolean whiteSpace = true;
-        boolean first = true;
-        for (int i = 0; i < value.length(); ++i) {
-            char c = value.charAt(i);
-            switch (c) {
-                case ' ':
-                case '_':
-                    if (!whiteSpace) {
-                        sb.append(' ');
-                    }
-                    whiteSpace = true;
-                    break;
-                default:
-                    if (first) {
-                        sb.append(Character.toUpperCase(c));
-                        first = false;
-                    } else {
-                        sb.append(c);
-                    }
-                    whiteSpace = false;
-                    break;
-            }
-        }
-        return sb.toString().trim();
+        return Encoder.normaliseTitle(value, true, ' ');
     }
     
     /**
