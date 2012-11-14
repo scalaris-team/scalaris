@@ -2,14 +2,14 @@
 <%@page import="de.zib.scalaris.examples.wikipedia.bliki.WikiServlet"%>
 <%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
- import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,org.apache.commons.lang.StringUtils,org.apache.commons.lang.StringEscapeUtils"%>
+ import="java.util.Calendar,java.util.Locale,java.text.DateFormat,java.text.SimpleDateFormat,java.util.TimeZone,java.util.Iterator,java.util.Map,java.util.List,org.apache.commons.lang.StringUtils,org.apache.commons.lang.StringEscapeUtils,java.net.URLEncoder"%>
 <jsp:useBean id="pageBean" type="de.zib.scalaris.examples.wikipedia.bliki.WikiPageEditBean" scope="request" />
 <jsp:useBean id="servlet" type="de.zib.scalaris.examples.wikipedia.WikiServletContext" scope="request" />
 <% /* created page based on https://secure.wikimedia.org/wiktionary/simple/wiki/relief */ %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="${ pageBean.wikiLang }" dir="${ pageBean.wikiLangDir }" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<% final String safePageTitle = StringEscapeUtils.escapeHtml(pageBean.getTitle()); %>
+<% final String safePageTitle = StringEscapeUtils.escapeHtml(URLEncoder.encode(pageBean.getTitle(), "UTF-8")); %>
 <% final String andServiceUser = pageBean.getServiceUser().isEmpty() ? "" : "&amp;service_user=" + pageBean.getServiceUser(); %>
 <title>Changing ${ pageBean.title } - ${ pageBean.wikiTitle }</title>
 <!--<% if (!pageBean.getError().isEmpty()) { %>
@@ -166,13 +166,16 @@ ${ pageBean.preview }
 				<p>Templates used on this page:</p>
 				</div>
 				<ul>
-                <% for (String include : pageBean.getIncludes()) { %>
-                <li><a href="wiki?title=<%= include %>" title="<%= include %>"><%= include %></a> (<a href="wiki?title=<%= include %>&amp;action=edit" title="<%= include %>">edit</a>) </li>
+                <% for (String include : pageBean.getIncludes()) {
+                    String safeInclude = StringEscapeUtils.escapeHtml(URLEncoder.encode(include, "UTF-8"));
+                    %>
+                <li><a href="wiki?title=<%= safeInclude %>" title="<%= include %>"><%= include %></a> (<a href="wiki?title=<%= safeInclude %>&amp;action=edit" title="<%= include %>">edit</a>) </li>
                 <% } %>
 				<% for (String template0 : pageBean.getTemplates()) {
 				    String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
+                    String safeTemplate = StringEscapeUtils.escapeHtml(URLEncoder.encode(template, "UTF-8"));
 				    %>
-                <li><a href="wiki?title=<%= template %>" title="<%= template %>"><%= template %></a> (<a href="wiki?title=<%= template %>&amp;action=edit" title="<%= template %>">edit</a>) </li>
+                <li><a href="wiki?title=<%= safeTemplate %>" title="<%= template %>"><%= template %></a> (<a href="wiki?title=<%= safeTemplate %>&amp;action=edit" title="<%= template %>">edit</a>) </li>
                 <% } %>
 				</ul>
 				</div>
