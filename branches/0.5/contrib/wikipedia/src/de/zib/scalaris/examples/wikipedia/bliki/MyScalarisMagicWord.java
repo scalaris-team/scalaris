@@ -16,8 +16,7 @@
 package de.zib.scalaris.examples.wikipedia.bliki;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
@@ -31,7 +30,7 @@ import de.zib.scalaris.examples.wikipedia.ValueResult;
  */
 public class MyScalarisMagicWord extends MyMagicWord {
 
-    private static List<String> MY_MAGIC_WORDS = new ArrayList<String>();
+    private static HashSet<String> MY_MAGIC_WORDS = new HashSet<String>(20);
 
     // private HashMap parameterValues = new HashMap();
 
