@@ -382,8 +382,9 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
 
         // write:
         // get previous categories, templates and backlinks:
-        final MyWikiModel wikiModel = new MyWikiModel("", "", new MyNamespace(siteinfo));
-        wikiModel.setPageName(title0);
+        final MyWikiModel wikiModel = new MyWikiModel("", "", nsObject);
+        wikiModel.setNamespaceName(nsObject.getNamespaceByNumber(normTitle.namespace));
+        wikiModel.setPageName(normTitle.title);
         Set<String> oldCats;
         Set<String> oldTpls;
         Set<String> oldLnks;
