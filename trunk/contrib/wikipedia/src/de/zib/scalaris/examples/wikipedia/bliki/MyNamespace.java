@@ -19,7 +19,9 @@ import info.bliki.Messages;
 import info.bliki.wiki.namespaces.Namespace;
 
 import java.util.ListResourceBundle;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -274,17 +276,10 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
     public MyNamespace(SiteInfo siteinfo) {
         super(new MyResourceBundle(siteinfo));
         this.siteinfo = siteinfo;
-        initializeAliases();
-    }
-
-    /**
-     * Initialises a mapping of namespace strings to integers.
-     */
-    private void initializeAliases() {
-        addAlias("Bild", Namespace.FILE_NAMESPACE_KEY);
-        addAlias("Bild Diskussion", Namespace.FILE_TALK_NAMESPACE_KEY);
-        addAlias("Imagen", Namespace.FILE_NAMESPACE_KEY);
-        addAlias("Imagen discusión", Namespace.FILE_TALK_NAMESPACE_KEY);
+        Locale locale = siteinfo.extractLolace();
+        if (locale != null) {
+            initializeAliases(Messages.getResourceBundle(locale));
+        }
     }
 
     /* (non-Javadoc)
