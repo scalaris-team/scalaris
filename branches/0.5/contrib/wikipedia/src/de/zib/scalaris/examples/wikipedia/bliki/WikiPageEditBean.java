@@ -15,6 +15,9 @@
  */
 package de.zib.scalaris.examples.wikipedia.bliki;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Bean with the content to display in the jsp (only for editing articles).
  * 
@@ -30,6 +33,16 @@ public class WikiPageEditBean extends WikiPageBeanBase {
      * the preview part of the site
      */
     private String preview = "";
+    
+    /**
+     * set of templates for the review content
+     */
+    private Set<String> templates = new HashSet<String>();
+    
+    /**
+     * set of transcludes (other than templates) for the review content
+     */
+    private Set<String> includes = new HashSet<String>();
     
     /**
      * the summary field of the site
@@ -105,5 +118,33 @@ public class WikiPageEditBean extends WikiPageBeanBase {
      */
     public void setNewPage(boolean isNewPage) {
         this.isNewPage = isNewPage;
+    }
+
+    /**
+     * @param templates
+     */
+    public void setTemplates(Set<String> templates) {
+        this.templates = templates;
+    }
+
+    /**
+     * @return the templates
+     */
+    public Set<String> getTemplates() {
+        return templates;
+    }
+
+    /**
+     * @param includes
+     */
+    public void setIncludes(Set<String> includes) {
+        this.includes = includes;
+    }
+
+    /**
+     * @return the includes
+     */
+    public Set<String> getIncludes() {
+        return includes;
     }
 }

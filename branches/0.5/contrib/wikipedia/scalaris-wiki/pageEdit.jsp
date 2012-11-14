@@ -160,23 +160,23 @@ ${ pageBean.preview }
 				If you did not write this yourself, it must be available under terms consistent with the <a href="wiki?title=Terms of Use<%= andServiceUser %>" rel="nofollow">Terms of Use</a>, and you agree to follow any relevant licensing requirements.
 				</p></div>
 				<div class="mw-editTools"></div>
+				<% if (!pageBean.getTemplates().isEmpty()) { %>
 				<div class='templatesUsed'>
 				<div class="mw-templatesUsedExplanation">
 				<p>Templates used on this page:</p>
 				</div>
 				<ul>
-<% /* TODO: parse templates
-				<li><a href="/wiktionary/simple/wiki/Template:audio" title="Template:audio">Template:audio</a> (<a href="/wiktionary/simple/w/index.php?title=Template:audio&amp;action=edit" title="Template:audio">view source</a>) (semi-protected)</li>
-				<li><a href="/wiktionary/simple/wiki/Template:context" title="Template:context">Template:context</a> (<a href="/wiktionary/simple/w/index.php?title=Template:context&amp;action=edit" title="Template:context">view source</a>) (semi-protected)</li>
-				<li><a href="/wiktionary/simple/wiki/Template:creatable" title="Template:creatable">Template:creatable</a> (<a href="/wiktionary/simple/w/index.php?title=Template:creatable&amp;action=edit" title="Template:creatable">view source</a>) (semi-protected)</li>
-				<li><a href="/wiktionary/simple/wiki/Template:creation_helper" title="Template:creation helper">Template:creation helper</a> (<a href="/wiktionary/simple/w/index.php?title=Template:creation_helper&amp;action=edit" title="Template:creation helper">view source</a>) (semi-protected)</li>
-				<li><a href="/wiktionary/simple/wiki/Template:cu_noun" title="Template:cu noun">Template:cu noun</a> (<a href="/wiktionary/simple/w/index.php?title=Template:cu_noun&amp;action=edit" title="Template:cu noun">edit</a>) </li>
-				<li><a href="/wiktionary/simple/wiki/Template:noun" title="Template:noun">Template:noun</a> (<a href="/wiktionary/simple/w/index.php?title=Template:noun&amp;action=edit" title="Template:noun">view source</a>) (semi-protected)</li>
-				<li><a href="/wiktionary/simple/wiki/Template:singular" title="Template:singular">Template:singular</a> (<a href="/wiktionary/simple/w/index.php?title=Template:singular&amp;action=edit" title="Template:singular">edit</a>) </li>
-				<li><a href="/wiktionary/simple/wiki/Template:uncountable" title="Template:uncountable">Template:uncountable</a> (<a href="/wiktionary/simple/w/index.php?title=Template:uncountable&amp;action=edit" title="Template:uncountable">view source</a>) (semi-protected)</li>
-*/ %>
+                <% for (String include : pageBean.getIncludes()) { %>
+                <li><a href="wiki?title=<%= include %>" title="<%= include %>"><%= include %></a> (<a href="wiki?title=<%= include %>&amp;action=edit" title="<%= include %>">edit</a>) </li>
+                <% } %>
+				<% for (String template0 : pageBean.getTemplates()) {
+				    String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
+				    %>
+                <li><a href="wiki?title=<%= template %>" title="<%= template %>"><%= template %></a> (<a href="wiki?title=<%= template %>&amp;action=edit" title="<%= template %>">edit</a>) </li>
+                <% } %>
 				</ul>
 				</div>
+				<% } %>
 				<div class='hiddencats'>
 				</div>
 				</form>
