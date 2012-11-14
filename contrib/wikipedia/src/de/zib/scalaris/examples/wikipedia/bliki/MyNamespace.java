@@ -32,8 +32,6 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  */
 public class MyNamespace extends Namespace implements NamespaceUtils {
     private SiteInfo siteinfo;
-    protected final Map<String, Integer> NAMESPACE_INT_MAP =
-            new TreeMap<String, Integer>(String.CASE_INSENSITIVE_ORDER);
     
     /**
      * Smallest namespace ID (for iterating over all namespaces).
