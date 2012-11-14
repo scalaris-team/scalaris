@@ -1839,6 +1839,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         MyWikiModel wikiModel = getWikiModel(connection, page);
         wikiModel.setPageName(title);
         page.setPreview(wikiModel.renderPageWithCache(content));
+        page.setIncludes(wikiModel.getIncludes());
+        page.setTemplates(wikiModel.getTemplates());
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         page.setPage(content);
