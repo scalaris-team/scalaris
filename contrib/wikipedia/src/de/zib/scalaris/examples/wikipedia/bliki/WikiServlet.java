@@ -110,7 +110,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * https://secure.wikimedia.org/wikipedia/en/wiki/Main_Page
      */
     protected static final Pattern MATCH_WIKI_SITE_BASE = Pattern.compile("^(http[s]?://.+)(/wiki/.*)$");
-    protected static final Pattern MATCH_WIKI_SITE_LANG = Pattern.compile("^http[s]?://([^.]+).*$");
     
     protected String currentImport = "";
 
@@ -275,15 +274,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     protected void setLocalisedSpecialPageNames() {
         if (initialized) {
-            String fullBaseUrl = siteinfo.getBase();
-            String lang = "en";
-            Matcher matcher = MATCH_WIKI_SITE_LANG.matcher(fullBaseUrl);
-            if (matcher.matches()) {
-                lang = matcher.group(1);
-                final EnumMap<SpecialPage, String> specialSuffixLang = MyWikiModel.SPECIAL_SUFFIX.get(lang);
-                if (specialSuffixLang != null) {
-                    SPECIAL_SUFFIX_LANG = specialSuffixLang;
-                }
+            String lang = siteinfo.extractLang();
+            final EnumMap<SpecialPage, String> specialSuffixLang = MyWikiModel.SPECIAL_SUFFIX.get(lang);
+            if (specialSuffixLang != null) {
+                SPECIAL_SUFFIX_LANG = specialSuffixLang;
             }
         }
         // note: we always need to add these suffixes, even if lang == "en"
