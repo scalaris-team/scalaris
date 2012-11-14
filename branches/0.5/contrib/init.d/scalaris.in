@@ -49,7 +49,7 @@ fi
 start() {
     if [ -f $PID_DS ]; then
         PROCPID=`cat $PID_DS`
-        if [ ! -e /proc/$PROCPID ];then
+        if [ -e /proc/$PROCPID ];then
             echo "Scalaris node \"${SCALARIS_NODE}\" already started"
             return 0
         fi

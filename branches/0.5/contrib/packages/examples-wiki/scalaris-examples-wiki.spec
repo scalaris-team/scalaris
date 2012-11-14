@@ -145,7 +145,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_tomcat5}
 %files -n scalaris-examples-wiki-tomcat5
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir /usr/share/tomcat5
 %dir /usr/share/tomcat5/webapps
 /usr/share/tomcat5/webapps/scalaris-wiki
@@ -153,7 +153,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_tomcat6}
 %files -n scalaris-examples-wiki-tomcat6
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir /usr/share/tomcat6
 %dir /usr/share/tomcat6/webapps
 /usr/share/tomcat6/webapps/scalaris-wiki
@@ -161,7 +161,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %if 0%{?with_tomcat7}
 %files -n scalaris-examples-wiki-tomcat7
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir /usr/share/tomcat
 %dir /usr/share/tomcat/webapps
 /usr/share/tomcat/webapps/scalaris-wiki
