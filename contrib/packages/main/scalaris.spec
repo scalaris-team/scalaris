@@ -8,7 +8,7 @@ Name:           scalaris
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
 Release:        1
-License:        ASL 2.0
+License:        Apache-2.0
 Group:          Productivity/Databases/Servers
 URL:            http://code.google.com/p/scalaris
 Source0:        %{name}-%{version}.tar.gz
@@ -63,12 +63,12 @@ processing with strong consistency over replicas. Scalaris is
 implemented in Erlang.
 
 %package doc
-Summary:    Documentation for scalaris
+Summary:    Documentation for Scalaris
 Group:      Documentation/Other
 Requires:   %{name} == %{version}-%{release}
 
 %description doc
-Documentation for scalaris.
+Documentation for Scalaris including its User-Dev-Guide.
 
 %prep
 %setup -q -n %{name}-%{version}
