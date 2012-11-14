@@ -18,6 +18,8 @@ package de.zib.scalaris.examples.wikipedia.data;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Represents generic site information.
@@ -58,6 +60,8 @@ public class SiteInfo implements Serializable {
      * @see #getNamespaces()
      */
     public final static String NAMESPACE_CASE = "case";
+    
+    protected static final Pattern MATCH_WIKI_SITE_LANG = Pattern.compile("^http[s]?://([^.]+).*$");
 
     /**
      * Creates a site info object with the given data.
@@ -108,6 +112,22 @@ public class SiteInfo implements Serializable {
      */
     public void setBase(String base) {
         this.base = base;
+    }
+    
+    /**
+     * Extract the language string from {@link #base}. Assumes <tt>en</tt> if no
+     * match is found.
+     * 
+     * @return Wikipedia language code
+     * @see #getBase()
+     */
+    public String extractLang() {
+        String lang = "en";
+        Matcher matcher = MATCH_WIKI_SITE_LANG.matcher(base);
+        if (matcher.matches()) {
+            lang = matcher.group(1);
+        }
+        return lang;
     }
 
     /**
