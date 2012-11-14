@@ -32,7 +32,7 @@ public class MyFullurl extends Fullurl {
     public String parseFunction(List<String> list, IWikiModel model,
             char[] src, int beginIndex, int endIndex, boolean isSubst)
             throws UnsupportedEncodingException {
-        final String server = MyMagicWord.processMagicWord("{{SERVER}}", "", model);
+        final String server = MyMagicWord.processMagicWord("{{SERVER}}", "", model, false);
         final String localurl = MyLocalurl.CONST.parseFunction(list, model,
                 src, beginIndex, endIndex, isSubst);
         return server + localurl;

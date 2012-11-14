@@ -77,14 +77,17 @@ public class MySQLiteWikiModel extends MyWikiModel {
      *            the magic word alone
      * @param parameter
      *            the parameters of the magic word
+     * @param hasParameter
+     *            whether a parameter was given or not (cannot distinguish from
+     *            <tt>parameter</tt> value alone)
      * 
      * @return the contents of the magic word (see
      *         {@link MySQLiteMagicWord#processMagicWord(String, String, info.bliki.wiki.model.IWikiModel)})
      */
     @Override
     protected String retrieveMagicWord(String articleName, String magicWord,
-            String parameter) {
-        return MySQLiteMagicWord.processMagicWord(magicWord, parameter, this);
+            String parameter, boolean hasParameter) {
+        return MySQLiteMagicWord.processMagicWord(magicWord, parameter, this, hasParameter);
     }
     
     @Override
