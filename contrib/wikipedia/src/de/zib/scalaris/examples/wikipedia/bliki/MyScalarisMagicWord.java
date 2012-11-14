@@ -76,18 +76,25 @@ public class MyScalarisMagicWord extends MyMagicWord {
      * Process a magic word, returning the value corresponding to the magic
      * word.
      * 
-     * @param name      the template name, i.e. a magic word
-     * @param origParameter the template parameters
-     * @param model     the currently used model
+     * @param name
+     *            the template name, i.e. a magic word
+     * @param origParameter
+     *            the template parameters
+     * @param model
+     *            the currently used model
+     * @param hasParameter
+     *            whether a parameter was given or not (cannot distinguish from
+     *            <tt>parameter</tt> value alone)
      * 
      * @return the value of the magic word
      * 
-     * @see <a href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
+     * @see <a
+     *      href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
      */
     public static String processMagicWord(final String name,
-            final String origParameter, final MyScalarisWikiModel model) {
+            final String origParameter, final MyScalarisWikiModel model, boolean hasParameter) {
         if (!isMyMagicWord(name)) {
-            return MyMagicWord.processMagicWord(name, origParameter, model);
+            return MyMagicWord.processMagicWord(name, origParameter, model, hasParameter);
         }
         
         // check whether numbers should be printed in raw format and
