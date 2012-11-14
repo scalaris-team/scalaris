@@ -180,6 +180,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     public static class MyResourceBundle extends ListResourceBundle {
         protected SiteInfo siteinfo;
+        protected ResourceBundle langResBundle = null;
         
         /**
          * Creates a new bundle using the namespace contents from the given
@@ -191,6 +192,10 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
         public MyResourceBundle(SiteInfo siteinfo) {
             super();
             this.siteinfo = siteinfo;
+            Locale locale = siteinfo.extractLolace();
+            if (locale != null) {
+                langResBundle = Messages.getResourceBundle(locale);
+            }
         }
         
         @Override
@@ -238,7 +243,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
                     {Messages.WIKI_API_CATEGORYTALK1, getNsPref(Namespace.CATEGORY_TALK_NAMESPACE_KEY)},
                     {Messages.WIKI_API_PORTAL1, getNsPref(Namespace.PORTAL_NAMESPACE_KEY)},
                     {Messages.WIKI_API_PORTALTALK1, getNsPref(Namespace.PORTAL_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_TAGS_TOC_CONTENT, "Contents"}, // TODO: internationalise!
+                    {Messages.WIKI_TAGS_TOC_CONTENT, langResBundle == null ? "Contents" : Messages.getString(langResBundle, Messages.WIKI_TAGS_TOC_CONTENT, "Contents")}
             };
         }
 
