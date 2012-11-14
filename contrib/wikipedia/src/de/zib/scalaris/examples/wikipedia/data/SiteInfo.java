@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia.data;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -128,6 +129,31 @@ public class SiteInfo implements Serializable {
             lang = matcher.group(1);
         }
         return lang;
+    }
+    
+    /**
+     * Extract the locale from the language string from {@link #base}.
+     * 
+     * @return locale or <tt>null</tt> if the found language is no valid language code
+     * @see #extractLang()
+     */
+    public Locale extractLolace() {
+        String lang = extractLang();
+        String country = "";
+        int idx = lang.indexOf('_'); // e.g. de_DE
+        if (idx >= 0) {
+            lang = lang.substring(0, idx);
+            country = lang.substring(idx + 1);
+        }
+        try {
+            Locale locale = new Locale(lang, country);
+            // test that the locale is working:
+            locale.getLanguage();
+            locale.getCountry();
+            return locale;
+        } catch (Exception e) {
+        }
+        return null;
     }
 
     /**
