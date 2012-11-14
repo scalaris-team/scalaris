@@ -19,6 +19,7 @@ import info.bliki.Messages;
 import info.bliki.wiki.namespaces.Namespace;
 
 import java.util.ListResourceBundle;
+import java.util.Map;
 
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -30,15 +31,6 @@ import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
  */
 public class MyNamespace extends Namespace implements NamespaceUtils {
     private SiteInfo siteinfo;
-    
-    /**
-     * Smallest namespace ID (for iterating over all namespaces).
-     */
-    public final static Integer MIN_NAMESPACE_ID = -2;
-    /**
-     * Highest namespace ID (for iterating over all namespaces).
-     */
-    public final static Integer MAX_NAMESPACE_ID = 15;
     
     /**
      * Provides all namespace values as an enum type.
@@ -116,9 +108,17 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
          */
         CATEGORY_NAMESPACE_KEY(MyNamespace.CATEGORY_NAMESPACE_KEY),
         /**
+         * Talk pages for portal pages.
+         */
+        CATEGORY_TALK_NAMESPACE_KEY(MyNamespace.CATEGORY_TALK_NAMESPACE_KEY),
+        /**
+         * Portal pages.
+         */
+        PORTAL_NAMESPACE_KEY(MyNamespace.PORTAL_NAMESPACE_KEY),
+        /**
          * 
          */
-        CATEGORY_TALK_NAMESPACE_KEY(MyNamespace.CATEGORY_TALK_NAMESPACE_KEY);
+        PORTAL_TALK_NAMESPACE_KEY(MyNamespace.PORTAL_TALK_NAMESPACE_KEY);
         
         private final int id;
         NamespaceEnum(int id) {
@@ -163,6 +163,8 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
                 case 13: return HELP_TALK_NAMESPACE_KEY;
                 case 14: return CATEGORY_NAMESPACE_KEY;
                 case 15: return CATEGORY_TALK_NAMESPACE_KEY;
+                case 100: return PORTAL_NAMESPACE_KEY;
+                case 101: return PORTAL_TALK_NAMESPACE_KEY;
                 default: throw new IllegalArgumentException(
                         "No constant with id " + id + " found");
             }
@@ -232,13 +234,9 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
                     {Messages.WIKI_API_HELPTALK1, getNsPref(Namespace.HELP_TALK_NAMESPACE_KEY)},
                     {Messages.WIKI_API_CATEGORY1, getNsPref(Namespace.CATEGORY_NAMESPACE_KEY)},
                     {Messages.WIKI_API_CATEGORYTALK1, getNsPref(Namespace.CATEGORY_TALK_NAMESPACE_KEY)},
+                    {Messages.WIKI_API_PORTAL1, getNsPref(Namespace.PORTAL_NAMESPACE_KEY)},
+                    {Messages.WIKI_API_PORTALTALK1, getNsPref(Namespace.PORTAL_TALK_NAMESPACE_KEY)},
                     {Messages.WIKI_TAGS_TOC_CONTENT, "Contents"}, // TODO: internationalise!
-                    // Aliases as defined by
-                    // https://secure.wikimedia.org/wikipedia/en/wiki/Wikipedia:Namespace#Aliases
-                    {Messages.WIKI_API_META2, "WP"}, // also: "Project" but we can only add one here
-                    {Messages.WIKI_API_METATALK2, "WT"}, // also: "Project talk" but we can only add one here
-                    {Messages.WIKI_API_IMAGE2, "Image"},
-                    {Messages.WIKI_API_IMAGETALK2, "Image talk"},
             };
         }
 
@@ -250,7 +248,12 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
          * @return
          */
         private String getNsPref(Integer key) {
-            return siteinfo.getNamespaces().get(key.toString()).get(SiteInfo.NAMESPACE_PREFIX);
+            final Map<String, String> nsMap = siteinfo.getNamespaces().get(key.toString());
+            if (nsMap != null) {
+                return nsMap.get(SiteInfo.NAMESPACE_PREFIX);
+            } else {
+                return null;
+            }
         }
     }
 
@@ -297,7 +300,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     @Override
     public String getTalkPageFromPageName(String pageName) {
-        String[] pnSplit = MyWikiModel.splitNsTitle(pageName, this);
+        String[] pnSplit = splitNsTitle(pageName);
         String talkspace = getTalkspace(pnSplit[0]);
         if (talkspace == null) {
             return pnSplit[1];
@@ -311,7 +314,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     @Override
     public String getPageNameFromTalkPage(String talkPageName) {
-        String[] pnSplit = MyWikiModel.splitNsTitle(talkPageName, this);
+        String[] pnSplit = splitNsTitle(talkPageName);
         String namespace = pnSplit[0];
         String talkspace = getTalkspace(namespace);
         if (talkspace == null || !namespace.equals(talkspace)) {
@@ -326,7 +329,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      */
     @Override
     public boolean isTalkPage(String pageName) {
-        String namespace = MyWikiModel.getNamespace(pageName, this);
+        String namespace = splitNsTitle(pageName)[0];
         String talkspace = getTalkspace(namespace);
         if (talkspace == null || !namespace.equals(talkspace)) {
             return false;

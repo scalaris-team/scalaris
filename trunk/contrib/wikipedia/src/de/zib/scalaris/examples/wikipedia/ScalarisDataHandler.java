@@ -34,7 +34,7 @@ import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
-import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
+import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -156,10 +156,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<List<NormalisedTitle>> getPageList(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        ArrayList<String> scalaris_keys = new ArrayList<String>(
-                MyNamespace.MAX_NAMESPACE_ID - MyNamespace.MIN_NAMESPACE_ID + 1);
-        for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
-            scalaris_keys.add(getPageListKey(i));
+        ArrayList<String> scalaris_keys = new ArrayList<String>(NamespaceEnum.values().length);
+        for (NamespaceEnum ns : NamespaceEnum.values()) {
+            scalaris_keys.add(getPageListKey(ns.getId()));
         }
         return getPageList2(connection, ScalarisOpType.PAGE_LIST,
                 scalaris_keys, false, timeAtStart, "page list");
@@ -321,10 +320,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getPageCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        ArrayList<String> scalaris_keys = new ArrayList<String>(
-                MyNamespace.MAX_NAMESPACE_ID - MyNamespace.MIN_NAMESPACE_ID + 1);
-        for (int i = MyNamespace.MIN_NAMESPACE_ID; i < MyNamespace.MAX_NAMESPACE_ID; ++i) {
-            scalaris_keys.add(getPageCountKey(i));
+        ArrayList<String> scalaris_keys = new ArrayList<String>(NamespaceEnum.values().length);
+        for (NamespaceEnum ns : NamespaceEnum.values()) {
+            scalaris_keys.add(getPageCountKey(ns.getId()));
         }
         return getInteger2(connection, ScalarisOpType.PAGE_LIST, scalaris_keys,
                 false, timeAtStart, "page count");

@@ -37,10 +37,6 @@ public class MyMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_CURRENT_VERSION);
         // page values
         MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
-        MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME);
-        MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME_E);
-        MY_MAGIC_WORDS.add(MAGIC_BASE_PAGE_NAME);
-        MY_MAGIC_WORDS.add(MAGIC_BASE_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_SITE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_SERVER);
         MY_MAGIC_WORDS.add(MAGIC_SCRIPT_PATH);
@@ -135,23 +131,6 @@ public class MyMagicWord extends MagicWord {
 //            {{DEFAULTCATEGORYSORT:sortkey}}
 
         /*
-         * Page names
-         */
-            
-        } else if (name.equals(MAGIC_BASE_PAGE_NAME) || name.equals(MAGIC_BASE_PAGE_NAME_E)) {
-            String pagename = getPageName(parameter, model);
-            String[] split = model.splitNsBaseSubPage(pagename);
-            return split[1];
-        } else if (name.equals(MAGIC_SUB_PAGE_NAME) || name.equals(MAGIC_SUB_PAGE_NAME_E)) {
-            String pagename = getPageName(parameter, model);
-            String[] split = model.splitNsBaseSubPage(pagename);
-            if (split[2].isEmpty()) {
-                return split[1];
-            } else {
-                return split[2];
-            }
-
-        /*
          * Technical metadata / Latest revision to current page
          */
         } else if (name.equals(MAGIC_PAGE_SIZE)) {
@@ -164,14 +143,5 @@ public class MyMagicWord extends MagicWord {
         }
         
         return name;
-    }
-    
-    private static String getPageName(String parameter, MyWikiModel model) {
-        // parse page name to operate on:
-        String pagename = parameter;
-        if (pagename.isEmpty()) {
-            pagename = model.getPageName();
-        }
-        return pagename;
     }
 }

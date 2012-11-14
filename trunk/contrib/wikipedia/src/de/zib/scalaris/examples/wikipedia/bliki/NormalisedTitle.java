@@ -81,7 +81,7 @@ public class NormalisedTitle {
      * @return a {@link NormalisedTitle} object
      */
     public static NormalisedTitle fromUnnormalised(String title, final MyNamespace nsObject) {
-        String[] parts = MyWikiModel.splitNsTitle(title, nsObject);
+        String[] parts = nsObject.splitNsTitle(title);
         return new NormalisedTitle(nsObject.getNumberByName(parts[0]), parts[1]);
     }
     
