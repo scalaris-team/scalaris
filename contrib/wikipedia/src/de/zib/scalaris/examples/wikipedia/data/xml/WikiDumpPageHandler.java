@@ -126,7 +126,8 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
             final NormalisedTitle normTitle = wikiModel.normalisePageTitle(page.getTitle());
             if (!revisions.isEmpty() && wikiModel != null) {
                 wikiModel.setUp();
-                wikiModel.setPageName(page.getTitle());
+                wikiModel.setNamespaceName(wikiModel.getNamespace().getNamespaceByNumber(normTitle.namespace));
+                wikiModel.setPageName(normTitle.title);
                 wikiModel.renderPageWithCache(null, revisions.get(0).unpackedText());
                 for (String cat_raw: wikiModel.getCategories().keySet()) {
                     NormalisedTitle category = new NormalisedTitle(

@@ -881,10 +881,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
-        wikiModel.setPageName(title);
+        NormalisedTitle titleN = NormalisedTitle.fromUnnormalised(title, namespace);
+        wikiModel.setNamespaceName(namespace.getNamespaceByNumber(titleN.namespace));
+        wikiModel.setPageName(titleN.title);
         if (renderer > 0) {
             String mainText = wikiModel.renderPageWithCache(result.revision.unpackedText());
-            NormalisedTitle titleN = NormalisedTitle.fromUnnormalised(title, namespace);
             if (titleN.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
                 ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, titleN);
                 page.addStats(catPagesResult.stats);
@@ -1837,7 +1838,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setPage(StringEscapeUtils.escapeHtml(content));
 
         MyWikiModel wikiModel = getWikiModel(connection, page);
-        wikiModel.setPageName(title);
+        String[] titleParts = wikiModel.splitNsTitle(title);
+        wikiModel.setNamespaceName(titleParts[0]);
+        wikiModel.setPageName(titleParts[1]);
         page.setPreview(wikiModel.renderPageWithCache(content));
         page.setIncludes(wikiModel.getIncludes());
         page.setTemplates(wikiModel.getTemplates());

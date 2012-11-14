@@ -260,7 +260,8 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                     final Revision revision = getRevResult.revision;
 
                     wikiModel.setUp();
-                    wikiModel.setPageName(page.getTitle());
+                    wikiModel.setNamespaceName(wikiModel.getNamespace().getNamespaceByNumber(normTitle.namespace));
+                    wikiModel.setPageName(normTitle.title);
                     wikiModel.renderPageWithCache(null, revision.unpackedText());
 
                     String redirLink_raw = wikiModel.getRedirectLink();
