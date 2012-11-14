@@ -19,7 +19,6 @@ import info.bliki.htmlcleaner.TagNode;
 import info.bliki.wiki.filter.Encoder;
 import info.bliki.wiki.filter.HTMLConverter;
 import info.bliki.wiki.filter.ITextConverter;
-import info.bliki.wiki.model.AbstractWikiModel;
 import info.bliki.wiki.model.Configuration;
 import info.bliki.wiki.model.WikiModel;
 import info.bliki.wiki.namespaces.Namespace;
@@ -150,8 +149,6 @@ public class MyWikiModel extends WikiModel {
      * Cache of processed magic words.
      */
     protected Map<String, String> magicWordCache = new HashMap<String, String>();
-
-    protected Set<String> includes = new HashSet<String>();
 
     protected LinkedMultiHashMap<String, Long> stats = new LinkedMultiHashMap<String, Long>();
     
@@ -588,139 +585,21 @@ public class MyWikiModel extends WikiModel {
     }
 
     /**
-     * Splits the given full title into its namespace and page title components.
-     * 
-     * @param fullTitle
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * 
-     * @return a 2-element array with the namespace (index 0) and the page title
-     *         (index 1)
-     */
-    public static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject) {
-        return splitNsTitle(fullTitle, nsObject, true);
-    }
-
-    /**
-     * Splits the given full title into its namespace and page title components.
-     * 
-     * @param fullTitle
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * @param onlyValidNs
-     *            whether only valid namespaces should be split off
-     * 
-     * @return a 2-element array with the namespace (index 0) and the page title
-     *         (index 1)
-     */
-    private static String[] splitNsTitle(String fullTitle, final MyNamespace nsObject, boolean onlyValidNs) {
-        return AbstractWikiModel.splitNsTitle(fullTitle, nsObject, onlyValidNs, true, ' ');
-    }
-
-    /**
-     * Returns the namespace of a given page title.
-     * 
-     * @param title
-     *            the (full) title including a namespace (if present)
-     * 
-     * @return the namespace part of the title or an empty string if no
-     *         namespace
-     * 
-     * @see #getTitleName(String, MyNamespace)
-     * @see #splitNsTitle(String, MyNamespace)
-     */
-    public String getNamespace(String title) {
-        return getNamespace(title, getNamespace());
-    }
-
-    /**
-     * Returns the namespace of a given page title.
-     * 
-     * @param title
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * 
-     * @return the namespace part of the title or an empty string if no
-     *         namespace
-     * 
-     * @see #getTitleName(String, MyNamespace)
-     * @see #splitNsTitle(String, MyNamespace)
-     */
-    public static String getNamespace(String title, final MyNamespace nsObject) {
-        return splitNsTitle(title, nsObject)[0];
-    }
-
-    /**
-     * Returns the name of a given page title without its namespace.
-     * 
-     * @param title
-     *            the (full) title including a namespace (if present)
-     * 
-     * @return the title part of the page title
-     * 
-     * @see #getNamespace(String, MyNamespace)
-     * @see #splitNsTitle(String, MyNamespace)
-     */
-    public String getTitleName(String title) {
-        return getTitleName(title, getNamespace());
-    }
-
-    /**
-     * Returns the name of a given page title without its namespace.
-     * 
-     * @param title
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * 
-     * @return the title part of the page title
-     * 
-     * @see #getNamespace(String, MyNamespace)
-     * @see #splitNsTitle(String, MyNamespace)
-     */
-    public static String getTitleName(String title, final MyNamespace nsObject) {
-        return splitNsTitle(title, nsObject)[1];
-    }
-
-    /**
-     * Splits the given full title into its namespace, base and sub page
-     * components.
+     * Splits the given full title at the first colon.
      * 
      * @param fullTitle
      *            the (full) title including a namespace (if present)
      * 
-     * @return a 3-element array with the namespace (index 0), the base page
-     *         (index 1) and the sub page (index 2)
+     * @return a 2-element array with the two components - the first may be
+     *         empty if no colon is found
      */
-    public String[] splitNsBaseSubPage(String fullTitle) {
-        return splitNsBaseSubPage(fullTitle, getNamespace());
-    }
-
-    /**
-     * Splits the given full title into its namespace, base and sub page
-     * components.
-     * 
-     * @param fullTitle
-     *            the (full) title including a namespace (if present)
-     * @param nsObject
-     *            the namespace for determining how to split the title
-     * 
-     * @return a 3-element array with the namespace (index 0), the base page
-     *         (index 1) and the sub page (index 2)
-     */
-    public static String[] splitNsBaseSubPage(String fullTitle, final MyNamespace nsObject) {
-        String[] split1 = splitNsTitle(fullTitle, nsObject);
-        String namespace = split1[0];
-        String title = split1[1];
-        int colonIndex = title.lastIndexOf('/');
+    protected static String[] splitAtColon(String fullTitle) {
+        int colonIndex = fullTitle.indexOf(':');
         if (colonIndex != (-1)) {
-            return new String[] { namespace, title.substring(0, colonIndex),
-                    title.substring(colonIndex + 1) };
+            return new String[] { fullTitle.substring(0, colonIndex),
+                    fullTitle.substring(colonIndex + 1) };
         }
-        return new String[] {namespace, title, ""};
+        return new String[] { "", fullTitle };
     }
 
     /* (non-Javadoc)
@@ -747,7 +626,7 @@ public class MyWikiModel extends WikiModel {
         if (INTERLANGUAGE_KEYS.contains(namespace)) {
             // also check if this is an inter wiki link to an external wiki in another language
             // -> only ignore inter language links to the same wiki
-            String namespace2 = splitNsTitle(title, getNamespace(), false)[0];
+            String namespace2 = splitAtColon(title)[0];
             if (!ignoreInterLang || (!namespace2.isEmpty() && isInterWiki(namespace2))) {
                 // bliki is not able to parse language-specific interwiki links
                 // -> use default language
@@ -769,7 +648,7 @@ public class MyWikiModel extends WikiModel {
          * do not add links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * the internal links
          */
-        String[] nsTitle = splitNsTitle(topicName, getNamespace(), false);
+        String[] nsTitle = splitAtColon(topicName);
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
             appendInterWikiLink(nsTitle[0], nsTitle[1], "");
         } else {
@@ -787,7 +666,7 @@ public class MyWikiModel extends WikiModel {
          * convert links like [[:w:nl:User:WinContro|Dutch Wikipedia]] to
          * external links if the link is an interwiki link
          */
-        String[] nsTitle = splitNsTitle(topic0, getNamespace(), false);
+        String[] nsTitle = splitAtColon(topic0);
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
             appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
@@ -809,7 +688,7 @@ public class MyWikiModel extends WikiModel {
      * @return a normalised string
      */
     public static String normaliseName(final String value) {
-        return Encoder.normaliseTitle(value, true, ' ');
+        return Encoder.normaliseTitle(value, true, ' ', true);
     }
     
     /**
@@ -939,23 +818,6 @@ public class MyWikiModel extends WikiModel {
      */
     public boolean isMediaNamespace(String namespace) {
         return namespace.equalsIgnoreCase(fNamespace.getMedia()) || namespace.equalsIgnoreCase(fNamespace.getMedia2());
-    }
-
-    /**
-     * Adds an inclusion to the currently parsed page.
-     * 
-     * @param includedName
-     *            the name of the article being included
-     */
-    public void addInclude(String includedName) {
-        includes.add(includedName);
-    }
-
-    /**
-     * @return the references
-     */
-    public Set<String> getIncludes() {
-        return includes;
     }
 
     /**
