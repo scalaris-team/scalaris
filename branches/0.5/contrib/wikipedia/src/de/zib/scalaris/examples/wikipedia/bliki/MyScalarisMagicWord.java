@@ -52,7 +52,6 @@ public class MyScalarisMagicWord extends MyMagicWord {
         MY_MAGIC_WORDS.add(MAGIC_REVISION_MONTH);
         MY_MAGIC_WORDS.add(MAGIC_REVISION_YEAR);
         MY_MAGIC_WORDS.add(MAGIC_REVISION_TIMESTAMP);
-        MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
     }
     
     public static boolean isMagicWord(String name) {
@@ -104,17 +103,10 @@ public class MyScalarisMagicWord extends MyMagicWord {
         } else {
             parameter = origParameter;
         }
-        
+
         /*
          * Technical metadata / Latest revision to current page
          */
-        if (name.equals(MAGIC_PAGE_SIZE)) {
-            final String revText = model.retrievePage(parameter, null, false);
-            int size = 0;
-            if (revText != null) {
-                size = revText.getBytes().length;
-            }
-            return model.formatStatisticNumber(rawNumber, size);
 //      } else if (name.equals(MAGIC_REVISION_ID)) {
 //          // TODO: implement
 //          return null;
@@ -135,11 +127,11 @@ public class MyScalarisMagicWord extends MyMagicWord {
 //          return null;
 //          {{REVISIONUSER}}
 //          {{PROTECTIONLEVEL:action}}
-
+        
         /*
          * Statistics / Entire wiki
          */
-        } else if (name.equals(MAGIC_NUMBER_PAGES)) {
+        if (name.equals(MAGIC_NUMBER_PAGES)) {
             ValueResult<BigInteger> pageCountResult = ScalarisDataHandler.getPageCount(model.connection);
             model.addStats(pageCountResult.stats);
             model.addInvolvedKeys(pageCountResult.involvedKeys);
@@ -176,7 +168,7 @@ public class MyScalarisMagicWord extends MyMagicWord {
             }
 //            {{NUMBERINGROUP:groupname}}
 //            {{NUMINGROUP:groupname}}
-//        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE) || name.equals(MAGIC_PAGES_IN_NS)) {
+//        } else if (name.equals(MAGIC_PAGES_IN_NAMESPACE) || name.equals(MAGIC_PAGES_IN_NAMESPACE_NS)) {
 //            // TODO: implement
 //            return null;
         }
