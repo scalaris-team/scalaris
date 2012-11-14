@@ -19,8 +19,6 @@ import info.bliki.Messages;
 import info.bliki.wiki.namespaces.Namespace;
 
 import java.util.ListResourceBundle;
-import java.util.Map;
-import java.util.TreeMap;
 
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
@@ -280,31 +278,10 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
      * Initialises a mapping of namespace strings to integers.
      */
     private void initializeAliases() {
-        // Aliases as defined by
-        // https://secure.wikimedia.org/wikipedia/en/wiki/Wikipedia:Namespace#Aliases
-        addAlias("WP", Namespace.PROJECT_NAMESPACE_KEY);
-        addAlias("Project", Namespace.PROJECT_NAMESPACE_KEY);
-        addAlias("WT", Namespace.PROJECT_TALK_NAMESPACE_KEY);
-        addAlias("Project talk", Namespace.PROJECT_TALK_NAMESPACE_KEY);
-        addAlias("Image", Namespace.FILE_NAMESPACE_KEY);
-        addAlias("Image talk", Namespace.FILE_TALK_NAMESPACE_KEY);
         addAlias("Bild", Namespace.FILE_NAMESPACE_KEY);
         addAlias("Bild Diskussion", Namespace.FILE_TALK_NAMESPACE_KEY);
         addAlias("Imagen", Namespace.FILE_NAMESPACE_KEY);
         addAlias("Imagen discusión", Namespace.FILE_TALK_NAMESPACE_KEY);
-    }
-
-    protected void addAlias(final String alias, final Integer namespaceCode) {
-        String aliasLower;
-        if (fResourceBundle == null || fResourceBundle.getLocale() == null) {
-            aliasLower = alias.toLowerCase();
-        } else {
-            aliasLower = alias.toLowerCase(fResourceBundle.getLocale());
-        }
-        NAMESPACE_MAP.put(aliasLower, getNamespaceByNumber(namespaceCode));
-        TALKSPACE_MAP.put(alias, getTalkspace(getNamespaceByNumber(namespaceCode)));
-        CONTENTSPACE_MAP.put(getTalkspace(getNamespaceByNumber(namespaceCode)), alias);
-        NAMESPACE_INT_MAP.put(alias, namespaceCode);
     }
 
     /* (non-Javadoc)

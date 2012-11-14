@@ -37,26 +37,10 @@ public class MyMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_CURRENT_VERSION);
         // page values
         MY_MAGIC_WORDS.add(MAGIC_PAGE_SIZE);
-        MY_MAGIC_WORDS.add(MAGIC_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_SUB_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_BASE_PAGE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_BASE_PAGE_NAME_E);
-        MY_MAGIC_WORDS.add(MAGIC_NAMESPACE);
-        MY_MAGIC_WORDS.add(MAGIC_NAMESPACE_E);
-        MY_MAGIC_WORDS.add(MAGIC_FULL_PAGE_NAME_E);
-        MY_MAGIC_WORDS.add(MAGIC_TALK_SPACE);
-        MY_MAGIC_WORDS.add(MAGIC_TALK_SPACE_E);
-        MY_MAGIC_WORDS.add(MAGIC_SUBJECT_SPACE);
-        MY_MAGIC_WORDS.add(MAGIC_SUBJECT_SPACE_E);
-        MY_MAGIC_WORDS.add(MAGIC_ARTICLE_SPACE);
-        MY_MAGIC_WORDS.add(MAGIC_ARTICLE_SPACE_E);
-        MY_MAGIC_WORDS.add(MAGIC_TALK_PAGE_NAME);
-        MY_MAGIC_WORDS.add(MAGIC_TALK_PAGE_NAME_E);
-        MY_MAGIC_WORDS.add(MAGIC_SUBJECT_PAGE_NAME);
-        MY_MAGIC_WORDS.add(MAGIC_SUBJECT_PAGE_NAME_E);
-        MY_MAGIC_WORDS.add(MAGIC_ARTICLE_PAGE_NAME);
-        MY_MAGIC_WORDS.add(MAGIC_ARTICLE_PAGE_NAME_E);
         MY_MAGIC_WORDS.add(MAGIC_SITE_NAME);
         MY_MAGIC_WORDS.add(MAGIC_SERVER);
         MY_MAGIC_WORDS.add(MAGIC_SCRIPT_PATH);
@@ -87,17 +71,24 @@ public class MyMagicWord extends MagicWord {
      * Process a magic word, returning the value corresponding to the magic
      * word.
      * 
-     * @param name      the template name, i.e. a magic word
-     * @param parameter the template parameters
-     * @param model     the currently used model
+     * @param name
+     *            the template name, i.e. a magic word
+     * @param parameter
+     *            the template parameters
+     * @param model
+     *            the currently used model
+     * @param hasParameter
+     *            whether a parameter was given or not (cannot distinguish from
+     *            <tt>parameter</tt> value alone)
      * 
      * @return the value of the magic word
      * 
-     * @see <a href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
+     * @see <a
+     *      href="http://meta.wikimedia.org/wiki/Help:Magic_words">http://meta.wikimedia.org/wiki/Help:Magic_words</a>
      */
-    public static String processMagicWord(String name, String parameter, MyWikiModel model) {
+    public static String processMagicWord(String name, String parameter, MyWikiModel model, boolean hasParameter) {
         if (!isMyMagicWord(name)) {
-            return MagicWord.processMagicWord(name, parameter, model);
+            return MagicWord.processMagicWord(name, parameter, model, hasParameter);
         }
         
         // check whether numbers should be printed in raw format and
@@ -159,66 +150,6 @@ public class MyMagicWord extends MagicWord {
             } else {
                 return split[2];
             }
-        } else if (name.equals(MAGIC_SUBJECT_PAGE_NAME) || name.equals(MAGIC_SUBJECT_PAGE_NAME_E) ||
-                name.equals(MAGIC_ARTICLE_PAGE_NAME) || name.equals(MAGIC_ARTICLE_PAGE_NAME_E)) {
-            String pagename = getPageName(parameter, model);
-            String[] split = model.splitNsTitle(pagename);
-            String subjectSpace = model.getNamespace().getContentspace(split[0]);
-            if (subjectSpace == null || subjectSpace.isEmpty()) {
-                subjectSpace = "";
-            } else {
-                subjectSpace += ':';
-            }
-            return subjectSpace + split[1];
-        } else if (name.equals(MAGIC_TALK_PAGE_NAME) || name.equals(MAGIC_TALK_PAGE_NAME_E)) {
-            String pagename = getPageName(parameter, model);
-            String[] split = model.splitNsTitle(pagename);
-            if (split[0].equals(model.getNamespace().getTalk())) {
-                return pagename;
-            } else {
-                String talkSpace = model.getNamespace().getTalkspace(split[0]);
-                if (talkSpace == null) {
-                    talkSpace = "";
-                } else {
-                    talkSpace += ':';
-                }
-                return talkSpace + split[1];
-            }
-
-        /*
-         * Namespaces
-         */
-
-        } else if (name.equals(MAGIC_NAMESPACE) || name.equals(MAGIC_NAMESPACE_E)) {
-            String pagename = getPageName(parameter, model);
-            return model.getNamespace(pagename);
-        } else if (name.equals(MAGIC_TALK_SPACE) || name.equals(MAGIC_TALK_SPACE_E)) {
-            String pagename = getPageName(parameter, model);
-            String pageNamespace = model.getNamespace(pagename);
-            String talkspace = model.getNamespace().getTalkspace(pageNamespace);
-            if (talkspace == null) {
-                return "";
-            } else {
-                return talkspace;
-            }
-        } else if (name.equals(MAGIC_SUBJECT_SPACE) || name.equals(MAGIC_SUBJECT_SPACE_E) ||
-                name.equals(MAGIC_ARTICLE_SPACE) || name.equals(MAGIC_ARTICLE_SPACE_E)) {
-            String pagename = getPageName(parameter, model);
-            String talkNamespace = model.getNamespace(pagename);
-            String subjectspace = model.getNamespace().getContentspace(talkNamespace);
-            if (subjectspace == null) {
-                return "";
-            } else {
-                return subjectspace;
-            }
-
-        // some MediaWiki-encoded URLs -> forward to MagicWord class:
-        } else if (name.equals(MAGIC_PAGE_NAME_E)) {
-            return MagicWord.processMagicWord(MAGIC_PAGE_NAME, parameter, model);
-        } else if (name.equals(MAGIC_FULL_PAGE_NAME_E)) {
-            return MagicWord.processMagicWord(MAGIC_FULL_PAGE_NAME, parameter, model);
-        } else if (name.equals(MAGIC_TALK_PAGE_NAME_E)) {
-            return MagicWord.processMagicWord(MAGIC_TALK_PAGE_NAME, parameter, model);
 
         /*
          * Technical metadata / Latest revision to current page
