@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<%@page import="de.zib.scalaris.examples.wikipedia.bliki.MyMagicWord"%>
 <%@page import="de.zib.scalaris.examples.wikipedia.bliki.WikiServlet"%>
 <%@page import="de.zib.scalaris.examples.wikipedia.InvolvedKey"%>
 <%@page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"
@@ -172,11 +173,12 @@ ${ pageBean.preview }
                 <li><a href="wiki?title=<%= safeInclude %>" title="<%= include %>"><%= include %></a> (<a href="wiki?title=<%= safeInclude %>&amp;action=edit" title="<%= include %>">edit</a>) </li>
                 <% } %>
 				<% for (String template0 : pageBean.getTemplates()) {
-				    String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
-                    String safeTemplate = StringEscapeUtils.escapeHtml(URLEncoder.encode(template, "UTF-8"));
+				    if (!MyMagicWord.isMagicWord(template0)) {
+				        String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
+				        String safeTemplate = StringEscapeUtils.escapeHtml(URLEncoder.encode(template, "UTF-8"));
 				    %>
                 <li><a href="wiki?title=<%= safeTemplate %>" title="<%= template %>"><%= template %></a> (<a href="wiki?title=<%= safeTemplate %>&amp;action=edit" title="<%= template %>">edit</a>) </li>
-                <% } %>
+                <% } } %>
 				</ul>
 				</div>
 				<% } %>
