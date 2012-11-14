@@ -140,7 +140,7 @@ fi
 %if 0%{?fedora_version}
 # >=1 packages after uninstall -> pkg was updated -> restart
 if [ "$1" -ge "1" ] ; then
-  /sbin/service scalaris condrestart >/dev/null 2>&1 || :
+  /sbin/service scalaris try-restart >/dev/null 2>&1 || :
 fi
 %endif
 %if 0%{?mandriva_version}
@@ -150,7 +150,7 @@ fi
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %dir %{_docdir}/scalaris
 %{_docdir}/scalaris/AUTHORS
 %{_docdir}/scalaris/README
@@ -168,7 +168,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
 
 %files doc
-%defattr(-,root,root)
+%defattr(-,root,root,-)
 %doc %{_docdir}/scalaris/erlang
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
 
