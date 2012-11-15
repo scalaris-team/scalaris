@@ -195,7 +195,7 @@ mpath(Config) ->
     %server starts sync
 	%trace_mpath:start(TraceName, fun mpath_map/1),
     trace_mpath:start(TraceName),
-    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
 	timer:sleep(3000),
@@ -257,7 +257,7 @@ dest(Config) ->
     CO = count_outdated(CKey),
     CM = count_dbsize(CKey),
     %server starts sync
-    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
     waitForSyncRoundEnd([SKey, CKey]),
@@ -298,7 +298,7 @@ dest_empty_node(Config) ->
     IM = count_dbsize(IKey),
     CM = count_dbsize(CKey),
     %server starts sync
-    api_dht_raw:unreliable_lookup(IKey, {send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
     waitForSyncRoundEnd([IKey, CKey]),
@@ -377,12 +377,12 @@ session_ttl(Config) ->
     CName = receive {get_pid_group_response, Key} -> Key end,
     
     %server starts sync
-    api_dht_raw:unreliable_lookup(SKey, {send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
     api_vm:kill_node(CName),
 
     %check timeout
-    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
+    Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     api_dht_raw:unreliable_lookup(SKey, Req),
     Open = receive {get_state_response, R1} -> R1 =/= 0 end,
     timer:sleep(TTL),
@@ -535,7 +535,7 @@ print_status(R, {_, _, M, O}) ->
 -spec count_outdated(?RT:key()) -> non_neg_integer().
 count_outdated(Key) ->
     Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
-    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, rrepair, Req}),
+    api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, rrepair, Req}),
     receive
         {count_old_replicas_reply, Old} -> Old
     end.
@@ -545,7 +545,7 @@ count_outdated() ->
     Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
     lists:foldl(
       fun(Node, Acc) -> 
-              comm:send(Node, {send_to_group_member, rrepair, Req}),
+              comm:send(Node, {?send_to_group_member, rrepair, Req}),
               receive
                   {count_old_replicas_reply, Old} -> Acc + Old
               end
@@ -602,13 +602,13 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 startSyncRound(NodeKeys) ->
     lists:foreach(fun(X) ->
-                          api_dht_raw:unreliable_lookup(X, {send_to_group_member, rrepair, {rr_trigger}})
+                          api_dht_raw:unreliable_lookup(X, {?send_to_group_member, rrepair, {rr_trigger}})
                   end, 
                   NodeKeys),
     ok.
 
 waitForSyncRoundEnd(NodeKeys) ->
-    Req = {send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
+    Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     lists:foreach(
       fun(Key) -> 
               util:wait_for(

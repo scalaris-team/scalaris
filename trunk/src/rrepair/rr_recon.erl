@@ -139,7 +139,7 @@ on({get_state_response, MyI}, State =
                         dest_key = DestKey,
                         dhtNodePid = DhtPid,                        
                         ownerRemotePid = OwnerPid }) ->    
-    Msg = {send_to_group_member, rrepair, 
+    Msg = {?send_to_group_member, rrepair, 
            {continue_recon, OwnerPid, rr_recon_stats:get(session_id, Stats), 
             {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
     DKey = case DestKey of

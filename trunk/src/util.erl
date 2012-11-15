@@ -1290,6 +1290,8 @@ extint2atom(X) when is_integer(X) ->
         %% lookup
         ?lookup_aux -> ?lookup_aux_atom;
         ?lookup_fin -> ?lookup_fin_atom;
+        %% comm
+        ?send_to_group_member -> ?send_to_group_member_atom;
         %% dht_node
         ?get_key_with_id_reply -> ?get_key_with_id_reply_atom;
         ?get_key -> ?get_key_atom;
