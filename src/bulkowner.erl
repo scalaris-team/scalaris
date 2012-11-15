@@ -65,7 +65,7 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
 -spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
-send_reply(Id, Target, {send_to_group_member, Proc, Msg}, [], Shepherd) ->
+send_reply(Id, Target, {?send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
 send_reply(Id, Target, Msg, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}]);
@@ -162,7 +162,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     % for aggregation using a tree, activate this instead:
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
                     comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
-                {send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
+                {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
                                     {bulkowner, deliver, Id, Range, Msg1, Parents})
             end
@@ -188,8 +188,8 @@ on({bulkowner, reply_process_all}, State) ->
                  [{bulk_read_entry_response, _HRange, _HData} | _] ->
                      comm:send_local(self(),
                                      {bulkowner, gather, Id, Target, Msgs, Parents});
-                 [{send_to_group_member, Proc, _Msg} | _] ->
-                     Msgs1 = [Msg1 || {send_to_group_member, _Proc, Msg1} <- Msgs],
+                 [{?send_to_group_member, Proc, _Msg} | _] ->
+                     Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
                      comm:send_local(pid_groups:get_my(Proc),
                                      {bulkowner, gather, Id, Target, Msgs1, Parents})
              end
