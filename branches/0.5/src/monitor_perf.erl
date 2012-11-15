@@ -160,7 +160,7 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
         _ ->
             % start a new timeslot and gather stats...
             NewId = uid:get_global_uid(),
-            Msg = {send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
+            Msg = {?send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
             bulkowner:issue_bulk_owner(NewId, intervals:all(), Msg),
             Leader1 = check_timeslots(Leader),
             broadcast_values(Leader, Leader1),
@@ -189,7 +189,7 @@ on({collect, {get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonDat
     AllData = lists:append([MyMonData, process_rrds(DBs)]),
     case AllData of
         [] -> ok;
-        _  -> ReplyMsg = {send_to_group_member, monitor_perf, {gather_stats_response, AllData}},
+        _  -> ReplyMsg = {?send_to_group_member, monitor_perf, {gather_stats_response, AllData}},
               bulkowner:issue_send_reply(Id, SourcePid, ReplyMsg, Parents)
     end,
     State;
@@ -212,7 +212,7 @@ on({bulkowner, gather, Id, Target, Msgs, Parents}, State) ->
                        end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
              end, {undefined, undefined, undefined}, Msgs),
     
-    Msg = {send_to_group_member, monitor_perf,
+    Msg = {?send_to_group_member, monitor_perf,
            {gather_stats_response, [{?MODULE, 'read_read', PerfRR},
                                     {dht_node, 'lookup_hops', PerfLH},
                                     {api_tx, 'req_list', PerfTX}]}},
@@ -323,7 +323,7 @@ broadcast_values(OldState, NewState) ->
     case PerfRRNewSlot orelse PerfLHNewSlot orelse PerfTXNewSlot of
         true -> % new slot -> broadcast latest values only:
             SendState = reduce_timeslots(1, OldState),
-            Msg = {send_to_group_member, monitor_perf, {report_value, SendState}},
+            Msg = {?send_to_group_member, monitor_perf, {report_value, SendState}},
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg);
         _ -> ok %nothing to do
     end.
