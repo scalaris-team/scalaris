@@ -382,7 +382,7 @@ loop(UState, GCState) ->
 %%   not in a breakpoint. A selective receive of breakpoint messages,
 %%   provides further bp instructions when needed inside a bp.
 %%%%%%%%%%%%%%%%%%%%
--spec on(comm:message(), user_state(), gc_state())
+-spec on(comm:message() | comm:group_message(), user_state(), gc_state())
         -> ok.
 on(GCMsg, UState, GCState)
   when is_tuple(GCMsg)
@@ -392,7 +392,7 @@ on({ping, Pid}, UState, GCState) ->
     %% handle failure detector messages
     comm:send(Pid, {pong}, [{channel, prio}]),
     loop(UState, GCState);
-on({send_to_group_member, Processname, Msg}, UState, GCState) ->
+on({?send_to_group_member, Processname, Msg}, UState, GCState) ->
     %% forward a message to group member by its process name
     %% initiated via comm:send/3 with group_member
     Pid = pid_groups:get_my(Processname),
@@ -474,7 +474,7 @@ on_traced_msg({ping, Pid}, UState, GCState) ->
     trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
     trace_mpath:stop(),
     loop(UState, GCState);
-on_traced_msg({send_to_group_member, Processname, Msg}, UState, GCState) ->
+on_traced_msg({?send_to_group_member, Processname, Msg}, UState, GCState) ->
     %% forward a message to group member by its process name
     %% initiated via comm:send/3 with group_member
     Pid = pid_groups:get_my(Processname),

@@ -84,7 +84,7 @@ init(Neighbors) ->
     comm:send_local(self(), {trigger_random_lookup}),
 
     % ask the successor node for its routing table
-    Msg = {send_to_group_member, routing_table, {get_rt, comm:this()}},
+    Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
     % create an initial RT consisting of the neighbors
     EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
@@ -361,7 +361,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
     Interval = config:read(active_learning_lookup_interval),
     msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
 
-    api_dht_raw:unreliable_lookup(Key, {send_to_group_member, routing_table,
+    api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
                                         {rt_get_node, comm:this()}}),
     State
     ;
@@ -948,7 +948,7 @@ wrap_message(Msg, _) -> Msg.
 -spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
 unwrap_message({'$wrapped', Pid, UnwrappedMessage}, State) ->
     comm:send(Pid,
-        {send_to_group_member, routing_table,
+        {?send_to_group_member, routing_table,
             {rt_learn_node, dht_node_state:get(State, node)}
         }),
     UnwrappedMessage

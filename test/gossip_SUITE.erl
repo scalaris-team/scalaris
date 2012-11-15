@@ -466,7 +466,7 @@ test_on_cy_cache3(Config) ->
     ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     % if pids don't match, a get_state is send to the cached node's dht_node
     This = comm:this(),
-    ?expect_message({send_to_group_member, gossip, {get_state, This, Values}}),
+    ?expect_message({?send_to_group_member, gossip, {get_state, This, Values}}),
     % no further messages
     ?expect_no_message(),
     

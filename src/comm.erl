@@ -51,7 +51,7 @@
 -export([init_and_wait_for_valid_pid/0]).
 
 -ifdef(with_export_type_support).
--export_type([message/0, msg_tag/0, mypid/0,
+-export_type([message/0, group_message/0, msg_tag/0, mypid/0,
               erl_local_pid/0, erl_local_pid_with_reply_as/0,
               send_options/0]).
 % for comm_layer and tester_scheduler
@@ -93,7 +93,16 @@
         {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
         {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
 
--type group_message() :: {send_to_group_member, atom(), message()}.
+-ifdef(forward_or_recursive_types_are_not_allowed).
+% define 3 levels of recursion manually:
+-type group_message() ::
+        {?send_to_group_member, atom(), message()} |
+        {?send_to_group_member, atom(), {?send_to_group_member, atom(), message()}} |
+        {?send_to_group_member, atom(), {?send_to_group_member, atom(), {?send_to_group_member, atom(), message()}}}.
+-else.
+-type group_message() :: {?send_to_group_member, atom(), message() | group_message()}.
+-endif.
+
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
                          {group_member, Process::atom()} |
                          {channel, main | prio} | quiet].
@@ -125,7 +134,7 @@ send(Pid, Msg, Options) ->
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()).
--spec send_local(erl_local_pid(), message()) -> ok.
+-spec send_local(erl_local_pid(), message() | group_message()) -> ok.
 send_local(Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     _ = case erlang:get(trace_mpath) of
@@ -141,7 +150,7 @@ send_local(Pid, Msg) ->
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
--spec send_local_after(non_neg_integer(), erl_local_pid(), message()) -> reference().
+-spec send_local_after(non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference().
 send_local_after(Delay, Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     case erlang:get(trace_mpath) of
@@ -216,7 +225,7 @@ get_port(Pid) ->
 get_msg_tag({Msg, _Cookie})
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
-get_msg_tag({send_to_group_member, _ProcessName, Msg})
+get_msg_tag({?send_to_group_member, _ProcessName, Msg})
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
 get_msg_tag(Msg)
@@ -233,13 +242,13 @@ unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_server process.
--spec pack_group_member(message(), send_options()) -> message().
+-spec pack_group_member(message() | group_message(), send_options()) -> message() | group_message().
 pack_group_member(Msg, [])                      -> Msg;
 pack_group_member(Msg, [{shepherd, _Shepherd}]) -> Msg;
 pack_group_member(Msg, Options)                 ->
     case lists:keyfind(group_member, 1, Options) of
         false                   -> Msg;
-        {group_member, Process} -> {send_to_group_member, Process, Msg}
+        {group_member, Process} -> {?send_to_group_member, Process, Msg}
     end.
 
 %% @doc Initializes the comm layer by sending a message to known_hosts. A
