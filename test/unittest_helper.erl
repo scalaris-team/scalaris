@@ -430,7 +430,11 @@ get_all_children(Supervisor) ->
 -spec get_processes() -> [process_info()].
 get_processes() ->
     [begin
-         InitCall = element(2, lists:keyfind(initial_call, 1, Data)),
+         InitCall =
+             case proc_lib:initial_call(X) of
+                 false -> element(2, lists:keyfind(initial_call, 1, Data));
+                 {Module, Function, Args} -> {Module, Function, length(Args)}
+             end,
          CurFun = element(2, lists:keyfind(current_function, 1, Data)),
          RegName = case lists:keyfind(registered_name, 1, Data) of
                        false -> not_registered;
@@ -494,7 +498,7 @@ kill_new_processes(OldProcesses, Options) ->
                               CurFun =:= {test_server_sup, timetrap, 3}),
                      not (InitCall =:= {test_server_sup, timetrap, 2} andalso
                               CurFun =:= {test_server_sup, timetrap, 2}),
-                     not InitCall =:= {test_server_gl, init, 1},
+                     not (InitCall =:= {test_server_gl, init, 1}),
                      X =/= self(),
                      X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
