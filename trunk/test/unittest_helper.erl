@@ -494,6 +494,7 @@ kill_new_processes(OldProcesses, Options) ->
                               CurFun =:= {test_server_sup, timetrap, 3}),
                      not (InitCall =:= {test_server_sup, timetrap, 2} andalso
                               CurFun =:= {test_server_sup, timetrap, 2}),
+                     not InitCall =:= {test_server_gl, init, 1},
                      X =/= self(),
                      X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
