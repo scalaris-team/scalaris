@@ -44,12 +44,13 @@
 % internal state (known nodes)
 -type(state()::Nodes::gb_set()).
 
-%% @doc trigger a message with  the number of nodes known to the mgmt server
+%% @doc trigger a message with the number of nodes known to the mgmt server
 -spec number_of_nodes() -> ok.
 number_of_nodes() ->
     Pid = mgmtPid(),
-    case comm:is_valid(Pid) of
-        true -> comm:send(Pid, {get_list_length, comm:this()});
+    This = comm:this(),
+    case comm:is_valid(Pid) andalso comm:is_valid(This) of
+        true -> comm:send(Pid, {get_list_length, This});
         _    -> comm:send_local(self(), {get_list_length_response, 0})
     end.
 
