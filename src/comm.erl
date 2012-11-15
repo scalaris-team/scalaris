@@ -232,8 +232,6 @@ get_msg_tag(Msg)
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     erlang:element(1, Msg).
 
-% note: cannot simplify to the following spec -> this lets dialyzer crash
-%-spec unpack_cookie(mypid(), message()) -> {mypid(), message()}.
 -spec unpack_cookie(mypid(), message()) -> {mypid_plain(), message()};
                    (erl_local_pid(), message()) -> {erl_local_pid_plain(), message()}.
 unpack_cookie({Pid, e, Nth, Envelope}, Msg) ->

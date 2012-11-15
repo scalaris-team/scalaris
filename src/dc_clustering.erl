@@ -270,7 +270,7 @@ on_active({query_my, Atom, Pid}, State) ->
 % Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec cluster(centroids:centroids(), centroids:centroids(), float()) -> centroids:centroids().
+-spec cluster(dc_centroids:centroids(), dc_centroids:centroids(), float()) -> dc_centroids:centroids().
 cluster([], RemoteCentroids, _Radius) -> RemoteCentroids;
 cluster(Centroids, RemoteCentroids, Radius) ->
     NewCentroids = mathlib:aggloClustering(Centroids ++ RemoteCentroids, Radius),
