@@ -116,8 +116,8 @@ msg_write_deny(Client, Key, NewerRound) ->
 noop_read_filter(X) -> X.
 
 %% initialize: return initial state.
--spec init([]) -> state().
-init([]) -> ?PDB:new(?MODULE, [set, protected]).
+-spec init(atom()) -> state().
+init(DBName) -> ?PDB:new(DBName, [ordered_set, protected]).
 
 -spec on(message(), state()) -> state().
 on({prbr, read, _DB, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->

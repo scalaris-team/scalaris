@@ -72,7 +72,11 @@
                 bulkowner_reply_timer   = null :: null | reference(),
                 bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
-                prbr_kv_db = ?required(state, prbr_state) :: prbr:state()
+                prbr_kv_db = ?required(state, prbr_state) :: prbr:state(),
+                lease_db1 = ?required(state, prbr_state) :: prbr:state(),
+                lease_db2 = ?required(state, prbr_state) :: prbr:state(),
+                lease_db3 = ?required(state, prbr_state) :: prbr:state(),
+                lease_db4 = ?required(state, prbr_state) :: prbr:state()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -86,7 +90,11 @@ new(RT, RMState, DB) ->
            tx_tp_db = tx_tp:init(),
            proposer = pid_groups:get_my(paxos_proposer),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
-           prbr_kv_db = prbr:init([])
+           prbr_kv_db = prbr:init(prbr_kv_db),
+           lease_db1 = prbr:init(lease_db1),
+           lease_db2 = prbr:init(lease_db2),
+           lease_db3 = prbr:init(lease_db3),
+           lease_db4 = prbr:init(lease_db4)
           }.
 
 %% @doc Gets the given property from the dht_node state.
