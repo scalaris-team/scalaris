@@ -79,18 +79,27 @@ out(Arg) ->
       <div class="middleleft">
 <h2>Datacenter Clustering Map</h2>
 
-<div id="clusterinfo">
-    <button id="toggleUpdate" onclick="toggleUpdate()">
+<erl>
+out(Arg) ->
+    case config:read(dc_clustering_enable) of
+        true -> {html, "
+<div id=\"clusterinfo\">
+    <button id=\"toggleUpdate\" onclick=\"toggleUpdate()\">
         Disable automatic update
     </button>
-    <input type="text" name="updateInterval" id="updateInterval" />
+    <input type=\"text\" name=\"updateInterval\" id=\"updateInterval\" />
 </div>
-<div id="stats">
+<div id=\"stats\">
     <ul>
     </ul>
 </div>
-<div id="graph"></div>
-<div id="histogram"></div>
+<div id=\"graph\"></div>
+<div id=\"histogram\"></div>
+<script src=\"dc.js\"></script>
+"};
+        _ -> {ehtml, {p, [], "DC Clustering disabled. Enable clustering in <tt>scalaris.local.cfg</tt> (change to: <tt>{dc_clustering_enable, true}.</tt>)."}}
+    end.
+</erl>
 
 <p>
     Last update:
@@ -106,6 +115,5 @@ out(Arg) ->
 </div>
 <div class="bottom">
 </div>
-<script src="dc.js"></script>
 </body>
 </html>

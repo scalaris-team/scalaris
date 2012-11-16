@@ -36,10 +36,15 @@ out(Arg) ->
       </div>
       <div class=\"highlighted\">
         <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
-      </div>
+      </div>" ++ 
+    case config:read(dc_clustering_enable) of
+        true -> "
       <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
       </div>
+";
+        _ -> ""
+    end ++ "
       <div class=\"nothighlighted\">
         <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
       </div>
