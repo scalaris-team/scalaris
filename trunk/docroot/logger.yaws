@@ -121,7 +121,7 @@ tree_log_to_table(Map, Start, Heading) ->
     case gb_trees:size(Map) of
       0 ->
         [{h3, [], Heading},
-         {p, [], "No messages logged. Enable logging in include/scalaris.hrl (LOG_MESSAGE and/or LOG_MESSAGE_SOCK macro)."}];
+         {p, [], "No messages logged. Enable logging in <tt>include/scalaris.hrl</tt> (<tt>LOG_MESSAGE</tt> and/or <tt>LOG_MESSAGE_SOCK</tt> macro)."}];
       _ ->
         SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
         {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),

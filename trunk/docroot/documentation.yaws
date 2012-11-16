@@ -75,8 +75,9 @@ out(Arg) ->
 <h2>Documentation</h2>
 
 <p>
-<a name="doc" href="doc">Documentation extracted from Erlang sources.</a>
+Documentation extracted from Erlang sources <a name="doc" href="doc" target="_blank" title="Documentation extracted from Erlang sources (in new window)">(open in new window)</a>:
 </p>
+<iframe src="doc" width="920" height="600"></iframe>
 
 <hr />
 <p>Last update:
