@@ -52,11 +52,11 @@
            Old::client_value(), New::client_value()}.
 -type request() :: request_on_key() | {commit}.
 
--type read_result() :: {ok, client_value()} | {fail, timeout | not_found}.
--type write_result() :: {ok} | {fail, timeout}.
+-type read_result() :: {ok, client_value()} | {fail, not_found}.
+-type write_result() :: {ok}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
--type commit_result() :: {ok} | {fail, timeout} | {fail, abort, [client_key()]}.
+-type commit_result() :: {ok} | {fail, abort, [client_key()]}.
 -type testandset_result() :: write_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 -type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
 
