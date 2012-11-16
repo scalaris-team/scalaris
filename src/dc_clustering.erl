@@ -30,7 +30,8 @@
 -export([start_link/1]).
 
 -export([init/1, on_inactive/2, on_active/2,
-         activate/0, deactivate/0]).
+         activate/0, deactivate/0,
+         check_config/0]).
 
 -record(state_active,{
         centroids = [] :: dc_centroids:centroids()
@@ -72,7 +73,7 @@ activate() ->
         true ->
             Pid = pid_groups:get_my(dc_clustering),
             comm:send_local(Pid, {activate_clustering});
-        false ->
+        _ ->
             ignore
     end.
 
@@ -83,7 +84,7 @@ deactivate() ->
         true ->
             Pid = pid_groups:get_my(dc_clustering),
             comm:send_local(Pid, {deactivate_clustering});
-        false ->
+        _ ->
             ignore
     end.
 
@@ -101,7 +102,7 @@ start_link(DHTNodeGroup) ->
             ClusterTrigger = config:read(dc_clustering_cluster_trigger),
             gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, {ResetTrigger, ClusterTrigger},
                                      [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
-        false ->
+        _ ->
             ignore
     end.
 
@@ -110,16 +111,11 @@ start_link(DHTNodeGroup) ->
 init({ResetTrigger, ClusterTrigger}) ->
     ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
     ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
-    Radius = case config:read(dc_clustering_radius) of
-        failed -> exit(dc_clustering_radius_not_set);
-        R when R > 0 -> R;
-        _Else -> exit(dc_clustering_radius_invalid)
-    end,
     #state_inactive{
         queued_messages = msg_queue:new()
         , reset_trigger_state = ResetTriggerState
         , cluster_trigger_state = ClusterTriggerState
-        , radius=Radius
+        , radius = config:read(dc_clustering_radius)
     }
     .
 
@@ -265,6 +261,22 @@ on_active({query_my, Atom, Pid}, State) ->
     end,
     State
     .
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    case config:read(dc_clustering_enable) of
+        true ->
+            config:cfg_is_integer(dc_clustering_reset_interval) andalso
+            config:cfg_is_greater_than(dc_clustering_reset_interval, 0) andalso
+            config:cfg_is_integer(dc_clustering_interval) andalso
+            config:cfg_is_greater_than(dc_clustering_interval, 0) andalso
+            config:cfg_is_module(dc_clustering_reset_trigger) andalso
+            config:cfg_is_module(dc_clustering_cluster_trigger) andalso
+            config:cfg_is_float(dc_clustering_radius) andalso
+            config:cfg_is_greater_than(dc_clustering_radius, 0.0);
+        _ -> true
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helpers
