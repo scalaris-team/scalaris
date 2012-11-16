@@ -143,13 +143,13 @@ out(A) ->
     end.
 </erl>
 
-Last update:
+<hr />
+<p>Last update:
 <erl>
- 
  out(Arg) ->
 	{Date, {Hour, Minute, Second}} = calendar:local_time(),
     {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
-</erl>
+</erl></p>
 </div>
 <br class="br_class">&nbsp;
 </div>

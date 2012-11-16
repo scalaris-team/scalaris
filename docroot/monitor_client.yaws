@@ -234,14 +234,13 @@ $(function() {
 <p>I/O - Traffic (10s aggregates)</p>
 <div id="io" style="width: 800px; height: 300px; margin-bottom:50px"></div>
 
-Last update:
+<hr />
+<p>Last update:
 <erl>
- 
  out(Arg) ->
-	{Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
     {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
-</erl>
-</p>
+</erl></p>
 </div>
 <br class="br_class">&nbsp;
 </div>

@@ -145,6 +145,15 @@ out(Arg) ->
     {ehtml, [tree_log_to_table(Received, Start, "Received Messages") ++ tree_log_to_table(Sent, Start, "Sent Messages")]}.
 </erl>
 
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</div>
+<br class="br_class">&nbsp;
 </div>
 <div class="bottom">
 </div>
