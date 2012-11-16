@@ -95,10 +95,13 @@
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
 % define 3 levels of recursion manually:
+-define(GROUP_MESSAGE(MSG), {?send_to_group_member, atom(), MSG}).
 -type group_message() ::
-        {?send_to_group_member, atom(), message()} |
-        {?send_to_group_member, atom(), {?send_to_group_member, atom(), message()}} |
-        {?send_to_group_member, atom(), {?send_to_group_member, atom(), {?send_to_group_member, atom(), message()}}}.
+        ?GROUP_MESSAGE(message()) |
+        ?GROUP_MESSAGE(?GROUP_MESSAGE(message())) |
+        ?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(message()))).
+-type group_message4() ::
+        ?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(message())))).
 -else.
 -type group_message() :: {?send_to_group_member, atom(), message() | group_message()}.
 -endif.
@@ -240,7 +243,11 @@ unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_server process.
+-ifdef(forward_or_recursive_types_are_not_allowed).
+-spec pack_group_member(message() | group_message(), send_options()) -> message() | group_message() | group_message4().
+-else.
 -spec pack_group_member(message() | group_message(), send_options()) -> message() | group_message().
+-endif.
 pack_group_member(Msg, [])                      -> Msg;
 pack_group_member(Msg, [{shepherd, _Shepherd}]) -> Msg;
 pack_group_member(Msg, Options)                 ->
