@@ -181,6 +181,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
     public static class MyResourceBundle extends ListResourceBundle {
         protected SiteInfo siteinfo;
         protected ResourceBundle langResBundle = null;
+        protected ResourceBundle enBundle;
         
         /**
          * Creates a new bundle using the namespace contents from the given
@@ -196,6 +197,7 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
             if (locale != null) {
                 langResBundle = Messages.getResourceBundle(locale);
             }
+            enBundle = Messages.getResourceBundle(Locale.ENGLISH);
         }
         
         @Override
@@ -218,31 +220,33 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
              * 12  Help    Help pages
              * 13  Help talk   
              * 14  Category    Category description pages
-             * 15  Category talk   
+             * 15  Category talk
+             * 100 Portal
+             * 101 Portal talk
              * -1  Special     Holds special pages
              * -2  Media   Alias for direct links to media files
              */
             return new Object[][] {
-                    {Messages.WIKI_API_MEDIA1, getNsPref(Namespace.MEDIA_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_SPECIAL1, getNsPref(Namespace.SPECIAL_NAMESPACE_KEY)},
+                    {Messages.WIKI_API_MEDIA1, getNsPref(Namespace.MEDIA_NAMESPACE_KEY, Messages.WIKI_API_MEDIA1)},
+                    {Messages.WIKI_API_SPECIAL1, getNsPref(Namespace.SPECIAL_NAMESPACE_KEY, Messages.WIKI_API_SPECIAL1)},
                     // Main - nothing to add for this
-                    {Messages.WIKI_API_TALK1, getNsPref(Namespace.TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_USER1, getNsPref(Namespace.USER_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_USERTALK1, getNsPref(Namespace.USER_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_META1, getNsPref(Namespace.PROJECT_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_METATALK1, getNsPref(Namespace.PROJECT_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_IMAGE1, getNsPref(Namespace.FILE_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_IMAGETALK1, getNsPref(Namespace.FILE_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_MEDIAWIKI1, getNsPref(Namespace.MEDIAWIKI_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_MEDIAWIKITALK1, getNsPref(Namespace.MEDIAWIKI_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_TEMPLATE1, getNsPref(Namespace.TEMPLATE_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_TEMPLATETALK1, getNsPref(Namespace.TEMPLATE_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_HELP1, getNsPref(Namespace.HELP_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_HELPTALK1, getNsPref(Namespace.HELP_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_CATEGORY1, getNsPref(Namespace.CATEGORY_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_CATEGORYTALK1, getNsPref(Namespace.CATEGORY_TALK_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_PORTAL1, getNsPref(Namespace.PORTAL_NAMESPACE_KEY)},
-                    {Messages.WIKI_API_PORTALTALK1, getNsPref(Namespace.PORTAL_TALK_NAMESPACE_KEY)},
+                    {Messages.WIKI_API_TALK1, getNsPref(Namespace.TALK_NAMESPACE_KEY, Messages.WIKI_API_TALK1)},
+                    {Messages.WIKI_API_USER1, getNsPref(Namespace.USER_NAMESPACE_KEY, Messages.WIKI_API_USER1)},
+                    {Messages.WIKI_API_USERTALK1, getNsPref(Namespace.USER_TALK_NAMESPACE_KEY, Messages.WIKI_API_USERTALK1)},
+                    {Messages.WIKI_API_META1, getNsPref(Namespace.PROJECT_NAMESPACE_KEY, Messages.WIKI_API_META1)},
+                    {Messages.WIKI_API_METATALK1, getNsPref(Namespace.PROJECT_TALK_NAMESPACE_KEY, Messages.WIKI_API_METATALK1)},
+                    {Messages.WIKI_API_IMAGE1, getNsPref(Namespace.FILE_NAMESPACE_KEY, Messages.WIKI_API_IMAGE1)},
+                    {Messages.WIKI_API_IMAGETALK1, getNsPref(Namespace.FILE_TALK_NAMESPACE_KEY, Messages.WIKI_API_IMAGETALK1)},
+                    {Messages.WIKI_API_MEDIAWIKI1, getNsPref(Namespace.MEDIAWIKI_NAMESPACE_KEY, Messages.WIKI_API_MEDIAWIKI1)},
+                    {Messages.WIKI_API_MEDIAWIKITALK1, getNsPref(Namespace.MEDIAWIKI_TALK_NAMESPACE_KEY, Messages.WIKI_API_MEDIAWIKITALK1)},
+                    {Messages.WIKI_API_TEMPLATE1, getNsPref(Namespace.TEMPLATE_NAMESPACE_KEY, Messages.WIKI_API_TEMPLATE1)},
+                    {Messages.WIKI_API_TEMPLATETALK1, getNsPref(Namespace.TEMPLATE_TALK_NAMESPACE_KEY, Messages.WIKI_API_TEMPLATETALK1)},
+                    {Messages.WIKI_API_HELP1, getNsPref(Namespace.HELP_NAMESPACE_KEY, Messages.WIKI_API_HELP1)},
+                    {Messages.WIKI_API_HELPTALK1, getNsPref(Namespace.HELP_TALK_NAMESPACE_KEY, Messages.WIKI_API_HELPTALK1)},
+                    {Messages.WIKI_API_CATEGORY1, getNsPref(Namespace.CATEGORY_NAMESPACE_KEY, Messages.WIKI_API_CATEGORY1)},
+                    {Messages.WIKI_API_CATEGORYTALK1, getNsPref(Namespace.CATEGORY_TALK_NAMESPACE_KEY, Messages.WIKI_API_CATEGORYTALK1)},
+                    {Messages.WIKI_API_PORTAL1, getNsPref(Namespace.PORTAL_NAMESPACE_KEY, Messages.WIKI_API_PORTAL1)},
+                    {Messages.WIKI_API_PORTALTALK1, getNsPref(Namespace.PORTAL_TALK_NAMESPACE_KEY, Messages.WIKI_API_PORTALTALK1)},
                     {Messages.WIKI_TAGS_TOC_CONTENT, langResBundle == null ? "Contents" : Messages.getString(langResBundle, Messages.WIKI_TAGS_TOC_CONTENT, "Contents")}
             };
         }
@@ -252,15 +256,25 @@ public class MyNamespace extends Namespace implements NamespaceUtils {
          * 
          * @param key
          *            the key of the namespace to retrieve
-         * @return
+         * @param msgkey
+         *            the key used by {@link Messages}
+         * @return namespace name
          */
-        private String getNsPref(Integer key) {
+        private String getNsPref(Integer key, String msgkey) {
             final Map<String, String> nsMap = siteinfo.getNamespaces().get(key.toString());
             if (nsMap != null) {
                 return nsMap.get(SiteInfo.NAMESPACE_PREFIX);
-            } else {
-                return null;
             }
+            // note: the result MUST NOT BE NULL!
+            // otherwise Messages#getString() will return <tt>"!" + key + "!"</tt>
+            String fallBackName = null;
+            if (langResBundle != null) {
+                fallBackName = Messages.getString(langResBundle, msgkey, null);
+            }
+            if (fallBackName == null) {
+                fallBackName = Messages.getString(enBundle, msgkey, null);
+            }
+            return fallBackName;
         }
     }
 
