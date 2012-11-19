@@ -514,7 +514,15 @@ public class MyWikiModel extends WikiModel {
                         }
                     } else {
                         // we must disarm the redirect here!
-                        System.err.println("Couldn't parse the redirect title from: " + text);
+                        System.err
+                                .println("Couldn't parse the redirect title of \""
+                                        + createFullPageName(namespace, articleName)
+                                        + "\" in \""
+                                        + createFullPageName(
+                                                getNamespaceName(),
+                                                getPageName())
+                                        + "\" from: "
+                                        + text.substring(0, Math.min(100, text.length())));
                         text = null;
                     }
                 }
