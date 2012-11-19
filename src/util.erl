@@ -50,6 +50,7 @@
          smerge2/2, smerge2/3, smerge2/4,
          is_unittest/0, make_filename/1,
          app_get_env/2,
+         timestamp2us/1, us2timestamp/1,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          readable_utc_time/1,
          for_to/3, for_to_ex/3, for_to_ex/4, for_to_fold/5,
@@ -87,6 +88,8 @@
 -type time() :: {MegaSecs::non_neg_integer(),
                  Secs::non_neg_integer(),
                  MicroSecs::non_neg_integer()}.
+
+-type us_timestamp() :: non_neg_integer(). % micro seconds since Epoch
 
 -type time_utc() :: {{1970..10000, 1..12, 1..31}, {0..23, 0..59, 0..59}}.
 
@@ -908,6 +911,28 @@ app_check_known() ->
             error_logger:warning_msg("unknown application: ~.0p~n", [App]),
             ok
     end.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% time calculations
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% @doc convert os:timestamp() to microsecs
+% See http://erlang.org/pipermail/erlang-questions/2008-December/040368.html
+-spec timestamp2us(time()) -> us_timestamp().
+timestamp2us({MegaSecs, Secs, MicroSecs}) ->
+    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+
+% @doc convert microsecs to os:timestamp()
+-spec us2timestamp(us_timestamp()) -> time().
+us2timestamp(Time) ->
+    MicroSecs = Time rem 1000000,
+    Time2 = (Time - MicroSecs) div 1000000,
+    Secs = Time2 rem 1000000,
+    MegaSecs = (Time2 - Secs) div 1000000,
+    {MegaSecs, Secs, MicroSecs}.
 
 -spec time_plus_us(Time::time(), Delta_MicroSeconds::integer()) -> time().
 time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->

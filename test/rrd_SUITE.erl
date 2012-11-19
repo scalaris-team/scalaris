@@ -93,7 +93,7 @@ create_timing(_Config) ->
 
 timestamp(_Config) ->
     TS = erlang:now(),
-    ?equals(TS, rrd:us2timestamp(rrd:timestamp2us(TS))),
+    ?equals(TS, util:us2timestamp(util:timestamp2us(TS))),
     ok.
 
 add_nonexisting_timeslots(_Config) ->
@@ -147,7 +147,7 @@ timing_perf() ->
 %%      microseconds since epoch.
 -spec time2us(util:time() | rrd:internal_time()) -> rrd:internal_time().
 time2us({_, _, _} = Time) ->
-    rrd:timestamp2us(Time);
+    util:timestamp2us(Time);
 time2us(Time) ->
     Time.
 

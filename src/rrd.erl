@@ -44,7 +44,7 @@
          add_with/4, timing_with_hist_merge_fun/3]).
 
 % misc
--export([timestamp2us/1, us2timestamp/1, check_config/0]).
+-export([check_config/0]).
 
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
@@ -104,7 +104,7 @@ check_timeslot_now(DB) ->
 -spec dump(rrd()) -> [{From::time(), To::time(), data_type()}].
 dump(DB) ->
     dump_with(DB, fun(_DB, From, To, X) ->
-                          {us2timestamp(From), us2timestamp(To), X}
+                          {util:us2timestamp(From), util:us2timestamp(To), X}
                   end).
 
 -type dump_fun_existing(T) :: fun((rrd(), From::internal_time(), To::internal_time(), Value::data_type()) -> T).
@@ -154,7 +154,7 @@ merge(DB1 = #rrd{type = Type}, DB2 = #rrd{type = Type}) ->
 -spec create(SlotLength::timespan(), Count::pos_integer(), Type::timeseries_type(),
              StartTime::time() | internal_time()) -> rrd().
 create(SlotLength, Count, Type, {_, _, _} = StartTime) ->
-    create(SlotLength, Count, Type, timestamp2us(StartTime));
+    create(SlotLength, Count, Type, util:timestamp2us(StartTime));
 create(SlotLength, Count, Type, StartTime) ->
     #rrd{slot_length = SlotLength, count = Count, type = Type, current_index = 0,
          current_time = StartTime, data = array:new(Count),
@@ -164,7 +164,7 @@ create(SlotLength, Count, Type, StartTime) ->
 %      accepts any value.
 -spec add(Time::time() | internal_time(), Value::term(), rrd()) -> rrd().
 add({_, _, _} = ExternalTime, Value, DB) ->
-    add_with(timestamp2us(ExternalTime), Value, DB, select_fun(DB));
+    add_with(util:timestamp2us(ExternalTime), Value, DB, select_fun(DB));
 add(Time, Value, DB) ->
     add_with(Time, Value, DB, select_fun(DB)).
 
@@ -181,7 +181,7 @@ select_fun(DB) ->
 % @doc Advances the stored timeslots (if necessary) to the given time.
 -spec check_timeslot(Time::time() | internal_time(), rrd()) -> rrd().
 check_timeslot({_, _, _} = ExternalTime, DB) ->
-    add_with(timestamp2us(ExternalTime), undefined, DB, fun keep_old_update_fun/3);
+    add_with(util:timestamp2us(ExternalTime), undefined, DB, fun keep_old_update_fun/3);
 check_timeslot(Time, DB) ->
     add_with(Time, undefined, DB, fun keep_old_update_fun/3).
 
@@ -311,7 +311,7 @@ get_current_time(DB) ->
 %% @doc Gets the value at the given time or 'undefined' if there is no value.
 -spec get_value(DB::rrd(), Time::time() | internal_time()) -> undefined | data_type().
 get_value(DB, {_, _, _} = Time) ->
-    get_value(DB, timestamp2us(Time));
+    get_value(DB, util:timestamp2us(Time));
 get_value(DB, InternalTime) when is_integer(InternalTime) ->
     case time2slotidx(InternalTime, DB#rrd.current_time, DB#rrd.slot_length,
                       DB#rrd.current_index, DB#rrd.count) of
@@ -474,25 +474,6 @@ timing_with_hist_merge_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
                   {NewSum, NewSum2, NewCount, NewMin, NewMax, NewHist}) ->
     {Sum + NewSum, Sum2 + NewSum2, Count + NewCount,
      erlang:min(Min, NewMin), erlang:max(Max, NewMax), histogram:merge(Hist, NewHist)}.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% time calculations
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% @doc convert os:timestamp() to microsecs
--spec timestamp2us(time()) -> internal_time().
-timestamp2us({MegaSecs, Secs, MicroSecs}) ->
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
-
--spec us2timestamp(internal_time()) -> time().
-us2timestamp(Time) ->
-    MicroSecs = Time rem 1000000,
-    Time2 = (Time - MicroSecs) div 1000000,
-    Secs = Time2 rem 1000000,
-    MegaSecs = (Time2 - Secs) div 1000000,
-    {MegaSecs, Secs, MicroSecs}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
