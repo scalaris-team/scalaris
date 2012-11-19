@@ -14,6 +14,8 @@
 
 %% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
 %% @doc A flexible routing table algorithm as presented in (Nagao, Shudo, 2011)
+%%
+%% @todo Explain how to dump RT for evaluating FRTChord
 %% @end
 %% @version $Id$
 
@@ -51,6 +53,8 @@
 
 -record(rt_t, {
         source = undefined :: key_t() | undefined
+        , num_active_learning_lookups = 0 :: non_neg_integer()
+        , should_dump = false :: boolean() % set by configuration parameter rt_frtchord_should_dump
         , nodes = gb_trees:empty() :: gb_tree()
     }).
 
@@ -88,7 +92,12 @@ init(Neighbors) ->
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
     % create an initial RT consisting of the neighbors
     EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
-    update_entries(Neighbors, EmptyRT)
+
+    RT = case config:read(rt_frtchord_should_dump) of
+        true -> set_should_dump(EmptyRT);
+        _ -> EmptyRT
+    end,
+    update_entries(Neighbors, RT)
     .
 
 %% @doc Hashes the key to the identifier space.
@@ -274,6 +283,26 @@ get_replica_keys(Key) ->
 dump(RT) -> [{"0", webhelpers:safe_html_string("~p", [RT])}].
 %% userdevguide-end rt_frtchord:dump
 
+% @doc Dump the routing table into a CSV string
+-spec dump_to_csv(RT :: rt()) -> [char()].
+dump_to_csv(RT) ->
+    Fingers = internal_to_list(RT),
+    IndexedFingers = lists:zip(lists:seq(1,length(Fingers)), Fingers),
+    MyId = get_source_id(RT),
+    lists:flatten(
+        [
+            io_lib:format("# Source node: ~p", [MyId]),
+            "#-----------------------",
+            "# Finger,Id"
+            ] ++
+        [
+            io_lib:format("~p,~p~n",[Index,Finger])
+            || {Index, Finger} <- IndexedFingers
+        ]
+    )
+    .
+
+
 %% @doc Checks whether config parameters of the rt_frtchord process exist and are
 %%      valid.
 -spec check_config() -> boolean().
@@ -363,7 +392,30 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
                                         {rt_get_node, comm:this()}}),
-    State
+
+    % For evaluating FRTChord, we dump the RT at specific nodes to check if their RT
+    % approaches the best RT.
+    NewRT = case should_dump(RT) of
+        true ->
+            IncRT = inc_num_active_learning_lookups(RT),
+            % Dump RT if the number of active learning lookups is either 25 or 100. If so,
+            % dump the RT to text files in ebin
+            NumActiveLearningLookups = get_num_active_learning_lookups(IncRT),
+            _ = if NumActiveLearningLookups =:= 25 orelse
+               NumActiveLearningLookups =:= 100 ->
+                    CSV = dump_to_csv(IncRT),
+                    % Filename comes from ActiveLearningLookups_Number
+                    file:write_file(io_lib:format("all_~p.dump", [NumActiveLearningLookups]), CSV)
+                    ;
+                true ->
+                    ok
+            end,
+            IncRT;
+        false ->
+            RT
+    end,
+    NewState = rt_loop:set_rt(State, NewRT),
+    NewState
     ;
 
 handle_custom_message({rt_get_node, From}, State) ->
@@ -770,6 +822,10 @@ get_source_node(#rt_t{source=NodeId, nodes=Nodes}) ->
                 exit(rt_broken_tree_empty)
     end.
 
+% @doc Get the id of the source node.
+-spec get_source_id(RT :: rt()) -> ?RT:key().
+get_source_id(#rt_t{source=NodeId}) -> NodeId.
+
 % @doc Set the source node of a routing table
 -spec set_source_node(SourceId :: key(), RT :: rt()) -> rt().
 set_source_node(SourceId, #rt_t{source=undefined}=RT) ->
@@ -778,6 +834,37 @@ set_source_node(SourceId, #rt_t{source=undefined}=RT) ->
 % @doc Get the gb_tree of the routing table containing its nodes
 -spec get_rt_tree(Nodes::rt()) -> gb_tree().
 get_rt_tree(#rt_t{nodes=Nodes}) -> Nodes.
+
+% @doc Get the number of active learning lookups which have happened
+-spec get_num_active_learning_lookups(RT :: rt()) -> non_neg_integer().
+get_num_active_learning_lookups(RT) ->
+    RT#rt_t.num_active_learning_lookups
+    .
+
+% @doc Set the number of happened active learning lookups
+-spec set_num_active_learning_lookups(RT :: rt(), Num :: non_neg_integer()) -> rt().
+set_num_active_learning_lookups(RT,Num) ->
+    RT#rt_t{num_active_learning_lookups=Num}
+    .
+
+% @doc Increment the number of happened active learning lookups
+-spec inc_num_active_learning_lookups(RT :: rt()) -> rt().
+inc_num_active_learning_lookups(RT) ->
+    Inc = get_num_active_learning_lookups(RT) + 1,
+    set_num_active_learning_lookups(RT, Inc)
+    .
+
+% @doc Check if RT should be dumped for evaluating FRTChord
+-spec should_dump(RT :: rt()) -> boolean().
+should_dump(RT) ->
+    RT#rt_t.should_dump
+    .
+
+% @doc Set that the RT should be dumped
+-spec set_should_dump(RT :: rt()) -> rt().
+set_should_dump(RT) ->
+    RT#rt_t{should_dump=true}
+    .
 
 % @doc Get all sticky entries of a routing table
 -spec get_sticky_entries(rt()) -> [rt_entry()].
