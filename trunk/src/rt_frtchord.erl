@@ -291,12 +291,12 @@ dump_to_csv(RT) ->
     MyId = get_source_id(RT),
     lists:flatten(
         [
-            io_lib:format("# Source node: ~p", [MyId]),
-            "#-----------------------",
-            "# Finger,Id"
+            io_lib:format("# Source node: ~p~n", [MyId]),
+            "#-----------------------\n",
+            "# Finger,Id\n"
             ] ++
         [
-            io_lib:format("~p,~p~n",[Index,Finger])
+            io_lib:format("~p,~p~n",[Index,node:id(Finger)])
             || {Index, Finger} <- IndexedFingers
         ]
     )
