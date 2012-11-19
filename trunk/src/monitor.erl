@@ -275,8 +275,8 @@ get_last_n(Table, Key, N) ->
 -spec web_debug_info_dump_fun(rrd:rrd(), From_us::rrd:internal_time(), To::rrd:internal_time(), Value::term())
         -> {From::util:time_utc(), To::util:time_utc(), Diff_in_s::non_neg_integer(), ValueStr::string()}.
 web_debug_info_dump_fun(DB, From_us, To_us, Value) ->
-    From = calendar:now_to_universal_time(rrd:us2timestamp(From_us)),
-    To = calendar:now_to_universal_time(rrd:us2timestamp(To_us)),
+    From = calendar:now_to_universal_time(util:us2timestamp(From_us)),
+    To = calendar:now_to_universal_time(util:us2timestamp(To_us)),
     Diff_in_s = (To_us - From_us) div 1000,
     ValueStr =
         case rrd:get_type(DB) of
