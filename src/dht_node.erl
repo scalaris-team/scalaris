@@ -273,6 +273,11 @@ on({db_remove_subscription, Tag}, State) ->
     DB2 = ?DB:remove_subscription(dht_node_state:get(State, db), Tag),
     dht_node_state:set_db(State, DB2);
 
+on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
+    {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
+    comm:send(Source_PID, {delete_key_response, ClientsId, HashedKey, Result}),
+    dht_node_state:set_db(State, DB2);
+
 %% for unit testing only: allow direct DB manipulation
 on({get_key_entry, Source_PID, HashedKey}, State) ->
     Entry = ?DB:get_entry(dht_node_state:get(State, db), HashedKey),
@@ -289,9 +294,9 @@ on({add_data, Source_PID, Data}, State) ->
     comm:send(Source_PID, {add_data_reply}),
     dht_node_state:set_db(State, NewDB);
 
-on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
-    {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
-    comm:send(Source_PID, {delete_key_response, ClientsId, HashedKey, Result}),
+on({delete_keys, Source_PID, HashedKeys}, State) ->
+    DB2 = ?DB:delete_entries(dht_node_state:get(State, db), intervals:from_elements(HashedKeys)),
+    comm:send(Source_PID, {delete_keys_reply}),
     dht_node_state:set_db(State, DB2);
 
 on({drop_data, Data, Sender}, State) ->

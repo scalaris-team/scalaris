@@ -28,7 +28,7 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() -> [count].
+all() -> [tester_count].
 
 suite() -> [ {timetrap, {seconds, 10}} ].
 
@@ -42,35 +42,40 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-count(_Config) ->
-    ?equals(api_tx:write("i", 2), {ok}),
-    ?equals(api_tx:write("j", 3), {ok}),
-    ?equals(api_tx:write("k", 5), {ok}),
-    ?equals(api_tx:write("l", 7), {ok}),
+tester_count(_Config) ->
+    tester:test(?MODULE, count, 0, 1000),
+    ?expect_no_message().
+
+-spec count() -> ok.
+count() ->
+    Entries = [begin
+                   RandInt = uid:get_pids_uid(),
+                   db_entry:new(
+                     ?RT:hash_key(erlang:integer_to_list(RandInt)),
+                     X, RandInt)
+               end || X <- lists:seq(1, 16)],
+    db_generator:insert_db(Entries),
+    Total = reduce(Entries),
+    Keys = [db_entry:get_key(Entry) || Entry <- Entries],
     Id = uid:get_global_uid(),
-    bulkowner:issue_bulk_owner(Id, intervals:all(), {bulk_read_entry, comm:this()}),
-    ?equals(collect(Id, 0), 68),
-    ?expect_no_message(),
+    I = intervals:from_elements(Keys),
+    bulkowner:issue_bulk_owner(Id, I, {bulk_read_entry, comm:this()}),
+    ?equals(collect(Id, 0, Total, 0), Total),
+    db_generator:remove_keys(Keys),
     ok.
 
-collect(Id, Sum) ->
+collect(Id, Sum, ExpSum, Msgs) ->
+%%     if Msgs =< 0 -> ok;
+%%        true      -> ct:pal("sum after ~p msgs: ~p~n", [Msgs, Sum])
+%%     end,
     if
-        Sum < 68 ->
-%%         ct:pal("sum: ~p ~p~n", [Sum, Sum]),
+        Msgs =:= 4 -> Sum; % 4 nodes -> max 4 messages
+        Sum =:= ExpSum -> Sum;
+        true ->
             receive
                 {bulkowner, reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
-                collect(Id, Sum + reduce(Data))
-            end;
-        Sum == 68 ->
-            receive
-                {bulkowner, reply, Id, {bulk_read_entry_response, _NowDone, Data}} ->
-                    Sum + reduce(Data)
-            after 1000 ->
-                    Sum
-            end;
-        Sum > 68 ->
-            ct:pal("sum: ~p ~p~n", [Sum, Sum]),
-            Sum
+                    collect(Id, Sum + reduce(Data), ExpSum, Msgs + 1)
+            end
     end.
 
 -spec reduce(?DB:db_as_list()) -> integer().
