@@ -30,7 +30,8 @@
          getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1,
          safe_html_string/1, safe_html_string/2,
-         pid_to_integer/1
+         pid_to_integer/1, color/1, format_coordinate/1
+         , format_nodes/1
      ]).
 
 -opaque attribute_type() :: {atom(), string()}.
@@ -40,7 +41,7 @@
 -opaque html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
 -endif.
 
-%% @doc Checks whether the current request is a post operation.
+% @doc Checks whether the current request is a post operation.
 -spec isPost(A::#arg{req::#http_request{method::atom()}}) -> boolean().
 isPost(A) ->
     Method = (A#arg.req)#http_request.method,
@@ -70,8 +71,7 @@ delete_key(Key, Timeout) ->
     util:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%--------------------------Vivaldi-Map------------------------------
-
--spec getVivaldiMap() -> SVG::string().
+-spec getVivaldiMap() -> [{comm:mypid(), vivaldi:network_coordinate()}].
 getVivaldiMap() ->
     mgmt_server:node_list(),
     Nodes =
@@ -87,8 +87,8 @@ getVivaldiMap() ->
                    SourcePid = comm:reply_as(This, 1, {'_', Pid}),
                    comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
            end) || Pid <- Nodes],
-    CC_list = get_vivaldi(Nodes, [], 0),
-    renderVivaldiMap(CC_list, Nodes).
+    lists:zip(Nodes, get_vivaldi(Nodes, [], 0))
+    .
 
 -spec get_vivaldi(Pids::[comm:mypid()], [vivaldi:network_coordinate()], TimeInMS::non_neg_integer()) -> [vivaldi:network_coordinate()].
 get_vivaldi([], Coords, _TimeInS) -> Coords;
@@ -116,134 +116,93 @@ get_vivaldi(Pids, Coords, TimeInMS) ->
         _ -> Coords
     end.
 
--spec renderVivaldiMap(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()]) -> SVG::string().
-renderVivaldiMap(_CC_list, []) ->
-    "<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
-renderVivaldiMap(CC_list, Nodes) ->
-    {Min,Max} = get_min_max(CC_list),
-    %io:format("Min: ~p Max: ~p~n",[Min,Max]),
-    Xof=(lists:nth(1, Max)-lists:nth(1, Min))*0.1,
-    Yof=(lists:nth(2, Max)-lists:nth(2, Min))*0.1,
-    %io:format("~p ~p {~p ~p} ~n",[Min,Max,Xof,Yof]),
-    Vbx=lists:nth(1, Min)-Xof,
-    Vby=lists:nth(2, Min)-Yof,
-    Vbw=(lists:nth(1, Max)-lists:nth(1, Min))+Xof*2,
-    Vbh=(lists:nth(2, Max)-lists:nth(2, Min))+Yof*2,
-    
-    R=(Xof+Yof)*0.1,
-    Head=io_lib:format("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"~p,~p,~p,~p\">~n",
-                       [Vbx,Vby,Vbw,Vbh])++
-         io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
-                       [lists:nth(1, Min)-R*1.5,lists:nth(2, Min),lists:nth(1, Min)-R*1.5,lists:nth(2, Max),R*0.1])++
-         io_lib:format("<line x1=\"~p\" y1=\"~p\" x2=\"~p\" y2=\"~p\" stroke=\"#111111\" stroke-width=\"~p\" />~n",
-                       [lists:nth(1, Min),lists:nth(2, Max)+R*1.5,lists:nth(1, Max),lists:nth(2, Max)+R*1.5,R*0.1])++
-         io_lib:format("<text x=\"~p\" y=\"~p\" transform=\"rotate(90,~p,~p)\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
-                       [lists:nth(1, Min)-R*4,
-                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
-                        lists:nth(1, Min)-R*4,
-                        lists:nth(2, Min)+(lists:nth(2, Max)-lists:nth(2, Min))/3,
-                        R*2,
-                        util:floor(lists:nth(1, Max)-lists:nth(1, Min))])++
-         io_lib:format("<text x=\"~p\" y=\"~p\" style=\"font-size:~ppx;\"> ~p micro seconds </text>~n",
-                       [lists:nth(1, Min)+(lists:nth(1, Max)-lists:nth(1, Min))/3,
-                        lists:nth(2, Max)+R*4,
-                         R*2,
-                        util:floor(lists:nth(2, Max)-lists:nth(2, Min))]),
-
-    Content=gen_Nodes(CC_list, Nodes, R),
-    Foot="</svg>",
-    Head++Content++Foot.
-
--spec gen_Nodes(CC_list::[vivaldi:network_coordinate()], Nodes::[comm:mypid()], R::float()) -> string().
-gen_Nodes([],_,_) ->
-    "";
-gen_Nodes([H|T],[HN|TN],R) ->
-    Hi = 255,
-    Lo = 0,
-    
-    S1 = pid_to_integer(HN),
-    
-    _ = random:seed(S1,S1,S1),
-    C1 = random:uniform(Hi-Lo)+Lo-1,
-    C2 = random:uniform(Hi-Lo)+Lo-1,
-    C3 = random:uniform(Hi-Lo)+Lo-1,
-    io_lib:format("<circle cx=\"~p\" cy=\"~p\" r=\"~p\" style=\"fill:rgb( ~p, ~p ,~p) ;\" />~n",
-                  [lists:nth(1, H),lists:nth(2, H),R,C1,C2,C3])
-        ++ gen_Nodes(T,TN,R).
-
-%% @doc Gets the smallest and largest coordinates in each dimension of all
-%%      vectors in the given list.
--spec get_min_max(Vectors::[vivaldi:network_coordinate()])
-        -> {vivaldi:network_coordinate(), vivaldi:network_coordinate()}.
-get_min_max([]) ->
-    {[], []};
-get_min_max([H | T]) ->
-    lists:foldl(fun(A, {Min, Max}) ->
-                        {min_list(A, Min), max_list(A, Max)}
-                end, {H, H}, T).
-
-%% @doc Gets the smallest coordinate in each dimension of the given vectors.
--spec min_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
-min_list(L1, L2) ->
-    lists:zipwith(fun erlang:min/2, L1, L2).
-
-%% @doc Gets the largest coordinate in each dimension of the given vectors.
--spec max_list(L1::vivaldi:network_coordinate(), L2::vivaldi:network_coordinate()) -> vivaldi:network_coordinate().
-max_list(L1, L2) ->
-    lists:zipwith(fun erlang:max/2, L1, L2).
-
+% @doc Convert a Pid into an integer.
 -spec pid_to_integer(comm:mypid()) -> integer().
 pid_to_integer(Pid) ->
     {A,B,C,D} = comm:get_ip(Pid),
     I = comm:get_port(Pid),
     A+B+C+D+I.
 
+% @doc Choose a random color for a Pid
+-spec color(comm:mypid()) -> string().
+color(Pid) ->
+    Hi = 255,
+    Lo = 0,
+    S1 = webhelpers:pid_to_integer(Pid),
+    _ = random:seed(S1,S1,S1),
+    C1 = random:uniform(Hi-Lo)+Lo-1,
+    C2 = random:uniform(Hi-Lo)+Lo-1,
+    C3 = random:uniform(Hi-Lo)+Lo-1,
+    io_lib:format("rgb(~p,~p,~p)",[C1,C2,C3])
+    .
 
+% @doc Get a string representation for a vivaldi coordinate
+-spec format_coordinate([vivaldi:network_coordinate(),...]) -> string().
+format_coordinate([X,Y]) ->
+    io_lib:format("[~p,~p]", [X,Y]).
+
+% @doc Format Nodes as returned by getVivaldiMap() into JSON.
+-spec format_nodes([{comm:mypid(), vivaldi:network_coordinate()}]) -> string().
+format_nodes(Nodes) ->
+    % order nodes according to their datacenter (designated by color)
+    NodesTree = lists:foldl(
+        fun({NodeName, Coords}, Acc) ->
+            Key = webhelpers:color(NodeName),
+            PriorValue = gb_trees:lookup(Key, Acc),
+            case PriorValue of
+                none -> gb_trees:enter(Key,[webhelpers:format_coordinate(Coords)], Acc);
+                {value, V} -> gb_trees:enter(Key, [webhelpers:format_coordinate(Coords) | V], Acc)
+            end
+    end, gb_trees:empty(), Nodes),
+
+    "[" ++ util:gb_trees_foldl(fun(Color, DCNodes, Acc) ->
+        NodesString = string:join(DCNodes,","),
+        Sep = case Acc of
+            "" -> "";
+            _ -> ","
+        end,
+        io_lib:format("{\"color\":\"~s\",\"coords\":[~s]}~s", [Color,NodesString,Sep]) ++ Acc
+    end, "", NodesTree) ++ "]".
 %%%--------------------------DC Clustering------------------------------
--spec getDCClustersAndNodes() -> {[vivaldi:network_coordinate()],
+-spec getDCClustersAndNodes() -> {[{comm:mypid(), vivaldi:network_coordinate()}],
         dc_centroids:centroids(), non_neg_integer(), float()} | disabled.
 getDCClustersAndNodes() ->
     case config:read(dc_clustering_enable) of
         true ->
             mgmt_server:node_list(),
-            Nodes =
-                receive
-                    {get_list_response, X} -> X
-                    after 2000 ->
-                        log:log(error,"[ WH ] Timeout getting node list from mgmt server"),
-                        throw('mgmt_server_timeout')
-                end,
+
             This = comm:this(),
             ClusteringProcess = pid_groups:find_a(dc_clustering),
             comm:send_local(ClusteringProcess, {query_clustering, This}),
             comm:send_local(ClusteringProcess, {query_my, local_epoch, This}),
             comm:send_local(ClusteringProcess, {query_my, radius, This}),
             
-            _ = [erlang:spawn(
-                   fun() ->
-                           SourcePid = comm:reply_as(This, 1, {'_', Pid}),
-                           comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
-                   end) || Pid <- Nodes],
-            
             Centroids = receive
-                            {query_clustering_response, Cs} -> Cs
-                        end,
-            
+                {query_clustering_response, Cs} -> Cs
+            after 2000 ->
+                    log:log(error,"[ WH ] Timeout getting query_clustering_response from dc_clustering"),
+                    throw('dc_clustering_timeout')
+            end,
+
             Epoch = receive
-                        {query_my_response, local_epoch, E} -> E
-                    end,
-            
+                {query_my_response, local_epoch, E} -> E
+            after 2000 ->
+                    log:log(error,"[ WH ] Timeout getting local_epoch from dc_clustering"),
+                    throw('dc_clustering_timeout')
+            end,
+
             Radius = receive
-                         {query_my_response, radius, R} -> R
-                     end,
+                {query_my_response, radius, R} -> R
+            after 2000 ->
+                    log:log(error,"[ WH ] Timeout getting radius from dc_clustering"),
+                    throw('dc_clustering_timeout')
+            end,
             
-            CC_list = get_vivaldi(Nodes, [], 0),
+            Nodes = getVivaldiMap(),
             
-            {lists:zip(Nodes, CC_list), Centroids, Epoch, Radius};
+            {Nodes, Centroids, Epoch, Radius};
         _ -> disabled
     end.
-
-
 
 %%%-----------------------------Ring----------------------------------
 
