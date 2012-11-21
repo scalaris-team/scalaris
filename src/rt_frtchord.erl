@@ -32,6 +32,18 @@
         , get_random_key_from_generator/3
     ]).
 
+% Make dialyzer stop complaining about unused functions
+% The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
+% complain when they are not called.
+-export([
+    get_source_id/1
+    , get_num_active_learning_lookups/1
+    , set_num_active_learning_lookups/2
+    , inc_num_active_learning_lookups/1
+    , should_dump/1
+    , dump_to_csv/1
+]).
+
 %% userdevguide-begin rt_frtchord:types
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type external_rt_t() :: gb_tree().
