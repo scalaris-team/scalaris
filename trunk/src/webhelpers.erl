@@ -214,9 +214,10 @@ getDCClustersAndNodes() ->
                         throw('mgmt_server_timeout')
                 end,
             This = comm:this(),
-            comm:send(hd(Nodes), {query_clustering, This}, [{group_member, dc_clustering}]),
-            comm:send(hd(Nodes), {query_my, local_epoch, This}, [{group_member, dc_clustering}]),
-            comm:send(hd(Nodes), {query_my, radius, This}, [{group_member, dc_clustering}]),
+            ClusteringProcess = pid_groups:find_a(dc_clustering),
+            comm:send_local(ClusteringProcess, {query_clustering, This}),
+            comm:send_local(ClusteringProcess, {query_my, local_epoch, This}),
+            comm:send_local(ClusteringProcess, {query_my, radius, This}),
             
             _ = [erlang:spawn(
                    fun() ->
