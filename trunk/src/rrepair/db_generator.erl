@@ -29,6 +29,7 @@
 
 -export([get_db/3, get_db/4]).
 -export([fill_ring/3]).
+-export([insert_db/1, remove_keys/1]).
 
 -define(ReplicationFactor, 4).
 
@@ -174,19 +175,29 @@ fill_wiki(_Params, DBFile) ->
 -spec insert_db(?DB:db_as_list()) -> ok.
 insert_db(KVV) ->
     Nodes = get_node_list(),
-    _ = lists:foldl(fun(Node, ActKVV) ->
-                            comm:send(Node, {get_state, comm:this(), my_range}),
-                            NRange = receive
-                                         {get_state_response, Range} -> Range
-                                     end,
-                            {NKVV, RestKVV} = lists:partition(fun(Entry) ->
-                                                                      intervals:in(db_entry:get_key(Entry), NRange)
-                                                              end, ActKVV),
-                            comm:send(Node, {add_data, comm:this(), NKVV}),
-                            receive {add_data_reply} -> ok end,
-                            RestKVV
-                    end,
-                    KVV, Nodes),
+    _ = lists:foldl(
+          fun(Node, ActKVV) ->
+                  comm:send(Node, {get_state, comm:this(), my_range}),
+                  NRange = receive
+                               {get_state_response, Range} -> Range
+                           end,
+                  {NKVV, RestKVV} = lists:partition(
+                                      fun(Entry) ->
+                                              intervals:in(db_entry:get_key(Entry), NRange)
+                                      end, ActKVV),
+                  comm:send(Node, {add_data, comm:this(), NKVV}),
+                  receive {add_data_reply} -> ok end,
+                  RestKVV
+          end,
+          KVV, Nodes),
+    ok.
+
+-spec remove_keys([?RT:key()]) -> ok.
+remove_keys(Keys) ->
+    _ = [begin
+             comm:send(Node, {delete_keys, comm:this(), Keys}),
+             receive {delete_keys_reply} -> ok end
+         end || Node <- get_node_list()],
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
