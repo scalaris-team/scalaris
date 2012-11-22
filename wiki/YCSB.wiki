@@ -1,0 +1,28 @@
+#summary Shows you how to benchmark Scalaris using YCSB
+
+= Scalaris YCSB Client =
+
+The Scalaris client is not yet part of the official YCSB bundle but a fork of
+YCSB with the necessary implementation is available on GitHub.
+
+== Compile ==
+
+Check out the fork of YCSB with branch scalaris:
+
+{{{
+git clone git://github.com/mxm/YCSB -b scalaris
+}}}
+  
+Build with Maven:
+
+{{{
+cd YCSB
+mvn package
+}}}
+
+== Run ==
+
+{{{
+./bin/ycsb load scalaris -P workloads/workloada
+./bin/ycsb run scalaris -P workloads/workloada
+}}}
