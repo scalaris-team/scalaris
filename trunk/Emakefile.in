@@ -51,6 +51,10 @@
 {"test/*",
  [debug_info,
   inline_list_funcs,
+  warn_exported_vars,
+  warn_missing_spec,
+  warn_untyped_record,
+  warn_unused_import,
   {outdir, "test"},
   {i, "include"}
   @EMAKEFILEDEFINES@
