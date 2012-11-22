@@ -158,13 +158,10 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
             case Msg of
                 {bulk_read_entry, Issuer} ->
                     Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
-                    if Data =/= [] ->
-                           ReplyMsg = {bulk_read_entry_response, MyRange, Data},
-                           % for aggregation using a tree, activate this instead:
-                           % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
-                           comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
-                       true -> ok
-                    end;
+                    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
+                    % for aggregation using a tree, activate this instead:
+                    % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
+                    comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
                 {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
                                     {bulkowner, deliver, Id, Range, Msg1, Parents})
