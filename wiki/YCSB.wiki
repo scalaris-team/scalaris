@@ -10,7 +10,7 @@ YCSB with the necessary implementation is available on GitHub.
 Check out the fork of YCSB with branch scalaris:
 
 {{{
-git clone https://github.com/mxm/YCSB.git -b scalaris
+git clone git://github.com/mxm/YCSB.git -b scalaris
 }}}
   
 Build with Maven:
