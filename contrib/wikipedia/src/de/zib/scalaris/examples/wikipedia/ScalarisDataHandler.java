@@ -391,7 +391,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<NormalisedTitle> getRandomArticle(Connection connection, Random random) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "random article";
+        final String statName = "random page";
         
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(ScalarisOpType.PAGE_LIST);
         final ErlangConverter<List<ErlangValue>> conv = new ErlangConverter<List<ErlangValue>>() {
