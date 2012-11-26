@@ -221,7 +221,10 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 filter_dead_node(RT, DeadPid) -> 
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
-        [Node] -> entry_delete(node:id(Node), RT);
+        [Node] ->
+            fd:unsubscribe(DeadPid),
+            entry_delete(node:id(Node), RT)
+            ;
         [] -> RT
     end
     .
@@ -383,7 +386,6 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 
         false -> LocalRT
     end,
-    update_fd(LocalRT, NewRT),
     rt_loop:set_rt(State, NewRT)
     ;
 
@@ -481,7 +483,7 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
             end,
             % update failure detector:
             case ReportToFD of
-                true -> update_fd(OldRT, NewRT);
+                true -> add_fd(NewRT);
                 _Else -> ok
             end
     end
@@ -500,10 +502,6 @@ update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
     OldPids = to_pid_list(OldRT),
     NewPids = to_pid_list(NewRT),
     fd:update_subscriptions(OldPids, NewPids).
-
-%% @doc Delete a subscription
--spec delete_fd(EntryPid :: comm:mypid()) -> ok.
-delete_fd(EntryPid) -> fd:unsubscribe(EntryPid).
 
 %% userdevguide-end rt_frtchord:check
 
@@ -629,7 +627,6 @@ entry_filtering(RT, [_|_] = AllowedNodes) ->
             end, Spacings)
     ),
     FilteredNode = rt_entry_node(FilterEntry),
-    delete_fd(node:pidX(FilteredNode)),
     entry_delete(node:id(FilteredNode), RT)
     .
 
@@ -805,7 +802,7 @@ entry_learning_and_filtering(Entry, Type, RT) ->
     case SizeOfRT >= MaxEntries of
         true ->
             NewRT = entry_filtering(IntermediateRT),
-            %% only delete the subscription if not the newly added node was filtered;
+            %% only delete the subscription if the newly added node was not filtered;
             %otherwise, there isn't a subscription yet
             case rt_lookup_node(node:id(Entry), NewRT) of
                 none -> ok;
@@ -814,7 +811,9 @@ entry_learning_and_filtering(Entry, Type, RT) ->
             end,
             NewRT
             ;
-        false -> IntermediateRT
+        false ->
+            add_fd(IntermediateRT),
+            IntermediateRT
     end
     .
 
@@ -897,9 +896,7 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 %-spec add_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) -> rt().
 -spec add_entry(node:node_type(),'normal' | 'source' | 'sticky',rt()) -> rt().
 add_entry(Node, Type, RT) ->
-    NewRT = entry_learning_and_filtering(Node, Type, RT),
-    update_fd(RT, NewRT),
-    NewRT
+    entry_learning_and_filtering(Node, Type, RT)
     .
 
 % @doc Add a sticky entry to the routing table
