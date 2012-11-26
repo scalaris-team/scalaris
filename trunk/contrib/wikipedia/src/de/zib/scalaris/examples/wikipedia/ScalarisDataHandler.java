@@ -324,8 +324,9 @@ public class ScalarisDataHandler {
         for (NamespaceEnum ns : NamespaceEnum.values()) {
             scalaris_keys.add(getPageCountKey(ns.getId()));
         }
+        final String statName = "page count";
         return getInteger2(connection, ScalarisOpType.PAGE_LIST, scalaris_keys,
-                false, timeAtStart, "page count");
+                false, timeAtStart, statName);
     }
 
     /**
@@ -341,9 +342,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "page count:" + namespace;
         return getInteger2(connection, ScalarisOpType.PAGE_LIST,
-                getPageCountKey(namespace), false, timeAtStart,
-                "page count:" + namespace);
+                getPageCountKey(namespace), false, timeAtStart, statName);
     }
 
     /**
@@ -357,8 +358,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getArticleCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "article count";
         return getInteger2(connection, ScalarisOpType.ARTICLE_COUNT,
-                getArticleCountKey(), false, timeAtStart, "article count");
+                getArticleCountKey(), false, timeAtStart, statName);
     }
 
     /**
@@ -372,8 +374,9 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "page edits";
         return getInteger2(connection, ScalarisOpType.EDIT_STAT,
-                getStatsPageEditsKey(), false, timeAtStart, "page edits");
+                getStatsPageEditsKey(), false, timeAtStart, statName);
     }
 
     /**
