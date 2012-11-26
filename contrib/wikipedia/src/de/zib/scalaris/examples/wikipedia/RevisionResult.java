@@ -66,18 +66,18 @@ public class RevisionResult extends Result {
      *            the retrieved page
      * @param revision
      *            the retrieved revision
-     * @param name
+     * @param statName
      *            the name of the operation (for the stats - see {@link #stats})
      * @param time
      *            time in milliseconds for this operation
      */
     public RevisionResult(List<InvolvedKey> involvedKeys, NormalisedTitle normalisedTitle, Page page,
-            Revision revision, String name, long time) {
+            Revision revision, String statName, long time) {
         super(involvedKeys);
         this.normalisedTitle = normalisedTitle;
         this.page = page;
         this.revision = revision;
-        addStat(name, time);
+        addStat(statName, time);
     }
     
     /**

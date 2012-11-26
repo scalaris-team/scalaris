@@ -222,11 +222,11 @@ public class SQLiteDataHandler {
         Page page = null;
         Revision revision = null;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
-        final String titleAsString = title.toString();
+        final String statName = title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to SQLite DB", true, title, page, revision, false,
-                    false, titleAsString, System.currentTimeMillis() - timeAtStart);
+                    false, statName, System.currentTimeMillis() - timeAtStart);
         }
         
         final SQLiteStatement stmt = connection.stmtGetLatestRev;
@@ -263,23 +263,23 @@ public class SQLiteDataHandler {
                 page.setCurRev(revision);
             } else {
                 return new RevisionResult(false, involvedKeys,
-                        "page \"" + titleAsString + "\" not found", false,
-                        title, page, revision, true, false, titleAsString,
+                        "page \"" + statName + "\" not found", false,
+                        title, page, revision, true, false, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
             // there should only be one data item
             if (stmt.step()) {
                 return new RevisionResult(false, involvedKeys,
                         "more than one result", false, title, page, revision, false,
-                        false, titleAsString, System.currentTimeMillis() - timeAtStart);
+                        false, statName, System.currentTimeMillis() - timeAtStart);
             }
 
-            return new RevisionResult(involvedKeys, title, page, revision, titleAsString,
+            return new RevisionResult(involvedKeys, title, page, revision, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (SQLiteException e) {
             return new RevisionResult(false, involvedKeys, "SQLite exception: "
                     + e.getMessage(), false, title, page, revision, false,
-                    false, titleAsString, System.currentTimeMillis()
+                    false, statName, System.currentTimeMillis()
                             - timeAtStart);
         } finally {
             try {

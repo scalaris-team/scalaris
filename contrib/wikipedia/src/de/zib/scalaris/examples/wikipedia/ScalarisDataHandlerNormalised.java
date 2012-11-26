@@ -230,10 +230,11 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
         Page page = null;
         Revision revision = null;
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        final String statName = title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to Scalaris", true, title, page, revision, false,
-                    false, title.toString(), System.currentTimeMillis() - timeAtStart);
+                    false, statName, System.currentTimeMillis() - timeAtStart);
         }
         
         TransactionSingleOp scalaris_single;
@@ -248,14 +249,14 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
         } catch (NotFoundException e) {
             return new RevisionResult(false, involvedKeys,
                     "page not found at \"" + scalaris_key + "\"", false, title,
-                    page, revision, true, false, title.toString(),
+                    page, revision, true, false, statName,
                     System.currentTimeMillis() - timeAtStart);
         } catch (Exception e) {
             return new RevisionResult(false, involvedKeys,
                     e.getClass().getCanonicalName() + " reading \"" + scalaris_key
                             + "\" from Scalaris: " + e.getMessage(),
                     e instanceof ConnectionException, title, page, revision, false,
-                    false, title.toString(), System.currentTimeMillis() - timeAtStart);
+                    false, statName, System.currentTimeMillis() - timeAtStart);
         }
 
         // load requested version if it is not the current one cached in the Page object
@@ -267,21 +268,21 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             } catch (NotFoundException e) {
                 return new RevisionResult(false, involvedKeys,
                         "revision not found at \"" + scalaris_key + "\"",
-                        false, title, page, revision, false, true, title.toString(),
+                        false, title, page, revision, false, true, statName,
                         System.currentTimeMillis() - timeAtStart);
             } catch (Exception e) {
                 return new RevisionResult(false, involvedKeys,
                         e.getClass().getCanonicalName() + " reading \"" + scalaris_key
                                 + "\" from Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, title, page,
-                        revision, false, false, title.toString(),
+                        revision, false, false, statName,
                         System.currentTimeMillis() - timeAtStart);
             }
         } else {
             revision = page.getCurRev();
         }
 
-        return new RevisionResult(involvedKeys, title, page, revision, title.toString(),
+        return new RevisionResult(involvedKeys, title, page, revision, statName,
                 System.currentTimeMillis() - timeAtStart);
     }
 
@@ -360,9 +361,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "pages in " + title;
         return getPageList2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
                 Arrays.asList(getCatPageListKey(title)), false,
-                timeAtStart, "pages in " + title);
+                timeAtStart, statName);
     }
 
     /**
@@ -378,9 +380,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "pages in " + title;
         return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
                 Arrays.asList(getTplPageListKey(title)), false,
-                timeAtStart, "pages in " + title);
+                timeAtStart, statName);
     }
 
     /**
@@ -420,9 +423,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
+        final String statName = "page count in " + title;
         return getInteger2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
                 getCatPageCountKey(title), false, timeAtStart,
-                "page count in " + title);
+                statName);
     }
     
     /**
