@@ -995,7 +995,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         for (String pageSaveTime : pageSaveTimes) {
             final int pageSaveTimeInt = parseInt(pageSaveTime, -1);
             if (pageSaveTimeInt >= 0) {
-                page.addStat("saving " + title, pageSaveTimeInt);
+                final String statName = "SAVE: " + title;
+                page.addStat(statName, pageSaveTimeInt);
             }
         }
         final int pageSaveServerTime = parseInt(getParam(request, "server_time"), -1);
@@ -1019,7 +1020,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         for (String pageRandomTime : pageRandomTimes) {
             final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
             if (pageRandomTimeInt >= 0) {
-                page.addStat("random page", pageRandomTimeInt);
+                final String statName = "RANDOM_PAGE";
+                page.addStat(statName, pageRandomTimeInt);
             }
         }
         page.setError(getParam_error(request));

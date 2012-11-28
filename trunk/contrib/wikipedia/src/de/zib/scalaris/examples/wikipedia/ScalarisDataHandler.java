@@ -120,7 +120,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<String> getDbVersion(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "Scalaris version";
+        final String statName = "SCALARIS_VERSION";
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<String>(false, involvedKeys,
@@ -195,7 +195,7 @@ public class ScalarisDataHandler {
     public final static ValueResult<List<Contribution>> getContributions(
             Connection connection, String contributor) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "contributions of " + contributor;
+        final String statName = "CONTRIB: " + contributor;
         if (Options.getInstance().WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
             ValueResult<List<Contribution>> result = getPageList3(connection,
                     ScalarisOpType.CONTRIBUTION,
@@ -324,7 +324,7 @@ public class ScalarisDataHandler {
         for (NamespaceEnum ns : NamespaceEnum.values()) {
             scalaris_keys.add(getPageCountKey(ns.getId()));
         }
-        final String statName = "page count";
+        final String statName = "PAGE_COUNT";
         return getInteger2(connection, ScalarisOpType.PAGE_LIST, scalaris_keys,
                 false, timeAtStart, statName);
     }
@@ -342,7 +342,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "page count:" + namespace;
+        final String statName = "PAGE_COUNT:" + namespace;
         return getInteger2(connection, ScalarisOpType.PAGE_LIST,
                 getPageCountKey(namespace), false, timeAtStart, statName);
     }
@@ -358,7 +358,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getArticleCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "article count";
+        final String statName = "ARTICLE_COUNT";
         return getInteger2(connection, ScalarisOpType.ARTICLE_COUNT,
                 getArticleCountKey(), false, timeAtStart, statName);
     }
@@ -374,7 +374,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<BigInteger> getStatsPageEdits(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "page edits";
+        final String statName = "PAGE_EDITS";
         return getInteger2(connection, ScalarisOpType.EDIT_STAT,
                 getStatsPageEditsKey(), false, timeAtStart, statName);
     }
@@ -391,7 +391,7 @@ public class ScalarisDataHandler {
      */
     public final static ValueResult<NormalisedTitle> getRandomArticle(Connection connection, Random random) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "random page";
+        final String statName = "RANDOM_PAGE";
         
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(ScalarisOpType.PAGE_LIST);
         final ErlangConverter<List<ErlangValue>> conv = new ErlangConverter<List<ErlangValue>>() {
