@@ -303,7 +303,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             final Revision newRev, final int prevRevId, final Map<String, String> restrictions,
             final SiteInfo siteinfo, final String username, final MyNamespace nsObject) {
         long timeAtStart = System.currentTimeMillis();
-        final String statName = "saving " + title0;
+        final String statName = "SAVE: " + title0;
         Page oldPage = null;
         Page newPage = null;
         List<ShortRevision> newShortRevs = null;

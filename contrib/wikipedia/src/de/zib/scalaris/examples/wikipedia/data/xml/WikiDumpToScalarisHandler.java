@@ -254,7 +254,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         // articles count:
         TransactionSingleOp.RequestList requests = new TransactionSingleOp.RequestList();
         requests.addOp(new WriteOp(ScalarisDataHandler.getArticleCountKey(), articleCount));
-        worker = new MyScalarisSingleRunnable(this, requests, scalaris_single, "article count");
+        worker = new MyScalarisSingleRunnable(this, requests, scalaris_single, "ARTICLE_COUNT");
         pageListExecutor.execute(worker);
         
         // list of pages in each category:

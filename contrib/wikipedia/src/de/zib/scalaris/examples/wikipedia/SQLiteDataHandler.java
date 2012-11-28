@@ -222,7 +222,7 @@ public class SQLiteDataHandler {
         Page page = null;
         Revision revision = null;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
-        final String statName = title.toString();
+        final String statName = "PAGE: " + title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to SQLite DB", true, title, page, revision, false,
@@ -299,7 +299,7 @@ public class SQLiteDataHandler {
      */
     public static ValueResult<BigInteger> getPageCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "page count";
+        final String statName = "PAGE_COUNT";
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
@@ -321,7 +321,7 @@ public class SQLiteDataHandler {
      */
     public static ValueResult<BigInteger> getArticleCount(Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "article count";
+        final String statName = "ARTICLE_COUNT";
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
@@ -345,7 +345,7 @@ public class SQLiteDataHandler {
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "page count in " + title;
+        final String statName = "CAT_CNT: " + title;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<BigInteger>(false, involvedKeys,
@@ -416,7 +416,7 @@ public class SQLiteDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInCategory(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "pages in " + title;
+        final String statName = "CAT_LIST: " + title;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
@@ -440,7 +440,7 @@ public class SQLiteDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "pages in " + title;
+        final String statName = "TPL_LIST: " + title;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new ValueResult<List<NormalisedTitle>>(false, involvedKeys,
@@ -464,7 +464,7 @@ public class SQLiteDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "links to " + title;
+        final String statName = "LINKS: " + title;
         final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (Options.getInstance().WIKI_USE_BACKLINKS) {
             if (connection == null) {
