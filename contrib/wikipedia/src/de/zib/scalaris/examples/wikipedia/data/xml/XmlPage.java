@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
 
+import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
 import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 
@@ -272,6 +273,10 @@ public class XmlPage extends DefaultHandler {
             curRev = revisions.lastEntry().getValue();
             curRev.setUnpackedText(lastRevText);
         }
+        // NOTE: We cannot rely on the page info from the XML dump since our
+        //       current revision may be different to the latest available one!
+        // -> update redirect with info from curRev
+        redirect = MyWikiModel.MATCH_WIKI_REDIRECT.matcher(lastRevText).matches();
         final_page = new Page(title,
                 Integer.parseInt(id), redirect, restrictions_map, curRev);
     }
