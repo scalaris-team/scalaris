@@ -32,10 +32,6 @@
 %% filters and checks for rbr_cseq operations
 %% consistency
 -export([is_valid_state_change/2]).
-%% read filters
--export([rf_all/1]).
-%% write filters
--export([wf_all/3]).
 
 -type lease_id() :: ?RT:key().
 -type lease_aux() :: any().
@@ -50,7 +46,7 @@
           timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease_entry() :: #lease{}.
 
--type ldb_entry() :: lease_entry().
+%% -type ldb_entry() :: lease_entry().
 
 -spec read(lease_id()) -> api_tx:read_result().
 read(Key) ->
@@ -62,7 +58,7 @@ read(Key) ->
              io_lib:format("lease_db~p", [?RT:get_key_segment(Key, 4)]))),
 
     %% perform qread
-    rbrcseq:qread(DB, self(), Key, fun l_on_cseq:rf_all/1),
+    rbrcseq:qread(DB, self(), Key),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
                        case Value of
@@ -81,9 +77,9 @@ write(Key, Value) ->
            lists:flatten(
              io_lib:format("lease_db~p", ?RT:get_key_segment(Key, 4)))),
 
-    rbrcseq:qwrite(DB, self(), Key, fun l_on_cseq:rf_all/1,
-                   fun l_on_cseq:is_valid_state_change/2,
-                   fun l_on_cseq:wf_all/3, Value),
+    rbrcseq:qwrite(DB, self(), Key,
+                   fun l_on_cseq:is_valid_state_change/3,
+                   Value),
     receive
         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
 %%        ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value}, {fail, timeout} )
@@ -129,12 +125,3 @@ is_valid_renewal(Old, New) ->
 is_start_complex_op(_Old, _New) ->
     false.
 
-%% read filters
--spec rf_all(ldb_entry()) -> ldb_entry().
-rf_all(prbr_bottom) -> no_value_yet;
-rf_all(X)          -> X.
-
-%% write filters
--spec wf_all(lease_entry() | prbr_bottom, null,
-                      lease_entry()) -> lease_entry().
-wf_all(_Old, null, WriteValue) -> WriteValue.

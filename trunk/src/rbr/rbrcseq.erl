@@ -30,7 +30,7 @@
 
 %% api:
 -export([qread/3, qread/4]).
--export([qwrite/7]).
+-export([qwrite/5, qwrite/7]).
 
 -export([start_link/3]).
 -export([init/1, on/2]).
@@ -41,7 +41,7 @@
                  }.
 
 %% TODO: add support for *consistent* quorum by counting the number of
-%% same round number replies
+%% same-round-number replies
 
 -type entry() :: {any(), %% ReqId
                   non_neg_integer(), %% period of last retriggering / starting
@@ -63,12 +63,24 @@
 -export_type([check_next_step/0]).
 -endif.
 
+%% quorum read protocol for consensus sequence
+%%
+%% user definable functions and types for qread and abbreviations:
+%% RF = ReadFilter(dbdata() | no_value_yet) -> read_info().
+%% r = replication degree.
+%%
+%% qread(Client, Key, RF) ->
+%%   % read phase
+%%     r * lookup -> r * dbaccess ->
+%%     r * read_filter(DBEntry)
+%%   collect quorum, select newest (prbr knows that itself) ->
+%%     send newest to client.
+
+%% This variant works on whole dbentries without filtering.
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), client_key()) -> ok.
 qread(CSeqPidName, Client, Key) ->
-    qread(CSeqPidName, Client, Key, fun prbr:noop_read_filter/1).
-
-%% user definable functions for read:
-%% ContentReadFilter(custom_data() | no_value_yet) -> any().
+    RF = fun prbr:noop_read_filter/1,
+    qread(CSeqPidName, Client, Key, RF).
 
 -spec qread(pid_groups:pidname(), comm:erl_local_pid(), any(), prbr:read_filter()) -> ok.
 qread(CSeqPidName, Client, Key, ReadFilter) ->
@@ -77,19 +89,54 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
     %% the process will reply to the client directly
     .
 
-%% user definable functions for write:
-%% ContentReadFilter(custom_data() | no_value_yet) -> read_info().
-%% ContentValidNextStep(read_info(), {ContentWriteFilter, Value}) ->
-%%    {boolean(), info_passed_from_read_to_write()}
-%% info_passed_from_read_to_write() must be used to update older
-%% versions, so in all replicas the same data is written
-%% ContentWriteFilter(custom_data(), info_passed_from_read_to_write(), Value()) -> custom_data()
+%% quorum write protocol for consensus sequence
+%%
+%% user definable functions and types for qwrite and abbreviations:
+%% RF = ReadFilter(dbdata() | no_value_yet) -> read_info().
+%% CC = ContentCheck(read_info(), WF, value()) -> {boolean(), UI}.
+%% WF = WriteFilter(old_dbdata(), UI, value()) -> dbdata().
+%% RI = ReadInfo produced by RF
+%% UI = UpdateInfo (data that could be used to update/detect outdated replicas)
+%% r = replication degree
+%%
+%% qwrite(Client, RF, CC, WF, Val) ->
+%%   % read phase
+%%     r * lookup -> r * dbaccess ->
+%%     r * RF(DBEntry) -> read_info();
+%%   collect quorum, select newest read_info() = RI
+%%   % allowed next value? (version outdated for example?)
+%%   CC(RI, WF, Val) -> {IsValid = boolean(), UI}
+%%   if false =:= IsValid => return abort to the client
+%%   if true =:= IsValid =>
+%%   % write phase
+%%     r * lookup -> r * dbaccess ->
+%%     r * WF(OldDBEntry, UI, Val) -> NewDBEntry
+%%   collect quorum of 'written' acks
+%%   inform client on done.
+
+%% if the paxos register is changed concurrently or a majority of
+%% answers cannot be collected, rbrcseq automatically restarts with
+%% the read phase. Either the CC fails then (which informs the client
+%% and ends the protocol) or the operation passes through (or another
+%% retry will happen).
+
+%% This variant works on whole dbentries without filtering.
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              client_key(),
-             fun ((any()) -> any()),
-             fun ((any(), any()) -> any()),
-             fun ((any(), any(), any()) -> any()),
+             fun ((any(), any(), any()) -> any()), %% CC (Content Check)
+             client_value()) -> ok.
+qwrite(CSeqPidName, Client, Key, CC, Value) ->
+    RF = fun prbr:noop_read_filter/1,
+    WF = fun prbr:noop_write_filter/3,
+    qwrite(CSeqPidName, Client, Key, RF, CC, WF, Value).
+
+-spec qwrite(pid_groups:pidname(),
+             comm:erl_local_pid(),
+             client_key(),
+             fun ((any()) -> any()), %% read filter
+             fun ((any(), any(), any()) -> any()), %% content check
+             fun ((any(), any(), any()) -> any()), %% write filter
 %%              %% select what you need to read for the operation
 %%              fun ((CustomData) -> ReadInfo),
 %%              %% is it an allowed follow up operation? and what info is
@@ -208,7 +255,7 @@ on({qwrite_read_done, ReqId, {qread_done, _ReadId, Round, ReadValue}},
     WriteFilter = element(3, entry_filters(Entry)),
     WriteValue = entry_val(Entry),
 
-    _ = case ContentCheck(ReadValue, {WriteFilter, WriteValue}) of
+    _ = case ContentCheck(ReadValue, WriteFilter, WriteValue) of
         {true, PassedToUpdate} ->
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
