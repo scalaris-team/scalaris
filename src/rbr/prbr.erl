@@ -36,7 +36,9 @@
 %%% functions for module where embedded into
 -export([on/2, init/1]).
 -export([check_config/0]).
--export([noop_read_filter/1]).
+-export([noop_read_filter/1]).  %% See rbrcseq for explanation.
+-export([noop_write_filter/3]). %% See rbrcseq for explanation.
+
 
 %% let users retrieve their uid from an assigned round number.
 -export([r_with_id_get_id/1]).
@@ -56,7 +58,7 @@
 %%              InfosToUpdateOutdatedEntry :: info_passed_from_read_to_write(),
 %%              ValueForWriteOperation:: Value())
 %% -> custom_data()
--type write_filter() :: fun((term(), term()) -> term()).
+-type write_filter() :: fun((term(), term(), term()) -> term()).
 
 -type state() :: ?PDB:tableid().
 
@@ -114,6 +116,9 @@ msg_write_deny(Client, Key, NewerRound) ->
 
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
+
+-spec noop_write_filter(Old :: term(), WF :: term(), Val :: term()) -> term().
+noop_write_filter(_, _, X) -> X.
 
 %% initialize: return initial state.
 -spec init(atom()) -> state().

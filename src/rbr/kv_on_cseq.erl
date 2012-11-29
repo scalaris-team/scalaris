@@ -30,7 +30,7 @@
 
 %% filters and checks for rbr_cseq operations
 %% consistency
--export([is_valid_next_req/2]).
+-export([is_valid_next_req/3]).
 %% read filters
 -export([rf_val/1]).
 -export([rf_rl_wl_vers/1]).
@@ -65,7 +65,7 @@ read(Key) ->
 -spec write(client_key(), client_value()) -> api_tx:write_result().
 write(Key, Value) ->
     rbrcseq:qwrite(kv_rbrcseq, self(), Key, fun kv_on_cseq:rf_rl_wl_vers/1,
-                   fun kv_on_cseq:is_valid_next_req/2,
+                   fun kv_on_cseq:is_valid_next_req/3,
                    fun kv_on_cseq:wf_set_vers_val/3, Value),
     receive
         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
@@ -77,9 +77,9 @@ write(Key, Value) ->
 %% append(...)
 
 %% content checks
--spec is_valid_next_req(any(), {prbr:write_filter(), any()}) ->
+-spec is_valid_next_req(any(), prbr:write_filter(), any()) ->
                                {boolean(), any()}.
-is_valid_next_req({RL, WL, Vers}, {_WriteFilter, _Val}) ->
+is_valid_next_req({RL, WL, Vers}, _WriteFilter, _Val) ->
     {RL =:= 0 andalso
      WL =:= false %% version check??, for single write inc is done implicitly
      , Vers}.
