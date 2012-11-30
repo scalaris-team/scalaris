@@ -221,10 +221,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 filter_dead_node(RT, DeadPid) -> 
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
-        [Node] ->
-            fd:unsubscribe(DeadPid),
-            entry_delete(node:id(Node), RT)
-            ;
+        [Node] -> entry_delete(node:id(Node), RT);
         [] -> RT
     end
     .
