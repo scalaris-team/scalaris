@@ -416,9 +416,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             wikiModel.renderPageWithCache(null, newRev.unpackedText());
             timeAtStart += (System.currentTimeMillis() - timeAtRenderStart);
         } while (false);
-        if (wikiModel.getRedirectLink() != null) {
-            newPage.setRedirect(true);
-        }
+        newPage.setRedirect(wikiModel.getRedirectLink() != null);
         if (restrictions != null) {
             newPage.setRestrictions(restrictions);
         }
