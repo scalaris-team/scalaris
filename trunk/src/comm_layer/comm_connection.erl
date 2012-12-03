@@ -217,29 +217,31 @@ on({tcp_closed, Socket}, State) ->
 on({report_stats}, State) ->
     %% re-trigger
     msg_delay:send_local(10, self(), {report_stats}),
-    case socket(State) of
-        notconnected -> State;
-        Socket ->
-            case inet:getstat(Socket, [recv_cnt, recv_oct,
-                                       send_cnt, send_oct]) of
-                {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
-                      {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
-                    PrevStat = last_stat_report(State),
-                    NewStat = {RcvCnt, RcvBytes, SendCnt, SendBytes},
-                    case PrevStat of
-                        NewStat -> State;
-                        _ ->
-                            {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
-                            comm:send_local(comm_stats,
-                                            {report_stat, RcvCnt - PrevRcvCnt,
-                                             RcvBytes - PrevRcvBytes,
-                                             SendCnt - PrevSendCnt,
-                                             SendBytes - PrevSendBytes}),
-                            set_last_stat_report(State, NewStat)
-                    end;
-                {error, _Reason} -> State
-            end
-    end;
+    NewState =
+        case socket(State) of
+            notconnected -> State;
+            Socket ->
+                case inet:getstat(Socket, [recv_cnt, recv_oct,
+                                           send_cnt, send_oct]) of
+                    {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
+                          {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
+                        PrevStat = last_stat_report(State),
+                        NewStat = {RcvCnt, RcvBytes, SendCnt, SendBytes},
+                        case PrevStat of
+                            NewStat -> State;
+                            _ ->
+                                {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
+                                comm:send_local(comm_stats,
+                                                {report_stat, RcvCnt - PrevRcvCnt,
+                                                 RcvBytes - PrevRcvBytes,
+                                                 SendCnt - PrevSendCnt,
+                                                 SendBytes - PrevSendBytes}),
+                                set_last_stat_report(State, NewStat)
+                        end;
+                    {error, _Reason} -> State
+                end
+        end,
+    send_bundle_if_ready(NewState);
 
 on({web_debug_info, Requestor}, State) ->
     Now = erlang:now(),
