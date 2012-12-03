@@ -138,7 +138,7 @@ on({send, DestPid, Message, Options}, State) ->
             case msg_queue_len(State) of
                 0 ->
                     {_, MQL} = process_info(self(), message_queue_len),
-                    if MQL > 5 ->
+                    if MQL > 0 ->
                             %% start message bundle for sending
                             %% io:format("MQL ~p~n", [MQL]),
                             MaxBundle = erlang:max(200, MQL div 100),
