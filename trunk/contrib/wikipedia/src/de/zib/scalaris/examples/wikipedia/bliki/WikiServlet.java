@@ -17,6 +17,7 @@ package de.zib.scalaris.examples.wikipedia.bliki;
 
 import info.bliki.api.Connector;
 import info.bliki.api.User;
+import info.bliki.wiki.model.Configuration;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -1565,16 +1566,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         content.append("   <th>Version</th>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
-        content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris Wiki Example</a></td>\n");
+        content.append("   <td><a href=\"https://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris Wiki Example</a></td>\n");
         content.append("   <td>" + version + "</td>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
-        content.append("   <td><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
+        content.append("   <td><a href=\"https://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
         content.append("   <td>" + dbVersionStr + "</td>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td>Server</td>\n");
         content.append("   <td>" + getServletContext().getServerInfo() + "</td>\n");
+        content.append("  </tr>\n");
+        content.append("  <tr>\n");
+        content.append("   <td><a href=\"https://code.google.com/p/gwtwiki/\" class=\"external text\" rel=\"nofollow\">bliki renderer</a></td>\n");
+        content.append("   <td>" + Configuration.BLIKI_VERSION + "</td>\n");
         content.append("  </tr>\n");
         content.append(" </tbody>\n");
         content.append("</table>\n");
