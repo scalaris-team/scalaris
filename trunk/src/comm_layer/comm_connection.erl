@@ -63,7 +63,7 @@
      LastStatReport       :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
                               SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}}.
 -type message() ::
-    {send, DestPid::pid(), Message::comm:message()} |
+    {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
     {tcp_closed, Socket::inet:socket()} |
     {report_stats} |
@@ -144,7 +144,9 @@ on({send, DestPid, Message, Options}, State) ->
                             MaxBundle = erlang:max(200, MQL div 100),
                             T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
                             T2 = set_msg_queue_len(T1, 1),
-                            set_desired_bundle_size(T2, erlang:min(MQL,MaxBundle));
+                            % note: need to set the bundle size equal to MQL
+                            % -> to process this 1 msg + MQL messages (see below)
+                            set_desired_bundle_size(T2, erlang:min(MQL, MaxBundle));
                        true ->
                             NewSocket =
                                 send({dest_ip(State), dest_port(State), Socket},
@@ -153,27 +155,19 @@ on({send, DestPid, Message, Options}, State) ->
                             inc_s_msg_count(T1)
                     end;
                 QL ->
+                    {MsgQueue0, OptionQueue0} = msg_queue(State),
+                    MQueue = [{DestPid, Message} | MsgQueue0],
+                    OQueue = [Options | OptionQueue0],
                     DBS = desired_bundle_size(State),
                     MSBS = msgs_since_bundle_start(State),
+                    % can check for QL instead of QL+1 here due to DBS init above
                     case (QL + MSBS) >= DBS of
                         true ->
-                            {MsgQueue, OptionQueue} = msg_queue(State),
-                            MQueue = [{DestPid, Message} | MsgQueue],
-                            OQueue = [Options | OptionQueue],
 %%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
-                            NewSocket =
-                                send({dest_ip(State), dest_port(State), Socket},
-                                     unpack_msg_bundle, MQueue, OQueue, State),
-                            T1State = set_socket(State, NewSocket),
-                            T2State = inc_s_msg_count(T1State),
-                            T3State = set_msg_queue(T2State, {[], []}),
-                            T4State = set_msg_queue_len(T3State, 0),
-                            _T5State = set_msgs_since_bundle_start(T4State,0);
+                            send_msg_bundle(State, Socket, MQueue, OQueue, QL + 1);
                         false ->
                             %% add to message bundle
-                            {MsgQueue, OptionQueue} = msg_queue(State),
-                            T1 = set_msg_queue(State, {[{DestPid, Message} | MsgQueue],
-                                                       [Options | OptionQueue]}),
+                            T1 = set_msg_queue(State, {MQueue, OQueue}),
                             set_msg_queue_len(T1, QL + 1)
                     end
             end
@@ -391,6 +385,7 @@ new_connection(Address, Port, MyPort, Channel) ->
             fail
     end.
 
+-spec send_bundle_if_ready(state()) -> state().
 send_bundle_if_ready(InState) ->
     QL = msg_queue_len(InState),
     case QL of
@@ -404,17 +399,26 @@ send_bundle_if_ready(InState) ->
                     Socket = socket(State),
                     %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
                     {MQueue, OQueue} = msg_queue(State),
-                    NewSocket =
-                        send({dest_ip(State), dest_port(State), Socket},
-                             unpack_msg_bundle, MQueue, OQueue, State),
-                    T1State = set_socket(State, NewSocket),
-                    T2State = inc_s_msg_count(T1State),
-                    T3State = set_msg_queue(T2State, {[], []}),
-                    T4State = set_msg_queue_len(T3State, 0),
-                    _T5State = set_msgs_since_bundle_start(T4State, 0);
+                    send_msg_bundle(State, Socket, MQueue, OQueue, QL);
                 false -> State
             end
     end.
+
+-spec send_msg_bundle(state(), inet:socket(),
+                      MQueue::[{DestPid::pid(), Message::comm:message()}],
+                      OQueue::[comm:send_options()], QL::pos_integer()) -> state().
+send_msg_bundle(State, notconnected, MQueue, OQueue, QL) ->
+    % should not occur often - just in case a new MQueue, OQueue was given:
+    T1 = set_msg_queue(State, {MQueue, OQueue}),
+    set_msg_queue_len(T1, QL);
+send_msg_bundle(State, Socket, MQueue, OQueue, _QL) ->
+    NewSocket = send({dest_ip(State), dest_port(State), Socket},
+                     unpack_msg_bundle, MQueue, OQueue, State),
+    T1State = set_socket(State, NewSocket),
+    T2State = inc_s_msg_count(T1State),
+    T3State = set_msg_queue(T2State, {[], []}),
+    T4State = set_msg_queue_len(T3State, 0),
+    _T5State = set_msgs_since_bundle_start(T4State,0).
 
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
                 LocalListenPort::comm_server:tcp_port(), Channel::main | prio,
