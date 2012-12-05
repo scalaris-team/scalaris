@@ -620,7 +620,11 @@ public class MyWikiModel extends WikiModel {
     public boolean appendRedirectLink(String redirectLink) {
         // do not add redirection if we are parsing a template:
         if (getRecursionLevel() == 0) {
-            return super.appendRedirectLink(redirectLink);
+            // remove "#section" from redirect links (this form of redirects is unsupported)
+            if (redirectLink != null) {
+                return super.appendRedirectLink(redirectLink.replaceFirst("#.*$", ""));
+            }
+            return super.appendRedirectLink(null);
         }
         return true;
     }
@@ -936,16 +940,6 @@ public class MyWikiModel extends WikiModel {
      */
     public void setExistingPages(BloomFilter<NormalisedTitle> existingPages) {
         this.existingPages = existingPages;
-    }
-
-    @Override
-    public String getRedirectLink() {
-        // remove "#section" from redirect links (this form of redirects is unsupported)
-        final String link = super.getRedirectLink();
-        if (link != null) {
-            return link.replaceFirst("#.*$", "");
-        }
-        return link;
     }
     
     /**
