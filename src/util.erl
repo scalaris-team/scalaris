@@ -417,8 +417,7 @@ dumpX(Keys, ValueFun) ->
 dumpXNoSort(Keys, ValueFun) ->
     [{Pid, [ValueFun(Key, dump_extract_from_list(Data, Key)) || Key <- Keys]}
      || Pid <- processes(),
-        Data <- [process_info(Pid, Keys)],
-        Data =/= undefined].
+        undefined =/= (Data = process_info(Pid, Keys))].
 
 %% @doc Convenience wrapper to topDumpX/3.
 -spec topDumpX(Keys | Seconds | ValueFun) -> [{pid(), [Reductions | RegName | term(),...]},...]
