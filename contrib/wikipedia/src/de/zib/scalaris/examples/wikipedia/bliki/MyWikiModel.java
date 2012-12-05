@@ -178,7 +178,7 @@ public class MyWikiModel extends WikiModel {
     /**
      * Pattern to check whether a wikitext is redirecting or not.
      */
-    public static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^\\s*#REDIRECT[ ]?\\[\\[:?([^\\]]*)\\]\\].*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    public static final Pattern MATCH_WIKI_REDIRECT = Pattern.compile("^\\s*#REDIRECT[ ]?\\[\\[:?([^\\]#]*)[^\\]]*\\]\\].*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
     static {
         // BEWARE: fields in Configuration are static -> this changes all configurations!
