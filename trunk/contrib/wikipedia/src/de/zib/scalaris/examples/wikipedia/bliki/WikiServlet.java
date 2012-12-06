@@ -959,6 +959,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                         page.setDate(Revision.stringToCalendar(result.revision.getTimestamp()));
                     }
                 }
+            } else {
+                setSubPageNav(title, page, wikiModel);
             }
             page.setPage(mainText);
             page.setCategories(wikiModel.getCategories().keySet());
@@ -1029,6 +1031,63 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
     }
+
+    /**
+     * For sub-pages set a navigation to higher-level pages via
+     * {@link WikiPageBean#setContentSub(String)} into the page bean.
+     * 
+     * @param title
+     *            the title of the article to render
+     * @param page
+     *            the bean for the page
+     * @param wikiModel
+     *            the wiki model to get the base URL from
+     */
+    protected void setSubPageNav(String title, WikiPageBean page,
+            MyWikiModel wikiModel) {
+        final String wikiBaseURL = wikiModel.getWikiBaseURL();
+        setSubPageNav(title, page, wikiBaseURL);
+    }
+
+    /**
+     * For sub-pages set a navigation to higher-level pages via
+     * {@link WikiPageBean#setContentSub(String)} into the page bean.
+     * 
+     * @param title
+     *            the title of the article to render
+     * @param page
+     *            the bean for the page
+     * @param wikiBaseURL
+     *            base url for links
+     */
+    protected void setSubPageNav(String title, WikiPageBean page,
+            final String wikiBaseURL) {
+        String[] parts = title.split("/");
+        if (parts.length > 1) {
+            String fullPart = null;
+            StringBuilder contentSub = new StringBuilder();
+            for (int i = 0; i < parts.length - 1; ++i) {
+                String part = parts[i];
+                if (i == 0) {
+                    // first?
+                    fullPart = part;
+                } else {
+                    contentSub.append(" · ");
+                    fullPart += "/" + part;
+                }
+                contentSub.append("<a href=\"");
+                contentSub.append(wikiBaseURL.replace("${title}", fullPart));
+                contentSub.append("\" title=\"");
+                contentSub.append(fullPart);
+                contentSub.append("\">");
+                contentSub.append(fullPart);
+                contentSub.append("</a>‎");
+            }
+            if (contentSub.length() > 0) {
+                page.setContentSub("<span class=\"subpages\">&lt; " + contentSub.toString() + "</span>");
+            }
+        }
+    }
     
     /**
      * Shows the "Page not available" message the wiki returns in case a page
@@ -1072,6 +1131,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setError(getParam_error(request));
             page.setTitle(title);
         }
+        setSubPageNav(title, page, getLinkbaseurl(page));
         // re-set version (we are only showing this page due to a non-existing page)
         page.setVersion(-1);
         page.setNotAvailable(true);
