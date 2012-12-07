@@ -352,22 +352,34 @@ tester_blob_coding(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+wait_until_true(DestKey, Request, ConFun, MaxWait) ->
+    api_dht_raw:unreliable_lookup(DestKey, Request),
+    Result = receive {get_state_response, R} -> ConFun(R) end,
+    case Result of
+        true -> true;
+        false when MaxWait > 0 ->
+            erlang:yield(),
+            timer:sleep(10),
+            wait_until_true(DestKey, Request, ConFun, MaxWait - 10);
+        false when MaxWait =< 0 -> 
+            false
+    end.
+
 session_ttl(Config) ->
     %parameter
     NodeCount = 7,
     DataCount = 1000,
-    Method = bloom,
+    Method = merkle_tree,
     FType = mixed,
     TTL = 2500,
     
-    _R1 = get_rep_upd_config(Method),
-    _R2 = lists:keyreplace(rr_session_ttl, 1, _R1, {rr_session_ttl, TTL / 2}),
-    RRConf = lists:keyreplace(rr_gc_interval, 1, _R2, {rr_gc_interval, erlang:round(TTL / 10)}),
+    _RRConf = lists:keyreplace(rr_session_ttl, 1, get_rep_upd_config(Method), {rr_session_ttl, TTL / 2}),
+    RRConf = lists:keyreplace(rr_gc_interval, 1, _RRConf, {rr_gc_interval, erlang:round(TTL / 10)}),
     
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RRConf),    
     db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                               {fprob, 50}, 
+                                               {fprob, 90}, 
                                                {distribution, uniform}]),
     %chose node pair
     SKey = ?RT:get_random_node_id(),
@@ -379,16 +391,22 @@ session_ttl(Config) ->
     %server starts sync
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
-    api_vm:kill_node(CName),
+    Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
+    SessionExists = wait_until_true(SKey, Req, fun(X) -> X =/= 0 end, TTL),
 
     %check timeout
-    Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
-    api_dht_raw:unreliable_lookup(SKey, Req),
-    Open = receive {get_state_response, R1} -> R1 =/= 0 end,
+    api_vm:kill_node(CName),    
     timer:sleep(TTL),
     api_dht_raw:unreliable_lookup(SKey, Req),
-    Open2 = receive {get_state_response, R2} -> R2 =:= 0 end,
-    ?equals_pattern_w_note(Open, Open2, io_lib:format("start session open = ~p - end session closed = ~p", [Open, Open2])),
+    SessionGCRemoved = receive {get_state_response, R2} -> R2 =:= 0 end,
+    case SessionExists of
+        true ->
+            ?equals_pattern_w_note(SessionExists, SessionGCRemoved, 
+                                   io_lib:format("Session opened = ~p - Session garbage collected = ~p", 
+                                                 [SessionExists, SessionGCRemoved]));
+        false ->
+            ct:pal("Session finished before client node could be killed.")
+    end,
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
