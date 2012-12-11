@@ -132,7 +132,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static PageHistoryResult getPageHistory(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "HISTORY: " + title;
+        final String statName = "HISTORY:" + title;
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         if (connection == null) {
             return new PageHistoryResult(false, involvedKeys, "no connection to Scalaris",
@@ -230,7 +230,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
         Page page = null;
         Revision revision = null;
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
-        final String statName = "PAGE: " + title.toString();
+        final String statName = "PAGE:" + title.toString();
         if (connection == null) {
             return new RevisionResult(false, involvedKeys,
                     "no connection to Scalaris", true, title, page, revision, false,
@@ -361,7 +361,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInCategory(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "CAT_LIST: " + title;
+        final String statName = "CAT_LIST:" + title;
         return getPageList2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
                 Arrays.asList(getCatPageListKey(title)), false,
                 timeAtStart, statName);
@@ -380,7 +380,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "TPL_LIST: " + title;
+        final String statName = "TPL_LIST:" + title;
         return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
                 Arrays.asList(getTplPageListKey(title)), false,
                 timeAtStart, statName);
@@ -399,7 +399,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection,
             NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "LINKS: " + title;
+        final String statName = "LINKS:" + title;
         if (Options.getInstance().WIKI_USE_BACKLINKS) {
             return getPageList2(connection, ScalarisOpType.BACKLINK_PAGE_LIST,
                     Arrays.asList(getBackLinksPageListKey(title)),
@@ -423,7 +423,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     public static ValueResult<BigInteger> getPagesInCategoryCount(
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "CAT_CNT: " + title;
+        final String statName = "CAT_CNT:" + title;
         return getInteger2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
                 getCatPageCountKey(title), false, timeAtStart,
                 statName);

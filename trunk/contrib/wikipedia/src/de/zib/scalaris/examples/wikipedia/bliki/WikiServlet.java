@@ -998,7 +998,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         for (String pageSaveTime : pageSaveTimes) {
             final int pageSaveTimeInt = parseInt(pageSaveTime, -1);
             if (pageSaveTimeInt >= 0) {
-                final String statName = "SAVE: " + title;
+                final String statName = "SAVE:" + title;
                 page.addStat(statName, pageSaveTimeInt);
             }
         }
