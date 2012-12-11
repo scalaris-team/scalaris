@@ -279,6 +279,22 @@ public interface WikiServletDataHandler<Connection> {
      */
     public ValueResult<List<NormalisedTitle>> getPagesInTemplate(Connection connection,
             NormalisedTitle title);
+
+    /**
+     * Retrieves a list of pages using the given templates from the DB.
+     * 
+     * @param connection
+     *            the connection to the DB
+     * @param titles
+     *            the titles of the templates
+     * @param pageTitle
+     *            the title of the page to retrieve the list for (will be
+     *            included in the statname)
+     * 
+     * @return a result object with the page list on success
+     */
+    public ValueResult<List<NormalisedTitle>> getPagesInTemplates(Connection connection,
+            List<NormalisedTitle> titles, String pageTitle);
     
     /**
      * Retrieves a list of pages linking to the given page from the DB.

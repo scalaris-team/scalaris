@@ -890,29 +890,33 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
                     final List<String> catPageList = new ArrayList<String>(catPagesResult.value.size());
                     wikiModel.denormalisePageTitles(catPagesResult.value, catPageList);
+                    final List<NormalisedTitle> tplPages = new ArrayList<NormalisedTitle>(catPagesResult.value.size());
 
                     for (NormalisedTitle pageInCat: catPagesResult.value) {
                         if (pageInCat.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
                             subCategories.add(pageInCat.title);
                         } else if (pageInCat.namespace == MyNamespace.TEMPLATE_NAMESPACE_KEY) {
-                            // all pages using a template are in the category of the template, too
-                            ValueResult<List<NormalisedTitle>> tplResult = getPagesInTemplate(connection, pageInCat);
-                            page.addStats(tplResult.stats);
-                            page.getInvolvedKeys().addAll(tplResult.involvedKeys);
-                            if (tplResult.success) {
-                                final List<String> tplPageList = new ArrayList<String>(tplResult.value.size());
-                                wikiModel.denormalisePageTitles(tplResult.value, tplPageList);
-                                categoryPages.addAll(tplPageList);
-                            } else {
-                                if (tplResult.connect_failed) {
-                                    setParam_error(request, "ERROR: DB connection failed");
-                                } else {
-                                    setParam_error(request, "ERROR: template page list unavailable");
-                                }
-                                addToParam_notice(request, "error getting pages using template: " + tplResult.message);
-                            }
+                            tplPages.add(pageInCat);
                         } else {
                             categoryPages.add(pageInCat.denormalise(namespace));
+                        }
+                    }
+                    if (!tplPages.isEmpty()) {
+                        // all pages using a template are in the category of the template, too
+                        ValueResult<List<NormalisedTitle>> tplResult = getPagesInTemplates(connection, tplPages, title);
+                        page.addStats(tplResult.stats);
+                        page.getInvolvedKeys().addAll(tplResult.involvedKeys);
+                        if (tplResult.success) {
+                            final List<String> tplPageList = new ArrayList<String>(tplResult.value.size());
+                            wikiModel.denormalisePageTitles(tplResult.value, tplPageList);
+                            categoryPages.addAll(tplPageList);
+                        } else {
+                            if (tplResult.connect_failed) {
+                                setParam_error(request, "ERROR: DB connection failed");
+                            } else {
+                                setParam_error(request, "ERROR: template page lists unavailable");
+                            }
+                            addToParam_notice(request, "error getting pages using templates: " + tplResult.message);
                         }
                     }
                     page.setSubCategories(subCategories);

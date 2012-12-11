@@ -528,6 +528,11 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     }
 
     @Override
+    public ValueResult<List<NormalisedTitle>> getPagesInTemplates(Connection connection, List<NormalisedTitle> titles, String pageTitle) {
+        return ScalarisDataHandlerNormalised.getPagesInTemplates(connection, titles, pageTitle);
+    }
+
+    @Override
     public ValueResult<List<NormalisedTitle>> getPagesLinkingTo(Connection connection, String title, final MyNamespace nsObject) {
         return ScalarisDataHandlerUnnormalised.getPagesLinkingTo(connection, title, nsObject);
     }

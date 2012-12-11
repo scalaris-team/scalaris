@@ -387,6 +387,31 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
     }
 
     /**
+     * Retrieves a list of pages using the given templates from Scalaris.
+     * 
+     * @param connection
+     *            the connection to Scalaris
+     * @param titles
+     *            the titles of the templates
+     * @param pageTitle
+     *            the title of the page to retrieve the list for (will be
+     *            included in the statname)
+     * 
+     * @return a result object with the page list on success
+     */
+    public static ValueResult<List<NormalisedTitle>> getPagesInTemplates(Connection connection,
+            List<NormalisedTitle> titles, String pageTitle) {
+        final long timeAtStart = System.currentTimeMillis();
+        final String statName = "TPL_LISTS_FOR:" + pageTitle;
+        ArrayList<String> scalarisKeys = new ArrayList<String>(titles.size());
+        for (NormalisedTitle title : titles) {
+            scalarisKeys.add(getTplPageListKey(title));
+        }
+        return getPageList2(connection, ScalarisOpType.TEMPLATE_PAGE_LIST,
+                scalarisKeys, false, timeAtStart, statName);
+    }
+
+    /**
      * Retrieves a list of pages linking to the given page from Scalaris.
      * 
      * @param connection
