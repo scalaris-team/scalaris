@@ -195,7 +195,7 @@ public class ScalarisDataHandler {
     public final static ValueResult<List<Contribution>> getContributions(
             Connection connection, String contributor) {
         final long timeAtStart = System.currentTimeMillis();
-        final String statName = "CONTRIB: " + contributor;
+        final String statName = "CONTRIB:" + contributor;
         if (Options.getInstance().WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
             ValueResult<List<Contribution>> result = getPageList3(connection,
                     ScalarisOpType.CONTRIBUTION,
