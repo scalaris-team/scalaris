@@ -124,7 +124,7 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      */
     private boolean inWhiteList(NormalisedTitle pageTitle) {
         return whitelist == null
-                || pageTitle.namespace == MyNamespace.MEDIAWIKI_NAMESPACE_KEY
+                || pageTitle.namespace.equals(MyNamespace.MEDIAWIKI_NAMESPACE_KEY)
                 || whitelist.contains(pageTitle);
     }
     
@@ -365,7 +365,15 @@ public abstract class WikiDumpHandler extends DefaultHandler implements WikiDump
      * @author Nico Kruber, kruber@zib.de
      */
     public class ReportAtShutDown extends Thread {
+        @Override
         public void run() {
+            reportAtEnd();
+        }
+
+        /**
+         * Sets the import end time and reports the overall speed.
+         */
+        public void reportAtEnd() {
             // import may have been interrupted - get an end time in this case
             if (timeAtEnd == 0) {
                 importEnd();

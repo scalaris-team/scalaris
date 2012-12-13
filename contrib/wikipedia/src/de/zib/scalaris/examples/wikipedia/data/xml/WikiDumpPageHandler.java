@@ -123,8 +123,9 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
             Collections.sort(revisions, Collections.reverseOrder(new byRevId()));
             Collections.sort(revisions_short, Collections.reverseOrder(new byShortRevId()));
 
+            assert(wikiModel != null);
             final NormalisedTitle normTitle = wikiModel.normalisePageTitle(page.getTitle());
-            if (!revisions.isEmpty() && wikiModel != null) {
+            if (!revisions.isEmpty()) {
                 wikiModel.setUp();
                 wikiModel.setNamespaceName(wikiModel.getNamespace().getNamespaceByNumber(normTitle.namespace));
                 wikiModel.setPageName(normTitle.title);
