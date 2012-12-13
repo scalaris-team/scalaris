@@ -188,10 +188,10 @@ public class PubSubTest {
         final PubSub conn = new PubSub();
 
         try {
-            for (int i = 0; i < testData.length; ++i) {
+            for (final String element : testData) {
                 conn.publish(
                         testTime + topic,
-                        testData[i] );
+                        element );
             }
         } finally {
             conn.closeConnection();
@@ -357,19 +357,19 @@ public class PubSubTest {
         final PubSub conn = new PubSub();
 
         try {
-            for (int i = 0; i < testData.length; ++i) {
+            for (final String element : testData) {
                 conn.subscribe(
                         testTime + topic,
-                        testData[i] );
+                        element );
             }
 
             // check if the subscribers were successfully saved:
             final List<String> subscribers = conn
                     .getSubscribers(testTime + topic).stringListValue();
-            for (int i = 0; i < testData.length; ++i) {
-                assertTrue("Subscriber " + testData[i]
+            for (final String element : testData) {
+                assertTrue("Subscriber " + element
                         + " does not exist for topic " + topic, checkSubscribers(
-                        subscribers, testData[i]));
+                        subscribers, element));
             }
 
             assertEquals("unexpected subscriber of topic \"" + topic + "\"", null, getDiffElement(subscribers, testData));
@@ -580,10 +580,10 @@ public class PubSubTest {
 
         try {
             // first subscribe all test "urls"...
-            for (int i = 0; i < testData.length; ++i) {
+            for (final String element : testData) {
                 conn.subscribe(
                         testTime + topic,
-                        testData[i]);
+                        element);
             }
             // ... then unsubscribe every second url:
             for (int i = 0; i < testData.length; i += 2) {
@@ -705,14 +705,16 @@ public class PubSubTest {
         for (final Entry<String, Vector<String>> expected_element : expected.entrySet()) {
             final String topic = expected_element.getKey();
             final Vector<String> notifications_topic = notifications.get(topic);
-            for (final String content : expected_element.getValue()) {
-                if ((notifications_topic == null) || !notifications_topic.contains(content)) {
-                    notReceived.add(topic + ": " + content);
+            if (notifications_topic != null) {
+                for (final String content : expected_element.getValue()) {
+                    if ((notifications_topic == null) || !notifications_topic.contains(content)) {
+                        notReceived.add(topic + ": " + content);
+                    }
+                    notifications_topic.remove(content);
                 }
-                notifications_topic.remove(content);
-            }
-            if ((notifications_topic != null) && !notifications_topic.isEmpty()) {
-                unrelatedItems.add("(" + topic + ": " + notifications_topic.toString() + ")");
+                if (!notifications_topic.isEmpty()) {
+                    unrelatedItems.add("(" + topic + ": " + notifications_topic.toString() + ")");
+                }
             }
             notifications.remove(topic);
         }
@@ -750,9 +752,9 @@ public class PubSubTest {
         try {
             conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[0].path);
 
-            for (int i = 0; i < testData.length; ++i) {
-                conn.publish(topic, testData[i]);
-                notifications_server1_expected.get(topic).add(testData[i]);
+            for (final String element : testData) {
+                conn.publish(topic, element);
+                notifications_server1_expected.get(topic).add(element);
             }
 
             // wait max 'notifications_timeout' seconds for notifications:
@@ -797,11 +799,11 @@ public class PubSubTest {
             conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[1].path);
             conn.subscribe(topic, "http://" + server.getHost() + ":" + server.getLocalPort() + server.servlet[2].path);
 
-            for (int i = 0; i < testData.length; ++i) {
-                conn.publish(topic, testData[i]);
-                notifications_server1_expected.get(topic).add(testData[i]);
-                notifications_server2_expected.get(topic).add(testData[i]);
-                notifications_server3_expected.get(topic).add(testData[i]);
+            for (final String element : testData) {
+                conn.publish(topic, element);
+                notifications_server1_expected.get(topic).add(element);
+                notifications_server2_expected.get(topic).add(element);
+                notifications_server3_expected.get(topic).add(element);
             }
 
             // wait max 'notifications_timeout' seconds for notifications:

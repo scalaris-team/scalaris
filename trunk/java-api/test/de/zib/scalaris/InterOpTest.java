@@ -66,15 +66,16 @@ public class InterOpTest {
      * @param args
      *            command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         boolean verbose = false;
-        CommandLineParser parser = new GnuParser();
+        final CommandLineParser parser = new GnuParser();
         CommandLine line = null;
-        Options options = getOptions();
+        final Options options = getOptions();
         try {
             line = parser.parse(options, args);
-        } catch (ParseException e) {
+        } catch (final ParseException e) {
             Main.printException("Parsing failed", e, false);
+            return; // will not be reached since printException exits
         }
 
         if (line.hasOption("verbose")) {
@@ -86,10 +87,10 @@ public class InterOpTest {
         Mode mode;
         if (line.hasOption("r")) { // read
             mode = Mode.READ;
-            String[] optionValues = line.getOptionValues("read");
+            final String[] optionValues = line.getOptionValues("read");
             Main.checkArguments(optionValues, 2, options, "r");
             basekey = optionValues[0];
-            String language = optionValues[1];
+            final String language = optionValues[1];
             basekey += "_" + language;
             System.out.println("Java-API: reading from " + language);
         } else if (line.hasOption("w")) { // write
@@ -104,12 +105,12 @@ public class InterOpTest {
         } else {
             // print help if no other option was given
 //        if (line.hasOption("help")) {
-            HelpFormatter formatter = new HelpFormatter();
+            final HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("scalaris [Options]", getOptions());
             return;
         }
         try {
-            TransactionSingleOp sc = new TransactionSingleOp();
+            final TransactionSingleOp sc = new TransactionSingleOp();
             int failed = 0;
 
             failed += read_write_boolean(basekey, sc, mode);
@@ -133,19 +134,19 @@ public class InterOpTest {
                 System.out.println();
                 System.exit(1);
             }
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             Main.printException("failed with connection error", e, verbose);
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             Main.printException("failed with unknown", e, verbose);
         }
     }
 
-    private static int read_or_write(TransactionSingleOp sc, String key, Object value, Mode mode) {
+    private static int read_or_write(final TransactionSingleOp sc, final String key, final Object value, final Mode mode) {
         try {
             switch (mode) {
                 case READ:
                     System.out.println("read(" + key + ")");
-                    ErlangValue result = sc.read(key);
+                    final ErlangValue result = sc.read(key);
                     System.out.println("  expected: " + valueToStr(value));
                     System.out.println("  read raw: " + result.value().toString());
 
@@ -168,6 +169,8 @@ public class InterOpTest {
                         jresult = result.listValue();
                     } else if (value instanceof Map<?, ?>) {
                         jresult = result.jsonValue();
+                    } else {
+                        jresult = result.value();
                     }
 
                     System.out.println(" read java: " + valueToStr(jresult));
@@ -183,27 +186,27 @@ public class InterOpTest {
                     sc.write(key, value);
                     return 0;
             }
-        } catch (ConnectionException e) {
+        } catch (final ConnectionException e) {
             System.out.println("failed with connection error");
-        } catch (TimeoutException e) {
+        } catch (final TimeoutException e) {
             System.out.println("failed with timeout");
-        } catch (AbortException e) {
+        } catch (final AbortException e) {
             System.out.println("failed with abort");
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             System.out.println("failed with not_found");
-        } catch (UnknownException e) {
+        } catch (final UnknownException e) {
             System.out.println("failed with unknown");
             e.printStackTrace();
-        } catch (ClassCastException e) {
+        } catch (final ClassCastException e) {
             System.out.println("failed with ClassCastException");
             e.printStackTrace();
         }
         return 1;
     }
 
-    private static boolean compare(byte[] actual, Object expected) {
+    private static boolean compare(final byte[] actual, final Object expected) {
         try {
-            byte[] expected_bytes = (byte[]) expected;
+            final byte[] expected_bytes = (byte[]) expected;
             if (expected_bytes.length != actual.length) {
                 return false;
             }
@@ -213,14 +216,15 @@ public class InterOpTest {
                 }
             }
             return true;
-        } catch (Exception e) {
+        } catch (final Exception e) {
             return false;
         }
     }
 
-    private static boolean compare(List<Object> actual, Object expected) {
+    private static boolean compare(final List<Object> actual, final Object expected) {
         try {
             @SuppressWarnings("unchecked")
+            final
             List<Object> expected_list = (List<Object>) expected;
             if (expected_list.size() != actual.size()) {
                 return false;
@@ -231,30 +235,31 @@ public class InterOpTest {
                 }
             }
             return true;
-        } catch (Exception e) {
+        } catch (final Exception e) {
             return false;
         }
     }
 
-    private static boolean compare(Map<String, Object> actual, Object expected) {
+    private static boolean compare(final Map<String, Object> actual, final Object expected) {
         try {
             @SuppressWarnings("unchecked")
+            final
             Map<String, Object> expected_map = (Map<String, Object>) expected;
             if (expected_map.size() != actual.size()) {
                 return false;
             }
-            for (String key : expected_map.keySet()) {
+            for (final String key : expected_map.keySet()) {
                 if (!compare(actual.get(key), expected_map.get(key))) {
                     return false;
                 }
             }
             return true;
-        } catch (Exception e) {
+        } catch (final Exception e) {
             return false;
         }
     }
 
-    private static boolean compare(Object actual, Object expected) {
+    private static boolean compare(final Object actual, final Object expected) {
         try {
             if (expected instanceof byte[]) {
                 if (actual instanceof ErlangValue) {
@@ -267,6 +272,7 @@ public class InterOpTest {
                     return compare(((ErlangValue) actual).listValue(), expected);
                 } else {
                     @SuppressWarnings("unchecked")
+                    final
                     List<Object> actual_list = (List<Object>) actual;
                     return compare(actual_list, expected);
                 }
@@ -275,6 +281,7 @@ public class InterOpTest {
                     return compare(((ErlangValue) actual).jsonValue(), expected);
                 } else {
                     @SuppressWarnings("unchecked")
+                    final
                     Map<String, Object> actual_map = (Map<String, Object>) actual;
                     return compare(actual_map, expected);
                 }
@@ -317,28 +324,29 @@ public class InterOpTest {
             } else {
                 return false;
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             return false;
         }
     }
 
-    private static String valueToStr(Object value) {
+    private static String valueToStr(final Object value) {
         String value_str;
         if (value instanceof String) {
 //            value_str = "\"" + ((String) value).replace("\n", "\\n") + "\"";
             value_str = "\"" + value + "\"";
         } else if (value instanceof byte[]) {
-            byte[] bytes = ((byte[]) value);
+            final byte[] bytes = ((byte[]) value);
             value_str = "<<";
-            for (byte b : bytes) {
+            for (final byte b : bytes) {
                 value_str += b;
             }
             value_str += ">>";
         } else if (value instanceof Map<?, ?>) {
             @SuppressWarnings("unchecked")
+            final
             Map<String, Object> map = ((Map<String, Object>) value);
             value_str = "{";
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
+            for (final Map.Entry<String, Object> entry : map.entrySet()) {
                 value_str += valueToStr(entry.getKey()) + "=" + valueToStr(entry.getValue()) + ",";
             }
             // remove last ","
@@ -348,9 +356,10 @@ public class InterOpTest {
             value_str += "}";
         } else if (value instanceof List<?>) {
             @SuppressWarnings("unchecked")
+            final
             List<Object> list = (List<Object>) value;
             value_str = "[";
-            for (Object object : list) {
+            for (final Object object : list) {
                 value_str += valueToStr(object) + ",";
             }
             // remove last ","
@@ -366,7 +375,7 @@ public class InterOpTest {
         return value_str;
     }
 
-    private static int read_write_boolean(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_boolean(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -380,7 +389,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_integer(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_integer(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -406,7 +415,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_long(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_long(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -432,7 +441,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_biginteger(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_biginteger(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -455,7 +464,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_double(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_double(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -492,7 +501,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_string(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_string(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -514,7 +523,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_binary(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_binary(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -531,7 +540,7 @@ public class InterOpTest {
         return failed;
     }
 
-    private static int read_write_list(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_list(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -539,22 +548,22 @@ public class InterOpTest {
         key = basekey + "_list_empty"; value = new ArrayList<Object>();
         failed += read_or_write(sc, key, value, mode);
 
-        ArrayList<Integer> list1 = new ArrayList<Integer>();
+        final ArrayList<Integer> list1 = new ArrayList<Integer>();
         list1.add(0); list1.add(1); list1.add(2); list1.add(3);
         key = basekey + "_list_0_1_2_3"; value = list1;
         failed += read_or_write(sc, key, value, mode);
 
-        ArrayList<Integer> list2 = new ArrayList<Integer>();
+        final ArrayList<Integer> list2 = new ArrayList<Integer>();
         list2.add(0); list2.add(123); list2.add(456); list2.add(65000);
         key = basekey + "_list_0_123_456_65000"; value = list2;
         failed += read_or_write(sc, key, value, mode);
 
-        ArrayList<Integer> list3 = new ArrayList<Integer>();
+        final ArrayList<Integer> list3 = new ArrayList<Integer>();
         list3.add(0); list3.add(123); list3.add(456); list3.add(0x10ffff);
         key = basekey + "_list_0_123_456_0x10ffff"; value = list3;
         failed += read_or_write(sc, key, value, mode);
 
-        ArrayList<Object> list4 = new ArrayList<Object>();
+        final ArrayList<Object> list4 = new ArrayList<Object>();
         list4.add(0);
         list4.add("foo");
         list4.add(1.5);
@@ -577,7 +586,7 @@ public class InterOpTest {
     }
 
     // Map/JSON:
-    private static int read_write_map(String basekey, TransactionSingleOp sc, Mode mode) {
+    private static int read_write_map(final String basekey, final TransactionSingleOp sc, final Mode mode) {
         int failed = 0;
         String key;
         Object value;
@@ -586,19 +595,19 @@ public class InterOpTest {
         value = new LinkedHashMap<String, Object>();
         failed += read_or_write(sc, key, value, mode);
 
-        LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
+        final LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
         map1.put("x", 0);
         map1.put("y", 1);
         key = basekey + "_map_x=0_y=1";
         value = map1;
         failed += read_or_write(sc, key, value, mode);
 
-        LinkedHashMap<String, Object> map2 = new LinkedHashMap<String, Object>();
+        final LinkedHashMap<String, Object> map2 = new LinkedHashMap<String, Object>();
         map2.put("a", 0);
         map2.put("b", "foo");
         map2.put("c", 1.5);
         map2.put("d", "foo\nbar");
-        ArrayList<Integer> list1 = new ArrayList<Integer>();
+        final ArrayList<Integer> list1 = new ArrayList<Integer>();
         list1.add(0);
         list1.add(1);
         list1.add(2);
@@ -609,13 +618,13 @@ public class InterOpTest {
         value = map2;
         failed += read_or_write(sc, key, value, mode);
 
-        LinkedHashMap<String, Integer> map3 = new LinkedHashMap<String, Integer>();
+        final LinkedHashMap<String, Integer> map3 = new LinkedHashMap<String, Integer>();
         map3.put("", 0);
         key = basekey + "_map_=0";
         value = map3;
         failed += read_or_write(sc, key, value, mode);
 
-        LinkedHashMap<String, Object> map4 = new LinkedHashMap<String, Object>();
+        final LinkedHashMap<String, Object> map4 = new LinkedHashMap<String, Object>();
         // some (arbitrary) unicode characters
         // (please don't be offended if they actually mean something)
         map4.put("x", 0);
@@ -624,7 +633,7 @@ public class InterOpTest {
         value = map4;
         failed += read_or_write(sc, key, value, mode);
 
-        LinkedHashMap<String, Integer> map5 = new LinkedHashMap<String, Integer>();
+        final LinkedHashMap<String, Integer> map5 = new LinkedHashMap<String, Integer>();
         // some (arbitrary) unicode characters
         // (please don't be offended if they actually mean something)
         map5.put("x", 0);
@@ -644,8 +653,8 @@ public class InterOpTest {
      * @return the options the program understands
      */
     private static Options getOptions() {
-        Options options = new Options();
-        OptionGroup group = new OptionGroup();
+        final Options options = new Options();
+        final OptionGroup group = new OptionGroup();
 
         /* Note: arguments are set to be optional since we implement argument
          * checks on our own (commons.cli is not flexible enough and only
@@ -656,13 +665,13 @@ public class InterOpTest {
 
         options.addOption(new Option("v", "verbose", false, "print verbose information, e.g. the properties read"));
 
-        Option read = new Option("r", "read", true, "read an item");
+        final Option read = new Option("r", "read", true, "read an item");
         read.setArgName("basekey> <language");
         read.setArgs(2);
         read.setOptionalArg(true);
         group.addOption(read);
 
-        Option write = new Option("w", "write", true, "write an item");
+        final Option write = new Option("w", "write", true, "write an item");
         write.setArgName("basekey");
         write.setArgs(1);
         write.setOptionalArg(true);

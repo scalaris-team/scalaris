@@ -102,6 +102,7 @@ public class Main {
             line = parser.parse(options, args);
         } catch (final ParseException e) {
             printException("Parsing failed", e, false);
+            return; // will not be reached since printException exits
         }
 
         if (line.hasOption("verbose")) {

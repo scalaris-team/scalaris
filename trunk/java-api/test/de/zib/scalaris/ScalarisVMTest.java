@@ -470,6 +470,8 @@ public class ScalarisVMTest {
                 case KILL:
                     result = conn.killNodes(nodesToRemove);
                     break;
+                default:
+                    throw new RuntimeException();
             }
             assertEquals(nodesToRemove, result.size());
             assertEquals(size, conn.getNumberOfNodes());
@@ -604,6 +606,8 @@ public class ScalarisVMTest {
                 case KILL:
                     result = conn.killNodes(removedNodes);
                     break;
+                default:
+                    throw new RuntimeException();
             }
             assertEquals(nodesToRemove, result.successful.size());
             assertEquals(0, result.notFound.size());
