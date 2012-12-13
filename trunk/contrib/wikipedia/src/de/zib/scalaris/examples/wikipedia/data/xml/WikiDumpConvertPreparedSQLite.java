@@ -161,6 +161,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
      */
     public class ReportAtShutDown extends Thread {
         public void run() {
+            reportAtEnd();
+        }
+
+        /**
+         * Sets the import end time and reports the overall speed.
+         */
+        public void reportAtEnd() {
             // import may have been interrupted - get an end time in this case
             if (timeAtEnd == 0) {
                 importEnd();

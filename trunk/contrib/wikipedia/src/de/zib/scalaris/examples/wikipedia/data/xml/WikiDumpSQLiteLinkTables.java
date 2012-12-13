@@ -149,6 +149,13 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
      */
     public class ReportAtShutDown extends Thread {
         public void run() {
+            reportAtEnd();
+        }
+
+        /**
+         * Sets the import end time and reports the overall speed.
+         */
+        public void reportAtEnd() {
             // import may have been interrupted - get an end time in this case
             if (timeAtEnd == 0) {
                 importEnd();
@@ -585,7 +592,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                 // first insert all categories:
                 stmt = connection.db.prepare("REPLACE INTO currentpages (cp_id) SELECT page_id FROM page WHERE page_title == ?;");
                 for (NormalisedTitle pageTitle : allowedCats) {
-                    if (pageTitle.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                    if (pageTitle.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
                         stmt.bind(1, pageTitle.toString()).stepThrough().reset();
                     }
                 }
@@ -667,7 +674,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                                 + MyNamespace.CATEGORY_NAMESPACE_KEY
                                 + " page_title == ?;");
                 for (NormalisedTitle pageTitle : allowedCats) {
-                    if (pageTitle.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                    if (pageTitle.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
                         stmt.bind(1, pageTitle.toString()).stepThrough().reset();
                     }
                 }

@@ -58,7 +58,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
     private ArrayBlockingQueue<Transaction> scalaris_tx = new ArrayBlockingQueue<Transaction>(MAX_SCALARIS_CONNECTIONS);
     private ExecutorService executor = createExecutor(MAX_SCALARIS_CONNECTIONS);
     private ExecutorService pageListExecutor = createExecutor(1);
-    protected boolean errorDuringImport = false;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a

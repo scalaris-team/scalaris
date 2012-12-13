@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -157,7 +158,7 @@ public class Main {
                 Runtime.getRuntime().addShutdownHook(shutdownHook);
                 handler.writeToScalaris();
                 handler.tearDown();
-                shutdownHook.run();
+                shutdownHook.reportAtEnd();
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
                 exitCheckHandler(handler);
             } else {
@@ -206,15 +207,8 @@ public class Main {
         String whitelistFile = "";
         if (args.length > i && !args[i].isEmpty()) {
             whitelistFile = args[i];
-            FileReader inFile = new FileReader(whitelistFile);
-            BufferedReader br = new BufferedReader(inFile);
             whitelist = new HashSet<String>();
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (!line.isEmpty()) {
-                    whitelist.add(line);
-                }
-            }
+            addFromFile(whitelist, whitelistFile);
             if (whitelist.isEmpty()) {
                 whitelist = null;
             }
@@ -241,16 +235,17 @@ public class Main {
             switch (type) {
                 case PREPARE_DB:
                     handler = new WikiDumpPrepareSQLiteForScalarisHandler(
-                            blacklist, whitelist, maxRevisions, minTime, maxTime,
-                            dbFileName);
+                            blacklist, whitelist, maxRevisions, minTime,
+                            maxTime, dbFileName);
                     break;
                 case XML_2_DB:
-                    handler = new WikiDumpXml2SQLite(
-                            blacklist, whitelist, maxRevisions, minTime, maxTime,
-                            dbFileName);
+                    handler = new WikiDumpXml2SQLite(blacklist, whitelist,
+                            maxRevisions, minTime, maxTime, dbFileName);
+                    break;
+                default:
+                    throw new RuntimeException();
             }
-            InputSource file = getFileReader(filename);
-            runXmlHandler(handler, file);
+            runXmlHandler(handler, getFileReader(filename));
         } else if (type == ImportType.IMPORT_XML) {
             WikiDumpHandler.println(System.out, "wiki import from " + filename);
             WikiDumpHandler.println(System.out, " white list    : " + whitelistFile);
@@ -259,8 +254,7 @@ public class Main {
             WikiDumpHandler.println(System.out, " max time      : " + (maxTime == null ? "null" : Revision.calendarToString(maxTime)));
             WikiDumpHandler handler = new WikiDumpToScalarisHandler(
                     blacklist, whitelist, maxRevisions, minTime, maxTime);
-            InputSource file = getFileReader(filename);
-            runXmlHandler(handler, file);
+            runXmlHandler(handler, getFileReader(filename));
         }
     }
 
@@ -324,7 +318,7 @@ public class Main {
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         handler.convertObjects();
         handler.tearDown();
-        shutdownHook.run();
+        shutdownHook.reportAtEnd();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
         exitCheckHandler(handler);
     }
@@ -351,7 +345,7 @@ public class Main {
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         handler.processLinks();
         handler.tearDown();
-        shutdownHook.run();
+        shutdownHook.reportAtEnd();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
         exitCheckHandler(handler);
     }
@@ -396,14 +390,7 @@ public class Main {
         String allowedPagesFileName = "";
         if (args.length > i && !args[i].isEmpty()) {
             allowedPagesFileName = args[i];
-            FileReader inFile = new FileReader(allowedPagesFileName);
-            BufferedReader br = new BufferedReader(inFile);
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (!line.isEmpty()) {
-                    allowedPages0.add(line);
-                }
-            }
+            addFromFile(allowedPages0, allowedPagesFileName);
         }
         ++i;
         
@@ -446,7 +433,7 @@ public class Main {
      * @throws SAXException
      * @throws IOException
      */
-    static void runXmlHandler(WikiDumpHandler handler, InputSource file)
+    private static void runXmlHandler(WikiDumpHandler handler, InputSource file)
             throws SAXException, IOException {
         XMLReader reader = XMLReaderFactory.createXMLReader();
         handler.setUp();
@@ -455,7 +442,7 @@ public class Main {
         reader.setContentHandler(handler);
         reader.parse(file);
         handler.tearDown();
-        shutdownHook.run();
+        shutdownHook.reportAtEnd();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
         exitCheckHandler(handler);
     }
@@ -512,14 +499,7 @@ public class Main {
         String allowedPagesFileName = "";
         if (args.length > i && !args[i].isEmpty()) {
             allowedPagesFileName = args[i];
-            FileReader inFile = new FileReader(allowedPagesFileName);
-            BufferedReader br = new BufferedReader(inFile);
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (!line.isEmpty()) {
-                    allowedPages.add(line);
-                }
-            }
+            addFromFile(allowedPages, allowedPagesFileName);
         }
         ++i;
         
@@ -547,6 +527,19 @@ public class Main {
             }
             out.close();
         } while(false);
+    }
+
+    private static void addFromFile(Collection<String> container,
+            String fileName) throws FileNotFoundException, IOException {
+        FileReader inFile = new FileReader(fileName);
+        BufferedReader br = new BufferedReader(inFile);
+        String line;
+        while ((line = br.readLine()) != null) {
+            if (!line.isEmpty()) {
+                container.add(line);
+            }
+        }
+        br.close();
     }
 
     /**
@@ -596,8 +589,7 @@ public class Main {
             WikiDumpHandler.println(System.out, "building category tree from " + filename + " ...");
             WikiDumpGetCategoryTreeHandler handler = new WikiDumpGetCategoryTreeHandler(
                     blacklist, null, maxTime, trees.getPath());
-            InputSource file = getFileReader(filename);
-            runXmlHandler(handler, file);
+            runXmlHandler(handler, getFileReader(filename));
             WikiDumpGetCategoryTreeHandler.readTrees(trees.getAbsolutePath(),
                     templateTree, includeTree, referenceTree);
         }

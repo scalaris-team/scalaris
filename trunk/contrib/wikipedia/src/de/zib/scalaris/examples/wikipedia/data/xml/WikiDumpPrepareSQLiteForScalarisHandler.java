@@ -384,15 +384,15 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
                 if (stWrite != null) {
                     stWrite.dispose();
                 }
-                try {
-                    db.exec("DROP TABLE pages;");
-                    db.exec("DROP TABLE categories;");
-                    db.exec("DROP TABLE templates;");
-                    db.exec("DROP TABLE links;");
-                } catch (SQLiteException e) {
-                    throw new RuntimeException(e);
-                }
                 if (db != null) {
+                    try {
+                        db.exec("DROP TABLE pages;");
+                        db.exec("DROP TABLE categories;");
+                        db.exec("DROP TABLE templates;");
+                        db.exec("DROP TABLE links;");
+                    } catch (SQLiteException e) {
+                        throw new RuntimeException(e);
+                    }
                     db.dispose();
                 }
                 initialised = false;

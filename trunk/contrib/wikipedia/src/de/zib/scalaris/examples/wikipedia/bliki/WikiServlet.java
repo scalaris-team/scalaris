@@ -881,7 +881,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         wikiModel.setPageName(titleN.title);
         if (renderer > 0) {
             String mainText = wikiModel.renderPageWithCache(result.revision.unpackedText());
-            if (titleN.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+            if (titleN.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
                 ValueResult<List<NormalisedTitle>> catPagesResult = getPagesInCategory(connection, titleN);
                 page.addStats(catPagesResult.stats);
                 page.getInvolvedKeys().addAll(catPagesResult.involvedKeys);
@@ -893,9 +893,9 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     final List<NormalisedTitle> tplPages = new ArrayList<NormalisedTitle>(catPagesResult.value.size());
 
                     for (NormalisedTitle pageInCat: catPagesResult.value) {
-                        if (pageInCat.namespace == MyNamespace.CATEGORY_NAMESPACE_KEY) {
+                        if (pageInCat.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
                             subCategories.add(pageInCat.title);
-                        } else if (pageInCat.namespace == MyNamespace.TEMPLATE_NAMESPACE_KEY) {
+                        } else if (pageInCat.namespace.equals(MyNamespace.TEMPLATE_NAMESPACE_KEY)) {
                             tplPages.add(pageInCat);
                         } else {
                             categoryPages.add(pageInCat.denormalise(namespace));

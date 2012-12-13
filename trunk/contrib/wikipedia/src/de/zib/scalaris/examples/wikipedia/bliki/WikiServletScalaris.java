@@ -383,13 +383,13 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     reader.setContentHandler(xmlHandler);
                     is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(fileName);
                     reader.parse(is);
-                    xmlHandler.new ReportAtShutDown().run();
+                    xmlHandler.new ReportAtShutDown().reportAtEnd();
                     ps.println("import finished");
                 } else if (handler instanceof WikiDumpPreparedSQLiteToScalaris) {
                     WikiDumpPreparedSQLiteToScalaris sqlHandler =
                             (WikiDumpPreparedSQLiteToScalaris) handler;
                     sqlHandler.writeToScalaris();
-                    sqlHandler.new ReportAtShutDown().run();
+                    sqlHandler.new ReportAtShutDown().reportAtEnd();
                 }
             } catch (Exception e) {
                 if (e instanceof SAXParsingInterruptedException) {
