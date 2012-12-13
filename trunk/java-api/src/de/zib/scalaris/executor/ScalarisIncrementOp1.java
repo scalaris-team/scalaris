@@ -106,15 +106,14 @@ public class ScalarisIncrementOp1<T extends Number> implements ScalarisOp {
     protected int prepareWrite(final int firstOp, final ResultList results,
             final RequestList requests) throws OtpErlangException,
             UnknownException {
-        BigInteger currrentValue;
+        BigInteger newValue;
         try {
-            currrentValue = results.processReadAt(firstOp).bigIntValue();
+            newValue = results.processReadAt(firstOp).bigIntValue().add(value);
         } catch (final NotFoundException e) {
             // this is ok
-            currrentValue = BigInteger.ZERO;
+            newValue = value;
         }
-        currrentValue.add(value);
-        requests.addOp(new WriteOp(key, currrentValue));
+        requests.addOp(new WriteOp(key, newValue));
         return 1;
     }
 
