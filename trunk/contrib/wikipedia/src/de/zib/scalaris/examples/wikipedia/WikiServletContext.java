@@ -49,6 +49,27 @@ public interface WikiServletContext {
     public abstract String getVersion();
 
     /**
+     * Gets the version of the DB used by the wiki servlet.
+     * 
+     * @return the version
+     */
+    public abstract String getDbVersion();
+
+    /**
+     * Gets the version of the Server running the wiki servlet.
+     * 
+     * @return the version
+     */
+    public abstract String getServerVersion();
+
+    /**
+     * Gets the version of the bliki rendering library used by the wiki servlet.
+     * 
+     * @return the version
+     */
+    public abstract String getBlikiVersion();
+
+    /**
      * Gets the base URL for links to articles relative to the servlet's context
      * path.
      * 
