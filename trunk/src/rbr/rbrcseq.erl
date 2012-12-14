@@ -77,7 +77,7 @@
 %%     send newest to client.
 
 %% This variant works on whole dbentries without filtering.
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), client_key()) -> ok.
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), client_key() | ?RT:key()) -> ok.
 qread(CSeqPidName, Client, Key) ->
     RF = fun prbr:noop_read_filter/1,
     qread(CSeqPidName, Client, Key, RF).
@@ -123,7 +123,7 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 %% This variant works on whole dbentries without filtering.
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
-             client_key(),
+             client_key() | ?RT:key(),
              fun ((any(), any(), any()) -> any()), %% CC (Content Check)
              client_value()) -> ok.
 qwrite(CSeqPidName, Client, Key, CC, Value) ->
@@ -133,7 +133,7 @@ qwrite(CSeqPidName, Client, Key, CC, Value) ->
 
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
-             client_key(),
+             client_key() | ?RT:key(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> any()), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter

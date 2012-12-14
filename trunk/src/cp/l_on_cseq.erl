@@ -42,12 +42,12 @@
 
 -type lease_id() :: ?RT:key().
 -type lease_aux() ::
-  empty
-| {invalid, split, R1, R2}
-| {valid,   split, R1, R2}
-| {invalid, merge, L1, L2}
-| {invalid, merge, stopped}
-| {valid,   merge, L1, L2}.
+        empty
+      | {invalid, split, R1, R2}
+      | {valid,   split, R1, R2}
+      | {invalid, merge, L1, L2}
+      | {invalid, merge, stopped}
+      | {valid,   merge, L1, L2}.
 
 -record(lease, {
           id      = ?required(lease, id     ) :: lease_id(),
@@ -71,27 +71,27 @@ delta() -> 5.
 
 -spec lease_renew(lease_entry()) -> ok.
 lease_renew(Lease) ->
-    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, renew, Lease}),
+    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, renew, Lease}),
     ok.
 
 -spec lease_handover(lease_entry(), comm:mypid()) -> ok.
 lease_handover(Lease, NewOwner) ->
-    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, handover, Lease, NewOwner}),
+    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, handover, Lease, NewOwner}),
     ok.
 
 -spec lease_takeover(lease_entry()) -> ok.
 lease_takeover(Lease) ->
-    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, takeover, Lease}),
+    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, takeover, Lease}),
     ok.
 
 -spec lease_split(lease_entry(), intervals:interval(), intervals:interval()) -> ok.
 lease_split(Lease, R1, R2) ->
-    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, split, Lease, R1, R2}),
+    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, split, Lease, R1, R2}),
     ok.
 
 -spec lease_merge(lease_entry(), lease_entry()) -> ok.
 lease_merge(Lease1, Lease2) ->
-    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, merge, Lease1, Lease2}),
+    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, merge, Lease1, Lease2}),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -126,6 +126,7 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
 
 on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
     % @todo if success update lease in State
+    % retry?
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -168,7 +169,7 @@ on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}}
     Timeout = util:time_plus_s(os:timestamp(), delta()),
     New = Old#lease{epoch = OldEpoch + 1,
                     version = 0,
-                    owner = pidgroups:get_my(dht_node),
+                    owner = comm:make_global(pidgroups:get_my(dht_node)),
                     timeout = Timeout},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     DB = erlang:list_to_existing_atom(
@@ -308,104 +309,111 @@ on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2}}, State)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec is_valid_renewal(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean, null}). %% content check
 is_valid_renewal(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch == Next#lease.epoch)
-                andalso (Current#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
                 andalso (Current#lease.owner == Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux == Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_handover(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
                 andalso (Current#lease.owner =/= Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux == Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_takeover(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_takeover(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Next#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Next#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
                 andalso (Current#lease.owner =/= Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux == Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_merge_step1(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_merge_step1(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
                 andalso (Current#lease.owner == Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux =/= Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_merge_step2(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_merge_step2(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
                 andalso (Current#lease.owner == Next#lease.owner)
                 andalso (Current#lease.range =/= Next#lease.range)
                 andalso (Current#lease.aux =/= Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_merge_step3(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean, null}). %% content check
 is_valid_merge_step3(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
                 andalso (Current#lease.owner == Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux =/= Next#lease.aux)
-                andalso (Current#lease.timeout == Next#lease.timeout)
+                andalso (Current#lease.timeout == Next#lease.timeout),
+            {Res, null}
     end.
 
 -spec is_valid_merge_step4(non_neg_integer(), non_neg_integer()) ->
-    fun().
+    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_merge_step4(Epoch, Version) ->
     fun (Current, _WriteFilter, Next) ->
-            standard_check(Current, Next, Epoch, Version)
-%% checks for debugging
+            Res = standard_check(Current, Next, Epoch, Version)
+            %% checks for debugging
                 andalso (Current#lease.epoch+1 == Next#lease.epoch)
                 andalso (Current#lease.owner == Next#lease.owner)
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Next#lease.aux == empty)
                 andalso (Current#lease.aux =/= Next#lease.aux)
                 andalso (Current#lease.timeout =/= Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout),
+            {Res, null}
     end.
 
 standard_check(Current, Next, CurrentEpoch, CurrentVersion) ->
