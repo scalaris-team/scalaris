@@ -297,7 +297,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * the <tt>request</tt> object are set appropriately if not <tt>null</tt>.
      * 
      * @param request
-     *            the request to the servlet
+     *            the request to the servlet (may be <tt>null</tt>)
      * 
      * @return a valid connection of <tt>null</tt> if an error occurred
      */
@@ -1592,15 +1592,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         final String title = MyWikiModel.createFullPageName(namespace.getSpecial(), SPECIAL_SUFFIX_LANG.get(SpecialPage.SPECIAL_VERSION));
         page.setPageHeading("Version");
         page.setTitle(title);
-        String dbVersionStr;
-        do {
-            ValueResult<String> dbVersion = getDbVersion(connection);
-            if (dbVersion.success) {
-                dbVersionStr = dbVersion.value;
-            } else {
-                dbVersionStr = "n/a";
-            }
-        } while(false);
 
         StringBuilder content = new StringBuilder();
         content.append("<h2 id=\"mw-version-license\"> <span class=\"mw-headline\" id=\"License\">License</span></h2>\n");
@@ -1635,15 +1626,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td><a href=\"https://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></td>\n");
-        content.append("   <td>" + dbVersionStr + "</td>\n");
+        content.append("   <td>" + getDbVersionStr(connection) + "</td>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td>Server</td>\n");
-        content.append("   <td>" + getServletContext().getServerInfo() + "</td>\n");
+        content.append("   <td>" + getServerVersion() + "</td>\n");
         content.append("  </tr>\n");
         content.append("  <tr>\n");
         content.append("   <td><a href=\"https://code.google.com/p/gwtwiki/\" class=\"external text\" rel=\"nofollow\">bliki renderer</a></td>\n");
-        content.append("   <td>" + Configuration.BLIKI_VERSION + "</td>\n");
+        content.append("   <td>" + getBlikiVersion() + "</td>\n");
         content.append("  </tr>\n");
         content.append(" </tbody>\n");
         content.append("</table>\n");
@@ -2160,6 +2151,34 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     @Override
     public String getVersion() {
         return version;
+    }
+
+    @Override
+    public String getDbVersion() {
+        Connection connection = getConnection(null);
+        if (connection == null) {
+            return "n/a"; // return just in case
+        }
+        return getDbVersionStr(connection);
+    }
+
+    protected String getDbVersionStr(Connection connection) {
+        ValueResult<String> dbVersion = getDbVersion(connection);
+        if (dbVersion.success) {
+            return dbVersion.value;
+        } else {
+            return "n/a";
+        }
+    }
+
+    @Override
+    public String getServerVersion() {
+        return getServletContext().getServerInfo();
+    }
+
+    @Override
+    public String getBlikiVersion() {
+        return Configuration.BLIKI_VERSION;
     }
 
     /* (non-Javadoc)

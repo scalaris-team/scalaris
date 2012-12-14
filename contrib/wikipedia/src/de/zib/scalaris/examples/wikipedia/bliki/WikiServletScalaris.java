@@ -165,7 +165,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
      * the <tt>request</tt> object are set appropriately if not <tt>null</tt>.
      * 
      * @param request
-     *            the request to the servlet
+     *            the request to the servlet (may be <tt>null</tt>)
      * 
      * @return a valid connection of <tt>null</tt> if an error occurred
      */
