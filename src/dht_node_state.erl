@@ -150,11 +150,16 @@ new(RT, RMState, DB) ->
          (state(), msg_fwd) -> [{intervals:interval(), comm:mypid()}];
          (state(), rm_state) -> rm_loop:state();
          (state(), monitor_proc) -> pid();
-         (state(), prbr_kv_db) -> prbr:state().
+         (state(), prbr_kv_db) -> prbr:state();
+         (state(), lease_db1) -> prbr:state();
+         (state(), lease_db2) -> prbr:state();
+         (state(), lease_db3) -> prbr:state();
+         (state(), lease_db4) -> prbr:state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
-           db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState}, Key) ->
+           db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
+           lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -189,29 +194,34 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         join_time    -> JoinTime;
         load         -> ?DB:get_load(DB);
-        prbr_kv_db   -> PRBRState
+        prbr_kv_db   -> PRBRState;
+        %% txid_db -> TxIdDB;
+        lease_db1    -> LeaseDB1;
+        lease_db2    -> LeaseDB2;
+        lease_db3    -> LeaseDB3;
+        lease_db4    -> LeaseDB4
     end.
 
 -spec get_prbr_state(state(), db_selector()) -> prbr:state().
 get_prbr_state(State, WhichDB) ->
     case WhichDB of
-        kv -> get(State, prbr_kv_db)
-        %% tx_id -> get(State, tx_id);
-        %% leases_1 -> get(State, leases_1);
-        %% leases_2 -> get(State, leases_2);
-        %% leases_3 -> get(State, leases_3);
-        %% leases_4 -> get(State, leases_4)
+        kv -> get(State, prbr_kv_db);
+        %% tx_id -> get(State, txid_db);
+        leases_1 -> get(State, lease_db1);
+        leases_2 -> get(State, lease_db2);
+        leases_3 -> get(State, lease_db3);
+        leases_4 -> get(State, lease_db4)
     end.
 
 -spec set_prbr_state(state(), db_selector(), prbr:state()) -> state().
 set_prbr_state(State, WhichDB, Value) ->
     case WhichDB of
-        kv -> State#state{prbr_kv_db = Value}
+        kv -> State#state{prbr_kv_db = Value};
         %% tx_id ->    State#state{tx_id = Value};
-        %% leases_1 -> State#state{leases_1 = Value};
-        %% leases_2 -> State#state{leases_2 = Value};
-        %% leases_3 -> State#state{leases_3 = Value};
-        %% leases_4 -> State#state{leases_ = Value}
+        leases_1 -> State#state{lease_db1 = Value};
+        leases_2 -> State#state{lease_db2 = Value};
+        leases_3 -> State#state{lease_db3 = Value};
+        leases_4 -> State#state{lease_db4 = Value}
     end.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
