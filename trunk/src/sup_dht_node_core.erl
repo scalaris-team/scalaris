@@ -63,11 +63,40 @@ childs([DHTNodeGroup, Options]) ->
                                    [DHTNodeGroup, Options]),
     %% rbrcseq process working on the kv DB
     KV_RBRcseq = util:sup_worker_desc(
-                   rbrcseq, rbrcseq,
+                   kv_rbrcseq, rbrcseq,
                    start_link,
                    [DHTNodeGroup,
-                    _PidGroupsName = kv_rbrcseq,
-                    _DBSelector = kv]),
+                    _PidGroupsNameKV = kv_rbrcseq,
+                    _DBSelectorKV = kv]),
+    %% rbrcseq process working on the lease_db1 DB
+    L1_RBRcseq = util:sup_worker_desc(
+                   l1_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameL1 = lease_db1,
+                    _DBSelectorL1 = leases_1]),
+    %% rbrcseq process working on the lease_db2 DB
+    L2_RBRcseq = util:sup_worker_desc(
+                   l2_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameL2 = lease_db2,
+                    _DBSelectorL2 = leases_2]),
+    %% rbrcseq process working on the lease_db3 DB
+    L3_RBRcseq = util:sup_worker_desc(
+                   l3_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameL3 = lease_db3,
+                    _DBSelectorL3 = leases_3]),
+    %% rbrcseq process working on the lease_db4 DB
+    L4_RBRcseq = util:sup_worker_desc(
+                   l4_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameL4 = lease_db4,
+                    _DBSelectorL4 = leases_4]),
+
     DHTNodeMonitor = util:sup_worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
                        [DHTNodeGroup, Options]),
@@ -77,6 +106,10 @@ childs([DHTNodeGroup, Options]) ->
     [
      PaxosProcesses,
      KV_RBRcseq,
+     L1_RBRcseq,
+     L2_RBRcseq,
+     L3_RBRcseq,
+     L4_RBRcseq,
      DHTNodeMonitor,
      DHTNode,
      TX
