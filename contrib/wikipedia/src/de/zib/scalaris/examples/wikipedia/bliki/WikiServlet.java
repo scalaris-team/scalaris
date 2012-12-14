@@ -1027,7 +1027,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         for (String pageRandomTime : pageRandomTimes) {
             final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
             if (pageRandomTimeInt >= 0) {
-                final String statName = "RANDOM_PAGE";
+                final String statName = "RANDOM_PAGE (last op)";
                 page.addStat(statName, pageRandomTimeInt);
             }
         }
