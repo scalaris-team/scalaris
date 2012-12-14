@@ -6,7 +6,6 @@ import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.UnknownException;
 
 /**
- *
  * Provides methods to monitor a specific Scalaris (Erlang) VM via JMX.
  *
  * @author Nico Kruber, kruber@zib.de
