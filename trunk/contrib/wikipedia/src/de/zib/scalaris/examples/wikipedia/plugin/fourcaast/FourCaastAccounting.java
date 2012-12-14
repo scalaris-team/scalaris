@@ -25,6 +25,7 @@ import java.net.URL;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Map.Entry;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -104,13 +105,20 @@ public class FourCaastAccounting implements WikiEventHandler {
     
     protected String createSdr(final WikiPageBeanBase page) {
         final Calendar now = GregorianCalendar.getInstance();
+        final long serverTime = System.currentTimeMillis() - page.getStartTime();
         long dbTime = 0l;
-        for (List<Long> stats : page.getStats().values()) {
-            for (Long stat : stats) {
-                dbTime += stat;
+        for (Entry<String, List<Long>> stats : page.getStats().entrySet()) {
+            String statName = stats.getKey();
+            for (Long stat : stats.getValue()) {
+                if (statName.endsWith(" (last op)")) {
+                    // this is from a previous operation that lead to the
+                    // current page view, e.g. during random page view
+                    // -> exclude it here (it has already been accounted for)
+                } else {
+                    dbTime += stat;
+                }
             }
         }
-        final long serverTime = System.currentTimeMillis() - page.getStartTime();
         return "{" + 
                 "\"TenantID\": \"" + StringEscapeUtils.escapeJava(page.getServiceUser()) + "\"," +
                 "\"MeteringInstructionId\": \"" + meteringInstructionId + "\"," +

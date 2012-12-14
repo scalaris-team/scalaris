@@ -35,6 +35,7 @@ public class FourCaastAccountingPlugin implements WikiPlugin {
      */
     @Override
     public void init(WikiServletContext servlet, ServletConfig config) {
+        System.out.println("Activating 4CaaSt accounting plugin...");
         final String accountingServer = config.getInitParameter("4CaaSt.accounting");
         if (accountingServer != null) {
             try {
