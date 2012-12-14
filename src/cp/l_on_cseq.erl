@@ -1,16 +1,16 @@
-                                                % @copyright 2012 Zuse Institute Berlin,
+% @copyright 2012 Zuse Institute Berlin,
 
-                                                %   Licensed under the Apache License, Version 2.0 (the "License");
-                                                %   you may not use this file except in compliance with the License.
-                                                %   You may obtain a copy of the License at
-                                                %
-                                                %       http://www.apache.org/licenses/LICENSE-2.0
-                                                %
-                                                %   Unless required by applicable law or agreed to in writing, software
-                                                %   distributed under the License is distributed on an "AS IS" BASIS,
-                                                %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-                                                %   See the License for the specific language governing permissions and
-                                                %   limitations under the License.
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc lease store based on rbrcseq.
@@ -20,7 +20,7 @@
 -author('schintke@zib.de').
 -vsn('$Id:$ ').
 
-                                                %-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -29,24 +29,25 @@
 -export([read/1]).
 -export([write/2]).
 
+-export([on/2]).
+
 -export([lease_renew/1]).
 -export([lease_handover/2]).
+-export([lease_takeover/1]).
+-export([lease_split/3]).
+-export([lease_merge/2]).
 
 %% filters and checks for rbr_cseq operations
 %% consistency
--export([is_valid_state_change/3]).
--export([is_valid_renewal/3]).
--export([is_valid_handover/3]).
 
 -type lease_id() :: ?RT:key().
 -type lease_aux() ::
-        any().
-        %% | {aux, empty}
-        %% %% split
-        %% | {aux, jhsgjghs} %% 1. L1: 
-        %%    | 
-        %%    %% merge
-%%.
+  empty
+| {invalid, split, R1, R2}
+| {valid,   split, R1, R2}
+| {invalid, merge, L1, L2}
+| {invalid, merge, stopped}
+| {valid,   merge, L1, L2}.
 
 -record(lease, {
           id      = ?required(lease, id     ) :: lease_id(),
@@ -62,35 +63,379 @@ delta() -> 5.
 
 %% -type ldb_entry() :: lease_entry().
 
--spec lease_renew(lease_entry()) -> {ok}.
-lease_renew(Old = #lease{id=Id, version=OldVersion}) ->
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Public API
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec lease_renew(lease_entry()) -> ok.
+lease_renew(Lease) ->
+    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, renew, Lease}),
+    ok.
+
+-spec lease_handover(lease_entry(), comm:mypid()) -> ok.
+lease_handover(Lease, NewOwner) ->
+    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, handover, Lease, NewOwner}),
+    ok.
+
+-spec lease_takeover(lease_entry()) -> ok.
+lease_takeover(Lease) ->
+    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, takeover, Lease}),
+    ok.
+
+-spec lease_split(lease_entry(), intervals:interval(), intervals:interval()) -> ok.
+lease_split(Lease, R1, R2) ->
+    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, split, Lease, R1, R2}),
+    ok.
+
+-spec lease_merge(lease_entry(), lease_entry()) -> ok.
+lease_merge(Lease1, Lease2) ->
+    comm:send(pidgroups:get_my(dht_node), {l_on_cseq, merge, Lease1, Lease2}),
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% gen_component
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease renewal
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
+on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
+   State) ->
     Timeout = util:time_plus_s(os:timestamp(), delta()),
     New = Old#lease{version=OldVersion+1, timeout=Timeout},
-    write(Id, New, fun l_on_cseq:is_valid_renewal/3).
+    ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
 
--spec lease_handover(lease_entry(), comm:this()) -> {ok}.
-%% dht_node must remove its old version from its cache immediately
-lease_handover(Old = #lease{id=Id, epoch=OldEpoch}, NewOwner) ->
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
+
+on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease handover
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
+    NewOwner}, State) ->
     Timeout = util:time_plus_s(os:timestamp(), delta()),
     New = Old#lease{epoch = OldEpoch + 1,
                     owner = NewOwner,
                     version = 0,
                     timeout = Timeout},
-    write(Id, New, fun l_on_cseq:is_valid_handover/3).
+    ContentCheck = is_valid_handover(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
 
+on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
 
+on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease takeover
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
+   State) ->
+    Timeout = util:time_plus_s(os:timestamp(), delta()),
+    New = Old#lease{epoch = OldEpoch + 1,
+                    version = 0,
+                    owner = pidgroups:get_my(dht_node),
+                    timeout = Timeout},
+    ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, takeover_reply, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
+
+on({l_on_cseq, takeover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
+
+on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease merge (step1)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
+    L2}, State) ->
+    Timeout = util:time_plus_s(os:timestamp(), delta()),
+    New = L1#lease{epoch = OldEpoch + 1,
+                    version = 0,
+                    aux = {invalid, merge, L1, L2},
+                    timeout = Timeout},
+    ContentCheck = is_valid_merge_step1(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step1, L2, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
+
+on({l_on_cseq, merge_reply_step1, L2, {qwrite_deny, _ReqId, _Round, L1}}, State) ->
+    % @todo if success update lease in State
+    % retry?
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease merge (step2)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, merge_reply_step1,
+    L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
+    {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    % @todo if success update lease in State
+    Timeout = util:time_plus_s(os:timestamp(), delta()),
+    New = L2#lease{epoch = OldEpoch + 1,
+                   version = 0,
+                   range = intervals:union(L1#lease.range, L2#lease.range),
+                   aux = {valid, merge, L1, L2},
+                   timeout = Timeout},
+    ContentCheck = is_valid_merge_step2(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step2, L1, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
+
+on({l_on_cseq, merge_reply_step2, L1, {qwrite_deny, _ReqId, _Round, L2}}, State) ->
+    % @todo if success update lease in State
+    % retry?
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease merge (step3)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, merge_reply_step2,
+    L1 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
+    {qwrite_done, _ReqId, _Round, L2}}, State) ->
+    % @todo if success update lease in State
+    New = L1#lease{epoch = OldEpoch + 1,
+                   version = 0,
+                   aux = {invalid, merge, stopped}},
+    ContentCheck = is_valid_merge_step3(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step3, L2, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
+
+on({l_on_cseq, merge_reply_step3, L2, {qwrite_deny, _ReqId, _Round, L1}}, State) ->
+    % @todo if success update lease in State
+    % retry?
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease merge (step4)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, merge_reply_step3,
+    L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
+    {qwrite_done, _ReqId, _Round, L1}}, State) ->
+    % @todo if success update lease in State
+    Timeout = util:time_plus_s(os:timestamp(), delta()),
+    New = L2#lease{epoch = OldEpoch + 1,
+                   version = 0,
+                   aux = empty,
+                   timeout=Timeout},
+    ContentCheck = is_valid_merge_step4(OldEpoch, OldVersion),
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step4, L1, '_'}),
+    rbrcseq:qwrite(DB, Self, Id,
+                   ContentCheck,
+                   New),
+    State;
+
+on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2}}, State) ->
+    % @todo if success update lease in State
+    % retry?
+    State.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% content checks
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec is_valid_renewal(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_renewal(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch == Next#lease.epoch)
+                andalso (Current#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Current#lease.owner == Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Current#lease.aux == Next#lease.aux)
+                andalso (Current#lease.timeout < Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+-spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_handover(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Current#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Current#lease.owner =/= Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Current#lease.aux == Next#lease.aux)
+                andalso (Current#lease.timeout < Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+-spec is_valid_takeover(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_takeover(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Next#lease.owner == pid_groups:get_my(dht_node))
+                andalso (Current#lease.owner =/= Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Current#lease.aux == Next#lease.aux)
+                andalso (Current#lease.timeout < Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+-spec is_valid_merge_step1(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_merge_step1(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Current#lease.owner == Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Current#lease.aux =/= Next#lease.aux)
+                andalso (Current#lease.timeout < Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+-spec is_valid_merge_step2(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_merge_step2(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Current#lease.owner == Next#lease.owner)
+                andalso (Current#lease.range =/= Next#lease.range)
+                andalso (Current#lease.aux =/= Next#lease.aux)
+                andalso (Current#lease.timeout < Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+-spec is_valid_merge_step3(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_merge_step3(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Current#lease.owner == Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Current#lease.aux =/= Next#lease.aux)
+                andalso (Current#lease.timeout == Next#lease.timeout)
+    end.
+
+-spec is_valid_merge_step4(non_neg_integer(), non_neg_integer()) ->
+    fun().
+is_valid_merge_step4(Epoch, Version) ->
+    fun (Current, _WriteFilter, Next) ->
+            standard_check(Current, Next, Epoch, Version)
+%% checks for debugging
+                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+                andalso (Current#lease.owner == Next#lease.owner)
+                andalso (Current#lease.range == Next#lease.range)
+                andalso (Next#lease.aux == empty)
+                andalso (Current#lease.aux =/= Next#lease.aux)
+                andalso (Current#lease.timeout =/= Next#lease.timeout)
+                andalso (os:timestamp() <  Next#lease.timeout)
+    end.
+
+standard_check(Current, Next, CurrentEpoch, CurrentVersion) ->
+%% this serializes all operations on leases
+%% additional checks only for debugging the protocol and ensuring
+%% valid maintenance of the lease data structure and state machine
+
+%% for serialization, we check whether epoch and version match
+    (Current#lease.epoch == CurrentEpoch)
+        andalso (Current#lease.version == CurrentVersion)
+
+%% normal operation incs version
+        andalso ( ( (Current#lease.version+1 == Next#lease.version)
+                    andalso (Current#lease.epoch == Next#lease.epoch))
+%% reset version counter on epoch change
+                  orelse ((0 == Next#lease.version)
+                          andalso (Current#lease.epoch+1 == Next#lease.epoch))
+                 )
+%% debugging test
+        andalso (Current#lease.id == Next#lease.id).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% util
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec read(lease_id()) -> api_tx:read_result().
 read(Key) ->
-    %% decide which lease db is responsible, ie. if the key is from
-    %% the first quarter of the ring, use lease_db1, if from 2nd
-    %% quarter -> use lease_db2, ...
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", [?RT:get_key_segment(Key, 4)]))),
-
-    %% perform qread
-    rbrcseq:qread(DB, self(), Key),
+    read(Key, self()),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
                        case Value of
@@ -99,6 +444,18 @@ read(Key) ->
                        end
                       )
         end.
+
+-spec read(lease_id(), comm:erl_local_pid_plain()) -> ok.
+read(Key, Pid) ->
+%% decide which lease db is responsible, ie. if the key is from
+%% the first quarter of the ring, use lease_db1, if from 2nd
+%% quarter -> use lease_db2, ...
+    DB = erlang:list_to_existing_atom(
+           lists:flatten(
+             io_lib:format("lease_db~p", [?RT:get_key_segment(Key, 4)]))),
+
+%% perform qread
+    rbrcseq:qread(DB, Pid, Key).
 
 write(Key, Value, ContentCheck) ->
     %% decide which lease db is responsible, ie. if the key is from
@@ -119,72 +476,3 @@ write(Key, Value, ContentCheck) ->
 -spec write(lease_id(), lease_entry()) -> api_tx:write_result().
 write(Key, Value) ->
     write(Key, Value, fun l_on_cseq:is_valid_state_change/3).
-
-%% content checks
--spec is_valid_state_change(any(), prbr:write_filter(), any()) ->
-                                   {boolean(), null}.
-is_valid_state_change(rbr_bottom, _WriteFilter, NewLease) ->
-    is_valid_creation(NewLease);
-is_valid_state_change(OldQRLease, WriteFilter, NewLease) ->
-    Result =
-        case OldQRLease#lease.aux of
-            {aux, empty} ->
-                is_valid_renewal(OldQRLease, WriteFilter, NewLease)
-                    orelse true; %% list further checks...
-            %% {aux, {create, Parent}} ->
-            %%     is_valid_create_step2(
-            %%        andalso true,
-            _ -> true
-        end,
-    {Result, null}.
-
-is_valid_creation(New) ->
-    %% check with info in aux field (epoch from parent lease)
-    %%    (Old#lease.epoch == New#lease.epoch) andalso
-    (nil == New#lease.owner)
-        andalso (1 == New#lease.version)
-    %%    (Old#lease.range == New#lease.range) andalso
-    %%    ({aux, {create, ParentId}} == New#lease.aux) andalso
-        andalso ({0,0,0} == New#lease.timeout).
-
--spec is_valid_renewal(lease_entry(), prbr:write_filter(), any()) ->
-                              {boolean(), null}.
-is_valid_renewal(Current, _WriteFilter, Next) ->
-    standard_check(Current, Next)
-    %% checks for debugging
-        andalso (Current#lease.epoch == Next#lease.epoch)
-        andalso (Current#lease.owner == (_Self = pid_groups:get_my(dht_node)))
-        andalso (Current#lease.owner == Next#lease.owner)
-        andalso (Current#lease.range == Next#lease.range)
-        andalso (Current#lease.aux == Next#lease.aux)
-        andalso (Current#lease.timeout < Next#lease.timeout)
-        andalso (os:timestamp() <  Next#lease.timeout).
-
--spec is_valid_handover(lease_entry(), prbr:write_filter(), any()) ->
-                              {boolean(), null}.
-is_valid_handover(Current, _WriteFilter, Next) ->
-    standard_check(Current, Next)
-    %% checks for debugging
-        andalso (Current#lease.epoch+1 == Next#lease.epoch)
-        andalso (Current#lease.owner == (_Self = pid_groups:get_my(dht_node)))
-        andalso (Current#lease.owner =/= Next#lease.owner)
-        andalso (Current#lease.range == Next#lease.range)
-        andalso (Current#lease.aux == Next#lease.aux)
-        andalso (Current#lease.timeout < Next#lease.timeout)
-        andalso (os:timestamp() <  Next#lease.timeout).
-
-standard_check(Current, Next) ->
-    %% this serializes all operations on leases
-    %% additional checks only for debugging the protocol and ensuring
-    %% valid maintenance of the lease data structure and state machine
-
-    %% normal operation incs version
-    ( ( (Current#lease.version+1 == Next#lease.version)
-     andalso (Current#lease.epoch == Next#lease.epoch))
-    %% reset version counter on epoch change
-        orelse ((0 == Next#lease.version)
-                andalso (Current#lease.epoch+1 == Next#lease.epoch))
-    )
-    %% debugging test
-        andalso (Current#lease.id == Next#lease.id).
-
