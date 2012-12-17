@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rt_beh).
 -author('schuett@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 % for behaviour
 -ifndef(have_callback_support).
@@ -48,6 +48,7 @@
 -callback to_pid_list(rt()) -> [comm:mypid()].
 -callback get_size(rt() | external_rt()) -> non_neg_integer().
 -callback get_replica_keys(key()) -> [key()].
+-callback get_key_segment(key()) -> pos_integer().
 
 -callback n() -> number().
 -callback get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
@@ -92,6 +93,8 @@ behaviour_info(callbacks) ->
      % gets all (replicated) keys for a given (hashed) key
      % (for symmetric replication)
      {get_replica_keys, 1},
+     % get the segment of the ring a key belongs to (1-4)
+     {get_key_segment, 1},
      % address space size, range and split key
      % (may all throw 'throw:not_supported' if unsupported by the RT)
      {n, 0}, {get_range, 2}, {get_split_key, 3},

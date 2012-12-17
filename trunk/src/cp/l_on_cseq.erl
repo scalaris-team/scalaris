@@ -472,12 +472,12 @@ add_first_lease_to_db(Id, State) ->
     Lease = #lease{id=Id,
                    epoch   = 1,
                    owner   = comm:this(),
-                   range   = intervals:interval(Id,Id),
+                   range   = intervals:all(),
                    aux     = empty,
                    version = 1,
                    timeout = util:time_plus_s(os:timestamp(), delta())
                   },
-    DBHandle = dht_node_state:get(DB, State),
+    DBHandle = dht_node_state:get(State, DB),
     [ begin
           Entry = prbr:new(X, Lease),
           prbr:set_entry(Entry, DBHandle)
@@ -488,4 +488,4 @@ add_first_lease_to_db(Id, State) ->
 get_db_for_id(Id) ->
     erlang:list_to_existing_atom(
       lists:flatten(
-        io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))).
+        io_lib:format("lease_db~p", [?RT:get_key_segment(Id)]))).
