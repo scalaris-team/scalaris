@@ -46,7 +46,7 @@
 -type entry() :: {any(), %% ReqId
                   non_neg_integer(), %% period of last retriggering / starting
                   non_neg_integer(), %% period of next retriggering
-                  client_key(), %% key
+                  ?RT:key(), %% key
                   comm:erl_local_pid(), %% client
                   prbr:r_with_id(), %% my round
                   non_neg_integer(), %% number of acks
@@ -77,7 +77,7 @@
 %%     send newest to client.
 
 %% This variant works on whole dbentries without filtering.
--spec qread(pid_groups:pidname(), comm:erl_local_pid(), client_key() | ?RT:key()) -> ok.
+-spec qread(pid_groups:pidname(), comm:erl_local_pid(), ?RT:key()) -> ok.
 qread(CSeqPidName, Client, Key) ->
     RF = fun prbr:noop_read_filter/1,
     qread(CSeqPidName, Client, Key, RF).
@@ -123,7 +123,7 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 %% This variant works on whole dbentries without filtering.
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
-             client_key() | ?RT:key(),
+             ?RT:key(),
              fun ((any(), any(), any()) -> any()), %% CC (Content Check)
              client_value()) -> ok.
 qwrite(CSeqPidName, Client, Key, CC, Value) ->
@@ -133,7 +133,7 @@ qwrite(CSeqPidName, Client, Key, CC, Value) ->
 
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
-             client_key() | ?RT:key(),
+             ?RT:key(),
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> any()), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
@@ -200,7 +200,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     _ = [ comm:send_local(Dest,
                           {?lookup_aux, X, 0,
                            {prbr, read, DB, This, X, MyId, ReadFilter}})
-      || X <- api_rdht:get_replica_keys(Key) ],
+      || X <- ?RT:get_replica_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
 
@@ -267,7 +267,7 @@ on({qwrite_read_done, ReqId, {qread_done, _ReadId, Round, ReadValue}},
                                 WriteValue,
                                 PassedToUpdate,
                                 WriteFilter}})
-              || X <- api_rdht:get_replica_keys(entry_key(Entry)) ];
+              || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
         {false, _Reason} = Err ->
             %% own proposal not possible as of content check
             %% should rewrite old consensus??
@@ -379,7 +379,7 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
 %% abstract data type to collect quorum read/write replies
--spec entry_new_read(any(), client_key(),
+-spec entry_new_read(any(), ?RT:key(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer())
                     -> entry().
@@ -388,7 +388,7 @@ entry_new_read(ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
      _MyRound = {0, 0}, _NumAcked = 0,
      _NumDenied = 0, _AckRound = {0, 0}, _AckVal = 0, Filter}.
 
--spec entry_new_write(any(), client_key(), comm:erl_local_pid(),
+-spec entry_new_write(any(), ?RT:key(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->

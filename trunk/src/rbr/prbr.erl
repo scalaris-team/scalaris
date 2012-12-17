@@ -24,7 +24,6 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
--include("client_types.hrl").
 
 -define(PDB, pdb_ets).
 
@@ -64,10 +63,10 @@
 
 -type message() ::
         {prbr, read, DB :: dht_node_state:db_selector(),
-         Proposer :: comm:mypid(), client_key(), InRound,
+         Proposer :: comm:mypid(), ?RT:key(), InRound,
          read_filter()}
       | {prbr, write, DB :: dht_node_state:db_selector(),
-         Proposer :: comm:mypid(), client_key(), InRound,
+         Proposer :: comm:mypid(), ?RT:key(), InRound,
          Value :: term(), PassedToUpdate :: term(), write_filter()}.
 
 %% r_with_id() has to be unique for this key system wide
