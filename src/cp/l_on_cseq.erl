@@ -37,6 +37,8 @@
 -export([lease_split/3]).
 -export([lease_merge/2]).
 
+-export([add_first_lease_to_db/2]).
+
 %% filters and checks for rbr_cseq operations
 %% consistency
 
@@ -111,9 +113,7 @@ on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
     Timeout = util:time_plus_s(os:timestamp(), delta()),
     New = Old#lease{version=OldVersion+1, timeout=Timeout},
     ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -142,9 +142,7 @@ on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                     version = 0,
                     timeout = Timeout},
     ContentCheck = is_valid_handover(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -172,9 +170,7 @@ on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}}
                     owner = comm:make_global(pidgroups:get_my(dht_node)),
                     timeout = Timeout},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, takeover_reply, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -202,9 +198,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                     aux = {invalid, merge, L1, L2},
                     timeout = Timeout},
     ContentCheck = is_valid_merge_step1(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step1, L2, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -232,9 +226,7 @@ on({l_on_cseq, merge_reply_step1,
                    aux = {valid, merge, L1, L2},
                    timeout = Timeout},
     ContentCheck = is_valid_merge_step2(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step2, L1, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -259,9 +251,7 @@ on({l_on_cseq, merge_reply_step2,
                    version = 0,
                    aux = {invalid, merge, stopped}},
     ContentCheck = is_valid_merge_step3(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step3, L2, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -288,9 +278,7 @@ on({l_on_cseq, merge_reply_step3,
                    aux = empty,
                    timeout=Timeout},
     ContentCheck = is_valid_merge_step4(OldEpoch, OldVersion),
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))),
+    DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step4, L1, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
@@ -455,27 +443,19 @@ read(Key) ->
 
 -spec read(lease_id(), comm:erl_local_pid_plain()) -> ok.
 read(Key, Pid) ->
-%% decide which lease db is responsible, ie. if the key is from
-%% the first quarter of the ring, use lease_db1, if from 2nd
-%% quarter -> use lease_db2, ...
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", [?RT:get_key_segment(Key, 4)]))),
-
-%% perform qread
+    %% decide which lease db is responsible, ie. if the key is from
+    %% the first quarter of the ring, use lease_db1, if from 2nd
+    %% quarter -> use lease_db2, ...
+    DB = get_db_for_id(Key),
+    %% perform qread
     rbrcseq:qread(DB, Pid, Key).
 
 write(Key, Value, ContentCheck) ->
     %% decide which lease db is responsible, ie. if the key is from
     %% the first quarter of the ring, use lease_db1, if from 2nd
     %% quarter -> use lease_db2, ...
-    DB = erlang:list_to_existing_atom(
-           lists:flatten(
-             io_lib:format("lease_db~p", ?RT:get_key_segment(Key, 4)))),
-
-    rbrcseq:qwrite(DB, self(), Key,
-                   ContentCheck,
-                   Value),
+    DB = get_db_for_id(Key),
+    rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
     receive
         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
         %%        ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value}, {fail, timeout} )
@@ -484,3 +464,28 @@ write(Key, Value, ContentCheck) ->
 -spec write(lease_id(), lease_entry()) -> api_tx:write_result().
 write(Key, Value) ->
     write(Key, Value, fun l_on_cseq:is_valid_state_change/3).
+
+-spec add_first_lease_to_db(?RT:key(), dht_node_state:state()) ->
+                                  dht_node_state:state().
+add_first_lease_to_db(Id, State) ->
+    DB = get_db_for_id(Id),
+    Lease = #lease{id=Id,
+                   epoch   = 1,
+                   owner   = comm:this(),
+                   range   = intervals:interval(Id,Id),
+                   aux     = empty,
+                   version = 1,
+                   timeout = util:time_plus_s(os:timestamp(), delta())
+                  },
+    DBHandle = dht_node_state:get(DB, State),
+    [ begin
+          Entry = prbr:new(X, Lease),
+          prbr:set_entry(Entry, DBHandle)
+      end || X <- ?RT:get_replica_keys(Id) ],
+    State.
+
+-spec get_db_for_id(?RT:key()) -> atom().
+get_db_for_id(Id) ->
+    erlang:list_to_existing_atom(
+      lists:flatten(
+        io_lib:format("lease_db~p", ?RT:get_key_segment(Id, 4)))).
