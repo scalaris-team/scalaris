@@ -96,6 +96,10 @@ on(Msg, State) when join =:= element(1, Msg) ->
 on(Msg, State) when move =:= element(1, Msg) ->
     dht_node_move:process_move_msg(Msg, State);
 
+% Lease management messages (see l_on_cseq.erl)
+on(Msg, State) when l_on_cseq =:= element(1, Msg) ->
+    l_on_cseq:on(Msg, State);
+
 % RM messages (see rm_loop.erl)
 on(Msg, State) when element(1, Msg) =:= rm ->
     RMState = dht_node_state:get(State, rm_state),
