@@ -271,7 +271,9 @@ on({qwrite_read_done, ReqId, {qread_done, _ReadId, Round, ReadValue}},
         {false, _Reason} = Err ->
             %% own proposal not possible as of content check
             %% should rewrite old consensus??
-            comm:send_local(entry_client(Entry), Err)
+            comm:send_local(entry_client(Entry),
+                            {qwrite_deny, ReqId, Round, ReadValue,
+                             content_check_failed})
     end,
     State;
 
@@ -467,7 +469,7 @@ add_write_deny(Entry, Round) ->
     {2 =< 1+entry_num_denies(E1), entry_inc_num_denies(E1)}.
 
 
--spec inform_client(qread_done | qwrite_done | qwrite_deny, entry()) -> ok.
+-spec inform_client(qread_done | qwrite_done, entry()) -> ok.
 inform_client(Tag, Entry) ->
     comm:send_local(entry_client(Entry),
                     {Tag,

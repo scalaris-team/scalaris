@@ -27,7 +27,7 @@
 -include("client_types.hrl").
 
 -export([read/1]).
--export([write/2]).
+%%-export([write/2]).
 
 -export([on/2]).
 
@@ -61,6 +61,7 @@
           timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease_entry() :: #lease{}.
 
+-spec delta() -> pos_integer().
 delta() -> 5.
 
 %% -type ldb_entry() :: lease_entry().
@@ -110,21 +111,18 @@ lease_merge(Lease1, Lease2) ->
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
    State) ->
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = Old#lease{version=OldVersion+1, timeout=Timeout},
+    New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_'}),
-    rbrcseq:qwrite(DB, Self, Id,
-                   ContentCheck,
-                   New),
+    rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
     % @todo if success update lease in State
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -136,11 +134,10 @@ on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     NewOwner}, State) ->
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = Old#lease{epoch = OldEpoch + 1,
-                    owner = NewOwner,
+    New = Old#lease{epoch   = OldEpoch + 1,
+                    owner   = NewOwner,
                     version = 0,
-                    timeout = Timeout},
+                    timeout = new_timeout()},
     ContentCheck = is_valid_handover(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_'}),
@@ -153,7 +150,7 @@ on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
     % @todo if success update lease in State
     State;
 
-on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
     % @todo if success update lease in State
     State;
 
@@ -164,11 +161,10 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
    State) ->
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = Old#lease{epoch = OldEpoch + 1,
+    New = Old#lease{epoch   = OldEpoch + 1,
                     version = 0,
-                    owner = comm:make_global(pidgroups:get_my(dht_node)),
-                    timeout = Timeout},
+                    owner   = comm:this(),
+                    timeout = new_timeout()},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, takeover_reply, '_'}),
@@ -181,7 +177,7 @@ on({l_on_cseq, takeover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
     % @todo if success update lease in State
     State;
 
-on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
+on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
     % @todo if success update lease in State
     State;
 
@@ -192,11 +188,10 @@ on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value}}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     L2}, State) ->
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = L1#lease{epoch = OldEpoch + 1,
+    New = L1#lease{epoch    = OldEpoch + 1,
                     version = 0,
-                    aux = {invalid, merge, L1, L2},
-                    timeout = Timeout},
+                    aux     = {invalid, merge, L1, L2},
+                    timeout = new_timeout()},
     ContentCheck = is_valid_merge_step1(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step1, L2, '_'}),
@@ -205,7 +200,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step1, L2, {qwrite_deny, _ReqId, _Round, L1}}, State) ->
+on({l_on_cseq, merge_reply_step1, L2, {qwrite_deny, _ReqId, _Round, L1, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -219,12 +214,11 @@ on({l_on_cseq, merge_reply_step1,
     L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     % @todo if success update lease in State
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = L2#lease{epoch = OldEpoch + 1,
+    New = L2#lease{epoch   = OldEpoch + 1,
                    version = 0,
-                   range = intervals:union(L1#lease.range, L2#lease.range),
-                   aux = {valid, merge, L1, L2},
-                   timeout = Timeout},
+                   range   = intervals:union(L1#lease.range, L2#lease.range),
+                   aux     = {valid, merge, L1, L2},
+                   timeout = new_timeout()},
     ContentCheck = is_valid_merge_step2(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step2, L1, '_'}),
@@ -233,7 +227,7 @@ on({l_on_cseq, merge_reply_step1,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step2, L1, {qwrite_deny, _ReqId, _Round, L2}}, State) ->
+on({l_on_cseq, merge_reply_step2, L1, {qwrite_deny, _ReqId, _Round, L2, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -247,9 +241,9 @@ on({l_on_cseq, merge_reply_step2,
     L1 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     % @todo if success update lease in State
-    New = L1#lease{epoch = OldEpoch + 1,
+    New = L1#lease{epoch   = OldEpoch + 1,
                    version = 0,
-                   aux = {invalid, merge, stopped}},
+                   aux     = {invalid, merge, stopped}},
     ContentCheck = is_valid_merge_step3(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step3, L2, '_'}),
@@ -258,7 +252,7 @@ on({l_on_cseq, merge_reply_step2,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step3, L2, {qwrite_deny, _ReqId, _Round, L1}}, State) ->
+on({l_on_cseq, merge_reply_step3, L2, {qwrite_deny, _ReqId, _Round, L1, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -272,11 +266,10 @@ on({l_on_cseq, merge_reply_step3,
     L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion},
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     % @todo if success update lease in State
-    Timeout = util:time_plus_s(os:timestamp(), delta()),
-    New = L2#lease{epoch = OldEpoch + 1,
+    New = L2#lease{epoch   = OldEpoch + 1,
                    version = 0,
-                   aux = empty,
-                   timeout=Timeout},
+                   aux     = empty,
+                   timeout = new_timeout()},
     ContentCheck = is_valid_merge_step4(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 4, {l_on_cseq, merge_reply_step4, L1, '_'}),
@@ -285,9 +278,17 @@ on({l_on_cseq, merge_reply_step3,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2}}, State) ->
+on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
+    State;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease split (step1)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, split, Lease, R1, R2}, State) ->
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -404,6 +405,15 @@ is_valid_merge_step4(Epoch, Version) ->
             {Res, null}
     end.
 
+-spec standard_check(prbr_bottom | lease_entry(), lease_entry(),
+                     non_neg_integer(), non_neg_integer()) -> boolean().
+standard_check(prbr_bottom, _, _, _) ->
+    %% do not create leases from thin air. There are only two
+    %% situations where a lease DB entry can be created:
+    %% 1. when a first node starts a new Scalaris system
+    %%    (this lease is directly put to the database)
+    %% 2. when a split is performed (this has to use another check)
+    false;
 standard_check(Current, Next, CurrentEpoch, CurrentVersion) ->
 %% this serializes all operations on leases
 %% additional checks only for debugging the protocol and ensuring
@@ -450,38 +460,38 @@ read(Key, Pid) ->
     %% perform qread
     rbrcseq:qread(DB, Pid, Key).
 
-write(Key, Value, ContentCheck) ->
-    %% decide which lease db is responsible, ie. if the key is from
-    %% the first quarter of the ring, use lease_db1, if from 2nd
-    %% quarter -> use lease_db2, ...
-    DB = get_db_for_id(Key),
-    rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
-    receive
-        ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
-        %%        ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value}, {fail, timeout} )
-        end.
+%% write(Key, Value, ContentCheck) ->
+%%     %% decide which lease db is responsible, ie. if the key is from
+%%     %% the first quarter of the ring, use lease_db1, if from 2nd
+%%     %% quarter -> use lease_db2, ...
+%%     DB = get_db_for_id(Key),
+%%     rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
+%%     receive
+%%         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
+%%         %%        ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value, Reason}, {fail, timeout} )
+%%         end.
 
--spec write(lease_id(), lease_entry()) -> api_tx:write_result().
-write(Key, Value) ->
-    write(Key, Value, fun l_on_cseq:is_valid_state_change/3).
+%% -spec write(lease_id(), lease_entry()) -> api_tx:write_result().
+%% write(Key, Value) ->
+%%     write(Key, Value, fun l_on_cseq:is_valid_state_change/3).
 
 -spec add_first_lease_to_db(?RT:key(), dht_node_state:state()) ->
                                   dht_node_state:state().
 add_first_lease_to_db(Id, State) ->
     DB = get_db_for_id(Id),
-    Lease = #lease{id=Id,
+    Lease = #lease{id      = Id,
                    epoch   = 1,
                    owner   = comm:this(),
                    range   = intervals:all(),
                    aux     = empty,
                    version = 1,
-                   timeout = util:time_plus_s(os:timestamp(), delta())
+                   timeout = new_timeout()
                   },
     DBHandle = dht_node_state:get(State, DB),
-    [ begin
-          Entry = prbr:new(X, Lease),
-          prbr:set_entry(Entry, DBHandle)
-      end || X <- ?RT:get_replica_keys(Id) ],
+    _ = [ begin
+              Entry = prbr:new(X, Lease),
+              prbr:set_entry(Entry, DBHandle)
+          end || X <- ?RT:get_replica_keys(Id) ],
     State.
 
 -spec get_db_for_id(?RT:key()) -> atom().
@@ -489,3 +499,7 @@ get_db_for_id(Id) ->
     erlang:list_to_existing_atom(
       lists:flatten(
         io_lib:format("lease_db~p", [?RT:get_key_segment(Id)]))).
+
+-spec new_timeout() -> erlang_timestamp().
+new_timeout() ->
+    util:time_plus_s(os:timestamp(), delta()).
