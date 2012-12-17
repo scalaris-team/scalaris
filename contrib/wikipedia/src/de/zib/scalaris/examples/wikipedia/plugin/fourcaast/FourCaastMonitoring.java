@@ -97,7 +97,6 @@ public class FourCaastMonitoring implements WikiEventHandler, FourCaastMonitorin
                     // current page view, e.g. during random page view
                     // -> exclude it here (there has already been a monitoring call for it)
                 } else {
-                    System.out.println(statName);
                     dbTime += stat;
                 }
             }
