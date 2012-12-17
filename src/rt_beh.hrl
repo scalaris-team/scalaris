@@ -32,6 +32,7 @@
          hash_key/1, get_random_node_id/0, next_hop/2,
          init_stabilize/2, update/3,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
+         get_key_segment/1,
          n/0, get_range/2, get_split_key/3,
          dump/1, to_list/1, export_rt_to_dht_node/2,
          handle_custom_message/2,

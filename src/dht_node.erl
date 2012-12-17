@@ -415,7 +415,11 @@ init(Options) ->
              _ -> ?RT:get_random_node_id()
          end,
     case is_first(Options) of
-        true -> dht_node_join:join_as_first(Id, 0, Options);
+        true ->
+            TmpState = dht_node_join:join_as_first(Id, 0, Options),
+            %% we have to inject the first lease by hand, as otherwise
+            %% no routing will work.
+            l_on_cseq:add_first_lease_to_db(Id, TmpState);
         _    -> dht_node_join:join_as_other(Id, 0, Options)
     end.
 %% userdevguide-end dht_node:start

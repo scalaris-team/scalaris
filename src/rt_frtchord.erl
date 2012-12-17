@@ -289,6 +289,10 @@ get_replica_keys(Key) ->
     ].
 %% userdevguide-end rt_frtchord:get_replica_keys
 
+-spec get_key_segment(key()) -> pos_integer().
+get_key_segment(Key) ->
+    (Key bsr 126) + 1.
+
 %% userdevguide-begin rt_frtchord:dump
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].

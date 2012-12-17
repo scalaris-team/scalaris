@@ -37,7 +37,8 @@
 -export([check_config/0]).
 -export([noop_read_filter/1]).  %% See rbrcseq for explanation.
 -export([noop_write_filter/3]). %% See rbrcseq for explanation.
-
+-export([new/2]).
+-export([set_entry/2]).
 
 %% let users retrieve their uid from an assigned round number.
 -export([r_with_id_get_id/1]).

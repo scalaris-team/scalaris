@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2012 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -157,6 +157,10 @@ get_replica_keys(Key) ->
      Key bxor 16#80000000000000000000000000000000,
      Key bxor 16#C0000000000000000000000000000000
     ].
+
+-spec get_key_segment(key()) -> pos_integer().
+get_key_segment(Key) ->
+    (Key bsr 126) + 1.
 
 %% @doc Dumps the RT state for output in the web interface.
 -spec dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
