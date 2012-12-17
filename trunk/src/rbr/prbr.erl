@@ -170,10 +170,13 @@ set_entry(NewEntry, TableName) ->
 
 -spec new(any()) -> entry().
 new(Key) ->
+    new(Key, prbr_bottom).
+
+new(Key, Val) ->
     {Key,
      _R_Read = {0, '_'},
      _R_Write = {0, '_'},
-     _Value = prbr_bottom}.
+     _Value = Val}.
 
 
 %% -spec entry_key(entry()) -> any().
