@@ -800,15 +800,20 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     private void handleViewPage(HttpServletRequest request,
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws ServletException, IOException {
-        // get renderer
-        int render = getParam_renderer(request);
         // get revision id to load:
         int req_oldid = getParam_oldid(request);
 
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
-        
+        handleViewPage2(request, response, title, connection, page, req_oldid,
+                result);
+    }
+
+    private void handleViewPage2(HttpServletRequest request,
+            HttpServletResponse response, String title, Connection connection,
+            WikiPageBean page, int req_oldid, RevisionResult result)
+            throws ServletException, IOException {
         if (result.connect_failed) {
             setParam_error(request, "ERROR: DB connection failed");
             showEmptyPage(request, response, connection, page);
@@ -825,6 +830,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         }
         
         if (result.success) {
+            // get renderer
+            int render = getParam_renderer(request);
             final boolean noRedirect = getParam(request, "redirect").equals("no");
             renderRevision(result.page.getTitle(), result, render, request,
                     connection, page, noRedirect,
@@ -1735,6 +1742,13 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         int req_oldid = getParam_oldid(request);
 
         RevisionResult result = getRevision(connection, title, req_oldid, namespace);
+        
+        if (getParam_redlink(request) && !result.page_not_existing) {
+            handleViewPage2(request, response, title, connection,
+                    new WikiPageBean(page), req_oldid, result);
+            return;
+        }
+        
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
         if (result.connect_failed) {
@@ -2105,6 +2119,19 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             render = -1;
         }
         return render;
+    }
+
+    /**
+     * Check whether the page was reached by a "redlink" URL (in this case, if
+     * the edit page was requested but the page exists, show the page instead)
+     * 
+     * @param request
+     *            the http request
+     * @return <tt>true</tt> if it was a redlink, <tt>false</tt> otherwise
+     */
+    private static boolean getParam_redlink(HttpServletRequest request) {
+        String req_redlink = request.getParameter("redlink");
+        return parseInt(req_redlink, 0) == 1;
     }
     
     protected final static int parseInt(String value, int def) {
