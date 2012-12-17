@@ -190,6 +190,8 @@ public class MyWikiModel extends WikiModel {
         Configuration.DEFAULT_CONFIGURATION.addTokenTag("imagemap", new IgnoreTag("imagemap"));
         Configuration.DEFAULT_CONFIGURATION.addTokenTag("timeline", new IgnoreTag("timeline"));
         
+        Configuration.AVOID_PAGE_BREAK_IN_TABLE = false;
+        
         // allow style attributes:
         TagNode.addAllowedAttribute("style");
         
@@ -685,11 +687,11 @@ public class MyWikiModel extends WikiModel {
         if (!nsTitle[0].isEmpty() && isInterWiki(nsTitle[0])) {
             appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
-            NormalisedTitle topic = normalisePageTitle(topic0);
-            if (cssClass == null && existingPages!= null && !existingPages.contains(topic)) {
-                cssClass = "new";
+            boolean pageExists = true;
+            if (existingPages != null) {
+                pageExists = existingPages.contains(normalisePageTitle(topic0));
             }
-            super.appendInternalLink(topic0, hashSection, topicDescription, cssClass, parseRecursive);
+            super.appendInternalLink(topic0, hashSection, topicDescription, cssClass, parseRecursive, pageExists);
         }
     }
 
