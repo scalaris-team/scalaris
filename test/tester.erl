@@ -252,10 +252,15 @@ apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
                      tester_parse_state:state(), integer(), test_options()) -> ok.
 run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
     Master = self(),
+    Dict = erlang:get(),
     _Pids = [spawn_link(
                fun() ->
                        Name = list_to_atom("run_test:" ++ integer_to_list(Thread)),
                        catch(erlang:register(Name, self())),
+                       %% copy the dictionary of the original tester process
+                       %% to worker threads (allows to join a pid_group if
+                       %% necessary for a test
+                       [ erlang:put(K, V) || {K, V} <- Dict ],
                        Result = run(Module, Func, Arity,
                                     Iterations div Threads, ParseState, Options,
                                     Thread),
@@ -353,11 +358,26 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
                      false -> skipped
                  end,
 
+          %% %% if Fun is a feeder, crosscheck existance of tested fun,
+          %% %% but do not trigger tests for that.
+          FunString = atom_to_list(Fun),
+          %% case lists:suffix("_feeder", FunString) of
+          %%     true ->
+          %%         TestedFun = lists:sublist(FunString, length(FunString) - 7),
+          %%         case lists:member({TestedFun, Arity}, FunList) of
+          %%             true -> ok;
+          %%             false ->
+          %%                 ct:pal("Found feeder, but no destination fun ~p:~p/~p~n",
+          %%                        [Module, Fun, Arity])
+          %%         end;
+          %%     false -> ok
+          %% end,
+
           %% if a feeder is found, test with feeder and ignore the
           %% exclude list, as a feeder is expected to feed the
           %% tested fun appropriately (will type check feeder
           %% results for required input types anyhow).
-          FeederFun = list_to_atom(atom_to_list(Fun) ++ "_feeder"),
+          FeederFun = list_to_atom(FunString ++ "_feeder"),
           case lists:member({FeederFun, Arity}, FunList) of
               true ->
                   ct:pal("Testing with feeder ~p:~p/~p~n",
@@ -389,14 +409,19 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec register_type_checker({typedef, module(), atom()}, module(), atom()) ->
+                                   true.
 register_type_checker(Type, Module, Function) ->
     tester_global_state:register_type_checker(Type, Module, Function).
 
+-spec unregister_type_checker({typedef, module(), atom()}) -> true | ok.
 unregister_type_checker(Type) ->
     tester_global_state:unregister_type_checker(Type).
 
+-spec register_value_creator({typedef, module(), atom()}, module(), atom(), non_neg_integer()) -> true.
 register_value_creator(Type, Module, Function, Arity) ->
     tester_global_state:register_value_creator(Type, Module, Function, Arity).
 
+-spec unregister_value_creator({typedef, module(), atom()}) -> true | ok.
 unregister_value_creator(Type) ->
     tester_global_state:unregister_value_creator(Type).
