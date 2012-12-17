@@ -52,7 +52,8 @@
 
 -spec read(client_key()) -> api_tx:read_result().
 read(Key) ->
-    rbrcseq:qread(kv_rbrcseq, self(), Key, fun kv_on_cseq:rf_val/1),
+    rbrcseq:qread(kv_rbrcseq, self(), ?RT:hash_key(Key),
+                  fun kv_on_cseq:rf_val/1),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
                        case Value of
@@ -64,7 +65,8 @@ read(Key) ->
 
 -spec write(client_key(), client_value()) -> api_tx:write_result().
 write(Key, Value) ->
-    rbrcseq:qwrite(kv_rbrcseq, self(), Key, fun kv_on_cseq:rf_rl_wl_vers/1,
+    rbrcseq:qwrite(kv_rbrcseq, self(), ?RT:hash_key(Key),
+                   fun kv_on_cseq:rf_rl_wl_vers/1,
                    fun kv_on_cseq:is_valid_next_req/3,
                    fun kv_on_cseq:wf_set_vers_val/3, Value),
     receive
