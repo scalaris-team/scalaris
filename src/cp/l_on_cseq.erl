@@ -100,6 +100,7 @@ delta() -> 5.
 
 -spec lease_renew(lease_entry()) -> ok.
 lease_renew(Lease) ->
+    io:format("trigger renew~n", []),
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, renew, Lease}),
     ok.
@@ -149,18 +150,17 @@ on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_'}),
+    %% @todo New passed for debugging only:
+    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New}),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}}, State) ->
-    io:format("successful renewal~n", []),
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, New}, State) ->
     % @todo if success update lease in State
     update_lease_in_dht_node_state(Value, State);
 
-on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, Value, Reason}, New}, State) ->
     % @todo if success update lease in State
-    io:format("renewal failed: ~p~n", [Reason]),
     io:format("trying again~n", []),
     lease_renew(Value),
     State;
@@ -530,7 +530,7 @@ add_first_lease_to_db(Id, State) ->
               Entry = prbr:new(X, Lease),
               prbr:set_entry(Entry, DBHandle)
           end || X <- ?RT:get_replica_keys(Id) ],
-    State.
+    dht_node_state:set_lease_list(State, [Lease]).
 
 -spec get_db_for_id(?RT:key()) -> atom().
 get_db_for_id(Id) ->
