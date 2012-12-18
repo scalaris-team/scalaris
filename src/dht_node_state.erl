@@ -25,7 +25,7 @@
 -export([new/3,
          get/2,
          dump/1,
-         set_rt/2, set_rm/2, set_db/2,
+         set_rt/2, set_rm/2, set_db/2, set_lease_list/2,
          details/1, details/2]).
 %% node responsibility:
 -export([has_left/1,
@@ -76,7 +76,8 @@
                 lease_db1 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db2 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
-                lease_db4 = ?required(state, prbr_state) :: prbr:state()
+                lease_db4 = ?required(state, prbr_state) :: prbr:state(),
+                lease_list = ?required(state, lease_list) :: l_on_cseq:lease_list()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -94,7 +95,8 @@ new(RT, RMState, DB) ->
            lease_db1 = prbr:init(lease_db1),
            lease_db2 = prbr:init(lease_db2),
            lease_db3 = prbr:init(lease_db3),
-           lease_db4 = prbr:init(lease_db4)
+           lease_db4 = prbr:init(lease_db4),
+           lease_list = []
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -154,12 +156,13 @@ new(RT, RMState, DB) ->
          (state(), lease_db1) -> prbr:state();
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
-         (state(), lease_db4) -> prbr:state().
+         (state(), lease_db4) -> prbr:state();
+         (state(), lease_list) -> l_on_cseq:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
-           lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4}, Key) ->
+           lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -199,7 +202,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         lease_db1    -> LeaseDB1;
         lease_db2    -> LeaseDB2;
         lease_db3    -> LeaseDB3;
-        lease_db4    -> LeaseDB4
+        lease_db4    -> LeaseDB4;
+        lease_list   -> LeaseList
     end.
 
 -spec get_prbr_state(state(), db_selector()) -> prbr:state().
@@ -223,6 +227,10 @@ set_prbr_state(State, WhichDB, Value) ->
         leases_3 -> State#state{lease_db3 = Value};
         leases_4 -> State#state{lease_db4 = Value}
     end.
+
+-spec set_lease_list(state(), l_on_cseq:lease_list()) -> state().
+set_lease_list(State, LeaseList) ->
+    State#state{lease_list = LeaseList}.
 
 %% @doc Checks whether the current node has already left the ring, i.e. the has
 %%      already changed his ID in order to leave or jump.
