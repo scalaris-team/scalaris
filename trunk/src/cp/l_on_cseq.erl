@@ -39,6 +39,10 @@
 
 -export([add_first_lease_to_db/2]).
 
+-ifdef(with_export_type_support).
+-export_type([lease_list/0]).
+-endif.
+
 %% filters and checks for rbr_cseq operations
 %% consistency
 
@@ -60,11 +64,33 @@
           version = ?required(lease, version) :: non_neg_integer(),
           timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease_entry() :: #lease{}.
+-type lease_list() :: list(lease_entry()).
 
 -spec delta() -> pos_integer().
 delta() -> 5.
 
-%% -type ldb_entry() :: lease_entry().
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% qwrite_done messages should always be received by the current owner
+% of the message. The message handler can directly change the lease
+% list in the dht_node. The next message will than be handled under
+% the new lease list.
+%
+% If we would update the lease of another node and the qwrite_done is
+% received by us, the system assumes that the lease was updated but
+% the owner will still work according to the old version of the
+% lease. In some cases such a remote-modify is acceptable and correct.
+% E.g. if we use a remote-modify to extend the lease's range, the
+% remote node can continue to work with his old lease until the next
+% renewal. On renewal, he will notice that it fails because the lease
+% changed and additionally he will get notified of the range
+% extension.
+%
+% The goal is to limited remote-modifies to correct operations,
+% i.e. renewals, aux updates and range extensions.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -74,27 +100,36 @@ delta() -> 5.
 
 -spec lease_renew(lease_entry()) -> ok.
 lease_renew(Lease) ->
-    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, renew, Lease}),
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, renew, Lease}),
     ok.
 
 -spec lease_handover(lease_entry(), comm:mypid()) -> ok.
 lease_handover(Lease, NewOwner) ->
-    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, handover, Lease, NewOwner}),
+    % @todo precondition: i am owner of Lease
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, handover, Lease, NewOwner}),
     ok.
 
 -spec lease_takeover(lease_entry()) -> ok.
 lease_takeover(Lease) ->
-    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, takeover, Lease}),
+    % @todo precondition: Lease has timeouted
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, takeover, Lease}),
     ok.
 
 -spec lease_split(lease_entry(), intervals:interval(), intervals:interval()) -> ok.
 lease_split(Lease, R1, R2) ->
-    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, split, Lease, R1, R2}),
+    % @todo precondition: i am owner of Lease
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, split, Lease, R1, R2}),
     ok.
 
 -spec lease_merge(lease_entry(), lease_entry()) -> ok.
 lease_merge(Lease1, Lease2) ->
-    comm:send_local(pid_groups:get_my(dht_node), {l_on_cseq, merge, Lease1, Lease2}),
+    % @todo precondition: i am owner of Lease1 and Lease2
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, merge, Lease1, Lease2}),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -118,13 +153,16 @@ on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}}, State) ->
+    io:format("successful renewal~n", []),
     % @todo if success update lease in State
-    State;
+    update_lease_in_dht_node_state(Value, State);
 
-on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
     % @todo if success update lease in State
-    % retry?
+    io:format("renewal failed: ~p~n", [Reason]),
+    io:format("trying again~n", []),
+    lease_renew(Value),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,7 +238,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step1, L2, {qwrite_deny, _ReqId, _Round, L1, _Reason}}, State) ->
+on({l_on_cseq, merge_reply_step1, _L2, {qwrite_deny, _ReqId, _Round, _L1, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -227,7 +265,7 @@ on({l_on_cseq, merge_reply_step1,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step2, L1, {qwrite_deny, _ReqId, _Round, L2, _Reason}}, State) ->
+on({l_on_cseq, merge_reply_step2, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -252,7 +290,7 @@ on({l_on_cseq, merge_reply_step2,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step3, L2, {qwrite_deny, _ReqId, _Round, L1, _Reason}}, State) ->
+on({l_on_cseq, merge_reply_step3, _L2, {qwrite_deny, _ReqId, _Round, _L1, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -278,7 +316,7 @@ on({l_on_cseq, merge_reply_step3,
                    New),
     State;
 
-on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2, _Reason}}, State) ->
+on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reason}}, State) ->
     % @todo if success update lease in State
     % retry?
     State;
@@ -288,7 +326,7 @@ on({l_on_cseq, merge_reply_step4, L1, {qwrite_deny, _ReqId, _Round, L2, _Reason}
 % lease split (step1)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, split, Lease, R1, R2}, State) ->
+on({l_on_cseq, split, _Lease, _R1, _R2}, State) ->
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -503,3 +541,17 @@ get_db_for_id(Id) ->
 -spec new_timeout() -> erlang_timestamp().
 new_timeout() ->
     util:time_plus_s(os:timestamp(), delta()).
+
+-spec update_lease_in_dht_node_state(lease_entry(), dht_node_state:state()) ->
+    dht_node_state:state().
+update_lease_in_dht_node_state(Lease, State) ->
+    Id = Lease#lease.id,
+    LeaseList = dht_node_state:get(State, lease_list),
+    NewList = case lists:keyfind(Id, 2, LeaseList) of
+                  false ->
+                      [Lease|LeaseList];
+                  OldLease ->
+                      io:format("replacing ~p with ~p ~n", [OldLease, Lease]),
+                      lists:keyreplace(Id, 2, LeaseList, Lease)
+              end,
+    dht_node_state:set_lease_list(State, NewList).
