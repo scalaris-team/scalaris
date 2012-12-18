@@ -268,12 +268,13 @@ on({qwrite_read_done, ReqId, {qread_done, _ReadId, Round, ReadValue}},
                                 PassedToUpdate,
                                 WriteFilter}})
               || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
-        {false, _Reason} = Err ->
+        {false, Reason} = Err ->
             %% own proposal not possible as of content check
             %% should rewrite old consensus??
             comm:send_local(entry_client(Entry),
                             {qwrite_deny, ReqId, Round, ReadValue,
-                             content_check_failed})
+                             {content_check_failed, Reason}}),
+            ?PDB:delete(entry_reqid(Entry), tablename(State))
     end,
     State;
 
