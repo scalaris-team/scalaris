@@ -413,10 +413,17 @@ on({zombie, Node}, State) ->
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
-    % get my ID (if set, otherwise chose a random ID):
-    Id = case lists:keyfind({dht_node, id}, 1, Options) of
-             {{dht_node, id}, IdX} -> IdX;
-             _ -> ?RT:get_random_node_id()
+
+    Id = case config:read(leases) of
+        true ->
+                 msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 ?MINUS_INFINITY;
+        _ ->
+                 % get my ID (if set, otherwise chose a random ID):
+                 case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end
          end,
     case is_first(Options) of
         true ->
