@@ -305,16 +305,17 @@ stop_record_changes_(State, Interval) ->
 %%      touched by one of the DB setters).
 -spec get_changes_(DB::db_t()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes_(State) ->
-    CKDB = subscr_delta_check_table(State),
-    get_changes_helper(State, ?CKETS:tab2list(CKDB), intervals:all(), [], []).
+    get_changes_(State, intervals:all()).
 
 %% @doc Gets all db_entry objects in the given interval which have
 %%      (potentially) been changed or deleted (might return objects that have
 %%      not changed but have been touched by one of the DB setters).
 -spec get_changes_(DB::db_t(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes_(State, Interval) ->
-    CKDB = subscr_delta_check_table(State),
-    get_changes_helper(State, ?CKETS:tab2list(CKDB), Interval, [], []).
+    case erlang:get('$delta_tab') of
+        undefined -> get_changes_helper(State, [], Interval, [], []);
+        CKDB -> get_changes_helper(State, ?CKETS:tab2list(CKDB), Interval, [], [])
+    end.
 
 %% @doc Helper for get_changes/2 that adds the entry of a changed key either to
 %%      the list of changed entries or to the list of deleted entries.
