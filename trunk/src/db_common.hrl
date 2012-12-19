@@ -296,9 +296,7 @@ stop_record_changes_(State, Interval) ->
             NewI = intervals:minus(I, Interval),
             case intervals:is_empty(NewI) of
                 true -> remove_subscription_(State, Tag);
-                _ ->
-                    set_subscription_(State, {Tag, intervals:minus(I, Interval),
-                                              ChangesFun, RemSubscrFun})
+                _ -> set_subscription_(State, {Tag, NewI, ChangesFun, RemSubscrFun})
             end
     end.
 
