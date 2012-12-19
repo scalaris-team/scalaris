@@ -533,30 +533,26 @@ on({l_on_cseq, renew_leases}, State) ->
 -spec is_valid_renewal(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), renewal_failed_reason() | null}). %% content check
 is_valid_renewal(CurrentEpoch, CurrentVersion) ->
-    fun (Current, _WriteFilter, Next) ->
-            LeaseExists = Current =/= prbr_bottom,
-            VersionMatches = (Current#lease.epoch == CurrentEpoch)
-                andalso (Current#lease.version == CurrentVersion),
-            OwnerMatches = Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node))
-                andalso (Current#lease.owner == Next#lease.owner),
-            RangeMatches = (Current#lease.range == Next#lease.range),
-            AuxMatches = (Current#lease.aux == Next#lease.aux),
-            TimeoutIsNewerThanCurrentLease = (Current#lease.timeout < Next#lease.timeout),
-            TimeoutIsInTheFuture = (os:timestamp() <  Next#lease.timeout),
-            if
-                not LeaseExists ->
-                    {false, lease_does_not_exist};
-                not VersionMatches ->
-                    {false, epoch_or_version_mismatch};
-                not OwnerMatches ->
-                    {false, owner_changed};
-                not RangeMatches ->
-                    {false, range_changed};
-                not AuxMatches ->
-                    {false, aux_changed};
-                not TimeoutIsNewerThanCurrentLease ->
-                    {false, timeout_is_not_newer_than_current_lease};
-                not TimeoutIsInTheFuture ->
+    This = comm:make_global(pid_groups:get_my(dht_node)),
+    fun (prbr_bottom, _WriteFilter, _Next) ->
+            {false, lease_does_not_exist};
+        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+            {false, epoch_or_version_mismatch};
+        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+            {false, epoch_or_version_mismatch};
+        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
+            {false, range_changed};
+        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =/= Aux1->
+            {false, aux_changed};
+        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
+            {false, owner_changed};
+        (#lease{owner = O0}, _, _)                     when O0 =/= This->
+            {false, owner_changed};
+        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
+            {false, timeout_is_not_newer_than_current_lease};
+        (_Current, _WriteFilter, Next) ->
+            case (os:timestamp() <  Next#lease.timeout) of
+                false ->
                     {false, timeout_is_not_in_the_future};
                 true ->
                     {true, null}
