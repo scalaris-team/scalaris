@@ -521,8 +521,8 @@ on({l_on_cseq, split_reply_step4, _L2, _R1, _R2,
 on({l_on_cseq, renew_leases}, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
     %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
-    [lease_renew(L) || L <- LeaseList],
-    msg_delay:send_local(delta() / 2, self(), {l_on_cseq, renew_leases}),
+    _ = [lease_renew(L) || L <- LeaseList],
+    msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -885,6 +885,7 @@ update_lease_in_dht_node_state(Lease, State) ->
               end,
     dht_node_state:set_lease_list(State, NewList).
 
+- spec id(intervals:interval()) -> non_neg_integer().
 id(_Range = [{interval, _, Id, _, _}]) ->
     Id.
 
