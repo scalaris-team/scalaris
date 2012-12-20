@@ -173,6 +173,7 @@ set_entry(NewEntry, TableName) ->
 new(Key) ->
     new(Key, prbr_bottom).
 
+-spec new(any(), any()) -> entry().
 new(Key, Val) ->
     {Key,
      _R_Read = {0, '_'},
