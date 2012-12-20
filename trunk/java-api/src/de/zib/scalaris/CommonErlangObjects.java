@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris;
 
+import java.io.IOException;
 import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangAtom;
@@ -141,13 +142,23 @@ public final class CommonErlangObjects {
             oos.write1(OtpExternal.versionTag);
             oos.write_any(value);
             final byte[] encoded = oos.toByteArray();
-            return new OtpErlangBinary(encoded);
+            final OtpErlangBinary result = new OtpErlangBinary(encoded);
+            try {
+                oos.close();
+            } catch (final IOException e) {
+            }
+            return result;
         } else {
             final OtpOutputStream oos = new OtpOutputStream();
             oos.write1(OtpExternal.versionTag);
             oos.write_compressed(value);
             final byte[] encoded = oos.toByteArray();
-            return new OtpErlangBinary(encoded);
+            final OtpErlangBinary result = new OtpErlangBinary(encoded);
+            try {
+                oos.close();
+            } catch (final IOException e) {
+            }
+            return result;
         }
     }
 
@@ -168,7 +179,14 @@ public final class CommonErlangObjects {
         if (value instanceof OtpErlangBinary) {
             final OtpErlangBinary valueBin = (OtpErlangBinary) value;
             final OtpInputStream ois = new OtpInputStream(valueBin.binaryValue());
-            return ois.read_any();
+            try {
+                return ois.read_any();
+            } finally {
+                try {
+                    ois.close();
+                } catch (final IOException e) {
+                }
+            }
         } else {
             return value;
         }
