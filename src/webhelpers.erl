@@ -31,7 +31,7 @@
          lookup/1, set_key/2, delete_key/2, isPost/1,
          safe_html_string/1, safe_html_string/2,
          pid_to_integer/1, color/1, format_coordinate/1
-         , format_nodes/1
+         , format_nodes/1, format_centroids/1
      ]).
 
 -opaque attribute_type() :: {atom(), string()}.
@@ -170,14 +170,15 @@ format_nodes(Nodes) ->
     end, gb_trees:empty(), Nodes),
 
     "[" ++ util:gb_trees_foldl(fun(Color, DCNodes, Acc) ->
-        NodeString = lists:flatten(string:join(
-                            [
-                                "{"
-                                ++ io_lib:format("\"color\":\"~s\",\"info\":~s",
-                                                 [Color,NodeInfo])
-                                ++ "}" || NodeInfo <- DCNodes
-                            ], ",")),
-        NodeString ++ Acc
+                NodeString = string:join(
+                        [io_lib:format("{\"color\":\"~s\",\"info\":~s}",
+                                        [Color,NodeInfo])
+                         || NodeInfo <- DCNodes ], ","),
+                Sep = case Acc of
+                    "" -> "";
+                    _ -> ","
+                end,
+                NodeString ++ Sep ++ Acc
     end, "", NodesTree) ++ "]".
 %%%--------------------------DC Clustering------------------------------
 -spec getDCClustersAndNodes() -> {[{comm:mypid(), vivaldi:network_coordinate()}],
@@ -217,6 +218,20 @@ getDCClustersAndNodes() ->
             {Nodes, Centroids, Epoch, Radius};
         _ -> disabled
     end.
+
+format_centroid(Centroid) ->
+    {Coords, Radius} = dc_centroids:get_coordinate_and_relative_size(Centroid),
+    FormatString = "{\"coords\":~p, \"radius\":~f}",
+    io_lib:format(FormatString, [Coords, Radius])
+    .
+
+%% @doc Convert a list of centroids into a JSON string
+-spec format_centroids(Centroids :: [dc_centroids:centroid()]) -> string().
+format_centroids(Centroids) ->
+    "["
+    ++ lists:flatten([format_centroid(C) || C <- Centroids])
+    ++ "]"
+    .
 
 %%%-----------------------------Ring----------------------------------
 
