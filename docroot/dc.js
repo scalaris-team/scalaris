@@ -11,9 +11,16 @@ var DC = {
                 ;
 
             var nodes = $.map(data.nodes, function(d) {
+                // hostname not seen before
                 if (hosts[d.info.host] === undefined) {
+                    hosts[d.info.host] = {};
+                }
+
+                // VM on hostname not seen before
+                // The VM is determined by its unique color
+                if(hosts[d.info.host][d.color] === undefined) {
                     dc += 1;
-                    hosts[d.info.host] = dc;
+                    hosts[d.info.host][d.color] = true;
                     enable_legend = true;
                 } else {
                     enable_legend = false;
