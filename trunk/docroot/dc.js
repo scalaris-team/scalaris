@@ -26,6 +26,7 @@ var DC = {
                 if (enable_legend) {
                     options.label = {
                         dc: "dc " + hosts[d.info.host]
+                        , name: d.info.name
                         , host: d.info.host
                     };
                 }
@@ -85,9 +86,18 @@ var DC = {
                         var x = item.datapoint[0].toFixed(2),
                         y = item.datapoint[1].toFixed(2);
 
+                        var label;
+
+                        if (item.series.info.name !== undefined) {
+                            label = item.series.info.name + "@" + item.series.info.host;
+                        } else {
+                            // for centroids
+                            label = item.series.info.host;
+                        }
+
                         DC.showTooltip(item.pageX
                             , item.pageY
-                            , item.series.info.host
+                            , label
                             );
                     }
                 }
