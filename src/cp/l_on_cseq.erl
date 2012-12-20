@@ -13,18 +13,19 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
+%% @author Thorsten Schuett <schuett@zib.de>
 %% @doc lease store based on rbrcseq.
 %% @end
 %% @version $Id:$
 -module(l_on_cseq).
 -author('schintke@zib.de').
+-author('schuett@zib.de').
 -vsn('$Id:$ ').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
--include("client_types.hrl").
 
 -export([read/1]).
 %%-export([write/2]).
@@ -65,8 +66,8 @@
           aux     = ?required(lease, aux    ) :: lease_aux(),
           version = ?required(lease, version) :: non_neg_integer(),
           timeout = ?required(lease, timeout) :: erlang_timestamp()}).
--type lease_entry() :: #lease{}.
--type lease_list() :: [lease_entry()].
+-type lease_t() :: #lease{}.
+-type lease_list() :: [lease_t()].
 
 -type renewal_failed_reason() :: lease_does_not_exist
                                | epoch_or_version_mismatch
@@ -133,34 +134,35 @@ delta() -> 10.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec lease_renew(lease_entry()) -> ok.
+-spec lease_renew(lease_t()) -> ok.
 lease_renew(Lease) ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, renew, Lease}),
     ok.
 
--spec lease_handover(lease_entry(), comm:mypid()) -> ok.
+-spec lease_handover(lease_t(), comm:mypid()) -> ok.
 lease_handover(Lease, NewOwner) ->
     % @todo precondition: i am owner of Lease
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, handover, Lease, NewOwner}),
     ok.
 
--spec lease_takeover(lease_entry()) -> ok.
+-spec lease_takeover(lease_t()) -> ok.
 lease_takeover(Lease) ->
     % @todo precondition: Lease has timeouted
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, takeover, Lease}),
     ok.
 
--spec lease_split(lease_entry(), intervals:interval(), intervals:interval()) -> ok.
+-spec lease_split(lease_t(), intervals:interval(),
+                  intervals:interval()) -> ok.
 lease_split(Lease, R1, R2) ->
     % @todo precondition: i am owner of Lease and id(R2) == id(Lease)
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, split, Lease, R1, R2}),
     ok.
 
--spec lease_merge(lease_entry(), lease_entry()) -> ok.
+-spec lease_merge(lease_t(), lease_t()) -> ok.
 lease_merge(Lease1, Lease2) ->
     % @todo precondition: i am owner of Lease1 and Lease2
     comm:send_local(pid_groups:get_my(dht_node),
@@ -414,11 +416,11 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2,
     end,
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % lease split (step2)
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch,version=OldVersion}, R1, R2,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     io:format("split second step: updating L1~n", []),
@@ -445,11 +447,11 @@ on({l_on_cseq, split_reply_step2, _L2, _R1, _R2,
     end,
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % lease split (step3)
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step2,
     L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion,aux=OldAux}, R1, R2,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
@@ -476,11 +478,11 @@ on({l_on_cseq, split_reply_step3, _L1, _R1, _R2,
     end,
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % lease split (step4)
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step3,
     L1 = #lease{id=Id,epoch=OldEpoch,version=OldVersion,aux=OldAux}, R1, R2,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
@@ -512,11 +514,11 @@ on({l_on_cseq, split_reply_step4, _L2, _R1, _R2,
     end,
     State;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % renew all local leases
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew_leases}, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
     %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
@@ -667,8 +669,9 @@ is_valid_split_step1() ->
 -spec is_valid_split_step2(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), split_step2_failed_reason() | null}). %% content check
 is_valid_split_step2(OldEpoch, OldVersion) ->
-    fun (Current, _WriteFilter, Next) ->
-            LeaseExists = Current =/= prbr_bottom,
+    fun (prbr_bottom, _WriteFilter, _Next) ->
+            {false, lease_does_not_exist};
+        (Current, _WriteFilter, Next) ->
             VersionMatches = (Current#lease.epoch == OldEpoch)
                 andalso (Current#lease.version == OldVersion),
             OwnerMatches = Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node))
@@ -679,8 +682,6 @@ is_valid_split_step2(OldEpoch, OldVersion) ->
             TimeoutIsNewerThanCurrentLease = (Current#lease.timeout < Next#lease.timeout),
             TimeoutIsInTheFuture = (os:timestamp() <  Next#lease.timeout),
             if
-                not LeaseExists ->
-                    {false, lease_does_not_exist};
                 not VersionMatches ->
                     {false, epoch_or_version_mismatch};
                 not OwnerMatches ->
@@ -701,9 +702,10 @@ is_valid_split_step2(OldEpoch, OldVersion) ->
 -spec is_valid_split_step3(non_neg_integer(), non_neg_integer(), lease_aux()) ->
     fun ((any(), any(), any()) -> {boolean(), split_step3_failed_reason() | null}). %% content check
 is_valid_split_step3(OldEpoch, OldVersion, Aux) ->
-    fun (Current, _WriteFilter, Next) ->
+    fun  (prbr_bottom, _WriteFilter, _Next) ->
+            {false, lease_does_not_exist};
+         (Current, _WriteFilter, Next) ->
             %io:format("is_valid_split_step3: ~p ~p~n", [Current, Next]),
-            LeaseExists = Current =/= prbr_bottom,
             VersionMatches = (Current#lease.epoch == OldEpoch)
                 andalso (Current#lease.version == OldVersion),
             OwnerMatches = Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node))
@@ -714,8 +716,6 @@ is_valid_split_step3(OldEpoch, OldVersion, Aux) ->
             TimeoutIsNewerThanCurrentLease = (Current#lease.timeout < Next#lease.timeout),
             TimeoutIsInTheFuture = (os:timestamp() <  Next#lease.timeout),
             if
-                not LeaseExists ->
-                    {false, lease_does_not_exist};
                 not VersionMatches ->
                     {false, epoch_or_version_mismatch};
                 not OwnerMatches ->
@@ -736,8 +736,9 @@ is_valid_split_step3(OldEpoch, OldVersion, Aux) ->
 -spec is_valid_split_step4(non_neg_integer(), non_neg_integer(), lease_aux()) ->
     fun ((any(), any(), any()) -> {boolean(), split_step4_failed_reason() | null}). %% content check
 is_valid_split_step4(OldEpoch, OldVersion, OldAux) ->
-    fun (Current, _WriteFilter, Next) ->
-            LeaseExists = Current =/= prbr_bottom,
+    fun (prbr_bottom, _WriteFilter, _Next) ->
+            {false, lease_does_not_exist};
+        (Current, _WriteFilter, Next) ->
             VersionMatches = (Current#lease.epoch == OldEpoch)
                 andalso (Current#lease.version == OldVersion),
             OwnerMatches = Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node))
@@ -748,8 +749,6 @@ is_valid_split_step4(OldEpoch, OldVersion, OldAux) ->
             TimeoutIsNewerThanCurrentLease = (Current#lease.timeout < Next#lease.timeout),
             TimeoutIsInTheFuture = (os:timestamp() <  Next#lease.timeout),
             if
-                not LeaseExists ->
-                    {false, lease_does_not_exist};
                 not VersionMatches ->
                     {false, epoch_or_version_mismatch};
                 not OwnerMatches ->
@@ -767,7 +766,7 @@ is_valid_split_step4(OldEpoch, OldVersion, OldAux) ->
             end
     end.
 
--spec standard_check(prbr_bottom | lease_entry(), lease_entry(),
+-spec standard_check(prbr_bottom | lease_t(), lease_t(),
                      non_neg_integer(), non_neg_integer()) -> boolean().
 standard_check(prbr_bottom, _, _, _) ->
     %% do not create leases from thin air. There are only two
@@ -833,7 +832,7 @@ read(Key, Pid) ->
 %%         %% ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value, Reason}, {fail, timeout} )
 %%         end.
 
-%% -spec write(lease_id(), lease_entry()) -> api_tx:write_result().
+%% -spec write(lease_id(), lease_t()) -> api_tx:write_result().
 %% write(Key, Value) ->
 %%     write(Key, Value, fun l_on_cseq:is_valid_state_change/3).
 
@@ -841,7 +840,7 @@ read(Key, Pid) ->
                                   dht_node_state:state().
 add_first_lease_to_db(Id, State) ->
     DB = get_db_for_id(Id),
-    Lease = #lease{id      = Id,
+    Lease = #lease{id      = Id, %% set to 0 in dht_node
                    epoch   = 1,
                    owner   = comm:this(),
                    range   = intervals:all(),
@@ -866,7 +865,7 @@ get_db_for_id(Id) ->
 new_timeout() ->
     util:time_plus_s(os:timestamp(), delta()).
 
--spec update_lease_in_dht_node_state(lease_entry(), dht_node_state:state()) ->
+-spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().
 update_lease_in_dht_node_state(Lease, State) ->
     Id = Lease#lease.id,
@@ -881,8 +880,16 @@ update_lease_in_dht_node_state(Lease, State) ->
     dht_node_state:set_lease_list(State, NewList).
 
 - spec id(intervals:interval()) -> non_neg_integer().
-id(_Range = [{interval, _, Id, _, _}]) ->
-    Id.
+id([]) -> 0;
+id([[]]) -> 0;
+id(X) ->
+    case lists:member(all, X) of
+        true -> 0;
+        _ ->
+            {_, Id, _, _} = intervals:get_bounds(X),
+            Id
+    end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -895,15 +902,21 @@ split_test() ->
     pid_groups:join_as(Group, ?MODULE),
     DHTNode = pid_groups:get_my(dht_node),
     comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
-    [L] = receive
+    L = receive
                  {get_state_response, List} ->
-                     List
+                     hd(List)
              end,
     Range = L#lease.range,
-    io:format("lease_list: ~p~n", [List]),
-    [R1, R2] = intervals:split(Range, 2),
-    io:format("split ~p into ~p and ~p~n", [Range, R1, R2]),
-    lease_split(L, R1, R2),
+    io:format("lease_list length: ~p~n", [length(List)]),
+    io:format("splitting lease: ~p~n", [L]),
+    Res = intervals:split(Range, 2),
+    case Res of
+        [R1, R2] ->
+            io:format("split ~p into ~p and ~p~n", [Range, R1, R2]),
+            lease_split(L, R1, R2);
+        _ ->
+            io:format("cannot split ~p further.~n", [Range])
+    end,
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
