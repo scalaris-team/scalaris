@@ -23,6 +23,8 @@
 
 -include("scalaris.hrl").
 
+-include_lib("common_test/include/ct.hrl").
+
 -ifdef(with_export_type_support).
 -export_type([time/0, time_utc/0]).
 -endif.
@@ -76,6 +78,11 @@
 -export([empty/1]).
 
 -export([extint2atom/1]).
+
+% RRD helpers which don't belong to the rrd datastructure
+-export([ rrd_combine_timing_slots/3
+         , rrd_combine_timing_slots/4
+    ]).
 
 % feeder for tester
 -export([readable_utc_time_feeder/1]).
@@ -1347,3 +1354,70 @@ sets_map(Fun, Set) ->
     lists:reverse(sets:fold(fun (El, Acc) ->
                 [Fun(El) | Acc]
         end, [], Set)).
+
+%% @doc Combine the last N slots from a dump into one tuple. The number of slots to
+%% combine is determined by Interval (in us): Take as many slots as needed to look
+%% Interval-Epsilon microseconds back into the past.
+
+-spec rrd_combine_timing_slots(DB :: rrd:rrd()
+                               , CurrentTS :: time()
+                               , Interval :: non_neg_integer()) ->
+    {
+        Sum :: number(), SquaresSum :: number(), Count :: non_neg_integer(), Min :: number(),
+        Max :: number()
+    } | undefined.
+rrd_combine_timing_slots(DB, CurrentTS, Interval) ->
+    rrd_combine_timing_slots(DB, CurrentTS, Interval, 0). % Epsilon = 10ms
+
+-spec rrd_combine_timing_slots(DB :: rrd:rrd()
+                               , CurrentTS :: time()
+                               , Interval :: non_neg_integer()
+                               , Epsilon :: non_neg_integer()) ->
+    {
+        Sum :: number(), SquaresSum :: number(), Count :: non_neg_integer(), Min :: number(),
+        Max :: number()
+    } | undefined.
+rrd_combine_timing_slots(DB, CurrentTS, Interval, Epsilon) ->
+    Slots = rrd:dump(DB),
+    CalcStepLength = fun(Current, From, To) ->
+            case timer:now_diff(Current,From) >= 0
+                andalso timer:now_diff(To, Current) >= 0 of
+                true  -> timer:now_diff(Current, From);
+                false -> timer:now_diff(To, From)
+            end
+
+    end,
+    Acc = lists:foldl(
+            fun
+                (_, {RemainingUS,_,_,_,_,_} = Acc) when (RemainingUS - Epsilon) =< 0 ->
+                    Acc
+                    ;
+                ({From, To, {SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}},
+                 {RemainingUS, Sum, SquaresSum, Count, Min, Max}) ->
+                    StepLength = CalcStepLength(CurrentTS, From, To),
+                    {
+                        RemainingUS - StepLength
+                        , Sum+SlotSum
+                        , SquaresSum + SlotSquared
+                        , Count + SlotCount
+                        , erlang:min(Min, SlotMin)
+                        , erlang:max(Max, SlotMax)
+                    }
+                    ;
+                ({From, To, {SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}},
+                 {RemainingUS}) ->
+                    StepLength = CalcStepLength(CurrentTS, From, To),
+                    {
+                        RemainingUS - StepLength
+                        , SlotSum
+                        , SlotSquared
+                        , SlotCount
+                        , SlotMin
+                        , SlotMax
+                    }
+            end, {Interval}, Slots),
+    case Acc of
+        {_, Sum, SquaresSum, Count, Min, Max} -> {Sum,SquaresSum,Count,Min,Max};
+        {Interval} -> undefined
+    end
+    .

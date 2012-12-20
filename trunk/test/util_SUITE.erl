@@ -31,7 +31,10 @@ all() ->
      tester_minus_all, tester_minus_all_sort,
      tester_minus_first, tester_minus_first_sort,
      tester_par_map2, tester_par_map3,
-     lists_remove_at_indices
+     lists_remove_at_indices,
+     rrd_combine_timing_slots_handle_empty_rrd,
+     rrd_combine_timing_slots_simple,
+     rrd_combine_timing_slots_subset
  ].
 
 suite() ->
@@ -257,3 +260,66 @@ lists_remove_at_indices(_Config) ->
     ?expect_exception(util:lists_remove_at_indices([], [0]), error, function_clause),
     ?expect_exception(util:lists_remove_at_indices([0,1,2,3], [5]), error, function_clause),
     ok.
+
+rrd_combine_timing_slots_handle_empty_rrd(_Config) ->
+    DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
+    Dump = rrd:dump(DB0),
+    ?equals(Dump, []),
+    ?equals(util:rrd_combine_timing_slots(DB0, 0, 10), undefined),
+    ok
+    .
+
+rrd_combine_timing_slots_simple(_Config) ->
+    Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
+    DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0}}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0}}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0}}}]),
+    CurrentTS = {0,0,44}, % assume we are currently in the last slot
+
+    Expected = {1 + 3 + 30 + 42 % sum
+                , 1*1 + 3*3 + 30*30 + 42*42 % squares' sum
+                , 2 + 1 + 1 % count
+                , 1 % min
+                , 42 % max
+               },
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, 100), Expected),
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, 100, 10), Expected),
+    ok
+    .
+
+rrd_combine_timing_slots_subset(_Config) ->
+    % combine the newest two slots due to the interval
+    Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
+    DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0}}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0}}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0}}}]),
+
+    CurrentTS = {0,0,44}, % assume we are currently in the last slot
+    Interval = 10, % overlap at most two slots
+
+    ExpectedSmallEpsilon = {42 + 30
+                , 42*42 + 30*30
+                , 1 + 1
+                , 30
+                , 42
+               },
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval), ExpectedSmallEpsilon),
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 5), ExpectedSmallEpsilon),
+
+    % epsilon is big enough to do it only once
+    ExpectedBigEpsilon = {42
+                , 42*42
+                , 1
+                , 42
+                , 42
+               },
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 10), ExpectedBigEpsilon),
+    ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 100), ExpectedBigEpsilon),
+    ok
+    .
