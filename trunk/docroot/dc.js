@@ -34,14 +34,19 @@ var DC = {
             });
 
             if (data.centroids){
-                var centroids = {
-                    color: "black"
-                    , data: data.centroids
-                    , label: {host: "centroids"}
-                    , info: {host: "centroid"}
-                };
+                $.each(data.centroids, function(_index, c){
+                    var centroid = {
+                        color: "black"
+                        , data: [c.coords]
+                        , label: {host: "centroids"}
+                        , info: {
+                            host: "centroid"
+                            , radius: c.radius
+                        }
+                    };
+                    nodes.push(centroid);
+                });
 
-                nodes.push(centroids);
             }
 
             // print remaining data
@@ -92,7 +97,9 @@ var DC = {
                             label = item.series.info.name + "@" + item.series.info.host;
                         } else {
                             // for centroids
-                            label = item.series.info.host;
+                            label = DC.formatCentroidLabel(item.series.info.host
+                                                       ,item.series.info.radius
+                            );
                         }
 
                         DC.showTooltip(item.pageX
@@ -118,6 +125,9 @@ var DC = {
         if (loc === "vivaldi" || loc === "dc") {
             DC.get_map(loc + "Map.yaws");
         }
+    }
+    , formatCentroidLabel: function(host, radius){
+        return "<p><b>" + host + "</b><br/>radius: " + radius + "</p>";
     }
     , showTooltip: function (x, y, contents) {
         $('<div id="tooltip">' + contents + '</div>').css({

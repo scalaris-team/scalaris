@@ -4,12 +4,7 @@ out(_A) ->
     {Nodes, Centroids, Epoch, Radius} = webhelpers:getDCClustersAndNodes(),
 
     NodesJSON = webhelpers:format_nodes(Nodes),
-
-    CentroidsJSON = "[" ++ string:join(
-        lists:map(
-            fun(C) -> webhelpers:format_coordinate(dc_centroids:get_coordinate(C)) end, Centroids
-        ), ",")
-    ++ "]",
+    CentroidsJSON = webhelpers:format_centroids(Centroids),
 
     %% this is actually json, but we\"ll trick yaws. YAWS doesn\"t know json as a return
     % atom here.
