@@ -73,21 +73,18 @@ delete_key(Key, Timeout) ->
 %%%--------------------------Vivaldi-Map------------------------------
 -spec getVivaldiMap() -> [{comm:mypid(), vivaldi:network_coordinate()}].
 getVivaldiMap() ->
-    mgmt_server:node_list(),
-    Nodes =
-        receive
-            {get_list_response, X} -> X
-        after 2000 ->
-            log:log(error,"[ WH ] Timeout getting node list from mgmt server"),
-            throw('mgmt_server_timeout')
-        end,
+    Nodes = [{
+                node:pidX(node_details:get(Node, node))
+                , node_details:get(Node, hostname)
+            } || {ok, Node} <- get_and_cache_ring()],
+    NodePids = [P || {P, _} <- Nodes],
     This = comm:this(),
     _ = [erlang:spawn(
            fun() ->
                    SourcePid = comm:reply_as(This, 1, {'_', Pid}),
                    comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
-           end) || Pid <- Nodes],
-    lists:zip(Nodes, get_vivaldi(Nodes, [], 0))
+           end) || Pid <- NodePids],
+    lists:zip(Nodes, get_vivaldi(NodePids, [], 0))
     .
 
 -spec get_vivaldi(Pids::[comm:mypid()], [vivaldi:network_coordinate()], TimeInMS::non_neg_integer()) -> [vivaldi:network_coordinate()].
@@ -141,27 +138,41 @@ color(Pid) ->
 format_coordinate([X,Y]) ->
     io_lib:format("[~p,~p]", [X,Y]).
 
+-spec format_coordinate_and_hostname(Coord::[vivaldi:network_coordinate(), ...],
+                                     Hostname::node_details:hostname())
+    -> string().
+format_coordinate_and_hostname(Coord, Hostname) ->
+    io_lib:format("{\"coords\":~s,\"host\":\"~s\"}", [format_coordinate(Coord), Hostname])
+    .
+
 % @doc Format Nodes as returned by getVivaldiMap() into JSON.
--spec format_nodes([{comm:mypid(), vivaldi:network_coordinate()}]) -> string().
+-spec format_nodes([{{comm:mypid(), node_details:hostname()}
+                     , vivaldi:network_coordinate()}]) -> string().
 format_nodes(Nodes) ->
     % order nodes according to their datacenter (designated by color)
     NodesTree = lists:foldl(
-        fun({NodeName, Coords}, Acc) ->
+        fun({{NodeName, NodeHost}, Coords}, Acc) ->
             Key = webhelpers:color(NodeName),
             PriorValue = gb_trees:lookup(Key, Acc),
             case PriorValue of
-                none -> gb_trees:enter(Key,[webhelpers:format_coordinate(Coords)], Acc);
-                {value, V} -> gb_trees:enter(Key, [webhelpers:format_coordinate(Coords) | V], Acc)
+                none ->
+                    gb_trees:enter(Key,
+                       [format_coordinate_and_hostname(Coords, NodeHost)], Acc);
+                {value, V} ->
+                    gb_trees:enter(Key,
+                       [format_coordinate_and_hostname(Coords, NodeHost) | V], Acc)
             end
     end, gb_trees:empty(), Nodes),
 
     "[" ++ util:gb_trees_foldl(fun(Color, DCNodes, Acc) ->
-        NodesString = string:join(DCNodes,","),
-        Sep = case Acc of
-            "" -> "";
-            _ -> ","
-        end,
-        io_lib:format("{\"color\":\"~s\",\"coords\":[~s]}~s", [Color,NodesString,Sep]) ++ Acc
+        NodeString = lists:flatten(string:join(
+                            [
+                                "{"
+                                ++ io_lib:format("\"color\":\"~s\",\"info\":~s",
+                                                 [Color,NodeInfo])
+                                ++ "}" || NodeInfo <- DCNodes
+                            ], ",")),
+        NodeString ++ Acc
     end, "", NodesTree) ++ "]".
 %%%--------------------------DC Clustering------------------------------
 -spec getDCClustersAndNodes() -> {[{comm:mypid(), vivaldi:network_coordinate()}],
@@ -169,8 +180,6 @@ format_nodes(Nodes) ->
 getDCClustersAndNodes() ->
     case config:read(dc_clustering_enable) of
         true ->
-            mgmt_server:node_list(),
-
             This = comm:this(),
             ClusteringProcess = pid_groups:find_a(dc_clustering),
             comm:send_local(ClusteringProcess, {query_clustering, This}),
