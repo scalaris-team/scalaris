@@ -158,6 +158,9 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_record(Value, Type, CheckStack, ParseState);
         {record, FieldList} when is_list(FieldList) ->
             check_record_fields(Value, Type, CheckStack, ParseState);
+        tid ->
+            % built-in < R14; otherwise ets:tid()
+            inner_check(Value, integer, CheckStack, ParseState);
         {tuple, Tuple} when is_list(Tuple) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
