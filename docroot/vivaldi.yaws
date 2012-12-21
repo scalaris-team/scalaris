@@ -84,7 +84,10 @@ out(Arg) ->
       <div class="middleleft">
 <h2>Vivaldi Map</h2>
 
-<div id="graph" style='width:800px;height:400px'></div>
+<div id='graph' style='width:800px;height:400px;float:left;'></div>
+<div id='legend'></div>
+<br />
+
 <script src="dc.js"></script>
 
 <hr />

@@ -83,9 +83,12 @@ out(Arg) ->
 out(Arg) ->
     case config:read(dc_clustering_enable) of
         true -> {html, "
-<div id=\"graph\" style='width:800px;height:400px'></div>
-<div id=\"stats\"></div>
-<script src=\"dc.js\"></script>
+<div id='graph' style='width:800px;height:400px;float:left;'></div>
+<div id='legend'></div>
+<br />
+
+<div id='stats'></div>
+<script src='dc.js'></script>
 "};
         _ -> {ehtml, {p, [], "DC Clustering disabled. Enable clustering in <tt>scalaris.local.cfg</tt> (change to: <tt>{dc_clustering_enable, true}.</tt>)."}}
     end.
