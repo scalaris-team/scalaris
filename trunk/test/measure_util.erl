@@ -50,6 +50,9 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% real type spec (not compatible with R13):
+%-spec time_with_result(fun((...) -> Result), pos_integer(), [options()]) -> {Result, Time::result()}.
+-spec time_with_result(fun(), pos_integer(), [options()]) -> {Result::term(), Time::result()}.
 time_with_result(Fun, Iterations, Options) ->
     Time = time_avg(Fun, Iterations, Options),
     Result = Fun(),
