@@ -23,8 +23,6 @@
 
 -include("scalaris.hrl").
 
--include_lib("common_test/include/ct.hrl").
-
 -ifdef(with_export_type_support).
 -export_type([time/0, time_utc/0]).
 -endif.
