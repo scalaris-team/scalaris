@@ -42,30 +42,39 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec register_type_checker(type_spec(), module(), Fun::atom()) -> true.
 register_type_checker(Type, Module, Fun) ->
     insert({type_checker, Type}, {Module, Fun}).
 
+-spec unregister_type_checker(type_spec()) -> true | ok.
 unregister_type_checker(Type) ->
     delete({type_checker, Type}).
 
+-spec get_type_checker(type_spec()) -> failed | {module(), Fun::atom()}.
 get_type_checker(Type) ->
     lookup({type_checker, Type}).
 
+-spec register_value_creator(type_spec(), module(), Fun::atom(), Arity::non_neg_integer()) -> true.
 register_value_creator(Type, Module, Function, Arity) ->
     insert({value_creator, Type}, {Module, Function, Arity}).
 
+-spec unregister_value_creator(type_spec()) -> true | ok.
 unregister_value_creator(Type) ->
     delete({value_creator, Type}).
 
+-spec get_value_creator(type_spec()) -> failed | {module(), Fun::atom(), Arity::non_neg_integer()}.
 get_value_creator(Type) ->
     lookup({value_creator, Type}).
 
+-spec set_last_call(Thread::pos_integer(), module(), Fun::atom(), Args::list()) -> true.
 set_last_call(Thread, Module, Function, Args) ->
     insert({last_call, Thread}, {Module, Function, Args}).
 
+-spec reset_last_call(Thread::pos_integer()) -> true | ok.
 reset_last_call(Thread) ->
     delete({last_call, Thread}).
 
+-spec get_last_call(Thread::pos_integer()) -> failed | {module(), Fun::atom(), Args::list()}.
 get_last_call(Thread) ->
     lookup({last_call, Thread}).
 
@@ -85,10 +94,12 @@ lookup(Key) ->
         false -> failed
     end.
 
+-spec insert(Key::term(), Value::term()) -> true.
 insert(Key, Value) ->
     check_whether_table_exists(true),
     ets:insert(?MODULE, {Key, Value}).
 
+-spec delete(Key::term()) -> true | ok.
 delete(Key) ->
     case check_whether_table_exists(false) of
         true -> ets:delete(?MODULE, Key);

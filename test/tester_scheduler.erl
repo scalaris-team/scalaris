@@ -55,27 +55,23 @@
                 scheduled_process::pid() | false,
                 white_list::list(tuple())}).
 
+-spec comm_send(comm:mypid(), comm:message() | comm:group_message()) -> ok.
 comm_send(Pid, Message) ->
     {RealPid, RealMessage} = comm:unpack_cookie(Pid,Message),
     usscheduler ! {comm_send, self(), RealPid, RealMessage},
-    receive
-        {comm_send, ack} ->
-            ok
-    end,
+    receive {comm_send, ack} -> ok end,
     % assume TCP
-    comm_server:send(RealPid, RealMessage, []),
-    ok.
+    comm_server:send(RealPid, RealMessage, []).
 
+-spec comm_send_local(comm:erl_local_pid(), comm:message() | comm:group_message()) -> ok.
 comm_send_local(Pid, Message) ->
     {RealPid, RealMessage} = comm:unpack_cookie(Pid,Message),
     usscheduler ! {comm_send_local, self(), RealPid, RealMessage},
-    receive
-        {comm_send_local, ack} ->
-            ok
-    end,
+    receive {comm_send_local, ack} -> ok end,
     RealPid ! RealMessage,
     ok.
 
+-spec comm_send_local_after(Delay::non_neg_integer(), comm:erl_local_pid(), comm:message() | comm:group_message()) -> reference().
 comm_send_local_after(Delay, Pid, Message) ->
     {RealPid, RealMessage} = comm:unpack_cookie(Pid,Message),
     usscheduler ! {comm_send_local_after, self(), Delay, RealPid, RealMessage},
