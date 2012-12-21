@@ -387,9 +387,13 @@ dump2() ->
           end).
 
 %% @doc Returns various data about all processes.
--spec dump3() -> [{PID::pid(), Mem::non_neg_integer(), MsgQLength::non_neg_integer(),
-                   StackSize::non_neg_integer(), HeapSize::non_neg_integer(),
-                   Messages::[atom()], Fun::mfa()}].
+-spec dump3() -> [{PID::pid(), [Mem | MsgQLength | StackSize | HeapSize | Messages | Fun]}]
+        when is_subtype(Mem, non_neg_integer()),
+             is_subtype(MsgQLength, non_neg_integer()),
+             is_subtype(StackSize, non_neg_integer()),
+             is_subtype(HeapSize, non_neg_integer()),
+             is_subtype(Messages, [atom()]),
+             is_subtype(Fun, mfa()).
 dump3() ->
     dumpX([memory, message_queue_len, stack_size, heap_size, messages, current_function],
           fun(K, Value) ->
