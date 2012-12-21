@@ -119,14 +119,10 @@ post_end_per_testcase(TC, Config, Return, {ok, State}) ->
 post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) ->
     {Start, NewTcStart} =  case lists:keytake(self(), 1, State#state.tc_start) of
                                {value, {_, Val}, List} -> {Val, List};
-                               false -> { os:timestamp(), State#state.tc_start }
+                               false -> { failed, State#state.tc_start }
                            end,
-    TCTime_us = timer:now_diff(os:timestamp(), Start),
-    ct:pal("####################################################~n"
-           "End ~p:~p -> ~.0p (after ~fs)",
-           [State#state.suite, TC, Return, TCTime_us / 1000000]),
     case Return of
-        {timetrap_timeout, _} ->
+        {timetrap_timeout, TimeTrapTime_ms} ->
             case (catch config:read(no_print_ring_data)) of
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
@@ -139,9 +135,18 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
                                     [Thread, Module, Function, Args])
                      end
                  end || Thread <- lists:seq(1, 8)],
+            TCTime_ms = case Start of
+                            failed -> TimeTrapTime_ms;
+                            _      -> Start
+                        end,
             ok;
-        _ -> ok
+        _ ->
+            TCTime_ms = timer:now_diff(os:timestamp(), Start) / 1000,
+            ok
     end,
+    ct:pal("####################################################~n"
+           "End ~p:~p -> ~.0p (after ~fs)",
+           [State#state.suite, TC, Return, TCTime_ms / 1000]),
     {Return, State#state{tc_start = NewTcStart} }.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
