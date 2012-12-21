@@ -86,6 +86,7 @@ var DC = {
                     , labelFormatter: function(label, series) {
                         return label.host;
                     }
+                    , container: $("#legend")
                 }
             });
 
