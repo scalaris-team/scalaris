@@ -64,8 +64,10 @@
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
 -type(record_field_type() ::
-     {typed_record_field, atom(), any()}
-   | {untyped_record_field, atom()}).
+      {typed_record_field, atom(), any()}
+    | {untyped_record_field, atom()}
+    | {field_type, Name::atom(), Type::any()}
+     ).
 
 -type(type_spec() ::
       {'fun', any(), any()}
@@ -98,12 +100,17 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
-    | {record, list(record_field_type())}
+    | {record, [record_field_type()]} % TODO: is this still used?
+    | {record, module(), Name::atom()}
+    | {record, module(), Name::atom(), FieldTypes::[any()]}
+    | record_field_type()
      ).
 -else.
 -type(record_field_type() ::
-     {typed_record_field, atom(), type_spec()}
-   | {untyped_record_field, atom()}).
+      {typed_record_field, atom(), type_spec()}
+    | {untyped_record_field, atom()}
+    | {field_type, Name::atom(), Type::type_spec()}
+     ).
 
 -type(type_spec() ::
       {'fun', type_spec(), type_spec()}
@@ -136,6 +143,9 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
-    | {record, list(record_field_type())}
+    | {record, [record_field_type()]} % TODO: is this still used?
+    | {record, module(), Name::atom()}
+    | {record, module(), Name::atom(), FieldTypes::[type_spec()]}
+    | record_field_type()
      ).
 -endif.
