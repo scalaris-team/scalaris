@@ -37,6 +37,12 @@
 -export([lease_takeover/1]).
 -export([lease_split/3]).
 -export([lease_merge/2]).
+% or unit tests
+-export([lease_update/2]).
+
+% lease accessors
+-export([get_version/1,set_version/2, get_epoch/1, new_timeout/0, set_timeout/1,
+         get_id/1]).
 
 -export([add_first_lease_to_db/2]).
 
@@ -76,6 +82,9 @@
                                | aux_changed
                                | timeout_is_not_newer_than_current_lease
                                | timeout_is_not_in_the_future.
+
+-type update_failed_reason() :: lease_does_not_exist
+                              | epoch_or_version_mismatch.
 
 -type split_step1_failed_reason() :: lease_already_exists.
 -type split_step2_failed_reason() :: lease_does_not_exist
@@ -169,6 +178,13 @@ lease_merge(Lease1, Lease2) ->
                     {l_on_cseq, merge, Lease1, Lease2}),
     ok.
 
+% for unit tests
+-spec lease_update(lease_t(), lease_t()) -> ok.
+lease_update(Old, New) ->
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {l_on_cseq, update, Old, New}),
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % gen_component
@@ -183,31 +199,31 @@ lease_merge(Lease1, Lease2) ->
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
    State) ->
-    %io:format("renew ~p~n", [Old]),
+    %ct:pal("renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
-    %% @todo New passed for debugging only:
+%% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New}),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
-    io:format("successful renew~n", []),
+    ct:pal("successful renew~n", []),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
    State) ->
     % @todo retry
-    io:format("renew denied: ~p ~p ~p~n", [Reason, Value, New]),
+    ct:pal("renew denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
             % @todo log message
             State;
         epoch_or_version_mismatch ->
             lease_renew(Value),
-            io:format("trying again~n", []),
+            ct:pal("trying again~n", []),
             State;
         owner_changed ->
             % @todo log message
@@ -225,6 +241,40 @@ on({l_on_cseq, renew_reply,
         timeout_is_not_in_the_future ->
             lease_renew(Value),
             %io:format("trying again~n", []),
+            State
+    end;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% lease update (only for unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, update, _Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
+    New}, State) ->
+    %io:format("renew ~p~n", [Old]),
+    ContentCheck = is_valid_update(OldEpoch, OldVersion),
+    DB = get_db_for_id(Id),
+    %% @todo New passed for debugging only:
+    Self = comm:reply_as(self(), 3, {l_on_cseq, update_reply, '_', New}),
+    rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
+    State;
+
+on({l_on_cseq, update_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
+    io:format("successful update~n", []),
+    update_lease_in_dht_node_state(Value, State);
+
+on({l_on_cseq, update_reply,
+    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
+   State) ->
+    % @todo retry
+    io:format("update denied: ~p ~p ~p~n", [Reason, Value, New]),
+    case Reason of
+        lease_does_not_exist ->
+            % @todo log message
+            State;
+        epoch_or_version_mismatch ->
+            lease_renew(Value),
+            io:format("trying again~n", []),
             State
     end;
 
@@ -514,6 +564,7 @@ on({l_on_cseq, split_reply_step4, _L2, _R1, _R2,
     end,
     State;
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % renew all local leases
@@ -521,7 +572,7 @@ on({l_on_cseq, split_reply_step4, _L2, _R1, _R2,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew_leases}, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
-    %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
+    io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
     _ = [lease_renew(L) || L <- LeaseList],
     msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
     State.
@@ -559,6 +610,19 @@ is_valid_renewal(CurrentEpoch, CurrentVersion) ->
                 true ->
                     {true, null}
             end
+    end.
+
+-spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
+    fun ((any(), any(), any()) -> {boolean(), update_failed_reason() | null}). %% content check
+is_valid_update(CurrentEpoch, CurrentVersion) ->
+    fun (prbr_bottom, _WriteFilter, _Next) ->
+            {false, lease_does_not_exist};
+        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+            {false, epoch_or_version_mismatch};
+        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+            {false, epoch_or_version_mismatch};
+        (_Current, _WriteFilter, _Next) ->
+            {true, null}
     end.
 
 -spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
@@ -865,6 +929,21 @@ get_db_for_id(Id) ->
 new_timeout() ->
     util:time_plus_s(os:timestamp(), delta()).
 
+-spec get_version(lease_t()) -> non_neg_integer().
+get_version(#lease{version=Version}) -> Version.
+
+-spec set_version(lease_t(), non_neg_integer()) -> lease_t().
+set_version(Lease, Version) -> Lease#lease{version=Version}.
+
+-spec get_epoch(lease_t()) -> non_neg_integer().
+get_epoch(#lease{epoch=Epoch}) -> Epoch.
+
+-spec set_timeout(lease_t()) -> lease_t().
+set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
+
+-spec get_id(lease_t()) -> ?RT:key().
+get_id(#lease{id=Id}) -> Id.
+
 -spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().
 update_lease_in_dht_node_state(Lease, State) ->
@@ -923,7 +1002,6 @@ split_test() ->
 %
 % TODO
 %
-% - intervals:split and id/1
 % - fix merge protocol
 % - improve error handling for deny in renewal
 %
