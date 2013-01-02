@@ -101,7 +101,8 @@ tester_type_check_l_on_cseq(_Config) ->
              {on, 2} %% cannot create dht_node_state
            ],
            [ {read, 2}, %% cannot create pids
-             {update_lease_in_dht_node_state, 2} %% gb_trees not supported by type_checker
+             {update_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
+             {remove_lease_from_dht_node_state, 2} %% gb_trees not supported by type_checker
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
