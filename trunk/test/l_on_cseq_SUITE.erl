@@ -25,8 +25,8 @@
 -include("client_types.hrl").
 
 all()   -> [
-            test_renew_with_concurrent_renew
-            %test_renew_with_concurrent_owner_change
+            test_renew_with_concurrent_renew,
+            test_renew_with_concurrent_owner_change
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -43,7 +43,8 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                                    {leases, true}]}]),
             Config
     end.
 
@@ -51,8 +52,13 @@ end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_renew_with_concurrent_renew(_Config) ->
-    %ct:pal("starting test_renew~n", []),
+    ct:pal("starting test_renew~n", []),
     DHTNode = pid_groups:find_a(dht_node),
     pid_groups:join(pid_groups:group_with(dht_node)),
 
@@ -64,19 +70,57 @@ test_renew_with_concurrent_renew(_Config) ->
     Id         = l_on_cseq:get_id(Old),
     New = l_on_cseq:set_timeout(
             l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
-    %ct:pal("write new lease~n", []),
+    ct:pal("write new lease~n", []),
     l_on_cseq:lease_update(Old, New),
-    %ct:pal("wait for change~n", []),
+    ct:pal("wait for change~n", []),
     wait_for_lease(New),
     % now the error handling of lease_renew is going to be tested
-    %ct:pal("sending message ~p~n", [M]),
+    ct:pal("sending message ~p~n", [M]),
     comm:send_local(DHTNode, M),
     wait_for_lease_version(Id, OldEpoch, OldVersion+2),
-    %timer:sleep(1000),
     true.
 
+test_renew_with_concurrent_owner_change(_Config) ->
+    ct:pal("starting test_renew~n", []),
+    DHTNode = pid_groups:find_a(dht_node),
+    pid_groups:join(pid_groups:group_with(dht_node)),
+
+    % intercept lease renew
+    M = {l_on_cseq, renew, Old} = intercept_lease_renew(),
+    % now we update the lease
+    New = l_on_cseq:set_owner(
+            l_on_cseq:set_timeout(
+              l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+            comm:this()),
+    ct:pal("write new lease~n", []),
+    l_on_cseq:lease_update(Old, New),
+    ct:pal("wait for change~n", []),
+    wait_for_lease(New),
+    % now the error handling of lease_renew is going to be tested
+    ct:pal("sending message ~p~n", [M]),
+    comm:send_local(DHTNode, M),
+    ct:pal("wait for new lease list~n", []),
+    wait_for(fun () ->
+                     L = get_dht_node_state(DHTNode, lease_list),
+                     L == []
+             end),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+wait_for(F) ->
+    case F() of
+        true ->
+            ok;
+        false ->
+            wait_for(F)
+    end.
+
 wait_for_lease(Lease) ->
-    %DHTNode = pid_groups:find_a(dht_node),
     Id = l_on_cseq:get_id(Lease),
     wait_for_lease_helper(Id, fun (L) -> L == Lease end).
 
@@ -88,17 +132,27 @@ wait_for_lease_version(Id, Epoch, Version) ->
                           end).
 
 wait_for_lease_helper(Id, F) ->
-    case l_on_cseq:read(Id) of
-        {ok, Lease} ->
-            case F(Lease) of
-                true ->
-                    ok;
-                false ->
-                    wait_for_lease_helper(Id, F)
-            end;
-        _ ->
-            wait_for_lease_helper(Id, F)
+    wait_for(fun () ->
+                     case l_on_cseq:read(Id) of
+                         {ok, Lease} ->
+                             F(Lease);
+                         _ ->
+                             false
+                     end
+             end).
+
+get_dht_node_state(Pid, What) ->
+    comm:send_local(Pid, {get_state, comm:this(), What}),
+    receive
+        {get_state_response, Data} ->
+            Data
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intercepting and blocking
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 intercept_lease_renew() ->
     DHTNode = pid_groups:find_a(dht_node),
@@ -112,7 +166,6 @@ intercept_lease_renew() ->
     gen_component:bp_set_cond(DHTNode, block_trigger(self()), block_trigger),
     gen_component:bp_del(DHTNode, block_renew),
     Msg.
-
 
 block_renew(Pid) ->
     fun (Message, _State) ->

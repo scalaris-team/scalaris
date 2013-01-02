@@ -42,7 +42,7 @@
 
 % lease accessors
 -export([get_version/1,set_version/2, get_epoch/1, new_timeout/0, set_timeout/1,
-         get_id/1]).
+         get_id/1, set_owner/2]).
 
 -export([add_first_lease_to_db/2]).
 
@@ -199,7 +199,7 @@ lease_update(Old, New) ->
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
    State) ->
-    %ct:pal("renew ~p~n", [Old]),
+    ct:pal("renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
@@ -227,7 +227,7 @@ on({l_on_cseq, renew_reply,
             State;
         owner_changed ->
             % @todo log message
-            State;
+            remove_lease_from_dht_node_state(Value, State);
         range_changed ->
             % @todo log message
             State;
@@ -589,10 +589,6 @@ is_valid_renewal(CurrentEpoch, CurrentVersion) ->
     This = comm:make_global(pid_groups:get_my(dht_node)),
     fun (prbr_bottom, _WriteFilter, _Next) ->
             {false, lease_does_not_exist};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            {false, epoch_or_version_mismatch};
-        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            {false, epoch_or_version_mismatch};
         (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
             {false, range_changed};
         (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =/= Aux1->
@@ -603,6 +599,10 @@ is_valid_renewal(CurrentEpoch, CurrentVersion) ->
             {false, owner_changed};
         (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
             {false, timeout_is_not_newer_than_current_lease};
+        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+            {false, epoch_or_version_mismatch};
+        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+            {false, epoch_or_version_mismatch};
         (_Current, _WriteFilter, Next) ->
             case (os:timestamp() <  Next#lease.timeout) of
                 false ->
@@ -944,6 +944,9 @@ set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
+-spec set_owner(lease_t(), comm:mypid()) -> lease_t().
+set_owner(L, NewOwner) -> L#lease{owner=NewOwner}.
+
 -spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().
 update_lease_in_dht_node_state(Lease, State) ->
@@ -956,6 +959,14 @@ update_lease_in_dht_node_state(Lease, State) ->
                       %io:format("replacing ~p with ~p ~n", [OldLease, Lease]),
                       lists:keyreplace(Id, 2, LeaseList, Lease)
               end,
+    dht_node_state:set_lease_list(State, NewList).
+
+-spec remove_lease_from_dht_node_state(lease_t(), dht_node_state:state()) ->
+    dht_node_state:state().
+remove_lease_from_dht_node_state(Lease, State) ->
+    Id = Lease#lease.id,
+    LeaseList = dht_node_state:get(State, lease_list),
+    NewList = lists:keydelete(Id, 2, LeaseList),
     dht_node_state:set_lease_list(State, NewList).
 
 - spec id(intervals:interval()) -> non_neg_integer().
