@@ -403,62 +403,67 @@ on({?send_to_group_member, Processname, Msg}, UState, GCState) ->
     loop(UState, GCState);
 on(Msg, UState, GCState) ->
     T1GCState = on_bp(Msg, UState, GCState),
-    Module  = gc_mod(T1GCState),
-    Handler = gc_hand(T1GCState),
-    try Handler(Msg, UState) of
-        kill ->
-            log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
-                    [self(), Module, Handler]),
-            ok;
-        {'$gen_component', [{post_op, Msg1}], NewUState} ->
-            on_post_op(Msg1, NewUState, T1GCState);
-        {'$gen_component', Commands, NewUState} ->
-            %% This is not counted as a bp_step
-            case lists:keyfind(on_handler, 1, Commands) of
-                {on_handler, NewHandler} ->
-                    loop(NewUState, gc_set_hand(T1GCState, NewHandler));
-                false ->
-                    case lists:keyfind(post_op, 1, Commands) of
-                        {post_op, Msg1} ->
-                            on_post_op(Msg1, NewUState, T1GCState);
+    case T1GCState of
+        {drop_single, T2GCState} ->
+            loop(UState, T2GCState);
+        _ ->
+            Module  = gc_mod(T1GCState),
+            Handler = gc_hand(T1GCState),
+            try Handler(Msg, UState) of
+                kill ->
+                    log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
+                            [self(), Module, Handler]),
+                    ok;
+                {'$gen_component', [{post_op, Msg1}], NewUState} ->
+                    on_post_op(Msg1, NewUState, T1GCState);
+                {'$gen_component', Commands, NewUState} ->
+                    %% This is not counted as a bp_step
+                    case lists:keyfind(on_handler, 1, Commands) of
+                        {on_handler, NewHandler} ->
+                            loop(NewUState, gc_set_hand(T1GCState, NewHandler));
                         false ->
-                            %% let's fail since the Config list was either
-                            %% empty or contained an invalid entry
-                            log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
-                                    [Commands]),
-                            erlang:throw('unknown gen_component command')
+                            case lists:keyfind(post_op, 1, Commands) of
+                                {post_op, Msg1} ->
+                                    on_post_op(Msg1, NewUState, T1GCState);
+                                false ->
+                                    %% let's fail since the Config list was either
+                                    %% empty or contained an invalid entry
+                                    log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
+                                            [Commands]),
+                                    erlang:throw('unknown gen_component command')
+                            end
+                    end;
+                unknown_event ->
+                    %% drop T2State, as it contains the error message
+                    on_unknown_event(Msg, UState, T1GCState),
+                    case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
+                        false -> loop(UState, T1GCState);
+                        true -> loop(UState, bp_step_done(Msg, T1GCState))
+                    end;
+                NewUState ->
+                    case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
+                        false -> loop(NewUState, T1GCState);
+                        true -> loop(NewUState, bp_step_done(Msg, T1GCState))
                     end
-            end;
-        unknown_event ->
-            %% drop T2State, as it contains the error message
-            on_unknown_event(Msg, UState, T1GCState),
-            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
-                false -> loop(UState, T1GCState);
-                true -> loop(UState, bp_step_done(Msg, T1GCState))
-            end;
-        NewUState ->
-            case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
-                false -> loop(NewUState, T1GCState);
-                true -> loop(NewUState, bp_step_done(Msg, T1GCState))
+            catch Level:Reason ->
+                    Stacktrace = erlang:get_stacktrace(),
+                    case Stacktrace of
+                        %% erlang < R15 : {Module, Handler, [Msg, State]}
+                        %% erlang >= R15: {Module, Handler, [Msg, State], _}
+                        [T | _] when
+                              erlang:element(1, T) =:= Module andalso
+                              %% erlang:element(2, T) =:= Handler andalso
+                              erlang:element(3, T) =:= [Msg, UState] andalso
+                              Reason =:= function_clause andalso
+                              Level =:= error ->
+                            on_unknown_event(Msg, UState, T1GCState),
+                            loop(UState, T1GCState);
+                        _ ->
+                            on_exception(Msg, Level, Reason, Stacktrace,
+                                         UState, T1GCState),
+                            loop(UState, T1GCState)
+                    end
             end
-    catch Level:Reason ->
-              Stacktrace = erlang:get_stacktrace(),
-              case Stacktrace of
-                  %% erlang < R15 : {Module, Handler, [Msg, State]}
-                  %% erlang >= R15: {Module, Handler, [Msg, State], _}
-                  [T | _] when
-                    erlang:element(1, T) =:= Module andalso
-                        %% erlang:element(2, T) =:= Handler andalso
-                        erlang:element(3, T) =:= [Msg, UState] andalso
-                        Reason =:= function_clause andalso
-                        Level =:= error ->
-                      on_unknown_event(Msg, UState, T1GCState),
-                      loop(UState, T1GCState);
-                  _ ->
-                      on_exception(Msg, Level, Reason, Stacktrace,
-                                   UState, T1GCState),
-                      loop(UState, T1GCState)
-              end
     end.
 
 -spec on_traced_msg(comm:message(), user_state(), gc_state())
@@ -694,7 +699,8 @@ on_bp(Msg, UState, GCState) ->
     BPActive = bp_active(Msg, UState, GCState),
     wait_for_bp_leave(Msg, GCState, BPActive).
 
--spec bp_active(comm:message(), user_state(), gc_state()) -> boolean().
+-spec bp_active(comm:message(), user_state(), gc_state()) ->
+                       boolean() | drop_single.
 bp_active(_Msg, _UState, GCState)
   when (false =:= element(?BP_ACTIVE, GCState))
        andalso ([] =:= element(?BPS, GCState))->
@@ -716,14 +722,18 @@ bp_active(Msg, UState, GCState) ->
                 true ->
                     ?TRACE_BP("~p Now in BP ~p via: ~p~n", [self(), ThisBP, Msg]),
                     Decision;
-                false -> Decision
+                false ->
+                    bp_active(Msg, UState, gc_set_bps(GCState, RemainingBPs));
+                drop_single ->
+                    ?TRACE_BP("~p Now in BP ~p via: ~p~n", [self(), ThisBP, Msg]),
+                    Decision
             end
-        end
-        orelse
-        bp_active(Msg, UState, gc_set_bps(GCState, RemainingBPs)).
+        end.
 
--spec wait_for_bp_leave(comm:message(), gc_state(), boolean()) -> gc_state().
+-spec wait_for_bp_leave(comm:message(), gc_state(), boolean() | drop_single) ->
+                               gc_state() | {drop_single, gc_state()}.
 wait_for_bp_leave(_Msg, State, _BP_Active = false) -> State;
+wait_for_bp_leave(_Msg, State, _BP_Active = drop_single) -> {drop_single, State};
 wait_for_bp_leave(Msg, State, _BP_Active = true) ->
     ?TRACE_BP("~p In wait for bp leave~n", [self()]),
     {Queue, IsFromQueue} =
