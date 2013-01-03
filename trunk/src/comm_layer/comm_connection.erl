@@ -176,7 +176,7 @@ on({send, DestPid, Message, Options}, State) ->
 on({tcp, Socket, Data}, State) ->
     NewState =
         case binary_to_term(Data) of
-            {?deliver, unpack_msg_bundle, Message} ->
+            {?deliver, ?unpack_msg_bundle, Message} ->
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 ?TRACE("Received message ~.0p", [Message]),
                 lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg, State) end,
@@ -317,7 +317,7 @@ on(UnknownMessage, State) ->
 
 -spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), state()) ->
                    notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state()) ->
+          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state()) ->
                    notconnected | inet:socket().
 send({Address, Port, Socket}, Pid, Message, Options, State) ->
     BinaryMessage = term_to_binary({deliver, Pid, Message},
@@ -413,7 +413,7 @@ send_msg_bundle(State, notconnected, MQueue, OQueue, QL) ->
     set_msg_queue_len(T1, QL);
 send_msg_bundle(State, Socket, MQueue, OQueue, _QL) ->
     NewSocket = send({dest_ip(State), dest_port(State), Socket},
-                     unpack_msg_bundle, MQueue, OQueue, State),
+                     ?unpack_msg_bundle, MQueue, OQueue, State),
     T1State = set_socket(State, NewSocket),
     T2State = inc_s_msg_count(T1State),
     T3State = set_msg_queue(T2State, {[], []}),
@@ -464,9 +464,9 @@ status(State) ->
 -spec report_bundle_error
         (comm:send_options(), {inet:ip_address(), comm_server:tcp_port(), pid()},
          comm:message(), socket_closed | inet:posix()) -> ok;
-        ([comm:send_options()], {inet:ip_address(), comm_server:tcp_port(), unpack_msg_bundle},
+        ([comm:send_options()], {inet:ip_address(), comm_server:tcp_port(), ?unpack_msg_bundle},
          [{pid(), comm:message()}], socket_closed | inet:posix()) -> ok.
-report_bundle_error(Options, {Address, Port, unpack_msg_bundle}, Message, Reason) ->
+report_bundle_error(Options, {Address, Port, ?unpack_msg_bundle}, Message, Reason) ->
     zip_and_foldr(
       fun (OptionsX, {DestPid, MessageX}) ->
                comm_server:report_send_error(

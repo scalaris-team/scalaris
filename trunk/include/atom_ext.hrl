@@ -43,6 +43,9 @@
 -define(deliver_atom, deliver).
 -define(deliver, ?int_or_atom(12, ?deliver_atom)).
 
+-define(unpack_msg_bundle_atom, unpack_msg_bundle).
+-define(unpack_msg_bundle, ?int_or_atom(13, ?unpack_msg_bundle_atom)).
+
 %% dht_node
 -define(get_key_with_id_reply_atom, get_key_with_id_reply).
 -define(get_key_with_id_reply, ?int_or_atom(21, ?get_key_with_id_reply_atom)).
