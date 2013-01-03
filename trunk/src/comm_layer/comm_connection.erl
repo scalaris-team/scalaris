@@ -176,7 +176,7 @@ on({send, DestPid, Message, Options}, State) ->
 on({tcp, Socket, Data}, State) ->
     NewState =
         case binary_to_term(Data) of
-            {deliver, unpack_msg_bundle, Message} ->
+            {?deliver, unpack_msg_bundle, Message} ->
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 ?TRACE("Received message ~.0p", [Message]),
                 lists:foldr(fun({DestPid, Msg}, _) -> forward_msg(DestPid, Msg, State) end,
@@ -184,7 +184,7 @@ on({tcp, Socket, Data}, State) ->
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
-            {deliver, Process, Message} ->
+            {?deliver, Process, Message} ->
                 ?TRACE("Received message ~.0p", [Message]),
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 forward_msg(Process, Message, State),

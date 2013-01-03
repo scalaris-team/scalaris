@@ -40,6 +40,9 @@
 -define(send_to_group_member_atom, send_to_group_member).
 -define(send_to_group_member, ?int_or_atom(11, ?send_to_group_member_atom)).
 
+-define(deliver_atom, deliver).
+-define(deliver, ?int_or_atom(12, ?deliver_atom)).
+
 %% dht_node
 -define(get_key_with_id_reply_atom, get_key_with_id_reply).
 -define(get_key_with_id_reply, ?int_or_atom(21, ?get_key_with_id_reply_atom)).
