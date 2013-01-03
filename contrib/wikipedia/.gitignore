@@ -2,6 +2,8 @@
 /.settings
 /.classpath
 /.project
+/*pages-articles.xml*
+/*pages-articles*.db
 /*pages-meta-history.xml*
 /*pages-meta-history*.db
 /*pages-meta-current.xml*
@@ -11,3 +13,4 @@
 /.ant-targets-build.xml
 /build
 /demo*.txt
+/*.log
