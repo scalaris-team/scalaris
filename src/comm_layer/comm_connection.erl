@@ -315,13 +315,22 @@ on(UnknownMessage, State) ->
     log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
     send_bundle_if_ready(State).
 
--spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), state()) ->
-                   notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state()) ->
-                   notconnected | inet:socket().
-send({Address, Port, Socket}, Pid, Message, Options, State) ->
-    BinaryMessage = term_to_binary({deliver, Pid, Message},
+-spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), state())
+            -> notconnected | inet:socket();
+          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state())
+            -> notconnected | inet:socket().
+send(Receiver, Pid, Message, Options, State) ->
+    DeliverMsg = {?deliver, Pid, Message},
+    BinaryMessage = term_to_binary(DeliverMsg,
                                    [{compressed, 2}, {minor_version, 1}]),
+    send_internal(Receiver, Pid, Message, Options, BinaryMessage, State).
+
+-spec send_internal
+    ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), BinMsg::binary(), state())
+        -> notconnected | inet:socket();
+    ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state())
+        -> notconnected | inet:socket().
+send_internal({Address, Port, Socket} = Receiver, Pid, Message, Options, BinaryMessage, State) ->
     NewSocket =
         case gen_tcp:send(Socket, BinaryMessage) of
             ok ->
@@ -339,7 +348,7 @@ send({Address, Port, Socket}, Pid, Message, Options, State) ->
             {error, timeout} ->
                 log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
                         [Address, Port, timeout]),
-                send({Address, Port, Socket}, Pid, Message, Options, State);
+                send_internal(Receiver, Pid, Message, Options, BinaryMessage, State);
             {error, Reason} ->
                 report_bundle_error(Options,
                                     {Address, Port, Pid},
