@@ -174,8 +174,9 @@ on({send, DestPid, Message, Options}, State) ->
     end;
 
 on({tcp, Socket, Data}, State) ->
+    DeliverMsg = ?COMM_DECOMPRESS_MSG(Data, State),
     NewState =
-        case binary_to_term(Data) of
+        case DeliverMsg of
             {?deliver, ?unpack_msg_bundle, Message} ->
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 ?TRACE("Received message ~.0p", [Message]),
@@ -321,8 +322,7 @@ on(UnknownMessage, State) ->
             -> notconnected | inet:socket().
 send(Receiver, Pid, Message, Options, State) ->
     DeliverMsg = {?deliver, Pid, Message},
-    BinaryMessage = term_to_binary(DeliverMsg,
-                                   [{compressed, 2}, {minor_version, 1}]),
+    BinaryMessage = ?COMM_COMPRESS_MSG(DeliverMsg, State),
     send_internal(Receiver, Pid, Message, Options, BinaryMessage, State).
 
 -spec send_internal

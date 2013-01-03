@@ -98,6 +98,32 @@
 %-compile({parse_transform, ct_line}).
 -endif.
 
+% disable compression (the overhead is too high, at least for GbE)
+-define(COMM_COMPRESS_MSG(DeliverMsg, State),
+        term_to_binary(DeliverMsg, [{minor_version, 1}])
+       ).
+% do not compress big messages (assumes that those messages contain already-compressed values)
+%% -define(COMM_COMPRESS_MSG(DeliverMsg, State),
+%%         DeliverMsgSize = erlang:external_size(DeliverMsg, [{minor_version, 1}]),
+%%         MsgQueueLen = erlang:max(1, msg_queue_len(State)),
+%%         CompressionLvl = if (DeliverMsgSize / MsgQueueLen) > 1024 -> 0;
+%%                             true -> 2
+%%                          end,
+%%         term_to_binary(DeliverMsg, [{compressed, CompressionLvl}, {minor_version, 1}])
+%%        ).
+-define(COMM_DECOMPRESS_MSG(DeliverMsg, State), binary_to_term(DeliverMsg)).
+
+% using snappy-erlang-nif:
+%% -define(COMM_COMPRESS_MSG(DeliverMsg, State),
+%%         {ok, SnappyMsg} = snappy:compress(term_to_binary(DeliverMsg, [{minor_version, 1}])),
+%%         SnappyMsg
+%%        ).
+%% -define(COMM_DECOMPRESS_MSG(DeliverMsg, State),
+%%         {ok, SnappyMsg} = snappy:decompress(DeliverMsg),
+%%         binary_to_term(SnappyMsg)
+%%        ).
+
+
 -define(SCALARIS_RECV(X,Y),
         {'$gen_component', trace_mpath,
          _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
