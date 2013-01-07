@@ -28,9 +28,10 @@
 -include("client_types.hrl").
 
 -behaviour(tx_op_beh).
--export([work_phase/3, work_phase_key/4,
+-export([work_phase/3, work_phase_key/5,
          validate_prefilter/1, validate/2,
-         commit/3, abort/3]).
+         commit/3, abort/3,
+         extract_from_db/3]).
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
@@ -50,29 +51,38 @@ msg_reply(Id, TLogEntry) ->
                  api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     Key = element(2, Request),
+    Op = ?read,
     HashedKey = ?RT:hash_key(Key),
-    work_phase_key(ClientPid, ReqId, Key, HashedKey).
+    work_phase_key(ClientPid, ReqId, Key, HashedKey, Op).
 
 -spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                     client_key(), ?RT:key()) -> ok.
-work_phase_key(ClientPid, ReqId, Key, HashedKey) ->
+                     client_key(), ?RT:key(), Op::?read) -> ok.
+work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
     %% find rdht_tx_read process as collector
     CollectorPid = pid_groups:find_a(?MODULE),
     %% trigger quorum read
-    quorum_read(comm:make_global(CollectorPid), ReqId, HashedKey),
+    quorum_read(comm:make_global(CollectorPid), ReqId, HashedKey, Op),
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
     ok.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
-                  HashedKey::?RT:key()) -> ok.
-quorum_read(CollectorPid, ReqId, HashedKey) ->
+                  HashedKey::?RT:key(), Op::?read) -> ok.
+quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     RKeys = ?RT:get_replica_keys(HashedKey),
-    _ = [ api_dht_raw:unreliable_get_key(CollectorPid, ReqId, X) || X <- RKeys ],
+    _ = [ api_dht_raw:unreliable_lookup(
+            RKey, {?read_op, CollectorPid, ReqId, RKey, Op})
+        || RKey <- RKeys ],
     ok.
+
+%% @doc Performs the requested operation in the dht_node context.
+-spec extract_from_db(?DB:db(), HashedKey::?RT:key(), Op::?read)
+        -> Result::{ok, ?DB:value(), ?DB:version()} | {ok, empty_val, -1}.
+extract_from_db(DB, HashedKey, ?read) ->
+    ?DB:read(DB, HashedKey).
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
@@ -158,14 +168,14 @@ init([]) ->
 
 -spec on(comm:message(), state()) -> state().
 %% reply triggered by api_dht_raw:unreliable_get_key/3
-on({?get_key_with_id_reply, Id, _Key, {ok, Val, Vers}},
+on({?read_op_with_id_reply, Id, Result},
    {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
     Entry = get_entry(Id, Table),
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    TmpEntry = state_add_reply(Entry, Val, Vers, MajOk, MajDeny),
+    TmpEntry = state_add_reply(Entry, Result, MajOk, MajDeny),
     _ = case state_get_client(TmpEntry) of
             unknown ->
                 %% when we get a client, we will inform it
@@ -247,7 +257,7 @@ inform_client(Client, Entry) ->
 -spec make_tlog_entry(read_state()) ->
                                 tx_tlog:tlog_entry().
 make_tlog_entry(Entry) ->
-    {Val, Vers} = state_get_result(Entry),
+    {_, Val, Vers} = state_get_result(Entry),
     Key = state_get_key(Entry),
     Status = state_get_decided(Entry),
     tx_tlog:new_entry(?read, Key, Vers, Status, Val).
