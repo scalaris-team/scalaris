@@ -1327,6 +1327,8 @@ extint2atom(X) when is_integer(X) ->
         %% dht_node
         ?get_key_with_id_reply -> ?get_key_with_id_reply_atom;
         ?get_key -> ?get_key_atom;
+        ?read_op -> ?read_op_atom;
+        ?read_op_with_id_reply -> ?read_op_with_id_reply_atom;
         %% paxos
         ?proposer_accept -> ?proposer_accept_atom;
         ?acceptor_accept -> ?acceptor_accept_atom;

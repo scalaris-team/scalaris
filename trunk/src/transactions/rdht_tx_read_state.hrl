@@ -30,20 +30,21 @@
                    state_is_newly_decided/1
                   ]}).
 
+-type result() :: {ok, ?DB:value() | 0, -1 | ?DB:version()}. % {ok, Val, Vers}
 -type read_state() ::
                   { rdht_tx:req_id(),       % Id,
                     pid() | unknown, % ClientPid/unknown,
                     ?RT:key() | unknown,    % Key,
                     non_neg_integer(),      % NumOk,
                     non_neg_integer(),      % NumFail,
-                    {?DB:value() | 0, integer()},     % Result = {Val, Vers},
+                    result(),               % Result,
                     tx_tlog:tx_status() | false, % is_decided
                     boolean()               % is_client_informed
                   }.
 
 -spec state_new(rdht_tx:req_id()) -> read_state().
 state_new(Id) ->
-    {Id, unknown, unknown, 0, 0, {0, -1}, false, false}.
+    {Id, unknown, unknown, 0, 0, {ok, 0, -1}, false, false}.
 
 -spec state_get_id(read_state()) -> rdht_tx:req_id().
 state_get_id(State) ->              element(1, State).
@@ -64,9 +65,9 @@ state_inc_numok(State) ->           setelement(4, State, element(4, State) + 1).
 state_get_numfailed(State) ->       element(5, State).
 -spec state_inc_numfailed(read_state()) -> read_state().
 state_inc_numfailed(State) ->       setelement(5, State, element(5, State) + 1).
--spec state_get_result(read_state()) -> {any(), integer()}.
+-spec state_get_result(read_state()) -> result().
 state_get_result(State) ->          element(6, State).
--spec state_set_result(read_state(), {?DB:value() | 0, integer()}) -> read_state().
+-spec state_set_result(read_state(), result()) -> read_state().
 state_set_result(State, Val) ->     setelement(6, State, Val).
 -spec state_get_decided(read_state()) -> tx_tlog:tx_status() | false.
 state_get_decided(State) ->         element(7, State).
@@ -81,12 +82,14 @@ state_set_client_informed(State) -> setelement(8, State, true).
 state_get_numreplied(State) ->
     state_get_numok(State) + state_get_numfailed(State).
 
--spec state_add_reply(read_state(), ?DB:value(), integer(),
+-spec state_add_reply(read_state(),
+                Result::{ok, ?DB:value(), ?DB:version()} | {ok, empty_val, -1},
                 non_neg_integer(), non_neg_integer()) -> read_state().
-state_add_reply(State, Val, Vers, MajOk, MajDeny) ->
-    ?TRACE("state_add_reply state val vers majok majdeny ~p ~p ~p ~p ~p~n", [State, Val, Vers, MajOk, MajDeny]),
-    {_OldVal, OldVers} = state_get_result(State),
-    TmpState = if Vers > OldVers -> state_set_result(State, {Val, Vers});
+state_add_reply(State, Result, MajOk, MajDeny) ->
+    ?TRACE("state_add_reply state res majok majdeny ~p ~p ~p ~p ~p~n", [State, Result, MajOk, MajDeny]),
+    Vers = element(3, Result),
+    OldVers = element(3, state_get_result(State)),
+    TmpState = if Vers > OldVers -> state_set_result(State, Result);
                   true           -> State
                end,
     NewState = if Vers >= 0 -> state_inc_numok(TmpState);
@@ -99,7 +102,7 @@ state_add_reply(State, Val, Vers, MajOk, MajDeny) ->
 state_update_decided(State, MajOk, MajDeny) ->
     ?TRACE("state_update_decided state maj ~p ~p ~p~n",
            [State, MajOk, MajDeny]),
-    {_, Vers} = state_get_result(State),
+    {_Ok, _Val, Vers} = state_get_result(State),
     if Vers =/= -1 ->
            OK = state_get_numok(State) >= MajOk,
            if OK -> %% OK andalso (not Abort) ->

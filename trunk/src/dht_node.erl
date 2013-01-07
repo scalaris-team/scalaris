@@ -218,6 +218,13 @@ on({?get_key, Source_PID, SourceId, HashedKey}, State) ->
     comm:send(Source_PID, Msg),
     State;
 
+on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
+    Result = rdht_tx_read:extract_from_db(
+               dht_node_state:get(State, db), HashedKey, Op),
+    Msg = {?read_op_with_id_reply, SourceId, Result},
+    comm:send(Source_PID, Msg),
+    State;
+
 on({get_entries, Source_PID, Interval}, State) ->
     Entries = ?DB:get_entries(dht_node_state:get(State, db), Interval),
     comm:send_local(Source_PID, {get_entries_response, Entries}),

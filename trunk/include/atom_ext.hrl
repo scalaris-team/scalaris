@@ -53,6 +53,12 @@
 -define(get_key_atom, get_key).
 -define(get_key, ?int_or_atom(22, ?get_key_atom)).
 
+-define(read_op_atom, read_op).
+-define(read_op, ?int_or_atom(23, ?read_op_atom)).
+
+-define(read_op_with_id_reply_atom, read_op_with_id_reply).
+-define(read_op_with_id_reply, ?int_or_atom(24, ?read_op_with_id_reply_atom)).
+
 %% paxos
 -define(proposer_accept_atom, proposer_accept).
 -define(proposer_accept, ?int_or_atom(41, ?proposer_accept_atom)).
