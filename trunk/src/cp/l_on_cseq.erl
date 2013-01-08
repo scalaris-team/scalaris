@@ -42,7 +42,7 @@
 
 % lease accessors
 -export([get_version/1,set_version/2, get_epoch/1, new_timeout/0, set_timeout/1,
-         get_id/1, set_owner/2]).
+         get_id/1, set_owner/2, get_aux/1, set_aux/2, get_range/1]).
 
 -export([add_first_lease_to_db/2]).
 
@@ -58,11 +58,11 @@
 -type lease_id() :: ?RT:key().
 -type lease_aux() ::
         empty
-      | {invalid, split, R1, R2}
-      | {valid,   split, R1, R2}
-      | {invalid, merge, L1, L2}
+      | {invalid, split, intervals:interval(), intervals:interval()}
+      | {valid,   split, intervals:interval(), intervals:interval()}
+      | {invalid, merge, intervals:interval(), intervals:interval()}
       | {invalid, merge, stopped}
-      | {valid,   merge, L1, L2}.
+      | {valid,   merge, intervals:interval(), intervals:interval()}.
 
 -record(lease, {
           id      = ?required(lease, id     ) :: lease_id(),
@@ -233,8 +233,16 @@ on({l_on_cseq, renew_reply,
             State;
         aux_changed ->
             %case of
+            case get_aux(Value) of
+                empty -> lease_renew(Value), State;
+                {invalid, split, _, _} -> lease_renew(Value), State;
+                {invalid, merge, _, _} -> lease_renew(Value), State;
+                {invalid, merge, stopped} ->
+                    remove_lease_from_dht_node_state(Value, State);
+                {valid, split, _, _} -> lease_renew(Value), State;
+                {valid, merge, _, _} -> lease_renew(Value), State
+            end;
             % @todo log message
-            State;
         timeout_is_not_newer_than_current_lease ->
             % somebody else already updated the lease
             State;
@@ -341,7 +349,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     L2}, State) ->
     New = L1#lease{epoch    = OldEpoch + 1,
                     version = 0,
-                    aux     = {invalid, merge, L1, L2},
+                    aux     = {invalid, merge, get_range(L1), get_range(L2)},
                     timeout = new_timeout()},
     ContentCheck = is_valid_merge_step1(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
@@ -368,7 +376,7 @@ on({l_on_cseq, merge_reply_step1,
     New = L2#lease{epoch   = OldEpoch + 1,
                    version = 0,
                    range   = intervals:union(L1#lease.range, L2#lease.range),
-                   aux     = {valid, merge, L1, L2},
+                   aux     = {valid, merge, get_range(L1), get_range(L2)},
                    timeout = new_timeout()},
     ContentCheck = is_valid_merge_step2(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
@@ -946,6 +954,15 @@ get_id(#lease{id=Id}) -> Id.
 
 -spec set_owner(lease_t(), comm:mypid()) -> lease_t().
 set_owner(L, NewOwner) -> L#lease{owner=NewOwner}.
+
+-spec get_aux(lease_t()) -> lease_aux().
+get_aux(#lease{aux=Aux}) -> Aux.
+
+-spec set_aux(lease_t(), lease_aux()) -> lease_t().
+set_aux(L, Aux) -> L#lease{aux=Aux}.
+
+-spec get_range(lease_t()) -> intervals:interval().
+get_range(#lease{range=Range}) -> Range.
 
 -spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().

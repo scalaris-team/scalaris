@@ -26,7 +26,10 @@
 
 all()   -> [
             test_renew_with_concurrent_renew,
-            test_renew_with_concurrent_owner_change
+            test_renew_with_concurrent_owner_change,
+            test_renew_with_concurrent_aux_change_invalid_split,
+            test_renew_with_concurrent_aux_change_invalid_merge,
+            test_renew_with_concurrent_aux_change_invalid_merge_stopped
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -54,61 +57,104 @@ end_per_testcase(_TestCase, Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% unit tests
+% renew unit tests
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-test_renew_with_concurrent_renew(_Config) ->
-    ct:pal("starting test_renew~n", []),
-    DHTNode = pid_groups:find_a(dht_node),
-    pid_groups:join(pid_groups:group_with(dht_node)),
 
-    % intercept lease renew
-    M = {l_on_cseq, renew, Old} = intercept_lease_renew(),
-    % now we update the lease
-    OldVersion = l_on_cseq:get_version(Old),
-    OldEpoch   = l_on_cseq:get_epoch(Old),
-    Id         = l_on_cseq:get_id(Old),
-    New = l_on_cseq:set_timeout(
-            l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
-    ct:pal("write new lease~n", []),
-    l_on_cseq:lease_update(Old, New),
-    ct:pal("wait for change~n", []),
-    wait_for_lease(New),
-    % now the error handling of lease_renew is going to be tested
-    ct:pal("sending message ~p~n", [M]),
-    comm:send_local(DHTNode, M),
-    wait_for_lease_version(Id, OldEpoch, OldVersion+2),
+test_renew_with_concurrent_renew(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                l_on_cseq:set_timeout(
+                  l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1))
+        end,
+    WaitF = fun wait_for_simple_update/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
     true.
 
 test_renew_with_concurrent_owner_change(_Config) ->
-    ct:pal("starting test_renew~n", []),
-    DHTNode = pid_groups:find_a(dht_node),
-    pid_groups:join(pid_groups:group_with(dht_node)),
+    ModifyF =
+        fun(Old) ->
+                l_on_cseq:set_owner(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  comm:this())
+        end,
+    WaitF = fun wait_for_delete/3,
+        fun(_Id, _Old, _New) ->
+                DHTNode = pid_groups:find_a(dht_node),
+                wait_for(fun () ->
+                                 L = get_dht_node_state(DHTNode, lease_list),
+                                 L == []
+                         end)
+        end,
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
 
-    % intercept lease renew
-    M = {l_on_cseq, renew, Old} = intercept_lease_renew(),
-    % now we update the lease
-    New = l_on_cseq:set_owner(
-            l_on_cseq:set_timeout(
-              l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
-            comm:this()),
-    ct:pal("write new lease~n", []),
-    l_on_cseq:lease_update(Old, New),
-    ct:pal("wait for change~n", []),
-    wait_for_lease(New),
-    % now the error handling of lease_renew is going to be tested
-    ct:pal("sending message ~p~n", [M]),
-    comm:send_local(DHTNode, M),
-    ct:pal("wait for new lease list~n", []),
-    wait_for(fun () ->
-                     L = get_dht_node_state(DHTNode, lease_list),
-                     L == []
-             end),
+test_renew_with_concurrent_aux_change_invalid_split(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                Aux = {invalid, split, r1, r2},
+                l_on_cseq:set_aux(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  Aux)
+        end,
+    WaitF = fun wait_for_simple_update/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_renew_with_concurrent_aux_change_invalid_merge(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                Aux = {invalid, merge, r1, r2},
+                l_on_cseq:set_aux(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  Aux)
+        end,
+    WaitF = fun wait_for_simple_update/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_renew_with_concurrent_aux_change_invalid_merge_stopped(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                Aux = {invalid, merge, stopped},
+                l_on_cseq:set_aux(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  Aux)
+        end,
+    WaitF = fun wait_for_delete/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_renew_helper(_Config, ModifyF, WaitF) ->
+    DHTNode = pid_groups:find_a(dht_node),
+    pid_groups:join(pid_groups:group_with(dht_node)),
+
+    % intercept lease renew
+    M = {l_on_cseq, renew, Old} = intercept_lease_renew(),
+    Id = l_on_cseq:get_id(Old),
+    % now we update the lease
+    New = ModifyF(Old),
+    l_on_cseq:lease_update(Old, New),
+    wait_for_lease(New),
+    % now the error handling of lease_renew is going to be tested
+    ct:pal("sending message ~p~n", [M]),
+    comm:send_local(DHTNode, M),
+    WaitF(Id, Old, New),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% wait helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -147,6 +193,18 @@ get_dht_node_state(Pid, What) ->
         {get_state_response, Data} ->
             Data
     end.
+
+wait_for_simple_update(Id, Old, _New) ->
+    OldVersion = l_on_cseq:get_version(Old),
+    OldEpoch   = l_on_cseq:get_epoch(Old),
+    wait_for_lease_version(Id, OldEpoch, OldVersion+2).
+
+wait_for_delete(_Id, _Old, _New) ->
+    DHTNode = pid_groups:find_a(dht_node),
+    wait_for(fun () ->
+                     L = get_dht_node_state(DHTNode, lease_list),
+                     L == []
+             end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
