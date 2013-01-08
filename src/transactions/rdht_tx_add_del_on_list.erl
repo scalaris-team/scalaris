@@ -50,7 +50,7 @@ extract_from_tlog(Entry, _Key, ToAdd, ToDel, true) when
     {tx_tlog:set_entry_status(Entry, {fail, abort}), {fail, not_a_list}};
 extract_from_tlog(Entry, Key, ToAdd, ToDel, true) ->
     Status = tx_tlog:get_entry_status(Entry),
-    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, ?read, true),
+    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, read, true),
     case Res0 of
         {ok, OldValue} when erlang:is_list(OldValue) ->
             %% types ok

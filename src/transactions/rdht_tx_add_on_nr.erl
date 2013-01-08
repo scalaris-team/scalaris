@@ -49,7 +49,7 @@ extract_from_tlog(Entry, _Key, X, true) when (not erlang:is_number(X)) ->
      {fail, not_a_number}};
 extract_from_tlog(Entry, Key, X, true) ->
     Status = tx_tlog:get_entry_status(Entry),
-    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, ?read, true),
+    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, read, true),
     case Res0 of
         {ok, OldValue} when erlang:is_number(OldValue) ->
             %% types ok
