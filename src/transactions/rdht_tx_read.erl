@@ -31,7 +31,7 @@
 -export([work_phase/3, work_phase_key/5,
          validate_prefilter/1, validate/2,
          commit/3, abort/3,
-         extract_from_value/3]).
+         extract_from_value/3, extract_from_tlog/4]).
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
@@ -84,6 +84,18 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
         (empty_val, -1, Op::?read) -> Result::{ok, empty_val, -1}.
 extract_from_value(Value, Version, ?read) ->
     {ok, Value, Version}.
+
+%% @doc Get a result entry for a read from the given TLog entry.
+-spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), Op::?read, EnDecode::boolean()) ->
+                       {tx_tlog:tlog_entry(), api_tx:read_result()}.
+extract_from_tlog(Entry, _Key, ?read, EnDecode) ->
+    Res = case tx_tlog:get_entry_status(Entry) of
+              ?value -> {ok, tx_tlog:get_entry_value(Entry)};
+              %% try reading from a failed entry (type mismatch was the reason?)
+              {fail, abort} -> {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, not_found} = R -> R %% not_found
+          end,
+    {Entry, ?IIF(EnDecode, rdht_tx:decode_result(Res), Res)}.
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->

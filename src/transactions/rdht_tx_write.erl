@@ -30,7 +30,8 @@
 -behaviour(tx_op_beh).
 -export([work_phase/3,
          validate_prefilter/1, validate/2,
-         commit/3, abort/3]).
+         commit/3, abort/3,
+         extract_from_tlog/4]).
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
@@ -57,6 +58,35 @@ work_phase(ClientPid, ReqId, Request) ->
     % hash key here so that any error during the process is thrown in the client's context
     HashedKey = ?RT:hash_key(element(2, Request)),
     comm:send_local(RdhtTxWritePid, {start_work_phase, ReqId, ClientPid, HashedKey, Request}).
+
+%% @doc Get a result entry for a write from the given TLog entry.
+%%      Update the TLog entry accordingly.
+-spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), client_value(), EnDecode::boolean()) ->
+                       {tx_tlog:tlog_entry(), api_tx:write_result()}.
+extract_from_tlog(Entry, _Key, Value1, EnDecode) ->
+    Value = ?IIF(EnDecode, rdht_tx:encode_value(Value1), Value1),
+    NewEntryAndResult =
+        fun(FEntry, FValue) ->
+                case tx_tlog:get_entry_operation(FEntry) of
+                    ?write ->
+                        {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
+                    ?read ->
+                        E1 = tx_tlog:set_entry_operation(FEntry, ?write),
+                        E2 = tx_tlog:set_entry_value(E1, FValue),
+                        {E2, {ok}}
+            end
+        end,
+    case tx_tlog:get_entry_status(Entry) of
+        ?value ->
+            NewEntryAndResult(Entry, Value);
+        {fail, not_found} ->
+            E1 = tx_tlog:set_entry_operation(Entry, ?write),
+            E2 = tx_tlog:set_entry_value(E1, Value),
+            E3 = tx_tlog:set_entry_status(E2, ?value),
+            {E3, {ok}};
+        {fail, abort} ->
+            {Entry, {ok}}
+    end.
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
