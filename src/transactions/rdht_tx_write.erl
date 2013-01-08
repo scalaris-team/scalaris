@@ -188,7 +188,7 @@ init([]) ->
 on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->
     %% PRE: No entry for key in TLog
     %% build translog entry from quorum read
-    rdht_tx_read:work_phase_key(self(), ReqId, element(2, Request), HashedKey, ?read),
+    rdht_tx_read:work_phase_key(self(), ReqId, element(2, Request), HashedKey, ?write),
     pdb:set({ReqId, ClientPid, element(3, Request)}, TableName),
     TableName;
 

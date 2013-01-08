@@ -56,7 +56,7 @@ work_phase(ClientPid, ReqId, Request) ->
     work_phase_key(ClientPid, ReqId, Key, HashedKey, Op).
 
 -spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                     client_key(), ?RT:key(), Op::?read) -> ok.
+                     client_key(), ?RT:key(), Op::?read | ?write) -> ok.
 work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -69,7 +69,7 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ok.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
-                  HashedKey::?RT:key(), Op::?read) -> ok.
+                  HashedKey::?RT:key(), Op::?read | ?write) -> ok.
 quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     RKeys = ?RT:get_replica_keys(HashedKey),
@@ -81,9 +81,13 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
         (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
-        (empty_val, -1, Op::?read) -> Result::{ok, empty_val, -1}.
+        (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
+        (empty_val, -1, Op::?read) -> Result::{ok, empty_val, -1};
+        (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
 extract_from_value(Value, Version, ?read) ->
-    {ok, Value, Version}.
+    {ok, Value, Version};
+extract_from_value(_Value, Version, ?write) ->
+    {ok, ?value_dropped, Version}.
 
 %% @doc Get a result entry for a read from the given TLog entry.
 -spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), Op::?read, EnDecode::boolean()) ->
