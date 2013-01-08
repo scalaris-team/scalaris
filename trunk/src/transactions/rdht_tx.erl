@@ -173,9 +173,9 @@ initiate_rdht_ops(ReqList) ->
           case req_get_op(Entry) of
               write           -> rdht_tx_write:work_phase(self(), NewReqId, Entry);
               read            -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
-              test_and_set    -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
-              add_del_on_list -> rdht_tx_read:work_phase(self(), NewReqId, Entry);
-              add_on_nr       -> rdht_tx_read:work_phase(self(), NewReqId, Entry)
+              test_and_set    -> rdht_tx_test_and_set:work_phase(self(), NewReqId, Entry);
+              add_del_on_list -> rdht_tx_add_del_on_list:work_phase(self(), NewReqId, Entry);
+              add_on_nr       -> rdht_tx_add_on_nr:work_phase(self(), NewReqId, Entry)
           end,
           NewReqId
       end || Entry <- ReqList ].
@@ -210,159 +210,17 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
-            {read, Key}           -> tlog_read(Entry, Key, EnDecode);
-            {write, Key, Value}   -> tlog_write(Entry, Key, Value, EnDecode);
+            {read, Key}           -> rdht_tx_read:extract_from_tlog(Entry, Key, ?read, EnDecode);
+            {write, Key, Value}   -> rdht_tx_write:extract_from_tlog(Entry, Key, Value, EnDecode);
             %% non-native functions:
-            {add_del_on_list, Key, ToAdd, ToDel} -> tlog_add_del_on_list(Entry, Key, ToAdd, ToDel, EnDecode);
-            {add_on_nr, Key, X}           -> tlog_add_on_nr(Entry, Key, X, EnDecode);
-            {test_and_set, Key, Old, New} -> tlog_test_and_set(Entry, Key, Old, New, EnDecode)
+            {add_del_on_list, Key, ToAdd, ToDel} -> rdht_tx_add_del_on_list:extract_from_tlog(Entry, Key, ToAdd, ToDel, EnDecode);
+            {add_on_nr, Key, X}           -> rdht_tx_add_on_nr:extract_from_tlog(Entry, Key, X, EnDecode);
+            {test_and_set, Key, Old, New} -> rdht_tx_test_and_set:extract_from_tlog(Entry, Key, Old, New, EnDecode)
         end,
     NewTLog = tx_tlog:update_entry(TLog, NewTLogEntry),
     do_reqs_on_tlog_iter(NewTLog, ReqTail, [ResultEntry | Acc], EnDecode);
 do_reqs_on_tlog_iter(TLog, [], Acc, _EnDecode) ->
     {tx_tlog:cleanup(TLog), lists:reverse(Acc)}.
-
-%% @doc Get a result entry for a read from the given TLog entry.
--spec tlog_read(tx_tlog:tlog_entry(), client_key(), EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:read_result()}.
-tlog_read(Entry, _Key, EnDecode) ->
-    Res = case tx_tlog:get_entry_status(Entry) of
-              ?value -> {ok, tx_tlog:get_entry_value(Entry)};
-              %% try reading from a failed entry (type mismatch was the reason?)
-              {fail, abort} -> {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, not_found} = R -> R %% not_found
-          end,
-    {Entry, ?IIF(EnDecode, decode_result(Res), Res)}.
-
-%% @doc Get a result entry for a write from the given TLog entry.
-%%      Update the TLog entry accordingly.
--spec tlog_write(tx_tlog:tlog_entry(), client_key(), client_value(), EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:write_result()}.
-tlog_write(Entry, _Key, Value1, EnDecode) ->
-    Value = ?IIF(EnDecode, encode_value(Value1), Value1),
-    NewEntryAndResult =
-        fun(FEntry, FValue) ->
-                case tx_tlog:get_entry_operation(FEntry) of
-                    ?write ->
-                        {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
-                    ?read ->
-                        E1 = tx_tlog:set_entry_operation(FEntry, ?write),
-                        E2 = tx_tlog:set_entry_value(E1, FValue),
-                        {E2, {ok}}
-            end
-        end,
-    case tx_tlog:get_entry_status(Entry) of
-        ?value ->
-            NewEntryAndResult(Entry, Value);
-        {fail, not_found} ->
-            E1 = tx_tlog:set_entry_operation(Entry, ?write),
-            E2 = tx_tlog:set_entry_value(E1, Value),
-            E3 = tx_tlog:set_entry_status(E2, ?value),
-            {E3, {ok}};
-        {fail, abort} ->
-            {Entry, {ok}}
-    end.
-
-%% @doc Simulate a change on a set via read and write requests.
-%%      Update the TLog entry accordingly.
--spec tlog_add_del_on_list(tx_tlog:tlog_entry(), client_key(),
-                      client_value(), client_value(), EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:listop_result()}.
-tlog_add_del_on_list(Entry, _Key, ToAdd, ToDel, true) when
-      (not erlang:is_list(ToAdd)) orelse
-      (not erlang:is_list(ToDel)) ->
-    %% input type error
-    {tx_tlog:set_entry_status(Entry, {fail, abort}), {fail, not_a_list}};
-tlog_add_del_on_list(Entry, Key, ToAdd, ToDel, true) ->
-    Status = tx_tlog:get_entry_status(Entry),
-    {_, Res0} = tlog_read(Entry, Key, true),
-    case Res0 of
-        {ok, OldValue} when erlang:is_list(OldValue) ->
-            %% types ok
-            case ToAdd =:= [] andalso ToDel =:= [] of
-                true -> {Entry, {ok}}; % no op
-                _ ->
-                    case ?value =:= Status
-                        orelse {fail, not_found} =:= Status of
-                        true ->
-                            NewValue1 = lists:append(ToAdd, OldValue),
-                            NewValue2 = util:minus_first(NewValue1, ToDel),
-                            tlog_write(Entry, Key, NewValue2, true);
-                        false -> %% TLog has abort, report ok for this op.
-                            {Entry, {ok}}
-                    end
-            end;
-        {fail, not_found} -> %% key creation
-            NewValue2 = util:minus_first(ToAdd, ToDel),
-            tlog_write(Entry, Key, NewValue2, true);
-        {ok, _} -> %% value is not a list
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
-             {fail, not_a_list}}
-    end;
-tlog_add_del_on_list(Entry, Key, ToAdd, ToDel, false) ->
-    % note: we can only work with decoded values here
-    tlog_add_del_on_list(Entry, Key, decode_value(ToAdd), decode_value(ToDel), true).
-
--spec tlog_add_on_nr(tx_tlog:tlog_entry(), client_key(),
-                     client_value(), EnDecode::boolean()) ->
-                             {tx_tlog:tlog_entry(), api_tx:numberop_result()}.
-tlog_add_on_nr(Entry, _Key, X, true) when (not erlang:is_number(X)) ->
-    %% check type of input data
-    {tx_tlog:set_entry_status(Entry, {fail, abort}),
-     {fail, not_a_number}};
-tlog_add_on_nr(Entry, Key, X, true) ->
-    Status = tx_tlog:get_entry_status(Entry),
-    {_, Res0} = tlog_read(Entry, Key, true),
-    case Res0 of
-        {ok, OldValue} when erlang:is_number(OldValue) ->
-            %% types ok
-            case X == 0 of %% also accepts 0.0
-                true -> {Entry, {ok}}; % no op
-                _ ->
-                    case ?value =:= Status orelse
-                        {fail, not_found} =:= Status of
-                        true ->
-                            NewValue = OldValue + X,
-                            tlog_write(Entry, Key, NewValue, true);
-                        false -> %% TLog has abort, report ok for this op.
-                            {Entry, {ok}}
-                    end
-            end;
-        {ok, _} ->
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
-             {fail, not_a_number}};
-        {fail, not_found} -> %% key creation
-            tlog_write(Entry, Key, X, true)
-    end;
-tlog_add_on_nr(Entry, Key, X, false) ->
-    % note: we can only work with decoded values here
-    tlog_add_on_nr(Entry, Key, decode_value(X), true).
-
--spec tlog_test_and_set(tx_tlog:tlog_entry(), client_key(),
-                        client_value(), client_value(), EnDecode::boolean()) ->
-                               {tx_tlog:tlog_entry(), api_tx:testandset_result()}.
-tlog_test_and_set(Entry, Key, Old, New, EnDecode) ->
-    {_, Res0} = tlog_read(Entry, Key, EnDecode),
-    case Res0 of
-        {ok, Old} ->
-            tlog_write(Entry, Key, New, EnDecode);
-        {ok, RealOldValue} when not EnDecode ->
-            % maybe there is just a different compression scheme
-            % -> test decoded values
-            Res0Decoded = decode_value(RealOldValue),
-            OldDecoded = decode_value(Old),
-            if Res0Decoded =:= OldDecoded ->
-                   tlog_write(Entry, Key, New, EnDecode);
-               true ->
-                   {tx_tlog:set_entry_status(Entry, {fail, abort}),
-                    {fail, {key_changed, RealOldValue}}}
-            end;
-        {ok, RealOldValue} ->
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
-             {fail, {key_changed, RealOldValue}}};
-        X when erlang:is_tuple(X) -> %% other previous error
-            {Entry, X}
-    end.
 
 %% @doc Encode the given client value to its internal representation which is
 %%      compressed for all values except atom, boolean, number or binary.
