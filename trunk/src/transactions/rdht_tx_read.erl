@@ -90,9 +90,9 @@ extract_from_value(_Value, Version, ?write) ->
     {ok, ?value_dropped, Version}.
 
 %% @doc Get a result entry for a read from the given TLog entry.
--spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), Op::?read, EnDecode::boolean()) ->
+-spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), Op::read, EnDecode::boolean()) ->
                        {tx_tlog:tlog_entry(), api_tx:read_result()}.
-extract_from_tlog(Entry, _Key, ?read, EnDecode) ->
+extract_from_tlog(Entry, _Key, read, EnDecode) ->
     Res = case tx_tlog:get_entry_status(Entry) of
               ?value -> {ok, tx_tlog:get_entry_value(Entry)};
               %% try reading from a failed entry (type mismatch was the reason?)

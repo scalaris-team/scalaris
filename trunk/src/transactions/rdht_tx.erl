@@ -210,7 +210,7 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
     {NewTLogEntry, ResultEntry} =
         case Req of
             %% native functions first:
-            {read, Key}           -> rdht_tx_read:extract_from_tlog(Entry, Key, ?read, EnDecode);
+            {read, Key}           -> rdht_tx_read:extract_from_tlog(Entry, Key, read, EnDecode);
             {write, Key, Value}   -> rdht_tx_write:extract_from_tlog(Entry, Key, Value, EnDecode);
             %% non-native functions:
             {add_del_on_list, Key, ToAdd, ToDel} -> rdht_tx_add_del_on_list:extract_from_tlog(Entry, Key, ToAdd, ToDel, EnDecode);
