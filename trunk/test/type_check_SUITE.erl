@@ -299,6 +299,15 @@ tester_type_check_tx(_Config) ->
              {validate, 2},
              {work_phase, 3}
            ], []},
+          {rdht_tx_add_del_on_list,
+           [ {work_phase, 3}
+           ], []},
+          {rdht_tx_add_on_nr,
+           [ {work_phase, 3}
+           ], []},
+          {rdht_tx_test_and_set,
+           [ {work_phase, 3}
+           ], []},
           {tx_op_beh,[], []},
           {tx_tlog,
            [ {new_entry, 5}, %% split tlog types for client and rt:keys
