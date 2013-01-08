@@ -278,7 +278,6 @@ tester_type_check_tx(_Config) ->
           {rdht_tx_read,
            [ {abort, 3},
              {commit, 3},
-             {extract_from_db, 3}, %% needs DB
              {init, 1},
              {on,2},
              {start_link, 1},

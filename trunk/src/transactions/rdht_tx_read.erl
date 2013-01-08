@@ -31,7 +31,7 @@
 -export([work_phase/3, work_phase_key/5,
          validate_prefilter/1, validate/2,
          commit/3, abort/3,
-         extract_from_db/3]).
+         extract_from_value/3]).
 
 -behaviour(gen_component).
 -export([init/1, on/2]).
@@ -79,10 +79,11 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ok.
 
 %% @doc Performs the requested operation in the dht_node context.
--spec extract_from_db(?DB:db(), HashedKey::?RT:key(), Op::?read)
-        -> Result::{ok, ?DB:value(), ?DB:version()} | {ok, empty_val, -1}.
-extract_from_db(DB, HashedKey, ?read) ->
-    ?DB:read(DB, HashedKey).
+-spec extract_from_value
+        (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
+        (empty_val, -1, Op::?read) -> Result::{ok, empty_val, -1}.
+extract_from_value(Value, Version, ?read) ->
+    {ok, Value, Version}.
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
