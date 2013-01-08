@@ -285,7 +285,7 @@ tester_type_check_tx(_Config) ->
              {validate, 2},
              {work_phase, 3}
            ],
-           [ {quorum_read, 3}, %% needs collector pid
+           [ {quorum_read, 4}, %% needs collector pid
              {inform_client, 2}, %% needs collector pid
              %% split tlog types for client and rt:keys
              %% use feeder to avoid unknown as key
