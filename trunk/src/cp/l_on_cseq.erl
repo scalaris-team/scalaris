@@ -41,8 +41,13 @@
 -export([lease_update/2]).
 
 % lease accessors
--export([get_version/1,set_version/2, get_epoch/1, new_timeout/0, set_timeout/1,
-         get_id/1, set_owner/2, get_aux/1, set_aux/2, get_range/1]).
+-export([get_version/1,set_version/2,
+         get_epoch/1,
+         new_timeout/0, set_timeout/1,
+         get_id/1,
+         set_owner/2,
+         get_aux/1, set_aux/2,
+         get_range/1, set_range/2]).
 
 -export([add_first_lease_to_db/2]).
 
@@ -219,17 +224,14 @@ on({l_on_cseq, renew_reply,
     ct:pal("renew denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
-            % @todo log message
-            State;
+            remove_lease_from_dht_node_state(Value, State);
         epoch_or_version_mismatch ->
             lease_renew(Value),
-            ct:pal("trying again~n", []),
             State;
         owner_changed ->
-            % @todo log message
             remove_lease_from_dht_node_state(Value, State);
         range_changed ->
-            % @todo log message
+            lease_renew(Value),
             State;
         aux_changed ->
             %case of
@@ -244,11 +246,10 @@ on({l_on_cseq, renew_reply,
             end;
             % @todo log message
         timeout_is_not_newer_than_current_lease ->
-            % somebody else already updated the lease
+            lease_renew(Value),
             State;
         timeout_is_not_in_the_future ->
             lease_renew(Value),
-            %io:format("trying again~n", []),
             State
     end;
 
@@ -963,6 +964,9 @@ set_aux(L, Aux) -> L#lease{aux=Aux}.
 
 -spec get_range(lease_t()) -> intervals:interval().
 get_range(#lease{range=Range}) -> Range.
+
+-spec set_range(lease_t(), intervals:interval()) -> lease_t().
+set_range(L, Range) -> L#lease{range=Range}.
 
 -spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().
