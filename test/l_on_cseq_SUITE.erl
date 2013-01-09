@@ -27,9 +27,12 @@
 all()   -> [
             test_renew_with_concurrent_renew,
             test_renew_with_concurrent_owner_change,
+            test_renew_with_concurrent_range_change,
             test_renew_with_concurrent_aux_change_invalid_split,
+            test_renew_with_concurrent_aux_change_valid_split,
             test_renew_with_concurrent_aux_change_invalid_merge,
-            test_renew_with_concurrent_aux_change_invalid_merge_stopped
+            test_renew_with_concurrent_aux_change_invalid_merge_stopped,
+            test_renew_with_concurrent_aux_change_valid_merge
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -80,13 +83,18 @@ test_renew_with_concurrent_owner_change(_Config) ->
                   comm:this())
         end,
     WaitF = fun wait_for_delete/3,
-        fun(_Id, _Old, _New) ->
-                DHTNode = pid_groups:find_a(dht_node),
-                wait_for(fun () ->
-                                 L = get_dht_node_state(DHTNode, lease_list),
-                                 L == []
-                         end)
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_renew_with_concurrent_range_change(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                l_on_cseq:set_range(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  other_range)
         end,
+    WaitF = fun wait_for_simple_update/3,
     test_renew_helper(_Config, ModifyF, WaitF),
     true.
 
@@ -94,6 +102,19 @@ test_renew_with_concurrent_aux_change_invalid_split(_Config) ->
     ModifyF =
         fun(Old) ->
                 Aux = {invalid, split, r1, r2},
+                l_on_cseq:set_aux(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  Aux)
+        end,
+    WaitF = fun wait_for_simple_update/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_renew_with_concurrent_aux_change_valid_split(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                Aux = {valid, split, r1, r2},
                 l_on_cseq:set_aux(
                   l_on_cseq:set_timeout(
                     l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
@@ -128,6 +149,20 @@ test_renew_with_concurrent_aux_change_invalid_merge_stopped(_Config) ->
     WaitF = fun wait_for_delete/3,
     test_renew_helper(_Config, ModifyF, WaitF),
     true.
+
+test_renew_with_concurrent_aux_change_valid_merge(_Config) ->
+    ModifyF =
+        fun(Old) ->
+                Aux = {valid, merge, r1, r2},
+                l_on_cseq:set_aux(
+                  l_on_cseq:set_timeout(
+                    l_on_cseq:set_version(Old, l_on_cseq:get_version(Old)+1)),
+                  Aux)
+        end,
+    WaitF = fun wait_for_simple_update/3,
+    test_renew_helper(_Config, ModifyF, WaitF),
+    true.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
