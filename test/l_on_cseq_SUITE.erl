@@ -25,15 +25,16 @@
 -include("client_types.hrl").
 
 all()   -> [
-            %test_renew_with_concurrent_renew,
-            %test_renew_with_concurrent_owner_change,
-            %test_renew_with_concurrent_range_change,
-            %test_renew_with_concurrent_aux_change_invalid_split,
-            %test_renew_with_concurrent_aux_change_valid_split,
-            %test_renew_with_concurrent_aux_change_invalid_merge,
-            %test_renew_with_concurrent_aux_change_invalid_merge_stopped,
-            %test_renew_with_concurrent_aux_change_valid_merge,
-            test_split
+            test_renew_with_concurrent_renew,
+            test_renew_with_concurrent_owner_change,
+            test_renew_with_concurrent_range_change,
+            test_renew_with_concurrent_aux_change_invalid_split,
+            test_renew_with_concurrent_aux_change_valid_split,
+            test_renew_with_concurrent_aux_change_invalid_merge,
+            test_renew_with_concurrent_aux_change_invalid_merge_stopped,
+            test_renew_with_concurrent_aux_change_valid_merge,
+            test_split,
+            test_split_with_concurrent_renew
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -183,6 +184,26 @@ test_split(_Config) ->
                                   WaitLeftLeaseF, WaitRightLeaseF),
     true.
 
+test_split_with_concurrent_renew(_Config) ->
+    NullF = fun (_Id, _Lease) -> ok end,
+    RenewLeaseF = fun (_Id, Lease) ->
+                          l_on_cseq:lease_renew(Lease),
+                          wait_for_lease_version(l_on_cseq:get_id(Lease),
+                                                 l_on_cseq:get_epoch(Lease),
+                                                 l_on_cseq:get_version(Lease)+1)
+                  end,
+    WaitLeftLeaseF = fun (Id, Lease) ->
+                              OldEpoch   = l_on_cseq:get_epoch(Lease),
+                              wait_for_lease_version(Id, OldEpoch+2, 0)
+                     end,
+    WaitRightLeaseF = fun (Id) ->
+                             wait_for_lease_version(Id, 2, 0)
+                      end,
+    test_split_helper_for_4_steps(_Config,
+                                  NullF, RenewLeaseF, RenewLeaseF, RenewLeaseF,
+                                  WaitLeftLeaseF, WaitRightLeaseF),
+    true.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % split helper
@@ -234,13 +255,13 @@ test_split_helper_for_4_steps(_Config,
     % step4
     split_helper_do_step(split_reply_step3, ModifyBeforeStep4, LeftId),
     % wait for result
-    %ct:pal("wait left"),
+    ct:pal("wait left"),
     WaitLeftLease(LeftId, L),
-    %ct:pal("wait right"),
+    ct:pal("wait right"),
     WaitRightLease(RightId).
 
 split_helper_do_step(StepTag, ModifyBeforeStep, Id) ->
-    %ct:pal("doing ~p", [StepTag]),
+    ct:pal("doing ~p", [StepTag]),
     DHTNode = pid_groups:find_a(dht_node),
     ReplyMsg = receive
                    M = {l_on_cseq, StepTag, Lease, _R1, _R2, _Resp} ->
