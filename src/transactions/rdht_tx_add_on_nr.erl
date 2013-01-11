@@ -65,11 +65,11 @@ extract_from_tlog(Entry0, Key, X, true) ->
                             {Entry, {ok}}
                     end
             end;
-        {ok, _} ->
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
-             {fail, not_a_number}};
         {fail, not_found} -> %% key creation
-            rdht_tx_write:extract_from_tlog(Entry, Key, X, true)
+            rdht_tx_write:extract_from_tlog(Entry, Key, X, true);
+        {ok, _} -> %% value is not a number
+            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+             {fail, not_a_number}}
     end;
 extract_from_tlog(Entry, Key, X, false) ->
     % note: we can only work with decoded values here

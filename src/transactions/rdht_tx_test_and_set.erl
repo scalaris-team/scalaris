@@ -61,6 +61,6 @@ extract_from_tlog(Entry0, Key, Old, New, EnDecode) ->
         {ok, RealOldValue} ->
             {tx_tlog:set_entry_status(Entry, {fail, abort}),
              {fail, {key_changed, RealOldValue}}};
-        X when erlang:is_tuple(X) -> %% other previous error
+        {fail, not_found} = X ->
             {Entry, X}
     end.
