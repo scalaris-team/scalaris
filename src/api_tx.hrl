@@ -39,6 +39,7 @@
 
 % Public Interface
 -type read_request() :: {read, client_key()}.
+-type read_random_from_list_request() :: {read, client_key(), random_from_list}.
 -type write_request() :: {write, client_key(), client_value()}.
 -type add_del_on_list_request() ::
           {add_del_on_list, client_key(),
@@ -53,6 +54,7 @@
 
 -type request_on_key() ::
           read_request()
+        | read_random_from_list_request()
         | write_request()
         | add_del_on_list_request()
         | add_on_nr_request()
@@ -60,6 +62,7 @@
 -type request() :: request_on_key() | {commit}.
 
 -type read_result() :: {ok, client_value()} | {fail, not_found}.
+-type read_random_from_list_result() :: {ok, {RandomValue::client_value(), ListLenght::pos_integer()}} | {fail, not_found | empty_list | not_a_list}.
 -type write_result() :: {ok}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
@@ -69,6 +72,7 @@
         | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
 -type result() ::
           read_result()
+        | read_random_from_list_result()
         | write_result()
         | listop_result()
         | numberop_result()

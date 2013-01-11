@@ -722,9 +722,13 @@ prop_tlog_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
 tester_tlog_test_and_set(_Config) ->
     tester:test(?MODULE, prop_tlog_test_and_set, 4, 5000).
 
-%% same result when executing a req_list in a bunch or as sequential
-%% single requests.
--spec prop_tester_req_list([api_tx:request_on_key()]) -> true | no_return().
+%% @doc Checks that the same result is returned when executing a req_list in a
+%%      bunch or as sequential single requests (partial reads with random data
+%%      are not supported).
+-spec prop_tester_req_list([api_tx:read_request() | api_tx:write_request() |
+                            api_tx:add_del_on_list_request() |
+                            api_tx:add_on_nr_request() |
+                            api_tx:test_and_set_request()]) -> true | no_return().
 prop_tester_req_list(ReqList) ->
     {TLogAll, ResultAll} = api_tx:req_list(ReqList),
     {TLogSeq, ResultSeq} =
@@ -786,19 +790,67 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                                     {fail, abort})
                     end
             end;
-        {fail, abort} = Fail ->
+        {fail, Reason} = Fail when is_atom(Reason) ->
+            % despite the status being 'abort', the operation's result
+            % should be the same as if there was no abort!
             TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, ?value),
-            ?equals_w_note(NRes,
-                           element(2, api_tx:req_list([TmpTLogEntry], [Req])),
-                           io_lib:format("Req: ~.0p, RingVal: ~.0p", [Req, RingVal])),
+            Note = io_lib:format("Entry: ~.0p, Req: ~.0p, RingVal: ~.0p", [OldEntry, Req, RingVal]),
+            case element(1, Req) of
+                read when element(3, Req) =:= random_from_list ->
+                    case NRes of
+                        [{ok, {RandomVal, ListLength}}] ->
+                            NewValue =
+                                case tx_tlog:get_entry_operation(OldEntry) of
+                                    ?read -> RingVal;
+                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
+                                end,
+                            ?assert_w_note(lists:member(RandomVal, NewValue), Note),
+                            ?equals_w_note(ListLength, length(NewValue), Note),
+                            ?equals_pattern_w_note(element(2, api_tx:req_list([TmpTLogEntry], [Req])), [{ok, _}], Note);
+                        [{fail, _}] ->
+                            % the fail may be from this op or a previous one (can't distinguish here)
+                            ok
+                    end;
+                _ ->
+                    case element(1, hd(NRes)) of
+                        ok when RingVal =/= none ->
+                            % old entry failed but op was successfull anyway...
+                            % then the result should be the same as if executed on a successul entry
+                            % (a not_found may however yield {fail, not_found})
+                            ?equals_w_note(NRes, element(2, api_tx:req_list([TmpTLogEntry], [Req])), Note);
+                        _ ->
+                            % the fail may be from this op or a previous one (can't distinguish here)
+                            ok
+                    end
+            end,
+            % status must remain!
             ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
         ?value ->
-            case tx_tlog:get_entry_operation(OldEntry) of
-                ?read ->
-                    ?equals(NRes, element(2, api_tx:req_list([Req])));
-                ?write ->
-                    ?equals([{ok}, hd(NRes)], element(2, api_tx:req_list([{write, element(2, Req), rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))}, Req])))
+            % result must be the same as if executed alone
+            % note: previous write may have changed the value!
+            {ExpResAlone, ReqsAlone} =
+                case tx_tlog:get_entry_operation(OldEntry) of
+                    ?read -> {NRes, [Req]};
+                    ?write ->
+                        ValueAfterWrite = rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry)),
+                        {[{ok}, hd(NRes)], [{write, element(2, Req), ValueAfterWrite}, Req]}
+                end,
+            case element(1, Req) of
+                read when element(3, Req) =:= random_from_list ->
+                    case NRes of
+                        [{fail, _}] ->
+                            ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)));
+                        [{ok, _RandomVal}] ->
+                            % the only thing guaranteed here is that it must also be {ok, _}
+                            case length(ExpResAlone) of
+                                2 -> ?equals_pattern(element(2, api_tx:req_list(ReqsAlone)), [{ok}, {ok, _}]);
+                                1 -> ?equals_pattern(element(2, api_tx:req_list(ReqsAlone)), [{ok, _}])
+                            end
+                    end;
+                _ ->
+                    ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)))
             end,
+            % further tests for the individual requests' properties
             case element(1, Req) of
                 write ->
                     ?equals(tx_tlog:get_entry_status(NewEntry),
@@ -806,7 +858,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     ?equals(tx_tlog:get_entry_value(NewEntry),
                             rdht_tx:encode_value(element(3, Req))),
                     ?equals(NRes, [{ok}]);
-                read ->
+                read when size(Req) =:= 2 ->
                     ?equals(TLog, NTLog),
                     case tx_tlog:get_entry_operation(OldEntry) of
                         ?read ->
@@ -846,8 +898,30 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                                     tx_tlog:get_entry_status(NewEntry)),
                             ?equals(tx_tlog:get_entry_value(OldEntry),
                                     tx_tlog:get_entry_value(NewEntry))
+                    end;
+                read when element(3, Req) =:= random_from_list ->
+                    case hd(NRes) of
+                        {ok, {RandomVal, ListLength}} ->
+                            NewValue =
+                                case tx_tlog:get_entry_operation(OldEntry) of
+                                    ?read -> RingVal;
+                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
+                                end,
+                            Note = io:format("RandomVal: ~p (~p), StoredVal: ~p (~p)",
+                                             [RandomVal, ListLength, NewValue, length(NewValue)]),
+                            ?assert_w_note(lists:member(RandomVal, NewValue), Note),
+                            ?equals_w_note(ListLength, length(NewValue), Note),
+                            ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
+                                    X when X =:= ?value orelse X =:= ?partial_value);
+                        {fail, Reason} when Reason =:= empty_list orelse Reason =:= not_a_list ->
+                            ?equals(tx_tlog:get_entry_status(NewEntry),
+                                    {fail, abort}),
+                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                    tx_tlog:get_entry_value(OldEntry))
                     end
-            end
+            end;
+        ?partial_value ->
+            todo % TODO
     end.
 
 
@@ -928,6 +1002,7 @@ prop_tester_req_list_on_same_key(Key, InReqList) ->
     true.
 
 tester_req_list_on_same_key(_Config) ->
+    prop_tester_req_list_on_same_key("a", [{read,"a"},{add_on_nr,"a","*"},{test_and_set,"a",[],{42}}]),
     tester:test(?MODULE, prop_tester_req_list_on_same_key, 2, 5000).
 
 req_list_parallelism(_Config) ->

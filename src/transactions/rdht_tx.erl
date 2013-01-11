@@ -30,7 +30,8 @@
 -export([req_list/3]).
 -export([check_config/0]).
 -export([encode_value/1, decode_value/1]).
--export([req_needs_rdht_op_on_ex_tlog_read_entry/1, req_get_key/1, req_get_op/1]).
+-export([req_props/1,
+         req_get_key/1, req_get_op/1]).
 
 %% export to silence dialyzer
 -export([decode_result/1]).
@@ -136,8 +137,8 @@ tlog_and_results_to_abort_iter(TLog, [Req | ReqListT], AccRes) ->
 -spec upd_tlog_via_rdht(tx_tlog:tlog(), [request_on_key()]) -> tx_tlog:tlog().
 upd_tlog_via_rdht(TLog, ReqList) ->
     %% what to get from rdht? (also check old TLog)
-    USReqList = lists:ukeysort(2, ReqList),
-    ReqListonRDHT = tx_tlog:first_req_per_key_not_in_tlog(TLog, USReqList),
+    SReqList = lists:keysort(2, ReqList),
+    ReqListonRDHT = tx_tlog:first_req_per_key_not_in_tlog(TLog, SReqList),
 
     %% perform RDHT operations to collect missing TLog entries
     %% rdht requests for independent keys are processed in parallel.
@@ -149,17 +150,15 @@ upd_tlog_via_rdht(TLog, ReqList) ->
     %% in reads for same key is detected)
     _MTLog = tx_tlog:merge(TLog, RTLog).
 
--spec req_needs_rdht_op_on_ex_tlog_read_entry(Req::request_on_key()) -> boolean().
-req_needs_rdht_op_on_ex_tlog_read_entry(Req) ->
+-spec req_props(Req::request_on_key()) -> {NeedsFullRead::boolean(), WorksAfterAnyPartialRead::boolean(), ProvidesFullRead::boolean()}.
+req_props(Req) ->
     case req_get_op(Req) of
-        %% if operation needs the value (read) and
-        %% TLog is optimized, we need the op anyway to
-        %% calculate the result entry.
-        read -> true;
-        test_and_set -> true;
-        add_on_nr -> true;
-        add_del_on_list -> true;
-        _ -> false
+        read when size(Req) =:= 2 -> {true, false, true};
+        read when size(Req) =:= 3 -> {false, false, false};
+        test_and_set -> {true, false, true};
+        add_on_nr -> {true, false, true};
+        add_del_on_list -> {true, false, true};
+        write -> {false, true, true}
     end.
 
 %% @doc Trigger operations for the DHT.
@@ -211,6 +210,7 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
         case Req of
             %% native functions first:
             {read, Key}           -> rdht_tx_read:extract_from_tlog(Entry, Key, read, EnDecode);
+            {read, Key, Op}       -> rdht_tx_read:extract_from_tlog(Entry, Key, Op, EnDecode);
             {write, Key, Value}   -> rdht_tx_write:extract_from_tlog(Entry, Key, Value, EnDecode);
             %% non-native functions:
             {add_del_on_list, Key, ToAdd, ToDel} -> rdht_tx_add_del_on_list:extract_from_tlog(Entry, Key, ToAdd, ToDel, EnDecode);

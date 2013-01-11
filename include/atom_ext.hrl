@@ -129,3 +129,9 @@
 
 -define(tp_do_commit_abort_fwd_atom, tp_do_commit_abort_fwd).
 -define(tp_do_commit_abort_fwd, ?int_or_atom(80, ?tp_do_commit_abort_fwd_atom)).
+
+-define(random_from_list_atom, random_from_list).
+-define(random_from_list, ?int_or_atom(81, ?random_from_list_atom)).
+
+-define(partial_value_atom, partial_value).
+-define(partial_value, ?int_or_atom(82, ?partial_value_atom)).

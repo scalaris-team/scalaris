@@ -57,19 +57,27 @@
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status() :: ?value | {fail, abort | not_found}.
+-type tx_status() :: ?value | ?partial_value | {fail, abort | not_found | empty_list | not_a_list}.
 -type tx_op()     :: ?read | ?write.
 
 -type tlog_key() :: client_key(). %%| ?RT:key().
 %% TLogEntry: {Operation, Key, Status, Value, Version}
 %% Sample: {?read,"key3",?value,"value3",0}
--type tlog_entry() ::
-          { tx_op(),                  %% operation
-            tlog_key(),             %% key
-            non_neg_integer() | -1,   %% version
-            tx_status(),              %% status
-            any()                     %% value
+-type tlog_entry_read() ::
+          { Op      :: ?read,
+            Key     :: tlog_key(),
+            Version :: non_neg_integer() | -1,
+            Status  :: tx_status(), % note: only partial reads allow ?partial_value
+            Value   :: any()
           }.
+-type tlog_entry_write() ::
+          { Op      :: ?write,
+            Key     :: tlog_key(),
+            Version :: non_neg_integer() | -1,
+            Status  :: ?value | {fail, abort | not_found | empty_list | not_a_list}, % no ?partial_value allowed!
+            Value   :: any()
+          }.
+-type tlog_entry() :: tlog_entry_read() | tlog_entry_write().
 %% -opaque tlog() :: [tlog_entry()]. % creates a false warning in add_or_update_status_by_key/3
 -type tlog() :: [tlog_entry()].
 
@@ -151,7 +159,12 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                    NewTLogEntry =
                        if TVersion =:= RTVersion ->
                               Val = get_entry_value(RTEntry),
-                              set_entry_value(TEntry, Val);
+                              TEntry2 = set_entry_value(TEntry, Val),
+                              TStatus = get_entry_status(TEntry),
+                              if TStatus =:= ?value orelse TStatus =:= ?partial_value ->
+                                     set_entry_status(TEntry2, get_entry_status(RTEntry));
+                                 true -> TEntry2
+                              end;
                           true ->
                               set_entry_status(RTEntry, {fail, abort})
                        end,
@@ -173,42 +186,73 @@ merge_tlogs_iter([_|_] = SortedTLog, [], [_|_] = Acc)  -> lists:reverse(Acc) ++ 
 %%      Note: uses functions from rdht_tx to cope with requests.
 -spec first_req_per_key_not_in_tlog(tlog(), [rdht_tx:request_on_key()])
         -> [rdht_tx:request_on_key()].
-first_req_per_key_not_in_tlog(SortedTLog, USortedReqList) ->
+first_req_per_key_not_in_tlog(SortedTLog, SortedReqList) ->
     %% PRE: no {commit} requests in SortedReqList
-    %% POST: returns requests in reverse order, but thats sufficient.
-    first_req_per_key_not_in_tlog_iter(SortedTLog, USortedReqList, []).
+    %% POST: returns requests in arbitrary order.
+    first_req_per_key_not_in_tlog_iter(SortedTLog, SortedReqList, []).
 
 %% @doc Helper to acquire requests, that need information from the DHT.
 -spec first_req_per_key_not_in_tlog_iter(
-        [tlog_entry()], [rdht_tx:request_on_key()], [rdht_tx:request_on_key()])
+        [tlog_entry()], SortedReqList::[rdht_tx:request_on_key()], Acc::[rdht_tx:request_on_key()])
         -> [rdht_tx:request_on_key()].
 first_req_per_key_not_in_tlog_iter(_, [], Acc) -> Acc;
-first_req_per_key_not_in_tlog_iter([], USortedReqList, Acc) ->
-    USortedReqList ++ Acc;
+first_req_per_key_not_in_tlog_iter([] = USTLog, [Req | _] = SReqList, Acc) ->
+    ReqKey = rdht_tx:req_get_key(Req),
+    {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], false),
+    first_req_per_key_not_in_tlog_iter(USTLog, RTail2, Req2 ++ Acc);
 first_req_per_key_not_in_tlog_iter([TEntry | TTail] = USTLog,
-                                   [Req | RTail] = USReqList,
+                                   [Req | _RTail] = SReqList,
                                    Acc) ->
     TKey = get_entry_key(TEntry),
     ReqKey = rdht_tx:req_get_key(Req),
     if TKey =:= ReqKey ->
-            %% key is in TLog, rdht op not necessary
-            case get_entry_operation(TEntry) of
-                ?write ->
-                    first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc);
-                _ ->
-                    NeedsOp = rdht_tx:req_needs_rdht_op_on_ex_tlog_read_entry(Req),
-                    if NeedsOp ->
-                           first_req_per_key_not_in_tlog_iter
-                             (USTLog, RTail, [Req | Acc]);
-                       true ->
-                           first_req_per_key_not_in_tlog_iter(USTLog, RTail, Acc)
-                    end
-            end;
+           HaveValue = get_entry_operation(TEntry) =:= ?write,
+           {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], HaveValue),
+           first_req_per_key_not_in_tlog_iter
+             (USTLog, RTail2, Req2 ++ Acc);
        TKey < ReqKey ->
            %% jump to next Tlog entry
-           first_req_per_key_not_in_tlog_iter(TTail, USReqList, Acc);
+           first_req_per_key_not_in_tlog_iter(TTail, SReqList, Acc);
        true -> % TKey > ReqKey
-           first_req_per_key_not_in_tlog_iter(USTLog, RTail, [Req | Acc])
+           {Req2, RTail2} = first_req_for_key(ReqKey, SReqList, [], false),
+           first_req_per_key_not_in_tlog_iter(USTLog, RTail2, Req2 ++ Acc)
+    end.
+
+%% @doc Filters the (sorted) request list for all ops with the given Key and
+%%      returns a full read request if required or otherwise the partial read
+%%      as requested.
+%% note: it does not matter which request is actually returned here as long as
+%%       we get a full read op if needed!
+first_req_for_key(_Key, [] = SReqList, TmpReq, _HaveValue) ->
+    {TmpReq, SReqList};
+first_req_for_key(Key, [Req | RTail] = SReqList, TmpReq, HaveValue) ->
+    ReqKey = rdht_tx:req_get_key(Req),
+    if Key =:= ReqKey andalso HaveValue ->
+           % consume further requests with the same key (there already is a full read)
+           first_req_for_key(Key, RTail, TmpReq, HaveValue);
+       Key =:= ReqKey -> %andalso not HaveValue
+           % no full read yet
+           {ReqNeedsFullRead, ReqWorksAfterAnyPartialRead, ReqProvidesFullRead} = rdht_tx:req_props(Req),
+           if ReqNeedsFullRead ->
+                  % req in TmpReq (if any) does not matter
+                  % -> this op requires a full read and there is none yet!
+                  first_req_for_key(Key, RTail, [Req], ReqProvidesFullRead);
+              TmpReq =/= [] andalso ReqWorksAfterAnyPartialRead ->
+                  % there is a previous request but it does not provide a full value
+                  % -> must be a partial read
+                  % this op is e.g. a write which works after any partial read
+                  first_req_for_key(Key, RTail, TmpReq, ReqProvidesFullRead);
+              TmpReq =/= [] ->
+                  % there is a previous request but it does not provide a full value
+                  % -> must be a partial read
+                  % this op can not operate on every partial read
+                  % -> create a full read
+                  NewReq = {read, ReqKey},
+                  first_req_for_key(Key, RTail, [NewReq], true);
+              true -> % TmpReq =:= []
+                  first_req_for_key(Key, RTail, [Req], ReqProvidesFullRead)
+           end;
+       true -> {TmpReq, SReqList}
     end.
 
 %% @doc Strips the tlog from read values (sets those values to '$empty').

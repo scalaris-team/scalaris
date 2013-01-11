@@ -73,18 +73,22 @@ extract_from_tlog(Entry, _Key, Value1, EnDecode) ->
                     ?read ->
                         E1 = tx_tlog:set_entry_operation(FEntry, ?write),
                         E2 = tx_tlog:set_entry_value(E1, FValue),
-                        {E2, {ok}}
+                        E3 = tx_tlog:set_entry_status(E2, ?value),
+                        {E3, {ok}}
             end
         end,
     case tx_tlog:get_entry_status(Entry) of
         ?value ->
+            NewEntryAndResult(Entry, Value);
+        ?partial_value ->
             NewEntryAndResult(Entry, Value);
         {fail, not_found} ->
             E1 = tx_tlog:set_entry_operation(Entry, ?write),
             E2 = tx_tlog:set_entry_value(E1, Value),
             E3 = tx_tlog:set_entry_status(E2, ?value),
             {E3, {ok}};
-        {fail, abort} ->
+        {fail, Reason} when is_atom(Reason) ->
+            % in this case, the result of the write is still OK!
             {Entry, {ok}}
     end.
 
@@ -200,6 +204,23 @@ on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
     comm:send_local(ClientPid, Msg),
     TableName.
 
+-spec update_tlog_entry_feeder(tx_tlog:tlog_entry(), client_value())
+        -> {tx_tlog:tlog_entry(), client_value()}.
+update_tlog_entry_feeder(TLogEntry, WriteValue) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(TLogEntry) of
+            ?value -> % only ?partial_value allowed here
+                E2 = tx_tlog:set_entry_status(TLogEntry, ?partial_value),
+                % since ?partial_value is not allowed after write ops, set ?read here
+                % -> we would not go into the dht op if it was a write! 
+                tx_tlog:set_entry_operation(E2, ?read);
+            {fail, _} ->
+                % the only failure that could happen here!
+                tx_tlog:set_entry_status(TLogEntry, {fail, not_found});
+            _ -> TLogEntry
+        end,
+    {NewEntry, WriteValue}.
+
 -spec update_tlog_entry(tx_tlog:tlog_entry(), client_value())
         -> tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry, WriteValue) ->
@@ -207,13 +228,12 @@ update_tlog_entry(TLogEntry, WriteValue) ->
     %% validation and increment then in case of write.
     T2 = tx_tlog:set_entry_operation(TLogEntry, ?write),
     case tx_tlog:get_entry_status(TLogEntry) of
-        ?value ->
-            tx_tlog:set_entry_value(T2, WriteValue);
-        {fail, not_found} ->
+        ?partial_value -> % we issue a partial read, so this is the only result (except for failures) we expect!
             T3 = tx_tlog:set_entry_status(T2, ?value),
             tx_tlog:set_entry_value(T3, WriteValue);
-        {fail, abort} -> %% only for tester? never called this way?
-            TLogEntry
+        {fail, not_found} ->
+            T3 = tx_tlog:set_entry_status(T2, ?value),
+            tx_tlog:set_entry_value(T3, WriteValue)
 %        {fail, timeout} ->
 %            tx_tlog:new_entry(?write, Key, Version, {fail, timeout},
 %                               WriteValue)
