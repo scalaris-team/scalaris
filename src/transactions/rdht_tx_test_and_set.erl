@@ -42,8 +42,8 @@ work_phase(ClientPid, ReqId, Request) ->
 -spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(),
                         client_value(), client_value(), EnDecode::boolean()) ->
                                {tx_tlog:tlog_entry(), api_tx:testandset_result()}.
-extract_from_tlog(Entry, Key, Old, New, EnDecode) ->
-    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, read, EnDecode),
+extract_from_tlog(Entry0, Key, Old, New, EnDecode) ->
+    {Entry, Res0} = rdht_tx_read:extract_from_tlog(Entry0, Key, read, EnDecode),
     case Res0 of
         {ok, Old} ->
             rdht_tx_write:extract_from_tlog(Entry, Key, New, EnDecode);
