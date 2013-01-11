@@ -29,7 +29,7 @@
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
          logged_exec/1,
-         randomelem/1, pop_randomelem/1, pop_randomelem/2,
+         randomelem/1, randomelem_and_length/1, pop_randomelem/1, pop_randomelem/2,
          first_matching/2,
          get_stacktrace/0, get_linetrace/0, get_linetrace/1,
          dump/0, dump2/0, dump3/0, dumpX/1, dumpX/2,
@@ -576,9 +576,15 @@ sleep_for_ever() ->
 %%      a uniform distribution.
 -spec randomelem(List::[X,...]) -> X.
 randomelem(List)->
+    element(1, randomelem_and_length(List)).
+
+%% @doc Returns a random element from the given (non-empty!) list according to
+%%      a uniform distribution (also returns the list's length).
+-spec randomelem_and_length(List::[X,...]) -> {X, Length::pos_integer()}.
+randomelem_and_length(List)->
     Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
-    lists:nth(RandomNum, List).
+    {lists:nth(RandomNum, List), Length - 1}.
     
 %% @doc Removes a random element from the (non-empty!) list and returns the
 %%      resulting list and the removed element.
