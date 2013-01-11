@@ -48,9 +48,9 @@ extract_from_tlog(Entry, _Key, ToAdd, ToDel, true) when
       (not erlang:is_list(ToDel)) ->
     %% input type error
     {tx_tlog:set_entry_status(Entry, {fail, abort}), {fail, not_a_list}};
-extract_from_tlog(Entry, Key, ToAdd, ToDel, true) ->
-    Status = tx_tlog:get_entry_status(Entry),
-    {_, Res0} = rdht_tx_read:extract_from_tlog(Entry, Key, read, true),
+extract_from_tlog(Entry0, Key, ToAdd, ToDel, true) ->
+    Status = tx_tlog:get_entry_status(Entry0),
+    {Entry, Res0} = rdht_tx_read:extract_from_tlog(Entry0, Key, read, true),
     case Res0 of
         {ok, OldValue} when erlang:is_list(OldValue) ->
             %% types ok
