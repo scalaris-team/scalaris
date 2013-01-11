@@ -32,10 +32,11 @@
 
 -ifdef(with_export_type_support).
 -export_type([request/0, request_on_key/0,
-              read_request/0, write_request/0,
+              read_request/0, read_random_from_list_request/0, write_request/0,
               add_del_on_list_request/0, add_on_nr_request/0,
               test_and_set_request/0]).
--export_type([result/0, read_result/0, write_result/0, commit_result/0]).
+-export_type([result/0, read_result/0, read_random_from_list_result/0,
+              write_result/0, commit_result/0]).
 -export_type([listop_result/0, numberop_result/0, testandset_result/0]).
 -export_type([client_key/0]).
 -endif.

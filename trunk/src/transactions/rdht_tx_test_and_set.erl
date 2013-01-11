@@ -32,11 +32,26 @@
 
 -export([work_phase/3, extract_from_tlog/5]).
 
+% feeder for tester
+-export([extract_from_tlog_feeder/5]).
+
 
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                  api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     rdht_tx_read:work_phase(ClientPid, ReqId, Request).
+
+-spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(),
+                               client_value(), client_value(), EnDecode::boolean())
+        -> {tx_tlog:tlog_entry(), client_key(), client_value(), client_value(), EnDecode::boolean()}.
+extract_from_tlog_feeder(Entry, Key, Old, New, EnDecode) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(Entry) of
+            ?partial_value -> % only ?value allowed here
+                tx_tlog:set_entry_status(Entry, ?value);
+            _ -> Entry
+        end,
+    {NewEntry, Key, Old, New, EnDecode}.
 
 %% @doc Get a result entry for a test_and_set operation from the given TLog entry.
 -spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(),

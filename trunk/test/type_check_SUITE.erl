@@ -278,6 +278,8 @@ tester_type_check_tx(_Config) ->
           {rdht_tx_read,
            [ {abort, 3},
              {commit, 3},
+             {extract_from_value, 3}, %% tested via feeder
+             {extract_from_tlog, 4}, %% tested via feeder
              {init, 1},
              {on,2},
              {start_link, 1},
@@ -298,21 +300,31 @@ tester_type_check_tx(_Config) ->
              {validate_prefilter, 1}, %% TODO: not a list error
              {validate, 2},
              {work_phase, 3}
-           ], []},
+           ],
+           [ {update_tlog_entry, 2} %% tested via feeder
+           ]},
           {rdht_tx_add_del_on_list,
-           [ {work_phase, 3}
+           [ {extract_from_tlog, 5}, %% tested via feeder
+             {work_phase, 3}
            ], []},
           {rdht_tx_add_on_nr,
-           [ {work_phase, 3}
+           [ {extract_from_tlog, 4}, %% tested via feeder
+             {work_phase, 3}
            ], []},
           {rdht_tx_test_and_set,
-           [ {work_phase, 3}
+           [ {extract_from_tlog, 5}, %% tested via feeder
+             {work_phase, 3}
            ], []},
           {tx_op_beh,[], []},
           {tx_tlog,
-           [ {new_entry, 5}, %% split tlog types for client and rt:keys
-             {set_entry_key, 2} %% split tlog types for client and rt:keys
-           ], []},
+           [ {add_or_update_status_by_key, 3}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+             {new_entry, 5}, %% split tlog types for client and rt:keys
+             {set_entry_key, 2}, %% split tlog types for client and rt:keys
+             {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+             {set_entry_status, 2} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+           ],
+           [ {first_req_for_key, 4} %% no type spec available (a 1-element list may not be specified anyway)
+           ]},
           {tx_tm_rtm,
            [ {commit, 4},
              {get_my, 2},

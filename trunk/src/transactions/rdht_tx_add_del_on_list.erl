@@ -32,17 +32,32 @@
 
 -export([work_phase/3, extract_from_tlog/5]).
 
+% feeder for tester
+-export([extract_from_tlog_feeder/5]).
+
 
 -spec work_phase(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
                  api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     rdht_tx_read:work_phase(ClientPid, ReqId, Request).
 
+-spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(),
+                               client_value(), client_value(), EnDecode::boolean())
+        -> {tx_tlog:tlog_entry(), client_key(), client_value(), client_value(), EnDecode::boolean()}.
+extract_from_tlog_feeder(Entry, Key, ToAdd, ToDel, EnDecode) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(Entry) of
+            ?partial_value -> % only ?value allowed here
+                tx_tlog:set_entry_status(Entry, ?value);
+            _ -> Entry
+        end,
+    {NewEntry, Key, ToAdd, ToDel, EnDecode}.
+
 %% @doc Simulate a change on a set via read and write requests.
 %%      Update the TLog entry accordingly.
 -spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(),
-                      client_value(), client_value(), EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:listop_result()}.
+                        client_value(), client_value(), EnDecode::boolean()) ->
+                        {tx_tlog:tlog_entry(), api_tx:listop_result()}.
 extract_from_tlog(Entry, _Key, ToAdd, ToDel, true) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->

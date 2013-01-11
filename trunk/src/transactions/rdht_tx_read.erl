@@ -39,6 +39,9 @@
 -export([start_link/1]).
 -export([check_config/0]).
 
+% feeder for tester
+-export([extract_from_value_feeder/3, extract_from_tlog_feeder/4]).
+
 -include("rdht_tx_read_state.hrl").
 
 %% reply messages a client should expect (when calling asynch work_phase/3)
@@ -51,12 +54,18 @@ msg_reply(Id, TLogEntry) ->
                  api_tx:request()) -> ok.
 work_phase(ClientPid, ReqId, Request) ->
     Key = element(2, Request),
-    Op = ?read,
+    Op = if element(1, Request) =/= read -> ?read; % e.g. {add_del_on_list, Key, ToAdd, ToRemove}
+            size(Request) =:= 3 ->
+                case element(3, Request) of
+                    random_from_list -> ?random_from_list
+                end;
+            true -> ?read
+         end,
     HashedKey = ?RT:hash_key(Key),
     work_phase_key(ClientPid, ReqId, Key, HashedKey, Op).
 
 -spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                     client_key(), ?RT:key(), Op::?read | ?write) -> ok.
+                     client_key(), ?RT:key(), Op::?read | ?write | ?random_from_list) -> ok.
 work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -65,11 +74,11 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     %% trigger quorum read
     quorum_read(comm:make_global(CollectorPid), ReqId, HashedKey, Op),
     %% inform CollectorPid on whom to inform after quorum reached
-    comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key}),
+    comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key, Op}),
     ok.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
-                  HashedKey::?RT:key(), Op::?read | ?write) -> ok.
+                  HashedKey::?RT:key(), Op::?read | ?write | ?random_from_list) -> ok.
 quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     RKeys = ?RT:get_replica_keys(HashedKey),
@@ -78,28 +87,122 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
         || RKey <- RKeys ],
     ok.
 
+-spec extract_from_value_feeder
+        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list) -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list};
+        (empty_val, -1, Op::?read | ?write | ?random_from_list) -> {empty_val, -1, Op::?read | ?write | ?random_from_list}.
+extract_from_value_feeder(empty_val = Value, Version, Op) ->
+    {Value, Version, Op};
+extract_from_value_feeder(Value, Version, ?random_from_list = Op) ->
+    {rdht_tx:encode_value(Value), Version, Op}; % need a valid encoded value!
+extract_from_value_feeder(Value, Version, Op) ->
+    {Value, Version, Op}.
+
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
-        (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?read | ?random_from_list) -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
-        (empty_val, -1, Op::?read) -> Result::{ok, empty_val, -1};
+        (empty_val, -1, Op::?read | ?random_from_list) -> Result::{ok, empty_val, -1};
         (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
 extract_from_value(Value, Version, ?read) ->
     {ok, Value, Version};
 extract_from_value(_Value, Version, ?write) ->
-    {ok, ?value_dropped, Version}.
+    {ok, ?value_dropped, Version};
+extract_from_value(empty_val, Version, ?random_from_list) ->
+    {ok, empty_val, Version}; % will be handled later
+extract_from_value(ValueEnc, Version, ?random_from_list) ->
+    Value = rdht_tx:decode_value(ValueEnc),
+    case Value of
+        [_|_]     -> {RandVal, Len} = util:randomelem_and_length(Value),
+                     {ok, {rdht_tx:encode_value(RandVal), Len}, Version};
+        []        -> {fail, empty_list, Version};
+        _         -> {fail, not_a_list, Version}
+    end.
+
+-spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, {EnDecode::boolean(), ListLenght::pos_integer()})
+        -> {tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, EnDecode::boolean()}.
+extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLenght}) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(Entry) of
+            ?partial_value -> % only ?value allowed here
+                tx_tlog:set_entry_status(Entry, ?value);
+            _ -> Entry
+        end,
+    {NewEntry, Key, Op, EnDecode};
+extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLenght}) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(Entry) of
+            ?partial_value -> % need value partial value!
+                PartialValue = {tx_tlog:get_entry_value(Entry), ListLenght},
+                tx_tlog:set_entry_value(Entry, PartialValue);
+            _ -> Entry
+        end,
+    {NewEntry, Key, Op, EnDecode}.
 
 %% @doc Get a result entry for a read from the given TLog entry.
--spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), Op::read, EnDecode::boolean()) ->
-                       {tx_tlog:tlog_entry(), api_tx:read_result()}.
+-spec extract_from_tlog
+        (tx_tlog:tlog_entry(), client_key(), Op::read, EnDecode::boolean())
+            -> {tx_tlog:tlog_entry(), api_tx:read_result()};
+        (tx_tlog:tlog_entry(), client_key(), Op::random_from_list, EnDecode::boolean())
+            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()}.
 extract_from_tlog(Entry, _Key, read, EnDecode) ->
     Res = case tx_tlog:get_entry_status(Entry) of
               ?value -> {ok, tx_tlog:get_entry_value(Entry)};
+              {fail, not_found} = R -> R; %% not_found
               %% try reading from a failed entry (type mismatch was the reason?)
-              {fail, abort} -> {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, not_found} = R -> R %% not_found
+              {fail, Reason} when is_atom(Reason) -> {ok, tx_tlog:get_entry_value(Entry)}
           end,
-    {Entry, ?IIF(EnDecode, rdht_tx:decode_result(Res), Res)}.
+    {Entry, ?IIF(EnDecode, rdht_tx:decode_result(Res), Res)};
+extract_from_tlog(Entry, _Key, random_from_list, EnDecode) ->
+    case tx_tlog:get_entry_status(Entry) of
+        ?partial_value ->
+            % this MUST BE the partial value from this op!
+            % (otherwise a full read would have been executed)
+            PValue = tx_tlog:get_entry_value(Entry),
+            {Entry, {ok, ?IIF(EnDecode, rdht_tx:decode_value(PValue), PValue)}};
+        ?value ->
+            Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
+            case Value of
+                [_|_]     ->
+                    {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
+                    % note: if not EnDecode is given, an encoded value is
+                    % expected like the original value!
+                    {Entry,
+                     {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
+                _ ->
+                    Res = case Value of
+                              []        -> {fail, empty_list};
+                              _         -> {fail, not_a_list}
+                          end,
+                    {tx_tlog:set_entry_status(Entry, {fail, abort}), Res}
+            end;
+        {fail, not_found} = R -> {Entry, R}; %% not_found
+        {fail, empty_list} = R -> {Entry, R};
+        {fail, not_a_list} = R -> {Entry, R};
+        %% try reading from a failed entry (type mismatch was the reason?)
+        % any other failure should work like ?value or ?partial_value since it
+        % is from another operation and thus independent from this one
+        % -> there is no other potential failure at the moment though
+        % TODO: don't know whether it is a partial or full value!!
+        % -> at the moment, though, any other failure can only contain a full
+        %    value since reads only fail with not_found and other ops write a
+        %    full value
+        {fail, Reason} when is_atom(Reason) -> 
+            Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
+            case Value of
+                [_|_]     ->
+                    {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
+                    % note: if not EnDecode is given, an encoded value is
+                    % expected like the original value!
+                    {Entry,
+                     {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
+                _ ->
+                    Res = case Value of
+                              []        -> {fail, empty_list};
+                              _         -> {fail, not_a_list}
+                          end,
+                    {Entry, Res} % note: entry is already set to abort
+            end
+    end.
 
 %% May make several ones from a single TransLog item (item replication)
 %% validate_prefilter(TransLogEntry) ->
@@ -208,10 +311,11 @@ on({?read_op_with_id_reply, Id, Result},
     State;
 
 %% triggered by ?MODULE:work_phase/3
-on({client_is, Id, Pid, Key}, {Reps, _MajOk, _MajDeny, Table} = State) ->
+on({client_is, Id, Pid, Key, Op}, {Reps, _MajOk, _MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(client_is)~n", [self()]),
     Entry = get_entry(Id, Table),
-    Tmp1Entry = state_set_client(Entry, Pid),
+    Tmp0Entry = state_set_op(Entry, Op),
+    Tmp1Entry = state_set_client(Tmp0Entry, Pid),
     TmpEntry = state_set_key(Tmp1Entry, Key),
     _ = case state_is_newly_decided(TmpEntry) of
             true ->
@@ -258,10 +362,20 @@ get_entry(Id, Table) ->
 -spec inform_client(pid(), read_state()) ->
                            read_state().
 inform_client(Client, Entry) ->
-    Id = state_get_id(Entry),
-    Msg = msg_reply(Id, make_tlog_entry(Entry)),
+    % if partial read and decided is ?value -> set to ?partial_value!
+    % ?read | ?write | ?random_from_list
+    Op = state_get_op(Entry),
+    Entry2 = if Op =:= ?read -> Entry;
+                true ->
+                    case state_get_decided(Entry) of
+                        ?value -> state_set_decided(Entry, ?partial_value);
+                        _ -> Entry
+                    end
+             end,
+    Id = state_get_id(Entry2),
+    Msg = msg_reply(Id, make_tlog_entry(Entry2)),
     comm:send_local(Client, Msg),
-    state_set_client_informed(Entry).
+    state_set_client_informed(Entry2).
 
 %% -spec make_tlog_entry_feeder(
 %%         {read_state(), ?RT:key()})
