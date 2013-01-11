@@ -38,18 +38,25 @@
 -include("client_types.hrl").
 
 % Public Interface
--type write_request() ::{write, client_key(), client_value()}.
+-type read_request() :: {read, client_key()}.
+-type write_request() :: {write, client_key(), client_value()}.
+-type add_del_on_list_request() ::
+          {add_del_on_list, client_key(),
+           client_value(),  %% abort when not ToAdd::[client_value()],
+           client_value()}.  %% abort when not ToRemove::[client_value()]}
+-type add_on_nr_request() ::
+          {add_on_nr, client_key(),
+           client_value()}. %% abort when not number()}
+-type test_and_set_request() ::
+          {test_and_set, client_key(),
+           Old::client_value(), New::client_value()}.
 
 -type request_on_key() ::
-          {read, client_key()}
+          read_request()
         | write_request()
-        | {add_del_on_list, client_key(),
-           client_value(),  %% abort when not ToAdd::[client_value()],
-           client_value()}  %% abort when not ToRemove::[client_value()]}
-        | {add_on_nr, client_key(),
-           client_value()} %% abort when not number()}
-        | {test_and_set, client_key(),
-           Old::client_value(), New::client_value()}.
+        | add_del_on_list_request()
+        | add_on_nr_request()
+        | test_and_set_request().
 -type request() :: request_on_key() | {commit}.
 
 -type read_result() :: {ok, client_value()} | {fail, not_found}.
@@ -57,8 +64,16 @@
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
 -type commit_result() :: {ok} | {fail, abort, [client_key()]}.
--type testandset_result() :: write_result() | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
--type result() :: read_result() | write_result() | listop_result() | numberop_result() | testandset_result() | commit_result().
+-type testandset_result() ::
+          write_result()
+        | {fail, not_found | {key_changed, RealOldValue::client_value()}}.
+-type result() ::
+          read_result()
+        | write_result()
+        | listop_result()
+        | numberop_result()
+        | testandset_result()
+        | commit_result().
 
 %% @doc Get an empty transaction log to start a new transaction.
 -spec new_tlog() -> tx_tlog:tlog().
