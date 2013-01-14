@@ -87,7 +87,7 @@
 
 % @doc Maximum number of entries in a routing table
 -spec maximum_entries() -> non_neg_integer().
-maximum_entries() -> 128.
+maximum_entries() -> 3.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
@@ -611,33 +611,37 @@ entry_filtering(#rt_t{} = RT) ->
     SourceId = get_source_id(RT),
 
     %% XXX See [FRT] for information on the sets of nodes
-    Nodes = gb_trees:values(get_rt_tree(RT)),
+    Nodes = [N || N <- gb_trees:values(get_rt_tree(RT))],
+    {E_NG, E_G} = lists:partition(fun is_from_other_group/1, Nodes),
 
-    [First,_] = E_G = [N || N <- Nodes, not is_from_other_group(N)],
-    FirstDist = get_range(SourceId, node:id(rt_entry_node(First))),
-    FirstPacked = {FirstDist, First}, % for the fold below
+    E_leap = case E_G of
+        [First|_] ->
+            FirstDist = get_range(SourceId, node:id(rt_entry_node(First))),
+            FirstPacked = {FirstDist, First}, % for the fold below
 
-    E_NG = [N || N <- Nodes, is_from_other_group(N)],
-
-    % E_alpha: nearest entry to this node in E_G
-    % E_beta: farthest entry to this node in E_G
-    % TODO we need only the distances, get rid of the nodes
-    % TODO do this calculation when computing E_G
-    {{E_alphaDist, _E_alpha}
-     , {E_betaDist, _E_beta}} = lists:foldl(fun (Node, {Min, Max}) ->
-                    NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
-                    NodePacked = {NodeDist, Node},
-                    NewMin = min(Min, NodePacked),
-                    NewMax = max(Max, NodePacked),
-                    {NewMin, NewMax}
-            end, {FirstPacked, FirstPacked}, E_G),
-    % TODO speed this up: use partition to separate in < E_alpha and >= E_alphaDist
-    % TODO we need only E_leap and E_NG, so compute them together somehow
-    % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
-    E_far = [N || N <- Nodes, get_range(SourceId, N) >= E_alphaDist,
-                              not is_sticky(N) % this is easier than comparing the distance with pred
-                              ],
-    E_leap = [N || N <- E_far, is_from_other_group(N)],
+            % E_alpha: nearest entry to this node in E_G
+            % E_beta: farthest entry to this node in E_G
+            % TODO we need only the distances, get rid of the nodes
+            % TODO do this calculation when computing E_G
+            {{E_alphaDist, _E_alpha}
+             , {E_betaDist, _E_beta}} = lists:foldl(fun (Node, {Min, Max}) ->
+                            NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
+                            NodePacked = {NodeDist, Node},
+                            NewMin = min(Min, NodePacked),
+                            NewMax = max(Max, NodePacked),
+                            {NewMin, NewMax}
+                    end, {FirstPacked, FirstPacked}, E_G),
+            % TODO speed this up: use partition to separate in < E_alpha and >= E_alphaDist
+            % TODO we need only E_leap and E_NG, so compute them together somehow
+            % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
+            E_far = [N || N <- Nodes,
+                get_range(SourceId, node:id(rt_entry_node(N))) >= E_alphaDist,
+                not is_sticky(N) % this is easier than comparing the distance with pred
+            ],
+            [N || N <- E_far, is_from_other_group(N)]
+            ;
+        [] -> []
+    end,
 
     AllowedNodes = case E_leap of
         [] -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)];
@@ -792,7 +796,13 @@ entry_learning(Entry, Type, RT) ->
                                     Interval2 = intervals:new('[', 0, Succ, ']'),
                                     intervals:in(node:id(Entry), Interval) orelse
                                         intervals:in(node:id(Entry), Interval2)
-                            end
+                            end;
+                        false ->
+                            % two nodes are existing in the ring (otherwise, Pred == Succ
+                            % means there is a bug somewhere). when two nodes are in the
+                            % system, another third node will be either the successor or
+                            % predecessor of the source node when added.
+                            true
                     end,
                     case ShouldBeAStickyNode of
                         true -> sticky;
