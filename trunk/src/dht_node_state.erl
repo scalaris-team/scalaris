@@ -59,7 +59,7 @@
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 rm_state   = ?required(state, rm_state)  :: rm_loop:state(),
-                join_time  = ?required(state, join_time) :: util:time(),
+                join_time  = ?required(state, join_time) :: erlang_timestamp(),
                 db         = ?required(state, db)        :: ?DB:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
                 proposer   = ?required(state, proposer)  :: pid(),
@@ -142,7 +142,7 @@ new(RT, RMState, DB) ->
          (state(), my_range) -> intervals:interval();
          (state(), db_range) -> [{intervals:interval(), slide_op:id()}];
          (state(), succ_range) -> intervals:interval();
-         (state(), join_time) -> util:time();
+         (state(), join_time) -> erlang_timestamp();
          (state(), db) -> ?DB:db();
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();

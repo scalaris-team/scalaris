@@ -49,5 +49,7 @@
 -ifdef(have_erlang_timestamp).
 -type erlang_timestamp() :: erlang:timestamp().
 -else.
--type erlang_timestamp() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+-type erlang_timestamp() :: {MegaSecs::non_neg_integer(),
+                             Secs::non_neg_integer(),
+                             MicroSecs::non_neg_integer()}.
 -endif.

@@ -38,7 +38,7 @@ start() ->
     Last = erlang:now(),
     ganglia_loop(Last).
 
--spec ganglia_loop(PreviousTime::util:time()) -> no_return().
+-spec ganglia_loop(PreviousTime::erlang_timestamp()) -> no_return().
 ganglia_loop(_Last) ->
     % message statistics
     {Received, Sent, _Time} = comm_logger:dump(),

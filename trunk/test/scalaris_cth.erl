@@ -20,6 +20,8 @@
 -author('kruber@zib.de').
 -vsn('$Id$ ').
 
+-include("types.hrl").
+
 %% Callbacks
 -export([id/1, init/2, terminate/1]).
 -export([pre_init_per_suite/3, post_init_per_suite/4,
@@ -29,7 +31,7 @@
 
 -record(state, { processes = [] :: [unittest_helper:process_info()] | undefined,
                  suite          :: atom() | undefined,
-                 tc_start = []  :: [{comm:erl_local_pid(), util:time()}] | [] 
+                 tc_start = []  :: [{comm:erl_local_pid(), erlang_timestamp()}] | [] 
                }).
 -type state() :: #state{} | {ok, #state{}}. % the latter for erlang =< R14B03
 -type id() :: atom().

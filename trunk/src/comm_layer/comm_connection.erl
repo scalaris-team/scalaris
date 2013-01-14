@@ -52,7 +52,7 @@
      LocalListenPort      :: comm_server:tcp_port(),
      Channel              :: main | prio,
      Socket               :: inet:socket() | notconnected,
-     StartTime            :: util:time(),
+     StartTime            :: erlang_timestamp(),
      SentMsgCount         :: non_neg_integer(),
      ReceivedMsgCount     :: non_neg_integer(),
      MsgQueue             :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
