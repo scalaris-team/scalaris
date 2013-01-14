@@ -28,7 +28,7 @@
 list_length_min() -> 0.
 list_length_max() -> 5.
 
-integer_min() -> 1.
+integer_min() -> 0. %don't change this! (negative values will be created between -max and +max)
 integer_max() -> 5.
 
 %% @doc create a random value of the given type
@@ -94,7 +94,7 @@ create_value_(float, _Size, ParseState) ->
 create_value_(integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_integers/1,
-      fun() -> crypto:rand_uniform(integer_min(), integer_max() + 1) end);
+      fun() -> crypto:rand_uniform(integer_min(), integer_max() * 2 + 1) - integer_max() end);
 create_value_({integer, Value}, _Size, _ParseState) ->
     Value;
 create_value_({list, Type}, Size, ParseState) ->
