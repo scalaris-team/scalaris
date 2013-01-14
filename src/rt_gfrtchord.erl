@@ -648,11 +648,7 @@ entry_filtering(#rt_t{} = RT) ->
         _ -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
     end,
 
-    NodesOfOtherGroups = [N || N <- AllowedNodes, is_from_other_group(N)],
-    case NodesOfOtherGroups of
-        [] -> entry_filtering(RT, AllowedNodes);
-        _ -> entry_filtering(RT, NodesOfOtherGroups)
-    end
+    entry_filtering(RT, AllowedNodes)
     .
 
 -spec entry_filtering(rt(),[#rt_entry{type :: 'normal'}]) -> rt().
