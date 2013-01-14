@@ -860,7 +860,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
             end,
             % status must remain!
             ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
-        ?value ->
+        Status when Status =:= ?value orelse Status =:= ?partial_value ->
             % result must be the same as if executed alone
             % note: previous write may have changed the value!
             {ExpResAlone, ReqsAlone} =
@@ -895,7 +895,11 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             rdht_tx:encode_value(Value)),
                     ?equals(NRes, [{ok}]);
                 {read, _Key} ->
-                    ?equals(TLog, NTLog),
+                    if Status =:= ?partial_value ->
+                           ?equals([tx_tlog:set_entry_status(OldEntry, ?value) | tl(TLog)], NTLog);
+                       Status =:= ?value ->
+                           ?equals(TLog, NTLog)
+                    end,
                     case tx_tlog:get_entry_operation(OldEntry) of
                         ?read ->
                             ?equals(NRes, [{ok, RingVal}]);
@@ -968,17 +972,21 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             ?assert_w_note(length(SubList) =< erlang:abs(Len), Note),
                             ?equals_w_note(lists:subtract(SubList, NewValue), [], Note),
                             ?equals_w_note(ListLength, length(NewValue), Note),
-                            ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
-                                    X when X =:= ?value orelse X =:= ?partial_value);
+                            case tx_tlog:get_entry_operation(OldEntry) of
+                                ?read ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                                            ?partial_value);
+                                ?write ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry),
+                                            ?value)
+                            end;
                         {fail, not_a_list} ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
                                     {fail, abort}),
                             ?equals(tx_tlog:get_entry_value(NewEntry),
                                     tx_tlog:get_entry_value(OldEntry))
                     end
-            end;
-        ?partial_value ->
-            todo % TODO
+            end
     end.
 
 
