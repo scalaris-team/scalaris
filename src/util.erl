@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([time/0, time_utc/0]).
+-export_type([time_utc/0]).
 -endif.
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
@@ -89,10 +89,6 @@
 -export([lists_partition3_feeder/1]).
 
 -export([sets_map/2]).
-
--type time() :: {MegaSecs::non_neg_integer(),
-                 Secs::non_neg_integer(),
-                 MicroSecs::non_neg_integer()}.
 
 -type us_timestamp() :: non_neg_integer(). % micro seconds since Epoch
 
@@ -932,12 +928,12 @@ app_check_known() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @doc convert os:timestamp() to microsecs
 % See http://erlang.org/pipermail/erlang-questions/2008-December/040368.html
--spec timestamp2us(time()) -> us_timestamp().
+-spec timestamp2us(erlang_timestamp()) -> us_timestamp().
 timestamp2us({MegaSecs, Secs, MicroSecs}) ->
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 % @doc convert microsecs to os:timestamp()
--spec us2timestamp(us_timestamp()) -> time().
+-spec us2timestamp(us_timestamp()) -> erlang_timestamp().
 us2timestamp(Time) ->
     MicroSecs = Time rem 1000000,
     Time2 = (Time - MicroSecs) div 1000000,
@@ -945,7 +941,7 @@ us2timestamp(Time) ->
     MegaSecs = (Time2 - Secs) div 1000000,
     {MegaSecs, Secs, MicroSecs}.
 
--spec time_plus_us(Time::time(), Delta_MicroSeconds::integer()) -> time().
+-spec time_plus_us(Time::erlang_timestamp(), Delta_MicroSeconds::integer()) -> erlang_timestamp().
 time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     MicroSecs1 = MicroSecs + Delta,
     NewMicroSecs = MicroSecs1 rem 1000000,
@@ -955,11 +951,11 @@ time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, NewMicroSecs}.
 
--spec time_plus_ms(Time::time(), Delta_MilliSeconds::integer()) -> time().
+-spec time_plus_ms(Time::erlang_timestamp(), Delta_MilliSeconds::integer()) -> erlang_timestamp().
 time_plus_ms(Time, Delta) ->
     time_plus_us(Time, Delta * 1000).
 
--spec time_plus_s(Time::time(), Delta_Seconds::integer()) -> time().
+-spec time_plus_s(Time::erlang_timestamp(), Delta_Seconds::integer()) -> erlang_timestamp().
 time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     Secs1 = Secs + Delta,
     NewSecs = Secs1 rem 1000000,
@@ -1374,7 +1370,7 @@ sets_map(Fun, Set) ->
 %% Interval-Epsilon microseconds back into the past.
 
 -spec rrd_combine_timing_slots(DB :: rrd:rrd()
-                               , CurrentTS :: time()
+                               , CurrentTS :: erlang_timestamp()
                                , Interval :: non_neg_integer()) ->
     {
         Sum :: number(), SquaresSum :: number(), Count :: non_neg_integer(), Min :: number(),
@@ -1384,7 +1380,7 @@ rrd_combine_timing_slots(DB, CurrentTS, Interval) ->
     rrd_combine_timing_slots(DB, CurrentTS, Interval, 0). % Epsilon = 10ms
 
 -spec rrd_combine_timing_slots(DB :: rrd:rrd()
-                               , CurrentTS :: time()
+                               , CurrentTS :: erlang_timestamp()
                                , Interval :: non_neg_integer()
                                , Epsilon :: non_neg_integer()) ->
     {

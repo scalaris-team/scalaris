@@ -54,7 +54,7 @@
                          %% the other end (fd_hbs) has a monitor
                          %% established for this
           non_neg_integer(), %% number of local subscribers for the remote pid
-          util:time(),   %% delay remote demonitoring:
+          erlang_timestamp(),   %% delay remote demonitoring:
                          %%   time of ref count reached 0
                          %%   all other modifications change this to {0,0,0}
           boolean()      %% delayed demonitoring requested and still open?
@@ -63,8 +63,8 @@
 -type(state() :: {
        comm:mypid(), %% remote hbs
        [rempid()],  %% subscribed rem. pids + ref counting
-       util:time(),  %% local time of last pong arrival
-       util:time(),  %% remote is crashed if no pong arrives until this
+       erlang_timestamp(),  %% local time of last pong arrival
+       erlang_timestamp(),  %% remote is crashed if no pong arrives until this
        atom(),       %% ets table name
        %% locally erlang:monitored() pids for a remote hbs:
        [{comm:mypid(), reference()}]
@@ -338,7 +338,7 @@ trigger_delayed_del_watching(RemPidEntry) ->
     rempid_set_pending_demonitor(E1, true).
 
 -spec state_new(comm:mypid(), [rempid()],
-                util:time(), util:time(), atom()) -> state().
+                erlang_timestamp(), erlang_timestamp(), atom()) -> state().
 state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter,Table) ->
     {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
 
@@ -350,13 +350,13 @@ state_set_rem_hbs(State, Val)       -> setelement(1, State, Val).
 state_get_rem_pids(State)           -> element(2, State).
 -spec state_set_rem_pids(state(), [rempid()]) -> state().
 state_set_rem_pids(State, Val)      -> setelement(2, State, Val).
--spec state_get_last_pong(state())  -> util:time().
+-spec state_get_last_pong(state())  -> erlang_timestamp().
 state_get_last_pong(State)          -> element(3, State).
--spec state_set_last_pong(state(), util:time()) -> state().
+-spec state_set_last_pong(state(), erlang_timestamp()) -> state().
 state_set_last_pong(State, Val)     -> setelement(3, State, Val).
--spec state_get_crashed_after(state()) -> util:time().
+-spec state_get_crashed_after(state()) -> erlang_timestamp().
 state_get_crashed_after(State)      -> element(4, State).
--spec state_set_crashed_after(state(), util:time()) -> state().
+-spec state_set_crashed_after(state(), erlang_timestamp()) -> state().
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
 -spec state_get_table(state()) -> atom().
 state_get_table(State)              -> element(5, State).
@@ -512,9 +512,9 @@ rempid_inc(Entry) ->
 rempid_dec(Entry) ->
     TmpEntry = setelement(2, Entry, element(2, Entry) - 1),
     rempid_set_last_modified(TmpEntry, {0,0,0}).
--spec rempid_get_last_modified(rempid()) -> util:time().
+-spec rempid_get_last_modified(rempid()) -> erlang_timestamp().
 rempid_get_last_modified(Entry) -> element(3, Entry).
--spec rempid_set_last_modified(rempid(), util:time()) -> rempid().
+-spec rempid_set_last_modified(rempid(), erlang_timestamp()) -> rempid().
 rempid_set_last_modified(Entry, Time) -> setelement(3, Entry, Time).
 -spec rempid_get_pending_demonitor(rempid()) -> boolean().
 rempid_get_pending_demonitor(Entry) -> element(4, Entry).

@@ -26,7 +26,7 @@
 -export([start_link/1, init/1, on/2]).
 -export([get_stats/0]).
 
--type state() :: {StartTime::util:time(), RcvCnt::non_neg_integer(),
+-type state() :: {StartTime::erlang_timestamp(), RcvCnt::non_neg_integer(),
                   RcvBytes::non_neg_integer(), SendCnt::non_neg_integer(),
                   SendBytes::non_neg_integer()}.
 
