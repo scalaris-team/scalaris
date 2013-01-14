@@ -87,7 +87,7 @@
 
 % @doc Maximum number of entries in a routing table
 -spec maximum_entries() -> non_neg_integer().
-maximum_entries() -> 3.
+maximum_entries() -> 64.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
