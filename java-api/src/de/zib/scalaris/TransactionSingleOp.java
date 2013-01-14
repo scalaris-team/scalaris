@@ -19,8 +19,13 @@ import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
 import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.TestAndSetOp;
 import de.zib.scalaris.operations.TransactionSingleOpOperation;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Provides methods to read and write key/value pairs to/from a scalaris ring.
@@ -245,7 +250,7 @@ public class TransactionSingleOp extends
         public ErlangValue processReadAt(final int pos) throws TimeoutException,
                 NotFoundException, UnknownException {
             return new ErlangValue(
-                    CommonErlangObjects.processResult_read(results.elementAt(pos), compressed));
+                    ReadOp.processResult_read(results.elementAt(pos), compressed));
         }
 
         /**
@@ -266,7 +271,7 @@ public class TransactionSingleOp extends
         public void processWriteAt(final int pos) throws TimeoutException,
                 AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            CommonErlangObjects.processResult_write(results.elementAt(pos), compressed);
+            WriteOp.processResult_write(results.elementAt(pos), compressed);
         }
 
         /**
@@ -291,7 +296,7 @@ public class TransactionSingleOp extends
         public void processAddDelOnListAt(final int pos) throws TimeoutException,
                 NotAListException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            CommonErlangObjects.processResult_addDelOnList(results.elementAt(pos), compressed);
+            AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
         }
 
         /**
@@ -316,7 +321,7 @@ public class TransactionSingleOp extends
         public void processAddOnNrAt(final int pos) throws TimeoutException,
                 NotANumberException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            CommonErlangObjects.processResult_addOnNr(results.elementAt(pos), compressed);
+            AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
         }
 
         /**
@@ -344,7 +349,7 @@ public class TransactionSingleOp extends
                 NotFoundException, KeyChangedException, AbortException,
                 UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            CommonErlangObjects.processResult_testAndSet(results.elementAt(pos), compressed);
+            TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
         }
     }
 

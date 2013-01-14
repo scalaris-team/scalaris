@@ -26,8 +26,13 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.operations.AddDelOnListOp;
+import de.zib.scalaris.operations.AddOnNrOp;
 import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.TestAndSetOp;
 import de.zib.scalaris.operations.TransactionOperation;
+import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Provides means to realise a transaction with the scalaris ring using Java.
@@ -247,7 +252,7 @@ public class Transaction extends
         public ErlangValue processReadAt(final int pos) throws TimeoutException,
                 NotFoundException, UnknownException {
             return new ErlangValue(
-                    CommonErlangObjects.processResult_read(results.elementAt(pos), compressed));
+                    ReadOp.processResult_read(results.elementAt(pos), compressed));
         }
 
         /**
@@ -265,7 +270,7 @@ public class Transaction extends
         @Override
         public void processWriteAt(final int pos) throws TimeoutException,
                 UnknownException {
-            CommonErlangObjects.processResult_write(results.elementAt(pos), compressed);
+            WriteOp.processResult_write(results.elementAt(pos), compressed);
         }
 
         /**
@@ -287,7 +292,7 @@ public class Transaction extends
         @Override
         public void processAddDelOnListAt(final int pos) throws TimeoutException,
                 NotAListException, UnknownException {
-            CommonErlangObjects.processResult_addDelOnList(results.elementAt(pos), compressed);
+            AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
         }
 
         /**
@@ -309,7 +314,7 @@ public class Transaction extends
         @Override
         public void processAddOnNrAt(final int pos) throws TimeoutException,
                 NotANumberException, UnknownException {
-            CommonErlangObjects.processResult_addOnNr(results.elementAt(pos), compressed);
+            AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
         }
 
         /**
@@ -333,7 +338,7 @@ public class Transaction extends
         @Override
         public void processTestAndSetAt(final int pos) throws TimeoutException,
                 NotFoundException, KeyChangedException, UnknownException {
-            CommonErlangObjects.processResult_testAndSet(results.elementAt(pos), compressed);
+            TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
         }
 
         /**

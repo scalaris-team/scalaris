@@ -21,6 +21,8 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * An operation writing a value.
@@ -69,5 +71,45 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
     @Override
     public String toString() {
         return "write(" + key + ", " + value + ")";
+    }
+
+    /**
+     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
+     * result from a write operation.
+     *
+     * NOTE: this method should not be called manually by an application and may
+     * change without notice!
+     *
+     * @param received_raw
+     *            the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
+     *
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws UnknownException
+     *             if any other error occurs
+     */
+    public static final void processResult_write(final OtpErlangObject received_raw,
+            final boolean compressed) throws TimeoutException, UnknownException {
+        /*
+         * possible return values:
+         *  {ok} | {fail, timeout}
+         */
+        try {
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            if (received.equals(CommonErlangObjects.okTupleAtom)) {
+                return;
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                final OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
+                    throw new TimeoutException(received_raw);
+                }
+            }
+            throw new UnknownException(received_raw);
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received_raw);
+        }
     }
 }
