@@ -907,8 +907,8 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                                     ?read -> RingVal;
                                     ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
                                 end,
-                            Note = io:format("RandomVal: ~p (~p), StoredVal: ~p (~p)",
-                                             [RandomVal, ListLength, NewValue, length(NewValue)]),
+                            Note = io_lib:format("RandomVal: ~p (~p), StoredVal: ~p (~p)",
+                                                 [RandomVal, ListLength, NewValue, length(NewValue)]),
                             ?assert_w_note(lists:member(RandomVal, NewValue), Note),
                             ?equals_w_note(ListLength, length(NewValue), Note),
                             ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
