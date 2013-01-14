@@ -153,8 +153,8 @@ upd_tlog_via_rdht(TLog, ReqList) ->
 -spec req_props(Req::request_on_key()) -> {NeedsFullRead::boolean(), WorksAfterAnyPartialRead::boolean(), ProvidesFullRead::boolean()}.
 req_props(Req) ->
     case req_get_op(Req) of
-        read when size(Req) =:= 2 -> {true, false, true};
-        read when size(Req) =:= 3 -> {false, false, false};
+        read when size(Req) =:= 2 -> {true, false, true}; % full read
+        read when size(Req) =:= 3 -> {false, false, false}; % partial read
         test_and_set -> {true, false, true};
         add_on_nr -> {true, false, true};
         add_del_on_list -> {true, false, true};
