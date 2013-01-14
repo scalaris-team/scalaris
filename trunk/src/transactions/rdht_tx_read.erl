@@ -88,8 +88,10 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ok.
 
 -spec extract_from_value_feeder
-        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list) -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list};
-        (empty_val, -1, Op::?read | ?write | ?random_from_list) -> {empty_val, -1, Op::?read | ?write | ?random_from_list}.
+        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list)
+            -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list};
+        (empty_val, -1, Op::?read | ?write | ?random_from_list)
+            -> {empty_val, -1, Op::?read | ?write | ?random_from_list}.
 extract_from_value_feeder(empty_val = Value, Version, Op) ->
     {Value, Version, Op};
 extract_from_value_feeder(Value, Version, ?random_from_list = Op) ->
@@ -100,7 +102,9 @@ extract_from_value_feeder(Value, Version, Op) ->
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
         (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
-        (?DB:value(), ?DB:version(), Op::?random_from_list) -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?random_from_list)
+            -> Result::{ok, {RandomElement::?DB:value(), ListLen::pos_integer()}, ?DB:version()}
+                     | {fail, empty_list | not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
         (empty_val, -1, Op::?read | ?random_from_list) -> Result::{ok, empty_val, -1};
         (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
@@ -119,7 +123,9 @@ extract_from_value(ValueEnc, Version, ?random_from_list) ->
         _         -> {fail, not_a_list, Version}
     end.
 
--spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, {EnDecode::boolean(), ListLength::pos_integer()})
+-spec extract_from_tlog_feeder(
+        tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list,
+        {EnDecode::boolean(), ListLength::pos_integer()})
         -> {tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, EnDecode::boolean()}.
 extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLength}) ->
     NewEntry =
