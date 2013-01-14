@@ -34,7 +34,8 @@ all() ->
      lists_remove_at_indices,
      rrd_combine_timing_slots_handle_empty_rrd,
      rrd_combine_timing_slots_simple,
-     rrd_combine_timing_slots_subset
+     rrd_combine_timing_slots_subset,
+     sublist, tester_sublist3
  ].
 
 suite() ->
@@ -260,6 +261,69 @@ lists_remove_at_indices(_Config) ->
     ?expect_exception(util:lists_remove_at_indices([], [0]), error, function_clause),
     ?expect_exception(util:lists_remove_at_indices([0,1,2,3], [5]), error, function_clause),
     ok.
+
+sublist(_Config) ->
+    L = [a,b,c,d,e,f,g],
+    LLen = length(L),
+    ?equals(util:sublist(L, 1, 0)    , {[], LLen}),
+    ?equals(util:sublist(L, 1, 1)    , {[a], LLen}),
+    ?equals(util:sublist(L, 1, 3)    , {[a,b,c], LLen}),
+    ?equals(util:sublist(L, 1, 7)    , {[a,b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, 1, 8)    , {[a,b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, 1, 10)   , {[a,b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, 2, 10)   , {[b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, 3, 10)   , {[c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, 7, 10)   , {[g], LLen}),
+    ?equals(util:sublist(L, 8, 10)   , {[], LLen}),
+    ?equals(util:sublist(L, 10, 10)  , {[], LLen}),
+    
+    ?equals(util:sublist(L, 1, -1)   , {[a], LLen}),
+    ?equals(util:sublist(L, 1, -2)   , {[a], LLen}),
+    ?equals(util:sublist(L, 1, -3)   , {[a], LLen}),
+    ?equals(util:sublist(L, 2, -1)   , {[b], LLen}),
+    ?equals(util:sublist(L, 3, -1)   , {[c], LLen}),
+    ?equals(util:sublist(L, 4, -1)   , {[d], LLen}),
+    ?equals(util:sublist(L, 5, -1)   , {[e], LLen}),
+    ?equals(util:sublist(L, 6, -1)   , {[f], LLen}),
+    ?equals(util:sublist(L, 7, -1)   , {[g], LLen}),
+    ?equals(util:sublist(L, 8, -1)   , {[g], LLen}),
+    ?equals(util:sublist(L, 3, -5)   , {[c,b,a], LLen}),
+    
+    ?equals(util:sublist(L, -1, 0)   , {[], LLen}),
+    ?equals(util:sublist(L, -1, 1)   , {[g], LLen}),
+    ?equals(util:sublist(L, -1, 3)   , {[g], LLen}),
+    ?equals(util:sublist(L, -1, 10)  , {[g], LLen}),
+    ?equals(util:sublist(L, -2, 10)  , {[f,g], LLen}),
+    ?equals(util:sublist(L, -3, 10)  , {[e,f,g], LLen}),
+    ?equals(util:sublist(L, -7, 10)  , {[a,b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, -8, 10)  , {[a,b,c,d,e,f,g], LLen}),
+    ?equals(util:sublist(L, -10, 10) , {[a,b,c,d,e,f,g], LLen}),
+    
+    ?equals(util:sublist(L, -1, -1)  , {[g], LLen}),
+    ?equals(util:sublist(L, -1, -3)  , {[g,f,e], LLen}),
+    ?equals(util:sublist(L, -1, -7)  , {[g,f,e,d,c,b,a], LLen}),
+    ?equals(util:sublist(L, -1, -8)  , {[g,f,e,d,c,b,a], LLen}),
+    ?equals(util:sublist(L, -1, -10) , {[g,f,e,d,c,b,a], LLen}),
+    ?equals(util:sublist(L, -2, -10) , {[f,e,d,c,b,a], LLen}),
+    ?equals(util:sublist(L, -3, -10) , {[e,d,c,b,a], LLen}),
+    ?equals(util:sublist(L, -7, -10) , {[a], LLen}),
+    ?equals(util:sublist(L, -8, -10) , {[], LLen}),
+    ?equals(util:sublist(L, -10, -10), {[], LLen}),
+    
+    ok.
+
+-spec prop_sublist3([any()], X::1..1000) -> true.
+prop_sublist3(L, X) ->
+    % last X elements (in different order)
+    ?equals(lists:reverse(element(1, util:sublist(L, -1, -X))),
+            element(1, util:sublist(L, -X, X))),
+    % first X elements (in different order)
+    ?equals(lists:reverse(element(1, util:sublist(L, 1, X))),
+            element(1, util:sublist(L, X, -X))),
+    true.
+
+tester_sublist3(_Config) ->
+    tester:test(?MODULE, prop_sublist3, 2, 5000, [{threads, 2}]).
 
 rrd_combine_timing_slots_handle_empty_rrd(_Config) ->
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),

@@ -42,6 +42,7 @@
          lists_split/2, lists_keystore2/5,
          lists_partition3/2,
          lists_remove_at_indices/2,
+         sublist/3,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -571,13 +572,13 @@ sleep_for_ever() ->
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution.
 -spec randomelem(List::[X,...]) -> X.
-randomelem(List)->
+randomelem(List) ->
     element(1, randomelem_and_length(List)).
 
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution (also returns the list's length).
 -spec randomelem_and_length(List::[X,...]) -> {X, Length::pos_integer()}.
-randomelem_and_length(List)->
+randomelem_and_length(List) ->
     Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
     {lists:nth(RandomNum, List), Length - 1}.
@@ -1148,6 +1149,52 @@ lists_remove_at_indices([X|L], AccList, Indices, CurrentIndex) ->
 -spec lists_prepend_reversed([any()], [any()]) -> [any()].
 lists_prepend_reversed(L, To) -> lists:foldl(fun(El, Acc) -> [El | Acc] end, To, L).
 
+%% @doc A more flexible sublist function than lists:sublist/3.
+%%      Extracts a sublist of length Length starting at Start.
+%%      If Start is negative, we count from the end, e.g. -1 is the last
+%%      element, -2 the second last.
+%%      If Length is negative, the sublist is created in reversed
+%%      direction, e.g. sublist([a,b,c], -1, -2) gets [c, b].
+%%      If Start is less than -ListLength and Length is non-negative, it will be
+%%      set to 1. If Length is negative in this case, an empty sublist will be
+%%      returned.
+%%      If Start is greater than ListLength and Length is non-negative, an empty
+%%      sublist will be returned. If Length is negative in this case, it will
+%%      be set to ListLength.
+%%      Note: sublists never wrap between start and end, i.e.
+%%      sublist([a,b,c], 1, -2) gets []!
+%%      Examples:
+%%       * first 10: sublist(L, 1, 10) | sublist(L, 10, -10) (reverse order)
+%%       * last 10 : sublist(L, -10, 10) | sublist(L, -1, -10) (reverse order)
+-spec sublist(List::[X,...], Start::pos_integer() | neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}.
+sublist(List, Start, Length) ->
+    ListLen = length(List),
+    NewStart = if Start > ListLen andalso Length >= 0  -> 0;
+                  Start > ListLen andalso Length < 0   -> ListLen;
+                  Start >= 1                           -> Start;
+                  Start < -ListLen andalso Length >= 0 -> 1;
+                  Start < -ListLen andalso Length < 0  -> 0;
+                  Start =< -1                          -> ListLen + Start + 1
+               end,
+    sublist_(List, ListLen, NewStart, Length).
+
+-spec sublist__feeder(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer())
+        -> {List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()}.
+sublist__feeder(List, _, Start, Length) ->
+    ListLength = length(List),
+    {List, ListLength, erlang:min(Start, ListLength), Length}.
+
+%% @doc Helper for sublist/3.
+%%      Pre: ListLength =:= length(List), 0 =< Start =< ListLength
+-spec sublist_(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}.
+sublist_(_List, ListLength, 0, _Length) ->
+    {[], ListLength};
+sublist_(List, ListLength, Start, Length) when Length >= 0 ->
+    {lists:sublist(List, Start, Length), ListLength};
+sublist_(List, ListLength, Start, Length) when Length < 0 ->
+    RevList = lists:reverse(List),
+    NewStart = ListLength - Start + 1, % note: reverse order!
+    {lists:sublist(RevList, NewStart, -Length), ListLength}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
