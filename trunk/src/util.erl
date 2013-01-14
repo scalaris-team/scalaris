@@ -1185,7 +1185,7 @@ sublist__feeder(List, _, Start, Length) ->
     {List, ListLength, erlang:min(Start, ListLength), Length}.
 
 %% @doc Helper for sublist/3.
-%%      Pre: ListLength =:= length(List), 0 =< Start =< ListLength
+%%      Pre: ListLength =:= length(List), 0 =&lt; Start =&lt; ListLength
 -spec sublist_(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}.
 sublist_(_List, ListLength, 0, _Length) ->
     {[], ListLength};
