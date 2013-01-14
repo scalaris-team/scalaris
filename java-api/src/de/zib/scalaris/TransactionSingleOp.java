@@ -134,7 +134,7 @@ public class TransactionSingleOp extends
      * {@link TransactionSingleOp#req_list(RequestList)}.
      *
      * @author Nico Kruber, kruber@zib.de
-     * @version 3.5
+     * @version 3.18
      * @since 3.5
      */
     public static class RequestList extends de.zib.scalaris.RequestList {
@@ -143,6 +143,17 @@ public class TransactionSingleOp extends
          */
         public RequestList() {
             super();
+        }
+
+        /**
+         * Creates a new request list with the given operation.
+         *
+         * Provided for convenience.
+         *
+         * @since 3.18
+         */
+        protected RequestList(final Operation op) {
+            super(op);
         }
 
         /**
