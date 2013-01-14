@@ -119,9 +119,9 @@ extract_from_value(ValueEnc, Version, ?random_from_list) ->
         _         -> {fail, not_a_list, Version}
     end.
 
--spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, {EnDecode::boolean(), ListLenght::pos_integer()})
+-spec extract_from_tlog_feeder(tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, {EnDecode::boolean(), ListLength::pos_integer()})
         -> {tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, EnDecode::boolean()}.
-extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLenght}) ->
+extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLength}) ->
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
             ?partial_value -> % only ?value allowed here
@@ -129,11 +129,11 @@ extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLenght}) ->
             _ -> Entry
         end,
     {NewEntry, Key, Op, EnDecode};
-extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLenght}) ->
+extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLength}) ->
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
             ?partial_value -> % need value partial value!
-                PartialValue = {tx_tlog:get_entry_value(Entry), ListLenght},
+                PartialValue = {tx_tlog:get_entry_value(Entry), ListLength},
                 tx_tlog:set_entry_value(Entry, PartialValue);
             _ -> Entry
         end,
