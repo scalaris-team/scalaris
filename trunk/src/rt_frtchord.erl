@@ -669,6 +669,19 @@ sticky_entry_to_normal_node(EntryKey, RT) ->
     RT#rt_t{nodes=UpdatedTree}
     .
 
+
+-spec rt_entry_from(Node::node:node_type()
+                    , Type :: entry_type()
+                    , PredId :: key_t()
+                    , SuccId :: key_t()
+                   ) -> rt_entry().
+rt_entry_from(Node, Type, PredId, SuccId) ->
+    #rt_entry{
+        node=Node
+        , type=Type
+        , adjacent_fingers={PredId, SuccId}
+    }.
+
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
 -spec create_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) ->
@@ -681,11 +694,7 @@ create_entry(Node, Type, RT) ->
     RTSize = get_size(RT),
     case PredLookup of
         nil when RTSize =:= 0 -> % this is the first entry of the RT
-            NewEntry = #rt_entry{
-                node=Node,
-                type=Type,
-                adjacent_fingers={NodeId, NodeId}
-            },
+            NewEntry = rt_entry_from(Node, Type, NodeId, NodeId),
             {NewEntry, NewEntry, NewEntry}
             ;
         nil -> % largest finger
@@ -706,11 +715,7 @@ get_adjacent_fingers_from(Pred, Node, Type, RT) ->
     Succ = successor_node(RT, Pred),
     SuccId = entry_nodeid(Succ),
     NodeId = node:id(Node),
-    NewEntry = #rt_entry{
-        node=Node,
-        type=Type,
-        adjacent_fingers={PredId, SuccId}
-    },
+    NewEntry = rt_entry_from(Node, Type, PredId, SuccId),
     case PredId =:= SuccId of
         false ->
             {set_adjacent_succ(Pred, NodeId),
