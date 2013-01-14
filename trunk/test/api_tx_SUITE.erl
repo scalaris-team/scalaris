@@ -813,8 +813,8 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
             % should be the same as if there was no abort!
             TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, ?value),
             Note = io_lib:format("Entry: ~.0p, Req: ~.0p, RingVal: ~.0p", [OldEntry, Req, RingVal]),
-            case element(1, Req) of
-                read when element(3, Req) =:= random_from_list ->
+            case Req of
+                {read, _Key, random_from_list} ->
                     case NRes of
                         [{ok, {RandomVal, ListLength}}] ->
                             NewValue =
@@ -853,12 +853,12 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                         ValueAfterWrite = rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry)),
                         {[{ok}, hd(NRes)], [{write, element(2, Req), ValueAfterWrite}, Req]}
                 end,
-            case element(1, Req) of
-                read when element(3, Req) =:= random_from_list ->
+            case Req of
+                {read, _Key0, random_from_list} ->
                     case NRes of
                         [{fail, _}] ->
                             ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)));
-                        [{ok, _RandomVal}] ->
+                        [{ok, {_RandomVal, _ListLength}}] ->
                             % the only thing guaranteed here is that it must also be {ok, _}
                             case length(ExpResAlone) of
                                 2 -> ?equals_pattern(element(2, api_tx:req_list(ReqsAlone)), [{ok}, {ok, _}]);
@@ -869,14 +869,14 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)))
             end,
             % further tests for the individual requests' properties
-            case element(1, Req) of
-                write ->
+            case Req of
+                {write, _Key, Value} ->
                     ?equals(tx_tlog:get_entry_status(NewEntry),
                             ?value),
                     ?equals(tx_tlog:get_entry_value(NewEntry),
-                            rdht_tx:encode_value(element(3, Req))),
+                            rdht_tx:encode_value(Value)),
                     ?equals(NRes, [{ok}]);
-                read when size(Req) =:= 2 ->
+                {read, _Key} ->
                     ?equals(TLog, NTLog),
                     case tx_tlog:get_entry_operation(OldEntry) of
                         ?read ->
@@ -884,7 +884,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                         ?write ->
                             ?equals(NRes, [{ok, rdht_tx:decode_value(tx_tlog:get_entry_value(NewEntry))}])
                     end;
-                test_and_set ->
+                {test_and_set, _Key, _Old, _New} ->
                     case hd(NRes) of
                         {ok} ->
                             ?equals(?value,
@@ -895,7 +895,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             ?equals(tx_tlog:get_entry_value(OldEntry),
                                     tx_tlog:get_entry_value(NewEntry))
                     end;
-                add_on_nr ->
+                {add_on_nr, _Key, _X} ->
                     case hd(NRes) of
                         {ok} ->
                             ?equals(?value,
@@ -906,7 +906,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             ?equals(tx_tlog:get_entry_value(OldEntry),
                                     tx_tlog:get_entry_value(NewEntry))
                     end;
-                add_del_on_list ->
+                {add_del_on_list, _Key, _ToAdd, _ToRemove} ->
                     case hd(NRes) of
                         {ok} ->
                             ?equals(?value,
@@ -917,7 +917,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             ?equals(tx_tlog:get_entry_value(OldEntry),
                                     tx_tlog:get_entry_value(NewEntry))
                     end;
-                read when element(3, Req) =:= random_from_list ->
+                {read, _Key, random_from_list} ->
                     case hd(NRes) of
                         {ok, {RandomVal, ListLength}} ->
                             NewValue =
