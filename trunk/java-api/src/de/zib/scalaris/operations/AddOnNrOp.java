@@ -23,6 +23,9 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotANumberException;
+import de.zib.scalaris.TimeoutException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Operation incrementing a numeric value.
@@ -34,6 +37,7 @@ import de.zib.scalaris.ErlangValue;
 public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOperation {
     final protected OtpErlangString key;
     final protected OtpErlangObject toAdd;
+
     /**
      * Constructor
      *
@@ -46,6 +50,7 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
         this.key = key;
         this.toAdd = toAdd;
     }
+
     /**
      * Constructor
      *
@@ -58,6 +63,7 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
         this.key = key;
         this.toAdd = toAdd;
     }
+
     /**
      * Constructor
      *
@@ -70,6 +76,7 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
         this.key = new OtpErlangString(key);
         this.toAdd = ErlangValue.convertToErlang(toAdd);
     }
+
     /**
      * Constructor
      *
@@ -95,5 +102,52 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
     @Override
     public String toString() {
         return "add_on_nr(" + key + ", " + toAdd + ")";
+    }
+
+    /**
+     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
+     * result from an add_on_nr operation.
+     *
+     * NOTE: this method should not be called manually by an application and may
+     * change without notice!
+     *
+     * @param received_raw
+     *            the object to process
+     * @param compressed
+     *            whether the transfer of values is compressed or not
+     *
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to fetch the value
+     * @throws NotANumberException
+     *             if the previously stored value was not a number
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @since 3.8
+     */
+    public static final void processResult_addOnNr(final OtpErlangObject received_raw,
+            final boolean compressed) throws TimeoutException,
+            NotANumberException, UnknownException {
+        /*
+         * possible return values:
+         *  {ok} | {fail, timeout} | {fail, not_a_number}.
+         */
+        try {
+            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            if (received.equals(CommonErlangObjects.okTupleAtom)) {
+                return;
+            } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
+                final OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
+                    throw new TimeoutException(received_raw);
+                } else if (reason.equals(CommonErlangObjects.notANumberAtom)) {
+                    throw new NotANumberException(received_raw);
+                }
+            }
+            throw new UnknownException(received_raw);
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, received_raw);
+        }
     }
 }
