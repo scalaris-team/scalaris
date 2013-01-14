@@ -25,6 +25,7 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.operations.AddDelOnListOp;
 import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.Operation;
 import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.TestAndSetOp;
 import de.zib.scalaris.operations.WriteOp;
@@ -36,7 +37,7 @@ import de.zib.scalaris.operations.WriteOp;
  * @param <ResL> {@link ResultList} type
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.14
+ * @version 3.18
  * @since 3.14
  */
 public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends ResultList> {
@@ -76,6 +77,36 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
     }
 
     abstract protected ReqL newReqList();
+
+    /**
+     * Executes the given operation.
+     *
+     * @param op
+     *            the operation to execute
+     *
+     * @return results list containing a single result of the given operation
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if a commit failed (if there was one)
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #req_list(RequestList)
+     *
+     * @since 3.18
+     */
+    public ResL req_list(final Operation op) throws ConnectionException,
+            TimeoutException, AbortException, UnknownException {
+        final ReqL reqList = newReqList();
+        reqList.addOp(op);
+        return req_list(reqList);
+    }
 
     /**
      * Executes all requests in <code>req</code>.
