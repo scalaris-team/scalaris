@@ -56,6 +56,8 @@ public final class CommonErlangObjects {
     public static final OtpErlangAtom notANumberAtom = new OtpErlangAtom("not_a_number");
     public static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
     public static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
+    public static final OtpErlangAtom sublistAtom = new OtpErlangAtom("sublist");
+    public static final OtpErlangAtom randomFromListAtom = new OtpErlangAtom("random_from_list");
 
     // JSON
     public static final OtpErlangAtom structAtom = new OtpErlangAtom("struct");
