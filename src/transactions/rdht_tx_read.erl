@@ -167,13 +167,16 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
             ClientVal =
                 case Op of
                     random_from_list ->
-                        {RandVal, Len} = EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), Len}, EncodedVal)
+                        {RandVal, ListLen} = EncodedVal = tx_tlog:get_entry_value(Entry),
+                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), ListLen}, EncodedVal)
                 end,
             {Entry, {ok, ClientVal}};
         ?value ->
             extract_partial_from_full(Entry, Key, Op, EnDecode);
         {fail, not_found} = R -> {Entry, R}; %% not_found
+        % note: the following two error states depend on the actual op, if a
+        %       state is not defined for an op, the generic handler below must
+        %       be used!
         {fail, empty_list} = R -> {Entry, R};
         {fail, not_a_list} = R -> {Entry, R};
         %% try reading from a failed entry (type mismatch was the reason?)
