@@ -40,7 +40,7 @@
                     Result           :: result(),
                     IsDecided        :: tx_tlog:tx_status() | false,
                     IsClientInformed :: boolean(),
-                    Op               :: ?read | ?write | ?random_from_list
+                    Op               :: ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
                   }.
 
 -spec state_new(rdht_tx:req_id()) -> read_state().
@@ -78,9 +78,9 @@ state_set_decided(State, Val) ->    setelement(7, State, Val).
 state_is_client_informed(State) ->  element(8, State).
 -spec state_set_client_informed(read_state()) -> read_state().
 state_set_client_informed(State) -> setelement(8, State, true).
--spec state_get_op(read_state()) -> ?read | ?write | ?random_from_list.
+-spec state_get_op(read_state()) -> ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}.
 state_get_op(State) ->          element(9, State).
--spec state_set_op(read_state(), ?read | ?write | ?random_from_list) -> read_state().
+-spec state_set_op(read_state(), ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}) -> read_state().
 state_set_op(State, Op) ->     setelement(9, State, Op).
 
 -spec state_get_numreplied(read_state()) -> non_neg_integer().

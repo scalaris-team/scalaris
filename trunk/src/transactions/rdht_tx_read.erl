@@ -57,7 +57,11 @@ work_phase(ClientPid, ReqId, Request) ->
     Op = if element(1, Request) =/= read -> ?read; % e.g. {add_del_on_list, Key, ToAdd, ToRemove}
             size(Request) =:= 3 ->
                 case element(3, Request) of
-                    random_from_list -> ?random_from_list
+                    random_from_list -> ?random_from_list;
+                     % let client crash if input data is not correct:
+                    {sublist, Start, Len} when is_integer(Start)
+                      andalso Start =/= 0 andalso is_integer(Len)
+                      -> {?sublist, Start, Len}
                 end;
             true -> ?read
          end,
@@ -65,7 +69,9 @@ work_phase(ClientPid, ReqId, Request) ->
     work_phase_key(ClientPid, ReqId, Key, HashedKey, Op).
 
 -spec work_phase_key(pid(), rdht_tx:req_id() | rdht_tx_write:req_id(),
-                     client_key(), ?RT:key(), Op::?read | ?write | ?random_from_list) -> ok.
+                     client_key(), ?RT:key(),
+                     Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+        -> ok.
 work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -78,7 +84,9 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ok.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
-                  HashedKey::?RT:key(), Op::?read | ?write | ?random_from_list) -> ok.
+                  HashedKey::?RT:key(),
+                  Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+        -> ok.
 quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:quorum_read ~p Collector: ~p~n", [self(), CollectorPid]),
     RKeys = ?RT:get_replica_keys(HashedKey),
@@ -88,13 +96,15 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
     ok.
 
 -spec extract_from_value_feeder
-        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list)
-            -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list};
-        (empty_val, -1, Op::?read | ?write | ?random_from_list)
-            -> {empty_val, -1, Op::?read | ?write | ?random_from_list}.
+        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}};
+        (empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> {empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}}.
 extract_from_value_feeder(empty_val = Value, Version, Op) ->
     {Value, Version, Op};
 extract_from_value_feeder(Value, Version, ?random_from_list = Op) ->
+    {rdht_tx:encode_value(Value), Version, Op}; % need a valid encoded value!
+extract_from_value_feeder(Value, Version, {?sublist, _Start, _Len} = Op) ->
     {rdht_tx:encode_value(Value), Version, Op}; % need a valid encoded value!
 extract_from_value_feeder(Value, Version, Op) ->
     {Value, Version, Op}.
@@ -105,8 +115,11 @@ extract_from_value_feeder(Value, Version, Op) ->
         (?DB:value(), ?DB:version(), Op::?random_from_list)
             -> Result::{ok, {RandomElement::?DB:value(), ListLen::pos_integer()}, ?DB:version()}
                      | {fail, empty_list | not_a_list, ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
-        (empty_val, -1, Op::?read | ?random_from_list) -> Result::{ok, empty_val, -1};
+        (empty_val, -1, Op::?read | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{ok, empty_val, -1};
         (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
 extract_from_value(Value, Version, ?read) ->
     {ok, Value, Version};
@@ -121,12 +134,23 @@ extract_from_value(ValueEnc, Version, ?random_from_list) ->
                      {ok, {rdht_tx:encode_value(RandVal), Len}, Version};
         []        -> {fail, empty_list, Version};
         _         -> {fail, not_a_list, Version}
+    end;
+extract_from_value(ValueEnc, Version, {?sublist, Start, Len}) ->
+    Value = rdht_tx:decode_value(ValueEnc),
+    if is_list(Value) ->
+           {SubList, ListLen} = util:sublist(Value, Start, Len),
+           {ok, {rdht_tx:encode_value(SubList), ListLen}, Version};
+       true ->
+           {fail, not_a_list, Version}
     end.
 
 -spec extract_from_tlog_feeder(
-        tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list,
+        tx_tlog:tlog_entry(), client_key(),
+        Op::read | random_from_list | {sublist, Start::pos_integer() | neg_integer(), Len::integer()},
         {EnDecode::boolean(), ListLength::pos_integer()})
-        -> {tx_tlog:tlog_entry(), client_key(), Op::read | random_from_list, EnDecode::boolean()}.
+        -> {tx_tlog:tlog_entry(), client_key(),
+            Op::read | random_from_list | {sublist, Start::pos_integer() | neg_integer(), Len::integer()},
+            EnDecode::boolean()}.
 extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLength}) ->
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
@@ -143,6 +167,15 @@ extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLengt
                 tx_tlog:set_entry_value(Entry, PartialValue);
             _ -> Entry
         end,
+    {NewEntry, Key, Op, EnDecode};
+extract_from_tlog_feeder(Entry, Key, {sublist, _Start, _Len} = Op, {EnDecode, ListLength}) ->
+    NewEntry =
+        case tx_tlog:get_entry_status(Entry) of
+            ?partial_value -> % need partial value according to sublist op!
+                PartialValue = {[tx_tlog:get_entry_value(Entry)], ListLength},
+                tx_tlog:set_entry_value(Entry, PartialValue);
+            _ -> Entry
+        end,
     {NewEntry, Key, Op, EnDecode}.
 
 %% @doc Get a result entry for a read from the given TLog entry.
@@ -150,7 +183,9 @@ extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLengt
         (tx_tlog:tlog_entry(), client_key(), Op::read, EnDecode::boolean())
             -> {tx_tlog:tlog_entry(), api_tx:read_result()};
         (tx_tlog:tlog_entry(), client_key(), Op::random_from_list, EnDecode::boolean())
-            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()}.
+            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()};
+        (tx_tlog:tlog_entry(), client_key(), Op::{sublist, Start::pos_integer() | neg_integer(), Len::integer()}, EnDecode::boolean())
+            -> {tx_tlog:tlog_entry(), api_tx:read_sublist_result()}.
 extract_from_tlog(Entry, _Key, read, EnDecode) ->
     Res = case tx_tlog:get_entry_status(Entry) of
               ?value -> {ok, tx_tlog:get_entry_value(Entry)};
@@ -168,7 +203,10 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
                 case Op of
                     random_from_list ->
                         {RandVal, ListLen} = EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), ListLen}, EncodedVal)
+                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), ListLen}, EncodedVal);
+                    {sublist, _Start, _Len} ->
+                        {SubList, ListLen} = EncodedVal = tx_tlog:get_entry_value(Entry),
+                        ?IIF(EnDecode, {rdht_tx:decode_value(SubList), ListLen}, EncodedVal)
                 end,
             {Entry, {ok, ClientVal}};
         ?value ->
@@ -177,7 +215,7 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
         % note: the following two error states depend on the actual op, if a
         %       state is not defined for an op, the generic handler below must
         %       be used!
-        {fail, empty_list} = R -> {Entry, R};
+        {fail, empty_list} = R when Op =:= random_from_list -> {Entry, R};
         {fail, not_a_list} = R -> {Entry, R};
         %% try reading from a failed entry (type mismatch was the reason?)
         % any other failure should work like ?value or ?partial_value since it
@@ -195,7 +233,9 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
 %%      entry with a full value.
 -spec extract_partial_from_full
         (tx_tlog:tlog_entry(), client_key(), Op::random_from_list, EnDecode::boolean())
-            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()}.
+            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()};
+        (tx_tlog:tlog_entry(), client_key(), Op::{sublist, Start::pos_integer() | neg_integer(), Len::integer()}, EnDecode::boolean())
+            -> {tx_tlog:tlog_entry(), api_tx:read_sublist_result()}.
 extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
     Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
     case Value of
@@ -211,6 +251,18 @@ extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
                       _         -> {fail, not_a_list}
                   end,
             {tx_tlog:set_entry_status(Entry, {fail, abort}), Res}
+    end;
+extract_partial_from_full(Entry, _Key, {sublist, Start, Len}, EnDecode) ->
+    Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
+    if is_list(Value) ->
+           {SubList, ListLen} = DecodedVal = util:sublist(Value, Start, Len),
+           % note: if not EnDecode is given, an encoded value is
+           % expected like the original value!
+           {Entry,
+            {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(SubList), ListLen}, DecodedVal)}};
+       true ->
+           {tx_tlog:set_entry_status(Entry, {fail, abort}),
+            {fail, not_a_list}}
     end.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -372,7 +424,7 @@ get_entry(Id, Table) ->
                            read_state().
 inform_client(Client, Entry) ->
     % if partial read and decided is ?value -> set to ?partial_value!
-    % ?read | ?write | ?random_from_list
+    % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
     Op = state_get_op(Entry),
     Entry2 = if Op =:= ?read -> Entry;
                 true ->

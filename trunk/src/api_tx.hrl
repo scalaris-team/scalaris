@@ -40,6 +40,7 @@
 % Public Interface
 -type read_request() :: {read, client_key()}.
 -type read_random_from_list_request() :: {read, client_key(), random_from_list}.
+-type read_sublist_request() :: {read, client_key(), {sublist, Start::pos_integer() | neg_integer(), Len::integer()}}.
 -type write_request() :: {write, client_key(), client_value()}.
 -type add_del_on_list_request() ::
           {add_del_on_list, client_key(),
@@ -55,6 +56,7 @@
 -type request_on_key() ::
           read_request()
         | read_random_from_list_request()
+        | read_sublist_request()
         | write_request()
         | add_del_on_list_request()
         | add_on_nr_request()
@@ -63,6 +65,7 @@
 
 -type read_result() :: {ok, client_value()} | {fail, not_found}.
 -type read_random_from_list_result() :: {ok, {RandomValue::client_value(), ListLength::pos_integer()}} | {fail, not_found | empty_list | not_a_list}.
+-type read_sublist_result() :: {ok, {SubListMaybeEncoded::[client_value()] | binary(), ListLength::non_neg_integer()}} | {fail, not_found | not_a_list}.
 -type write_result() :: {ok}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.
@@ -73,6 +76,7 @@
 -type result() ::
           read_result()
         | read_random_from_list_result()
+        | read_sublist_result()
         | write_result()
         | listop_result()
         | numberop_result()

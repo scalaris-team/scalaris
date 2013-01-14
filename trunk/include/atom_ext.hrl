@@ -135,3 +135,6 @@
 
 -define(partial_value_atom, partial_value).
 -define(partial_value, ?int_or_atom(82, ?partial_value_atom)).
+
+-define(sublist_atom, sublist).
+-define(sublist, ?int_or_atom(83, ?sublist_atom)).
