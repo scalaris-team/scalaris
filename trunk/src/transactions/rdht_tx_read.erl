@@ -99,7 +99,8 @@ extract_from_value_feeder(Value, Version, Op) ->
 
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
-        (?DB:value(), ?DB:version(), Op::?read | ?random_from_list) -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?random_from_list) -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
         (empty_val, -1, Op::?read | ?random_from_list) -> Result::{ok, empty_val, -1};
         (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
