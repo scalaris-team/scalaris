@@ -608,9 +608,42 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 
 -spec entry_filtering(rt()) -> rt().
 entry_filtering(#rt_t{} = RT) ->
-    %% TODO calculate E_leap etc, as they are needed here
-    AllowedNodes = [N || N <- gb_trees:values(get_rt_tree(RT)),
-        not is_sticky(N) and not is_source(N)],
+    SourceId = get_source_id(RT),
+
+    %% XXX See [FRT] for information on the sets of nodes
+    Nodes = gb_trees:values(get_rt_tree(RT)),
+
+    [First,_] = E_G = [N || N <- Nodes, not is_from_other_group(N)],
+    FirstDist = get_range(SourceId, First),
+    FirstPacked = {FirstDist, First}, % for the fold below
+
+    E_NG = [N || N <- Nodes, is_from_other_group(N)],
+
+    % E_alpha: nearest entry to this node in E_G
+    % E_beta: farthest entry to this node in E_G
+    % TODO we need only the distances, get rid of the nodes
+    % TODO do this calculation when computing E_G
+    {{E_alphaDist, _E_alpha}
+     , {E_betaDist, _E_beta}} = lists:foldl(fun (Node, {Min, Max}) ->
+                    NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
+                    NodePacked = {NodeDist, Node},
+                    NewMin = min(Min, NodePacked),
+                    NewMax = max(Max, NodePacked),
+                    {NewMin, NewMax}
+            end, {FirstPacked, FirstPacked}, E_G),
+    % TODO speed this up: use partition to separate in < E_alpha and >= E_alphaDist
+    % TODO we need only E_leap and E_NG, so compute them together somehow
+    % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
+    E_far = [N || N <- Nodes, get_range(SourceId, N) >= E_alphaDist,
+                              not is_sticky(N) % this is easier than comparing the distance with pred
+                              ],
+    E_leap = [N || N <- E_far, is_from_other_group(N)],
+
+    AllowedNodes = case E_leap of
+        [] -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)];
+        _ -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
+    end,
+
     NodesOfOtherGroups = [N || N <- AllowedNodes, is_from_other_group(N)],
     case NodesOfOtherGroups of
         [] -> entry_filtering(RT, AllowedNodes);

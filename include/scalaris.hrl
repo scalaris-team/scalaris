@@ -45,6 +45,9 @@
 %%Flexible routingtable
 %-define(RT, rt_frtchord).
 
+%%Grouped Flexible Routing Table
+%-define(RT, rt_gfrtchord).
+
 %% userdevguide-begin scalaris:db
 %%Standard database backend
 %-define(DB, db_toke).
