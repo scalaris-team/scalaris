@@ -629,10 +629,9 @@ entry_filtering(#rt_t{} = RT) ->
                 end, {FirstDist, FirstDist}, E_G),
             % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
             % E_NG intersected with E_far to build E_leap:
-            SourcePred = 
-            [N || N <- E_NG,
-                get_range(SourceId, node:id(rt_entry_node(N))) >= E_alphaDist,
-                not is_sticky(N) % this is easier than comparing the distance with pred
+            Predecessor = predecessor_node(RT, get_source_node(RT)),
+            [N || N <- E_NG, get_range(SourceId, node:id(rt_entry_node(N))) >= E_alphaDist
+                           , N =/= Predecessor
             ]
             ;
         [] -> []
