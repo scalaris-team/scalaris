@@ -157,8 +157,8 @@ extract_from_tlog(Entry, _Key, random_from_list, EnDecode) ->
         ?partial_value ->
             % this MUST BE the partial value from this op!
             % (otherwise a full read would have been executed)
-            PValue = tx_tlog:get_entry_value(Entry),
-            {Entry, {ok, ?IIF(EnDecode, rdht_tx:decode_value(PValue), PValue)}};
+            {RandVal, Len} = EncodedVal = tx_tlog:get_entry_value(Entry),
+            {Entry, {ok, ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), Len}, EncodedVal)}};
         ?value ->
             Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
             case Value of

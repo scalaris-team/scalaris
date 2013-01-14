@@ -61,6 +61,7 @@ all()   -> [
             tester_tlog_add_on_nr_maybe_invalid,
             tester_tlog_test_and_set_not_existing,
             tester_tlog_test_and_set,
+            tester_random_from_list,
             tester_req_list,
             tester_req_list_on_same_key,
             req_list_parallelism
@@ -565,6 +566,23 @@ prop_test_and_set(Key, RealOldValue, OldValue, NewValue) ->
 
 tester_test_and_set(_Config) ->
     tester:test(?MODULE, prop_test_and_set, 4, 5000).
+
+-spec prop_random_from_list(Key::client_key(), Value::client_value()) -> true.
+prop_random_from_list(Key, Value) ->
+    _ = api_tx:write(Key,  [Value]),
+    ?equals_pattern(
+        api_tx:req_list([{read, Key, random_from_list}]),
+        {[{?read, Key, Version, ?partial_value, '$empty'}],
+         [{ok, { Value, 1 } }]} when is_integer(Version) andalso Version >= 0),
+    ValueEnc = rdht_tx:encode_value(Value),
+    ?equals_pattern(
+        api_txc:req_list([{read, Key, random_from_list}]),
+        {[{?read, Key, Version, ?partial_value, '$empty'}],
+         [{ok, { ValueEnc, 1 } }]} when is_integer(Version) andalso Version >= 0),
+    true.
+
+tester_random_from_list(_Config) ->
+    tester:test(?MODULE, prop_random_from_list, 2, 5000).
 
 %%% operations with TLOG:
 
