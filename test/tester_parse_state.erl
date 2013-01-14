@@ -43,7 +43,7 @@
          % get values
          get_atoms/1, get_binaries/1, get_floats/1,
          get_strings/1, get_non_empty_strings/1,
-         get_integers/1, get_pos_integers/1, get_non_neg_integers/1,
+         get_integers/1, get_pos_integers/1, get_neg_integers/1, get_non_neg_integers/1,
 
          reset_unknown_types/1,
 
@@ -66,6 +66,7 @@
          binaries          = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [binary()]},
          integers          = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [integer()]},
          pos_integers      = null             :: null     | {Length::non_neg_integer(), [pos_integer()]},
+         neg_integers      = null             :: null     | {Length::non_neg_integer(), [neg_integer()]},
          non_neg_integers  = null             :: null     | {Length::non_neg_integer(), [non_neg_integer()]},
          floats            = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [float()]},
          non_empty_strings = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [nonempty_string()]}
@@ -171,6 +172,13 @@ get_pos_integers(#parse_state{integers=Integers, pos_integers=null}) ->
 get_pos_integers(#parse_state{pos_integers=PosIntegers}) ->
     PosIntegers.
 
+-spec get_neg_integers(state()) -> {Length::non_neg_integer(), Integers::[neg_integer()]}.
+get_neg_integers(#parse_state{integers=Integers, neg_integers=null}) ->
+    IntegerList = [I || I <- gb_sets:to_list(Integers), I < 0],
+    {erlang:length(IntegerList), IntegerList};
+get_neg_integers(#parse_state{neg_integers=NegIntegers}) ->
+    NegIntegers.
+
 -spec get_non_neg_integers(state()) -> {Length::non_neg_integer(), [non_neg_integer()]}.
 get_non_neg_integers(#parse_state{integers=Integers, non_neg_integers=null}) ->
     IntegerList = [I || I <- gb_sets:to_list(Integers), I >= 0],
@@ -248,6 +256,7 @@ finalize(#parse_state{unknown_types=UnknownTypes, atoms=Atoms,
                       non_empty_strings=Strings} = ParseState) ->
     IntegersList = gb_sets:to_list(Integers),
     PosIntegersList = [I || I <- IntegersList, I > 0],
+    NegIntegersList = [I || I <- IntegersList, I < 0],
     NonNegIntegersList = [I || I <- IntegersList, I >= 0],
     UnknownTypesList = gb_sets:to_list(UnknownTypes),
     AtomsList = gb_sets:to_list(Atoms),
@@ -259,6 +268,7 @@ finalize(#parse_state{unknown_types=UnknownTypes, atoms=Atoms,
                            binaries          = {erlang:length(BinariesList), BinariesList},
                            integers          = {erlang:length(IntegersList), IntegersList},
                            pos_integers      = {erlang:length(PosIntegersList), PosIntegersList},
+                           neg_integers      = {erlang:length(NegIntegersList), NegIntegersList},
                            non_neg_integers  = {erlang:length(NonNegIntegersList), NonNegIntegersList},
                            floats            = {erlang:length(FloatsList), FloatsList},
                            non_empty_strings = {erlang:length(StringsList), StringsList}}.

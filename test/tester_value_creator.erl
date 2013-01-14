@@ -144,6 +144,11 @@ create_value_(pos_integer, _Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_pos_integers/1,
       fun() -> crypto:rand_uniform(1, integer_max() + 1) end);
+% ..-1
+create_value_(neg_integer, _Size, ParseState) ->
+    create_val_50rand_50coll(
+      ParseState, fun tester_parse_state:get_neg_integers/1,
+      fun() -> -(crypto:rand_uniform(1, integer_max() + 1)) end);
 create_value_({product, []}, _Size, _ParseState) ->
     [];
 create_value_({product, Types}, Size, ParseState) ->

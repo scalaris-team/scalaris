@@ -83,6 +83,7 @@
     | nonempty_string
     | integer
     | pos_integer
+    | neg_integer
     | non_neg_integer
     | bool
     | binary
@@ -126,6 +127,7 @@
     | nonempty_string
     | integer
     | pos_integer
+    | neg_integer
     | non_neg_integer
     | bool
     | binary
