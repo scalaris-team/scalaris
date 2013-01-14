@@ -41,7 +41,7 @@ import de.zib.scalaris.operations.WriteOp;
  * @since 3.5
  */
 public abstract class RequestList {
-    protected final List<Operation> requests = new ArrayList<Operation>(10);
+    protected final List<Operation> requests = new ArrayList<Operation>(5);
     private boolean isCommit = false;
 
     protected static class CommitOp implements TransactionOperation {
