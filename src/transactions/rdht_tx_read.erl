@@ -112,7 +112,7 @@ extract_from_value(Value, Version, ?read) ->
     {ok, Value, Version};
 extract_from_value(_Value, Version, ?write) ->
     {ok, ?value_dropped, Version};
-extract_from_value(empty_val, Version, ?random_from_list) ->
+extract_from_value(empty_val, Version, _Op) ->
     {ok, empty_val, Version}; % will be handled later
 extract_from_value(ValueEnc, Version, ?random_from_list) ->
     Value = rdht_tx:decode_value(ValueEnc),
@@ -138,7 +138,7 @@ extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLength}) ->
 extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLength}) ->
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % need value partial value!
+            ?partial_value -> % need partial value according to random_from_list op!
                 PartialValue = {tx_tlog:get_entry_value(Entry), ListLength},
                 tx_tlog:set_entry_value(Entry, PartialValue);
             _ -> Entry
@@ -159,29 +159,20 @@ extract_from_tlog(Entry, _Key, read, EnDecode) ->
               {fail, Reason} when is_atom(Reason) -> {ok, tx_tlog:get_entry_value(Entry)}
           end,
     {Entry, ?IIF(EnDecode, rdht_tx:decode_result(Res), Res)};
-extract_from_tlog(Entry, _Key, random_from_list, EnDecode) ->
+extract_from_tlog(Entry, Key, Op, EnDecode) ->
     case tx_tlog:get_entry_status(Entry) of
         ?partial_value ->
             % this MUST BE the partial value from this op!
             % (otherwise a full read would have been executed)
-            {RandVal, Len} = EncodedVal = tx_tlog:get_entry_value(Entry),
-            {Entry, {ok, ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), Len}, EncodedVal)}};
+            ClientVal =
+                case Op of
+                    random_from_list ->
+                        {RandVal, Len} = EncodedVal = tx_tlog:get_entry_value(Entry),
+                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), Len}, EncodedVal)
+                end,
+            {Entry, {ok, ClientVal}};
         ?value ->
-            Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
-            case Value of
-                [_|_]     ->
-                    {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
-                    % note: if not EnDecode is given, an encoded value is
-                    % expected like the original value!
-                    {Entry,
-                     {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
-                _ ->
-                    Res = case Value of
-                              []        -> {fail, empty_list};
-                              _         -> {fail, not_a_list}
-                          end,
-                    {tx_tlog:set_entry_status(Entry, {fail, abort}), Res}
-            end;
+            extract_partial_from_full(Entry, Key, Op, EnDecode);
         {fail, not_found} = R -> {Entry, R}; %% not_found
         {fail, empty_list} = R -> {Entry, R};
         {fail, not_a_list} = R -> {Entry, R};
@@ -193,22 +184,30 @@ extract_from_tlog(Entry, _Key, random_from_list, EnDecode) ->
         % -> at the moment, though, any other failure can only contain a full
         %    value since reads only fail with not_found and other ops write a
         %    full value
-        {fail, Reason} when is_atom(Reason) -> 
-            Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
-            case Value of
-                [_|_]     ->
-                    {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
-                    % note: if not EnDecode is given, an encoded value is
-                    % expected like the original value!
-                    {Entry,
-                     {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
-                _ ->
-                    Res = case Value of
-                              []        -> {fail, empty_list};
-                              _         -> {fail, not_a_list}
-                          end,
-                    {Entry, Res} % note: entry is already set to abort
-            end
+        {fail, Reason} when is_atom(Reason) ->
+            extract_partial_from_full(Entry, Key, Op, EnDecode)
+    end.
+
+%% @doc Helper for extract_from_tlog/4, applying the partial read op on a tlog
+%%      entry with a full value.
+-spec extract_partial_from_full
+        (tx_tlog:tlog_entry(), client_key(), Op::random_from_list, EnDecode::boolean())
+            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()}.
+extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
+    Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
+    case Value of
+        [_|_]     ->
+            {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
+            % note: if not EnDecode is given, an encoded value is
+            % expected like the original value!
+            {Entry,
+             {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
+        _ ->
+            Res = case Value of
+                      []        -> {fail, empty_list};
+                      _         -> {fail, not_a_list}
+                  end,
+            {tx_tlog:set_entry_status(Entry, {fail, abort}), Res}
     end.
 
 %% May make several ones from a single TransLog item (item replication)
