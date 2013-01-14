@@ -941,7 +941,7 @@ us2timestamp(Time) ->
     MegaSecs = (Time2 - Secs) div 1000000,
     {MegaSecs, Secs, MicroSecs}.
 
--spec time_plus_us(Time::erlang_timestamp(), Delta_MicroSeconds::integer()) -> erlang_timestamp().
+-spec time_plus_us(Time::erlang_timestamp(), Delta_MicroSeconds::non_neg_integer()) -> erlang_timestamp().
 time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     MicroSecs1 = MicroSecs + Delta,
     NewMicroSecs = MicroSecs1 rem 1000000,
@@ -951,11 +951,11 @@ time_plus_us({MegaSecs, Secs, MicroSecs}, Delta) ->
     NewMegaSecs = MegaSecs1 rem 1000000,
     {NewMegaSecs, NewSecs, NewMicroSecs}.
 
--spec time_plus_ms(Time::erlang_timestamp(), Delta_MilliSeconds::integer()) -> erlang_timestamp().
+-spec time_plus_ms(Time::erlang_timestamp(), Delta_MilliSeconds::non_neg_integer()) -> erlang_timestamp().
 time_plus_ms(Time, Delta) ->
     time_plus_us(Time, Delta * 1000).
 
--spec time_plus_s(Time::erlang_timestamp(), Delta_Seconds::integer()) -> erlang_timestamp().
+-spec time_plus_s(Time::erlang_timestamp(), Delta_Seconds::non_neg_integer()) -> erlang_timestamp().
 time_plus_s({MegaSecs, Secs, MicroSecs}, Delta) ->
     Secs1 = Secs + Delta,
     NewSecs = Secs1 rem 1000000,
