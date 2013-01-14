@@ -610,42 +610,39 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 entry_filtering(#rt_t{} = RT) ->
     SourceId = get_source_id(RT),
 
-    %% XXX See [FRT] for information on the sets of nodes
     Nodes = [N || N <- gb_trees:values(get_rt_tree(RT))],
     {E_NG, E_G} = lists:partition(fun is_from_other_group/1, Nodes),
 
     E_leap = case E_G of
         [First|_] ->
             FirstDist = get_range(SourceId, node:id(rt_entry_node(First))),
-            FirstPacked = {FirstDist, First}, % for the fold below
 
             % E_alpha: nearest entry to this node in E_G
             % E_beta: farthest entry to this node in E_G
             % TODO we need only the distances, get rid of the nodes
             % TODO do this calculation when computing E_G
-            {{E_alphaDist, _E_alpha}
-             , {E_betaDist, _E_beta}} = lists:foldl(fun (Node, {Min, Max}) ->
-                            NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
-                            NodePacked = {NodeDist, Node},
-                            NewMin = min(Min, NodePacked),
-                            NewMax = max(Max, NodePacked),
-                            {NewMin, NewMax}
-                    end, {FirstPacked, FirstPacked}, E_G),
-            % TODO speed this up: use partition to separate in < E_alpha and >= E_alphaDist
-            % TODO we need only E_leap and E_NG, so compute them together somehow
+            {E_alphaDist, _E_betaDist} = lists:foldl(fun (Node, {Min, Max}) ->
+                        NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
+                        NewMin = min(Min, NodeDist),
+                        NewMax = max(Max, NodeDist),
+                        {NewMin, NewMax}
+                end, {FirstDist, FirstDist}, E_G),
             % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
-            E_far = [N || N <- Nodes,
+            % E_NG intersected with E_far to build E_leap:
+            SourcePred = 
+            [N || N <- E_NG,
                 get_range(SourceId, node:id(rt_entry_node(N))) >= E_alphaDist,
                 not is_sticky(N) % this is easier than comparing the distance with pred
-            ],
-            [N || N <- E_far, is_from_other_group(N)]
+            ]
             ;
         [] -> []
     end,
 
     AllowedNodes = case E_leap of
         [] -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)];
-        _ -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
+        _ -> 
+            io:format("happens~n"),
+            [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
     end,
 
     entry_filtering(RT, AllowedNodes)
