@@ -175,6 +175,8 @@ parse_type_({type, _Line, integer, []}, _Module, ParseState) ->
     {integer, ParseState};
 parse_type_({type, _Line, pos_integer, []}, _Module, ParseState) ->
     {pos_integer, ParseState};
+parse_type_({type, _Line, neg_integer, []}, _Module, ParseState) ->
+    {neg_integer, ParseState};
 parse_type_({type, _Line, non_neg_integer, []}, _Module, ParseState) ->
     {non_neg_integer, ParseState};
 parse_type_({type, _Line, byte, []}, _Module, ParseState) ->
