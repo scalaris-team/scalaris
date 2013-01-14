@@ -639,9 +639,7 @@ entry_filtering(#rt_t{} = RT) ->
 
     AllowedNodes = case E_leap of
         [] -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)];
-        _ -> 
-            io:format("happens~n"),
-            [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
+        _ -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
     end,
 
     entry_filtering(RT, AllowedNodes)
