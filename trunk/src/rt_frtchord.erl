@@ -755,7 +755,13 @@ entry_learning(Entry, Type, RT) ->
                                     Interval2 = intervals:new('[', 0, Succ, ']'),
                                     intervals:in(node:id(Entry), Interval) orelse
                                         intervals:in(node:id(Entry), Interval2)
-                            end
+                            end;
+                        false ->
+                            % two nodes are existing in the ring (otherwise, Pred == Succ
+                            % means there is a bug somewhere). when two nodes are in the
+                            % system, another third node will be either the successor or
+                            % predecessor of the source node when added.
+                            true
                     end,
                     case ShouldBeAStickyNode of
                         true -> sticky;
