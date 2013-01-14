@@ -829,6 +829,23 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             % the fail may be from this op or a previous one (can't distinguish here)
                             ok
                     end;
+                {read, _Key, {sublist, _Start, Len}} ->
+                    case NRes of
+                        [{ok, {SubList, ListLength}}] ->
+                            NoteWSubList = Note ++ io_lib:format(", SubList: ~.0p", [SubList]),
+                            ?assert_w_note(length(SubList) =< erlang:abs(Len), NoteWSubList),
+                            NewValue =
+                                case tx_tlog:get_entry_operation(OldEntry) of
+                                    ?read -> RingVal;
+                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
+                                end,
+                            ?equals_w_note(lists:subtract(SubList, NewValue), [], NoteWSubList),
+                            ?equals_w_note(ListLength, length(NewValue), NoteWSubList),
+                            ?equals_pattern_w_note(element(2, api_tx:req_list([TmpTLogEntry], [Req])), [{ok, _}], NoteWSubList);
+                        [{fail, _}] ->
+                            % the fail may be from this op or a previous one (can't distinguish here)
+                            ok
+                    end;
                 _ ->
                     case element(1, hd(NRes)) of
                         ok when RingVal =/= none ->
@@ -854,7 +871,8 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                         {[{ok}, hd(NRes)], [{write, element(2, Req), ValueAfterWrite}, Req]}
                 end,
             case Req of
-                {read, _Key0, random_from_list} ->
+                {read, _Key0, ReadOp} when ReadOp =:= random_from_list
+                  orelse (is_tuple(ReadOp) andalso element(1, ReadOp) =:= sublist) ->
                     case NRes of
                         [{fail, _}] ->
                             ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)));
@@ -932,6 +950,27 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                             ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
                                     X when X =:= ?value orelse X =:= ?partial_value);
                         {fail, Reason} when Reason =:= empty_list orelse Reason =:= not_a_list ->
+                            ?equals(tx_tlog:get_entry_status(NewEntry),
+                                    {fail, abort}),
+                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                    tx_tlog:get_entry_value(OldEntry))
+                    end;
+                {read, _Key, {sublist, _Start, Len}} ->
+                    case hd(NRes) of
+                        {ok, {SubList, ListLength}} ->
+                            NewValue =
+                                case tx_tlog:get_entry_operation(OldEntry) of
+                                    ?read -> RingVal;
+                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
+                                end,
+                            Note = io_lib:format("SubList: ~p (~p), StoredVal: ~p (~p)",
+                                                 [SubList, ListLength, NewValue, length(NewValue)]),
+                            ?assert_w_note(length(SubList) =< erlang:abs(Len), Note),
+                            ?equals_w_note(lists:subtract(SubList, NewValue), [], Note),
+                            ?equals_w_note(ListLength, length(NewValue), Note),
+                            ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
+                                    X when X =:= ?value orelse X =:= ?partial_value);
+                        {fail, not_a_list} ->
                             ?equals(tx_tlog:get_entry_status(NewEntry),
                                     {fail, abort}),
                             ?equals(tx_tlog:get_entry_value(NewEntry),
