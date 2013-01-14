@@ -470,6 +470,7 @@ tester_type_check_util(_Config) ->
              {parallel_collect,3}, %% needs fun
              {par_map_recv, 2}, %% receives messages
              {par_map_recv2, 2}, %% receives messages
+             {sublist_, 4}, %% tested via feeder
              {collect_while,2}, %% needs fun
              {gb_trees_foldl_iter,3}, %% needs fun
              {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
