@@ -614,7 +614,7 @@ entry_filtering(#rt_t{} = RT) ->
     Nodes = gb_trees:values(get_rt_tree(RT)),
 
     [First,_] = E_G = [N || N <- Nodes, not is_from_other_group(N)],
-    FirstDist = get_range(SourceId, First),
+    FirstDist = get_range(SourceId, node:id(rt_entry_node(First))),
     FirstPacked = {FirstDist, First}, % for the fold below
 
     E_NG = [N || N <- Nodes, is_from_other_group(N)],
