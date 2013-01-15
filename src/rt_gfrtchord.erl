@@ -623,8 +623,8 @@ entry_filtering(#rt_t{} = RT) ->
             % TODO do this calculation when computing E_G
             {E_alphaDist, _E_betaDist} = lists:foldl(fun (Node, {Min, Max}) ->
                         NodeDist = get_range(SourceId, node:id(rt_entry_node(Node))),
-                        NewMin = min(Min, NodeDist),
-                        NewMax = max(Max, NodeDist),
+                        NewMin = erlang:min(Min, NodeDist),
+                        NewMax = erlang:max(Max, NodeDist),
                         {NewMin, NewMax}
                 end, {FirstDist, FirstDist}, E_G),
             % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
