@@ -54,6 +54,7 @@ public final class CommonErlangObjects {
     public static final OtpErlangAtom keyChangedAtom = new OtpErlangAtom("key_changed");
     public static final OtpErlangAtom notAListAtom = new OtpErlangAtom("not_a_list");
     public static final OtpErlangAtom notANumberAtom = new OtpErlangAtom("not_a_number");
+    public static final OtpErlangAtom emptyListAtom = new OtpErlangAtom("empty_list");
     public static final OtpErlangTuple okTupleAtom = new OtpErlangTuple(okAtom);
     public static final OtpErlangTuple commitTupleAtom = new OtpErlangTuple(new OtpErlangAtom("commit"));
     public static final OtpErlangAtom sublistAtom = new OtpErlangAtom("sublist");

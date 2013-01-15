@@ -18,6 +18,7 @@ package de.zib.scalaris.operations;
 import com.ericsson.otp.erlang.OtpErlangObject;
 
 import de.zib.scalaris.AbortException;
+import de.zib.scalaris.EmptyListException;
 import de.zib.scalaris.KeyChangedException;
 import de.zib.scalaris.NotAListException;
 import de.zib.scalaris.NotANumberException;
@@ -54,6 +55,9 @@ public interface TransactionSingleOpOperation extends Operation {
      *             if the previously stored value was not a number
      * @throws NotAListException
      *             if the previously stored value was no list
+     * @throws EmptyListException
+     *             if the stored value is an empty list but the op requires a
+     *             non-empty list
      * @throws AbortException
      *             if a commit failed
      * @throws UnknownException
@@ -63,5 +67,5 @@ public interface TransactionSingleOpOperation extends Operation {
      */
     public abstract Object processResultSingle() throws NotFoundException,
             KeyChangedException, NotANumberException, NotAListException,
-            AbortException, UnknownException;
+            AbortException, EmptyListException, UnknownException;
 }

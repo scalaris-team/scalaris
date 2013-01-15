@@ -1,5 +1,5 @@
 /**
- *  Copyright 2012 Zuse Institute Berlin
+ *  Copyright 2013 Zuse Institute Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -15,11 +15,19 @@
  */
 package de.zib.scalaris.operations;
 
+import com.ericsson.otp.erlang.OtpErlangDecodeException;
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangRangeException;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.CommonErlangObjects;
+import de.zib.scalaris.EmptyListException;
+import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Operation reading a random entry from a (non-empty) list value.
@@ -28,7 +36,55 @@ import de.zib.scalaris.CommonErlangObjects;
  * @version 3.18
  * @since 3.18
  */
-public class ReadRandomFromListOp extends ReadOp {
+public class ReadRandomFromListOp extends PartialReadOp {
+    /**
+     * Result type of random_from_list operations.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.18
+     * @since 3.18
+     */
+    public static class Result {
+        /**
+         * A random value from the stored list.
+         */
+        public final ErlangValue randomElement;
+        /**
+         * The length of the whole list stored in Scalaris.
+         */
+        public final int listLength;
+
+        protected Result(final OtpErlangTuple result, final boolean compressed)
+                throws OtpErlangDecodeException, UnknownException {
+            // {RandomValue, ListLength}
+            if (result.arity() != 2) {
+                throw new UnknownException(result);
+            }
+            final OtpErlangObject randomElementOtp = result.elementAt(0);
+            if (compressed) {
+                randomElement = new ErlangValue(
+                        CommonErlangObjects.decode(randomElementOtp));
+            } else {
+                randomElement = new ErlangValue(randomElementOtp);
+            }
+            final OtpErlangLong listLengthOtp = (OtpErlangLong) result.elementAt(1);
+            try {
+                listLength = listLengthOtp.intValue();
+            } catch (final OtpErlangRangeException e) {
+                throw new UnknownException("Unsupported list length ("
+                        + listLengthOtp + ")");
+            }
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#toString()
+         */
+        @Override
+        public String toString() {
+            return "{randomElement: " + randomElement.toString()
+                    + ", listLength: " + listLength + "}";
+        }
+    }
 
     /**
      * Constructor
@@ -49,11 +105,50 @@ public class ReadRandomFromListOp extends ReadOp {
         super(key);
     }
 
-    @Override
     public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
                 CommonErlangObjects.readAtom, key,
                 CommonErlangObjects.randomFromListAtom });
+    }
+
+    public Result processResult() throws NotFoundException, EmptyListException,
+            NotAListException, UnknownException {
+        /*
+         * possible return values:
+         *  {ok, {RandomValue, ListLength}} | {fail, not_found | empty_list | not_a_list}
+         */
+        try {
+            final OtpErlangTuple received = (OtpErlangTuple) resultRaw;
+            final OtpErlangObject state = received.elementAt(0);
+            if (received.arity() != 2) {
+                throw new UnknownException(resultRaw);
+            }
+            if (state.equals(CommonErlangObjects.okAtom)) {
+                final OtpErlangTuple result = (OtpErlangTuple) received.elementAt(1);
+                return new Result(result, resultCompressed);
+            } else if (state.equals(CommonErlangObjects.failAtom)) {
+                final OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                    throw new NotFoundException(resultRaw);
+                } else if (reason.equals(CommonErlangObjects.emptyListAtom)) {
+                    throw new EmptyListException(resultRaw);
+                } else if (reason.equals(CommonErlangObjects.notAListAtom)) {
+                    throw new NotAListException(resultRaw);
+                }
+            }
+            throw new UnknownException(resultRaw);
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, resultRaw);
+        } catch (final OtpErlangDecodeException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, resultRaw);
+        }
+    }
+
+    public Result processResultSingle() throws NotFoundException,
+            EmptyListException, NotAListException, UnknownException {
+        return processResult();
     }
 
     @Override

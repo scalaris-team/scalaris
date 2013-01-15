@@ -397,7 +397,7 @@ public class ErlangValue {
      * @throws ClassCastException
      *             if the conversion fails
      */
-    static OtpErlangList otpObjectToOtpList(final OtpErlangObject value)
+    public static OtpErlangList otpObjectToOtpList(final OtpErlangObject value)
             throws ClassCastException {
         // need special handling if OTP thought that the value is a string
         if (value instanceof OtpErlangString) {
