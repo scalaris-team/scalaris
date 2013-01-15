@@ -105,15 +105,13 @@ public class TransactionTest {
      * Test method for {@link Transaction#commit()} with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=ConnectionException.class)
     public void testCommit_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException,
-            AbortException {
+            UnknownException, NotFoundException, AbortException {
         final Transaction t = new Transaction();
         try {
             t.closeConnection();
@@ -130,10 +128,10 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws UnknownException
      * @throws AbortException
-     * @throws TimeoutException
      */
     @Test
-    public void testCommit_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
+    public void testCommit_Empty() throws ConnectionException,
+            UnknownException, AbortException {
         final Transaction t = new Transaction();
         try {
             t.commit();
@@ -146,13 +144,12 @@ public class TransactionTest {
      * Test method for {@link Transaction#abort()} with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test
     public void testAbort_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final Transaction t = new Transaction();
         t.closeConnection();
         t.abort();
@@ -181,12 +178,10 @@ public class TransactionTest {
      * @throws UnknownException
      * @throws ConnectionException
      * @throws NotFoundException
-     * @throws TimeoutException
      */
     @Test(expected = NotFoundException.class)
     public void testRead_NotFound() throws ConnectionException,
-            UnknownException,
-            TimeoutException, NotFoundException {
+            UnknownException, NotFoundException {
         final String key = "_Read_NotFound";
         final Transaction t = new Transaction();
         try {
@@ -201,13 +196,12 @@ public class TransactionTest {
      * connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test(expected = ConnectionException.class)
     public void testRead_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String key = "_Read_NotConnected";
         final Transaction t = new Transaction();
         try {
@@ -223,13 +217,12 @@ public class TransactionTest {
      * connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test(expected = ConnectionException.class)
     public void testWriteString_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String key = "_WriteString_NotConnected";
         final Transaction t = new Transaction();
         try {
@@ -248,11 +241,11 @@ public class TransactionTest {
      *
      * @throws UnknownException
      * @throws ConnectionException
-     * @throws TimeoutException
      * @throws NotFoundException
      */
     @Test
-    public void testWriteString_NotFound() throws ConnectionException, UnknownException, TimeoutException, NotFoundException {
+    public void testWriteString_NotFound() throws ConnectionException,
+            UnknownException, NotFoundException {
         final String key = "_WriteString_notFound";
         final Transaction t = new Transaction();
         try {
@@ -277,15 +270,13 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      *
      * @since 3.9
      */
     @Test
     public void testWriteString1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException,
-            AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_testWriteString1_";
         Transaction t = new Transaction();
         try {
@@ -333,15 +324,13 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      *
      * @since 3.9
      */
     @Test
     public void testWriteString2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException,
-            AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_testWriteString2_";
         Transaction t = new Transaction();
         try {
@@ -382,15 +371,14 @@ public class TransactionTest {
      *
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws AbortException
      *
      * @since 3.9
      */
     @Test
-    public void testWriteList1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testWriteList1() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String key = "_testWriteList1_";
         Transaction t = new Transaction();
         try {
@@ -447,15 +435,14 @@ public class TransactionTest {
      *
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws AbortException
      *
      * @since 3.9
      */
     @Test
-    public void testWriteList2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testWriteList2() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String key = "_testWriteList1_";
         Transaction t = new Transaction();
         try {
@@ -499,7 +486,6 @@ public class TransactionTest {
      * with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -509,7 +495,8 @@ public class TransactionTest {
      */
     @Test(expected=ConnectionException.class)
     public void testTestAndSetList_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList_NotConnected";
         final Transaction t = new Transaction();
         t.closeConnection();
@@ -525,7 +512,6 @@ public class TransactionTest {
      * Tries test_and_set with a non-existing key.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -535,7 +521,8 @@ public class TransactionTest {
      */
     @Test(expected=NotFoundException.class)
     public void testTestAndSetList_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList_NotFound";
         final Transaction t = new Transaction();
 
@@ -558,7 +545,6 @@ public class TransactionTest {
      * knowing the correct old value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -568,7 +554,8 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetList1a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList1a";
         Transaction t = new Transaction();
 
@@ -640,7 +627,6 @@ public class TransactionTest {
      * knowing the wrong old value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -649,7 +635,7 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetList1b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetList1b";
         Transaction t = new Transaction();
 
@@ -734,7 +720,6 @@ public class TransactionTest {
      * using a single key for all the values. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -744,7 +729,8 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetList2a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList2a";
         Transaction t = new Transaction();
 
@@ -803,7 +789,6 @@ public class TransactionTest {
      * the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -812,7 +797,7 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetList2b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetList2b";
         Transaction t = new Transaction();
 
@@ -875,7 +860,6 @@ public class TransactionTest {
      * with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -885,7 +869,8 @@ public class TransactionTest {
      */
     @Test(expected=ConnectionException.class)
     public void testTestAndSetString_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetString_NotConnected";
         final Transaction t = new Transaction();
         t.closeConnection();
@@ -898,7 +883,6 @@ public class TransactionTest {
      * Tries test_and_set with a non-existing key.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -908,7 +892,8 @@ public class TransactionTest {
      */
     @Test(expected=NotFoundException.class)
     public void testTestAndSetString_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetString_NotFound";
         final Transaction t = new Transaction();
 
@@ -928,7 +913,6 @@ public class TransactionTest {
      * knowing the correct old value. Tries to read the string afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -938,7 +922,8 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetString1a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetString1a";
         Transaction t = new Transaction();
 
@@ -995,7 +980,6 @@ public class TransactionTest {
      * knowing the wrong old value. Tries to read the string afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -1004,7 +988,7 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetString1b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetString1b";
         Transaction t = new Transaction();
 
@@ -1076,7 +1060,6 @@ public class TransactionTest {
      * using a single key for all the values. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -1086,7 +1069,8 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetString2a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetString2a";
         Transaction t = new Transaction();
 
@@ -1136,7 +1120,6 @@ public class TransactionTest {
      * the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -1145,7 +1128,7 @@ public class TransactionTest {
      */
     @Test
     public void testTestAndSetString2b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetString2b";
         Transaction t = new Transaction();
 
@@ -1204,10 +1187,10 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws UnknownException
      * @throws AbortException
-     * @throws TimeoutException
      */
     @Test
-    public void testReqList_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
+    public void testReqList_Empty() throws ConnectionException,
+            UnknownException, AbortException {
         final Transaction t = new Transaction();
         try {
             t.req_list(new RequestList());
@@ -1223,11 +1206,11 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws UnknownException
      * @throws AbortException
-     * @throws TimeoutException
      * @throws NotFoundException
      */
     @Test
-    public void testReqList1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+    public void testReqList1() throws ConnectionException, UnknownException,
+            AbortException, NotFoundException {
         final String key = "_ReqList1_";
         final Transaction conn = new Transaction();
 
@@ -1295,21 +1278,19 @@ public class TransactionTest {
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      *
      * @since 3.17
      */
     @Test
-    public void testVarious() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException,
-            AbortException {
+    public void testVarious() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         writeSingleTest("_0:Šarplaninac:page_", testData[0]);
     }
 
     protected void writeSingleTest(final String key, final String data)
-            throws ConnectionException, TimeoutException, UnknownException,
-            ClassCastException, NotFoundException, AbortException {
+            throws ConnectionException, UnknownException, ClassCastException,
+            NotFoundException, AbortException {
         Transaction t = new Transaction();
         try {
             t.write(testTime + key, data);
@@ -1341,7 +1322,6 @@ public class TransactionTest {
      * random strings (enable manually).
      *
      * @throws ConnectionException
-     * @throws TimeoutException
      * @throws NotFoundException
      * @throws ClassCastException
      * @throws AbortException
@@ -1349,8 +1329,8 @@ public class TransactionTest {
      */
 //    @Test
     public void testPerformance1() throws ConnectionException,
-            TimeoutException, NotFoundException, ClassCastException,
-            AbortException, UnknownException {
+            NotFoundException, ClassCastException, AbortException,
+            UnknownException {
         final String key = "_testPerformance1_";
         final Transaction t = new Transaction();
         try {

@@ -241,16 +241,14 @@ public class Transaction extends
          *
          * @return the stored value
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch the value
          * @throws NotFoundException
          *             if the requested key does not exist
          * @throws UnknownException
          *             if any other error occurs
          */
         @Override
-        public ErlangValue processReadAt(final int pos) throws TimeoutException,
-                NotFoundException, UnknownException {
+        public ErlangValue processReadAt(final int pos)
+                throws NotFoundException, UnknownException {
             return new ErlangValue(
                     ReadOp.processResult_read(results.elementAt(pos), compressed));
         }
@@ -262,14 +260,11 @@ public class Transaction extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws UnknownException
          *             if any other error occurs
          */
         @Override
-        public void processWriteAt(final int pos) throws TimeoutException,
-                UnknownException {
+        public void processWriteAt(final int pos) throws UnknownException {
             WriteOp.processResult_write(results.elementAt(pos), compressed);
         }
 
@@ -280,8 +275,6 @@ public class Transaction extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws NotAListException
          *             if the previously stored value was no list
          * @throws UnknownException
@@ -290,8 +283,8 @@ public class Transaction extends
          * @since 3.9
          */
         @Override
-        public void processAddDelOnListAt(final int pos) throws TimeoutException,
-                NotAListException, UnknownException {
+        public void processAddDelOnListAt(final int pos)
+                throws NotAListException, UnknownException {
             AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
         }
 
@@ -302,8 +295,6 @@ public class Transaction extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws NotANumberException
          *             if the previously stored value was not a number
          * @throws UnknownException
@@ -312,8 +303,8 @@ public class Transaction extends
          * @since 3.9
          */
         @Override
-        public void processAddOnNrAt(final int pos) throws TimeoutException,
-                NotANumberException, UnknownException {
+        public void processAddOnNrAt(final int pos) throws NotANumberException,
+                UnknownException {
             AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
         }
 
@@ -324,8 +315,6 @@ public class Transaction extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch/write the value
          * @throws NotFoundException
          *             if the requested key does not exist
          * @throws KeyChangedException
@@ -336,8 +325,8 @@ public class Transaction extends
          * @since 3.8
          */
         @Override
-        public void processTestAndSetAt(final int pos) throws TimeoutException,
-                NotFoundException, KeyChangedException, UnknownException {
+        public void processTestAndSetAt(final int pos)
+                throws NotFoundException, KeyChangedException, UnknownException {
             TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
         }
 
@@ -351,15 +340,13 @@ public class Transaction extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws AbortException
          *             if the commit failed
          * @throws UnknownException
          *             if any other error occurs
          */
-        public void processCommitAt(final int pos) throws TimeoutException,
-                AbortException, UnknownException {
+        public void processCommitAt(final int pos) throws AbortException,
+                UnknownException {
             CommonErlangObjects.processResult_commit(results.elementAt(pos), compressed);
         }
     }
@@ -523,8 +510,6 @@ public class Transaction extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if a commit failed (if there was one)
      * @throws UnknownException
@@ -534,8 +519,8 @@ public class Transaction extends
      *
      * @since 3.18
      */
-    public ResultList req_list(final TransactionOperation op) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException {
+    public ResultList req_list(final TransactionOperation op)
+            throws ConnectionException, AbortException, UnknownException {
         return super.req_list(op);
     }
 
@@ -559,8 +544,6 @@ public class Transaction extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit failed
      * @throws UnknownException
@@ -568,8 +551,7 @@ public class Transaction extends
      */
     @Override
     public ResultList req_list(final RequestList req)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException {
+            throws ConnectionException, AbortException, UnknownException {
         if (req.isEmpty()) {
             return new ResultList(new OtpErlangList(), compressed);
         }
@@ -622,8 +604,6 @@ public class Transaction extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to commit the transaction
      * @throws AbortException
      *             if the commit failed
      * @throws UnknownException
@@ -634,7 +614,7 @@ public class Transaction extends
      *
      * @see #abort()
      */
-    public void commit() throws ConnectionException, TimeoutException, AbortException, UnknownException {
+    public void commit() throws ConnectionException, AbortException, UnknownException {
         req_list((RequestList) new RequestList().addCommit());
     }
 
@@ -663,7 +643,7 @@ public class Transaction extends
 
     @Override
     public void write(final OtpErlangString key, final OtpErlangObject value)
-            throws ConnectionException, TimeoutException, UnknownException {
+            throws ConnectionException, UnknownException {
         try {
             super.write(key, value);
         } catch (final AbortException e) {
@@ -674,7 +654,7 @@ public class Transaction extends
 
     @Override
     public <T> void write(final String key, final T value)
-            throws ConnectionException, TimeoutException, UnknownException {
+            throws ConnectionException, UnknownException {
         try {
             super.write(key, value);
         } catch (final AbortException e) {
@@ -686,8 +666,7 @@ public class Transaction extends
     @Override
     public void addDelOnList(final OtpErlangString key,
             final OtpErlangList toAdd, final OtpErlangList toRemove)
-            throws ConnectionException, TimeoutException, NotAListException,
-            UnknownException {
+            throws ConnectionException, NotAListException, UnknownException {
         try {
             super.addDelOnList(key, toAdd, toRemove);
         } catch (final AbortException e) {
@@ -699,7 +678,7 @@ public class Transaction extends
     @Override
     public <T> void addDelOnList(final String key, final List<T> toAdd,
             final List<T> toRemove) throws ConnectionException,
-            TimeoutException, NotAListException, UnknownException {
+            NotAListException, UnknownException {
         try {
             super.addDelOnList(key, toAdd, toRemove);
         } catch (final AbortException e) {
@@ -710,8 +689,7 @@ public class Transaction extends
 
     @Override
     public void addOnNr(final OtpErlangString key, final OtpErlangLong toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            UnknownException {
+            throws ConnectionException, NotANumberException, UnknownException {
         try {
             super.addOnNr(key, toAdd);
         } catch (final AbortException e) {
@@ -722,8 +700,7 @@ public class Transaction extends
 
     @Override
     public void addOnNr(final OtpErlangString key, final OtpErlangDouble toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            UnknownException {
+            throws ConnectionException, NotANumberException, UnknownException {
         try {
             super.addOnNr(key, toAdd);
         } catch (final AbortException e) {
@@ -734,8 +711,7 @@ public class Transaction extends
 
     @Override
     public <T> void addOnNr(final String key, final T toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            UnknownException {
+            throws ConnectionException, NotANumberException, UnknownException {
         try {
             super.addOnNr(key, toAdd);
         } catch (final AbortException e) {
@@ -747,8 +723,8 @@ public class Transaction extends
     @Override
     public void testAndSet(final OtpErlangString key,
             final OtpErlangObject oldValue, final OtpErlangObject newValue)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            KeyChangedException, UnknownException {
+            throws ConnectionException, NotFoundException, KeyChangedException,
+            UnknownException {
         try {
             super.testAndSet(key, oldValue, newValue);
         } catch (final AbortException e) {
@@ -759,8 +735,8 @@ public class Transaction extends
 
     @Override
     public <OldT, NewT> void testAndSet(final String key, final OldT oldValue,
-            final NewT newValue) throws ConnectionException, TimeoutException,
-            NotFoundException, KeyChangedException, UnknownException {
+            final NewT newValue) throws ConnectionException, NotFoundException,
+            KeyChangedException, UnknownException {
         try {
             super.testAndSet(key, oldValue, newValue);
         } catch (final AbortException e) {

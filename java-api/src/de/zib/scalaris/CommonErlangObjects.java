@@ -207,15 +207,13 @@ public final class CommonErlangObjects {
      * @param compressed
      *            whether the transfer of values is compressed or not
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws AbortException
      *             if the commit of the commit failed
      * @throws UnknownException
      *             if any other error occurs
      */
     static final void processResult_commit(final OtpErlangObject received_raw,
-            final boolean compressed) throws TimeoutException, AbortException,
+            final boolean compressed) throws AbortException,
             UnknownException {
         /*
          * possible return values:

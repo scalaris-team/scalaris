@@ -131,13 +131,12 @@ public class PubSubTest {
      * connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test(expected=ConnectionException.class)
     public void testPublish_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String topic = "_Publish_NotConnected";
         final PubSub conn = new PubSub();
         conn.closeConnection();
@@ -150,13 +149,12 @@ public class PubSubTest {
      * Publishes some topics and uses a distinct key for each value.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test
-    public void testPublish1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+    public void testPublish1() throws ConnectionException, UnknownException,
+            NotFoundException {
         final String topic = "_Publish1_";
         final PubSub conn = new PubSub();
 
@@ -177,13 +175,12 @@ public class PubSubTest {
      * Publishes some topics and uses a single key for all the values.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test
-    public void testPublish2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+    public void testPublish2() throws ConnectionException, UnknownException,
+            NotFoundException {
         final String topic = "_Publish2";
         final PubSub conn = new PubSub();
 
@@ -206,13 +203,12 @@ public class PubSubTest {
      * connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test(expected=ConnectionException.class)
     public void testGetSubscribers_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String topic = "_GetSubscribers_NotConnected";
         final PubSub conn = new PubSub();
         conn.closeConnection();
@@ -225,13 +221,12 @@ public class PubSubTest {
      * Tries to get a subscriber list from an empty topic.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      */
     @Test
-    public void testGetSubscribers_NotExistingTopic() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+    public void testGetSubscribers_NotExistingTopic()
+            throws ConnectionException, UnknownException, NotFoundException {
         final String topic = "_GetSubscribers_NotExistingTopic";
         final PubSub conn = new PubSub();
 
@@ -283,14 +278,13 @@ public class PubSubTest {
      * connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=ConnectionException.class)
     public void testSubscribe_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_Subscribe_NotConnected";
         final PubSub conn = new PubSub();
         conn.closeConnection();
@@ -304,14 +298,13 @@ public class PubSubTest {
      * Subscribes some arbitrary URLs to arbitrary topics and uses a distinct topic for each URL.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
-    public void testSubscribe1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testSubscribe1() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String topic = "_Subscribe1_";
         final PubSub conn = new PubSub();
 
@@ -345,14 +338,13 @@ public class PubSubTest {
      * Subscribes some arbitrary URLs to arbitrary topics and uses a single topic for all URLs.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
-    public void testSubscribe2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testSubscribe2() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String topic = "_Subscribe2";
         final PubSub conn = new PubSub();
 
@@ -386,14 +378,13 @@ public class PubSubTest {
      * closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=ConnectionException.class)
     public void testUnsubscribe_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_Unsubscribe_NotConnected";
         final PubSub conn = new PubSub();
         conn.closeConnection();
@@ -408,14 +399,13 @@ public class PubSubTest {
      * the subscriber list afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=NotFoundException.class)
     public void testUnsubscribe_NotExistingTopic() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_Unsubscribe_NotExistingTopic";
         final PubSub conn = new PubSub();
 
@@ -446,15 +436,13 @@ public class PubSubTest {
      * the subscriber list afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=NotFoundException.class)
-    public void testUnsubscribe_NotExistingUrl()
-            throws ConnectionException, TimeoutException, UnknownException,
-            NotFoundException, AbortException {
+    public void testUnsubscribe_NotExistingUrl() throws ConnectionException,
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_Unsubscribe_NotExistingUrl";
         final PubSub conn = new PubSub();
 
@@ -501,14 +489,13 @@ public class PubSubTest {
      * @see #testSubscribe1()
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
     public void testUnsubscribe1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_UnsubscribeString1_";
         final PubSub conn = new PubSub();
 
@@ -567,14 +554,13 @@ public class PubSubTest {
      * @see #testSubscribe2()
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
     public void testUnsubscribe2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String topic = "_SingleUnubscribeString2";
         final PubSub conn = new PubSub();
 

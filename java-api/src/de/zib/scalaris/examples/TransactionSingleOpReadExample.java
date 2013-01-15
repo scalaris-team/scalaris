@@ -19,7 +19,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
@@ -67,9 +66,6 @@ public class TransactionSingleOpReadExample {
         } catch (final ConnectionException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed: " + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      read(" + otpKey.stringValue()
-                    + ") failed with timeout: " + e.getMessage());
         } catch (final NotFoundException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with not found: " + e.getMessage());
@@ -89,9 +85,6 @@ public class TransactionSingleOpReadExample {
             System.out.println("      read(" + key + ") == " + value);
         } catch (final ConnectionException e) {
             System.out.println("      read(" + key + ") failed: "
-                    + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      read(" + key + ") failed with timeout: "
                     + e.getMessage());
         } catch (final ClassCastException e) {
             System.out.println("      read(" + key + ") failed with unexpected return type: "

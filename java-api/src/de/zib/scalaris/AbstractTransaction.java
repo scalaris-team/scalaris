@@ -90,8 +90,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if a commit failed (if there was one)
      * @throws UnknownException
@@ -102,7 +100,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.18
      */
     protected ResL req_list(final Operation op) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException {
+            AbortException, UnknownException {
         final ReqL reqList = newReqList();
         reqList.addOp(op);
         return req_list(reqList);
@@ -128,15 +126,13 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if a commit failed (if there was one)
      * @throws UnknownException
      *             if any other error occurs
      */
     abstract public ResL req_list(final ReqL req) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException;
+            AbortException, UnknownException;
 
     /**
      * Selects the module to use depending in the {@link #compressed} property.
@@ -159,8 +155,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
@@ -169,8 +163,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 2.9
      */
     public ErlangValue read(final OtpErlangString key)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            UnknownException {
+            throws ConnectionException, NotFoundException, UnknownException {
         try {
             final ReqL requests = newReqList();
             requests.addOp(new ReadOp(key));
@@ -197,8 +190,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
@@ -208,7 +199,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 2.9
      */
     public ErlangValue read(final String key) throws ConnectionException,
-            TimeoutException, NotFoundException, UnknownException {
+            NotFoundException, UnknownException {
         return read(new OtpErlangString(key));
     }
 
@@ -224,8 +215,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit failed (if there was one)
      * @throws UnknownException
@@ -234,8 +223,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 2.9
      */
     public void write(final OtpErlangString key, final OtpErlangObject value)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException {
+            throws ConnectionException, AbortException, UnknownException {
         final ReqL requests = newReqList();
         requests.addOp(new WriteOp(key, value));
         final ResL result = req_list(requests);
@@ -260,8 +248,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit failed (if there was one)
      * @throws UnknownException
@@ -271,8 +257,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 2.9
      */
     public <T> void write(final String key, final T value)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException {
+            throws ConnectionException, AbortException, UnknownException {
         write(new OtpErlangString(key), ErlangValue.convertToErlang(value));
     }
 
@@ -292,8 +277,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotAListException
      *             if the previously stored value was no list
      * @throws AbortException
@@ -305,8 +288,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      */
     public void addDelOnList(final OtpErlangString key,
             final OtpErlangList toAdd, final OtpErlangList toRemove)
-            throws ConnectionException, TimeoutException, NotAListException,
-            AbortException, UnknownException {
+            throws ConnectionException, NotAListException, AbortException,
+            UnknownException {
         final ReqL reqs = newReqList();
         reqs.addOp(new AddDelOnListOp(key, toAdd, toRemove));
         final ResL result = req_list(reqs);
@@ -333,8 +316,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotAListException
      *             if the previously stored value was no list
      * @throws AbortException
@@ -347,8 +328,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      */
     public <T> void addDelOnList(final String key, final List<T> toAdd,
             final List<T> toRemove) throws ConnectionException,
-            TimeoutException, NotAListException, AbortException,
-            UnknownException {
+            NotAListException, AbortException, UnknownException {
         OtpErlangList toAddErl;
         OtpErlangList toRemoveErl;
         try {
@@ -377,8 +357,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was no number
      * @throws AbortException
@@ -390,8 +368,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.9
      */
     public void addOnNr(final OtpErlangString key, final OtpErlangLong toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            AbortException, UnknownException {
+            throws ConnectionException, NotANumberException, AbortException,
+            UnknownException {
         addOnNr_(new AddOnNrOp(key, toAdd));
     }
 
@@ -409,8 +387,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was no number
      * @throws AbortException
@@ -422,8 +398,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.9
      */
     public void addOnNr(final OtpErlangString key, final OtpErlangDouble toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            AbortException, UnknownException {
+            throws ConnectionException, NotANumberException, AbortException,
+            UnknownException {
         addOnNr_(new AddOnNrOp(key, toAdd));
     }
 
@@ -438,8 +414,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was no number
      * @throws AbortException
@@ -452,8 +426,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.9
      */
     protected void addOnNr_(final AddOnNrOp op) throws ConnectionException,
-            TimeoutException, NotANumberException, AbortException,
-            UnknownException {
+            NotANumberException, AbortException, UnknownException {
         final ReqL reqs = newReqList();
         reqs.addOp(op);
         final ResL result = req_list(reqs);
@@ -478,8 +451,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was no number
      * @throws AbortException
@@ -492,8 +463,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.9
      */
     public <T> void addOnNr(final String key, final T toAdd)
-            throws ConnectionException, TimeoutException, NotANumberException,
-            AbortException, UnknownException {
+            throws ConnectionException, NotANumberException, AbortException,
+            UnknownException {
         final OtpErlangObject toAddErl = ErlangValue.convertToErlang(toAdd);
         if (toAddErl instanceof OtpErlangLong) {
             addOnNr(new OtpErlangString(key), (OtpErlangLong) toAddErl);
@@ -519,8 +490,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws KeyChangedException
@@ -534,8 +503,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      */
     public void testAndSet(final OtpErlangString key,
             final OtpErlangObject oldValue, final OtpErlangObject newValue)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            KeyChangedException, AbortException, UnknownException {
+            throws ConnectionException, NotFoundException, KeyChangedException,
+            AbortException, UnknownException {
         final ReqL reqs = newReqList();
         reqs.addOp(new TestAndSetOp(key, oldValue, newValue));
         final ResL result = req_list(reqs);
@@ -561,8 +530,6 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws KeyChangedException
@@ -576,9 +543,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @since 3.9
      */
     public <OldT, NewT> void testAndSet(final String key, final OldT oldValue,
-            final NewT newValue) throws ConnectionException, TimeoutException,
-            NotFoundException, KeyChangedException, AbortException,
-            UnknownException {
+            final NewT newValue) throws ConnectionException, NotFoundException,
+            KeyChangedException, AbortException, UnknownException {
         testAndSet(new OtpErlangString(key),
                 ErlangValue.convertToErlang(oldValue),
                 ErlangValue.convertToErlang(newValue));

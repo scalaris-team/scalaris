@@ -20,7 +20,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.PubSub;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -75,10 +74,6 @@ public class PubSubSubscribeExample {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed: "
                     + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      subscribe(" + otpTopic.stringValue()
-                    + ", " + otpURL.stringValue() + ") failed with timeout: "
-                    + e.getMessage());
         } catch (final AbortException e) {
             System.out.println("      subscribe(" + otpTopic.stringValue()
                     + ", " + otpURL.stringValue() + ") failed with abort: "
@@ -99,9 +94,6 @@ public class PubSubSubscribeExample {
         } catch (final ConnectionException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed: " + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      subscribe(" + topic + ", " + URL
-                    + ") failed with timeout: " + e.getMessage());
         } catch (final AbortException e) {
             System.out.println("      subscribe(" + topic + ", " + URL
                     + ") failed with abort: " + e.getMessage());

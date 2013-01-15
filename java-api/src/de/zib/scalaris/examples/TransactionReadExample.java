@@ -21,7 +21,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
@@ -83,9 +82,6 @@ public class TransactionReadExample {
                 } catch (final ConnectionException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed: " + e.getMessage());
-                } catch (final TimeoutException e) {
-                    System.out.println("      read(" + otpKey.stringValue()
-                            + ") failed with timeout: " + e.getMessage());
                 } catch (final UnknownException e) {
                     System.out.println("      read(" + otpKey.stringValue()
                             + ") failed with unknown: " + e.getMessage());
@@ -99,17 +95,13 @@ public class TransactionReadExample {
             }
 
             System.out.println("    `String read(String)`...");
-            for (int i = 0; i < keys.length; ++i) {
-                final String key = keys[i];
+            for (final String key : keys) {
                 try {
                     value = transaction.read(key).stringValue();
                     System.out.println("      read(" + key + ") == " + value);
                 } catch (final ConnectionException e) {
                     System.out.println("      read(" + key + ") failed: "
                             + e.getMessage());
-                } catch (final TimeoutException e) {
-                    System.out.println("      read(" + key
-                            + ") failed with timeout: " + e.getMessage());
                 } catch (final UnknownException e) {
                     System.out.println("      read(" + key
                             + ") failed with unknown: " + e.getMessage());
@@ -123,9 +115,6 @@ public class TransactionReadExample {
             transaction.commit();
             System.out.println("done");
         } catch (final ConnectionException e) {
-            System.out.println("failed: " + e.getMessage());
-            return;
-        } catch (final TimeoutException e) {
             System.out.println("failed: " + e.getMessage());
             return;
         } catch (final AbortException e) {
